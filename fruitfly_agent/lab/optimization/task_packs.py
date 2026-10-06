@@ -309,8 +309,13 @@ class TaskPackCatalog:
             if path.is_file() or path.is_symlink():
                 sources.append((path, registration.writable))
             elif path.exists():
-                for source in path.glob("*/pack.json"):
-                    if source.parent.name.startswith("."):
+                for directory in path.iterdir():
+                    if directory.name.startswith(".") or not directory.is_dir():
+                        continue
+                    source = directory / "pack.json"
+                    # Python 3.11 glob omits dangling literal-name symlinks.
+                    # Keep them visible so loading reports the invalid path.
+                    if not source.exists() and not source.is_symlink():
                         continue
                     sources.append((source, registration.writable))
                     if len(sources) > 100:

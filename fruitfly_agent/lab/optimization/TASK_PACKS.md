@@ -162,6 +162,8 @@ Selecting a pack changes one job, not the YAML or runtime manifest. `/optimize T
 
 Embedding hosts can register read-only sources with `TaskPackRegistration` via `RunApplicationFactory(task_pack_sources=...)`. The default CLI scans the workspace task-packs directory, not arbitrary examples or Session directories.
 
+Catalog discovery skips hidden directories and directories without a `pack.json` entry. Invalid manifests, including dangling symbolic links, remain visible as errors and cannot be used for search on any supported Python version.
+
 ## Save a failed task
 
 | Action | Behavior |

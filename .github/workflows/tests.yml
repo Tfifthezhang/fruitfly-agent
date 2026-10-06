@@ -99,4 +99,4 @@ jobs:
         run: |
           /tmp/fruitfly-wheel/bin/fruitfly-agent --help
           /tmp/fruitfly-wheel/bin/fruitfly-agent-eval catalog --json
-          /tmp/fruitfly-wheel/bin/python -c "from fruitfly_agent.lab.base_prompt import builtins; assert [p.prompt_id for p in builtins()] == ['coding-default']"
+          /tmp/fruitfly-wheel/bin/python -c "from fruitfly_agent.lab.base_prompt import builtins; assert [p.prompt_id for p in builtins()] == ['assistant-default']"

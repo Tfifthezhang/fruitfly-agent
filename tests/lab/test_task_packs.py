@@ -141,6 +141,23 @@ class TaskPackageTests(unittest.TestCase):
         self.path.write_bytes(b" " * 100001)
         self.assertIn("100 KB", self.catalog.summaries()[0].error)
 
+    def test_dangling_manifest_is_reported_and_cannot_be_frozen(self):
+        self.path.unlink()
+        self.path.symlink_to(self.path.parent / "missing-manifest.json")
+        summaries = self.catalog.summaries()
+        self.assertEqual(1, len(summaries))
+        self.assertIn("symlinks", summaries[0].error)
+        with self.assertRaisesRegex(ValueError, "unknown or duplicate"):
+            self.catalog.freeze("project", "base_prompt")
+
+    def test_discovery_ignores_hidden_and_incomplete_directories(self):
+        hidden = self.path.parent.parent / ".in-progress"
+        hidden.mkdir()
+        (hidden / "pack.json").symlink_to(hidden / "missing.json")
+        (self.path.parent.parent / "empty").mkdir()
+        (self.path.parent.parent / "unrelated.txt").write_text("unrelated")
+        self.assertEqual(["project"], [s.pack_id for s in self.catalog.summaries()])
+
     def test_writer_lock_and_failed_write_preserve_original(self):
         before = self.path.read_bytes()
         lock = self.catalog.root / ".write.lock"

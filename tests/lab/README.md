@@ -11,7 +11,7 @@ Verify algorithms and components through Core contracts and Catalog assembly.
 | `test_search.py` | Frozen problems, evaluator, OPRO, journal, budgets, and optional private tool Agent |
 | `test_skill_catalog.py / test_algorithm_contracts.py` | Bounded guidance, transformer forms, signals, and cancellation |
 | `test_reduction_safety.py / test_summarizing_compaction.py` | Valid summaries, tool associations, overflow, external references, and commits |
-| `test_task_packs.py / test_pack_format.py / test_coding_tasks.py` | Task material, policy, and restricted scoring |
+| `test_task_packs.py / test_pack_format.py / test_coding_tasks.py` | Task material, catalog discovery and dangling-link rejection, policy, and restricted scoring |
 | `test_rsi.py / test_rlm.py` | Host-driven evolution and local IPython/artifact behavior |
 | `test_algorithm_audit.py` | Edit spans, rendered budgets, and environment regressions |
 
