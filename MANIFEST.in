@@ -1,6 +1,8 @@
 include README.md GETTING_STARTED.md CONFIGURATION.md CONTRIBUTING.md AGENTS.md
 include LICENSE THIRD_PARTY_NOTICES.md models.example.yaml .env.example .gitignore
 include assets/logo.svg
+include assets/mechanism-selection.svg
+include assets/configuration-choices.svg
 recursive-include fruitfly_agent *.py *.md
 recursive-include eval *.py *.md
 recursive-include tests *.py *.md *.json *.yaml

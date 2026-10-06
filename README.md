@@ -15,7 +15,7 @@
 
 Agent research needs a system you can understand, change, and test. FruitFlyAgent keeps the essential runtime in a small Python core, with replaceable algorithms in a pluggable Lab. Small, focused source files make mechanisms easy to inspect and modify, for both developers and coding agents.
 
-It combines a Python runtime adapted from [Pi](https://github.com/earendil-works/pi) with [RLM-inspired programmatic context externalization](fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md).
+Its Python runtime is adapted from [Pi](https://github.com/earendil-works/pi). [RLM-inspired programmatic context externalization](fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md) is one optional, pluggable Lab mechanism that you can enable for an experiment.
 
 The research object is the **whole harness**: context, tools, execution, optimization, and adoption. Python and public extension contracts let you study these mechanisms in the same language as your experiments.
 
@@ -80,6 +80,20 @@ To explore the extension lifecycle without keys or network access:
 
 Expected output: `Offline response: example-guidance is active.` The example registers a context mechanism and runs it through the Application in a temporary workspace. See the [walkthrough](examples/extensions/README.md).
 
+## Choose your mechanisms
+
+Use the terminal configuration menu to assemble the harness for your task or experiment. Select a model and base prompt, enable or disable mechanisms, and choose their registered algorithms. Context management, tools, environment, and optimization are configurable through the same interface.
+
+![Compose a FruitFlyAgent harness: choose a model and base prompt, configure context, environment, tools, and optimization, then assemble a new Agent session](assets/mechanism-selection.svg)
+
+*A composition overview. Mechanisms are selectable; RLM-inspired externalization is optional and requires the IPython tool.*
+
+![FruitFlyAgent terminal menus: select Context Manager, toggle checked and unchecked mechanisms, and expand an inline algorithm selector](assets/configuration-choices.svg)
+
+*Example terminal selections, not defaults. Use arrow keys to navigate, Space to toggle a mechanism, and Enter to expand its algorithm selector. A check mark means enabled; an unchecked mechanism remains available for a later experiment.*
+
+For example, enable RLM-inspired externalization together with the IPython tool to inspect context through Python, or leave it disabled to study other context strategies. Configuration changes apply to a new session; active and resumed sessions retain their runtime identity. Edit YAML for detailed parameters. See [Configuration](CONFIGURATION.md) and [Terminal](fruitfly_agent/interactive/terminal/README.md) for controls and dependencies.
+
 ## What you can do
 
 | Task | Start here |
@@ -102,11 +116,13 @@ Expected output: `Offline response: example-guidance is active.` The example reg
 | [eval/](eval/README.md) | Optional benchmark execution and reports |
 | [examples/](examples/README.md) | Runnable extensions and optimization task packs |
 | [tests/](tests/README.md) | Offline contract, architecture, and behavior checks |
-| [AGENTS.md](AGENTS.md) | Workspace and engineering rules |
+| [AGENTS.md](AGENTS.md) | Engineering instructions for AI-assisted development |
 
 ## Contribute
 
 Bring a focused mechanism, a reproducible experiment, or a failure that challenges an existing explanation. Include the conditions, observations, and limits needed for someone else to investigate it. Start with [Contributing](CONTRIBUTING.md) and the [engineering rules](AGENTS.md).
+
+**AI-assisted development is welcome.** [AGENTS.md](AGENTS.md) defines the project rules coding agents should follow. Developers must actively guide the work: define the problem and research hypothesis, question proposed designs, inspect the implementation, and verify the evidence. Human judgment and responsibility remain essential throughout development.
 
 Run the offline checks from your source checkout:
 

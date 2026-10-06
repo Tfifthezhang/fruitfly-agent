@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="740" viewBox="0 0 1200 740" role="img" aria-labelledby="title description">
+<title id="title">FruitFlyAgent terminal mechanism selection</title>
+<desc id="description">Two terminal views show the configuration menu and the expanded Context Manager menu. Checked mechanisms are enabled; unchecked mechanisms are available but disabled. Algorithm rows expand in place. Example selections include Summarizing, Skill catalog and File memory, with Externalization disabled. This illustration follows the terminal menu structure and does not represent default settings.</desc>
+<style>
+text { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 17px; fill: #dce7f0; }
+.muted { fill: #869eb3; }
+.selected { fill: #88f1ec; font-weight: 700; }
+.heading { font-size: 22px; font-weight: 700; }
+.small { font-size: 14px; }
+</style>
+<rect width="1200" height="740" rx="20" fill="#091522"/>
+<text x="44" y="52" class="heading">Configure the harness in your terminal.</text>
+<text x="44" y="84" class="muted">Choose a category. Toggle mechanisms. Expand algorithm choices.</text>
+
+<rect x="44" y="112" width="536" height="558" rx="12" fill="#0d2236" stroke="#284157"/>
+<path d="M56 112H568a12 12 0 0 1 12 12v26H44v-26a12 12 0 0 1 12-12Z" fill="#183149"/>
+<text x="64" y="137" class="small muted" xml:space="preserve">fruitfly-agent · Configuration</text>
+<rect x="620" y="112" width="536" height="558" rx="12" fill="#0d2236" stroke="#284157"/>
+<path d="M632 112H1144a12 12 0 0 1 12 12v26H620v-26a12 12 0 0 1 12-12Z" fill="#183149"/>
+<text x="640" y="137" class="small muted" xml:space="preserve">fruitfly-agent · Context Manager</text>
+<text x="66" y="188" class="heading" xml:space="preserve">Configuration</text>
+<text x="66" y="222" class="small muted" xml:space="preserve">Choose the model, runtime components,</text>
+<text x="66" y="244" class="small muted" xml:space="preserve">and primary algorithm selections.</text>
+<text x="66" y="285" class="" xml:space="preserve">  1. Model</text>
+<text x="66" y="305" class="small muted" xml:space="preserve">     your-model-profile</text>
+<text x="66" y="330" class="" xml:space="preserve">  2. Base prompt</text>
+<text x="66" y="350" class="small muted" xml:space="preserve">     Assistant default · next session</text>
+<text x="66" y="375" class="selected" xml:space="preserve">&gt; 3. Context Manager</text>
+<text x="66" y="395" class="small muted" xml:space="preserve">     3 of 6 enabled</text>
+<text x="66" y="420" class="" xml:space="preserve">  4. Environment</text>
+<text x="66" y="440" class="small muted" xml:space="preserve">     1 of 1 enabled</text>
+<text x="66" y="465" class="" xml:space="preserve">  5. Optimization</text>
+<text x="66" y="485" class="small muted" xml:space="preserve">     1 of 1 enabled</text>
+<text x="66" y="510" class="" xml:space="preserve">  6. Tools</text>
+<text x="66" y="530" class="small muted" xml:space="preserve">     4 of 5 enabled</text>
+<text x="66" y="555" class="" xml:space="preserve">  7. Back</text>
+<text x="66" y="575" class="small muted" xml:space="preserve">     Return to startup</text>
+<text x="66" y="639" class="small muted" xml:space="preserve">↑↓ move · Enter select · Esc back</text>
+<text x="642" y="188" class="heading" xml:space="preserve">Context Manager</text>
+<text x="642" y="222" class="small muted" xml:space="preserve">Check a module, then expand its algorithm.</text>
+<text x="642" y="244" class="small muted" xml:space="preserve">Changes apply to the next session.</text>
+<text x="642" y="285" class="" xml:space="preserve">  1. ✓ Reduction</text>
+<text x="642" y="314" class="selected" xml:space="preserve">&gt; 2.     Algorithm: Summarizing ▾</text>
+<text x="642" y="343" class="muted" xml:space="preserve">  3.   Externalization</text>
+<text x="642" y="372" class="" xml:space="preserve">  4. ✓ Skill catalog</text>
+<text x="642" y="401" class="muted" xml:space="preserve">  5.     Algorithm: Skill catalog ▾</text>
+<text x="642" y="430" class="" xml:space="preserve">  6. ✓ File memory</text>
+<text x="642" y="459" class="muted" xml:space="preserve">  7.     Algorithm: File memory ▾</text>
+<text x="642" y="488" class="muted" xml:space="preserve">  8.   Local knowledge</text>
+<text x="642" y="517" class="muted" xml:space="preserve">  9.   Live HTTP information</text>
+<text x="642" y="546" class="" xml:space="preserve"> 10. Back</text>
+<text x="642" y="603" class="small muted" xml:space="preserve">✓ enabled · blank marker = disabled</text>
+<text x="642" y="639" class="small muted" xml:space="preserve">↑↓ move · Enter select · Space toggle</text>
+<text x="44" y="707" class="small muted" xml:space="preserve">Example terminal selections, not defaults. RLM externalization is optional and requires IPython.</text>
+</svg>
