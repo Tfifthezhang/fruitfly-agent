@@ -1,0 +1,20 @@
+{
+  "schema_version": 2,
+  "id": "ticket-triage",
+  "name": "SaaS Ticket Triage",
+  "description": "Regression cases for current problems, mixed requests, and output labels.",
+  "task_schema": "single-turn-text-v1",
+  "target_schema": "text-v1",
+  "compatible_targets": [
+    "base_prompt"
+  ],
+  "objective": {
+    "policy_id": "normalized-exact-v1",
+    "direction": "max"
+  },
+  "files": {
+    "cases": "cases.json",
+    "holdout": "holdout.json"
+  },
+  "default_direction": "Use training feedback to improve ticket classification rules, correctly identify current problems and mixed requests, and output only the label."
+}

@@ -1,0 +1,21 @@
+{
+  "schema_version": 2,
+  "id": "python-functions",
+  "name": "Python Coding and Edge Case Fixes",
+  "description": "Pure function implementations, edge cases, and exception semantics, scored with actual function-call tests.",
+  "task_schema": "python-function-v1",
+  "target_schema": "text-v1",
+  "compatible_targets": [
+    "base_prompt",
+    "skill-catalog.guidance"
+  ],
+  "objective": {
+    "policy_id": "python-function-tests-v1",
+    "direction": "max"
+  },
+  "files": {
+    "cases": "cases.json",
+    "holdout": "holdout.json"
+  },
+  "default_direction": "Use training failures to improve general coding methods and increase the function-call test pass rate. Do not hard-code tasks or answers."
+}

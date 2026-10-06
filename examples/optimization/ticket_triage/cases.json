@@ -1,0 +1,66 @@
+{
+  "train": [
+    {
+      "id": "train-001",
+      "input": "Ticket: Someone is logging into the administrator account from an unfamiliar IP address and downloading our customers' personal information. Please address this immediately.",
+      "acceptance": {"expected": "P0|SECURITY"}
+    },
+    {
+      "id": "train-002",
+      "input": "Ticket: All login requests in production return 503. Users cannot access the system right now.",
+      "acceptance": {"expected": "P1|OUTAGE"}
+    },
+    {
+      "id": "train-003",
+      "input": "Ticket: The same order was charged twice. Please refund the extra charge.",
+      "acceptance": {"expected": "P2|BILLING"}
+    },
+    {
+      "id": "train-004",
+      "input": "Ticket: This is my first time using the system. How do I export the project member list?",
+      "acceptance": {"expected": "P3|HOWTO"}
+    },
+    {
+      "id": "train-005",
+      "input": "Ticket: Please add a dark theme in the future. All features currently work normally.",
+      "acceptance": {"expected": "P3|OTHER"}
+    },
+    {
+      "id": "train-006",
+      "input": "Ticket: We have confirmed there is no account intrusion or data leak, and the system is running normally. The billing name on this month's invoice is incorrect and needs to be corrected.",
+      "acceptance": {"expected": "P2|BILLING"}
+    },
+    {
+      "id": "train-007",
+      "input": "Ticket: Yesterday's login problem has been resolved. Today I only want to know where to configure two-factor authentication.",
+      "acceptance": {"expected": "P3|HOWTO"}
+    },
+    {
+      "id": "train-008",
+      "input": "Ticket: I want to check last month's bill, but the consoles for all tenants are currently inaccessible, and refreshing keeps returning 502.",
+      "acceptance": {"expected": "P1|OUTAGE"}
+    }
+  ],
+  "validation": [
+    {
+      "id": "validation-001",
+      "input": "Ticket: The administrator key was just made public, and someone is still using it to read the customer database. We also have a duplicate charge.",
+      "acceptance": {"expected": "P0|SECURITY"}
+    },
+    {
+      "id": "validation-002",
+      "input": "Ticket: The earlier failed payment has been resolved, but the production API is now timing out continuously, preventing business operations from calling it.",
+      "acceptance": {"expected": "P1|OUTAGE"}
+    },
+    {
+      "id": "validation-003",
+      "input": "Ticket: The application works normally and there is no security incident. We bought an annual plan but are also being charged repeatedly each month. Please check and refund the charges.",
+      "acceptance": {"expected": "P2|BILLING"}
+    },
+    {
+      "id": "validation-004",
+      "input": "Ticket: The old API key was revoked as planned; it was not leaked, and existing services work normally. Please tell me how to create a new key.",
+      "acceptance": {"expected": "P3|HOWTO"}
+    }
+  ]
+}

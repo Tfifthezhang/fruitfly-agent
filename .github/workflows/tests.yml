@@ -1,0 +1,102 @@
+name: Offline tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ['3.11', '3.12', '3.13']
+    env:
+      TERM: dumb
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install base package without benchmark dependencies
+        run: python -m pip install -e .
+      - name: Architecture and contract guards
+        run: |
+          python -m unittest discover -s tests/architecture -t .
+          python -m unittest discover -s tests/contracts -t .
+      - name: Complete offline suite
+        run: python -m unittest discover -s tests -t .
+      - name: CLI smoke
+        run: |
+          python -m fruitfly_agent --help
+          python -m eval catalog --json
+
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - name: Build distributions
+        run: |
+          python -m pip install build
+          python - <<'PY'
+          from pathlib import Path
+          for name in ('models.yaml', '.env', '.env.local', '.env.staging', '.env.production',
+                       '.fruitfly/publication-probe.json', '.claude/publication-probe.json'):
+              path = Path(name)
+              path.parent.mkdir(parents=True, exist_ok=True)
+              path.write_text('offline-publication-placeholder\n', encoding='utf-8')
+          PY
+          python -m build
+      - name: Verify distribution contents exclude local state
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import tarfile
+          import zipfile
+          for archive in sorted(Path('dist').iterdir()):
+              if archive.suffix == '.whl':
+                  with zipfile.ZipFile(archive) as stream:
+                      names = stream.namelist()
+              else:
+                  with tarfile.open(archive) as stream:
+                      names = stream.getnames()
+                  assert any(name.endswith('/.env.example') for name in names)
+                  assert any(name.endswith('/models.example.yaml') for name in names)
+                  assert any(name.endswith('/assets/logo.svg') for name in names)
+              for name in names:
+                  parts = Path(name).parts
+                  assert not set(parts) & {'.fruitfly', '.venv', '.claude', '.codex', '.agents', '__pycache__'}, name
+                  assert not any(part.startswith('.env') and part != '.env.example' for part in parts), name
+                  assert not name.endswith(('.pyc', '.DS_Store')), name
+                  assert Path(name).name != 'models.yaml', name
+              assert any(name.endswith('/LICENSE') for name in names)
+              assert any(name.endswith('/THIRD_PARTY_NOTICES.md') for name in names)
+              print(archive.name, 'contents verified')
+          PY
+      - name: Install wheel in a fresh environment
+        run: |
+          python -m venv /tmp/fruitfly-wheel
+          /tmp/fruitfly-wheel/bin/python -m pip install dist/*.whl
+      - name: Verify installed CLI outside the checkout
+        working-directory: /tmp
+        run: |
+          /tmp/fruitfly-wheel/bin/fruitfly-agent --help
+          /tmp/fruitfly-wheel/bin/fruitfly-agent-eval catalog --json
+          /tmp/fruitfly-wheel/bin/python -c "from fruitfly_agent.lab.base_prompt import builtins; assert [p.prompt_id for p in builtins()] == ['coding-default']"

@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fruitfly-agent"
+version = "0.1"
+description = "An interactive-first Python harness with a stable core and pluggable agent algorithms."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
+classifiers = [
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "anthropic>=0.40",
+    "ipython>=8.18",
+    "markdown-it-py>=3.0",
+    "openai>=1.66.0",
+    "Pygments>=2.17",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+benchmarks = [
+    "harbor==0.23.0",
+]
+
+[project.scripts]
+fruitfly-agent = "fruitfly_agent.run:main"
+fruitfly-agent-eval = "eval.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["fruitfly_agent*", "eval*"]

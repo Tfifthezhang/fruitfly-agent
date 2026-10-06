@@ -1,0 +1,20 @@
+{
+  "train-001": "P0|SECURITY",
+  "train-002": "P1|OUTAGE",
+  "train-003": "P2|BILLING",
+  "train-004": "P3|HOWTO",
+  "train-005": "P3|OTHER",
+  "train-006": "P2|BILLING",
+  "train-007": "P3|HOWTO",
+  "train-008": "P1|OUTAGE",
+  "validation-001": "P0|SECURITY",
+  "validation-002": "P1|OUTAGE",
+  "validation-003": "P2|BILLING",
+  "validation-004": "P3|HOWTO",
+  "holdout-001": "P0|SECURITY",
+  "holdout-002": "P1|OUTAGE",
+  "holdout-003": "P2|BILLING",
+  "holdout-004": "P3|HOWTO",
+  "holdout-005": "P3|OTHER",
+  "holdout-006": "P2|BILLING"
+}

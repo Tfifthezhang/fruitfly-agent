@@ -1,0 +1,34 @@
+{
+  "holdout": [
+    {
+      "id": "holdout-001",
+      "input": "Ticket: The invoice amount is incorrect. We also discovered an unauthorized account exporting customer data in bulk, and the export is still ongoing.",
+      "acceptance": {"expected": "P0|SECURITY"}
+    },
+    {
+      "id": "holdout-002",
+      "input": "Ticket: Payment succeeded and the account has not been compromised, but all production endpoints now return 504, halting our customers' business operations.",
+      "acceptance": {"expected": "P1|OUTAGE"}
+    },
+    {
+      "id": "holdout-003",
+      "input": "Ticket: Support has confirmed that yesterday's outage was resolved and the service is currently working normally. We now need a refund for an unintended renewal.",
+      "acceptance": {"expected": "P2|BILLING"}
+    },
+    {
+      "id": "holdout-004",
+      "input": "Ticket: The security drill has ended. There was no real intrusion, and the system works normally. I want to learn how to configure an IP allowlist.",
+      "acceptance": {"expected": "P3|HOWTO"}
+    },
+    {
+      "id": "holdout-005",
+      "input": "Ticket: Please make the home page buttons larger. There is no outage, billing issue, or security problem.",
+      "acceptance": {"expected": "P3|OTHER"}
+    },
+    {
+      "id": "holdout-006",
+      "input": "Ticket: Please check the duplicate charge and tell me how to download the receipt. The system is running normally, with no security incident.",
+      "acceptance": {"expected": "P2|BILLING"}
+    }
+  ]
+}

@@ -1,0 +1,174 @@
+{
+  "train": [
+    {
+      "id": "train-001",
+      "group_id": "stable_unique",
+      "input": "Implement stable_unique in Python. Given a list of JSON values, remove duplicates in order of first appearance. Support unhashable lists and dictionaries. Return only function definition code. Do not use imports, files, network access, classes, or decorators. Basic built-in functions and list, dictionary, and string methods are allowed. Do not modify the input.",
+      "acceptance": {
+        "entry_point": "stable_unique",
+        "tests": [
+          {"args": [[]], "expected": [], "preserve_args": true},
+          {"args": [[3, 1, 3, 2, 1]], "expected": [3, 1, 2], "preserve_args": true},
+          {"args": [[[1], {"x": 1}, [1], {"x": 1}]], "expected": [[1], {"x": 1}], "preserve_args": true}
+        ]
+      }
+    },
+    {
+      "id": "train-002",
+      "group_id": "chunked",
+      "input": "Implement chunked in Python. Given a list values and a positive integer size, return consecutive chunks; the final chunk may contain fewer than size items. Return [] for an empty list. Raise ValueError if size is zero or negative. Return only function definition code. Do not use imports, files, network access, classes, or decorators. Basic built-in functions and list, dictionary, and string methods are allowed. Do not modify the input.",
+      "acceptance": {
+        "entry_point": "chunked",
+        "tests": [
+          {"args": [[], 2], "expected": [], "preserve_args": true},
+          {"args": [[1, 2, 3, 4, 5], 2], "expected": [[1, 2], [3, 4], [5]], "preserve_args": true},
+          {"args": [[1], 4], "expected": [[1]], "preserve_args": true},
+          {"args": [[1], 0], "raises": "ValueError", "preserve_args": true},
+          {"args": [[1], -2], "raises": "ValueError", "preserve_args": true}
+        ]
+      }
+    },
+    {
+      "id": "train-003",
+      "group_id": "first_present",
+      "input": "Implement first_present in Python. Given a dictionary mapping, keys in priority order, and default=None, return the value of the first key that exists and whose value is not None. Preserve 0, False, and empty strings. Return default if no key qualifies. Return only function definition code. Do not use imports, files, network access, classes, or decorators. Basic built-in functions and list, dictionary, and string methods are allowed. Do not modify the input.",
+      "acceptance": {
+        "entry_point": "first_present",
+        "tests": [
+          {"args": [{"a": null, "b": 0}, ["a", "b"], 9], "expected": 0, "preserve_args": true},
+          {"args": [{"a": false}, ["a"], 9], "expected": false, "preserve_args": true},
+          {"args": [{"a": ""}, ["a"], 9], "expected": "", "preserve_args": true},
+          {"args": [{}, ["a"], "fallback"], "expected": "fallback", "preserve_args": true}
+        ]
+      }
+    },
+    {
+      "id": "train-004",
+      "group_id": "parse_pairs",
+      "input": "Implement parse_pairs in Python. Given a string text, parse comma-separated key=value items. Strip whitespace from both ends of keys and values. Allow additional = characters in values. Later values overwrite earlier values for duplicate keys. Ignore whitespace-only items. Raise ValueError if a nonempty item has no = or has an empty key. Return only function definition code. Do not use imports, files, network access, classes, or decorators. Basic built-in functions and list, dictionary, and string methods are allowed. Do not modify the input.",
+      "acceptance": {
+        "entry_point": "parse_pairs",
+        "tests": [
+          {"args": [""], "expected": {}, "preserve_args": true},
+          {"args": [" a = 1, b=x=y, a=2 "], "expected": {"a": "2", "b": "x=y"}, "preserve_args": true},
+          {"args": ["a=, ,b=2"], "expected": {"a": "", "b": "2"}, "preserve_args": true},
+          {"args": ["oops"], "raises": "ValueError", "preserve_args": true},
+          {"args": ["=x"], "raises": "ValueError", "preserve_args": true}
+        ]
+      }
+    },
+    {
+      "id": "train-005",
+      "group_id": "merge_counts",
+      "input": "Implement merge_counts in Python. Given a list of dictionaries mapping string keys to integers, sum values for matching keys. Keep keys whose total is zero. Return {} for an empty list. Return only function definition code. Do not use imports, files, network access, classes, or decorators. Basic built-in functions and list, dictionary, and string methods are allowed. Do not modify the input.",
+      "acceptance": {
+        "entry_point": "merge_counts",
+        "tests": [
+          {"args": [[]], "expected": {}, "preserve_args": true},
+          {"args": [[{"a": 2}, {"a": -2, "b": 3}]], "expected": {"a": 0, "b": 3}, "preserve_args": true},
+          {"args": [[{}, {"x": 4}]], "expected": {"x": 4}, "preserve_args": true}
+        ]
+      }
+    },
+    {
+      "id": "train-006",
+      "group_id": "parse_bool",
+      "input": "Implement parse_bool in Python. Given a string value, strip surrounding whitespace and ignore case. Return True for true/yes/1 and False for false/no/0. Raise ValueError for any other string. Return only function definition code. Do not use imports, files, network access, classes, or decorators. Basic built-in functions and list, dictionary, and string methods are allowed. Do not modify the input.",
+      "acceptance": {
+        "entry_point": "parse_bool",
+        "tests": [
+          {"args": [" YES "], "expected": true, "preserve_args": true},
+          {"args": ["0"], "expected": false, "preserve_args": true},
+          {"args": ["False"], "expected": false, "preserve_args": true},
+          {"args": ["1"], "expected": true, "preserve_args": true},
+          {"args": ["maybe"], "raises": "ValueError", "preserve_args": true},
+          {"args": [""], "raises": "ValueError", "preserve_args": true}
+        ]
+      }
+    },
+    {
+      "id": "train-007",
+      "group_id": "flatten_lists",
+      "input": "Implement flatten_lists in Python. Given values containing only integers or nested lists, recursively flatten them into a list of integers in the original order. Empty nested lists contribute no elements. Return only function definition code. Do not use imports, files, network access, classes, or decorators. Basic built-in functions and list, dictionary, and string methods are allowed. Do not modify the input.",
+      "acceptance": {
+        "entry_point": "flatten_lists",
+        "tests": [
+          {"args": [[]], "expected": [], "preserve_args": true},
+          {"args": [[1, [2, [], [3]], 4]], "expected": [1, 2, 3, 4], "preserve_args": true},
+          {"args": [[[[], []]]], "expected": [], "preserve_args": true}
+        ]
+      }
+    },
+    {
+      "id": "train-008",
+      "group_id": "slugify",
+      "input": "Implement slugify in Python. Given an ASCII string text, convert it to lowercase. Keep letters and digits and treat other characters as separators. Replace consecutive separators with a single -, with no leading or trailing -. Return an empty string if there are no letters or digits. Return only function definition code. Do not use imports, files, network access, classes, or decorators. Basic built-in functions and list, dictionary, and string methods are allowed. Do not modify the input.",
+      "acceptance": {
+        "entry_point": "slugify",
+        "tests": [
+          {"args": [" Hello, WORLD!! "], "expected": "hello-world", "preserve_args": true},
+          {"args": ["a__b---c"], "expected": "a-b-c", "preserve_args": true},
+          {"args": ["---"], "expected": "", "preserve_args": true},
+          {"args": ["abc123"], "expected": "abc123", "preserve_args": true}
+        ]
+      }
+    }
+  ],
+  "validation": [
+    {
+      "id": "validation-001",
+      "group_id": "coalesce_intervals",
+      "input": "Implement coalesce_intervals in Python. Given a list of half-open intervals [start, end], each with start < end, sort by start and merge overlapping or adjacent intervals. Return the resulting list, or [] for an empty input. Return only function definition code. Do not use imports, files, network access, classes, or decorators. Basic built-in functions and list, dictionary, and string methods are allowed. Do not modify the input.",
+      "acceptance": {
+        "entry_point": "coalesce_intervals",
+        "tests": [
+          {"args": [[]], "expected": [], "preserve_args": true},
+          {"args": [[[5, 7], [1, 3], [3, 5]]], "expected": [[1, 7]], "preserve_args": true},
+          {"args": [[[1, 10], [2, 4], [12, 13]]], "expected": [[1, 10], [12, 13]], "preserve_args": true}
+        ]
+      }
+    },
+    {
+      "id": "validation-002",
+      "group_id": "deep_get",
+      "input": "Implement deep_get in Python. Given a nested dictionary mapping, a dot-separated string path, and default=None, follow the path. Return default if any key is missing or an intermediate value is not a dictionary. Preserve None, 0, and False at the final key. Return the entire mapping for an empty path. Return only function definition code. Do not use imports, files, network access, classes, or decorators. Basic built-in functions and list, dictionary, and string methods are allowed. Do not modify the input.",
+      "acceptance": {
+        "entry_point": "deep_get",
+        "tests": [
+          {"args": [{"a": {"b": 0}}, "a.b", 7], "expected": 0, "preserve_args": true},
+          {"args": [{"a": null}, "a", 7], "expected": null, "preserve_args": true},
+          {"args": [{"a": 1}, "a.b", 7], "expected": 7, "preserve_args": true},
+          {"args": [{"a": 1}, "", 7], "expected": {"a": 1}, "preserve_args": true}
+        ]
+      }
+    },
+    {
+      "id": "validation-003",
+      "group_id": "top_k",
+      "input": "Implement top_k in Python. Given a dictionary counts mapping strings to integers and an integer k, return the k keys with the highest counts. Break ties by alphabetical key order. Return [] if k <= 0. Return only function definition code. Do not use imports, files, network access, classes, or decorators. Basic built-in functions and list, dictionary, and string methods are allowed. Do not modify the input.",
+      "acceptance": {
+        "entry_point": "top_k",
+        "tests": [
+          {"args": [{"b": 2, "a": 2, "c": 1}, 2], "expected": ["a", "b"], "preserve_args": true},
+          {"args": [{}, 3], "expected": [], "preserve_args": true},
+          {"args": [{"a": 1}, 0], "expected": [], "preserve_args": true},
+          {"args": [{"a": 1}, 4], "expected": ["a"], "preserve_args": true}
+        ]
+      }
+    },
+    {
+      "id": "validation-004",
+      "group_id": "moving_average",
+      "input": "Implement moving_average in Python. Given a list of numbers values and a positive integer window, return the averages of complete sliding windows. Return [] if window exceeds the list length. Raise ValueError if window <= 0. Return only function definition code. Do not use imports, files, network access, classes, or decorators. Basic built-in functions and list, dictionary, and string methods are allowed. Do not modify the input.",
+      "acceptance": {
+        "entry_point": "moving_average",
+        "tests": [
+          {"args": [[1, 2, 3, 4], 2], "expected": [1.5, 2.5, 3.5], "preserve_args": true},
+          {"args": [[], 2], "expected": [], "preserve_args": true},
+          {"args": [[1], 2], "expected": [], "preserve_args": true},
+          {"args": [[1], 0], "raises": "ValueError", "preserve_args": true}
+        ]
+      }
+    }
+  ]
+}

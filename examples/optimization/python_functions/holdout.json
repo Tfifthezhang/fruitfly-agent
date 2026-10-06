@@ -1,0 +1,85 @@
+{
+  "holdout": [
+    {
+      "id": "holdout-001",
+      "group_id": "run_lengths",
+      "input": "Implement run_lengths in Python. Given a list of JSON values values, run-length encode consecutive equal values as [[value, count], ...]. Do not combine nonadjacent duplicates. Return [] for an empty list. Return only function definition code. Do not use imports, files, network access, classes, or decorators. Basic built-in functions and list, dictionary, and string methods are allowed. Do not modify the input.",
+      "acceptance": {
+        "entry_point": "run_lengths",
+        "tests": [
+          {"args": [[]], "expected": [], "preserve_args": true},
+          {"args": [["a", "a", "b", "a"]], "expected": [["a", 2], ["b", 1], ["a", 1]], "preserve_args": true},
+          {"args": [[[1], [1], [2]]], "expected": [[[1], 2], [[2], 1]], "preserve_args": true}
+        ]
+      }
+    },
+    {
+      "id": "holdout-002",
+      "group_id": "transpose",
+      "input": "Implement transpose in Python. Given a rectangular two-dimensional list matrix, return its transpose. Return [] for an empty matrix or a matrix containing only empty rows. Raise ValueError if row lengths differ. Return only function definition code. Do not use imports, files, network access, classes, or decorators. Basic built-in functions and list, dictionary, and string methods are allowed. Do not modify the input.",
+      "acceptance": {
+        "entry_point": "transpose",
+        "tests": [
+          {"args": [[]], "expected": [], "preserve_args": true},
+          {"args": [[[], []]], "expected": [], "preserve_args": true},
+          {"args": [[[1, 2], [3, 4]]], "expected": [[1, 3], [2, 4]], "preserve_args": true},
+          {"args": [[[1], [2, 3]]], "raises": "ValueError", "preserve_args": true}
+        ]
+      }
+    },
+    {
+      "id": "holdout-003",
+      "group_id": "rotate_left",
+      "input": "Implement rotate_left in Python. Given a list values and any integer steps, rotate the list left by steps positions. Negative steps rotate right. Return [] for an empty list. Return only function definition code. Do not use imports, files, network access, classes, or decorators. Basic built-in functions and list, dictionary, and string methods are allowed. Do not modify the input.",
+      "acceptance": {
+        "entry_point": "rotate_left",
+        "tests": [
+          {"args": [[], 5], "expected": [], "preserve_args": true},
+          {"args": [[1, 2, 3], 4], "expected": [2, 3, 1], "preserve_args": true},
+          {"args": [[1, 2, 3], -1], "expected": [3, 1, 2], "preserve_args": true},
+          {"args": [[1, 2], 0], "expected": [1, 2], "preserve_args": true}
+        ]
+      }
+    },
+    {
+      "id": "holdout-004",
+      "group_id": "compact_dict",
+      "input": "Implement compact_dict in Python. Given a dictionary mapping, return a new dictionary excluding keys whose values are None. Keep 0, False, empty strings, and empty containers. Return only function definition code. Do not use imports, files, network access, classes, or decorators. Basic built-in functions and list, dictionary, and string methods are allowed. Do not modify the input.",
+      "acceptance": {
+        "entry_point": "compact_dict",
+        "tests": [
+          {"args": [{"a": null, "b": 0, "c": false, "d": "", "e": []}], "expected": {"b": 0, "c": false, "d": "", "e": []}, "preserve_args": true},
+          {"args": [{}], "expected": {}, "preserve_args": true}
+        ]
+      }
+    },
+    {
+      "id": "holdout-005",
+      "group_id": "decode_query",
+      "input": "Implement decode_query in Python. Given a string query, parse &-separated key=value items. Strip surrounding whitespace from keys. Preserve values exactly and allow = characters in values. Do not perform URL decoding. Store values for each key in a list in order of appearance. Ignore empty items. Raise ValueError if an item has no = or has an empty key. Return only function definition code. Do not use imports, files, network access, classes, or decorators. Basic built-in functions and list, dictionary, and string methods are allowed. Do not modify the input.",
+      "acceptance": {
+        "entry_point": "decode_query",
+        "tests": [
+          {"args": [""], "expected": {}, "preserve_args": true},
+          {"args": ["a=1&a=2& b =x=y"], "expected": {"a": ["1", "2"], "b": ["x=y"]}, "preserve_args": true},
+          {"args": ["a=&"], "expected": {"a": [""]}, "preserve_args": true},
+          {"args": ["bad"], "raises": "ValueError", "preserve_args": true}
+        ]
+      }
+    },
+    {
+      "id": "holdout-006",
+      "group_id": "longest_streak",
+      "input": "Implement longest_streak in Python. Given a list of integers values, return the length of the longest strictly increasing contiguous segment. Equal values end an increasing segment. Return 0 for an empty list. Return only function definition code. Do not use imports, files, network access, classes, or decorators. Basic built-in functions and list, dictionary, and string methods are allowed. Do not modify the input.",
+      "acceptance": {
+        "entry_point": "longest_streak",
+        "tests": [
+          {"args": [[]], "expected": 0, "preserve_args": true},
+          {"args": [[1, 2, 2, 3, 4]], "expected": 3, "preserve_args": true},
+          {"args": [[5, 4, 3]], "expected": 1, "preserve_args": true},
+          {"args": [[-3, -2, -1]], "expected": 3, "preserve_args": true}
+        ]
+      }
+    }
+  ]
+}

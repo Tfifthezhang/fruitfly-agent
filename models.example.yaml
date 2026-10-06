@@ -1,0 +1,34 @@
+# Copy this file to models.yaml and edit it before starting a live session.
+# Keep only profiles you can use. No real model or endpoint is supplied here.
+# Store key values in .env or the process environment, never in this file.
+models:
+  example-responses:
+    # Requires OpenAI Responses API compatibility, not just Chat Completions.
+    provider: openai
+    model: REPLACE_WITH_MODEL_ID
+    api_key_env: MODEL_API_KEY
+    base_url: https://api.example.invalid/v1
+    # Example limits only: replace with the model's documented limits.
+    context_window: 32768
+    max_output_tokens: 4096
+    # Set capabilities to match your model and endpoint.
+    capabilities:
+      tools: true
+      parallel_tool_calls: false
+      vision: false
+      reasoning: false
+      streaming: true
+  example-messages:
+    # Requires Anthropic Messages API compatibility.
+    provider: anthropic
+    model: REPLACE_WITH_MODEL_ID
+    api_key_env: MODEL_API_KEY
+    base_url: https://api.example.invalid
+    context_window: 32768
+    max_output_tokens: 4096
+    capabilities:
+      tools: true
+      parallel_tool_calls: false
+      vision: false
+      reasoning: false
+      streaming: true

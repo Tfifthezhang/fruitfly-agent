@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title description">
+  <title id="title">FruitFlyAgent logo</title>
+  <desc id="description">A geometric fruit fly with red eyes, translucent wings, and a golden segmented body on a dark blue field.</desc>
+  <rect width="256" height="256" rx="56" fill="#13263a"/>
+  <g fill="none" stroke="#a8bdc9" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M112 133 77 156 64 184M111 151 85 180 80 207M113 165 102 194 108 222"/>
+    <path d="M144 133 179 156 192 184M145 151 171 180 176 207M143 165 154 194 148 222"/>
+    <path d="M118 83 107 60 95 51M138 83 149 60 161 51"/>
+  </g>
+  <g fill="#deedf0" fill-opacity=".9" stroke="#8fb9c5" stroke-width="3">
+    <path d="M122 142C104 104 62 74 44 93C23 115 47 163 73 169C91 174 108 160 122 142Z"/>
+    <path d="M134 142C152 104 194 74 212 93C233 115 209 163 183 169C165 174 148 160 134 142Z"/>
+  </g>
+  <g fill="none" stroke="#8fb9c5" stroke-width="2" stroke-linecap="round">
+    <path d="M117 144 53 103M92 129 73 112M99 134 70 151"/>
+    <path d="M139 144 203 103M164 129 183 112M157 134 186 151"/>
+  </g>
+  <path d="M108 149C108 134 148 134 148 149C148 185 139 208 128 217C117 208 108 185 108 149Z" fill="#ecb45e"/>
+  <g fill="none" stroke="#80502e" stroke-width="5">
+    <path d="M109 162Q128 170 147 162M112 181Q128 189 144 181M118 200Q128 205 138 200"/>
+  </g>
+  <ellipse cx="128" cy="131" rx="23" ry="29" fill="#cc9046"/>
+  <path d="M128 114V145" stroke="#f5d18e" stroke-width="4" stroke-linecap="round"/>
+  <ellipse cx="128" cy="94" rx="25" ry="21" fill="#ecb45e"/>
+  <ellipse cx="111" cy="92" rx="13" ry="16" fill="#f06b64"/>
+  <ellipse cx="145" cy="92" rx="13" ry="16" fill="#f06b64"/>
+  <g fill="#ffd8c9">
+    <circle cx="107" cy="87" r="3"/>
+    <circle cx="141" cy="87" r="3"/>
+  </g>
+</svg>

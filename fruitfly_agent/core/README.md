@@ -1,0 +1,45 @@
+# Core
+
+[Up: Runtime Architecture](../README.md)
+
+Core runs the Agent loop and defines the contracts used by the surrounding modules. It does not import Providers, Lab, Interactive, or Eval.
+
+## Run a task
+
+Configure `AgentLoopConfig` with a Provider, tools, execution environment, context pipeline, and optional Session, then call `run_agent_loop`. The [offline example](../../examples/extensions/README.md) shows these capabilities through the Application.
+
+| Area | Entry point | Responsibility |
+|---|---|---|
+| Loop | [loop.py](loop.py), [config.py](config.py) | `run_agent_loop`, configuration, callbacks, and termination |
+| Messages and views | [Data model](data_model/README.md) | Shared runtime data |
+| Components and hooks | [Extensions](extensions/README.md) | Provider, Session, and lifecycle contracts |
+| Tool dispatch | [Tool runtime](tool_runtime/README.md) | Argument validation and execution |
+| Execution backend | [Environment](env/README.md) | Filesystem and shell protocols |
+| Model context | [Context](context/README.md) | Stage execution, reduction, and overflow recovery |
+| Persistence | [Session](session/README.md) | Append-only conversation storage |
+| Model stream | [model_stream.py](model_stream.py) | Stream events and terminal states |
+| Mechanisms | [mechanisms.py](mechanisms.py) | Generic mechanism descriptions |
+
+## Runtime rules
+
+| Case | Behavior |
+|---|---|
+| Tool failure | Lookup, argument, blocking, and ordinary execution failures become error `ToolResultMessage` entries. |
+| Callback failure | Use the default defined at the call site; propagate task cancellation. |
+| Environment failure | Operations return `Result`; `unwrap()` raises on a failed result. |
+| Provider failure | Adapters may retry transient errors within configured limits; Core routes overflow to recovery and other failures to a terminal result. |
+| Output token limit | Skip all tool calls in the truncated response and record error results so the model can reissue them. |
+| Tool termination | Finish only when every result in the batch requests termination. |
+| Cancellation | Preserve cancellation semantics and check again before the main Provider request after reduction. |
+| Context change | Validate and persist a decision before committing the model projection. |
+| Canonical conversation | Preserve valid conversation facts rather than replacing them with summaries. |
+| Provider overflow | Use bounded recovery; return a structured overflow failure if recovery cannot proceed. |
+| Streaming failure | Return an error terminal state rather than an assistant message. |
+
+Concrete algorithms belong in Lab. Extend Core only when an existing public protocol cannot express a general runtime requirement. Core has no module-specific environment variables.
+
+## Verify
+
+```bash
+.venv/bin/python -m unittest discover -s tests/core -t . -v
+```
