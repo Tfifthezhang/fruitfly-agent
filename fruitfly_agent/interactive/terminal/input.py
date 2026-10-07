@@ -66,14 +66,15 @@ class ReadlineLineEditor:
         self.reader = reader
         self.prompt = prompt
         self.framed = framed
+        self.frame_label = "prompt"
 
     def read_line(self) -> str | None:
         if not self.framed:
             try:
-                return self.reader("you> ")
+                return self.reader("you> " if self.frame_label == "prompt" else f"{self.frame_label}> ")
             except EOFError:
                 return None
-        top, bottom = self._frame_lines(self._terminal_columns())
+        top, bottom = self._frame_lines(self._terminal_columns(), self.frame_label)
         self.output.write(f"{top}\n\n{bottom}{self._MOVE_UP}\r")
         self.output.flush()
         try:
@@ -91,8 +92,8 @@ class ReadlineLineEditor:
         return terminal_columns(self.output)
 
     @staticmethod
-    def _frame_lines(columns: int) -> tuple[str, str]:
-        return prompt_frame_lines(columns)
+    def _frame_lines(columns: int, label: str = "prompt") -> tuple[str, str]:
+        return prompt_frame_lines(columns, label)
 
     def _finish_after_submitted_line(self, bottom: str) -> None:
         self.output.write(f"\r{self._CLEAR_LINE}{bottom}\n")
@@ -108,6 +109,25 @@ class ReadlineLineEditor:
     def _finish_after_interruption(self, bottom: str) -> None:
         self.output.write(f"\r{self._CLEAR_LINE}{bottom}\n")
         self.output.flush()
+
+
+def read_field_line(editor: LineEditor, label: str) -> str | None:
+    """Label built-in form readers without changing the injected reader contract."""
+    if isinstance(editor, ReadlineLineEditor):
+        previous = editor.frame_label
+        editor.frame_label = label
+        try:
+            return editor.read_line()
+        finally:
+            editor.frame_label = previous
+    if isinstance(editor, StreamLineEditor):
+        previous = editor.prompt
+        editor.prompt = f"{label}> "
+        try:
+            return editor.read_line()
+        finally:
+            editor.prompt = previous
+    return editor.read_line()
 
 
 def create_line_editor(

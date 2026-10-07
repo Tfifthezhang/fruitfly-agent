@@ -18,16 +18,20 @@ from fruitfly_agent.interactive import (
 )
 from fruitfly_agent.interactive.terminal import transient_screen
 from fruitfly_agent.providers.config import load_env
+from fruitfly_agent.providers.workspace import WorkspacePaths
 
 from .application import RunApplicationFactory, resolve_session_path as _resolve_path
 from .evaluation import RunEvaluationController
 
 
 async def run_cli(args: argparse.Namespace) -> int:
-    environment = {**os.environ, **load_env()}
     cwd = Path(args.cwd).resolve() if args.cwd else Path.cwd().resolve()
     application: AgentApplication | None = None
     try:
+        paths = WorkspacePaths(cwd)
+        for notice in paths.notices():
+            print(f"notice: {notice}", file=sys.stderr)
+        environment = {**load_env(paths.secret_file()), **os.environ}
         factory = RunApplicationFactory(
             cwd=cwd,
             environment=environment,
@@ -122,7 +126,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--resume",
         action="store_true",
-        help="load the specified or latest non-empty session",
+        help="resume the latest non-empty session, or select a path with --session",
     )
     parser.add_argument("--cwd", default=None, help="working directory")
     parser.add_argument(

@@ -31,7 +31,7 @@ The description helps the model decide when to read the full file. Use UTF-8, st
 
 | Action | Behavior |
 |---|---|
-| Enable **Configure → Context Manager → Skill catalog** | Keep **Read files** enabled, save, and start a new session. |
+| Enable **Configure → mechanisms · context-manager → skill-catalog** | Keep **read-tool** enabled, save, and start a new session. |
 | Submit a matching task | The model sees names, descriptions, and paths, then may use `read` to load instructions. |
 | Modify a Skill | Start a new session to rescan. |
 | Set `disable-model-invocation: true` | Hide it from the model; there is no separate manual Skill command. |

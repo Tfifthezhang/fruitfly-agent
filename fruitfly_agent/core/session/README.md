@@ -24,7 +24,7 @@ Sessions do not copy every Provider request, token event, or tool event. Use fro
 | Custom persistence | Implement `SessionLike` and inject it into `AgentLoopConfig`. |
 | Resume an application | Follow [Run recovery](../../run/README.md#recovery). |
 
-Records carry schema and kind identifiers. Replay validates entry IDs and parent references; incompatible data fails explicitly. An incomplete final JSON line can be discarded while retaining the valid prefix. A Session holds a POSIX writer lock for its lifetime. Failure to append a concise run record is logged and does not change the Agent result.
+Records carry schema and kind identifiers. Append validates the consecutive entry ID and earlier parent reference before writing. Replay applies the same validation; incompatible data fails explicitly. An incomplete final JSON line can be discarded while retaining the valid prefix. A Session holds a POSIX writer lock for its lifetime. Failure to append a concise run record is logged and does not change the Agent result.
 
 | File | Responsibility |
 |---|---|

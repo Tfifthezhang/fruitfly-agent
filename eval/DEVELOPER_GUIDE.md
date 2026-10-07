@@ -34,6 +34,8 @@ Pre-pull or build task images to separate image preparation failures from Agent 
 
 Preflight does not check cached images, free disk, every registry, or paid model connectivity. Host, Docker Engine, and container proxy settings are separate network paths.
 
+Select complete source or wheel material with `FRUITFLY_EVAL_PACKAGE` when the host is installed from a wheel. Source/editable use can discover the complete checkout. See [installation material](README.md#select-installation-material) for validation, staging, and environment precedence. Retain the exact artifact hash and corresponding source; version `0.1` alone does not establish reproducibility.
+
 ## Run through the terminal
 
 | Step | Action |

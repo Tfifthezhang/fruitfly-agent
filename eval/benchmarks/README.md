@@ -22,7 +22,7 @@ The installed-agent bridge reports project version `0.1`, matching package metad
 | Installation | Existing Python/venv preferred; bounded fallback setup with preserved logs |
 | Retries | Connection-only, before job creation; bounded attempts with all logs retained |
 
-Register in [Catalog](../catalog.py). Full setup, diagnostics, and extension procedures belong to [Evaluation guide](../DEVELOPER_GUIDE.md). No module-specific environment variables. Offline tests need no Docker; real jobs need the optional Harbor installation, Docker/Compose, registries, and model access.
+Register in [Catalog](../catalog.py). Full setup, diagnostics, and extension procedures belong to [Evaluation guide](../DEVELOPER_GUIDE.md). `FRUITFLY_EVAL_PACKAGE` selects explicit source or wheel installation material; see [Eval](../README.md#select-installation-material). Offline tests need no Docker; real jobs need the optional Harbor installation, Docker/Compose, registries, and model access.
 
 ```bash
 .venv/bin/python -m unittest tests.eval.test_catalog tests.eval.test_harbor -v

@@ -32,3 +32,6 @@ coverage.xml
 *.swp
 *.swo
 *.bak
+
+# Credential files are local even outside the default state directory.
+secrets.env

@@ -140,23 +140,21 @@ class Session:
 
     @staticmethod
     def _validate(entries: list[SessionEntry]) -> None:
-        seen: set[int] = set()
-        expected = 1
-        for entry in entries:
-            if entry.id != expected:
-                raise SessionCorruptError(
-                    f"session: non-consecutive id sequence (expected {expected}, got {entry.id})"
-                )
-            if entry.id in seen:
-                raise SessionCorruptError(f"session: duplicate entry id {entry.id}")
-            seen.add(entry.id)
-            if entry.parent_id is not None and (
-                entry.parent_id >= entry.id or entry.parent_id not in seen
-            ):
-                raise SessionCorruptError(
-                    f"session: entry {entry.id} has invalid parentId {entry.parent_id}"
-                )
-            expected += 1
+        for expected, entry in enumerate(entries, 1):
+            Session._validate_entry(entry, expected)
+
+    @staticmethod
+    def _validate_entry(entry: SessionEntry, expected: int) -> None:
+        if type(entry.id) is not int or entry.id != expected:
+            raise SessionCorruptError(
+                f"session: non-consecutive id sequence (expected {expected}, got {entry.id})"
+            )
+        if entry.parent_id is not None and (
+            type(entry.parent_id) is not int or not 1 <= entry.parent_id < entry.id
+        ):
+            raise SessionCorruptError(
+                f"session: entry {entry.id} has invalid parentId {entry.parent_id}"
+            )
 
     def _rewrite_valid_prefix(self, entries: list[SessionEntry]) -> None:
         """Atomically re-publish the valid prefix after a torn tail."""
@@ -183,10 +181,6 @@ class Session:
                 if existing.id == entry_id:
                     return existing
         next_id = entry_id if entry_id is not None else (self._entries[-1].id + 1 if self._entries else 1)
-        if self._entries and next_id != self._entries[-1].id + 1:
-            raise SessionCorruptError(
-                f"session: non-consecutive append (last {self._entries[-1].id}, got {next_id})"
-            )
         entry = SessionEntry(
             id=next_id,
             parent_id=parent_id,
@@ -194,6 +188,7 @@ class Session:
             timestamp=time.time(),
             payload=payload,
         )
+        self._validate_entry(entry, len(self._entries) + 1)
         line = entry.to_json_line()
         if self._repair_newline:
             with self.path.open("ab") as f:

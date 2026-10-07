@@ -15,14 +15,29 @@ Assemble the default runtime from configuration, Providers, Lab, and Interactive
 
 Real tasks call the configured model service and may incur charges. See [Getting started](../../GETTING_STARTED.md) for installation and [Terminal](../interactive/terminal/README.md) for interaction.
 
+| Resume entry | Behavior |
+|---|---|
+| `--resume` | Resume the latest non-empty session at startup, subject to full runtime validation. |
+| `--resume --session PATH` | Select the startup session explicitly. |
+| `/resume` / `/resume PATH` | Choose or switch a session from an idle terminal. |
+| `"TASK" --resume [--session PATH]` | Execute one new task with saved context; historical chat is not printed. Model requests may incur charges. |
+
+Interactive recovery displays original saved conversation through the same terminal history component for both entry points. Startup selection uses the configured workspace/profile; incompatible sessions are rejected rather than silently skipped. In-terminal discovery lists compatible candidates. Neither entry merges sessions or replays model/tool execution.
+
 ## Files and ownership
 
 | File / module | Responsibility |
 |---|---|
 | [Configuration](configuration/README.md) | Harness YAML, validation, persistence, and digest |
-| [profiles.py](profiles.py) | Catalog discovery and next-session configuration controller |
+| [profiles.py](profiles.py) | Next-session draft editing, dependency changes, and persistence |
+| [model_selection.py](model_selection.py) | Harness discovery and model catalog resolution |
+| [migrate_configuration.py](migrate_configuration.py) | Explicit offline configuration relocation; see [commands and limits](../../CONFIGURATION.md#relocate-workspace-configuration) |
+| [model_setup.py](model_setup.py) | Stage model additions and credentials, preserve local file contents, and coordinate save/rollback |
+| [configuration_views.py](configuration_views.py) | Mechanism, algorithm-group, and prompt menu projections |
 | [assembly.py](assembly.py) | Provider construction, Lab assembly, and actual manifest |
-| [application.py](application.py) | `RunApplicationFactory`, runtime preparation, and recovery |
+| [application.py](application.py) | `RunApplicationFactory`, runtime preparation, and candidate activation |
+| [search_jobs.py](search_jobs.py) | Preview receipts, frozen search inputs, and proposal persistence |
+| [recovery.py](recovery.py) | Session discovery, saved prompt/artifact references, and full manifest verification |
 | [optimization.py](optimization.py) | Candidate records and durable inbox |
 | [optimization_service.py](optimization_service.py) | Generic Interactive views and candidate preparation |
 | [retention.py](retention.py), [task_results.py](task_results.py) | Reference-protected cleanup and readable exports |
@@ -66,6 +81,8 @@ Assembly occurs at `factory.open()` or `Application.start()`. See the [offline A
 
 ## Recovery
 
+[recovery.py](recovery.py) owns discovery and manifest checks. The existing exports from `run.application` remain available.
+
 | Concern | Rule |
 |---|---|
 | RuntimeManifest | Schema 5 fixes actual model, effective selections/parameters, declared implementation identities, prompt content, and consumed artifacts. |
@@ -79,6 +96,8 @@ Assembly occurs at `factory.open()` or `Application.start()`. See the [offline A
 Canonical data and record semantics belong to [Session](../core/session/README.md). Configuration format belongs to [Harness configuration](configuration/README.md).
 
 ## Candidate jobs
+
+[search_jobs.py](search_jobs.py) coordinates previews and searches against the factory's active runtime. The factory retains runtime ownership and exposes the existing host methods.
 
 | Step | Run's responsibility |
 |---|---|
@@ -114,7 +133,7 @@ host = RunEvolutionHost(
 
 The verifier returns `VerificationEvidence` bound to candidate/artifact/parent/policy identities, not merely a search score. Jobs live in `.fruitfly/evolution/`. Only confirmed activation advances the version. Unknown paid phases stop; activation interruptions reconcile the actual manifest. One coordinator owns the job; no cross-process commit transaction. See [RSI](../lab/rsi/README.md).
 
-Run has no dedicated API-key variables. Use [Configuration](../../CONFIGURATION.md) and [Providers](../providers/README.md) for environment handling.
+Run exposes an optional `configuration.model_setup` service to the terminal. Model additions and hidden credentials stay in memory until configuration save; reset discards them. The factory's secret environment is updated after successful save, so the next session can use the model without restarting. Existing configuration-controller consumers can omit this service. Use [Configuration](../../CONFIGURATION.md) and [Providers](../providers/README.md) for supported APIs, generated key-variable names, and persistence limits.
 
 ```bash
 .venv/bin/python -m unittest discover -s tests/run -t . -v

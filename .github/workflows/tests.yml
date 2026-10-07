@@ -30,7 +30,9 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
       - name: Install base package without benchmark dependencies
-        run: python -m pip install -e .
+        run: python -m pip install -e '.[dev]'
+      - name: Runtime and interface type checks
+        run: python -m mypy
       - name: Architecture and contract guards
         run: |
           python -m unittest discover -s tests/architecture -t .
@@ -58,6 +60,7 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           for name in ('models.yaml', '.env', '.env.local', '.env.staging', '.env.production',
+                       '.fruitfly/models.yaml', '.fruitfly/secrets.env',
                        '.fruitfly/publication-probe.json', '.claude/publication-probe.json'):
               path = Path(name)
               path.parent.mkdir(parents=True, exist_ok=True)
@@ -77,8 +80,8 @@ jobs:
               else:
                   with tarfile.open(archive) as stream:
                       names = stream.getnames()
-                  assert any(name.endswith('/.env.example') for name in names)
-                  assert any(name.endswith('/models.example.yaml') for name in names)
+                  assert any(name.endswith('/examples/configuration/.env.example') for name in names)
+                  assert any(name.endswith('/examples/configuration/models.example.yaml') for name in names)
                   assert any(name.endswith('/assets/logo.svg') for name in names)
               for name in names:
                   parts = Path(name).parts
@@ -86,6 +89,7 @@ jobs:
                   assert not any(part.startswith('.env') and part != '.env.example' for part in parts), name
                   assert not name.endswith(('.pyc', '.DS_Store')), name
                   assert Path(name).name != 'models.yaml', name
+                  assert Path(name).name != 'secrets.env', name
               assert any(name.endswith('/LICENSE') for name in names)
               assert any(name.endswith('/THIRD_PARTY_NOTICES.md') for name in names)
               print(archive.name, 'contents verified')
@@ -100,3 +104,4 @@ jobs:
           /tmp/fruitfly-wheel/bin/fruitfly-agent --help
           /tmp/fruitfly-wheel/bin/fruitfly-agent-eval catalog --json
           /tmp/fruitfly-wheel/bin/python -c "from fruitfly_agent.lab.base_prompt import builtins; assert [p.prompt_id for p in builtins()] == ['assistant-default']"
+          /tmp/fruitfly-wheel/bin/python "$GITHUB_WORKSPACE/examples/packaging/check_installed.py" "$GITHUB_WORKSPACE"/dist/*.whl

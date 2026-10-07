@@ -23,7 +23,8 @@ from .events import (
     RunFinished,
     RunStarted,
 )
-from .models import InteractiveMechanism, InteractiveStatus
+from .models import ConversationMessage, InteractiveMechanism, InteractiveStatus
+from .conversation import conversation_snapshot
 
 
 RunLoop = Callable[..., Awaitable[AgentLoopResult]]
@@ -77,6 +78,10 @@ class InteractiveSession:
     @property
     def messages(self) -> list[AgentMessage]:
         return list(self._messages)
+
+    def conversation(self) -> tuple[ConversationMessage, ...]:
+        """Read canonical history without exposing mutable Core messages."""
+        return conversation_snapshot(item.message for item in self.canonical_items())
 
     @property
     def status(self) -> InteractiveStatus:

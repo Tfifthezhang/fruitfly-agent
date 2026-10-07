@@ -28,7 +28,9 @@ Configure `AgentLoopConfig` with a Provider, tools, execution environment, conte
 | Callback failure | Use the default defined at the call site; propagate task cancellation. |
 | Environment failure | Operations return `Result`; `unwrap()` raises on a failed result. |
 | Provider failure | Adapters may retry transient errors within configured limits; Core routes overflow to recovery and other failures to a terminal result. |
-| Output token limit | Skip all tool calls in the truncated response and record error results so the model can reissue them. |
+| Output token limit | Skip all tool calls in the truncated response and record associated error results. Three consecutive truncated responses end with an `output_limit` error; a complete response resets the counter. |
+| Tool budget | `max_tool_calls_per_turn` limits attempts within one outer turn. Execute only the remaining batch allowance; skipped calls each receive an associated error result. Follow-up turns receive a fresh allowance. |
+| Turn budget | `max_turns` bounds outer turns, including follow-ups; it is not a Provider request or monetary limit. |
 | Tool termination | Finish only when every result in the batch requests termination. |
 | Cancellation | Preserve cancellation semantics and check again before the main Provider request after reduction. |
 | Context change | Validate and persist a decision before committing the model projection. |

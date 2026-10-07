@@ -10,26 +10,43 @@ Use FruitFlyAgent through stdin/stdout, menus, and live events. Application owns
 |---|---|
 | Start | Run `python -m fruitfly_agent`; choose **Start new session**. |
 | Configure | `/config`; save choices for a new session. |
-| Select a prompt | **Configure → Base prompt**; preview and confirm. |
+| Select a prompt | **Configure → prompt**; preview and confirm. |
 | Inspect activity | `/status` |
 | Cancel active work | `/cancel` |
+| Restore a conversation | `/resume` to choose a session; `/resume PATH` to switch directly. |
 | Review live details | `/trace` |
 | Search or review candidates | `/optimize [DIRECTION]` |
 | Run external evaluation while idle | `/eval` |
 
 POSIX ANSI terminals support live input, history, cancellation, and bracketed paste. Redirected input uses line-based fallback. Display limits do not alter model context or stored messages. `NO_COLOR` and terminal capabilities affect rendering.
 
+## Restore a conversation
+
+After successful `/resume` or interactive startup with `--resume`, the terminal appends the original conversation in chronological order, followed by an end marker and the normal input prompt. User and assistant text is complete; ANSI terminals format assistant Markdown. Use terminal scrollback to review earlier turns. Existing scrollback is retained, and menus do not replay history.
+
+Tool calls show names without arguments. Tool results show at most 800 characters per message and explicitly mark omitted output. Images show attachment/media-type markers; reasoning shows an omission marker. Internal context summaries and transient activity events are not replayed. History display makes no model requests, executes no tools, and writes no messages. Context reduction may still affect the context sent to the model.
+
+Cancelled or failed restoration keeps the current session and does not display the target history. Embedding hosts can optionally expose `conversation()` using the [Interactive views](../README.md#state-and-events); existing terminal hosts without it continue to work. A single-task CLI run with `--resume` continues saved context without printing the historical conversation.
+
 ## Configure
 
 | Menu | Behavior |
 |---|---|
-| Model / Base prompt | Select the model and prompt for the next session. |
-| Context Manager, Tools, Environment, Optimization | Enable responsibilities and choose algorithms in-place. |
+| `model` / `prompt` | Select the model and prompt for the next session. |
+| Add model… | Collect host-provided service fields, hidden API key, and review; stage until configuration save. Opens on first startup when no models exist. |
+| Set API key… | Stage a missing credential for the selected model; the menu shows only set/missing status. |
+| `mechanisms · context-manager`, `mechanisms · tools`, `mechanisms · environment`, `mechanisms · optimization` | Enable responsibilities and choose algorithms in-place. |
 | Algorithm selector | Expand on the current row, including single-algorithm groups. |
 | Detailed parameters | Edit harness YAML; no parameter submenu. |
 | Prompt results | Current configuration/profile's latest task-scoped prompt candidates, plus built-ins and current selection |
 
 Expanding a prompt group does not change configuration. Choosing a prompt opens a full preview and confirmation. Active and resumed sessions retain their manifest. See [Configuration](../../../CONFIGURATION.md).
+
+Selecting a service replaces the choice menu with one field per screen. Each field shows the selected service, step count, its purpose, and any default. Input frames use the field name; normal conversation frames keep their prompt label. Official and custom services have separate address instructions. `models.<name>` is the menu name; `model` is the service's exact identifier. Other fields use their YAML keys.
+
+The `capabilities` page renders host-provided booleans as checkboxes with defaults. Space or Enter toggles the selected capability; Continue confirms. Choices limited to one value remain fixed and explain the requirement. Checked values are staged as `true`, unchecked values as `false`; cancel discards the page. The host remains responsible for capability validation.
+
+Model forms accept `/cancel` or EOF without staging. Review includes the selected service and defaults to Cancel. API key input disables TTY echo and bypasses readline/history; redirected input is read directly without writing its value to output. The host validates and saves settings; the terminal performs no Provider requests or filesystem configuration writes.
 
 ## Optimize and review
 
@@ -64,12 +81,15 @@ The frontend waits for evaluation to return; ordinary chat and the optimization 
 | Files | Responsibility |
 |---|---|
 | [frontend.py](frontend.py), [renderer.py](renderer.py) | Input routing and event display |
+| [history.py](history.py) | Static canonical conversation display, separate from live events |
 | [live.py](live.py), [input.py](input.py) | TTY editing and live input |
 | [menu.py](menu.py), [screen.py](screen.py) | Navigation and temporary menu display |
 | [configuration.py](configuration.py), [resume.py](resume.py), [evaluation.py](evaluation.py) | Service-driven menus |
+| [model_setup.py](model_setup.py) | Generic model form, review, and secret input with echo restoration |
+| [optimization.py](optimization.py) | Search confirmation, candidate review, and corrected-task menus with injected services |
 | [markdown.py](markdown.py), [text.py](text.py) | Safe content rendering |
 | [welcome.py](welcome.py), [branding.py](branding.py) | Welcome and identity display |
 
 ```bash
-.venv/bin/python -m unittest tests.interactive.test_terminal tests.interactive.test_line_editor tests.interactive.test_menu -v
+.venv/bin/python -m unittest discover -s tests/interactive -t . -v
 ```

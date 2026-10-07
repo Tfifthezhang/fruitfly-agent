@@ -213,7 +213,7 @@ class TaskPackApplicationTests(unittest.IsolatedAsyncioTestCase):
             keys = iter((b"\r", b"\r", b"\x1b[A", b"\r"))
             frontend.menu_input = SimpleNamespace(read_event=lambda: RawTerminalMenuInput.decode(next(keys)))
             frontend.menu_renderer.ansi = True
-            await frontend._save_correction_flow()
+            await frontend._optimization_frontend().save_correction()
             files = list(root.glob(".fruitfly/optimization/task-packs/*/pack.json"))
             self.assertEqual(1, len(files))
             self.assertEqual("answer", load_pack(root, files[0]).material["train"][0]["expected"])

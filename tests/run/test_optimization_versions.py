@@ -26,6 +26,20 @@ from fruitfly_agent.lab.optimization.text_optimizer import TextProposal, SearchR
 
 
 class RetentionTests(unittest.TestCase):
+    def test_unavailable_candidate_scores_round_trip_as_unknown(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = CandidateStore(root / "candidates", DataArtifactStore(root / "artifacts"))
+            record = store.create(
+                text="candidate", algorithm="custom", parent_manifest={"digest": "parent"},
+                cases_digest="cases", direction="improve", seed_score=None,
+                validation_score=None, metric_calls=0,
+                snapshot=BasePromptTarget("original").snapshot(),
+            )
+            saved = store.read(record.candidate_id)
+            self.assertIsNone(saved.seed_score)
+            self.assertIsNone(saved.validation_score)
+
     def test_latest_per_scope_collects_only_unreferenced_owned_text(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -302,7 +316,7 @@ class StartupVersionsTests(unittest.IsolatedAsyncioTestCase):
         frontend.menu_input=SimpleNamespace(read_event=lambda:RawTerminalMenuInput.decode(next(sequence)))
         frontend.menu_renderer=TerminalMenuRenderer(output)
         frontend.menu_renderer.ansi=True
-        await frontend._candidate_detail_flow('candidate-1')
+        await frontend._optimization_frontend().candidate_detail('candidate-1')
         self.assertIn('Original text (2/3)',output.getvalue())
         self.assertIn('Candidate text (1/1)',output.getvalue())
         frames=[f for f in output.getvalue().split('\x1b[2J\x1b[H') if f.startswith('Candidate candidate-')]

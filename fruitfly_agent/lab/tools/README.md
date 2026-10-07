@@ -23,6 +23,7 @@ Inject `builtin_tools()` into `AgentLoopConfig.tools`. IPython is added explicit
 
 | Operation | Contract |
 |---|---|
+| Paths | Preserve ASCII punctuation, including hyphens. Convert U+00A0, U+2000–U+200A, U+202F, U+205F, and U+3000 to spaces and strip a leading `@`; reads also try documented Unicode filename variants. |
 | Write | Create or replace text through the environment; report the number of Python string characters, not encoded bytes or displayed glyphs. |
 | Edit | Locate every replacement in the original file before writing; require unique, non-overlapping spans. |
 | Fuzzy edit | Compare whole-line spans; reject tied best matches and empty `oldText`. |

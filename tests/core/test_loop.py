@@ -40,6 +40,81 @@ class TestLoop(unittest.IsolatedAsyncioTestCase):
 
     # --- G1: length-truncated tool calls are NEVER executed -----------------
 
+    async def test_tool_batch_cannot_exceed_remaining_budget(self):
+        for mode in ("parallel", "sequential"):
+            with self.subTest(mode=mode):
+                provider = FauxProvider()
+                tool, calls = make_tool(execution_mode=mode)
+                provider.respond_tool_call("count", {"value": "first"})
+                provider.respond(AssistantMessage(content=[
+                    ToolCallBlock(id=f"batch_{i}", name="count", input={"value": str(i)})
+                    for i in range(3)
+                ], stop_reason="toolUse"))
+                result = await run_loop(make_config(
+                    provider, [tool], max_tool_calls_per_turn=2,
+                ), "work")
+                self.assertEqual([{"value": "first"}, {"value": "0"}], calls)
+                self.assertEqual(2, result.tool_call_count)
+                errors = [m for m in result.messages if isinstance(m, ToolResultMessage) and m.is_error]
+                self.assertEqual(["batch_1", "batch_2"], [m.tool_call_id for m in errors])
+                self.assertTrue(all("not executed" in m.text for m in errors))
+                self.assertEqual(2, len(provider.calls))
+
+    async def test_zero_tool_budget_preserves_each_call_association(self):
+        tool, calls = make_tool()
+        self.provider.respond_tool_call("count", {"value": "unused"})
+        result = await run_loop(make_config(
+            self.provider, [tool], max_tool_calls_per_turn=0,
+        ), "work")
+        self.assertEqual([], calls)
+        self.assertEqual(0, result.tool_call_count)
+        self.assertEqual("call_1", result.messages[-1].tool_call_id)
+        self.assertTrue(result.messages[-1].is_error)
+
+    async def test_tool_budget_resets_for_follow_up_turn(self):
+        tool, calls = make_tool()
+        for value in ("first", "second"):
+            self.provider.respond_tool_call("count", {"value": value})
+            self.provider.respond_text("done")
+        follow_ups = [[UserMessage(content="continue")], []]
+        result = await run_loop(make_config(
+            self.provider, [tool], max_tool_calls_per_turn=1,
+            get_follow_up_messages=lambda ctx: follow_ups.pop(0),
+        ), "work")
+        self.assertEqual(2, len(calls))
+        self.assertEqual(2, result.tool_call_count)
+        self.assertEqual(2, result.turn_count)
+
+    async def test_consecutive_truncation_is_bounded_with_and_without_tools(self):
+        for with_tools in (False, True):
+            with self.subTest(with_tools=with_tools):
+                provider = FauxProvider()
+                tool, calls = make_tool()
+                for _ in range(5):
+                    if with_tools:
+                        provider.respond_length_with_tool_call("count", {"value": "unused"})
+                    else:
+                        provider.respond_text("partial", stop_reason="length")
+                result = await run_loop(make_config(provider, [tool], max_turns=1), "work")
+                self.assertTrue(result.is_error)
+                self.assertEqual("output_limit", result.error_details["kind"])
+                self.assertEqual(3, result.error_details["attempts"])
+                self.assertEqual(3, len(provider.calls))
+                self.assertEqual([], calls)
+
+    async def test_complete_response_resets_truncation_counter(self):
+        tool, calls = make_tool()
+        for _ in range(2):
+            self.provider.respond_text("partial", stop_reason="length")
+        self.provider.respond_tool_call("count", {"value": "complete"})
+        for _ in range(2):
+            self.provider.respond_text("partial", stop_reason="length")
+        self.provider.respond_text("done")
+        result = await run_loop(make_config(self.provider, [tool]), "work")
+        self.assertFalse(result.is_error)
+        self.assertEqual(6, len(self.provider.calls))
+        self.assertEqual(1, len(calls))
+
     async def test_length_truncated_tool_calls_not_executed(self):
         tool, calls = make_tool()
         self.provider.respond_length_with_tool_call("count", {"value": "x"})

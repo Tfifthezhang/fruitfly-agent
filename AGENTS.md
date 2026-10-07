@@ -65,7 +65,7 @@ Follow the dependency table in [Runtime architecture](fruitfly_agent/README.md#m
 | Changed area | Documentation to check |
 |---|---|
 | Structure, imports, exports, CLI | Root/runtime READMEs, affected guides/examples, packaging, and architecture/contracts |
-| Model, key, or configuration fields | [Configuration](CONFIGURATION.md), Provider/module guides, `models.yaml`, and `.env.example` |
+| Model, key, or configuration fields | [Configuration](CONFIGURATION.md), Provider/module guides, `examples/configuration/models.example.yaml`, and `examples/configuration/.env.example` |
 | Algorithm, protocol, or lifecycle | Owning module, runtime architecture, and affected configuration/examples; Eval only when it consumes the capability |
 | Eval identity, artifacts, reports, or external effects | Eval guides, storage/CLI examples, and notices beside affected operations |
 

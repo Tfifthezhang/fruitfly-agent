@@ -15,6 +15,8 @@ from typing import Any, Mapping
 import yaml
 
 from fruitfly_agent.providers.config import load_env
+from fruitfly_agent.providers.workspace import WorkspacePaths
+from eval.installation import resolve_installation
 
 from .base import BenchmarkDescriptor, PreflightResult, ProgressSink
 
@@ -148,6 +150,10 @@ class HarborBenchmarkAdapter:
         self, *, plan_path: Path, result_path: Path, variant: str,
         progress: ProgressSink | None = None,
     ) -> None:
+        source_root = resolve_installation(
+            os.environ.get("FRUITFLY_EVAL_PACKAGE"),
+            checkout=Path(__file__).resolve().parents[2],
+        )
         preflight = self.preflight(variant)
         if not preflight.available:
             failed = next(item for item in preflight.checks if not item["ok"])
@@ -166,11 +172,10 @@ class HarborBenchmarkAdapter:
         timeout = int(execution.get("timeout_seconds", 3600))
         jobs_root = result_path.parent / "harbor"
         jobs_root.mkdir(parents=True, exist_ok=True)
-        source_root = Path(__file__).resolve().parents[2]
-        runner_environment = os.environ.copy()
-        workspace_env = Path(str(runtime.get("working_directory", ""))) / ".env"
-        if workspace_env.is_file():
-            runner_environment.update(load_env(workspace_env))
+        workspace_paths = WorkspacePaths(Path(str(runtime.get("working_directory", ""))))
+        for notice in workspace_paths.notices():
+            print(f"notice: {notice}", file=sys.stderr)
+        runner_environment = {**load_env(workspace_paths.secret_file()), **os.environ}
         all_trials: list[dict[str, Any]] = []
         all_metrics: list[dict[str, Any]] = []
         artifacts: list[dict[str, Any]] = []

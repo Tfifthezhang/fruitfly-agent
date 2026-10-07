@@ -11,7 +11,7 @@ import unicodedata
 
 from fruitfly_agent.core.env import ExecutionEnv
 
-_UNICODE_SPACES = "  -   　"
+_UNICODE_SPACES = "\u00a0" + "".join(chr(code) for code in range(0x2000, 0x200B)) + "\u202f\u205f\u3000"
 _NARROW_NO_BREAK_SPACE = " "
 _TRANSLATION = str.maketrans({ord(c): " " for c in _UNICODE_SPACES})
 

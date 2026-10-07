@@ -9,7 +9,7 @@ Search and compare improvements to a fixed target. Optimization proposes candida
 | Step | Action |
 |---|---|
 | 1 | Prepare a [task pack](TASK_PACKS.md) and run its offline checks. |
-| 2 | In **Configure → Optimization**, enable **Text optimizer**, select **OPRO**, save, and start a new session. |
+| 2 | In **Configure → mechanisms · optimization**, enable **text-optimizer**, select **opro**, save, and start a new session. |
 | 3 | Use `/optimize [DIRECTION]`, select the pack, and review target, model, budget, and execution policy. |
 | 4 | Confirm **Start search**; monitor `/status` or use `/cancel`. |
 | 5 | Review the complete candidate and evidence; save it for later or confirm a new session. |

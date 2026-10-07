@@ -12,7 +12,7 @@ Own the built-in system instructions and the adapter that makes them an optimiza
 | `get_builtin(id)` | Return the definition or raise `ValueError`. |
 | Profile selection | `prompt` defaults to `assistant-default`; may reference a content-addressed text artifact. |
 
-Choose **Configure → Base prompt**, preview the text, confirm, and start a new session. The menu shows built-ins, the current selection, and current configuration/profile task results. Resuming a session keeps its original manifest. Task labels do not imply general improvement or automatic prompt routing.
+Choose **Configure → prompt**, preview the text, confirm, and start a new session. The menu shows built-ins, the current selection, and current configuration/profile task results. Resuming a session keeps its original manifest. Task labels do not imply general improvement or automatic prompt routing.
 
 ## Default instructions
 

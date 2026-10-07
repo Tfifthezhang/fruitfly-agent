@@ -17,6 +17,10 @@
 
 `capabilities.reasoning: true` declares a model capability; it does not send reasoning parameters or guarantee lossless reasoning-state recovery.
 
+Responses represents input and output as typed items, including `function_call` and `function_call_output`; see the [official OpenAI guide](https://developers.openai.com/api/docs/guides/migrate-to-responses). This project's Messages adapter sends `messages` and separate `system` instructions, with `tool_use` and `tool_result` content blocks. The adapters translate these formats into Core messages. Protocol choice does not determine model quality, context limits, or service compatibility.
+
+The setup menu separates official accounts from custom compatible services. Official entries default to the corresponding SDK endpoint; custom entries require a base URL. Keys must belong to the selected service. A Chat Completions-only service cannot use this project's Responses adapter.
+
 ## Model parameters
 
 | Configuration | Result |
@@ -25,7 +29,7 @@
 | Anthropic `parameters.reasoning` | Unsupported constructor argument; fails before the request. |
 | Anthropic optional adapter settings | `retry_max`, `retry_base_delay` |
 
-Keep nonsecret specifications in `models.yaml` and keys in `.env`. Install both SDKs using the same environment that runs the Agent:
+Keep nonsecret specifications in `.fruitfly/models.yaml` and keys in `.fruitfly/secrets.env`. Install both SDKs using the same environment that runs the Agent:
 
 ```bash
 .venv/bin/python -m pip install -e .
@@ -34,18 +38,18 @@ Keep nonsecret specifications in `models.yaml` and keys in `.env`. Install both 
 
 ## Configure your service
 
-Copy the public [model template](../../models.example.yaml) to local `models.yaml`. It supplies two protocol examples with placeholder IDs and reserved `.invalid` endpoints:
+Copy the public [model template](../../examples/configuration/models.example.yaml) to local `.fruitfly/models.yaml`. It supplies two profiles for the same `deepseek-flash` model through DeepSeek endpoints:
 
-| Profile | Protocol | Required edits |
+| Profile | Protocol | API base URL |
 |---|---|---|
-| `example-responses` | OpenAI Responses | Model ID, Responses-compatible base URL, actual limits, and capabilities |
-| `example-messages` | Anthropic Messages | Model ID, Messages-compatible base URL, actual limits, and capabilities |
+| `deepseek-flash-openai` | OpenAI Responses | `https://api.deepseek.com` |
+| `deepseek-flash-anthropic` | Anthropic Messages | `https://api.deepseek.com/anthropic` |
 
 Keep only usable profiles and rename them if desired. A service offering only Chat Completions cannot use the Responses adapter. Omit `base_url` to use the chosen SDK's default endpoint. Do not infer protocol compatibility from the vendor name.
 
-Both template profiles use `api_key_env: MODEL_API_KEY`. Set that variable in `.env` or the process environment. For different credentials, give each profile its own variable name and set the matching values. Never put key values in the catalog.
+Both template profiles use `api_key_env: DEEPSEEK_API_KEY`. Set that variable in `.fruitfly/secrets.env` or the process environment. For different credentials, give each profile its own variable name and set the matching values. Never put key values in the catalog.
 
-The template's numeric limits are illustrative. Check your model's documented limits and set capabilities to match the model and endpoint. Optional `parameters` follow the protocol differences above; omit them unless your service and adapter accept them.
+The template uses conservative working/output budgets. Both profiles need a DeepSeek key. The Responses example disables thinking with `reasoning.effort: none`; the Messages adapter cannot configure thinking and uses the server default. See [example budgets, official sources, and unverified live paths](../../examples/configuration/README.md). Check documented limits and capabilities when customizing. Optional `parameters` follow the protocol differences above; omit them unless your service and adapter accept them.
 
 Use a model available to your account. Changing Provider or model requires a new session; recovery checks the actual manifest. Parsing the catalog offline does not verify remote compatibility. Live requests use the network and may incur charges.
 

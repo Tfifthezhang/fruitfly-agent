@@ -38,7 +38,7 @@ class ConfirmationNavigationTests(unittest.IsolatedAsyncioTestCase):
         for events, expected, start in scenarios:
             with self.subTest(events=events):
                 frontend, session, output = self.frontend(events)
-                await frontend._start_optimization_flow('improve')
+                await frontend._optimization_frontend().start_search('improve')
                 frames = [f for f in output.getvalue().split('\x1b[2J\x1b[H') if f.startswith('Confirm optimization')]
                 selections = [0 if '> 1. Start search' in f else 1 for f in frames]
                 self.assertEqual(expected, selections)
@@ -56,7 +56,7 @@ class ConfirmationNavigationTests(unittest.IsolatedAsyncioTestCase):
         ):
             with self.subTest(title=title):
                 frontend, session, output = self.frontend((b'\x1b[A', b'\r'))
-                self.assertTrue(frontend._confirm_choice(title=title, subtitle='Review first', rows=(MenuRow(label), MenuRow('Cancel'))))
+                self.assertTrue(frontend._optimization_frontend().confirm_choice(title=title, subtitle='Review first', rows=(MenuRow(label), MenuRow('Cancel'))))
                 self.assertIn('> 2. Cancel', output.getvalue())
                 self.assertIn(f'> 1. {label}', output.getvalue())
                 session.start_optimization.assert_not_called()
@@ -67,7 +67,7 @@ class ConfirmationNavigationTests(unittest.IsolatedAsyncioTestCase):
                 frontend, _, _ = self.frontend(())
                 frontend.menu_renderer.ansi = False
                 frontend.menu_input = LineMenuInput(SimpleNamespace(read_line=lambda: value))
-                self.assertEqual(expected, frontend._confirm_choice(title='Confirm', subtitle='', rows=(MenuRow('Proceed'), MenuRow('Cancel'))))
+                self.assertEqual(expected, frontend._optimization_frontend().confirm_choice(title='Confirm', subtitle='', rows=(MenuRow('Proceed'), MenuRow('Cancel'))))
 
     async def test_candidate_actions_preserve_arrow_selection_and_execute_on_enter(self):
         scenarios = (
@@ -92,7 +92,7 @@ class ConfirmationNavigationTests(unittest.IsolatedAsyncioTestCase):
                     session.adopt_candidate.assert_not_called()
                     return RawTerminalMenuInput.decode(next(sequence))
                 frontend.menu_input = SimpleNamespace(read_event=read_event)
-                await frontend._candidate_detail_flow('candidate-1')
+                await frontend._optimization_frontend().candidate_detail('candidate-1')
                 frames = [f for f in output.getvalue().split('\x1b[2J\x1b[H') if f.startswith('Candidate candidate-')]
                 selections = [next(i for i in range(4) if f'> {i + 1}.' in frame) for frame in frames]
                 self.assertEqual(expected, selections)
@@ -112,7 +112,7 @@ class ConfirmationNavigationTests(unittest.IsolatedAsyncioTestCase):
             candidate_id='candidate-1', status='selected_for_next_session',
             algorithm='custom', target='base_prompt', evidence=()), 'change'))
         session.candidate_action = Mock()
-        await frontend._candidate_detail_flow('candidate-1')
+        await frontend._optimization_frontend().candidate_detail('candidate-1')
         self.assertIn('> 2. Back', output.getvalue())
         self.assertIn('> 1. Use for a new session', output.getvalue())
         session.candidate_action.assert_not_called()

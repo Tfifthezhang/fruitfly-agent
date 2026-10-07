@@ -14,7 +14,7 @@ Adapt model APIs to Core's Provider protocol. Run resolves model specifications 
 
 See [Configuration](../../CONFIGURATION.md) for file locations and [Provider guide](PROVIDER_GUIDE.md) for protocol differences and parameter examples.
 
-Copy the public [model template](../../models.example.yaml) to local `models.yaml`. Replace placeholder IDs, endpoints, limits, and capabilities before use; keep key values in `.env` or the process environment.
+Use the terminal model wizard or copy the public [model template](../../examples/configuration/models.example.yaml) to local `.fruitfly/models.yaml` for manual setup. The single catalog contains DeepSeek Flash Responses and Messages profiles; configure a DeepSeek key and select a profile before use; keep key values in `.fruitfly/secrets.env` or the process environment. Wizard validation is offline and does not establish remote compatibility or model capability.
 
 ## Requests and errors
 
@@ -35,6 +35,7 @@ Harness call budgets do not count individual adapter retry attempts or guarantee
 | File | Responsibility |
 |---|---|
 | [specs.py](specs.py) | Model and Provider specifications |
+| [model_setup.py](model_setup.py) | Supported service descriptions and offline validation of new model entries |
 | [registry.py](registry.py), [config.py](config.py) | Registration, construction, and environment loading |
 | [anthropic.py](anthropic.py), [anthropic_codec.py](anthropic_codec.py) | Messages requests and codec |
 | [openai.py](openai.py), [openai_codec.py](openai_codec.py) | Responses requests and codec |
@@ -47,3 +48,7 @@ Implement Core's Provider protocol, register the adapter, and test messages, str
 ```
 
 Real network checks use the explicit [integration smoke](../../tests/integration/README.md) and may incur charges.
+
+[workspace.py](workspace.py) centralizes model and secret locations for Run and Eval. See [Configuration](../../CONFIGURATION.md#files-and-precedence) for defaults, legacy fallback, and explicit catalog precedence. `load_env()` reads only the selected workspace; an explicit file argument reads that file.
+
+The model wizard offers the exact `capabilities` names from the model catalog. Optional selections are declarations of service support, not connection tests. The Run harness requires `tools` and `streaming`; invalid boolean selections fail before staging.

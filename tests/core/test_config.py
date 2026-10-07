@@ -38,6 +38,14 @@ class ConfigTests(unittest.TestCase):
                     max_context_recovery_attempts=invalid,
                 )
 
+    def test_turn_and_tool_budgets_are_nonnegative_integers(self) -> None:
+        for name in ("max_turns", "max_tool_calls_per_turn"):
+            for invalid in (-1, True, 1.5):
+                with self.subTest(name=name, invalid=invalid), self.assertRaisesRegex(ValueError, name):
+                    AgentLoopConfig(provider=FauxProvider(), **{name: invalid})
+            config = AgentLoopConfig(provider=FauxProvider(), **{name: 0})
+            self.assertEqual(0, getattr(config, name))
+
 
 if __name__ == "__main__":
     unittest.main()

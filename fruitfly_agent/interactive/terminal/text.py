@@ -69,6 +69,7 @@ def pad_cells(text: str, width: int) -> str:
 
 
 __all__ = [
+    "safe_terminal_text",
     "cell_width",
     "colors_enabled",
     "is_tty",
@@ -77,3 +78,12 @@ __all__ = [
     "terminal_columns",
     "truncate_cells",
 ]
+
+
+def safe_terminal_text(value: str) -> str:
+    return "".join(
+        char if char in "\n\t" or 32 <= ord(char) < 127 or ord(char) >= 160
+        else f"\\x{ord(char):02x}"
+        for char in value
+    )
+

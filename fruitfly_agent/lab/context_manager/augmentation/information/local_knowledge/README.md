@@ -13,7 +13,7 @@ Retrieve cited passages from local Markdown and text files. This source does not
 | Retrieval | Lexical matches with source path and line numbers |
 | API | `LocalKnowledgeSource`, `create_local_knowledge_space(root)` |
 
-Enable **Context Manager → Local knowledge**. No module-specific environment variables.
+Enable **mechanisms · context-manager → knowledge-files**. No module-specific environment variables.
 
 Change chunking or ranking through [Information source contracts](../README.md#extend-a-source). Keep citations aligned with source text, document index/cache invalidation, and verify updates and empty matches. File-count limits do not bound full directory enumeration; see [Known limitations](../../../../ALGORITHM_AUDIT.md).
 

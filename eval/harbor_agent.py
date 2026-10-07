@@ -10,7 +10,11 @@ import json
 import os
 from pathlib import Path
 import shlex
+import shutil
+import tempfile
 from typing import Any
+
+from eval.installation import SOURCE_FILES, SOURCE_PACKAGES, validate_installation
 
 
 try:  # Harbor is an optional eval dependency.
@@ -27,7 +31,7 @@ except ImportError:  # pragma: no cover - exercised by catalog preflight instead
 
 
 class FruitFlyHarborAgent(BaseInstalledAgent):  # type: ignore[misc]
-    """Install the current source snapshot, then run its unmodified one-shot CLI."""
+    """Install validated source or a wheel, then run its normal one-shot CLI."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         self.source_root = Path(_required(kwargs.pop("source_root", None), "source_root"))
@@ -52,6 +56,10 @@ class FruitFlyHarborAgent(BaseInstalledAgent):  # type: ignore[misc]
         return "0.1"
 
     async def install(self, environment: BaseEnvironment) -> None:
+        package = validate_installation(self.source_root)
+        for path in (self.config_path, self.model_catalog_path):
+            if not path.is_file():
+                raise ValueError(f"installation runtime file is missing: {path}")
         # Official task images may already provide a suitable Python. Avoid an
         # unnecessary apt update and a second Python/uv download in that case.
         probe = await environment.exec(
@@ -67,18 +75,24 @@ class FruitFlyHarborAgent(BaseInstalledAgent):  # type: ignore[misc]
             environment,
             command="mkdir -p /installed-agent/fruitfly/source /installed-agent/fruitfly/runtime",
         )
-        await environment.upload_dir(
-            self.source_root / "fruitfly_agent",
-            "/installed-agent/fruitfly/source/fruitfly_agent",
-        )
-        await environment.upload_file(
-            self.source_root / "pyproject.toml",
-            "/installed-agent/fruitfly/source/pyproject.toml",
-        )
-        await environment.upload_file(
-            self.source_root / "LICENSE",
-            "/installed-agent/fruitfly/source/LICENSE",
-        )
+        install_target = "/installed-agent/fruitfly/source"
+        if package.is_file():
+            install_target += "/" + package.name
+            await environment.upload_file(package, install_target)
+        else:
+            # Stage only package code and declared build inputs, never local state.
+            with tempfile.TemporaryDirectory(prefix="fruitfly-install-") as directory:
+                staged = Path(directory)
+                for name in SOURCE_PACKAGES:
+                    for source in (package / name).rglob("*.py"):
+                        if "__pycache__" in source.parts or source.is_symlink():
+                            continue
+                        target = staged / source.relative_to(package)
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copyfile(source, target)
+                for name in SOURCE_FILES:
+                    shutil.copyfile(package / name, staged / name)
+                await environment.upload_dir(staged, install_target)
         await environment.upload_file(
             self.config_path,
             "/installed-agent/fruitfly/runtime/config.yaml",
@@ -92,7 +106,7 @@ class FruitFlyHarborAgent(BaseInstalledAgent):  # type: ignore[misc]
                 "python3 -m venv /installed-agent/fruitfly/venv && "
                 "/installed-agent/fruitfly/venv/bin/python -m pip install "
                 "--disable-pip-version-check --timeout 15 --retries 1 "
-                "/installed-agent/fruitfly/source"
+                + shlex.quote(install_target)
             )
         else:
             command = (
@@ -105,7 +119,7 @@ class FruitFlyHarborAgent(BaseInstalledAgent):  # type: ignore[misc]
                 "/installed-agent/fruitfly/venv && "
                 "/installed-agent/fruitfly/bin/uv pip install --python "
                 "/installed-agent/fruitfly/venv/bin/python "
-                "/installed-agent/fruitfly/source"
+                + shlex.quote(install_target)
             )
         await self.exec_as_root(environment, command=command, timeout_sec=300)
 

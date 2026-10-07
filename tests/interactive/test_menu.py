@@ -15,46 +15,23 @@ from fruitfly_agent.interactive.terminal.menu import (
     TerminalMenuRenderer,
 )
 from fruitfly_agent.interactive.terminal.screen import transient_screen
-
-
-class _Lines:
-    def __init__(self, *values: str | None) -> None:
-        self.values = iter(values)
-
-    def read_line(self) -> str | None:
-        return next(self.values)
-
-
-class _TtyStringIO(io.StringIO):
-    def isatty(self) -> bool:
-        return True
+from tests.support.terminal import ScriptedLines, TtyStringIO
 
 
 class MenuInputTest(unittest.TestCase):
     def test_raw_terminal_keys_map_to_generic_actions(self) -> None:
-        self.assertEqual(
-            RawTerminalMenuInput.decode(b"\x1b[A").action,
-            MenuAction.UP,
-        )
-        self.assertEqual(
-            RawTerminalMenuInput.decode(b"\x1b[B").action,
-            MenuAction.DOWN,
-        )
-        self.assertEqual(
-            RawTerminalMenuInput.decode(b" ").action,
-            MenuAction.TOGGLE,
-        )
-        self.assertEqual(
-            RawTerminalMenuInput.decode(b"\r").action,
-            MenuAction.ACTIVATE,
-        )
-        self.assertEqual(
-            RawTerminalMenuInput.decode(b"x").action,
-            MenuAction.IGNORE,
-        )
+        for key, action in (
+            (b"\x1b[A", MenuAction.UP),
+            (b"\x1b[B", MenuAction.DOWN),
+            (b" ", MenuAction.TOGGLE),
+            (b"\r", MenuAction.ACTIVATE),
+            (b"x", MenuAction.IGNORE),
+        ):
+            with self.subTest(key=key):
+                self.assertEqual(RawTerminalMenuInput.decode(key).action, action)
 
     def test_redirected_input_accepts_numbered_options(self) -> None:
-        reader = LineMenuInput(_Lines("3"))
+        reader = LineMenuInput(ScriptedLines("3"))
 
         event = reader.read_event()
 
@@ -81,8 +58,8 @@ class MenuInputTest(unittest.TestCase):
         self.assertNotIn("\x1b", rendered)
 
     def test_transient_screen_restores_main_buffer(self) -> None:
-        input_stream = _TtyStringIO()
-        output = _TtyStringIO()
+        input_stream = TtyStringIO()
+        output = TtyStringIO()
 
         with patch.dict(os.environ, {"TERM": "xterm-256color"}, clear=True):
             with transient_screen(input_stream, output):

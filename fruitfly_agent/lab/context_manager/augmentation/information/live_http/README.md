@@ -6,7 +6,7 @@ Fetch current information from an explicitly configured HTTPS text service. Each
 
 | Setting / rule | Behavior |
 |---|---|
-| Enable | **Context Manager → Live HTTP**; disabled by default |
+| Enable | **mechanisms · context-manager → live-http**; disabled by default |
 | `endpoint` | HTTPS URL containing exactly one `{query}`; no credentials or fragment |
 | `timeout_seconds` | 5 seconds by default |
 | Redirects | Disabled |

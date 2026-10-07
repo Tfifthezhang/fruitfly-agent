@@ -1,12 +1,12 @@
 include README.md GETTING_STARTED.md CONFIGURATION.md CONTRIBUTING.md AGENTS.md
-include LICENSE THIRD_PARTY_NOTICES.md models.example.yaml .env.example .gitignore
+include LICENSE THIRD_PARTY_NOTICES.md .gitignore
 include assets/logo.svg
 include assets/mechanism-selection.svg
 include assets/configuration-choices.svg
 recursive-include fruitfly_agent *.py *.md
 recursive-include eval *.py *.md
 recursive-include tests *.py *.md *.json *.yaml
-recursive-include examples *.py *.md *.json *.txt
+recursive-include examples *.py *.md *.json *.txt *.yaml
 recursive-include .github *.yml
 prune .fruitfly
 prune .venv
@@ -15,7 +15,7 @@ prune .codex
 prune .agents
 prune build
 prune dist
-global-exclude __pycache__ *.py[cod] .DS_Store
+global-exclude __pycache__ *.py[cod] .DS_Store secrets.env
 exclude .env .env.*
 exclude models.yaml
-include .env.example
+include examples/configuration/.env.example

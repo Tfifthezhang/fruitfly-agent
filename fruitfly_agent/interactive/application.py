@@ -5,20 +5,19 @@ from __future__ import annotations
 import asyncio
 from collections import deque
 import copy
-from dataclasses import dataclass, field, replace
+from dataclasses import replace
 from enum import StrEnum
-from inspect import isawaitable
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Mapping, Protocol
+from typing import Any, Mapping
 
 from fruitfly_agent.core.data_model import AgentLoopResult
 
 from .configuration import ConfigurationController
 from .dispatch import EventSink
 from .events import InteractiveEvent
-from .models import InteractiveStatus, ResumableSession
-from .session import InteractiveSession
-from .optimization import OptimizationService, CandidateActivationService, OptimizationPreview, CandidateView, OptimizationProgress, CorrectionView, OptimizationActivityService
+from .models import ConversationMessage, InteractiveStatus, ResumableSession
+from .runtime import RuntimeFactory, RuntimeHandle
+from .optimization import OptimizationService, OptimizationPreview, CandidateView, OptimizationProgress, CorrectionView, OptimizationActivityService
 
 
 class ApplicationState(StrEnum):
@@ -30,96 +29,6 @@ class ApplicationState(StrEnum):
     RESUMING = "resuming"
     CLOSING = "closing"
     CLOSED = "closed"
-
-
-async def _call_optional(component: Any, method: str) -> Any:
-    callback = getattr(component, method, None)
-    if callback is None:
-        return None
-    result = callback()
-    return await result if isawaitable(result) else result
-
-
-@dataclass
-class RuntimeHandle:
-    """One assembled runtime plus deterministic component lifecycle."""
-
-    session: InteractiveSession
-    manifest: Mapping[str, Any]
-    components: Mapping[str, Any] = field(default_factory=dict)
-    close_callback: Callable[[], Awaitable[None] | None] | None = None
-    optimization: OptimizationService | None = None
-    candidate_activation: CandidateActivationService | None = None
-    activate_callback: Callable[[], None] | None = None
-    _started: list[Any] = field(default_factory=list, init=False, repr=False)
-    _closed: bool = field(default=False, init=False, repr=False)
-
-    async def start(self) -> None:
-        seen: set[int] = set()
-        try:
-            for component in self.components.values():
-                if id(component) in seen:
-                    continue
-                seen.add(id(component))
-                self._started.append(component)
-                await _call_optional(component, "start")
-        except BaseException:
-            await self.close()
-            raise
-
-    async def health(self) -> dict[str, Any]:
-        result: dict[str, Any] = {}
-        for key, component in self.components.items():
-            value = await _call_optional(component, "health")
-            result[key] = "ready" if value is None else value
-        return result
-
-    async def close(self) -> None:
-        if self._closed:
-            return
-        self._closed = True
-        errors: list[BaseException] = []
-        seen: set[int] = set()
-        for component in reversed(tuple(self.components.values())):
-            if id(component) in seen:
-                continue
-            seen.add(id(component))
-            try:
-                await _call_optional(component, "close")
-            except BaseException as exc:  # finish cleanup before surfacing failure
-                errors.append(exc)
-        if self.close_callback is not None:
-            try:
-                result = self.close_callback()
-                if isawaitable(result):
-                    await result
-            except BaseException as exc:
-                errors.append(exc)
-        if errors:
-            raise RuntimeError(f"runtime cleanup failed: {errors[0]}") from errors[0]
-
-
-class RuntimeFactory(Protocol):
-    @property
-    def configuration(self) -> ConfigurationController: ...
-
-    async def open(
-        self,
-        *,
-        resume: bool,
-        session_path: Path | None,
-    ) -> RuntimeHandle: ...
-
-    def reload_configuration(self) -> None: ...
-
-    def new_session_path(self) -> Path: ...
-
-    def resumable_sessions(
-        self,
-        *,
-        current_path: Path,
-        manifest_digest: str,
-    ) -> tuple[ResumableSession, ...]: ...
 
 
 class AgentApplication:
@@ -216,6 +125,10 @@ class AgentApplication:
     def trace(self, limit: int = 12) -> list[InteractiveEvent]:
         return self._require_handle().session.trace(limit)
 
+    def conversation(self) -> tuple[ConversationMessage, ...]:
+        """Return the active session's immutable canonical conversation view."""
+        return self._require_handle().session.conversation()
+
     def resumable_sessions(self) -> tuple[ResumableSession, ...]:
         """Return compatible non-empty sessions without exposing storage details."""
 
@@ -231,17 +144,13 @@ class AgentApplication:
             manifest_digest=digest,
         )
 
+    def _check_submission_state(self, operation: str) -> None:
+        if self._state not in {ApplicationState.IDLE, ApplicationState.RUNNING}:
+            raise RuntimeError(f"cannot {operation} while application is {self._state}")
+
     async def submit(self, prompt: str) -> AgentLoopResult:
         async with self._submission_lock:
-            if self._state in {
-                ApplicationState.STARTING,
-                ApplicationState.OPTIMIZING,
-                ApplicationState.REBUILDING,
-                ApplicationState.RESUMING,
-                ApplicationState.CLOSING,
-                ApplicationState.CLOSED,
-            }:
-                raise RuntimeError(f"cannot submit while application is {self._state}")
+            self._check_submission_state("submit")
             self._state = ApplicationState.RUNNING
             try:
                 result = await self._require_handle().session.submit(prompt)
@@ -255,15 +164,7 @@ class AgentApplication:
         prompt = prompt.strip()
         if not prompt:
             raise ValueError("prompt must not be empty")
-        if self._state in {
-            ApplicationState.STARTING,
-            ApplicationState.OPTIMIZING,
-            ApplicationState.REBUILDING,
-            ApplicationState.RESUMING,
-            ApplicationState.CLOSING,
-            ApplicationState.CLOSED,
-        }:
-            raise RuntimeError(f"cannot queue while application is {self._state}")
+        self._check_submission_state("queue")
         self._pending.append(prompt)
         if self._worker is None or self._worker.done():
             self._worker = asyncio.create_task(self._drain_queue())
@@ -308,7 +209,8 @@ class AgentApplication:
 
     def correction_tasks(self):
         from fruitfly_agent.core.data_model import UserMessage, AssistantMessage, TextBlock
-        rows, current, output, tools = [], None, "", False
+        rows: list[CorrectionView] = []
+        current, output, tools = None, "", False
         def finish():
             if current is not None and output.strip():
                 content = current.message.content
@@ -452,10 +354,7 @@ class AgentApplication:
                 if self._handle is not previous or self.runtime_manifest.get("digest") != expected:
                     raise RuntimeError("active runtime changed before candidate activation")
                 candidate = await service.prepare_candidate(self.runtime_manifest, candidate_id)
-                await candidate.start()
-                candidate.session.set_event_sink(self._event_sink)
-                if candidate.activate_callback is not None:
-                    candidate.activate_callback()
+                await self._prepare_handle(candidate)
                 self._handle = candidate
         except BaseException:
             try:
@@ -467,10 +366,7 @@ class AgentApplication:
         self._last_result = None
         self._last_error = None
         self._state = ApplicationState.IDLE
-        try:
-            await previous.close()
-        except BaseException as exc:
-            self._last_error = exc
+        await self._close_previous(previous)
         return replace(candidate_view, status="adopted")
 
     async def wait_until_idle(self) -> None:
@@ -500,10 +396,7 @@ class AgentApplication:
                 candidate = await self._factory.open(
                     resume=False, session_path=self._factory.new_session_path(),
                 )
-                await candidate.start()
-                candidate.session.set_event_sink(self._event_sink)
-                if candidate.activate_callback is not None:
-                    candidate.activate_callback()
+                await self._prepare_handle(candidate)
             except BaseException:
                 try:
                     if candidate is not None:
@@ -512,12 +405,8 @@ class AgentApplication:
                     self._state = ApplicationState.IDLE
                 raise
             self._handle = candidate
-            try:
-                await previous.close()
-            except BaseException as exc:
-                self._last_error = exc
-            finally:
-                self._state = ApplicationState.IDLE
+            await self._close_previous(previous)
+            self._state = ApplicationState.IDLE
 
     async def resume(self, session_path: str | Path) -> None:
         """Replace an idle runtime with a successfully restored candidate."""
@@ -544,37 +433,23 @@ class AgentApplication:
                     resume=True,
                     session_path=target,
                 )
-                await candidate.start()
-                candidate.session.set_event_sink(self._event_sink)
-                if candidate.activate_callback is not None:
-                    candidate.activate_callback()
-            except Exception as exc:
+                await self._prepare_handle(candidate)
+            except BaseException as exc:
                 if candidate is not None:
                     try:
                         await candidate.close()
                     except BaseException:
                         pass
                 self._state = ApplicationState.IDLE
-                raise RuntimeError(f"could not restore session: {exc}") from exc
-            except BaseException:
-                if candidate is not None:
-                    try:
-                        await candidate.close()
-                    except BaseException:
-                        pass
-                self._state = ApplicationState.IDLE
+                if isinstance(exc, Exception):
+                    raise RuntimeError(f"could not restore session: {exc}") from exc
                 raise
 
             self._handle = candidate
             self._last_result = None
             self._last_error = None
             self._state = ApplicationState.IDLE
-            try:
-                await previous.close()
-            except BaseException as exc:
-                # The target is already active; preserve the successful switch
-                # and expose cleanup trouble through the diagnostic property.
-                self._last_error = exc
+            await self._close_previous(previous)
 
     async def activate_runtime(self, candidate: RuntimeHandle, *, expected_manifest_digest: str) -> None:
         """Consume a prepared handle; failure closes it and retains the incumbent.
@@ -591,13 +466,10 @@ class AgentApplication:
             async with self._submission_lock:
                 if self._state != ApplicationState.IDLE or self._pending or self.runtime_manifest.get("digest") != expected_manifest_digest:
                     raise ValueError("active runtime changed before candidate activation")
-                previous = self._handle
+                previous = self._require_handle()
                 self._state = ApplicationState.REBUILDING
                 switching = True
-                await candidate.start()
-                candidate.session.set_event_sink(self._event_sink)
-                if candidate.activate_callback is not None:
-                    candidate.activate_callback()
+                await self._prepare_handle(candidate)
                 self._handle = candidate
         except BaseException:
             try:
@@ -606,12 +478,22 @@ class AgentApplication:
                 if switching:
                     self._state = ApplicationState.IDLE
             raise
+        await self._close_previous(previous)
+        self._state = ApplicationState.IDLE
+
+    async def _prepare_handle(self, handle: RuntimeHandle) -> None:
+        """Start and bind a replacement before committing it as active."""
+        await handle.start()
+        handle.session.set_event_sink(self._event_sink)
+        if handle.activate_callback is not None:
+            handle.activate_callback()
+
+    async def _close_previous(self, handle: RuntimeHandle) -> None:
+        """Keep a successful switch active when retiring the old runtime fails."""
         try:
-            await previous.close()
+            await handle.close()
         except BaseException as exc:
             self._last_error = exc
-        finally:
-            self._state = ApplicationState.IDLE
 
     async def close(self) -> None:
         if self._state == ApplicationState.CLOSED and self._handle is None:

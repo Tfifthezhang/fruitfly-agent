@@ -28,30 +28,25 @@ from .context_runtime import (
     recover_from_overflow,
 )
 from .context import ContextPipeline, ContextReducer
-from .data_model.runtime import AgentLoopContext, BeforeToolCallResult, ProviderView
+from .data_model.runtime import AgentLoopContext, ProviderView
 from .errors import FatalError, OverflowError, RetryableError
 from .extensions.hooks import (
     AFTER_RESPONSE,
-    AFTER_TOOL,
     BEFORE_REQUEST,
     BEFORE_RUN,
     BEFORE_RUN_END,
-    BEFORE_TOOL,
     AfterResponseEvent,
-    AfterToolEvent,
     BeforeRequestEvent,
     BeforeRunEndEvent,
     BeforeRunEvent,
     HookRegistry,
-    ToolEvent,
 )
 from .extensions.protocols import Provider
-from .tool_runtime import ToolCallContext
-from .tool_runtime.schema import validate_tool_arguments
+from .tool_runtime.execution import execute_tool_batch
+from .extensions.callbacks import call_extension
 from .data_model.messages import (
     AgentLoopResult,
     AgentMessage,
-    AgentToolResult,
     AssistantMessage,
     StopReason,
     TextBlock,
@@ -60,6 +55,8 @@ from .data_model.messages import (
 )
 
 logger = logging.getLogger(__name__)
+
+_MAX_CONSECUTIVE_TRUNCATED_RESPONSES = 3
 
 _TRUNCATED_TOOL_ERROR = (
     "Tool call {name} was NOT executed: the response hit the output token limit, "
@@ -92,21 +89,9 @@ async def run_agent_loop(
     try:
         return await _run(config, ctx, signal, context_pipeline)
     except asyncio.CancelledError:
-        _append_session_record(
-            ctx,
-            "end",
-            {
-                "stop_reason": "aborted",
-                "model": ctx.model,
-                "turn_count": 0,
-                "tool_call_count": 0,
-                "provider_attempt_count": ctx.provider_attempt_count,
-                "provider_failure_count": ctx.provider_failure_count,
-                "usage": ctx.usage.to_dict(),
-                "is_error": False,
-                "error": None,
-            },
-        )
+        _record_run_end(ctx, AgentLoopResult(
+            messages=ctx.messages, stop_reason="aborted", model=ctx.model, usage=ctx.usage,
+        ))
         raise
     except Exception as exc:  # noqa: BLE001 — return unexpected loop failures
         logger.error("agent loop crashed: %s", exc, exc_info=True)
@@ -126,21 +111,7 @@ async def run_agent_loop(
                 "context_window": ctx.context_window,
             },
         )
-        _append_session_record(
-            ctx,
-            "end",
-            {
-                "stop_reason": result.stop_reason,
-                "model": result.model,
-                "turn_count": result.turn_count,
-                "tool_call_count": result.tool_call_count,
-                "provider_attempt_count": ctx.provider_attempt_count,
-                "provider_failure_count": ctx.provider_failure_count,
-                "usage": result.usage.to_dict(),
-                "is_error": True,
-                "error": _session_error(result.error_details),
-            },
-        )
+        _record_run_end(ctx, result)
         return result
 
 
@@ -172,12 +143,14 @@ async def _run(
 
     turn_count = 0
     tool_call_count = 0
+    truncated_responses = 0
 
     # Outer loop: turns (steering + follow-up can extend a turn).
     while turn_count < config.max_turns:
         if _aborted(signal):
             return await _finish(config, ctx, hooks, "aborted", turn_count, tool_call_count)
         turn_count += 1
+        turn_tool_call_count = 0
 
         follow_up_used = False
         first_iteration = True
@@ -189,7 +162,7 @@ async def _run(
             # --- prepare_next_turn: per-request context/model swap ---
             # failure default: None → no swap this iteration
             if not first_iteration and config.prepare_next_turn is not None:
-                prepared = await _call_ext(config.prepare_next_turn, ctx, label="prepare_next_turn", default=None)
+                prepared = await call_extension(config.prepare_next_turn, ctx, label="prepare_next_turn", default=None)
                 if prepared is not None:
                     if prepared.model:
                         ctx.model = prepared.model
@@ -200,7 +173,7 @@ async def _run(
             # (the callback must drain — return each message once).
             # failure default: [] → nothing injected
             if config.get_steering_messages is not None:
-                for message in await _call_ext(
+                for message in await call_extension(
                     config.get_steering_messages,
                     ctx,
                     label="get_steering_messages",
@@ -292,42 +265,44 @@ async def _run(
                             is_error=True,
                         ),
                     )
+                truncated_responses += 1
+                if truncated_responses >= _MAX_CONSECUTIVE_TRUNCATED_RESPONSES:
+                    return await _finish(
+                        config, ctx, hooks, "error", turn_count, tool_call_count,
+                        is_error=True,
+                        error_details={
+                            "kind": "output_limit",
+                            "error": "consecutive truncated response limit reached",
+                            "attempts": truncated_responses,
+                            "model": ctx.model,
+                        },
+                    )
                 continue
+
+            truncated_responses = 0
 
             tool_calls = assistant.tool_calls
             if not tool_calls:
                 break  # inner loop done; poll follow-up
 
-            if tool_call_count >= config.max_tool_calls_per_turn:
-                _append(
-                    ctx,
-                    ToolResultMessage(
-                        tool_call_id="_harness",
-                        content=[
-                            TextBlock(
-                                text=(
-                                    f"Tool call budget exceeded ({config.max_tool_calls_per_turn}). "
-                                    "Stop calling tools and finish your response."
-                                )
-                            )
-                        ],
-                        is_error=True,
-                        terminate=True,
-                    ),
-                )
-                break
-
-            batch_results, terminate = await _execute_tool_batch(ctx, assistant, config, hooks, signal)
-            tool_call_count += len(batch_results)
+            remaining = max(0, config.max_tool_calls_per_turn - turn_tool_call_count)
+            batch_results, terminate = await execute_tool_batch(
+                ctx, assistant, config, hooks, signal, max_calls=remaining,
+            )
+            executed = min(remaining, len(tool_calls))
+            tool_call_count += executed
+            turn_tool_call_count += executed
             for result in batch_results:
                 _append(ctx, result)
             if terminate:
                 return await _finish(config, ctx, hooks, "stop", turn_count, tool_call_count)
+            if executed < len(tool_calls):
+                break
 
         # Agent would stop here. Follow-up messages keep it going.
         # failure default: [] → no follow-up
         if config.get_follow_up_messages is not None:
-            follow_ups = await _call_ext(config.get_follow_up_messages, ctx, label="get_follow_up_messages", default=[])
+            follow_ups = await call_extension(config.get_follow_up_messages, ctx, label="get_follow_up_messages", default=[])
             if follow_ups:
                 for message in follow_ups:
                     _append(ctx, message)
@@ -335,7 +310,7 @@ async def _run(
         if not follow_up_used:
             # failure default: False → continue (the outer loop is bounded by max_turns)
             if config.should_stop_after_turn is not None:
-                if await _call_ext(config.should_stop_after_turn, ctx, label="should_stop_after_turn", default=False):
+                if await call_extension(config.should_stop_after_turn, ctx, label="should_stop_after_turn", default=False):
                     break
             break
 
@@ -411,144 +386,6 @@ async def _handle_failure(
     }
 
 
-async def _execute_tool_batch(
-    ctx: AgentLoopContext,
-    assistant: AssistantMessage,
-    config: AgentLoopConfig,
-    hooks: HookRegistry,
-    signal: asyncio.Event | None,
-) -> tuple[list[ToolResultMessage], bool]:
-    calls = assistant.tool_calls
-    names = {tc.name for tc in calls}
-    sequential = config.tool_execution.default_execution_mode == "sequential" or any(
-        t.execution_mode == "sequential" for t in ctx.tools if t.name in names
-    )
-    semaphore = asyncio.Semaphore(max(1, config.tool_execution.max_parallel))
-
-    async def run_one(tc) -> ToolResultMessage:
-        async with semaphore:
-            return await _execute_one(ctx, tc, config, hooks, signal)
-
-    if sequential:
-        results = [await run_one(tc) for tc in calls]
-    else:
-        results = list(await asyncio.gather(*(run_one(tc) for tc in calls)))
-    terminate = bool(results) and all(r.terminate for r in results)
-    return results, terminate
-
-
-async def _execute_one(
-    ctx: AgentLoopContext,
-    tc: Any,
-    config: AgentLoopConfig,
-    hooks: HookRegistry,
-    signal: asyncio.Event | None,
-) -> ToolResultMessage:
-    tool = next((t for t in ctx.tools if t.name == tc.name), None)
-    if tool is None:
-        return ToolResultMessage(tool_call_id=tc.id, content=[TextBlock(f"Tool {tc.name} not found")], is_error=True)
-
-    args = dict(tc.input)
-    if tool.prepare_arguments is not None:
-        try:
-            args = tool.prepare_arguments(args)
-        except Exception as exc:  # noqa: BLE001
-            return ToolResultMessage(tool_call_id=tc.id, content=[TextBlock(f"Argument preparation failed: {exc}")], is_error=True)
-
-    validated = validate_tool_arguments(tool.parameters, args)
-    if not validated.is_ok:
-        return ToolResultMessage(tool_call_id=tc.id, content=[TextBlock(validated.error or "invalid arguments")], is_error=True)
-    args = validated.unwrap()
-
-    # --- before_tool: config callback + hook (block → error result) ---
-    # failure default: None → proceed unblocked
-    before = None
-    if config.before_tool_call is not None:
-        before = await _call_ext(
-            config.before_tool_call,
-            ToolCallContext(tc.id, tool.name, args, ctx.env, None, signal),
-            label="before_tool_call",
-            default=None,
-        )
-        before = before or BeforeToolCallResult()
-    tool_event = ToolEvent(
-        tool_name=tool.name,
-        args=args,
-        tool_call_id=tc.id,
-        block=bool(before and before.block),
-        reason=before.reason if before else "",
-        terminate=bool(before and before.terminate),
-    )
-    tool_event = await hooks.run(BEFORE_TOOL, tool_event)
-    args = dict(tool_event.args)
-    revalidated = validate_tool_arguments(tool.parameters, args)
-    if not revalidated.is_ok:
-        return ToolResultMessage(
-            tool_call_id=tc.id,
-            content=[TextBlock(revalidated.error or "invalid arguments after before_tool hook")],
-            is_error=True,
-        )
-    args = revalidated.unwrap()
-    tool_event.args = args
-    await hooks.emit(BEFORE_TOOL, tool_event)
-    if tool_event.block:
-        return ToolResultMessage(
-            tool_call_id=tc.id,
-            content=[TextBlock(text=tool_event.reason or f"Tool {tool.name} execution was blocked")],
-            is_error=True,
-            terminate=tool_event.terminate,
-        )
-
-    # Ordinary execution exceptions become error results; cancellation propagates.
-    async def on_update(text: str) -> None:
-        if config.on_partial is not None:
-            await _call_ext(config.on_partial, text, label="on_partial", default=None)
-
-    try:
-        result = tool.execute(ToolCallContext(tc.id, tool.name, args, ctx.env, on_update, signal))
-        if hasattr(result, "__await__"):
-            result = await result
-    except Exception as exc:  # noqa: BLE001
-        return ToolResultMessage(tool_call_id=tc.id, content=[TextBlock(f"{type(exc).__name__}: {exc}")], is_error=True)
-    if not isinstance(result, AgentToolResult):
-        return ToolResultMessage(
-            tool_call_id=tc.id,
-            content=[TextBlock(f"Tool {tool.name} returned {type(result).__name__}; expected AgentToolResult")],
-            is_error=True,
-        )
-
-    # --- after_tool: rewrite hooks ---
-    # failure default: None → keep the original result
-    if config.after_tool_call is not None:
-        rewritten = await _call_ext(
-            config.after_tool_call,
-            ToolCallContext(tc.id, tool.name, args, ctx.env, None, signal),
-            result,
-            label="after_tool_call",
-            default=None,
-        )
-        if rewritten is not None:
-            result = rewritten
-    after_event = await hooks.run(
-        AFTER_TOOL,
-        AfterToolEvent(
-            tool_name=tool.name,
-            args=args,
-            result=result,
-            tool_call_id=tc.id,
-        ),
-    )
-    result = after_event.result
-    await hooks.emit(AFTER_TOOL, after_event)
-
-    return ToolResultMessage(
-        tool_call_id=tc.id,
-        content=list(result.content),
-        is_error=False,
-        terminate=result.terminate,
-    )
-
-
 async def _finish(
     config: AgentLoopConfig,
     ctx: AgentLoopContext,
@@ -574,22 +411,22 @@ async def _finish(
     end_event = await hooks.run(BEFORE_RUN_END, BeforeRunEndEvent(result=result))
     result = end_event.result  # active handlers may rewrite the final result
     await hooks.emit(BEFORE_RUN_END, end_event)
-    _append_session_record(
-        ctx,
-        "end",
-        {
-            "stop_reason": result.stop_reason,
-            "model": result.model,
-            "turn_count": result.turn_count,
-            "tool_call_count": result.tool_call_count,
-            "provider_attempt_count": ctx.provider_attempt_count,
-            "provider_failure_count": ctx.provider_failure_count,
-            "usage": result.usage.to_dict(),
-            "is_error": result.is_error,
-            "error": _session_error(result.error_details),
-        },
-    )
+    _record_run_end(ctx, result)
     return result
+
+
+def _record_run_end(ctx: AgentLoopContext, result: AgentLoopResult) -> None:
+    _append_session_record(ctx, "end", {
+        "stop_reason": result.stop_reason,
+        "model": result.model,
+        "turn_count": result.turn_count,
+        "tool_call_count": result.tool_call_count,
+        "provider_attempt_count": ctx.provider_attempt_count,
+        "provider_failure_count": ctx.provider_failure_count,
+        "usage": result.usage.to_dict(),
+        "is_error": result.is_error,
+        "error": _session_error(result.error_details),
+    })
 
 
 def _append_session_record(
@@ -637,25 +474,6 @@ def _bounded_session_text(value: str, limit: int = 512) -> str:
 def _aborted(signal: asyncio.Event | None) -> bool:
     return signal is not None and signal.is_set()
 
-
-async def _maybe_await(value: Any) -> Any:
-    if hasattr(value, "__await__"):
-        return await value
-    return value
-
-
-async def _call_ext(fn: Any, *args: Any, label: str, default: Any) -> Any:
-    """Use the call site's default on ordinary failure; propagate cancellation."""
-    try:
-        result = fn(*args)
-        if hasattr(result, "__await__"):
-            result = await result
-        return result
-    except asyncio.CancelledError:
-        raise
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("%s failed (isolated): %s", label, exc)
-        return default
 
 
 __all__ = ["run_agent_loop", "AgentLoopContext"]

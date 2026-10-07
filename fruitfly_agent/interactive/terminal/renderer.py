@@ -22,7 +22,8 @@ from ..events import (
     ToolOutput,
     ToolStarted,
 )
-from ..models import InteractiveStatus
+from ..models import ConversationMessage, InteractiveStatus
+from .history import render_history_message
 from .branding import FRUIT_FLY_ICON
 from .live import prompt_frame_lines
 from .markdown import MarkdownStreamPresenter, MarkdownUpdate
@@ -123,6 +124,24 @@ class TerminalRenderer:
         self.finish_line()
         self.output.write(text)
         self.output.flush()
+
+    async def show_history(self, messages: tuple[ConversationMessage, ...]) -> None:
+        """Append saved conversation once, without emitting live run events."""
+        if not messages:
+            return
+        self._flush_markdown()
+        await self._stop_activity()
+        self.finish_line()
+        self._thinking_open = False
+        self.write_system("\n[Restored conversation]\n\n")
+        for message in messages:
+            self.output.write(render_history_message(
+                message, columns=terminal_columns(self.output),
+                terminal_ui=self._terminal_ui, color=self._color,
+            ))
+            self.output.flush()
+            await asyncio.sleep(0)
+        self.write_system("[End of restored conversation]\n\n")
 
     def write_log(self, text: str) -> None:
         """Append a raw log fragment without inserting newlines between chunks."""

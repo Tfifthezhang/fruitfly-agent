@@ -4,10 +4,10 @@
 
 Explicit real Provider checks. These use the network, may incur charges, and are excluded from default offline discovery.
 
-Copy and customize the [model template](../../models.example.yaml), configure `models.yaml` and `.env`, then choose an available profile. The command below assumes you have replaced all placeholders in `example-responses` with a working model configuration:
+Copy and customize the [model template](../../examples/configuration/models.example.yaml), configure `.fruitfly/models.yaml` and `.fruitfly/secrets.env`, then choose an available profile. The command below uses the `deepseek-flash-openai` profile and requires a usable `DEEPSEEK_API_KEY`:
 
 ```bash
-.venv/bin/python -m tests.integration.provider_smoke --models-file models.yaml --model-profile example-responses --json .fruitfly/smoke/example-responses.json
+.venv/bin/python -m tests.integration.provider_smoke --models-file .fruitfly/models.yaml --model-profile deepseek-flash-openai --json .fruitfly/smoke/deepseek-flash-openai.json
 ```
 
 | Input | Meaning |

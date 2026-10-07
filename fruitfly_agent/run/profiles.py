@@ -2,16 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
-import os
+from dataclasses import replace
 from pathlib import Path
-from typing import Any, Mapping
 
 from fruitfly_agent.interactive import (
     ConfigurationActionResult,
-    ConfigurationMechanism,
-    ConfigurationParameter,
-    ConfigurationSelectionGroup,
     ConfigurationSnapshot,
 )
 from fruitfly_agent.lab.catalog import (
@@ -19,134 +14,18 @@ from fruitfly_agent.lab.catalog import (
     MechanismSelection,
 )
 from fruitfly_agent.run.configuration import (
-    DEFAULT_HARNESS_CONFIG_NAME,
     HarnessConfig,
     HarnessProfile,
-    load_harness_config,
     save_harness_config,
 )
 from fruitfly_agent.providers.registry import load_model_specs
-from fruitfly_agent.providers.specs import ModelSpec
-from fruitfly_agent.lab.base_prompt import builtins
 from .artifacts import DataArtifactStore
-from .optimization import CandidateStore
-
-
-@dataclass(frozen=True)
-class HarnessSelection:
-    config: HarnessConfig
-    profile: HarnessProfile
-    config_path: Path
-    persisted: bool
-
-
-def resolve_harness_selection(
-    *,
-    cwd: Path,
-    config_path: str | None,
-    profile_id: str | None,
-    environment: Mapping[str, str],
-    catalog: LabCatalog,
-    allow_incomplete: bool = False,
-) -> HarnessSelection:
-    """Load an explicit/default config or synthesize the documented baseline."""
-
-    target = _resolve_config_path(cwd, config_path)
-    if target.is_file():
-        config = load_harness_config(target)
-        profile = config.select(profile_id)
-        return HarnessSelection(config, profile, target, True)
-    if config_path is not None and not allow_incomplete:
-        raise ValueError(f"harness config not found: {target}")
-    if profile_id is not None:
-        raise ValueError("--profile requires a harness config")
-
-    model_catalog = default_model_catalog_path(cwd)
-    if model_catalog is None:
-        if allow_incomplete:
-            return _incomplete_selection(
-                target,
-                catalog,
-                _model_catalog_reference(cwd / "models.yaml", target),
-            )
-        raise ValueError("no models.yaml found; configure a model catalog")
-    models = load_model_specs(model_catalog)
-    selected_model = environment.get("FRUITFLY_MODEL_PROFILE")
-    if selected_model is None:
-        if len(models) != 1:
-            if allow_incomplete:
-                return _incomplete_selection(
-                    target,
-                    catalog,
-                    _model_catalog_reference(model_catalog, target),
-                )
-            available = ", ".join(sorted(models)) or "none"
-            raise ValueError(
-                "model profile is ambiguous; configure .fruitfly/config.yaml or set "
-                f"FRUITFLY_MODEL_PROFILE (available: {available})"
-            )
-        selected_model = next(iter(models))
-    if selected_model not in models:
-        available = ", ".join(sorted(models)) or "none"
-        raise ValueError(
-            f"unknown model profile {selected_model!r} (available: {available})"
-        )
-    profile = HarnessProfile(
-        profile_id="default",
-        model_catalog=_model_catalog_reference(model_catalog, target),
-        model_profile=selected_model,
-        mechanisms=catalog.default_selections(),
-    )
-    config = HarnessConfig(default_profile="default", profiles={"default": profile})
-    return HarnessSelection(config, profile, target, False)
-
-
-def default_model_catalog_path(cwd: Path) -> Path | None:
-    candidates = (
-        cwd / "models.yaml",
-        Path(__file__).resolve().parents[2] / "models.yaml",
-    )
-    seen: set[Path] = set()
-    for candidate in candidates:
-        candidate = candidate.resolve()
-        if candidate in seen:
-            continue
-        seen.add(candidate)
-        if candidate.is_file():
-            return candidate
-    return None
-
-
-def model_catalog_path(profile: HarnessProfile, config_path: Path) -> Path:
-    path = Path(profile.model_catalog)
-    if not path.is_absolute():
-        path = config_path.parent / path
-    return path.resolve()
-
-
-def resolve_profile_models(
-    profile: HarnessProfile,
-    config_path: Path,
-) -> tuple[dict[str, ModelSpec], str, ModelSpec]:
-    path = model_catalog_path(profile, config_path)
-    models = load_model_specs(path)
-    selected = profile.model_profile
-    if selected is None:
-        if len(models) != 1:
-            available = ", ".join(sorted(models)) or "none"
-            raise ValueError(
-                f"profile {profile.profile_id!r} model is ambiguous "
-                f"(available: {available})"
-            )
-        selected = next(iter(models))
-    try:
-        spec = models[selected]
-    except KeyError as exc:
-        available = ", ".join(sorted(models)) or "none"
-        raise ValueError(
-            f"unknown model profile {selected!r} (available: {available})"
-        ) from exc
-    return models, selected, spec
+from .configuration_views import mechanism_views, prompt_choices, display_group
+from .model_selection import (
+    HarnessSelection, resolve_harness_selection, default_model_catalog_path,
+    model_catalog_path, resolve_profile_models,
+)
+from .model_setup import RunModelSetup
 
 
 class RunConfigurationController:
@@ -168,6 +47,10 @@ class RunConfigurationController:
             self._path.parent / "artifacts"
         )
         self._persisted = selection.persisted
+        self.model_setup: RunModelSetup | None = None
+
+    def _models(self, profile: HarnessProfile):
+        return self.model_setup.models(profile) if self.model_setup is not None else load_model_specs(model_catalog_path(profile, self._path))
 
     def snapshot(self) -> ConfigurationSnapshot:
         from .assembly import resolve_base_prompt
@@ -175,7 +58,7 @@ class RunConfigurationController:
         warnings: list[str] = []
         ready = True
         try:
-            models = load_model_specs(model_catalog_path(profile, self._path))
+            models = self._models(profile)
             selected_model = profile.model_profile
             if selected_model is None and len(models) == 1:
                 selected_model = next(iter(models))
@@ -202,89 +85,8 @@ class RunConfigurationController:
             warnings.append(str(exc))
             prompt_label = profile.prompt
             ready = False
-        prompt_options, prompt_labels, prompt_groups = self._prompt_choices(profile)
-        selections = {
-            item.mechanism_id: item for item in profile.mechanisms
-        }
-        mechanisms: list[ConfigurationMechanism] = []
-        for descriptor in sorted(
-            self._catalog.descriptors(),
-            key=lambda item: (
-                display_group(item),
-                _context_phase_order(item),
-                item.install_order,
-                item.mechanism_id,
-            ),
-        ):
-            selection = selections.get(descriptor.mechanism_id)
-            enabled = selection.enabled if selection is not None else False
-            raw_parameters = selection.parameters if selection is not None else {}
-            try:
-                values = descriptor.normalize_parameters(raw_parameters)
-            except ValueError as exc:
-                warnings.append(str(exc))
-                values = {
-                    item.name: raw_parameters.get(item.name, item.default)
-                    for item in descriptor.parameters
-                }
-            parameters = tuple(
-                ConfigurationParameter(
-                    name=item.name,
-                    label=item.label,
-                    description=item.description,
-                    kind=item.kind,
-                    value=values[item.name],
-                    choices=item.choices,
-                    advanced=item.advanced,
-                    minimum=item.minimum,
-                    maximum=item.maximum,
-                    nullable=item.nullable,
-                )
-                for item in descriptor.parameters
-            )
-            mechanisms.append(
-                ConfigurationMechanism(
-                    mechanism_id=descriptor.mechanism_id,
-                    category=display_group(descriptor),
-                    label=descriptor.label,
-                    description=descriptor.description,
-                    enabled=enabled,
-                    activation=descriptor.activation,
-                    layer=descriptor.primary.layer,
-                    family=descriptor.primary.family,
-                    context_phase=descriptor.primary.context_phase,
-                    display_section=_display_section(descriptor),
-                    visible=self._catalog.get(descriptor.mechanism_id).visible,
-                    parameters=parameters,
-                    effects=_selection_effect_messages(
-                        descriptor.mechanism_id,
-                        descriptor.effects,
-                        values,
-                    ),
-                    requires=tuple(sorted(descriptor.requires)),
-                    conflicts=tuple(sorted(descriptor.conflicts)),
-                    exclusive_group=descriptor.exclusive_group,
-                    selection_group=self._catalog.get(descriptor.mechanism_id).selection_group,
-                    selection_group_label=self._catalog.get(descriptor.mechanism_id).selection_group_label,
-                    selection_group_allow_disabled=self._catalog.get(descriptor.mechanism_id).selection_group_allow_disabled,
-                )
-            )
-        selection_groups = []
-        grouped_definitions: dict[str, list] = {}
-        for mechanism in mechanisms:
-            if mechanism.selection_group is not None:
-                grouped_definitions.setdefault(mechanism.selection_group, []).append(mechanism)
-        for group_id, options in sorted(grouped_definitions.items()):
-            enabled_options = [item.mechanism_id for item in options if item.enabled]
-            selection_groups.append(ConfigurationSelectionGroup(
-                group_id=group_id,
-                label=options[0].selection_group_label or group_id,
-                category=options[0].category,
-                section=options[0].display_section,
-                option_ids=tuple(item.mechanism_id for item in options),
-                selected_id=enabled_options[0] if enabled_options else None,
-                allow_disabled=options[0].selection_group_allow_disabled,
-            ))
+        prompt_options, prompt_labels, prompt_groups = prompt_choices(profile, self._artifact_store, self._path)
+        mechanisms, selection_groups = mechanism_views(profile, self._catalog, warnings)
         return ConfigurationSnapshot(
             config_path=str(self._path),
             selected_profile=self._selected,
@@ -304,47 +106,6 @@ class RunConfigurationController:
             warnings=tuple(warnings),
         )
 
-    def _prompt_choices(self, profile):
-        options = {prompt.prompt_id: prompt.label for prompt in builtins()}
-        builtin_ids = tuple(options)
-        hashes = {prompt.content_hash for prompt in builtins()}
-        store = CandidateStore(self._artifact_store.root.parent / 'optimization/candidates', self._artifact_store)
-        seen = set()
-        scope = (str(self._path.resolve()), profile.profile_id)
-        try:
-            records = store.list()
-        except (OSError, ValueError, TypeError):
-            records = ()
-        for record in records:
-            if (record.config_path, record.profile_id) != scope or record.target != 'base_prompt':
-                continue
-            task = record.task_pack_id
-            if task in seen:
-                continue
-            seen.add(task)
-            if record.status in {'rejected', 'stale'}:
-                continue
-            try:
-                self._artifact_store.read_text(record.artifact_id)
-            except (OSError, ValueError):
-                continue
-            if record.artifact_id in hashes:
-                continue
-            hashes.add(record.artifact_id)
-            name = record.task_pack_name or task or 'Unattributed task'
-            options[record.artifact_id] = f'{name} · {record.algorithm.upper()} optimized · {record.status}'
-        if profile.prompt not in options:
-            label = 'Current selected prompt'
-            selected = next((r for r in records if (r.config_path, r.profile_id) == scope
-                             and r.target == 'base_prompt' and r.artifact_id == profile.prompt), None)
-            if selected:
-                label = f'{selected.task_pack_name or selected.task_pack_id or "Unattributed task"} · {selected.algorithm.upper()} optimized · current'
-            options[profile.prompt] = label
-        adapted_ids = tuple(ref for ref in options if ref not in builtin_ids)
-        groups = (("builtin", "Built-in prompts", builtin_ids, False),
-                  ("adapted", "Task / scenario adapted prompts", adapted_ids, True))
-        return tuple(options), tuple(options.items()), groups
-
     def select_profile(self, profile_id: str) -> ConfigurationActionResult:
         self._draft.select(profile_id)
         self._selected = profile_id
@@ -354,7 +115,7 @@ class RunConfigurationController:
 
     def select_model(self, model_profile: str) -> ConfigurationActionResult:
         profile = self._draft.select(self._selected)
-        models = load_model_specs(model_catalog_path(profile, self._path))
+        models = self._models(profile)
         if model_profile not in models:
             available = ", ".join(sorted(models)) or "none"
             raise ValueError(
@@ -391,7 +152,7 @@ class RunConfigurationController:
     def preview_prompt(self, reference: str) -> tuple[str, str, str]:
         from .assembly import resolve_base_prompt
         content, identity = resolve_base_prompt(reference, self._artifact_store)
-        return dict(self._prompt_choices(self._draft.select(self._selected))[1]).get(reference, identity["label"]), identity["content_hash"], content
+        return dict(prompt_choices(self._draft.select(self._selected), self._artifact_store, self._path)[1]).get(reference, identity["label"]), identity["content_hash"], content
 
     def select_model_catalog(self, path: str) -> ConfigurationActionResult:
         value = path.strip()
@@ -572,30 +333,20 @@ class RunConfigurationController:
         parsed = parameter.parse(value)
         profile = self._draft.select(self._selected)
         selections = list(profile.mechanisms)
-        for index, selection in enumerate(selections):
-            if selection.mechanism_id != mechanism_id:
-                continue
-            parameters = dict(selection.parameters)
-            parameters[name] = parsed
-            selections[index] = MechanismSelection(
-                mechanism_id,
-                enabled=selection.enabled,
-                parameters=parameters,
-            )
-            break
+        index = next((i for i, item in enumerate(selections)
+                      if item.mechanism_id == mechanism_id), len(selections))
+        existing = selections[index] if index < len(selections) else None
+        parameters = (dict(existing.parameters) if existing is not None else
+                      {item.name: item.default for item in definition.descriptor.parameters})
+        parameters[name] = parsed
+        selection = MechanismSelection(
+            mechanism_id, enabled=existing.enabled if existing is not None else False,
+            parameters=parameters,
+        )
+        if existing is None:
+            selections.append(selection)
         else:
-            parameters = {
-                item.name: item.default
-                for item in definition.descriptor.parameters
-            }
-            parameters[name] = parsed
-            selections.append(
-                MechanismSelection(
-                    mechanism_id,
-                    enabled=False,
-                    parameters=parameters,
-                )
-            )
+            selections[index] = selection
         self._replace_profile(replace(profile, mechanisms=tuple(selections)))
         return _changed(
             f"staged {mechanism_id}.{name}={parsed!r}; "
@@ -610,9 +361,17 @@ class RunConfigurationController:
         )
         for profile in candidate.profiles.values():
             self._catalog.resolve(profile.mechanisms)
-            resolve_profile_models(profile, self._path)
+            if self.model_setup is None:
+                resolve_profile_models(profile, self._path)
+            else:
+                models = self._models(profile)
+                if profile.model_profile not in models and not (profile.model_profile is None and len(models) == 1):
+                    raise ValueError("Select a valid model before saving")
             resolve_base_prompt(profile.prompt, self._artifact_store)
-        save_harness_config(self._path, candidate)
+        if self.model_setup is not None and self.model_setup.changed:
+            self.model_setup.persist(lambda: save_harness_config(self._path, candidate))
+        else:
+            save_harness_config(self._path, candidate)
         self._draft = candidate
         self._original = candidate
         self._original_selected = self._selected
@@ -626,6 +385,8 @@ class RunConfigurationController:
         )
 
     def reset(self) -> ConfigurationActionResult:
+        if self.model_setup is not None:
+            self.model_setup.reset()
         self._draft = self._original
         self._selected = self._original_selected
         return ConfigurationActionResult(
@@ -645,98 +406,13 @@ class RunConfigurationController:
             not self._persisted
             or self._draft != self._original
             or self._selected != self._original_selected
+            or (self.model_setup is not None and self.model_setup.changed)
         )
-
-
-def _resolve_config_path(cwd: Path, value: str | None) -> Path:
-    if value is None:
-        return (cwd / DEFAULT_HARNESS_CONFIG_NAME).resolve()
-    path = Path(value)
-    return path.resolve() if path.is_absolute() else (cwd / path).resolve()
-
-
-def _incomplete_selection(
-    target: Path,
-    catalog: LabCatalog,
-    model_catalog: str,
-) -> HarnessSelection:
-    profile = HarnessProfile(
-        profile_id="default",
-        model_catalog=model_catalog,
-        model_profile=None,
-        mechanisms=catalog.default_selections(),
-    )
-    config = HarnessConfig(default_profile="default", profiles={"default": profile})
-    return HarnessSelection(config, profile, target, False)
-
-
-def _model_catalog_reference(model_catalog: Path, config_path: Path) -> str:
-    return os.path.relpath(
-        model_catalog.resolve(),
-        start=config_path.parent.resolve(),
-    )
 
 
 def _changed(message: str) -> ConfigurationActionResult:
     return ConfigurationActionResult(message, changed=True)
 
-
-def _effect_messages(effects) -> tuple[str, ...]:
-    rows = []
-    if effects.uses_provider:
-        rows.append("uses an auxiliary Provider")
-    if effects.uses_network:
-        rows.append("may access the network and incur cost")
-    if effects.writes_files:
-        rows.append("writes persistent files or session metadata")
-    if effects.tools:
-        rows.append("adds tools: " + ", ".join(effects.tools))
-    if effects.lifecycle_hooks:
-        rows.append("hooks: " + ", ".join(effects.lifecycle_hooks))
-    if effects.cost_notice:
-        rows.append(effects.cost_notice)
-    return tuple(rows)
-
-
-def _selection_effect_messages(
-    mechanism_id: str,
-    effects,
-    parameters: Mapping[str, Any],
-) -> tuple[str, ...]:
-    """Describe the configured variant's real runtime effects."""
-
-    return _effect_messages(effects)
-
-
-def _display_section(descriptor) -> str | None:
-    contribution = descriptor.primary
-    if contribution.family != "context":
-        return None
-    if contribution.context_phase is not None:
-        return contribution.context_phase
-    if contribution.layer == "capability":
-        return "augmentation"
-    return None
-
-
-def _context_phase_order(descriptor) -> int:
-    phase = _display_section(descriptor)
-    return {
-        "augmentation": 0,
-        "externalization": 1,
-        "reduction": 2,
-        None: 4,
-    }[phase]
-
-
-def display_group(descriptor) -> str:
-    """Project Core mechanism coordinates into the current application menu."""
-    contribution = descriptor.primary
-    if contribution.layer == "optimization":
-        return "optimization"
-    if contribution.family == "context":
-        return "context-manager"
-    return contribution.family
 
 
 __all__ = [

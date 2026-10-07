@@ -1,10 +1,18 @@
 """RuntimeFactory and task-application fixtures with offline providers."""
 from pathlib import Path
 from unittest.mock import Mock
+from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.interactive import AgentApplication, InteractiveSession, ResumableSession, RuntimeHandle
 from fruitfly_agent.run.application import RunApplicationFactory
 from tests.support.faux_provider import FauxProvider
 from tests.support.materials import _write_models
+
+
+def offline_session(*, provider=None, model="offline-model", **kwargs):
+    return InteractiveSession(
+        AgentLoopConfig(provider=provider if provider is not None else FauxProvider(), model=model),
+        **kwargs,
+    )
 
 
 class _Factory:

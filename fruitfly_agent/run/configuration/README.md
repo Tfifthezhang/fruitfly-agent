@@ -10,8 +10,8 @@ default_profile: default
 profiles:
   default:
     model:
-      catalog: ../../models.yaml
-      profile: example-responses
+      catalog: models.yaml
+      profile: deepseek-flash-openai
     mechanisms:
       - id: compaction
         enabled: true
@@ -27,6 +27,8 @@ profiles:
 | `load_harness_config(path)` | Parse and validate configuration. |
 | `save_harness_config(path, config)` | Atomically replace the file. |
 | Default location | `.fruitfly/config.yaml` |
+
+The example uses `.fruitfly/models.yaml`, resolved relative to `.fruitfly/config.yaml`. Explicit catalog paths keep precedence over workspace discovery. See the [file selection rules](../../../CONFIGURATION.md#files-and-precedence).
 
 Unknown fields and unsupported schema versions raise `ValueError`. Catalog validates mechanism IDs and parameters. Store key variable names in model specifications and key values in the environment; do not store secrets or full prompt text in YAML.
 

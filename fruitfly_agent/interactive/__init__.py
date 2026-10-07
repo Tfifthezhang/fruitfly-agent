@@ -43,7 +43,7 @@ from .evaluation import (
     EvaluationVariantOption,
 )
 from .dispatch import EventSink
-from .models import InteractiveMechanism, InteractiveStatus, ResumableSession
+from .models import ConversationBlock, ConversationMessage, InteractiveMechanism, InteractiveStatus, ResumableSession
 from .session import InteractiveSession
 from .terminal import (
     LineEditor,
@@ -55,6 +55,8 @@ from .terminal import (
 )
 
 __all__ = [
+    "ConversationBlock",
+    "ConversationMessage",
     "TaskPackView",
     "CorrectionView",
     "TaskPackClient",

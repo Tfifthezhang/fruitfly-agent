@@ -14,7 +14,7 @@ Read persistent notes maintained by the user or model with ordinary file tools. 
 | Updates | File edits take effect on the next query. |
 | API | `FileMemorySource`, `FileMemoryRetriever`, `create_file_memory_space(root)` |
 
-Enable **Context Manager → File memory**. Use `read`, `write`, and `edit` to maintain notes. Keep secrets and temporary task state out of memory.
+Enable **mechanisms · context-manager → memory-files**. Use `read`, `write`, and `edit` to maintain notes. Keep secrets and temporary task state out of memory.
 
 Extend through [Information source contracts](../README.md#extend-a-source). Preserve stable references and declare file scope, ordering, budgets, and update behavior. Automatic memory extraction belongs in a separately declared improvement mechanism, not hidden inside retrieval. No module-specific environment variables.
 

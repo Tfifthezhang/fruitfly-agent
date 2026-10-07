@@ -10,6 +10,7 @@ Validate arguments and dispatch tools. Concrete factories belong in [Lab Tools](
 | `ToolCallContext` | Call ID, validated arguments, environment, updates, and cancellation signal |
 | `AgentToolResult` | Result converted by Core into `ToolResultMessage` |
 | [schema.py](schema.py) | Supported JSON Schema subset and primitive coercion |
+| [execution.py](execution.py) | Remaining-budget batch dispatch, sequential/parallel execution, hooks, and result conversion |
 
 Invalid arguments and ordinary tool failures become error tool results. Tools use the injected execution environment. Add concrete operations in Lab rather than Core. No module-specific environment variables.
 

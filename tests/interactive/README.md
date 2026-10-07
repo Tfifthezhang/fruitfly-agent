@@ -6,11 +6,16 @@ Verify Application state/lifecycle, resource cleanup, events, menus, commands, a
 
 | Files | Protects |
 |---|---|
-| `test_terminal.py / test_menu.py` | Configuration, optimization, candidate review, confirmations, and navigation |
+| `test_terminal.py` | Commands, concurrent input, resume, and optimization dispatch |
+| `test_conversation.py` | Immutable original history after reduction, safe content projection, and static display bounds |
+| `test_terminal_configuration.py / test_menu.py` | Configuration drafts, startup confirmation, and generic menu navigation |
+| `test_terminal_renderer.py / test_markdown.py / test_welcome.py` | Event presentation, output bounds, ANSI handling, and layouts |
 | `test_evaluation.py` | Generic Eval menu and complete diagnostic display |
-| `test_line_editor.py` | PTY input, explicit TERM, and redirected fallback |
+| `test_line_editor.py` | PTY input, explicit TERM, redirected fallback, and model-key echo suppression/restoration |
 
 Local PTYs and fake models. Assembly/CLI belong to Run; complete multi-module paths belong to Workflows.
+
+Finite input and TTY streams come from [terminal support](../support/terminal.py). Configuration menus use the shared [controller substitutes](../support/configuration.py); their public entry points drive dropdown and confirmation checks.
 
 ```bash
 .venv/bin/python -m unittest discover -s tests/interactive -t . -v

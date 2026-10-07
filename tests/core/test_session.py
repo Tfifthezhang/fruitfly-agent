@@ -99,6 +99,28 @@ class TestSession(unittest.TestCase):
         with self.assertRaises(SessionCorruptError):
             Session(self.path)
 
+    def test_invalid_append_leaves_disk_and_replay_unchanged(self):
+        with Session(self.path) as session:
+            first = session.append("meta", {"kind": "fixture"})
+            before = self.path.read_bytes()
+            for parent_id in (0, -1, 2, 999, True, 1.5, "1"):
+                with self.subTest(parent_id=parent_id), self.assertRaises(SessionCorruptError):
+                    session.append("meta", {}, parent_id=parent_id)
+                self.assertEqual(before, self.path.read_bytes())
+                self.assertEqual([first], session.read_all())
+            session.append("meta", {}, parent_id=first.id)
+        with Session(self.path) as session:
+            self.assertEqual([None, 1], [entry.parent_id for entry in session.read_all()])
+
+    def test_first_provisioned_id_must_start_at_one(self):
+        with Session(self.path) as session:
+            with self.assertRaises(SessionCorruptError):
+                session.append("meta", {}, entry_id=5)
+            self.assertEqual([], session.read_all())
+            session.append("meta", {})
+        with Session(self.path) as session:
+            self.assertEqual([1], [entry.id for entry in session.read_all()])
+
     def test_flock_blocks_second_open(self):
         with Session(self.path):
             with self.assertRaises(SessionCorruptError):

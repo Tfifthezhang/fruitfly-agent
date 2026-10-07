@@ -12,6 +12,7 @@ from ..configuration import (
     ConfigurationSnapshot,
 )
 from .input import LineEditor, create_line_editor
+from .model_setup import configure_credential, run_model_setup
 from .menu import (
     MenuAction,
     MenuEvent,
@@ -78,6 +79,9 @@ class TerminalConfigurationFrontend:
             self._inside_active_session = False
 
     def _new_session_loop(self) -> ConfigurationLaunchResult:
+        setup = getattr(self.configuration, "model_setup", None)
+        if setup is not None and not self.configuration.snapshot().model_profiles:
+            run_model_setup(self, setup)
         selected = 0
         while True:
             snapshot = self.configuration.snapshot()
@@ -95,6 +99,8 @@ class TerminalConfigurationFrontend:
             if handled:
                 continue
             if event.action == MenuAction.QUIT:
+                if setup is not None:
+                    self.configuration.reset()
                 return ConfigurationLaunchResult(start=False)
             if event.action != MenuAction.ACTIVATE:
                 continue
@@ -104,8 +110,12 @@ class TerminalConfigurationFrontend:
                     return result
             elif selected == 1:
                 if self._configure_loop():
+                    if setup is not None:
+                        self.configuration.reset()
                     return ConfigurationLaunchResult(start=False)
             else:
+                if setup is not None:
+                    self.configuration.reset()
                 return ConfigurationLaunchResult(start=False)
 
     def _preview_prompt(self, label, content_hash, content):
@@ -116,7 +126,7 @@ class TerminalConfigurationFrontend:
         page, selected, size = 0, 1, 8
         values = ('Use for next session', 'Back')
         while True:
-            self._render(title='Base prompt preview',
+            self._render(title='prompt · preview',
                 subtitle=f'{label} · {content_hash}\nReview prompt ({page + 1}/{max(1, (len(lines) + size - 1)//size)})\n'
                          + '\n'.join(lines[page*size:(page+1)*size])
                          + '\nPageUp/PageDown: text pages',
@@ -146,8 +156,8 @@ class TerminalConfigurationFrontend:
             snapshot = self.configuration.snapshot()
             categories = _group_mechanisms(snapshot)
             rows = [
-                MenuRow("Model", snapshot.model_profile or "Select a model"),
-                MenuRow("Base prompt", f"{snapshot.prompt_label} · next session"),
+                MenuRow("model", snapshot.model_profile or "Select a model"),
+                MenuRow("prompt", f"{snapshot.prompt_label} · next session"),
             ]
             rows.extend(
                 MenuRow(
@@ -195,7 +205,7 @@ class TerminalConfigurationFrontend:
         rows = (
             MenuRow(
                 "Save and start new session",
-                f"base prompt: {self.active_prompt_label or 'current'} → {snapshot.prompt_label} (next)",
+                f"prompt: {self.active_prompt_label or 'current'} → {snapshot.prompt_label} (next)",
             ),
             MenuRow("Continue configuring", "Return to the configuration menu"),
             MenuRow(
@@ -267,8 +277,26 @@ class TerminalConfigurationFrontend:
                 return ConfigurationLaunchResult(start=False)
 
     def _choose_model(self, snapshot: ConfigurationSnapshot) -> bool:
+        setup = getattr(self.configuration, "model_setup", None)
+        if setup is not None:
+            values = snapshot.model_profiles + ("Add model…", "Set API key…")
+            labels = {name: f"{name} · {setup.credential_status(name)}" for name in snapshot.model_profiles}
+            quit_requested, value = self._choose_value(
+                title="model.profile", subtitle="Choose a model or add one. Changes apply to a new session.",
+                values=values, current=snapshot.model_profile, labels=labels,
+            )
+            if value == "Add model…":
+                run_model_setup(self, setup)
+            elif value == "Set API key…":
+                if snapshot.model_profile is None:
+                    self.notice = "Select a model before setting its API key."
+                else:
+                    configure_credential(self, setup, snapshot.model_profile)
+            elif value is not _CANCELLED:
+                self._call(self.configuration.select_model, str(value))
+            return quit_requested
         quit_requested, value = self._choose_value(
-            title="Model",
+            title="model.profile",
             subtitle="Choose one model from the configured model catalog.",
             values=snapshot.model_profiles,
             current=snapshot.model_profile,
@@ -302,7 +330,7 @@ class TerminalConfigurationFrontend:
             rows.append(MenuRow("Back", "Return to configuration"))
             actions.append(("back", None))
             selected = min(selected, len(rows) - 1)
-            self._render(title="Base prompt · next session",
+            self._render(title="prompt · next session",
                          subtitle="Built-in prompts and task / scenario adaptations. Preview before applying.",
                          rows=tuple(rows), selected=selected)
             event = self.menu_input.read_event()
@@ -350,9 +378,9 @@ class TerminalConfigurationFrontend:
             grouped_ids = {option for group in groups for option in group.option_ids}
             # Independent capabilities remain composable, with the same inline
             # selector shape as declared groups, even when only one option exists.
-            entries = [(group.group_id, group.label, group.option_ids, group.selected_id,
+            entries = [(group.group_id, group.group_id, group.option_ids, group.selected_id,
                         group.allow_disabled, True) for group in groups]
-            entries += [(item.mechanism_id, item.label, (item.mechanism_id,),
+            entries += [(item.mechanism_id, item.mechanism_id, (item.mechanism_id,),
                          item.mechanism_id if item.enabled else None, True, False)
                         for item in mechanisms if item.mechanism_id not in grouped_ids]
             rows = []
@@ -360,14 +388,15 @@ class TerminalConfigurationFrontend:
             for key, label, options, active, allow_disabled, declared in entries:
                 if active is not None:
                     remembered[key] = active
-                rows.append(MenuRow(label, marker="✓" if active else " "))
+                description = next((group.label for group in groups if group.group_id == key), by_id[key].label if key in by_id else "")
+                rows.append(MenuRow(label, detail=description if description != label else "", marker="✓" if active else " "))
                 actions.append(("toggle", key, options, active, allow_disabled, declared))
                 if active is not None:
-                    rows.append(MenuRow(f"  Algorithm: {by_id[active].label} {'▴' if expanded == key else '▾'}"))
+                    rows.append(MenuRow(f"  id: {active} {'▴' if expanded == key else '▾'}"))
                     actions.append(("expand", key, options, active, allow_disabled, declared))
                     if expanded == key:
                         for option in options:
-                            rows.append(MenuRow(f"    {by_id[option].label}", marker="✓" if option == active else " "))
+                            rows.append(MenuRow(f"    {option}", detail=by_id[option].label if by_id[option].label != option else "", marker="✓" if option == active else " "))
                             actions.append(("choose", key, options, option, allow_disabled, declared))
             rows.append(MenuRow("Back", "Return to configuration"))
             selected = min(selected, len(rows) - 1)
@@ -420,10 +449,11 @@ class TerminalConfigurationFrontend:
         values: tuple[Any, ...],
         current: Any,
         labels=None,
+        details=None,
     ) -> tuple[bool, Any]:
         if not values:
             self.notice = (
-                "No models are available. Configure models.yaml and "
+                "No models are available. Configure .fruitfly/models.yaml and "
                 ".fruitfly/config.yaml "
                 "before starting a session."
             )
@@ -436,6 +466,7 @@ class TerminalConfigurationFrontend:
             rows = tuple(
                 MenuRow(
                     (labels or {}).get(value, str(value)),
+                    detail=(details or {}).get(value, ""),
                     marker="✓" if value == current else " ",
                 )
                 for value in values
@@ -462,8 +493,8 @@ class TerminalConfigurationFrontend:
         selected = 0
         categories = _group_mechanisms(snapshot)
         rows = [
-            MenuRow("Model", snapshot.model_profile or "Not selected"),
-            MenuRow("Base prompt", snapshot.prompt_label),
+            MenuRow("model.profile", snapshot.model_profile or "Not selected"),
+            MenuRow("prompt", snapshot.prompt_label),
         ]
         rows.extend(
             MenuRow(_category_label(category), _category_summary(mechanisms))
@@ -492,6 +523,10 @@ class TerminalConfigurationFrontend:
     ) -> ConfigurationLaunchResult | None:
         if not snapshot.ready:
             self.notice = _warnings(snapshot) or "Configuration needs attention."
+            return None
+        setup = getattr(self.configuration, "model_setup", None)
+        if setup is not None and snapshot.model_profile is not None and setup.credential_status(snapshot.model_profile) == "API key missing":
+            self.notice = "API key missing. Open Configure → model → Set API key…"
             return None
         if not snapshot.changed:
             return ConfigurationLaunchResult(start=True)
@@ -579,7 +614,7 @@ def _group_mechanisms(
 
 
 def _category_label(category: str) -> str:
-    return category.replace("-", " ").replace("_", " ").title()
+    return f"mechanisms · {category}"
 
 
 def _category_summary(mechanisms: tuple[ConfigurationMechanism, ...]) -> str:

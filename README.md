@@ -63,14 +63,10 @@ Download the source and run these commands from the project root:
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install -e .
-cp models.example.yaml models.yaml
-cp .env.example .env
-# Fill in your model ID, API endpoint, limits, and capabilities in models.yaml.
-# Keep the profiles you need and set MODEL_API_KEY in .env.
 .venv/bin/python -m fruitfly_agent
 ```
 
-Choose a model, then **Start new session**. Model requests use the network and may incur charges. Local tools run with your user permissions; use a dedicated workspace when trying unfamiliar tasks.
+If no models are configured, the terminal opens **Add model**. Choose the service, enter its model ID and documented limits, and enter the API key with hidden input. Review and stage the model, then choose **Start new session** to save. For existing configuration, use **Configure → model → Add model…** or **Set API key…**. Setup checks are offline; live model requests use the network and may incur charges. Local tools run with your user permissions; use a dedicated workspace when trying unfamiliar tasks.
 
 To explore the extension lifecycle without keys or network access:
 

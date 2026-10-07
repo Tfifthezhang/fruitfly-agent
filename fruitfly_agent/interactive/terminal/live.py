@@ -28,13 +28,14 @@ _BRACKETED_PASTE_START = b"\x1b[200~"
 _BRACKETED_PASTE_END = b"\x1b[201~"
 
 
-def prompt_frame_lines(columns: int) -> tuple[str, str]:
+def prompt_frame_lines(columns: int, label: str = "prompt") -> tuple[str, str]:
     """Return borders that avoid the terminal's auto-wrap column."""
 
     width = max(4, columns - 1)
-    label = "─ prompt "
-    if width >= len(label) + 2:
-        top = "╭" + label + ("─" * (width - len(label) - 2)) + "╮"
+    label = "─ " + label + " "
+    label_width = cell_width(label)
+    if width >= label_width + 2:
+        top = "╭" + label + ("─" * (width - label_width - 2)) + "╮"
     else:
         top = "╭" + ("─" * (width - 2)) + "╮"
     return top, "╰" + ("─" * (width - 2)) + "╯"

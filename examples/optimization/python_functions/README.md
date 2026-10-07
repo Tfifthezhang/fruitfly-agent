@@ -34,7 +34,7 @@ These checks make no model requests. See [Task packs](../../../fruitfly_agent/la
 
 | Step | Action |
 |---|---|
-| 1 | Start the terminal; enable **Text optimizer → OPRO**, save, and start a new session. |
+| 1 | Start the terminal; enable **text-optimizer → opro**, save, and start a new session. |
 | 2 | Record the active prompt hash from `/status`. |
 | 3 | `/optimize` → **Start optimization** → select the installed Python pack. |
 | 4 | Accept or edit direction; verify 8 train / 4 selection, model, budgets, and restricted execution policy. |
@@ -42,7 +42,7 @@ These checks make no model requests. See [Task packs](../../../fruitfly_agent/la
 | 6 | Review evaluation, usage, differences, text, and scope. |
 | 7 | Choose **Save for later** or confirm **Use for a new session**. |
 
-The active target supplies the baseline; selecting the pack does not load `baseline.txt`. `/status` observes progress and `/cancel` stops search. Latest candidates do not guarantee better results. Use **Configure → Base prompt** to preview and select task results for future sessions.
+The active target supplies the baseline; selecting the pack does not load `baseline.txt`. `/status` observes progress and `/cancel` stops search. Latest candidates do not guarantee better results. Use **Configure → prompt** to preview and select task results for future sessions.
 
 ## Test independently
 

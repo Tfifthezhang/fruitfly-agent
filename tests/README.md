@@ -24,6 +24,10 @@ Verify public contracts, module boundaries, and observable behavior with offline
 
 The development runner rejects integration/support and non-test modules. It does not infer change impact or refresh baselines. Standard `unittest` commands remain available; run the full discovery command before delivery.
 
+## Static types
+
+Install the optional development dependencies with `pip install -e '.[dev]'` (network download), then run `.venv/bin/python -m mypy` offline. The explicit module list in `pyproject.toml` covers Core loop/tool/session contracts, Application ownership, and Run configuration/recovery. Imported types are analyzed silently outside that list; terminal and algorithm implementations are not covered by this gate.
+
 ## Groups
 
 | Group | Responsibility |
@@ -45,6 +49,8 @@ The development runner rejects integration/support and non-test modules. It does
 | Rule | Reason |
 |---|---|
 | Assert public behavior | Avoid fixing unnecessary implementation details. |
+| Give each behavior an owner | Module tests cover detailed rules; Workflows verify real module connections and user outcomes. Similar-looking checks at different boundaries may protect different failures. |
+| Use named input cases | Share identical setup and use `subTest` for the same rule with different inputs; retain distinct failure, cancellation, and recovery scenarios. |
 | Reproduce bugs | Protect the actual failure path. |
 | Preserve reviewed baselines | Do not regenerate expected values from the changed implementation. |
 | Keep dependency boundaries | Do not expand allowances to resolve a failure. |
@@ -62,6 +68,6 @@ Contract changes require explicit authorization, independent review, caller/comp
 | Default suite | No real keys, model requests, HTTP service access, benchmark downloads, or Docker jobs |
 | IPython / PTY / log tests | Local processes and temporary data |
 | Integration smoke | Explicit network/model calls, potentially paid |
-| CI | Dependency installation uses the network; test stages remain offline. |
+| CI | Dependency installation uses the network; type and test stages remain offline. |
 
 Error-isolation tests deliberately log failures; judge the final `OK`/`FAILED` and exit status. [GitHub Actions](../.github/workflows/tests.yml) runs macOS/Linux with Python 3.11–3.13 and `TERM=dumb`. See [Contributing](../CONTRIBUTING.md).

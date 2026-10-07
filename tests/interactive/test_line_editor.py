@@ -18,6 +18,7 @@ from fruitfly_agent.interactive.terminal.input import (
     ReadlineLineEditor,
     StreamLineEditor,
     create_line_editor,
+    read_field_line,
 )
 from fruitfly_agent.interactive.terminal.live import InlineTerminalDisplay
 
@@ -210,6 +211,24 @@ class LineEditorUnitTest(unittest.TestCase):
         self.assertTrue(bottom.startswith("╰"))
         self.assertTrue(bottom.endswith("╯"))
 
+    def test_form_labels_restore_normal_input_even_after_interruption(self) -> None:
+        for framed in (True, False):
+            output = io.StringIO()
+            prompts = []
+            def interrupt(prompt):
+                prompts.append(prompt)
+                raise KeyboardInterrupt
+            editor = ReadlineLineEditor(output, reader=interrupt, framed=framed)
+            with self.assertRaises(KeyboardInterrupt):
+                read_field_line(editor, "Model label")
+            self.assertIn("Model label", output.getvalue() if framed else prompts[0])
+            self.assertEqual(editor.frame_label, "prompt")
+        output = io.StringIO()
+        editor = StreamLineEditor(io.StringIO("name\nnext\n"), output)
+        self.assertEqual(read_field_line(editor, "Model label"), "name\n")
+        self.assertEqual(editor.read_line(), "next\n")
+        self.assertEqual(output.getvalue(), "Model label> you> ")
+
     def test_keyboard_interrupt_restores_a_bottom_border(self) -> None:
         output_stream = io.StringIO()
 
@@ -239,6 +258,32 @@ class LineEditorUnitTest(unittest.TestCase):
 
 @unittest.skipUnless(os.name == "posix", "PTY regression requires a POSIX terminal")
 class TerminalInputPtyRegressionTest(unittest.TestCase):
+    def test_form_frame_uses_field_name_then_restores_conversation_label(self) -> None:
+        code = (
+            "import sys; "
+            "from fruitfly_agent.interactive.terminal.input import create_line_editor, read_field_line; "
+            "editor=create_line_editor(sys.stdin,sys.stdout); "
+            "first=read_field_line(editor,'Model label'); second=editor.read_line(); "
+            "print('RESULT='+repr((first,second)),flush=True)"
+        )
+        output = self._run_pty_code(code, b"work-model\rnext\r")
+        self.assertIn("╭─ Model label ", output)
+        self.assertIn("╭─ prompt ", output)
+        self.assertIn("RESULT=('work-model', 'next')", output)
+
+    def test_model_key_input_hides_value_and_restores_echo(self) -> None:
+        code = (
+            "import sys, termios; "
+            "from fruitfly_agent.interactive.terminal.model_setup import read_secret; "
+            "value=read_secret(sys.stdin, sys.stdout); "
+            "print('RESULT='+str(value=='offline-placeholder'),flush=True); "
+            "print('ECHO='+str(bool(termios.tcgetattr(sys.stdin)[3]&termios.ECHO)),flush=True)"
+        )
+        output = self._run_pty_code(code, b"offline-placeholder\r", prompt=b"API key (hidden;")
+        self.assertIn("RESULT=True", output)
+        self.assertIn("ECHO=True", output)
+        self.assertNotIn("offline-placeholder", output)
+
     def test_bracketed_multiline_paste_is_one_submission(self) -> None:
         code = (
             "from fruitfly_agent.interactive.terminal.live import "
@@ -361,7 +406,7 @@ class TerminalInputPtyRegressionTest(unittest.TestCase):
         )
         return self._run_pty_code(code, keys)
 
-    def _run_pty_code(self, code: str, keys: bytes) -> str:
+    def _run_pty_code(self, code: str, keys: bytes, *, prompt=b"\xe2\x9d\xaf ") -> str:
         child_pid, master_fd = pty.fork()
         if child_pid == 0:
             os.chdir(ROOT)
@@ -370,7 +415,7 @@ class TerminalInputPtyRegressionTest(unittest.TestCase):
             os.execl(sys.executable, sys.executable, "-c", code)
         chunks: list[bytes] = []
         try:
-            self._read_until(master_fd, b"\xe2\x9d\xaf ", chunks)
+            self._read_until(master_fd, prompt, chunks)
             os.write(master_fd, keys)
             self._read_until_exit(child_pid, master_fd, chunks)
             self._drain(master_fd, chunks)

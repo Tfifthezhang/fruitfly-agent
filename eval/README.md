@@ -35,6 +35,12 @@ Use `/eval` in an idle Agent session, or run the standalone CLI with an `Evaluat
 
 Resource labels do not override task CPU/RAM/time limits. Preflight does not prove image availability, architecture compatibility, free disk space, or Provider connectivity.
 
+## Select installation material
+
+Harbor installs the complete validated source checkout by default when running from source or an editable installation. Wheel installations must set `FRUITFLY_EVAL_PACKAGE` to an absolute path to a complete FruitFlyAgent source directory or a built wheel. An explicit value also overrides checkout discovery. Material must identify `fruitfly-agent` version `0.1`; missing build inputs or invalid wheels fail before container task startup.
+
+Source installation stages Python package files, `pyproject.toml`, `README.md`, and license notices. It excludes local secrets, caches, and sessions. Wheel installation uploads the selected wheel. Neither path snapshots arbitrary learning state or proves source equivalence; retain the exact source/artifact and its hash for research. Dependency installation inside real containers still uses the network. The benchmark runner reads workspace `.fruitfly/secrets.env`, falling back to root `.env` only when absent; files are not merged and process environment values take precedence. See [Configuration](../CONFIGURATION.md#files-and-precedence).
+
 ## Commands and results
 
 | Command | Purpose |
@@ -55,6 +61,7 @@ Resource labels do not override task CPU/RAM/time limits. Preflight does not pro
 | [contracts.py](contracts.py), [planning.py](planning.py) | Requests and frozen conditions |
 | [execution.py](execution.py), [storage.py](storage.py) | Execution, reports, and artifacts |
 | [harbor_agent.py](harbor_agent.py) | Install and run the normal Agent in task containers |
+| [installation.py](installation.py) | Validate source build inputs or wheel identity before installation |
 | [Developer guide](DEVELOPER_GUIDE.md) | Running, diagnosis, and extension |
 
 Eval does not define production lifecycle or algorithm interfaces. Removing it must leave normal interaction intact.

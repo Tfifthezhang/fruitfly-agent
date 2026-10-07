@@ -4,13 +4,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .workspace import WorkspacePaths
+
 
 def load_env(path: str | Path | None = None) -> dict[str, str]:
     env: dict[str, str] = {}
     candidates = (
         [Path(path)]
         if path
-        else [Path.cwd() / ".env", Path(__file__).resolve().parents[2] / ".env"]
+        else [WorkspacePaths(Path.cwd()).secret_file()]
     )
     for candidate in candidates:
         if not candidate.is_file():

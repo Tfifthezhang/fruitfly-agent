@@ -41,6 +41,31 @@ class ToolTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertIn("line1", result.content[0].text)
         self.assertIn("line3", result.content[0].text)
 
+    async def test_file_tools_preserve_hyphens_when_space_path_also_exists(self):
+        target = self.root / "my-project" / "release-notes.txt"
+        other = self.root / "my project" / "release notes.txt"
+        other.parent.mkdir()
+        other.write_text("original", encoding="utf-8")
+        for path in ("my-project/release-notes.txt", str(target)):
+            with self.subTest(path=path):
+                await self.run_tool(create_write_tool(), {"path": path, "content": "original"})
+                self.assertEqual(target.read_text(), "original")
+                await self.run_tool(create_edit_tool(), {
+                    "path": path, "edits": [{"oldText": "original", "newText": "updated"}],
+                })
+                result = await self.run_tool(create_read_tool(), {"path": path})
+                self.assertEqual(result.content[0].text, "updated")
+                self.assertEqual(target.read_text(), "updated")
+                self.assertEqual(other.read_text(), "original")
+
+    async def test_unicode_space_path_compatibility(self):
+        (self.root / "release notes.txt").write_text("notes", encoding="utf-8")
+        for space in ("\u00a0", *(chr(code) for code in range(0x2000, 0x200B)),
+                      "\u202f", "\u205f", "\u3000"):
+            with self.subTest(codepoint=hex(ord(space))):
+                result = await self.run_tool(create_read_tool(), {"path": f"@release{space}notes.txt"})
+                self.assertEqual(result.content[0].text, "notes")
+
     async def test_write_reports_character_count_and_preserves_content(self):
         for content, count in (("", 0), ("hello", 5), ("ＡＢ\U0001f34e\ne\u0301", 6)):
             with self.subTest(content=content):

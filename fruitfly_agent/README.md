@@ -40,6 +40,8 @@ The Session keeps canonical conversation facts. The model projection is the cont
 | Session | Canonical messages, committed context decisions, manifest, and concise run/failure records |
 | Live events | Frontend observation; not a complete persisted request trace |
 
+Core enforces per-turn tool allowances and bounds consecutive truncated responses; see [runtime rules](core/README.md#runtime-rules). Provider retries and monetary cost require separate accounting.
+
 Recovery checks artifact contents and the full manifest. It does not restore arbitrary Python objects, snapshot algorithm source, or replay requests with unknown cost. Details belong to [Run](run/README.md#recovery) and [Session](core/session/README.md).
 
 ## Choose an extension point

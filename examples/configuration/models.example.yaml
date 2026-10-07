@@ -1,0 +1,41 @@
+# Copy this file to .fruitfly/models.yaml and edit it before starting a live session.
+# Both entries use DeepSeek Flash through different API protocols.
+# Live tasks require a DeepSeek key, use the network, and may incur charges.
+# Store key values in .fruitfly/secrets.env or the process environment, never in this file.
+models:
+  deepseek-flash-openai:
+    # Uses DeepSeek's OpenAI Responses-compatible endpoint, not Chat Completions.
+    provider: openai
+    model: deepseek-flash
+    api_key_env: DEEPSEEK_API_KEY
+    base_url: https://api.deepseek.com
+    # Conservative working budget within the documented 1M context.
+    # Output is capped at 4096 for this example, not the service maximum.
+    context_window: 1000000
+    max_output_tokens: 4096
+    # Text-focused defaults; false flags do not disable server-side thinking.
+    capabilities:
+      tools: true
+      parallel_tool_calls: false
+      vision: false
+      reasoning: false
+      streaming: true
+    # Disable thinking for the Responses example; the capability flag alone does not.
+    parameters:
+      reasoning:
+        effort: none
+  deepseek-flash-anthropic:
+    # Uses DeepSeek's Anthropic Messages-compatible endpoint.
+    # Thinking follows the server default; this adapter cannot configure it.
+    provider: anthropic
+    model: deepseek-flash
+    api_key_env: DEEPSEEK_API_KEY
+    base_url: https://api.deepseek.com/anthropic
+    context_window: 1000000
+    max_output_tokens: 4096
+    capabilities:
+      tools: true
+      parallel_tool_calls: false
+      vision: false
+      reasoning: false
+      streaming: true

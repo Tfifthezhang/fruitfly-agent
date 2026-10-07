@@ -94,6 +94,26 @@ class CliSurfaceTest(unittest.TestCase):
         self.assertEqual(found[0].model, "offline-model")
 
 class CliRunTest(unittest.IsolatedAsyncioTestCase):
+    async def test_cwd_selects_env_file_and_process_values_take_precedence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".env").write_text("TEST_SETTING=file\nFILE_ONLY=present\n", encoding="utf-8")
+            launch = root / "launch"
+            launch.mkdir()
+            (launch / ".env").write_text("TEST_SETTING=wrong-workspace\nFILE_ONLY=wrong\n", encoding="utf-8")
+            setup = Mock()
+            setup.run.return_value = ConfigurationLaunchResult(start=False)
+            with patch.dict(os.environ, {"TEST_SETTING": "process"}, clear=True), patch.object(
+                cli, "RunApplicationFactory"
+            ) as factory, patch.object(cli, "TerminalConfigurationFrontend", return_value=setup), patch.object(
+                Path, "cwd", return_value=launch
+            ):
+                self.assertEqual(await cli.run_cli(_args(cwd=tmp)), 0)
+            self.assertEqual(factory.call_args.kwargs["cwd"], root.resolve())
+            environment = factory.call_args.kwargs["environment"]
+            self.assertEqual(environment.get("TEST_SETTING"), "process")
+            self.assertEqual(environment.get("FILE_ONLY"), "present")
+
     async def test_resume_reloads_the_exact_bound_data_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

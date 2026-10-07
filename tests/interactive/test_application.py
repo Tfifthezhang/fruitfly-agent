@@ -5,27 +5,123 @@ from __future__ import annotations
 import asyncio
 import unittest
 from pathlib import Path
-import tempfile
-from unittest.mock import Mock
-from unittest.mock import patch
 
-from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.core.data_model import AgentLoopResult
 from fruitfly_agent.interactive import (
     AgentApplication,
     ApplicationState,
-    InteractiveSession,
     ResumableSession,
     RuntimeHandle,
 )
-from tests.support.faux_provider import FauxProvider
-from fruitfly_agent.run.application import RunApplicationFactory
-from tests.support.application import _Factory
-
-
+from tests.support.application import _Factory, offline_session
+from fruitfly_agent.interactive.optimization import CandidateView
 
 
 class AgentApplicationTest(unittest.IsolatedAsyncioTestCase):
+    async def _switch_fixture(self, *, activate=None, retire=None, start=None):
+        lifecycle = []
+        first = offline_session(model='first', session_path='first.jsonl')
+        second = offline_session(model='second', session_path='second.jsonl')
+
+        class Component:
+            async def start(self):
+                lifecycle.append("start:second")
+                if start is not None:
+                    await start()
+
+            def close(self):
+                lifecycle.append("close:second")
+
+        def close_first():
+            lifecycle.append("close:first")
+            if retire is not None:
+                retire()
+
+        candidate = RuntimeHandle(
+            second, {"digest": "candidate"}, {"component": Component()},
+            activate_callback=activate,
+        )
+        view = CandidateView("candidate", "proposed", "custom", "text", "artifact", "improve", "sha256:test")
+
+        class Service:
+            def candidates(self):
+                return (view,)
+
+            async def prepare_candidate(self, manifest, candidate_id):
+                return candidate
+
+        class Factory(_Factory):
+            async def open(self, *, resume, session_path):
+                if self.opened:
+                    return candidate
+                handle = await super().open(resume=resume, session_path=session_path)
+                handle.close_callback = close_first
+                handle.optimization = handle.candidate_activation = Service()
+                return handle
+
+        app = AgentApplication(Factory([first]))
+        await app.start()
+        self.addAsyncCleanup(app.close)
+        return app, candidate, lifecycle
+
+    async def _switch(self, app, candidate, operation):
+        if operation == "rebuild":
+            await app.rebuild()
+        elif operation == "resume":
+            await app.resume("second.jsonl")
+        elif operation == "adopt":
+            await app.adopt_candidate("candidate")
+        else:
+            await app.activate_runtime(candidate, expected_manifest_digest="sha256:test")
+
+    async def test_replacement_activation_failure_preserves_incumbent(self):
+        for operation in ("rebuild", "resume", "adopt", "activate"):
+            with self.subTest(operation=operation):
+                def fail():
+                    raise RuntimeError("activation failed")
+
+                app, candidate, lifecycle = await self._switch_fixture(activate=fail)
+                with self.assertRaisesRegex(RuntimeError, "activation failed"):
+                    await self._switch(app, candidate, operation)
+                self.assertEqual("first", app.status.model)
+                self.assertEqual(ApplicationState.IDLE, app.state)
+                self.assertEqual(["start:second", "close:second"], lifecycle)
+                await app.close()
+
+    async def test_replacement_retirement_failure_preserves_successful_switch(self):
+        for operation in ("rebuild", "resume", "adopt", "activate"):
+            with self.subTest(operation=operation):
+                def fail():
+                    raise RuntimeError("retirement failed")
+
+                app, candidate, lifecycle = await self._switch_fixture(retire=fail)
+                await self._switch(app, candidate, operation)
+                self.assertEqual("second", app.status.model)
+                self.assertEqual(ApplicationState.IDLE, app.state)
+                self.assertIn("retirement failed", str(app.last_error))
+                self.assertEqual(["start:second", "close:first"], lifecycle)
+                await app.close()
+
+    async def test_replacement_start_cancellation_preserves_incumbent(self):
+        for operation in ("rebuild", "resume", "adopt", "activate"):
+            with self.subTest(operation=operation):
+                entered = asyncio.Event()
+
+                async def wait():
+                    entered.set()
+                    await asyncio.Event().wait()
+
+                app, candidate, lifecycle = await self._switch_fixture(start=wait)
+                switching = asyncio.create_task(self._switch(app, candidate, operation))
+                await asyncio.wait_for(entered.wait(), timeout=1)
+                switching.cancel()
+                with self.assertRaises(asyncio.CancelledError):
+                    await switching
+                self.assertEqual("first", app.status.model)
+                self.assertEqual(ApplicationState.IDLE, app.state)
+                self.assertEqual(["start:second", "close:second"], lifecycle)
+                await app.close()
+
     async def test_prompt_queue_runs_serially_and_exposes_state(self) -> None:
         prompts: list[str] = []
 
@@ -38,10 +134,7 @@ class AgentApplicationTest(unittest.IsolatedAsyncioTestCase):
                 model=config.model,
             )
 
-        session = InteractiveSession(
-            AgentLoopConfig(provider=FauxProvider(), model="offline"),
-            run_loop=run,
-        )
+        session = offline_session(model='offline', run_loop=run)
         application = AgentApplication(_Factory([session]))
         await application.start(session_path=Path("first.jsonl"))
 
@@ -60,14 +153,8 @@ class AgentApplicationTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(application.state, ApplicationState.CLOSED)
 
     async def test_rebuild_replaces_runtime_and_reloads_saved_configuration(self) -> None:
-        first = InteractiveSession(
-            AgentLoopConfig(provider=FauxProvider(), model="first"),
-            session_path="first.jsonl",
-        )
-        second = InteractiveSession(
-            AgentLoopConfig(provider=FauxProvider(), model="second"),
-            session_path="second.jsonl",
-        )
+        first = offline_session(model='first', session_path='first.jsonl')
+        second = offline_session(model='second', session_path='second.jsonl')
         factory = _Factory([first, second])
         application = AgentApplication(factory)
         await application.start(session_path=Path("first.jsonl"))
@@ -95,13 +182,8 @@ class AgentApplicationTest(unittest.IsolatedAsyncioTestCase):
                 model=config.model,
             )
 
-        first = InteractiveSession(
-            AgentLoopConfig(provider=FauxProvider(), model="first"),
-            run_loop=run,
-        )
-        second = InteractiveSession(
-            AgentLoopConfig(provider=FauxProvider(), model="second")
-        )
+        first = offline_session(model='first', run_loop=run)
+        second = offline_session(model='second')
 
         class Factory(_Factory):
             async def open(self, *, resume: bool, session_path: Path | None):
@@ -127,12 +209,8 @@ class AgentApplicationTest(unittest.IsolatedAsyncioTestCase):
     async def test_rebuild_rejects_new_queue_items(self) -> None:
         close_started = asyncio.Event()
         allow_close = asyncio.Event()
-        first = InteractiveSession(
-            AgentLoopConfig(provider=FauxProvider(), model="first")
-        )
-        second = InteractiveSession(
-            AgentLoopConfig(provider=FauxProvider(), model="second")
-        )
+        first = offline_session(model='first')
+        second = offline_session(model='second')
 
         class Factory(_Factory):
             async def open(self, *, resume: bool, session_path: Path | None):
@@ -171,14 +249,8 @@ class AgentApplicationTest(unittest.IsolatedAsyncioTestCase):
             def close(self) -> None:
                 lifecycle.append(f"close:{self.name}")
 
-        first = InteractiveSession(
-            AgentLoopConfig(provider=FauxProvider(), model="first"),
-            session_path="first.jsonl",
-        )
-        second = InteractiveSession(
-            AgentLoopConfig(provider=FauxProvider(), model="second"),
-            session_path="second.jsonl",
-        )
+        first = offline_session(model='first', session_path='first.jsonl')
+        second = offline_session(model='second', session_path='second.jsonl')
 
         class Factory(_Factory):
             async def open(self, *, resume: bool, session_path: Path | None):
@@ -222,10 +294,7 @@ class AgentApplicationTest(unittest.IsolatedAsyncioTestCase):
         await application.close()
 
     async def test_resume_failure_keeps_current_runtime_active(self) -> None:
-        first = InteractiveSession(
-            AgentLoopConfig(provider=FauxProvider(), model="first"),
-            session_path="first.jsonl",
-        )
+        first = offline_session(model='first', session_path='first.jsonl')
 
         class Factory(_Factory):
             async def open(self, *, resume: bool, session_path: Path | None):
@@ -247,14 +316,8 @@ class AgentApplicationTest(unittest.IsolatedAsyncioTestCase):
         await application.close()
 
     async def test_resume_start_failure_keeps_current_runtime_active(self) -> None:
-        first = InteractiveSession(
-            AgentLoopConfig(provider=FauxProvider(), model="first"),
-            session_path="first.jsonl",
-        )
-        second = InteractiveSession(
-            AgentLoopConfig(provider=FauxProvider(), model="second"),
-            session_path="second.jsonl",
-        )
+        first = offline_session(model='first', session_path='first.jsonl')
+        second = offline_session(model='second', session_path='second.jsonl')
 
         class BrokenComponent:
             def start(self) -> None:
@@ -298,9 +361,7 @@ class RuntimeHandleTest(unittest.IsolatedAsyncioTestCase):
             async def close(self):
                 calls.append(f"close:{self.name}")
 
-        session = InteractiveSession(
-            AgentLoopConfig(provider=FauxProvider(), model="offline")
-        )
+        session = offline_session(model='offline')
         handle = RuntimeHandle(
             session,
             {"digest": "test"},
@@ -336,9 +397,7 @@ class RuntimeHandleTest(unittest.IsolatedAsyncioTestCase):
                 calls.append(f"close:{self.name}")
 
         handle = RuntimeHandle(
-            InteractiveSession(
-                AgentLoopConfig(provider=FauxProvider(), model="offline")
-            ),
+            offline_session(model='offline'),
             {"digest": "test"},
             {
                 "first": Component("first"),
@@ -353,7 +412,6 @@ class RuntimeHandleTest(unittest.IsolatedAsyncioTestCase):
             calls,
             ["start:first", "start:broken", "close:broken", "close:first"],
         )
-
 
 
 if __name__ == "__main__":

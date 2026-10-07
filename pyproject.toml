@@ -28,6 +28,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+dev = [
+    "mypy==2.4.0",
+]
 benchmarks = [
     "harbor==0.23.0",
 ]
@@ -39,3 +42,29 @@ fruitfly-agent-eval = "eval.__main__:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["fruitfly_agent*", "eval*"]
+
+[tool.mypy]
+python_version = "3.11"
+follow_imports = "silent"
+check_untyped_defs = true
+no_implicit_optional = true
+warn_unused_ignores = true
+files = [
+    "fruitfly_agent/core/config.py",
+    "fruitfly_agent/core/loop.py",
+    "fruitfly_agent/core/extensions/callbacks.py",
+    "fruitfly_agent/core/extensions/protocols.py",
+    "fruitfly_agent/core/session/storage.py",
+    "fruitfly_agent/core/tool_runtime/__init__.py",
+    "fruitfly_agent/core/tool_runtime/execution.py",
+    "fruitfly_agent/interactive/application.py",
+    "fruitfly_agent/interactive/runtime.py",
+    "fruitfly_agent/interactive/configuration.py",
+    "fruitfly_agent/interactive/optimization.py",
+    "fruitfly_agent/run/application.py",
+    "fruitfly_agent/run/model_selection.py",
+    "fruitfly_agent/run/configuration_views.py",
+    "fruitfly_agent/run/profiles.py",
+    "fruitfly_agent/run/recovery.py",
+    "fruitfly_agent/run/search_jobs.py",
+]

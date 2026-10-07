@@ -3,6 +3,25 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
+
+
+@dataclass(frozen=True)
+class ConversationBlock:
+    """Immutable display content; never contains image bytes or tool arguments."""
+
+    kind: Literal["text", "image", "thinking", "tool_call"]
+    text: str = ""
+
+
+@dataclass(frozen=True)
+class ConversationMessage:
+    """One canonical message projected for frontend history display."""
+
+    role: Literal["user", "assistant", "tool"]
+    content: tuple[ConversationBlock, ...]
+    tool_name: str = ""
+    is_error: bool = False
 
 
 @dataclass(frozen=True)
@@ -46,4 +65,4 @@ class InteractiveStatus:
     prompt_hash: str = ""
 
 
-__all__ = ["InteractiveMechanism", "InteractiveStatus", "ResumableSession"]
+__all__ = ["ConversationBlock", "ConversationMessage", "InteractiveMechanism", "InteractiveStatus", "ResumableSession"]

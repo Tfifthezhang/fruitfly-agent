@@ -193,6 +193,7 @@ def create_menu_input(
 
 
 __all__ = [
+    "navigate_menu",
     "LineMenuInput",
     "MenuAction",
     "MenuEvent",
@@ -202,3 +203,14 @@ __all__ = [
     "TerminalMenuRenderer",
     "create_menu_input",
 ]
+
+
+def navigate_menu(event, selected: int, size: int):
+    if event.index is not None:
+        return (event.index, False) if 0 <= event.index < size else (selected, True)
+    if event.action == MenuAction.UP:
+        return (selected - 1) % size, True
+    if event.action == MenuAction.DOWN:
+        return (selected + 1) % size, True
+    return selected, False
+

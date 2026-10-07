@@ -5,6 +5,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from fruitfly_agent.core.data_model import (
     AssistantMessage,
@@ -17,19 +18,23 @@ from fruitfly_agent.core.errors import FatalError, OverflowError, RetryableError
 from fruitfly_agent.providers.anthropic import classify_error as classify_anthropic_error
 from fruitfly_agent.providers.openai import OpenAIProvider, classify_error as classify_openai_error
 from fruitfly_agent.providers.openai_codec import convert_to_openai
-from fruitfly_agent.providers.registry import ProviderRegistry, load_model_specs
+from fruitfly_agent.providers.registry import ProviderRegistry, default_registry, load_model_specs
 
 
 class ProviderTests(unittest.TestCase):
     def test_public_model_template_loads_without_live_credentials(self) -> None:
-        specs = load_model_specs(Path(__file__).resolve().parents[2] / "models.example.yaml")
-        self.assertEqual({"example-responses", "example-messages"}, set(specs))
-        self.assertEqual("openai", specs["example-responses"].provider.type)
-        self.assertEqual("anthropic", specs["example-messages"].provider.type)
+        specs = load_model_specs(Path(__file__).resolve().parents[2] / "examples/configuration/models.example.yaml")
+        self.assertEqual({"deepseek-flash-openai", "deepseek-flash-anthropic"}, set(specs))
+        self.assertEqual("openai", specs["deepseek-flash-openai"].provider.type)
+        self.assertEqual("anthropic", specs["deepseek-flash-anthropic"].provider.type)
+        self.assertEqual("https://api.deepseek.com", specs["deepseek-flash-openai"].provider.base_url)
+        self.assertEqual("https://api.deepseek.com/anthropic", specs["deepseek-flash-anthropic"].provider.base_url)
+        self.assertEqual({"reasoning": {"effort": "none"}}, specs["deepseek-flash-openai"].parameters)
+        self.assertEqual({}, specs["deepseek-flash-anthropic"].parameters)
         for spec in specs.values():
             with self.subTest(profile=spec.id):
-                self.assertEqual("MODEL_API_KEY", spec.provider.api_key_env)
-                self.assertEqual("REPLACE_WITH_MODEL_ID", spec.model)
+                self.assertEqual("DEEPSEEK_API_KEY", spec.provider.api_key_env)
+                self.assertEqual("deepseek-flash", spec.model)
                 spec.require(tools=True, streaming=True)
                 registry = ProviderRegistry()
                 captured = []
@@ -38,8 +43,15 @@ class ProviderTests(unittest.TestCase):
                     captured.append((model, key))
                     return marker
                 registry.register(spec.provider.type, construct)
-                self.assertIs(marker, registry.create(spec, {"MODEL_API_KEY": "offline-placeholder"}))
+                self.assertIs(marker, registry.create(spec, {"DEEPSEEK_API_KEY": "offline-placeholder"}))
                 self.assertEqual([(spec, "offline-placeholder")], captured)
+        # Exercise the real factories and constructor parameters with SDK clients mocked.
+        with patch("openai.AsyncOpenAI") as responses, patch("anthropic.AsyncAnthropic") as messages:
+            registry = default_registry()
+            for spec in specs.values():
+                registry.create(spec, {"DEEPSEEK_API_KEY": "offline-placeholder"})
+            self.assertEqual("https://api.deepseek.com", responses.call_args.kwargs["base_url"])
+            self.assertEqual("https://api.deepseek.com/anthropic", messages.call_args.kwargs["base_url"])
 
     def test_compatible_endpoint_overflow_messages_are_normalized(self) -> None:
         messages = (

@@ -88,12 +88,11 @@ class AgentLoopConfig:
     on_partial: Callable[[str], Awaitable[None] | None] | None = None  # tool streaming updates
 
     def __post_init__(self) -> None:
-        if (
-            isinstance(self.max_context_recovery_attempts, bool)
-            or not isinstance(self.max_context_recovery_attempts, int)
-            or self.max_context_recovery_attempts < 1
-        ):
-            raise ValueError("max_context_recovery_attempts must be at least 1")
+        for name, minimum in (("max_context_recovery_attempts", 1), ("max_turns", 0),
+                              ("max_tool_calls_per_turn", 0)):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+                raise ValueError(f"{name} must be at least {minimum}")
         tools = tuple(self.tools or ())
         names = [tool.name for tool in tools]
         duplicates = sorted({name for name in names if names.count(name) > 1})
