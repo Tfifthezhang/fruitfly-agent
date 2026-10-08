@@ -20,3 +20,5 @@ Configuration and assembly tests share local setup helpers while keeping model i
 ```bash
 .venv/bin/python -m unittest discover -s tests/run -t . -v
 ```
+
+Assembly checks bind permission identity to recovery, require the standard authorizer, protect the active Session writer, and construct fresh approval services.

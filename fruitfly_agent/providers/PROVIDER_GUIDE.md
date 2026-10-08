@@ -13,7 +13,7 @@
 | System instructions | `instructions` | `system` |
 | Tool messages | `function_call` / `function_call_output` | `tool_use` / `tool_result` |
 | Extra `parameters` | Unconsumed constructor options forwarded to `responses.create()` | Only explicitly declared constructor options |
-| Reasoning | Responses reasoning stream/state not mapped | Thinking can be displayed, but blocks are not preserved for replay |
+| Reasoning | Text/summary reasoning deltas can be displayed; opaque reasoning items are not preserved for replay | Thinking can be displayed, but blocks are not preserved for replay |
 
 `capabilities.reasoning: true` declares a model capability; it does not send reasoning parameters or guarantee lossless reasoning-state recovery.
 
@@ -27,7 +27,29 @@ The setup menu separates official accounts from custom compatible services. Offi
 |---|---|
 | OpenAI `parameters.reasoning.effort: none` | Forwarded as a Responses request option. |
 | Anthropic `parameters.reasoning` | Unsupported constructor argument; fails before the request. |
-| Anthropic optional adapter settings | `retry_max`, `retry_base_delay` |
+| Both adapters | Transport/retry settings below are constructor options, not API body fields. |
+
+## Bound waiting and retries
+
+Set these values under a model's `parameters`. All time values are seconds and must be finite and positive, except `retry_base_delay`, which can be zero. `retry_max` is a nonnegative integer; `retry_jitter` is a finite fraction from 0 to 1.
+
+| Parameter | Default | Behavior |
+|---|---:|---|
+| `connect_timeout` | 10 | SDK connection timeout |
+| `timeout` | 600 | SDK read/write/pool timeout |
+| `first_progress_timeout` | 180 | Per-attempt deadline from request start until meaningful output, including header wait |
+| `stall_timeout` | 180 | Maximum gap between meaningful output events |
+| `total_timeout` | 900 | Deadline for one harness Provider invocation, including attempts and backoff |
+| `cleanup_timeout` | 5 | Separate allowance for each transport/client cleanup operation |
+| `retry_max` | 3 | At most four attempts by default |
+| `retry_base_delay` | 1 | Exponential base delay |
+| `retry_jitter` | 0.2 | Add up to this fraction of the delay |
+
+Meaningful output includes nonempty text, thinking, and tool-call starts/arguments. Keepalive and empty deltas do not reset the deadline. A model doing silent internal reasoning can still exceed the first-progress deadline; configure a larger limit when needed. Deadlines report exceeded waiting limits, not proof that the server is busy. Cleanup may extend wall time beyond the request deadline.
+
+Before partial delivery, retry transient failures within the attempt and total limits; honor numeric or HTTP-date `Retry-After` hints. After content delivery, failures are terminal, so already displayed content is not duplicated. No output does not establish that the remote request was unexecuted or free. Usage on failed attempts can be unknown. Core call budgets still count harness invocations rather than adapter attempts.
+
+Adapters publish effective defaults and overrides through `transport_parameters`; Run includes this identity in the full manifest. A resumed session must match it. `StreamActivity` is public Core observation vocabulary; consumers should handle its waiting/retrying/timeout phases or ignore it, and call `AssistantMessageEventStream.aclose()` when stopping consumption.
 
 Keep nonsecret specifications in `.fruitfly/models.yaml` and keys in `.fruitfly/secrets.env`. Install both SDKs using the same environment that runs the Agent:
 

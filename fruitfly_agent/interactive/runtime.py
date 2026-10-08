@@ -11,6 +11,7 @@ from .configuration import ConfigurationController
 from .models import ResumableSession
 from .optimization import CandidateActivationService, OptimizationService
 from .session import InteractiveSession
+from .authorization import AuthorizationService
 
 async def _call_optional(component: Any, method: str) -> Any:
     callback = getattr(component, method, None)
@@ -31,6 +32,7 @@ class RuntimeHandle:
     optimization: OptimizationService | None = None
     candidate_activation: CandidateActivationService | None = None
     activate_callback: Callable[[], None] | None = None
+    authorization: AuthorizationService | None = None
     _closed: bool = field(default=False, init=False, repr=False)
 
     async def start(self) -> None:
@@ -56,6 +58,8 @@ class RuntimeHandle:
         if self._closed:
             return
         self._closed = True
+        if self.authorization is not None:
+            await self.authorization.close()
         errors: list[BaseException] = []
         seen: set[int] = set()
         for component in reversed(tuple(self.components.values())):

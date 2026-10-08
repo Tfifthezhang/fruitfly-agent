@@ -56,6 +56,8 @@ class InteractiveSession:
         self._mechanism_details = tuple(mechanism_details)
         self._run_lock = asyncio.Lock()
         self._active_signal: asyncio.Event | None = None
+        self._active_task: asyncio.Task[AgentLoopResult] | None = None
+        self._cancel_handle: asyncio.TimerHandle | None = None
         self._accepting_steering = False
         self._steering: deque[UserMessage] = deque()
         self._dispatcher = EventDispatcher(
@@ -93,7 +95,12 @@ class InteractiveSession:
             tool_names=tuple(tool.name for tool in self._config.tools or ()),
             mechanisms=self._mechanisms,
             mechanism_details=self._mechanism_details,
+            **{**{"context_window": self._config.context_window,
+                  "max_output_tokens": self._config.max_tokens}, **self._bridge.context_status},
         )
+
+    async def emit_frontend_event(self, event) -> None:
+        await self._dispatcher.emit(event)
 
     def set_event_sink(self, sink: EventSink | None) -> None:
         self._dispatcher.set_sink(sink)
@@ -106,11 +113,18 @@ class InteractiveSession:
         return self._active_signal is not None
 
     def cancel(self) -> bool:
-        """Request cooperative cancellation at the next Core safe point."""
+        """Signal cancellation, then interrupt the owned run after a short grace."""
 
         if self._active_signal is None:
             return False
         self._active_signal.set()
+        self._accepting_steering = False
+        if self._active_task is not None and self._cancel_handle is None:
+            task = self._active_task
+            def interrupt():
+                if not task.done():
+                    task.cancel()
+            self._cancel_handle = asyncio.get_running_loop().call_later(0.05, interrupt)
         return True
 
     def steer(self, prompt: str) -> bool:
@@ -146,12 +160,23 @@ class InteractiveSession:
                         message_count=len(self._messages),
                     )
                 )
-                result = await self._run_loop(
+                self._active_task = asyncio.create_task(self._run_loop(
                     self._config,
                     self._messages,
                     signal=signal,
                     context_pipeline=self._context_pipeline,
-                )
+                ))
+                if signal.is_set():
+                    self.cancel()
+                external_cancellation = False
+                try:
+                    result = await self._active_task
+                except asyncio.CancelledError:
+                    external_cancellation = bool(asyncio.current_task().cancelling())
+                    result = self._bridge.last_result or AgentLoopResult(
+                        messages=list(self._messages), stop_reason="aborted", model=self._config.model,
+                    )
+                self._bridge.finish_run(result)
                 self._accepting_steering = False
                 self._active_signal = None
                 self._messages = list(result.messages)
@@ -174,9 +199,15 @@ class InteractiveSession:
                         error_details=result.error_details,
                     )
                 )
+                if external_cancellation:
+                    raise asyncio.CancelledError
                 return result
             finally:
                 self._active_signal = None
+                self._active_task = None
+                if self._cancel_handle is not None:
+                    self._cancel_handle.cancel()
+                    self._cancel_handle = None
                 self._accepting_steering = False
                 self._steering.clear()
                 self._dispatcher.end_run()

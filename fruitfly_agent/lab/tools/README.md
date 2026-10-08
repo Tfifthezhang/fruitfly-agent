@@ -52,3 +52,5 @@ Use [Core tool contracts](../../core/tool_runtime/README.md), [Environment](../e
 ```bash
 .venv/bin/python -m unittest tests.lab.test_builtin_tools -v
 ```
+
+Built-in tools declare `ToolPermission`: read is a file read, edit/write are file writes, and Bash/IPython are local execution. The standard host authorizes final arguments and injects the [guarded environment](../environment/README.md#apply-lightweight-permissions). Custom tools must declare their operation/path arguments; declarations are trusted plugin metadata, not proof that arbitrary plugin code respects a boundary.

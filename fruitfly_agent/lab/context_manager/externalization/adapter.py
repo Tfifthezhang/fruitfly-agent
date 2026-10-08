@@ -142,6 +142,7 @@ def install_ipython_tool(
         host_handler=handle,
         max_output_chars=config.max_cell_output_chars,
         timeout_seconds=config.cell_timeout_seconds,
+        process_environment=dict(context.process_environment) if context.process_environment is not None else None,
     )
     prompt = state.config.system_prompt
     prompt = f"{prompt}\n\n{IPYTHON_TOOL_PROMPT}" if prompt else IPYTHON_TOOL_PROMPT

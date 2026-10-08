@@ -26,7 +26,7 @@ The development runner rejects integration/support and non-test modules. It does
 
 ## Static types
 
-Install the optional development dependencies with `pip install -e '.[dev]'` (network download), then run `.venv/bin/python -m mypy` offline. The explicit module list in `pyproject.toml` covers Core loop/tool/session contracts, Application ownership, and Run configuration/recovery. Imported types are analyzed silently outside that list; terminal and algorithm implementations are not covered by this gate.
+Install the optional development dependencies with `pip install -e '.[dev]'` (network download), then run `.venv/bin/python -m mypy` offline. The explicit module list in `pyproject.toml` covers Core loop/tool/session contracts, Application ownership, and Run configuration/recovery. The gate also includes authorization contracts, Interactive confirmation, Lab permission/environment wrappers, and Run policy construction. Imported types are analyzed silently outside that list; terminal and algorithm implementations are not covered by this gate.
 
 ## Groups
 

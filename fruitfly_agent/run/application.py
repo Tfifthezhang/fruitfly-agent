@@ -26,6 +26,7 @@ from fruitfly_agent.providers.registry import ProviderRegistry
 from .optimization_service import RunOptimizationService
 from .search_jobs import RunSearchJobs
 
+from fruitfly_agent.lab.catalog import PermissionPolicy
 from .assembly import RuntimeManifest, build_runtime, resolve_base_prompt
 from .configuration import HarnessProfile
 from .artifacts import DataArtifactStore
@@ -68,8 +69,10 @@ class RunApplicationFactory:
         data_artifact_bindings: Mapping[str, str] | None = None,
         allow_incomplete: bool = False,
         task_pack_sources: tuple = (),
+        permission_policy: PermissionPolicy | None = None,
     ) -> None:
         self.cwd = cwd.resolve()
+        self.permission_policy = permission_policy
         self.task_pack_sources = tuple(task_pack_sources)
         self._task_snapshots = TaskSnapshotStore(self.cwd)
         self._search_previews: dict[str, tuple] = {}
@@ -189,6 +192,7 @@ class RunApplicationFactory:
                 artifact_store=self.artifact_store,
                 artifact_bindings=artifact_bindings,
                 task_pack_sources=self.task_pack_sources,
+                permission_policy=self.permission_policy,
             )
             check_session_manifest(
                 session, runtime, resume=resume,
@@ -226,6 +230,8 @@ class RunApplicationFactory:
                 mechanism_details=details,
                 tool_categories=tool_categories,
             )
+            approvals = runtime.components["authorization"]
+            approvals.emit = interaction.emit_frontend_event
             optimization_service = RunOptimizationService(self)
             handle = RuntimeHandle(
                 session=interaction,
@@ -234,6 +240,7 @@ class RunApplicationFactory:
                 close_callback=session.close,
                 optimization=optimization_service,
                 candidate_activation=optimization_service,
+                authorization=approvals,
             )
             optimizer = runtime.components.get(TEXT_OPTIMIZER_COMPONENT)
             if optimizer is not None and not isinstance(optimizer, TextOptimizer):

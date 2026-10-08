@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections import deque
 import copy
+import math
 from dataclasses import replace
 from enum import StrEnum
 from pathlib import Path
@@ -34,7 +35,10 @@ class ApplicationState(StrEnum):
 class AgentApplication:
     """Own runtime rebuilds and serialize user work independently of a frontend."""
 
-    def __init__(self, factory: RuntimeFactory) -> None:
+    def __init__(self, factory: RuntimeFactory, *, shutdown_timeout: float = 10.0) -> None:
+        if isinstance(shutdown_timeout, bool) or not math.isfinite(shutdown_timeout) or shutdown_timeout <= 0:
+            raise ValueError("shutdown_timeout must be finite and positive")
+        self._shutdown_timeout = shutdown_timeout
         self._factory = factory
         self._handle: RuntimeHandle | None = None
         self._state = ApplicationState.CLOSED
@@ -42,6 +46,8 @@ class AgentApplication:
         self._pending: deque[str] = deque()
         self._worker: asyncio.Task[None] | None = None
         self._event_sink: EventSink | None = None
+        self._authorization_enabled = False
+        self._authorization_handler = None
         self._last_result: AgentLoopResult | None = None
         self._last_error: BaseException | None = None
         self._optimization_task: asyncio.Task[tuple[CandidateView, ...]] | None = None
@@ -74,6 +80,11 @@ class AgentApplication:
             pending_count=len(self._pending),
             prompt_label=str(prompt.get("label", "")),
             prompt_hash=str(prompt.get("content_hash", "")),
+            permission_grants=self.authorization.status()['grants'] if self.authorization is not None else 0,
+            local_execution_approved=self.authorization.status()['local_execution'] if self.authorization is not None else False,
+            permission_pending=self.authorization.status()['pending'] if self.authorization is not None else '',
+            permission_read_roots=tuple(self._require_handle().manifest.get('permissions', {}).get('read_roots', ())),
+            permission_write_roots=tuple(self._require_handle().manifest.get('permissions', {}).get('write_roots', ())),
         )
 
     @property
@@ -115,7 +126,30 @@ class AgentApplication:
             raise
         self._handle = handle
         handle.session.set_event_sink(self._event_sink)
+        if handle.authorization is not None:
+            handle.authorization.available = self._authorization_enabled
+            handle.authorization.handler = self._authorization_handler
         self._state = ApplicationState.IDLE
+
+    @property
+    def authorization(self):
+        return self._handle.authorization if self._handle is not None else None
+
+    def enable_authorization(self, enabled=True):
+        self._authorization_enabled = bool(enabled)
+        if self.authorization is not None:
+            self.authorization.available = bool(enabled)
+            if not enabled:
+                self.authorization.clear()
+
+    def set_authorization_handler(self, handler):
+        self._authorization_handler = handler
+        if self.authorization is not None:
+            self.authorization.handler = handler
+
+    def clear_authorizations(self):
+        if self.authorization is not None:
+            self.authorization.clear()
 
     def set_event_sink(self, sink: EventSink | None) -> None:
         self._event_sink = sink
@@ -174,6 +208,8 @@ class AgentApplication:
         return self._require_handle().session.steer(prompt)
 
     def cancel(self) -> bool:
+        had_pending = bool(self._pending)
+        self._pending.clear()
         if self._state == ApplicationState.OPTIMIZING:
             service = self._optimization_service()
             accepted = service.cancel_optimization()
@@ -181,7 +217,7 @@ class AgentApplication:
                 self._optimization_task.cancel()
                 return True
             return accepted
-        return self._require_handle().session.cancel()
+        return self._require_handle().session.cancel() or had_pending
 
     def _optimization_service(self) -> OptimizationService:
         service = self._require_handle().optimization
@@ -372,7 +408,20 @@ class AgentApplication:
     async def wait_until_idle(self) -> None:
         worker = self._worker
         if worker is not None:
-            await worker
+            await asyncio.shield(worker)
+
+    async def _quiesce(self) -> None:
+        """Bound retirement waits without closing a still-active handle."""
+        try:
+            async with asyncio.timeout(self._shutdown_timeout):
+                await self.wait_for_optimization()
+                await self.wait_until_idle()
+                async with self._submission_lock:
+                    pass
+        except TimeoutError as exc:
+            error = RuntimeError("active work did not stop before the shutdown deadline; runtime retained")
+            self._last_error = error
+            raise error from exc
 
     async def rebuild(self) -> None:
         """Apply saved configuration by replacing the complete runtime/session."""
@@ -384,7 +433,11 @@ class AgentApplication:
         self._state = ApplicationState.REBUILDING
         self._pending.clear()
         self.cancel()
-        await self.wait_until_idle()
+        try:
+            await self._quiesce()
+        except BaseException:
+            self._state = ApplicationState.RUNNING if self._require_handle().session.running else ApplicationState.IDLE
+            raise
         # Queue workers use submit(), but an embedding host may call submit()
         # directly.  Serialize replacement with both paths so no live run can
         # retain resources from the handle being closed.
@@ -485,6 +538,9 @@ class AgentApplication:
         """Start and bind a replacement before committing it as active."""
         await handle.start()
         handle.session.set_event_sink(self._event_sink)
+        if handle.authorization is not None:
+            handle.authorization.available = self._authorization_enabled
+            handle.authorization.handler = self._authorization_handler
         if handle.activate_callback is not None:
             handle.activate_callback()
 
@@ -502,10 +558,9 @@ class AgentApplication:
             self.cancel()
         self._state = ApplicationState.CLOSING
         self._pending.clear()
-        await self.wait_for_optimization()
         if self._handle is not None:
             self._handle.session.cancel()
-        await self.wait_until_idle()
+        await self._quiesce()
         async with self._submission_lock:
             handle, self._handle = self._handle, None
             try:

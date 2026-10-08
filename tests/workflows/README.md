@@ -6,6 +6,7 @@ Exercise actual Application, Run assembly, and terminal paths with offline model
 
 | Files | Protects |
 |---|---|
+| `test_terminal_interrupt.py` | Actual Ctrl+C/SIGINT, quiet-run continuation, clean exit, and terminal restoration in ANSI and non-ANSI terminals |
 | `test_decoupling.py / test_offline_example.py` | Public extensions and interchangeable optimizers/targets |
 | `test_optimization.py / test_evolution.py` | Preview, adoption, explicit policy, and interrupted activation reconciliation |
 | `test_task_packs.py / test_coding_optimization.py / test_unified_packs.py` | Discovery, frozen tasks, corrections, and scoring |
@@ -18,3 +19,5 @@ Verify usable integration, not model quality. New algorithms should reuse generi
 ```bash
 .venv/bin/python -m unittest discover -s tests/workflows -t . -v
 ```
+
+Terminal interrupt workflows also exercise permission Enter/numeric/arrow selection, Esc denial, Ctrl+C cancellation, and session approval in ANSI and non-ANSI PTYs.

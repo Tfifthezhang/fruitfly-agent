@@ -10,6 +10,7 @@ import base64
 
 from fruitfly_agent.core.data_model import AgentToolResult, ImageBlock, TextBlock
 from fruitfly_agent.core.tool_runtime import AgentTool, ToolCallContext
+from fruitfly_agent.core.tool_runtime.authorization import ToolPermission
 from .path_utils import resolve_read_path
 from .truncate import DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, truncate_head
 
@@ -98,6 +99,7 @@ async def _execute(ctx: ToolCallContext) -> AgentToolResult:
 
 def create_read_tool() -> AgentTool:
     return AgentTool(
+        permission=ToolPermission("read", ("path",)),
         name="read",
         label="read",
         description=(

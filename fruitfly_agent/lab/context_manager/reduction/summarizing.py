@@ -78,6 +78,7 @@ class SummarizingCompactor(Algorithm):
         summary_output_limit: int | None = None,
     ) -> None:
         self.config = config
+        self._custom_estimator = estimate_fn is not None
         self.provider = provider
         self.summary_model = summary_model
         if estimate_fn is None:
@@ -91,6 +92,10 @@ class SummarizingCompactor(Algorithm):
     # ------------------------------------------------------------------
     # 2. FruitFlyAgent adapter: ContextSnapshot -> ContextDecision
     # ------------------------------------------------------------------
+
+    @property
+    def estimate_source(self) -> str:
+        return "injected estimator" if self._custom_estimator else self.config.token_estimator
 
     def estimate(self, snapshot: ContextSnapshot) -> int:
         total = self.estimate_tokens(snapshot.system_prompt)

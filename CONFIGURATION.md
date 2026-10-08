@@ -73,7 +73,7 @@ For manual setup, create `.fruitfly/`, then copy `examples/configuration/models.
 | `api_key_env` | Environment variable name; the template uses `DEEPSEEK_API_KEY`, whose value belongs in `.fruitfly/secrets.env` |
 | `context_window`, `max_output_tokens` | Actual model limits; template numbers are examples |
 | `capabilities` | Actual model and endpoint support, including tools and streaming |
-| `parameters` | Optional adapter/request options; see the [Provider guide](fruitfly_agent/providers/PROVIDER_GUIDE.md) |
+| `parameters` | Optional adapter/request options, including validated waiting deadlines and retry settings; see the [Provider guide](fruitfly_agent/providers/PROVIDER_GUIDE.md#bound-waiting-and-retries) |
 
 Keep only usable profiles. For different credentials, assign distinct `api_key_env` names and add their values to `.fruitfly/secrets.env`. Offline parsing validates the catalog structure; it does not verify remote API compatibility, model access, or declared limits. Requests use the network and may incur charges.
 
@@ -159,3 +159,9 @@ With no initial choice, a sole catalog entry is selected automatically. Multiple
 | Explicit evolution jobs | `.fruitfly/evolution/`; host-owned phases, policy, and activation evidence |
 
 Referenced results remain protected. Failed or cancelled searches do not replace a complete candidate. Editing a readable export does not change the runtime. See [Optimization](fruitfly_agent/lab/optimization/README.md#results-and-retention) for retention and [Run](fruitfly_agent/run/README.md#recovery) for compatibility rules.
+
+## Configure host permissions
+
+The standard Run host uses a lightweight file and local-execution policy. Additional roots and sensitive paths are supplied through `RunApplicationFactory(permission_policy=...)` or `build_runtime(permission_policy=...)`, using `PermissionPolicy` from `fruitfly_agent.lab.catalog`. They are not YAML model or harness parameters. See [Run permission policy](fruitfly_agent/run/README.md#bind-host-permission-policy) and [Environment permissions](fruitfly_agent/lab/environment/README.md#apply-lightweight-permissions).
+
+Model setup owns credential persistence. Restricting model file tools does not disable Add model or Set API key. Runtime approval is temporary and never saved as a permanent grant. Approved local code still has current-user permissions; isolation is not implemented.

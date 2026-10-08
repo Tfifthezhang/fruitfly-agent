@@ -31,9 +31,9 @@ class SessionRunRecordTests(unittest.IsolatedAsyncioTestCase):
                 events = [item["event"] for item in records]
 
                 self.assertFalse(result.is_error)
-                self.assertEqual(["start", "end"], events)
-                self.assertEqual(records[0]["run_id"], records[1]["run_id"])
-                end = records[1]["data"]
+                self.assertEqual(["start", "request_context", "request_receipt", "end"], events)
+                self.assertEqual(records[0]["run_id"], records[-1]["run_id"])
+                end = records[-1]["data"]
                 self.assertEqual("stop", end["stop_reason"])
                 self.assertEqual(1, end["provider_attempt_count"])
                 self.assertEqual(0, end["provider_failure_count"])
@@ -58,10 +58,10 @@ class SessionRunRecordTests(unittest.IsolatedAsyncioTestCase):
 
                 self.assertTrue(result.is_error)
                 self.assertEqual(
-                    ["start", "provider_attempt_failed", "end"],
+                    ["start", "request_context", "provider_attempt_failed", "end"],
                     [item["event"] for item in records],
                 )
-                failure = records[1]["data"]
+                failure = records[2]["data"]
                 self.assertEqual("FatalError", failure["error_kind"])
                 self.assertEqual("terminal", failure["disposition"])
                 self.assertLessEqual(len(failure["error"]), 513)

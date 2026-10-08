@@ -145,6 +145,9 @@ class IpythonRuntimeTest(unittest.IsolatedAsyncioTestCase):
                 timeout_seconds=10,
             )
             try:
+                from unittest.mock import patch
+                with patch.dict('os.environ', {'TEST_PROVIDER_KEY': 'offline-placeholder'}):
+                    absent_key = await runtime.execute("import os; 'TEST_PROVIDER_KEY' in os.environ")
                 first = await runtime.execute("value = 40")
                 persisted = await runtime.execute("value + 2")
                 queried = await runtime.execute("await llm_query('subproblem')")
@@ -154,6 +157,7 @@ class IpythonRuntimeTest(unittest.IsolatedAsyncioTestCase):
             finally:
                 await runtime.close()
 
+            self.assertEqual("False", absent_key.result)
             self.assertEqual("ok", first.status)
             self.assertEqual("42", persisted.result)
             self.assertIn("answer:subproblem", queried.result)

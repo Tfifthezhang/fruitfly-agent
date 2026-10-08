@@ -29,6 +29,7 @@ from .models import (
 )
 
 __all__ = [
+    "PermissionPolicy", "apply_permission_policy",
     "ActivationScope",
     "ContextPhase",
     "MechanismFamily",
@@ -53,3 +54,5 @@ __all__ = [
     "require_workspace_path",
     "builtin_catalog",
 ]
+
+from .permissions import PermissionPolicy, apply_permission_policy

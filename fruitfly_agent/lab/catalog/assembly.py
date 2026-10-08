@@ -38,6 +38,7 @@ class AssemblyContext:
     artifact_bindings: Mapping[str, str] = field(default_factory=dict)
     resource_sink: list[Any] | None = None
     task_pack_sources: tuple[Any, ...] = ()
+    process_environment: Mapping[str, str] | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "workspace", self.workspace.resolve())

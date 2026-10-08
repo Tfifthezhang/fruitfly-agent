@@ -20,3 +20,5 @@ Use temporary materials, fake Providers, and injected HTTP callbacks. RLM tests 
 ```bash
 .venv/bin/python -m unittest discover -s tests/lab -t . -v
 ```
+
+Environment tests include protected credentials, ordinary algorithm state, external approvals, symlink retargeting, and explicit child environments. No real credentials or network requests are used.

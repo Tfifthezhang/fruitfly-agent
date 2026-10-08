@@ -13,6 +13,7 @@ from typing import Any, Awaitable, Callable
 
 from ..data_model.messages import AgentToolResult
 from ..env.protocols import ExecutionEnv
+from .authorization import ToolPermission
 
 
 @dataclass(frozen=True)
@@ -35,6 +36,7 @@ class AgentTool:
     prepare_arguments: Callable[[dict[str, Any]], dict[str, Any]] | None = None
     execution_mode: str = "parallel"  # "parallel" | "sequential"
     hide_from_model: bool = False
+    permission: ToolPermission | None = None
 
     def to_schema(self) -> dict[str, Any]:
         return {

@@ -8,8 +8,12 @@ from collections.abc import Mapping
 from typing import Any
 
 from fruitfly_agent.core.config import AgentLoopConfig
+from fruitfly_agent.core.data_model import AssistantMessage, CustomMessage, ToolResultMessage, UserMessage
 from fruitfly_agent.core.extensions.hooks import (
     AFTER_TOOL,
+    AFTER_RESPONSE,
+    BEFORE_RUN_END,
+    REQUEST_PREPARED,
     BEFORE_COMPACTION,
     BEFORE_TOOL,
     HookRegistry,
@@ -19,6 +23,7 @@ from fruitfly_agent.core.extensions.protocols import Provider
 from fruitfly_agent.core.model_stream import (
     AssistantMessageEventStream,
     StreamDone,
+    StreamActivity,
     StreamError,
     TextDelta,
     ThinkingDelta,
@@ -66,10 +71,19 @@ class _ObservableProvider:
                 subject=model,
                 activity_id=f"model-request-{request_index}",
             )
+            inner = None
             try:
                 inner = self._provider(view, signal=signal)
                 async for event in inner:
-                    if isinstance(event, TextDelta):
+                    if isinstance(event, StreamActivity):
+                        await self._emit(RunActivityChanged(
+                            run_id="", phase=event.phase, request_index=request_index,
+                            subject=model, activity_id=f"model-request-{request_index}",
+                            attempt=event.attempt, max_attempts=event.max_attempts,
+                            delay_seconds=event.delay_seconds, error_kind=event.error_kind,
+                            status_code=event.status_code,
+                        ))
+                    elif isinstance(event, TextDelta):
                         if event.text and not saw_text:
                             await self._activity(
                                 "receiving_answer",
@@ -113,6 +127,9 @@ class _ObservableProvider:
                 raise
             except Exception as exc:  # Core classifies provider failures.
                 yield StreamError(error=exc)
+            finally:
+                if inner is not None:
+                    await inner.aclose()
 
         return AssistantMessageEventStream(observe())
 
@@ -149,8 +166,11 @@ class CoreEventBridge:
         self._dispatcher = dispatcher
         self._tool_categories = dict(tool_categories or {})
         self._observable_provider: _ObservableProvider | None = None
+        self.context_status: dict[str, Any] = {"compaction_count": 0}
+        self.last_result = None
 
     def begin_run(self) -> None:
+        self.last_result = None
         if self._observable_provider is not None:
             self._observable_provider.begin_run()
 
@@ -165,6 +185,25 @@ class CoreEventBridge:
             if source_hooks is not None
             else HookRegistry(session=config.session)
         )
+        hooks.on(REQUEST_PREPARED, self._on_request_prepared)
+        hooks.on(AFTER_RESPONSE, self._on_response)
+        hooks.on(BEFORE_RUN_END, self._on_run_end)
+        if config.session is not None:
+            for entry in config.session.read_all():
+                if entry.type == "compaction":
+                    self.context_status["compaction_count"] += 1
+                payload = entry.payload
+                if payload.get("kind") != "runRecord":
+                    continue
+                data = payload.get("data", {})
+                if payload.get("event") == "request_context":
+                    self._context(data)
+                elif payload.get("event") == "request_receipt":
+                    self._receipt(data)
+                elif payload.get("event") == "end":
+                    usage = data.get("usage", {})
+                    self.context_status.update(run_input_tokens=usage.get("inputTokens", 0),
+                                               run_output_tokens=usage.get("outputTokens", 0))
         hooks.on(BEFORE_TOOL, self._on_tool_started)
         hooks.on(AFTER_TOOL, self._on_tool_finished)
         hooks.on(BEFORE_COMPACTION, self._on_compaction)
@@ -187,6 +226,32 @@ class CoreEventBridge:
             on_partial=on_partial,
         )
         return observed_config, context_pipeline
+
+    def _context(self, data):
+        self.context_status.update(
+            context_window=data.get("context_window"), max_output_tokens=data.get("max_tokens"),
+            estimated_input_tokens=data.get("estimated_tokens"), estimate_source=data.get("estimate_source", ""),
+            estimate_model=data.get("model", ""), estimate_timestamp=data.get("timestamp"),
+        )
+
+    def _receipt(self, data):
+        self.context_status.update(last_input_tokens=data.get("input_tokens"),
+                                   receipt_model=data.get("model", ""), receipt_timestamp=data.get("timestamp"))
+
+    def _on_request_prepared(self, event):
+        self._context(dataclasses.asdict(event))
+
+    def _on_response(self, event):
+        self._receipt({"input_tokens": event.assistant.usage.input_tokens if event.assistant.usage else None,
+                       "model": self.context_status.get("estimate_model", ""), "timestamp": event.receipt_timestamp})
+
+    def _on_run_end(self, event):
+        self.finish_run(event.result)
+
+    def finish_run(self, result):
+        self.last_result = result
+        self.context_status.update(run_input_tokens=result.usage.input_tokens,
+                                   run_output_tokens=result.usage.output_tokens)
 
     async def _on_tool_started(self, event: Any) -> None:
         await self._dispatcher.emit(
@@ -231,6 +296,13 @@ class CoreEventBridge:
         )
 
     async def _on_compaction(self, event: Any) -> None:
+        # Core emits both rejected proposals and committed projections here.
+        # Count only projections that passed its commit validation.
+        if (not event.cancel and isinstance(event.messages, list)
+                and all(isinstance(message, (UserMessage, AssistantMessage, ToolResultMessage, CustomMessage))
+                        for message in event.messages)
+                and isinstance(event.metadata, dict)):
+            self.context_status["compaction_count"] += 1
         await self._dispatcher.emit(
             CompactionStarted(
                 run_id="",

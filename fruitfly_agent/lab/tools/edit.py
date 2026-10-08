@@ -13,6 +13,7 @@ import difflib
 
 from fruitfly_agent.core.data_model import AgentToolResult, TextBlock
 from fruitfly_agent.core.tool_runtime import AgentTool, ToolCallContext
+from fruitfly_agent.core.tool_runtime.authorization import ToolPermission
 from .file_queue import with_file_mutation_queue
 from .path_utils import normalize_tool_path
 
@@ -172,6 +173,7 @@ async def _execute(ctx: ToolCallContext) -> AgentToolResult:
 
 def create_edit_tool() -> AgentTool:
     return AgentTool(
+        permission=ToolPermission("write", ("path",)),
         name="edit",
         label="edit",
         description=(

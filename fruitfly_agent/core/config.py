@@ -19,6 +19,7 @@ from .env.protocols import ExecutionEnv
 from .extensions.hooks import HookRegistry
 from .extensions.protocols import PrepareNextTurnResult, Provider, SessionLike
 from .tool_runtime import AgentTool, ToolCallContext
+from .tool_runtime.authorization import ToolAuthorizer
 
 
 @dataclass(frozen=True)
@@ -78,6 +79,7 @@ class AgentLoopConfig:
     ) = None
 
     # --- subsystems ---
+    tool_authorizer: ToolAuthorizer | None = None
     tool_execution: ToolExecutionConfig = field(default_factory=ToolExecutionConfig)
     hooks: HookRegistry | None = None
     env: ExecutionEnv | None = None

@@ -1,7 +1,6 @@
 """Parsing and routing for the built-in interactive command vocabulary."""
 
 from __future__ import annotations
-from .optimization import format_optimization_activity
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -20,7 +19,7 @@ HELP_TEXT = """Commands:
   /eval          test the current setup or compare one mechanism
   /resume [PATH] switch to a compatible persisted session
   /cancel        cooperatively stop the active run
-  /trace [N]     show the latest N frontend events (default: 12)
+  /permissions clear  revoke temporary approvals\n  /trace [N]     show the latest N frontend events (default: 12)
   /exit          leave the interactive session"""
 
 
@@ -124,12 +123,6 @@ def _status(
             )
         except (OSError, TypeError, ValueError):
             pending_candidates = "unavailable"
-    progress = getattr(context, "optimization_progress", None)
-    optimization_line = ""
-    if progress is not None and progress.status != "idle":
-        optimization_line = f"optimization: {progress.status}\n"
-        if progress.activity is not None:
-            optimization_line += format_optimization_activity(progress.activity) + "\n"
     return CommandResult(
         text=(
             f"model: {status.model}\n"
@@ -140,8 +133,26 @@ def _status(
             f"state: {status.application_state}\n"
             f"queued: {status.pending_count}\n"
             f"pending candidates: {pending_candidates}\n"
-            f"{optimization_line}"
+            f"{_context_status(status)}"
         )
+    )
+
+
+def _context_status(status: InteractiveStatus) -> str:
+    tokens = None
+    source = ""
+    if status.estimated_input_tokens is not None and status.estimate_model == status.model:
+        tokens = status.estimated_input_tokens
+        source = "estimated; last request"
+    elif status.last_input_tokens is not None and status.receipt_model == status.model:
+        tokens = status.last_input_tokens
+        source = "reported; last request"
+    percentage = "unknown"
+    if tokens is not None and status.context_window and status.context_window > 0:
+        percentage = f"{100 * tokens / status.context_window:.1f}% ({source})"
+    return (
+        f"context usage: {percentage}\n"
+        f"compactions: {status.compaction_count:,}\n"
     )
 
 
@@ -251,7 +262,17 @@ def _evaluation_unavailable(
     )
 
 
+def _permissions(command, context):
+    if command.arguments != ('clear',):
+        return CommandResult(text='usage: /permissions clear\n')
+    clear = getattr(context, 'clear_authorizations', None)
+    if clear is None:
+        return CommandResult(text='authorization service unavailable\n')
+    clear()
+    return CommandResult(text='temporary approvals cleared\n')
+
 _BUILTIN_HANDLERS: dict[str, CommandHandler] = {
+    "permissions": _permissions,
     "exit": _exit,
     "help": _help,
     "status": _status,

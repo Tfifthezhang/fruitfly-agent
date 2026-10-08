@@ -12,11 +12,12 @@ import builtins
 import importlib
 import locale
 import os
+import select
 import sys
 from types import ModuleType
 from typing import Protocol, TextIO
 
-from .live import prompt_frame_lines
+from .live import prompt_frame_lines, InputInterrupted
 from .text import is_tty, supports_ansi, terminal_columns
 
 
@@ -45,6 +46,32 @@ class StreamLineEditor:
         self.output.flush()
         line = self.input.readline()
         return None if line == "" else line
+
+
+class PollingLineEditor:
+    """Canonical POSIX input that can stop without abandoning a reader thread."""
+
+    def __init__(self, input_stream, output_stream, interrupted):
+        self.input, self.output, self.interrupted = input_stream, output_stream, interrupted
+        self._buffer = b""
+
+    def read_line(self):
+        self.output.write("you> ")
+        self.output.flush()
+        descriptor = self.input.fileno()
+        while True:
+            if self.interrupted.is_set():
+                self._buffer = b""
+                raise InputInterrupted(handled=True)
+            if b"\n" in self._buffer:
+                line, self._buffer = self._buffer.split(b"\n", 1)
+                return line.decode(getattr(self.input, "encoding", None) or "utf-8", errors="replace")
+            ready, _, _ = select.select([descriptor], [], [], 0.1)
+            if ready:
+                chunk = os.read(descriptor, 4096)
+                if not chunk:
+                    return None
+                self._buffer += chunk
 
 
 class ReadlineLineEditor:

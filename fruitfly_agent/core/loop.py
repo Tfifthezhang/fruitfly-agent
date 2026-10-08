@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
+from dataclasses import asdict
 import traceback
 import uuid
 from typing import Any
@@ -26,6 +28,7 @@ from .context_runtime import (
     initialize_context_items,
     is_context_overflow,
     recover_from_overflow,
+    snapshot,
 )
 from .context import ContextPipeline, ContextReducer
 from .data_model.runtime import AgentLoopContext, ProviderView
@@ -35,6 +38,8 @@ from .extensions.hooks import (
     BEFORE_REQUEST,
     BEFORE_RUN,
     BEFORE_RUN_END,
+    REQUEST_PREPARED,
+    RequestPreparedEvent,
     AfterResponseEvent,
     BeforeRequestEvent,
     BeforeRunEndEvent,
@@ -42,6 +47,7 @@ from .extensions.hooks import (
     HookRegistry,
 )
 from .extensions.protocols import Provider
+from .model_stream import StreamActivity
 from .tool_runtime.execution import execute_tool_batch
 from .extensions.callbacks import call_extension
 from .data_model.messages import (
@@ -89,9 +95,27 @@ async def run_agent_loop(
     try:
         return await _run(config, ctx, signal, context_pipeline)
     except asyncio.CancelledError:
-        _record_run_end(ctx, AgentLoopResult(
-            messages=ctx.messages, stop_reason="aborted", model=ctx.model, usage=ctx.usage,
-        ))
+        pending_calls = {}
+        for message in ctx.messages:
+            if isinstance(message, AssistantMessage):
+                pending_calls.update({call.id: call for call in message.tool_calls})
+            elif isinstance(message, ToolResultMessage):
+                pending_calls.pop(message.tool_call_id, None)
+        for call in pending_calls.values():
+            _append(ctx, ToolResultMessage(
+                tool_call_id=call.id, is_error=True,
+                content=[TextBlock("Run interrupted before a tool outcome was recorded; effects may have occurred. Do not automatically replay.")],
+            ))
+        result = AgentLoopResult(
+            messages=list(ctx.messages), stop_reason="aborted", model=ctx.model, usage=ctx.usage,
+            canonical_messages=[item.message for item in ctx.canonical_items],
+            turn_count=ctx.turn_count, tool_call_count=ctx.tool_call_count,
+        )
+        _record_run_end(ctx, result)
+        # Cancellation remains cancellation. Hosts may observe the committed
+        # snapshot, but active end hooks cannot turn it into success.
+        hooks = config.hooks or HookRegistry(session=ctx.session)
+        await hooks.emit(BEFORE_RUN_END, BeforeRunEndEvent(result=result))
         raise
     except Exception as exc:  # noqa: BLE001 — return unexpected loop failures
         logger.error("agent loop crashed: %s", exc, exc_info=True)
@@ -150,6 +174,7 @@ async def _run(
         if _aborted(signal):
             return await _finish(config, ctx, hooks, "aborted", turn_count, tool_call_count)
         turn_count += 1
+        ctx.turn_count = turn_count
         turn_tool_call_count = 0
 
         follow_up_used = False
@@ -212,8 +237,29 @@ async def _run(
             # Rebuild after compaction because it may replace ctx.messages.
             request_ctx = _request_ctx(ctx)
 
+            estimate = None
+            source = ""
+            has_estimator = context_pipeline is not None and (
+                not isinstance(context_pipeline, ContextPipeline)
+                or context_pipeline.reduction_stage is not None
+            )
+            if context_pipeline is not None and has_estimator:
+                try:
+                    value = context_pipeline.estimate(snapshot(ctx, "budget"))
+                    if type(value) is int and value >= 0:
+                        estimate = value
+                        source = str(getattr(context_pipeline, "estimate_source", "context reducer"))
+                except Exception:
+                    logger.warning("request context estimate unavailable", exc_info=True)
+            prepared = RequestPreparedEvent(ctx.model, ctx.context_window, ctx.max_tokens,
+                                            estimate, source, time.time())
+            _append_session_record(ctx, "request_context", asdict(prepared))
+            await hooks.emit(REQUEST_PREPARED, prepared)
+            if _aborted(signal):
+                return await _finish(config, ctx, hooks, "aborted", turn_count, tool_call_count)
+
             ctx.provider_attempt_count += 1
-            assistant = await _stream_once(provider, request_ctx, signal)
+            assistant = await _stream_once(provider, request_ctx, signal, ctx)
             if isinstance(assistant, TaggedFailure):
                 handled = await _handle_failure(assistant, ctx, hooks, context_pipeline)
                 ctx.provider_failure_count += 1
@@ -245,6 +291,11 @@ async def _run(
             assistant = response_event.assistant
             _append(ctx, assistant)
             ctx.last_input_tokens = assistant.usage.input_tokens if assistant.usage else None
+            response_event.receipt_timestamp = time.time()
+            _append_session_record(ctx, "request_receipt", {
+                "model": ctx.model, "input_tokens": ctx.last_input_tokens,
+                "timestamp": response_event.receipt_timestamp,
+            })
             ctx.overflow_attempt = 0
             ctx.usage = Usage(
                 input_tokens=ctx.usage.input_tokens + (assistant.usage.input_tokens if assistant.usage else 0),
@@ -291,6 +342,7 @@ async def _run(
             )
             executed = min(remaining, len(tool_calls))
             tool_call_count += executed
+            ctx.tool_call_count = tool_call_count
             turn_tool_call_count += executed
             for result in batch_results:
                 _append(ctx, result)
@@ -339,7 +391,7 @@ def _request_ctx(ctx: AgentLoopContext) -> BeforeRequestEvent:
     )
 
 
-async def _stream_once(provider: Provider, request_ctx: BeforeRequestEvent, signal: asyncio.Event | None):
+async def _stream_once(provider: Provider, request_ctx: BeforeRequestEvent, signal: asyncio.Event | None, ctx: AgentLoopContext):
     """Run one provider stream; returns AssistantMessage or TaggedFailure."""
     # Pass only the public ProviderView fields to the model adapter.
     view = ProviderView(
@@ -349,10 +401,12 @@ async def _stream_once(provider: Provider, request_ctx: BeforeRequestEvent, sign
         model=request_ctx.model,
         max_tokens=request_ctx.max_tokens,
     )
+    stream = None
     try:
         stream = provider(view, signal=signal)
-        async for event in stream:  # noqa: B007 — drain to the terminal event
-            pass
+        async for event in stream:
+            if isinstance(event, StreamActivity):
+                _append_session_record(ctx, "provider_activity", asdict(event))
         return await stream.result()
     except asyncio.CancelledError:
         raise
@@ -367,6 +421,9 @@ async def _stream_once(provider: Provider, request_ctx: BeforeRequestEvent, sign
     except Exception as exc:  # noqa: BLE001
         logger.warning("provider failed (isolated): %s", exc)
         return TaggedFailure(FatalError(f"{type(exc).__name__}: {exc}"))
+    finally:
+        if stream is not None:
+            await stream.aclose()
 
 
 async def _handle_failure(
@@ -383,6 +440,8 @@ async def _handle_failure(
         "kind": type(error).__name__,
         "error": str(error),
         "model": ctx.model,
+        **({"timeout_kind": error.details["timeout_kind"]}
+           if isinstance(error.details, dict) and "timeout_kind" in error.details else {}),
     }
 
 

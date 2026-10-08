@@ -52,6 +52,11 @@ class RunActivityChanged(FrontendEvent):
     request_index: int = 0
     subject: str = ""
     activity_id: str = ""
+    attempt: int = 0
+    max_attempts: int = 0
+    delay_seconds: float = 0.0
+    error_kind: str = ""
+    status_code: int | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -112,8 +117,27 @@ class RunFinished(FrontendEvent):
     error_details: dict[str, Any] | None
 
 
+@dataclass(frozen=True, kw_only=True)
+class AuthorizationRequested(FrontendEvent):
+    event_type: ClassVar[str] = "authorization_requested"
+    request_id: str
+    tool_name: str
+    operation: str
+    targets: tuple[str, ...]
+    summary: str
+    session_label: str
+
+@dataclass(frozen=True, kw_only=True)
+class AuthorizationResolved(FrontendEvent):
+    event_type: ClassVar[str] = "authorization_resolved"
+    request_id: str
+    operation: str
+    choice: str
+
 InteractiveEvent = (
-    RunStarted
+    AuthorizationRequested
+    | AuthorizationResolved
+    | RunStarted
     | RunActivityChanged
     | AssistantTextDelta
     | AssistantThinkingDelta
@@ -128,6 +152,8 @@ InteractiveEvent = (
 _EVENT_TYPES = {
     event.event_type: event
     for event in (
+        AuthorizationRequested,
+        AuthorizationResolved,
         RunStarted,
         RunActivityChanged,
         AssistantTextDelta,
@@ -155,6 +181,8 @@ def event_from_dict(payload: Mapping[str, Any]) -> InteractiveEvent:
 
 __all__ = [
     "FrontendEvent",
+    "AuthorizationRequested",
+    "AuthorizationResolved",
     "RunStarted",
     "RunActivityChanged",
     "AssistantTextDelta",

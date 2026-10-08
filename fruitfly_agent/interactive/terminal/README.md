@@ -11,14 +11,16 @@ Use FruitFlyAgent through stdin/stdout, menus, and live events. Application owns
 | Start | Run `python -m fruitfly_agent`; choose **Start new session**. |
 | Configure | `/config`; save choices for a new session. |
 | Select a prompt | **Configure → prompt**; preview and confirm. |
-| Inspect activity | `/status` |
-| Cancel active work | `/cancel` |
+| Inspect activity | `/status`: model, prompt, workspace, session, message count, state, queue, pending candidates, context usage percentage, and session compaction count. |
+| Cancel active work | `/cancel` or the first Ctrl+C; clear pending Application input. |
+| Exit | `/exit`, `/quit`, or a second Ctrl+C within three seconds; drain cancelled work before resource cleanup. |
+| Clear a draft | First Ctrl+C while idle; normal submitted input resets the double-press interval. |
 | Restore a conversation | `/resume` to choose a session; `/resume PATH` to switch directly. |
 | Review live details | `/trace` |
 | Search or review candidates | `/optimize [DIRECTION]` |
 | Run external evaluation while idle | `/eval` |
 
-POSIX ANSI terminals support live input, history, cancellation, and bracketed paste. Redirected input uses line-based fallback. Display limits do not alter model context or stored messages. `NO_COLOR` and terminal capabilities affect rendering.
+POSIX ANSI terminals support live input, history, cancellation, and bracketed paste. Non-ANSI POSIX TTY input uses a stoppable canonical reader and handles SIGINT while a run is waiting. Redirected input uses sequential line-based fallback and cannot consume `/cancel` during a run. Display limits do not alter model context or stored messages. `NO_COLOR` and terminal capabilities affect rendering.
 
 ## Restore a conversation
 
@@ -93,3 +95,13 @@ The frontend waits for evaluation to return; ordinary chat and the optimization 
 ```bash
 .venv/bin/python -m unittest discover -s tests/interactive -t . -v
 ```
+
+Waiting/retry/timeout activity includes request and adapter attempt identities. Timeout text describes an exceeded waiting deadline; it does not assert server overload. `/status` prefers the latest prepared-input estimate for context usage, with a same-model Provider receipt as fallback. The line labels the source and last-request scope. Reported input receipts can exclude cached input according to the Provider convention. Estimates do not guarantee tokenizer accuracy and can be stale after new input. Missing measurements or configured capacity display `unknown`. Compactions count committed reductions across the session, including restored records; budget checks and cancelled proposals do not increment the count.
+
+## Respond to permission requests
+
+The real interactive terminal presents the tool, operation, canonical targets, command/code when applicable, and the scope of session approval. Choose **1 / Enter** to allow once, **2** to allow the displayed scope for this runtime session, or **3 / Esc** to deny. The ANSI editor also supports Up/Down then Enter. Ctrl+C cancels the run.
+
+The existing input reader routes approval keys; no second stdin reader is started. Ordinary non-ANSI TTY input uses numbered choices followed by Enter. Redirected input does not enable confirmations and therefore cannot silently approve local execution or external file operations. `/permissions clear` revokes remembered approvals while normal command input is available; use Esc to deny an active prompt.
+
+Local execution approval is not a sandbox. Approved Bash or Python retains current-user filesystem/network access. The terminal shows this boundary beside execution confirmation. File directory approval is separate from local execution approval.

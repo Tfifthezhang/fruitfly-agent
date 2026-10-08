@@ -41,6 +41,14 @@ def prompt_frame_lines(columns: int, label: str = "prompt") -> tuple[str, str]:
     return top, "╰" + ("─" * (width - 2)) + "╯"
 
 
+class InputInterrupted(Exception):
+    """An editor control key; never a process-level KeyboardInterrupt."""
+
+    def __init__(self, *, handled: bool = False):
+        super().__init__("input interrupted")
+        self.handled = handled
+
+
 class InlineTerminalDisplay:
     """Append completed output and redraw only the unfinished local surface."""
 
@@ -305,8 +313,24 @@ class IsolatedLineEditor:
     def __init__(self, input_stream: TextIO, display: InlineTerminalDisplay) -> None:
         self.input = input_stream
         self.display = display
+        self._interrupted = threading.Event()
         self._previous_terminal_state = None
         self._history: list[str] = []
+        self._choices: tuple[str, ...] = ()
+        self._selected_choice = 0
+        self._choice_request = ""
+
+    def set_choices(self, labels=(), request_id=""):
+        self._choice_request = request_id
+        self._choices = tuple(labels)
+        self._selected_choice = 0
+        if labels:
+            self.display.set_input("permission: " + labels[0], 0)
+        else:
+            self.display.set_input("", 0)
+
+    def interrupt(self) -> None:
+        self._interrupted.set()
 
     def start(self) -> None:
         """Enter no-echo character mode while preserving output processing."""
@@ -359,10 +383,30 @@ class IsolatedLineEditor:
                 self.start()
             self.display.set_input("", 0)
             while True:
+                if self._interrupted.is_set():
+                    self._interrupted.clear()
+                    self.display.set_input("", 0)
+                    raise InputInterrupted(handled=True)
+                ready, _, _ = select.select([descriptor], [], [], 0.1)
+                if not ready or self._interrupted.is_set():
+                    continue
                 first = os.read(descriptor, 1)
                 if not first:
                     self.display.set_input("", 0)
                     return None
+                if self._choices and first != b"\x03":
+                    if first in {b"\r", b"\n"}:
+                        return "\x00authorize:" + self._choice_request + ":" + str(self._selected_choice + 1)
+                    if first in {b"1", b"2", b"3"}:
+                        return "\x00authorize:" + self._choice_request + ":" + first.decode()
+                    if first == b"\x1b":
+                        sequence = _read_escape_sequence(descriptor, first)
+                        if sequence == b"\x1b":
+                            return "\x00authorize:" + self._choice_request + ":3"
+                        if sequence in {b"\x1b[A", b"\x1b[B"}:
+                            self._selected_choice = (self._selected_choice + (-1 if sequence.endswith(b"A") else 1)) % 3
+                    self.display.set_input("permission: " + self._choices[self._selected_choice], 0)
+                    continue
                 if first in {b"\r", b"\n"}:
                     value = "".join(characters)
                     if value and (not self._history or self._history[-1] != value):
@@ -371,7 +415,7 @@ class IsolatedLineEditor:
                     return value
                 if first == b"\x03":
                     self.display.set_input("", 0)
-                    raise KeyboardInterrupt
+                    raise InputInterrupted
                 if first == b"\x04":
                     if not characters:
                         self.display.set_input("", 0)

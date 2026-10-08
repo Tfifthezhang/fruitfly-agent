@@ -50,6 +50,12 @@ check_untyped_defs = true
 no_implicit_optional = true
 warn_unused_ignores = true
 files = [
+    "fruitfly_agent/core/tool_runtime/authorization.py",
+    "fruitfly_agent/interactive/authorization.py",
+    "fruitfly_agent/lab/environment/permissions.py",
+    "fruitfly_agent/lab/environment/guarded.py",
+    "fruitfly_agent/lab/catalog/permissions.py",
+    "fruitfly_agent/run/permissions.py",
     "fruitfly_agent/core/config.py",
     "fruitfly_agent/core/loop.py",
     "fruitfly_agent/core/extensions/callbacks.py",

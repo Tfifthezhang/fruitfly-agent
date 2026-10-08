@@ -8,7 +8,7 @@ import uuid
 from collections import deque
 from collections.abc import Awaitable, Callable
 
-from .events import FrontendEvent, InteractiveEvent
+from .events import FrontendEvent, InteractiveEvent, AuthorizationRequested
 
 
 EventSink = Callable[[InteractiveEvent], Awaitable[None] | None]
@@ -58,7 +58,8 @@ class EventDispatcher:
             run_id=self._run_id,
             sequence=self._sequence,
         )
-        self._trace.append(emitted)
+        if not isinstance(emitted, AuthorizationRequested):
+            self._trace.append(emitted)
         if self._sink is None:
             return
         try:

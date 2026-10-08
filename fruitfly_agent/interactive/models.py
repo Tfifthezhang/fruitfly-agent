@@ -63,6 +63,23 @@ class InteractiveStatus:
     pending_count: int = 0
     prompt_label: str = ""
     prompt_hash: str = ""
+    context_window: int | None = None
+    max_output_tokens: int | None = None
+    estimated_input_tokens: int | None = None
+    estimate_source: str = ""
+    estimate_model: str = ""
+    estimate_timestamp: float | None = None
+    last_input_tokens: int | None = None
+    receipt_model: str = ""
+    receipt_timestamp: float | None = None
+    run_input_tokens: int = 0
+    run_output_tokens: int = 0
+    permission_grants: int = 0
+    local_execution_approved: bool = False
+    permission_pending: str = ""
+    permission_read_roots: tuple[str, ...] = ()
+    permission_write_roots: tuple[str, ...] = ()
+    compaction_count: int = 0
 
 
 __all__ = ["ConversationBlock", "ConversationMessage", "InteractiveMechanism", "InteractiveStatus", "ResumableSession"]

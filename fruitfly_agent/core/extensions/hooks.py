@@ -27,6 +27,7 @@ from ..data_model.messages import (
 # Lifecycle hook points supported by FruitFlyAgent.
 BEFORE_RUN = "before_run"
 BEFORE_REQUEST = "before_request"
+REQUEST_PREPARED = "request_prepared"
 AFTER_RESPONSE = "after_response"
 BEFORE_TOOL = "before_tool"
 AFTER_TOOL = "after_tool"
@@ -36,6 +37,7 @@ BEFORE_RUN_END = "before_run_end"
 HOOK_NAMES = (
     BEFORE_RUN,
     BEFORE_REQUEST,
+    REQUEST_PREPARED,
     AFTER_RESPONSE,
     BEFORE_TOOL,
     AFTER_TOOL,
@@ -65,6 +67,19 @@ class BeforeRequestEvent:
 @dataclass
 class AfterResponseEvent:
     assistant: AssistantMessage
+    receipt_timestamp: float | None = None
+
+
+@dataclass(frozen=True)
+class RequestPreparedEvent:
+    """Observation of the final projection; does not run active handlers."""
+
+    model: str
+    context_window: int
+    max_tokens: int
+    estimated_tokens: int | None
+    estimate_source: str
+    timestamp: float
 
 
 @dataclass
@@ -118,6 +133,8 @@ class HookRegistry:
 
     def add(self, name: str, fn: Callable[[Any], Any], *, priority: int = 100) -> None:
         """Register an ACTIVE hook: may mutate or block via the event object."""
+        if name == REQUEST_PREPARED:
+            raise ValueError("request_prepared is observation-only; use on()")
         if name not in self._handlers:
             raise ValueError(f"unknown hook name {name!r}; known: {', '.join(HOOK_NAMES)}")
         self._handlers[name].append(_Handler(fn=fn, active=True, priority=priority))
@@ -194,6 +211,7 @@ __all__ = [
     "HookRegistry",
     "BEFORE_RUN",
     "BEFORE_REQUEST",
+    "REQUEST_PREPARED",
     "AFTER_RESPONSE",
     "BEFORE_TOOL",
     "AFTER_TOOL",
@@ -202,6 +220,7 @@ __all__ = [
     "BeforeRunEvent",
     "BeforeRequestEvent",
     "AfterResponseEvent",
+    "RequestPreparedEvent",
     "ToolEvent",
     "AfterToolEvent",
     "BeforeCompactionEvent",

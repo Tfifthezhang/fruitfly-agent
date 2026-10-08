@@ -23,10 +23,13 @@ Use the terminal model wizard or copy the public [model template](../../examples
 | Output limit | Smaller of constructor limit and positive `ProviderView.max_tokens`; nonpositive view limits use the constructor value. |
 | SDK retries | Disabled |
 | Adapter retries | `retry_max=3`: at most 4 attempts per harness call |
-| Cancellation | Check before requests, at retry boundaries, and during stream events; task cancellation interrupts event waits. |
+| Cancellation | Observe the signal while waiting for headers, chunks, final messages, and retry delays; task cancellation also releases transports. |
 | Error mapping | Core `OverflowError`, `RetryableError`, or `FatalError` |
-| Stream cleanup | Release SDK stream/context before final delivery, including failure and cancellation. |
+| Stream cleanup | Bound stream/context and owned SDK-client cleanup separately from request deadlines. |
 | Usage | Preserve available receipts; missing usage is unknown. |
+| Deadlines | SDK connection/read limits plus first progress, later progress, and total invocation deadlines; keepalive is not progress. |
+| Partial delivery | Do not retry after text, thinking, or tool-call content reaches the consumer. |
+| Retry activity | Emit Core `StreamActivity` events with attempts, delay, error category, and optional HTTP status; no raw headers. |
 
 Harness call budgets do not count individual adapter retry attempts or guarantee monetary cost. Third-party Providers must enforce their declared request-limit semantics.
 
@@ -40,6 +43,7 @@ Harness call budgets do not count individual adapter retry attempts or guarantee
 | [anthropic.py](anthropic.py), [anthropic_codec.py](anthropic_codec.py) | Messages requests and codec |
 | [openai.py](openai.py), [openai_codec.py](openai_codec.py) | Responses requests and codec |
 | [error_classification.py](error_classification.py) | Shared error categories |
+| [transport.py](transport.py) | Validated deadlines, signal-aware waits, retry hints/jitter, and cleanup |
 
 Implement Core's Provider protocol, register the adapter, and test messages, streaming, errors, limits, cancellation, and cleanup offline. Providers do not read Session, Lab, or Eval state. API keys come from the prepared environment; no Provider-specific `FRUITFLY_*` variables.
 

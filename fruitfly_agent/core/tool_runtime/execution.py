@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 from typing import Any
 
 from ..config import AgentLoopConfig
@@ -10,8 +11,10 @@ from ..data_model.messages import AgentToolResult, AssistantMessage, TextBlock, 
 from ..data_model.runtime import AgentLoopContext, BeforeToolCallResult
 from ..extensions.callbacks import call_extension
 from ..extensions.hooks import AFTER_TOOL, BEFORE_TOOL, AfterToolEvent, HookRegistry, ToolEvent
+from ..context_runtime import append_message
 from . import ToolCallContext
 from .schema import validate_tool_arguments
+from .authorization import AuthorizationRequest, AuthorizationDecision, unrestricted_authorization
 
 
 def _error_result(call_id: str, message: str, *, terminate: bool = False) -> ToolResultMessage:
@@ -34,15 +37,40 @@ async def execute_tool_batch(
         t.execution_mode == "sequential" for t in ctx.tools if t.name in names
     )
     semaphore = asyncio.Semaphore(max(1, config.tool_execution.max_parallel))
+    completed: dict[str, ToolResultMessage] = {}
+    started: set[str] = set()
 
     async def run_one(tc) -> ToolResultMessage:
         async with semaphore:
-            return await _execute_one(ctx, tc, config, hooks, signal)
+            if signal is not None and signal.is_set():
+                raise asyncio.CancelledError
+            started.add(tc.id)
+            ctx.tool_call_count += 1
+            result = await _execute_one(ctx, tc, config, hooks, signal)
+            completed[tc.id] = result
+            return result
 
-    if sequential:
-        results = [await run_one(tc) for tc in calls]
-    else:
-        results = list(await asyncio.gather(*(run_one(tc) for tc in calls)))
+    tasks: list[asyncio.Task] = []
+    try:
+        if sequential:
+            results = [await run_one(tc) for tc in calls]
+        else:
+            tasks = [asyncio.create_task(run_one(tc)) for tc in calls]
+            results = list(await asyncio.gather(*tasks))
+    except asyncio.CancelledError:
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        for call in assistant.tool_calls:
+            result = completed.get(call.id)
+            if result is None:
+                detail = ("Tool interrupted; its effects may have occurred and the outcome is unknown. Do not automatically replay."
+                          if call.id in started else "Tool was not executed: run cancelled.")
+                result = _error_result(call.id, detail)
+            append_message(ctx, result)
+        raise
     results.extend(
         ToolResultMessage(
             tool_call_id=call.id,
@@ -112,11 +140,26 @@ async def _execute_one(
         if config.on_partial is not None:
             await call_extension(config.on_partial, text, label="on_partial", default=None)
 
+    execution_started = False
     try:
-        result = tool.execute(ToolCallContext(tc.id, tool.name, args, ctx.env, on_update, signal))
-        if hasattr(result, "__await__"):
-            result = await result
+        request = AuthorizationRequest(tc.id, tool.name, copy.deepcopy(args), tool.permission)
+        scope = (config.tool_authorizer.authorize(request, signal=signal)
+                 if config.tool_authorizer is not None else unrestricted_authorization())
+        async with scope as decision:
+            if not isinstance(decision, AuthorizationDecision) or decision.allowed is not True:
+                reason = decision.reason if isinstance(decision, AuthorizationDecision) else "invalid authorization decision"
+                return _error_result(tc.id, f"Permission denied: {reason}")
+            if request.arguments != args:
+                return _error_result(tc.id, "Permission denied: authorized arguments changed")
+            if signal is not None and signal.is_set():
+                raise asyncio.CancelledError
+            execution_started = True
+            result = tool.execute(ToolCallContext(tc.id, tool.name, args, ctx.env, on_update, signal))
+            if hasattr(result, "__await__"):
+                result = await result
     except Exception as exc:  # noqa: BLE001
+        if not execution_started:
+            return _error_result(tc.id, 'Authorization failed; tool was not executed')
         return _error_result(tc.id, f'{type(exc).__name__}: {exc}')
     if not isinstance(result, AgentToolResult):
         return _error_result(tc.id, f'Tool {tool.name} returned {type(result).__name__}; expected AgentToolResult')

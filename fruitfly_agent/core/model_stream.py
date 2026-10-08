@@ -21,6 +21,18 @@ class StreamStart:
 
 
 @dataclass(frozen=True)
+class StreamActivity:
+    """Transport activity without vendor data or assistant content."""
+
+    phase: str
+    attempt: int = 1
+    max_attempts: int = 1
+    delay_seconds: float = 0.0
+    error_kind: str = ""
+    status_code: int | None = None
+
+
+@dataclass(frozen=True)
 class TextDelta:
     text: str
 
@@ -59,6 +71,7 @@ class StreamError:
 
 StreamEvent = (
     StreamStart
+    | StreamActivity
     | TextDelta
     | ThinkingDelta
     | ToolCallStart
@@ -100,6 +113,12 @@ class AssistantMessageEventStream:
             raise FatalError("stream ended without a terminal event")
         return self._final
 
+    async def aclose(self) -> None:
+        """Release a suspended producer, including cancellation during delivery."""
+        close = getattr(self._iterator, "aclose", None)
+        if close is not None:
+            await close()
+
 
 async def scripted_stream(
     events: list[StreamEvent], final: AssistantMessage | None = None
@@ -119,6 +138,7 @@ __all__ = [
     "AssistantMessageEventStream",
     "StreamEvent",
     "StreamStart",
+    "StreamActivity",
     "TextDelta",
     "ThinkingDelta",
     "ToolCallStart",

@@ -10,6 +10,7 @@ error classification + retry. GLM-compatible-endpoint quirks handled here:
 from __future__ import annotations
 
 import asyncio
+from dataclasses import asdict
 import json
 from typing import Any, AsyncIterator
 
@@ -36,6 +37,7 @@ from fruitfly_agent.core.model_stream import (
 
 from .anthropic_codec import convert_to_anthropic
 from .error_classification import classify_provider_error
+from .transport import TransportPolicy, AttemptDeadline, attempts, close_transport, retry_details, validate_retries
 
 _STOP_REASON_MAP = {
     "end_turn": "stop",
@@ -59,15 +61,32 @@ class AnthropicProvider:
         max_tokens: int = 4096,
         retry_max: int = 3,
         retry_base_delay: float = 1.0,
+        connect_timeout: float = 10.0,
+        timeout: float = 600.0,
+        first_progress_timeout: float = 180.0,
+        stall_timeout: float = 180.0,
+        total_timeout: float = 900.0,
+        cleanup_timeout: float = 5.0,
+        retry_jitter: float = 0.2,
     ) -> None:
         import anthropic  # SDK stays in this file.
 
         self._anthropic = anthropic
-        self._client = anthropic.AsyncAnthropic(api_key=api_key, base_url=base_url, max_retries=0)
+        validate_retries(retry_max, retry_base_delay)
+        self._policy = TransportPolicy(connect_timeout, timeout, first_progress_timeout,
+                                       stall_timeout, total_timeout, cleanup_timeout, retry_jitter)
+        self.transport_parameters = {**asdict(self._policy), "retry_max": retry_max,
+                                     "retry_base_delay": retry_base_delay, "transport_version": "bounded-v1"}
+        self._client = anthropic.AsyncAnthropic(api_key=api_key, base_url=base_url, max_retries=0,
+                                           timeout=anthropic.Timeout(timeout, connect=connect_timeout))
         self.model = model
         self.max_tokens = max_tokens
         self.retry_max = retry_max
         self.retry_base_delay = retry_base_delay
+
+    async def close(self) -> None:
+        """Close the owned SDK client within the cleanup allowance."""
+        await close_transport(self._client.close(), self._policy.cleanup_timeout)
 
     def __call__(
         self, view: ProviderView, *, signal: asyncio.Event | None = None
@@ -86,29 +105,12 @@ class AnthropicProvider:
     async def _gen(
         self, view: ProviderView, signal: asyncio.Event | None
     ) -> AsyncIterator[StreamEvent]:
-        for attempt in range(self.retry_max + 1):
-            if signal is not None and signal.is_set():
-                raise asyncio.CancelledError
-            try:
-                async for event in self._stream_once(view, signal):
-                    yield event
-                return
-            except RetryableError as exc:
-                if attempt >= self.retry_max:
-                    yield StreamError(error=exc)
-                    return
-                delay = self.retry_base_delay * (2**attempt)
-                await self._sleep(delay, signal)
-            except OverflowError as exc:
-                yield StreamError(error=exc)
-                return
-            except FatalError as exc:
-                yield StreamError(error=exc)
-                return
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:  # noqa: BLE001
-                yield StreamError(error=classify_error(exc))
+        producer = attempts(self, view, signal)
+        try:
+            async for event in producer:
+                yield event
+        finally:
+            await producer.aclose()
 
     async def _sleep(self, delay: float, signal: asyncio.Event | None) -> None:
         if signal is None:
@@ -122,7 +124,7 @@ class AnthropicProvider:
     # -- one attempt ---------------------------------------------------------
 
     async def _stream_once(
-        self, view: ProviderView, signal: asyncio.Event | None
+        self, view: ProviderView, signal: asyncio.Event | None, *, deadline: AttemptDeadline
     ) -> AsyncIterator[StreamEvent]:
         request = {
             "model": view.model or self.model,
@@ -134,20 +136,35 @@ class AnthropicProvider:
         if tools:
             request["tools"] = tools
 
+        manager = self._client.messages.stream(**request)
+        entered = False
         try:
-            async with self._client.messages.stream(**request) as sdk_stream:
-                async for event in sdk_stream:
-                    if signal is not None and signal.is_set():
-                        raise asyncio.CancelledError
-                    mapped = self._map_event(event)
-                    if mapped is not None:
+            sdk_stream = await deadline.wait(manager.__aenter__(), signal)
+            entered = True
+            iterator = sdk_stream.__aiter__()
+            while True:
+                try:
+                    event = await deadline.wait(iterator.__anext__(), signal)
+                except StopAsyncIteration:
+                    break
+                mapped = self._map_event(event)
+                if mapped is not None:
+                    meaningful = (isinstance(mapped, ToolCallStart) or
+                                  bool(getattr(mapped, "text", "") or getattr(mapped, "thinking", "") or
+                                       getattr(mapped, "json_delta", "")))
+                    if meaningful:
+                        deadline.progress()
                         yield mapped
-                final = await sdk_stream.get_final_message()
-            # Consumers stop on StreamDone, so release the SDK context first.
-            yield StreamDone(result=self._assemble(final))
-        except Exception as exc:  # noqa: BLE001
+            final = await deadline.wait(sdk_stream.get_final_message(), signal)
+        except TaggedError:
+            raise
+        except Exception as exc:
             status = getattr(exc, "status_code", None)
-            raise classify_error(exc, status_code=status) from exc
+            raise retry_details(exc, classify_error(exc, status_code=status)) from exc
+        finally:
+            if entered:
+                await close_transport(manager.__aexit__(None, None, None), self._policy.cleanup_timeout)
+        yield StreamDone(result=self._assemble(final))
 
     # -- event mapping -------------------------------------------------------
 

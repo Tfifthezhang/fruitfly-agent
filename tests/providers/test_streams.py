@@ -7,59 +7,13 @@ from unittest.mock import AsyncMock, Mock, patch
 
 from fruitfly_agent.core.data_model import ProviderView, UserMessage, ToolCallBlock, TextBlock
 from fruitfly_agent.core.errors import FatalError, OverflowError, RetryableError
-from fruitfly_agent.core.model_stream import TextDelta, ThinkingDelta, ToolCallStart, ToolCallDelta
+from fruitfly_agent.core.model_stream import StreamActivity, TextDelta, ThinkingDelta, ToolCallStart, ToolCallDelta
 from fruitfly_agent.providers.openai import OpenAIProvider
 from fruitfly_agent.providers.anthropic import AnthropicProvider
 from tests.support.loop import make_tool
 
 
-class SDKStream:
-    def __init__(self, events=(), final=None):
-        self.events = iter(events)
-        self.final = final
-        self.exited = False
-
-    def __aiter__(self):
-        return self
-
-    async def __anext__(self):
-        try:
-            event = next(self.events)
-        except StopIteration:
-            raise StopAsyncIteration
-        if isinstance(event, BaseException):
-            raise event
-        return event
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *args):
-        self.exited = True
-
-    async def get_final_message(self):
-        return self.final
-
-    async def close(self):
-        self.exited = True
-
-
-def view(tools=()):
-    return ProviderView('instructions', [UserMessage(content='hello')], list(tools), 'chosen-model', 32)
-
-
-def adapter(kind, streams, **options):
-    if kind == 'openai':
-        client = NS(responses=NS(create=AsyncMock(side_effect=streams)))
-        with patch('openai.AsyncOpenAI', return_value=client):
-            provider = OpenAIProvider(api_key='offline-placeholder', model='fallback', retry_base_delay=0, **options)
-        request = client.responses.create
-    else:
-        client = NS(messages=NS(stream=Mock(side_effect=streams)))
-        with patch('anthropic.AsyncAnthropic', return_value=client):
-            provider = AnthropicProvider(api_key='offline-placeholder', model='fallback', retry_base_delay=0, **options)
-        request = client.messages.stream
-    return provider, request
+from tests.support.provider_streams import SDKStream, adapter, view
 
 
 class ProviderStreamTests(unittest.IsolatedAsyncioTestCase):
@@ -118,7 +72,7 @@ class ProviderStreamTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ToolCallBlock(id='call-1', name='count', input={'value': 'x'}), final.content[1])
         self.assertEqual('toolUse', final.stop_reason)
         self.assertEqual((12, 4, 5), (final.usage.input_tokens, final.usage.output_tokens, final.usage.cache_read_tokens))
-        self.assertEqual([TextDelta, ToolCallStart, ToolCallDelta, ToolCallDelta], [type(e) for e in events])
+        self.assertEqual([StreamActivity, TextDelta, ToolCallStart, ToolCallDelta, ToolCallDelta], [type(e) for e in events])
         self.assertEqual('chosen-model', request.call_args.kwargs['model'])
         self.assertEqual('instructions', request.call_args.kwargs['instructions'])
         self.assertEqual('count', request.call_args.kwargs['tools'][0]['name'])
@@ -155,8 +109,8 @@ class ProviderStreamTests(unittest.IsolatedAsyncioTestCase):
         events = [event async for event in stream]
         result = await stream.result()
         self.assertTrue(sdk.exited)
-        self.assertEqual([TextDelta, ThinkingDelta, ToolCallStart, ToolCallDelta], [type(e) for e in events])
-        self.assertEqual({'value': 'x'}, events[2].input)
+        self.assertEqual([StreamActivity, TextDelta, ThinkingDelta, ToolCallStart, ToolCallDelta], [type(e) for e in events])
+        self.assertEqual({'value': 'x'}, events[3].input)
         self.assertEqual('toolUse', result.stop_reason)
         self.assertEqual({'value': 'x'}, result.content[-1].input)
         self.assertEqual((10, 3, 4, 2), (result.usage.input_tokens, result.usage.output_tokens,

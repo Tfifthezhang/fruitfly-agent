@@ -11,6 +11,8 @@ from collections.abc import Callable
 from typing import TextIO
 
 from ..events import (
+    AuthorizationRequested,
+    AuthorizationResolved,
     AssistantTextDelta,
     AssistantThinkingDelta,
     CompactionStarted,
@@ -27,7 +29,7 @@ from .history import render_history_message
 from .branding import FRUIT_FLY_ICON
 from .live import prompt_frame_lines
 from .markdown import MarkdownStreamPresenter, MarkdownUpdate
-from .text import colors_enabled, supports_ansi, terminal_columns, truncate_cells
+from .text import safe_terminal_text, colors_enabled, supports_ansi, terminal_columns, truncate_cells
 from .welcome import render_welcome
 
 
@@ -162,6 +164,18 @@ class TerminalRenderer:
         self.output.flush()
 
     async def render(self, event: InteractiveEvent) -> None:
+        if isinstance(event, AuthorizationRequested):
+            self.write_system("\nPermission required: " + safe_terminal_text(event.tool_name) + " / " + event.operation + "\n")
+            for target in event.targets:
+                self.write_system("target: " + safe_terminal_text(target) + "\n")
+            self.write_system(safe_terminal_text(event.summary) + "\n")
+            if event.operation == "execute":
+                self.write_system("Local code runs with current user permissions; file/network isolation is unavailable.\n")
+            self.write_system("1. Allow once (Enter)\n2. " + safe_terminal_text(event.session_label) + "\n3. Deny (Esc)\n")
+            return
+        if isinstance(event, AuthorizationResolved):
+            self.write_system("permission: " + event.choice + "\n")
+            return
         if isinstance(event, RunStarted):
             self._flush_markdown()
             self._set_activity("Preparing")
@@ -262,6 +276,8 @@ class TerminalRenderer:
             self._flush_markdown()
             await self._stop_activity()
             self._newline()
+            if event.stop_reason == "aborted":
+                self._write("[run cancelled; completed effects are retained]\n", _YELLOW)
             if event.is_error:
                 self._write(f"[run failed] {event.error_details}\n", _RED)
             self._write(
@@ -393,6 +409,14 @@ def _format_activity_label(event: RunActivityChanged) -> str:
     subject = event.subject.strip()
     if event.phase == "waiting_model":
         label = f"Waiting for {subject}" if subject else "Waiting for model"
+        if event.attempt:
+            label += f" · attempt {event.attempt}/{event.max_attempts}"
+        label += " · /cancel or Ctrl+C to stop"
+    elif event.phase == "provider_retrying":
+        status = f"HTTP {event.status_code}" if event.status_code is not None else event.error_kind
+        label = f"Retrying after {status}; attempt {event.attempt + 1}/{event.max_attempts} in {event.delay_seconds:.1f}s"
+    elif event.phase == "provider_timeout":
+        label = f"Provider waiting deadline exceeded ({event.error_kind})"
     elif event.phase == "receiving_thinking":
         label = "Receiving model reasoning"
     elif event.phase == "receiving_answer":

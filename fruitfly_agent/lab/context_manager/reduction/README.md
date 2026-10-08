@@ -8,7 +8,7 @@ Summarize history to fit the model projection while preserving recent complete t
 
 | Method / case | Result |
 |---|---|
-| `estimate(snapshot)` | Estimate prompt, tools, schemas, and projected messages; not a real tokenizer. |
+| `estimate(snapshot)` | Estimate prompt, tools, schemas, and projected messages; not a real tokenizer. The optional `estimate_source` property labels built-in or injected estimators for request/status observation. |
 | `check_budget(snapshot)` | Propose a summary when over budget; avoid duplicate proactive reduction during overflow recovery. |
 | `react_to_overflow(snapshot, error)` | Reduce retained history within algorithm and Core retry limits. |
 | Valid summary | Normal `stop`, nonblank text, no tool calls, smaller projection, within estimated budget. |

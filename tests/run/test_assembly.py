@@ -43,6 +43,54 @@ class RuntimeAssemblyTest(unittest.TestCase):
             config_path=kwargs.pop("config_path", self.root / "config.yaml"), **kwargs,
         )
 
+    def test_permission_identity_and_standard_authorizer_are_required_for_recovery(self):
+        from fruitfly_agent.lab.catalog import PermissionPolicy
+        from fruitfly_agent.lab.environment.guarded import GuardedEnv
+        catalog = builtin_catalog()
+        profile = HarnessProfile("default", str(self.model_path), "offline", catalog.default_selections())
+        with Session(self.root / "permissions.jsonl") as session:
+            original = self.assemble(profile, session, catalog=catalog)
+            self.assertIsNotNone(original.config.tool_authorizer)
+            self.assertIsInstance(original.config.env, GuardedEnv)
+            self.assertEqual("confirm", original.manifest.permissions["outside_workspace"])
+            record_session_manifest(session, original)
+            changed = self.assemble(profile, session, catalog=catalog,
+                permission_policy=PermissionPolicy(self.root, read_roots=(self.root.parent,)))
+            with self.assertRaisesRegex(ValueError, "differs"):
+                check_session_manifest(session, changed, resume=True)
+            identical = self.assemble(profile, session, catalog=catalog)
+            check_session_manifest(session, identical, resume=True)
+            self.assertEqual(0, identical.components['authorization'].status()['grants'])
+            self.assertFalse(identical.config.env.write_file(str(session.path), 'corrupt').is_ok)
+
+    def test_effective_transport_defaults_and_changes_bind_recovery_identity(self):
+        from tests.support.provider_streams import adapter
+
+        catalog = builtin_catalog()
+        profile = HarnessProfile("default", str(self.model_path), "offline", ())
+        for kind in ("openai", "anthropic"):
+            with self.subTest(kind=kind), Session(self.root / f"{kind}.jsonl") as session:
+                default, _ = adapter(kind, [])
+                explicit, _ = adapter(kind, [], total_timeout=900)
+                changed, _ = adapter(kind, [], total_timeout=901)
+                self.registry.create.side_effect = None
+                self.registry.create.return_value = default
+                original = self.assemble(profile, session, catalog=catalog)
+                self.assertEqual(900.0, original.manifest.models["main"]["transport"]["total_timeout"])
+                record_session_manifest(session, original)
+                self.registry.create.return_value = explicit
+                equivalent = self.assemble(profile, session, catalog=catalog)
+                self.assertEqual(original.manifest.digest, equivalent.manifest.digest)
+                check_session_manifest(session, equivalent, resume=True)
+                self.registry.create.return_value = changed
+                incompatible = self.assemble(profile, session, catalog=catalog)
+                with self.assertRaisesRegex(ValueError, "differs"):
+                    check_session_manifest(session, incompatible, resume=True)
+                self.registry.create.return_value = FauxProvider()
+                missing = self.assemble(profile, session, catalog=catalog)
+                with self.assertRaisesRegex(ValueError, "differs"):
+                    check_session_manifest(session, missing, resume=True)
+
     def test_algorithm_version_and_effective_defaults_bind_session_identity(self):
         from dataclasses import asdict, replace
         from fruitfly_agent.lab.catalog import LabCatalog
@@ -387,3 +435,58 @@ class RuntimeAssemblyTest(unittest.TestCase):
             set(runtime.manifest.models),
         )
         self.assertTrue(artifact_exists)
+
+class RuntimePermissionWorkflowTests(unittest.IsolatedAsyncioTestCase):
+    async def test_external_tools_confirm_and_restore_does_not_restore_grants(self):
+        from fruitfly_agent.interactive import AgentApplication
+        from fruitfly_agent.run import RunApplicationFactory
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            workspace = root / 'workspace'
+            workspace.mkdir()
+            _write_catalog(workspace / 'models.yaml', {'offline': 'offline-model'})
+            provider = FauxProvider()
+            registry = Mock()
+            registry.create.return_value = provider
+            factory = RunApplicationFactory(cwd=workspace,
+                environment={'TEST_API_KEY': 'offline-placeholder'}, provider_registry=registry)
+            factory.configuration.set_mechanism('compaction', enabled=False)
+            factory.configuration.save()
+            factory.reload_configuration()
+            app = AgentApplication(factory)
+            self.addAsyncCleanup(app.close)
+            prompts = []
+            async def approve(prompt):
+                prompts.append(prompt)
+                return 'session'
+            app.set_authorization_handler(approve)
+            path = workspace / '.fruitfly' / 'sessions' / 'permissions.jsonl'
+            await app.start(session_path=path)
+            target = root / 'outside.txt'
+            provider.respond_tool_call('write', {'path': str(target), 'content': 'first'})
+            provider.respond_text('written')
+            result = await app.submit('write external file')
+            self.assertFalse(result.is_error)
+            self.assertEqual('first', target.read_text())
+            self.assertEqual(1, len(prompts))
+            self.assertEqual(1, app.status.permission_grants)
+            provider.respond_tool_call('read', {'path': str(target)})
+            provider.respond_text('read')
+            await app.submit('read approved directory')
+            self.assertEqual(1, len(prompts))
+            await app.close()
+            await app.start(resume=True, session_path=path)
+            self.assertEqual(0, app.status.permission_grants)
+            provider.respond_tool_call('write', {'path': str(target), 'content': 'second'})
+            provider.respond_text('written again')
+            await app.submit('write after restore')
+            self.assertEqual(2, len(prompts))
+            self.assertEqual('second', target.read_text())
+            app.clear_authorizations()
+            self.assertEqual(0, app.status.permission_grants)
+            await app.close()
+            with Session(path) as durable:
+                decisions = [e.payload for e in durable.read_all() if e.payload.get('kind') == 'authorization']
+                self.assertEqual(3, len(decisions))
+                self.assertTrue(all(e['allowed'] for e in decisions))
+                self.assertTrue(all('arguments' not in e and 'command' not in e for e in decisions))

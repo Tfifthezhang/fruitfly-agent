@@ -7,6 +7,7 @@ from typing import Any, Mapping, Protocol
 
 from fruitfly_agent.core.data_model.messages import AgentToolResult, TextBlock
 from fruitfly_agent.core.tool_runtime import AgentTool, ToolCallContext
+from fruitfly_agent.core.tool_runtime.authorization import ToolPermission
 
 
 class _ExecutionResult(Protocol):
@@ -48,6 +49,7 @@ def create_ipython_tool(runtime: _IpythonExecutor) -> AgentTool:
         )
 
     return AgentTool(
+        permission=ToolPermission("execute", ()),
         name="ipython",
         label="IPython",
         description=(

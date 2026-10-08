@@ -42,8 +42,10 @@ class IpythonRuntime:
         host_handler: HostRequestHandler,
         max_output_chars: int,
         timeout_seconds: int,
+        process_environment: dict[str, str] | None = None,
     ) -> None:
         self.cwd = cwd.resolve()
+        self.process_environment = dict(process_environment or {"PATH": "/usr/bin:/bin:/usr/sbin:/sbin"})
         self.artifact_store = artifact_store
         self.host_handler = host_handler
         self.max_output_chars = max_output_chars
@@ -64,7 +66,7 @@ class IpythonRuntime:
             raise RuntimeError("IPython runtime is closed")
         if self._process is not None and self._process.returncode is None:
             return
-        env = dict(os.environ)
+        env = dict(self.process_environment)
         package_root = str(Path(__file__).resolve().parents[5])
         existing_pythonpath = env.get("PYTHONPATH")
         env.update(

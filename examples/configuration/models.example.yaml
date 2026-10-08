@@ -22,6 +22,11 @@ models:
       streaming: true
     # Disable thinking for the Responses example; the capability flag alone does not.
     parameters:
+      # Adapter waiting/retry policy; these values do not change model capacity.
+      first_progress_timeout: 180
+      stall_timeout: 180
+      total_timeout: 900
+      retry_max: 3
       reasoning:
         effort: none
   deepseek-flash-anthropic:
@@ -39,3 +44,8 @@ models:
       vision: false
       reasoning: false
       streaming: true
+    parameters:
+      first_progress_timeout: 180
+      stall_timeout: 180
+      total_timeout: 900
+      retry_max: 3

@@ -13,6 +13,7 @@ import time
 from fruitfly_agent.core.data_model import AgentToolResult, TextBlock
 from fruitfly_agent.core.env import ExecOptions
 from fruitfly_agent.core.tool_runtime import AgentTool, ToolCallContext
+from fruitfly_agent.core.tool_runtime.authorization import ToolPermission
 from .truncate import DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, truncate_tail
 
 _BASH_SCHEMA: dict = {
@@ -102,6 +103,7 @@ def _append_status(output: str, status: str) -> str:
 
 def create_bash_tool() -> AgentTool:
     return AgentTool(
+        permission=ToolPermission("execute", ()),
         name="bash",
         label="bash",
         description=(

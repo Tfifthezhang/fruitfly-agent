@@ -43,6 +43,8 @@ Leave `FRUITFLY_MODEL_PROFILE` unset or blank to choose interactively. A sole mo
 
 **Live tasks contact the configured model service and may incur charges. Local file and shell tools use your current user permissions and do not provide a sandbox.**
 
+The standard host allows ordinary workspace file operations, protects known credential paths, and asks before external file access or Bash/IPython execution. In an interactive terminal, choose **1 / Enter** to allow once, **2** for the displayed session scope, or **3 / Esc** to deny. `/permissions clear` revokes remembered approvals. Without an enabled confirmation frontend or injected handler, operations requiring approval are denied. See [terminal permissions](fruitfly_agent/interactive/terminal/README.md#respond-to-permission-requests).
+
 ## Run and resume
 
 After initial configuration:

@@ -85,8 +85,8 @@ Assembly occurs at `factory.open()` or `Application.start()`. See the [offline A
 
 | Concern | Rule |
 |---|---|
-| RuntimeManifest | Schema 5 fixes actual model, effective selections/parameters, declared implementation identities, prompt content, and consumed artifacts. |
-| Resume | Reload artifacts, verify hashes, and compare the complete manifest. |
+| RuntimeManifest | Schema 5 fixes actual model, normalized transport defaults/overrides and implementation identity when published by the Provider, effective selections/parameters, prompt content, and consumed artifacts. |
+| Resume | Reload artifacts, verify hashes, and compare the complete manifest, including transport policy. A manifest missing a matching transport identity is rejected; do not overwrite or silently adopt new defaults. |
 | Built-in prompt changes | A different reference or text hash requires a new session; do not substitute new instructions into an existing Session. |
 | Catalog changes | Unused model entries do not affect identity; changed active implementation or text does. |
 | Compatibility | Accepted only when original prompt provenance and the rest of assembly can be established; never overwrite the stored manifest. |
@@ -138,3 +138,13 @@ Run exposes an optional `configuration.model_setup` service to the terminal. Mod
 ```bash
 .venv/bin/python -m unittest discover -s tests/run -t . -v
 ```
+
+## Bind host permission policy
+
+[permissions.py](permissions.py) constructs the standard file policy and minimal process environment. `build_runtime(..., permission_policy=None)` and `RunApplicationFactory(..., permission_policy=None)` accept an optional host-owned `PermissionPolicy`, exported by Lab Catalog. Its workspace must match the runtime workspace. Defaults allow ordinary workspace reads/writes, protect known credentials, and require confirmation for external paths and local execution.
+
+After Lab installation, Run applies the policy to the final config and environment. It creates a fresh Interactive authorization service, binds it to Session frontend events, and protects the active Session file from tool writes. The normalized effective policy identity enters `RuntimeManifest.permissions`; recovery compares it with the rest of the manifest. Missing or changed permission identities do not silently resume. The current Session path is an additional per-handle protection, not part of reusable policy identity.
+
+Only host constructor parameters select additional roots and protection paths. Model-edited profile files do not expand permission scope. Algorithm configuration/state remains accessible within authorized roots. User-driven model setup continues to persist credentials through its owning host interface, and Provider construction can obtain its required key. Shell/IPython do not receive those keys automatically.
+
+Authorization audit entries contain call/tool identity, operation, outcome, and reason; they omit command/code contents, key values, and approval caches. Host policy must name additional credential files it uses. RuntimeManifest identities describe policy settings, not OS isolation or plugin source verification.

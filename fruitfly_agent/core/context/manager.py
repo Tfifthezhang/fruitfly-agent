@@ -71,6 +71,13 @@ class ContextPipeline:
         ctx.model = frame.model
         ctx.max_tokens = frame.max_tokens
 
+    @property
+    def estimate_source(self) -> str:
+        stage = self.reduction_stage
+        if stage is None:
+            return ""
+        return f"{stage.stage_id}: {getattr(stage.mechanism, 'estimate_source', 'stage estimator')}"
+
     def estimate(self, snapshot: ContextSnapshot) -> int:
         reduction = self._reduction()
         return reduction.estimate(snapshot) if reduction is not None else 0

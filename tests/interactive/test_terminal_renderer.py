@@ -176,7 +176,7 @@ class TerminalRendererTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(output.activities[0].startswith("⠋ Preparing · "))
         self.assertTrue(
             any(
-                "Waiting for offline-model · request 2" in activity
+                "Waiting for offline-model · /cancel or Ctrl+C to stop · request 2" in activity
                 for activity in output.activities
             )
         )

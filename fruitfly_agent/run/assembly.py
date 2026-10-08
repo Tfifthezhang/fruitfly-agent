@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from fruitfly_agent.lab.catalog import PermissionPolicy, apply_permission_policy
+from fruitfly_agent.interactive.authorization import AuthorizationService
+from .permissions import default_permission_policy, execution_environment
+
 from dataclasses import asdict, dataclass, replace
 import hashlib
 import json
@@ -63,6 +67,7 @@ class RuntimeManifest:
     data_artifacts: tuple[Mapping[str, Any], ...]
     base_prompt: Mapping[str, str]
     digest: str
+    permissions: Mapping[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         result = {
@@ -77,6 +82,8 @@ class RuntimeManifest:
             "base_prompt": dict(self.base_prompt),
             "digest": self.digest,
         }
+        if self.permissions is not None:
+            result["permissions"] = dict(self.permissions)
         if self.data_artifacts:
             result["data_artifacts"] = [dict(value) for value in self.data_artifacts]
         return result
@@ -123,6 +130,7 @@ def build_runtime(
     artifact_store: DataArtifactStore | None = None,
     artifact_bindings: Mapping[str, str] | None = None,
     task_pack_sources: tuple = (),
+    permission_policy: PermissionPolicy | None = None,
 ) -> RuntimeAssembly:
     """Build a fresh runtime; no result is applied until all installers succeed."""
 
@@ -132,9 +140,16 @@ def build_runtime(
         profile,
         config_path,
     )
+    policy = permission_policy or default_permission_policy(cwd, config_path)
+    if policy.workspace != cwd.resolve():
+        raise ValueError("permission workspace must match runtime workspace")
+    approvals = AuthorizationService()
+    def audit(data):
+        session.append("meta", {"kind": "authorization", **data})
+    process_environment = execution_environment(environment)
     main_spec.require(streaming=True)
     registry = provider_registry or default_registry()
-    resolved_model_specs: dict[str, Mapping[str, Any]] = {}
+    resolved_model_specs: dict[str, dict[str, Any]] = {}
     providers: dict[str, Any] = {}
 
     def resolve_provider(
@@ -163,6 +178,9 @@ def build_runtime(
             **asdict(spec),
         }
         provider = registry.create(spec, environment)
+        transport_parameters = getattr(provider, "transport_parameters", None)
+        if isinstance(transport_parameters, dict):
+            resolved_model_specs[binding_key]["transport"] = dict(transport_parameters)
         if resource_sink is not None:
             resource_sink.append(provider)
         providers[f"provider:{binding_key}"] = provider
@@ -208,8 +226,15 @@ def build_runtime(
             artifact_bindings=bindings,
             resource_sink=resource_sink,
             task_pack_sources=task_pack_sources,
+            process_environment=process_environment,
         ),
     )
+    # Apply host policy after all installers, so an installer cannot accidentally omit it.
+    secured = apply_permission_policy(assembled.config,
+        replace(policy, readonly_paths=(*policy.readonly_paths, session.path.resolve())),
+        confirm=approvals.confirm, audit=audit, process_environment=process_environment)
+    assembled = replace(assembled, config=secured,
+                        components={**assembled.components, "authorization": approvals})
     main_spec.require(tools=bool(assembled.config.tools), streaming=True)
     resolved = catalog.resolve(profile.mechanisms)
     component_entries = tuple(
@@ -251,6 +276,7 @@ def build_runtime(
             else None
         ),
         "base_prompt": prompt_identity,
+        "permissions": policy.identity(),
     }
     if data_artifacts:
         manifest_payload["data_artifacts"] = [dict(item) for item in data_artifacts]
@@ -265,6 +291,7 @@ def build_runtime(
         data_artifacts=data_artifacts,
         base_prompt=prompt_identity,
         digest=digest,
+        permissions=policy.identity(),
     )
     optional_ids = tuple(
         item.definition.descriptor.mechanism_id

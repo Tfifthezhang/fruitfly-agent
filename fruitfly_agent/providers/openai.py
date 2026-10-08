@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import asdict
 import json
 from typing import Any, AsyncIterator
 
@@ -20,11 +21,13 @@ from fruitfly_agent.core.model_stream import (
     StreamError,
     StreamEvent,
     TextDelta,
+    ThinkingDelta,
     ToolCallDelta,
     ToolCallStart,
 )
 from .openai_codec import convert_to_openai
 from .error_classification import classify_provider_error
+from .transport import TransportPolicy, AttemptDeadline, attempts, close_transport, retry_details, validate_retries
 
 
 def classify_error(exc: Exception, *, status_code: int | None = None) -> TaggedError:
@@ -43,13 +46,26 @@ class OpenAIProvider:
         max_output_tokens: int = 4096,
         retry_max: int = 3,
         retry_base_delay: float = 1.0,
+        connect_timeout: float = 10.0,
+        timeout: float = 600.0,
+        first_progress_timeout: float = 180.0,
+        stall_timeout: float = 180.0,
+        total_timeout: float = 900.0,
+        cleanup_timeout: float = 5.0,
+        retry_jitter: float = 0.2,
         store: bool = False,
         parallel_tool_calls: bool = True,
         **request_options: Any,
     ) -> None:
         import openai  # SDK stays inside the adapter.
 
-        self._client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url, max_retries=0)
+        validate_retries(retry_max, retry_base_delay)
+        self._policy = TransportPolicy(connect_timeout, timeout, first_progress_timeout,
+                                       stall_timeout, total_timeout, cleanup_timeout, retry_jitter)
+        self.transport_parameters = {**asdict(self._policy), "retry_max": retry_max,
+                                     "retry_base_delay": retry_base_delay, "transport_version": "bounded-v1"}
+        self._client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url, max_retries=0,
+                                           timeout=openai.Timeout(timeout, connect=connect_timeout))
         self.model = model
         self.max_output_tokens = max_output_tokens
         self.retry_max = retry_max
@@ -57,6 +73,10 @@ class OpenAIProvider:
         self.store = store
         self.parallel_tool_calls = parallel_tool_calls
         self.request_options = request_options
+
+    async def close(self) -> None:
+        """Close the owned SDK client within the cleanup allowance."""
+        await close_transport(self._client.close(), self._policy.cleanup_timeout)
 
     def __call__(
         self, view: ProviderView, *, signal: asyncio.Event | None = None
@@ -66,26 +86,12 @@ class OpenAIProvider:
     async def _gen(
         self, view: ProviderView, signal: asyncio.Event | None
     ) -> AsyncIterator[StreamEvent]:
-        for attempt in range(self.retry_max + 1):
-            if signal is not None and signal.is_set():
-                raise asyncio.CancelledError
-            try:
-                async for event in self._stream_once(view, signal):
-                    yield event
-                return
-            except RetryableError as exc:
-                if attempt >= self.retry_max:
-                    yield StreamError(error=exc)
-                    return
-                await self._sleep(self.retry_base_delay * (2**attempt), signal)
-            except (OverflowError, FatalError) as exc:
-                yield StreamError(error=exc)
-                return
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:  # noqa: BLE001
-                yield StreamError(error=classify_error(exc))
-                return
+        producer = attempts(self, view, signal)
+        try:
+            async for event in producer:
+                yield event
+        finally:
+            await producer.aclose()
 
     async def _sleep(self, delay: float, signal: asyncio.Event | None) -> None:
         if signal is None:
@@ -97,7 +103,7 @@ class OpenAIProvider:
             pass
 
     async def _stream_once(
-        self, view: ProviderView, signal: asyncio.Event | None
+        self, view: ProviderView, signal: asyncio.Event | None, *, deadline: AttemptDeadline
     ) -> AsyncIterator[StreamEvent]:
         request: dict[str, Any] = {
             "model": view.model or self.model,
@@ -127,15 +133,27 @@ class OpenAIProvider:
         completed: Any = None
         stream = None
         try:
-            stream = await self._client.responses.create(**request, stream=True)
-            async for event in stream:
+            stream = await deadline.wait(self._client.responses.create(**request, stream=True), signal)
+            iterator = stream.__aiter__()
+            while True:
+                try:
+                    event = await deadline.wait(iterator.__anext__(), signal)
+                except StopAsyncIteration:
+                    break
                 if signal is not None and signal.is_set():
                     raise asyncio.CancelledError
                 event_type = getattr(event, "type", "")
                 if event_type == "response.output_text.delta":
                     delta = str(getattr(event, "delta", ""))
                     text_parts.append(delta)
-                    yield TextDelta(text=delta)
+                    if delta:
+                        deadline.progress()
+                        yield TextDelta(text=delta)
+                elif event_type in {"response.reasoning_text.delta", "response.reasoning_summary_text.delta"}:
+                    delta = str(getattr(event, "delta", ""))
+                    if delta:
+                        deadline.progress()
+                        yield ThinkingDelta(thinking=delta)
                 elif event_type == "response.output_item.added":
                     item = getattr(event, "item", None)
                     if getattr(item, "type", "") == "function_call":
@@ -146,6 +164,7 @@ class OpenAIProvider:
                             "name": str(getattr(item, "name", "")),
                             "arguments": str(getattr(item, "arguments", "") or ""),
                         }
+                        deadline.progress()
                         yield ToolCallStart(id=call_id, name=calls[item_id]["name"])
                 elif event_type == "response.function_call_arguments.delta":
                     call_id = str(getattr(event, "item_id", ""))
@@ -153,7 +172,9 @@ class OpenAIProvider:
                     calls.setdefault(
                         call_id, {"id": call_id, "name": "", "arguments": ""}
                     )["arguments"] += delta
-                    yield ToolCallDelta(json_delta=delta)
+                    if delta:
+                        deadline.progress()
+                        yield ToolCallDelta(json_delta=delta)
                 elif event_type == "response.function_call_arguments.done":
                     item_id = str(getattr(event, "item_id", ""))
                     call = calls.setdefault(
@@ -175,12 +196,14 @@ class OpenAIProvider:
                 elif event_type in ("response.failed", "error"):
                     detail = getattr(event, "error", None) or getattr(event, "response", None)
                     raise FatalError(f"OpenAI response failed: {detail}")
+        except TaggedError:
+            raise
         except Exception as exc:  # noqa: BLE001
             status = getattr(exc, "status_code", None)
-            raise classify_error(exc, status_code=status) from exc
+            raise retry_details(exc, classify_error(exc, status_code=status)) from exc
         finally:
             if stream is not None:
-                await stream.close()
+                await close_transport(stream.close(), self._policy.cleanup_timeout)
         # StreamDone ends consumption; close the transport before emitting it.
         yield StreamDone(result=self._assemble(completed, text_parts, calls))
 
@@ -199,7 +222,7 @@ class OpenAIProvider:
             blocks.append(ToolCallBlock(id=call.get("id", item_id), name=call["name"], input=arguments))
         usage = getattr(response, "usage", None)
         input_details = getattr(usage, "input_tokens_details", None)
-        usage_obj = Usage(
+        usage_obj = None if usage is None else Usage(
             input_tokens=int(getattr(usage, "input_tokens", 0) or 0),
             output_tokens=int(getattr(usage, "output_tokens", 0) or 0),
             cache_read_tokens=int(getattr(input_details, "cached_tokens", 0) or 0),

@@ -36,9 +36,10 @@ class OptimizationActivityTests(unittest.IsolatedAsyncioTestCase):
                     self.assertIsNotNone(progress.activity)
                     self.assertEqual((0,1,1),(progress.activity.completed,progress.activity.total,progress.activity.trial_calls))
                     text=CommandRouter().execute(parse_command('/status'),app).text
-                    self.assertIn('optimization: running',text)
-                    self.assertIn('0/1',text)
-                    self.assertIn('trials used 1/',text)
+                    self.assertIn('state: optimizing',text)
+                    self.assertNotIn('optimization:',text)
+                    self.assertEqual(['context usage: unknown', 'compactions: 0'],
+                                     text.split('pending candidates: 0\n')[1].splitlines())
                     self.assertNotIn('SECRET',text)
                     release.set();await task;await asyncio.sleep(0)
                     self.assertEqual('completed',app.optimization_progress.status)
@@ -49,7 +50,7 @@ class OptimizationActivityTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(0, activity.usage_missing_calls)
                     self.assertGreater(activity.input_tokens + activity.output_tokens, 0)
                     status = CommandRouter().execute(parse_command('/status'), app).text
-                    self.assertIn('reported tokens', status)
+                    self.assertNotIn('reported tokens', status)
                     saved = factory.candidate_store.list()[0]
                     self.assertEqual(activity.input_tokens, saved.report['tokens']['input_tokens'])
                     self.assertEqual(activity.output_tokens, saved.report['tokens']['output_tokens'])

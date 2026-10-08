@@ -6,6 +6,7 @@ Verify messages, loop, hooks, tool dispatch, Session, failure isolation, and can
 
 | Files | Protects |
 |---|---|
+| `test_authorization.py` | Final arguments, fail-closed decisions, and cancellation before execution |
 | `test_*.py` | Core behavior by topic |
 | `../support/faux_provider.py / ../support/loop.py` | Scripted responses and loop fixtures |
 

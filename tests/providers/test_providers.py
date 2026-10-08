@@ -29,8 +29,9 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual("anthropic", specs["deepseek-flash-anthropic"].provider.type)
         self.assertEqual("https://api.deepseek.com", specs["deepseek-flash-openai"].provider.base_url)
         self.assertEqual("https://api.deepseek.com/anthropic", specs["deepseek-flash-anthropic"].provider.base_url)
-        self.assertEqual({"reasoning": {"effort": "none"}}, specs["deepseek-flash-openai"].parameters)
-        self.assertEqual({}, specs["deepseek-flash-anthropic"].parameters)
+        transport = {"first_progress_timeout": 180, "stall_timeout": 180, "total_timeout": 900, "retry_max": 3}
+        self.assertEqual({**transport, "reasoning": {"effort": "none"}}, specs["deepseek-flash-openai"].parameters)
+        self.assertEqual(transport, specs["deepseek-flash-anthropic"].parameters)
         for spec in specs.values():
             with self.subTest(profile=spec.id):
                 self.assertEqual("DEEPSEEK_API_KEY", spec.provider.api_key_env)

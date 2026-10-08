@@ -11,7 +11,7 @@ Search and compare improvements to a fixed target. Optimization proposes candida
 | 1 | Prepare a [task pack](TASK_PACKS.md) and run its offline checks. |
 | 2 | In **Configure → mechanisms · optimization**, enable **text-optimizer**, select **opro**, save, and start a new session. |
 | 3 | Use `/optimize [DIRECTION]`, select the pack, and review target, model, budget, and execution policy. |
-| 4 | Confirm **Start search**; monitor `/status` or use `/cancel`. |
+| 4 | Confirm **Start search**; monitor live terminal progress or use `/cancel`. `/status` shows the application state and pending candidate count. |
 | 5 | Review the complete candidate and evidence; save it for later or confirm a new session. |
 
 **Search calls the configured Provider and may incur charges. Python task scoring also executes restricted local functions.** Enabling the mechanism alone does not start a search.

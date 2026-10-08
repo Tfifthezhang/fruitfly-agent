@@ -60,3 +60,5 @@ Register subprocess resources immediately with `context.own` and expose them in 
 ```
 
 Tests use local IPython subprocesses, temporary artifacts, and a fake Provider; no real model requests.
+
+`IpythonRuntime(process_environment=...)` uses an explicit child environment rather than copying `os.environ`. Standard assembly supplies the host's minimal execution environment and keeps Provider credentials in the host-side model query broker. Model-driven IPython calls require local execution authorization. This does not isolate Python file/network APIs; approved cells still run with current-user permissions.

@@ -41,6 +41,8 @@ class AgentLoopContext:
     session_run_id: str | None = None
     provider_attempt_count: int = 0
     provider_failure_count: int = 0
+    turn_count: int = 0
+    tool_call_count: int = 0
     signal: asyncio.Event | None = field(default=None, repr=False, compare=False)
 
 
