@@ -9,8 +9,8 @@ import unittest
 from unittest.mock import Mock
 
 from fruitfly_agent.interactive import TerminalFrontend
-from fruitfly_agent.interactive.commands import CommandRouter, parse_command
-from fruitfly_agent.interactive.optimization import OptimizationActivity, OptimizationProgress
+from fruitfly_agent.interactive.interaction.commands import CommandRouter, parse_command
+from fruitfly_agent.interactive.contracts.optimization import OptimizationActivity, OptimizationProgress
 from fruitfly_agent.lab.optimization.services import NativeSearchServices
 from tests.support import application as fixtures
 from tests.support.task_packs import install
@@ -77,7 +77,7 @@ class OptimizationActivityTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(.6)
             self.assertFalse(task.done())
             self.assertIn('[optimization] Evaluating training [##--------] 2/8',output.getvalue())
-            frontend._show_optimization_activity()
+            frontend.show_notifications()
             self.assertEqual(1,output.getvalue().count('[optimization]'))
         finally:
             release.set()

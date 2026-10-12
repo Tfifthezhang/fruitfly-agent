@@ -16,19 +16,15 @@ Search and compare improvements to a fixed target. Optimization proposes candida
 
 **Search calls the configured Provider and may incur charges. Python task scoring also executes restricted local functions.** Enabling the mechanism alone does not start a search.
 
-## OPRO research basis
+## Optimization methods
 
-OPRO (Optimization by PROmpting) comes from Yang et al., [Large Language Models as Optimizers](https://arxiv.org/abs/2309.03409v3), Sections 2 and 4. An optimizer model proposes solutions from a task description and previously scored solutions; each new result becomes feedback for subsequent rounds.
+Each independent method has its own package directly under this module. Shared contracts, evaluation, budgets, evidence, task packs, and hosting remain at the Optimization level. Target adapters belong to the modules that own the objects being changed. A method package may expose an adapter for its own strategy when that capability is implemented.
 
-| Paper idea | FruitFlyAgent implementation |
-|---|---|
-| Scored optimization history | Bounded valid candidates, ordered so the best appears last |
-| Natural-language objective and examples | Frozen direction and authorized training examples |
-| Generate, evaluate, repeat | Baseline evaluation, JSON-array proposals, deduplication, target validation, and train/selection scoring |
-| Prompt optimization | `base_prompt` and `skill-catalog.guidance` text targets |
-| Published experiments | Not reproduced; no GSM8K/BBH gains or general improvement claims |
+| Method package | Public entry point | Scope |
+|---|---|---|
+| [OPRO](opro/README.md) | `opro.OproOptimizer`, `opro.definition()` | History-driven text search using shared services; disabled by default |
 
-This native implementation uses the harness's shared services rather than a research SDK. OPRO is the only built-in search algorithm and is disabled by default.
+OPRO is the only built-in method. Its guide documents the research basis, implemented behavior, and limits. Optimization remains part of Lab and can run independently of RSI and Eval.
 
 ## Ownership and contracts
 
@@ -101,7 +97,8 @@ Latest does not mean better. Failed, cancelled, or empty searches do not replace
 | [search.py](search.py) | Problems, strategies, observations, policies, and candidates |
 | [services.py](services.py) | Evaluation, budgets, model/tool services, and journal |
 | [host.py](host.py), [text_optimizer.py](text_optimizer.py) | Shared text host and Run-facing preview/search/cancel contract |
-| [opro.py](opro.py) | History-driven OPRO search |
+| [registration.py](registration.py) | Shared target/budget parameters and text optimizer assembly |
+| [OPRO](opro/README.md) | Independent history-driven text optimization method |
 | [scoring.py](scoring.py), [python_worker.py](python_worker.py) | Task policies and restricted function scoring |
 | [reporting.py](reporting.py) | Search reports, usage, and evidence validation |
 | [task_packs.py](task_packs.py), [tasks.py](tasks.py) | Pack catalog, freezing, editing, and read-only case loading |
@@ -110,7 +107,13 @@ Latest does not mean better. Failed, cancelled, or empty searches do not replace
 
 ## Extend search
 
+Create one package per independent method directly under `optimization/`, with a public entry point in `__init__.py` and an English README. Keep method-specific prompts and state beside its implementation when needed. The README must describe the research source, supported targets, injected capabilities, parameters, state/reset/recovery, budgets, failure/cancellation, limits, and offline checks. Do not create placeholder files for unsupported capabilities.
+
+Own the method's Catalog definition and installer in that package, as [OPRO](opro/README.md) does. For a native text method, reuse `text_target_parameters`, `text_budget_parameters`, and `install_text_optimizer` from [registration.py](registration.py). Declare method-specific parameters and model roles explicitly; assembly resolves only those roles. Definition construction and installation must not start research or make model requests.
+
 Implement `Optimizer.search` with declared schemas/capabilities and register it through [Catalog](../catalog/README.md). Use `HostedTextOptimizer` for shared evaluation and evidence, or implement the narrower `TextOptimizer` contract directly. A deterministic evaluator can run without a model; declare a truthful policy and execution identity. Synchronous evaluators must be fast and bounded.
+
+Reuse shared services for trials, budgets, journals, and results. Run and frontends consume the common host contract; adding a method must not add algorithm-specific branches there. Registration is explicit through Catalog definitions, not automatic package discovery. Algorithm tests belong in the project's `tests/` tree.
 
 The optional tool-Agent service uses a private text workspace, no Bash or user files, and at most 8 tool calls by default. It does not have production adoption authority.
 

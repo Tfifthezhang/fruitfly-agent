@@ -114,7 +114,7 @@ class ContractBoundaryTests(unittest.IsolatedAsyncioTestCase):
             catalog.extended((definition('a', 'b'), definition('b', 'a'))).resolve((MechanismSelection('a'), MechanismSelection('b')))
 
     async def test_new_declared_artifact_slot_is_consumed_without_host_whitelist(self):
-        from fruitfly_agent.run.artifacts import DataArtifactStore
+        from fruitfly_agent.run.storage.artifacts import DataArtifactStore
         def install(state, context, params):
             artifact_id = context.artifact_bindings['extra.guidance']
             text = context.artifact_reader(artifact_id)

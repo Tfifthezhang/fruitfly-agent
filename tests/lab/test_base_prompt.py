@@ -6,7 +6,7 @@ import hashlib
 from pathlib import Path
 
 from fruitfly_agent.lab.base_prompt import DEFAULT_PROMPT, DEFAULT_PROMPT_ID, get_builtin, builtins
-from fruitfly_agent.run.artifacts import DataArtifactStore
+from fruitfly_agent.run.storage.artifacts import DataArtifactStore
 from fruitfly_agent.run.assembly import resolve_base_prompt
 
 

@@ -7,14 +7,8 @@ import os
 import unittest
 from unittest.mock import patch
 
-from fruitfly_agent.interactive.terminal.menu import (
-    LineMenuInput,
-    MenuAction,
-    MenuRow,
-    RawTerminalMenuInput,
-    TerminalMenuRenderer,
-)
-from fruitfly_agent.interactive.terminal.screen import transient_screen
+from fruitfly_agent.interactive.terminal.io.menu import LineMenuInput, MenuAction, MenuRow, RawTerminalMenuInput, TerminalMenuRenderer
+from fruitfly_agent.interactive.terminal.io.screen import transient_screen
 from tests.support.terminal import ScriptedLines, TtyStringIO
 
 

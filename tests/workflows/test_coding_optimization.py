@@ -65,7 +65,7 @@ class CodingOptimizationTests(unittest.IsolatedAsyncioTestCase):
             frontend = TerminalFrontend(app, input_stream=io.StringIO(), output_stream=output, line_editor=editor)
             running = asyncio.create_task(frontend.run())
             for _ in range(200):
-                if app._optimization_task is not None:
+                if app.optimization_progress.sequence > 0:
                     break
                 await asyncio.sleep(.01)
             await app.wait_for_optimization()

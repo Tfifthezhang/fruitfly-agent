@@ -2,10 +2,7 @@
 
 from dataclasses import replace
 
-from fruitfly_agent.interactive.configuration import (
-    ConfigurationActionResult, ConfigurationMechanism, ConfigurationParameter,
-    ConfigurationSelectionGroup, ConfigurationSnapshot,
-)
+from fruitfly_agent.interactive.contracts.configuration import ConfigurationActionResult, ConfigurationMechanism, ConfigurationParameter, ConfigurationSelectionGroup, ConfigurationSnapshot
 
 
 class MockConfiguration:

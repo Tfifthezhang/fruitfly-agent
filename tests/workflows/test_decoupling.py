@@ -48,7 +48,7 @@ class DecouplingTests(unittest.IsolatedAsyncioTestCase):
                     async def drive():
                         editor.send('/optimize improve', '1', *(("1",) if algorithm in ('opro',) else ()), '1')
                         for _ in range(100):
-                            if app._optimization_task is not None:
+                            if app.optimization_progress.sequence > 0:
                                 break
                             await asyncio.sleep(.001)
                         await app.wait_for_optimization()

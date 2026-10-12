@@ -2,7 +2,7 @@
 
 import io
 
-from fruitfly_agent.interactive.events import RunFinished
+from fruitfly_agent.interactive.contracts.events import RunFinished
 
 
 class ScriptedLines:

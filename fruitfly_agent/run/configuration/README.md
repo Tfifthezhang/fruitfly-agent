@@ -2,7 +2,7 @@
 
 [Up: Run](../README.md)
 
-Store runtime selections independently of model specifications and mechanism definitions. This module reads and writes YAML; it does not construct Providers or run algorithms.
+Store runtime selections independently of model specifications and mechanism definitions. Manage configuration drafts and resolve model choices without constructing Providers or running algorithms. Candidate-backed menus are supplied through presentation callbacks.
 
 ```yaml
 schema_version: 1
@@ -31,6 +31,23 @@ profiles:
 The example uses `.fruitfly/models.yaml`, resolved relative to `.fruitfly/config.yaml`. Explicit catalog paths keep precedence over workspace discovery. See the [file selection rules](../../../CONFIGURATION.md#files-and-precedence).
 
 Unknown fields and unsupported schema versions raise `ValueError`. Catalog validates mechanism IDs and parameters. Store key variable names in model specifications and key values in the environment; do not store secrets or full prompt text in YAML.
+
+## Files and ownership
+
+| File | Responsibility |
+|---|---|
+| [profile.py](profile.py) | Schema 1 values, YAML validation and persistence |
+| [controller.py](controller.py) | Draft selection, edits, save/reset, and public profile operations |
+| [operations.py](operations.py) | Narrow binding/profile edit contracts for host consumers |
+| [resolution.py](resolution.py) | Workspace/profile discovery and model catalog resolution |
+| [views.py](views.py) | Mechanism and prompt menu projections |
+| [model_setup.py](model_setup.py) | Stage models and credentials through profile callbacks |
+| [persistence.py](persistence.py) | Atomic byte writes for configuration operations |
+| [migration.py](migration.py) | Explicit offline configuration relocation |
+
+`profile()`, `stage_profile()`, and `changed` expose draft operations without allowing other services to access private fields. Model setup receives these callbacks and a configuration path. It writes only on save, preserves unrelated content, rolls back ordinary failures, and updates the secret environment after success. No model requests occur during configuration.
+
+The public `RunConfigurationController` in [Run](../README.md) composes this controller with candidate-backed prompt presentation. The configuration implementation receives an artifact store and optional prompt-choice callback; it does not discover candidate paths or depend on runtime preparation. Default workspace paths and environment precedence are documented in the configuration reference below.
 
 | Reference | Purpose |
 |---|---|

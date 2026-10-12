@@ -12,7 +12,8 @@ from fruitfly_agent.core.model_stream import AssistantMessageEventStream, Stream
 from fruitfly_agent.core.session import Session
 from fruitfly_agent.core.tool_runtime import AgentTool
 from fruitfly_agent.interactive import InteractiveSession, RunActivityChanged
-from fruitfly_agent.interactive.commands import CommandRouter, InteractiveCommand
+from fruitfly_agent.interactive.interaction.commands import CommandRouter
+from fruitfly_agent.interactive.contracts.commands import InteractiveCommand
 from tests.support.faux_provider import FauxProvider
 
 
@@ -171,7 +172,7 @@ class ContextStatusTests(unittest.IsolatedAsyncioTestCase):
 
     def test_ratio_rejects_other_models_and_missing_window_without_clamping_overflow(self):
         from types import SimpleNamespace
-        from fruitfly_agent.interactive.models import InteractiveStatus
+        from fruitfly_agent.interactive.contracts.models import InteractiveStatus
         status = InteractiveStatus(model='current', working_directory='', session_path='',
                                    message_count=0, tool_names=(), mechanisms=(), context_window=1000,
                                    estimated_input_tokens=1200, estimate_model='current')

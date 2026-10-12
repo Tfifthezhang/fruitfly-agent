@@ -173,7 +173,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
                                     session, runtime, resume=True, allow_legacy_default_prompt=allow
                                 )
                     with patch(
-                        "fruitfly_agent.run.recovery._LEGACY_DEFAULT_PROMPT_HASH",
+                        "fruitfly_agent.run.runtime.recovery._LEGACY_DEFAULT_PROMPT_HASH",
                         DEFAULT_PROMPT.content_hash,
                     ):
                         check_session_manifest(

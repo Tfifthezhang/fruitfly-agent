@@ -7,10 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from fruitfly_agent.interactive import TerminalRenderer
-from fruitfly_agent.interactive.events import (
-    AssistantTextDelta, CompactionStarted, RunActivityChanged,
-    RunStarted, ToolOutput, ToolStarted,
-)
+from fruitfly_agent.interactive.contracts.events import AssistantTextDelta, CompactionStarted, RunActivityChanged, RunStarted, ToolOutput, ToolStarted
 from tests.support.application import offline_session
 from tests.support.terminal import TtyStringIO, run_finished
 

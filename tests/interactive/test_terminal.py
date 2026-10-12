@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fruitfly_agent.interactive.optimization import OptimizationPreview
+from fruitfly_agent.interactive.contracts.optimization import OptimizationPreview
 
 import asyncio
 from dataclasses import replace
@@ -12,16 +12,12 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from fruitfly_agent.interactive import (
-    ResumableSession,
-    TerminalFrontend,
-)
-from fruitfly_agent.interactive.commands import CommandResult, CommandRouter
-from fruitfly_agent.interactive.events import (
-    AssistantTextDelta,
-)
-from fruitfly_agent.interactive.terminal.input import ReadlineLineEditor
-from fruitfly_agent.interactive.terminal.live import InlineTerminalDisplay
+from fruitfly_agent.interactive import ResumableSession, TerminalFrontend
+from fruitfly_agent.interactive.contracts.commands import CommandResult
+from fruitfly_agent.interactive.interaction.commands import CommandRouter
+from fruitfly_agent.interactive.contracts.events import AssistantTextDelta
+from fruitfly_agent.interactive.terminal.io.input import ReadlineLineEditor
+from fruitfly_agent.interactive.terminal.io.live import InlineTerminalDisplay
 from tests.support.faux_provider import FauxProvider
 from tests.support.application import offline_session
 from tests.support.configuration import MockConfiguration

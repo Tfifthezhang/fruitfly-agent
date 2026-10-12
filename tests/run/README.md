@@ -2,6 +2,8 @@
 
 [Up: Tests](../README.md)
 
+`test_host_services.py` exercises search receipts, candidate activation checks, evolution operations, and model-setup rollback using explicit fake capabilities without a Factory. Architecture checks protect the corresponding service boundaries.
+
 Verify configuration, model selection, assembly, manifest, CLI, candidates, retention, and recovery.
 
 | Files | Protects |

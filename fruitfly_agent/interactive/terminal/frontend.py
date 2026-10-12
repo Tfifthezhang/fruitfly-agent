@@ -3,41 +3,31 @@
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 import sys
 import signal
 import time
 import threading
-from typing import Protocol, TextIO
+from typing import TextIO, Mapping
+from contextlib import contextmanager
 
-from ..models import InteractiveStatus
-from ..events import AuthorizationRequested, AuthorizationResolved
-from ..optimization import OptimizationClient, format_optimization_activity
-from ..dispatch import EventSink
+from fruitfly_agent.interactive.contracts.events import AuthorizationRequested, AuthorizationResolved
+from fruitfly_agent.interactive.terminal.bindings import TerminalBindings, TerminalSession, ImprovementClients
+from fruitfly_agent.interactive.terminal.commands import TerminalCommandRegistry, TerminalCommandHandler
+from fruitfly_agent.interactive.terminal.features.assembly import bind_commands
+from fruitfly_agent.interactive.terminal.notifications import ImprovementNotifications
 
-from ..configuration import ConfigurationController
-from ..evaluation import EvaluationController
-from ..commands import CommandRouter, parse_command
-from .configuration import TerminalConfigurationFrontend
-from .evaluation import TerminalEvaluationFrontend
-from .input import LineEditor, create_line_editor, PollingLineEditor
-from .live import InlineTerminalDisplay, create_inline_terminal, InputInterrupted
-from .renderer import TerminalRenderer
-from .resume import TerminalResumeFrontend
-from .screen import transient_screen
-from .optimization import TerminalOptimizationFrontend
-from .text import safe_terminal_text
-
-
-class TerminalSession(Protocol):
-    @property
-    def status(self) -> InteractiveStatus: ...
-    @property
-    def running(self) -> bool: ...
-    def set_event_sink(self, sink: EventSink | None) -> None: ...
-    def steer(self, prompt: str) -> bool: ...
-    def cancel(self) -> bool: ...
-    async def submit(self, prompt: str): ...
+from fruitfly_agent.interactive.contracts.configuration import ConfigurationController
+from fruitfly_agent.interactive.contracts.evaluation import EvaluationController
+from fruitfly_agent.interactive.interaction.commands import CommandRouter, parse_command
+from fruitfly_agent.interactive.terminal.io.input import LineEditor, create_line_editor, PollingLineEditor
+from fruitfly_agent.interactive.terminal.io.live import (
+    InlineTerminalDisplay,
+    create_inline_terminal,
+    InputInterrupted,
+)
+from fruitfly_agent.interactive.terminal.rendering.renderer import TerminalRenderer
+from fruitfly_agent.interactive.terminal.io.screen import transient_screen
+from fruitfly_agent.interactive.terminal.features.optimization.menu import TerminalOptimizationFrontend
 
 
 class TerminalFrontend:
@@ -54,15 +44,16 @@ class TerminalFrontend:
         command_router: CommandRouter | None = None,
         configuration: ConfigurationController | None = None,
         evaluation: EvaluationController | None = None,
+        command_handlers: Mapping[str, TerminalCommandHandler] | None = None,
+        bindings: TerminalBindings | None = None,
+        improvement_clients: ImprovementClients | None = None,
     ) -> None:
         self.session = session
-        self._last_optimization_notice = 0
         self._last_interrupt = 0.0
         self._interrupt_exit = False
         self._reader_interrupt = threading.Event()
         self._signal_installed = False
         self._previous_sigint = None
-        self._last_optimization_activity = None
         self.input = input_stream or sys.stdin
         self.output = output_stream or sys.stdout
         self._inline_display: InlineTerminalDisplay | None = None
@@ -75,17 +66,35 @@ class TerminalFrontend:
         self.line_editor = line_editor or create_line_editor(self.input, self.output)
         if command_router is not None and configuration is not None:
             raise ValueError("pass command_router or configuration, not both")
-        self.configuration = configuration or getattr(session, "configuration", None)
+        self.bindings = bindings or TerminalBindings.from_session(session)
+        self._configuration_override = configuration
+        self._improvement_clients = improvement_clients
         self.menu_input = None
         self.menu_renderer = None
-        if isinstance(session, OptimizationClient):
-            from .menu import create_menu_input, TerminalMenuRenderer
+        if (improvement_clients or ImprovementClients.from_session(session)).available:
+            from fruitfly_agent.interactive.terminal.io.menu import create_menu_input, TerminalMenuRenderer
             self.menu_input = create_menu_input(self.input, self.output, self.line_editor)
             self.menu_renderer = TerminalMenuRenderer(self.output)
         self.evaluation = evaluation
         self.command_router = command_router or CommandRouter()
         self._reading_authorization = False
         self.session.set_event_sink(self._render_event)
+        self.commands = TerminalCommandRegistry()
+        bind_commands(
+            self.commands, bindings=self.bindings, configuration=lambda: self.configuration,
+            evaluation=evaluation, status=lambda: self.session.status, cancel=self.bindings.cancel,
+            menu_scope=self.menu_scope, input_stream=self.input, output_stream=self.output,
+            line_editor=lambda: self.line_editor, write=self.renderer.write_system,
+            welcome=self.renderer.show_welcome, show_history=self.show_history,
+            optimization_frontend=self.optimization_frontend if self.menu_input is not None else None,
+        )
+        for name, handler in (command_handlers or {}).items():
+            self.commands.register(name, handler)
+        self._notifications = ImprovementNotifications(
+            progress=self.bindings.progress, notice=self.bindings.candidate_notice,
+            acknowledge=self.bindings.acknowledge_notice, busy=self.bindings.busy,
+            write=self.renderer.write_system,
+        )
 
     async def run(self) -> int:
         try:
@@ -96,15 +105,15 @@ class TerminalFrontend:
                 self._signal_installed = True
                 if self._inline_display is None:
                     self.line_editor = PollingLineEditor(self.input, self.output, self._reader_interrupt)
-            enable = getattr(self.session, "enable_authorization", None)
+            enable = self.bindings.enable_authorization
             if enable is not None:
                 enable(bool(self.input.isatty()))
             self.renderer.show_welcome(self.session.status)
-            await self._show_history()
-            self._show_candidate_notice()
+            await self.show_history()
+            self._notifications.show_candidates()
             return await self._run_loop()
         finally:
-            enable = getattr(self.session, "enable_authorization", None)
+            enable = self.bindings.enable_authorization
             if enable is not None:
                 enable(False)
             self._reader_interrupt.set()
@@ -126,9 +135,7 @@ class TerminalFrontend:
     async def _run_loop(self) -> int:
         while True:
             await asyncio.sleep(0)
-            self._show_optimization_activity()
-            self._show_optimization_notice()
-            self._show_candidate_notice()
+            self._notifications.show()
             if self._interrupt_exit:
                 return 0
             try:
@@ -142,7 +149,7 @@ class TerminalFrontend:
                 continue
             if line is None:
                 self.renderer.finish_line()
-                wait = getattr(self.session, "wait_until_idle", None)
+                wait = self.bindings.wait
                 if wait is not None:
                     await wait()
                 return 0
@@ -158,16 +165,16 @@ class TerminalFrontend:
                 self.renderer.write_user_input(submitted)
             command = parse_command(text)
             if command is None:
-                if bool(getattr(self.session, "running", False)) and self.session.steer(text):
+                if self.session.running and self.session.steer(text):
                     self.renderer.write_system("message added to current run\n")
                     continue
-                enqueue = getattr(self.session, "enqueue", None)
+                enqueue = self.bindings.enqueue
                 if enqueue is None:
                     task = asyncio.create_task(self.session.submit(text))
                     self.renderer.write_system("running; Ctrl+C cancels in an interactive terminal\n")
                     await task
                 else:
-                    was_running = bool(getattr(self.session, "running", False))
+                    was_running = self.session.running
                     try:
                         position = enqueue(text)
                     except (RuntimeError, ValueError) as exc:
@@ -177,7 +184,7 @@ class TerminalFrontend:
                         self.renderer.write_system(
                             f"queued prompt ({position} pending)\n"
                         )
-                    wait = getattr(self.session, "wait_until_idle", None)
+                    wait = self.bindings.wait
                     if wait is not None and self._inline_display is None:
                         # A readline frame and streamed model output cannot safely
                         # own the same cursor in the fallback path.  A real ANSI
@@ -187,121 +194,20 @@ class TerminalFrontend:
                 if self._inline_display is None:
                     self.renderer.finish_line()
                 continue
-            if command.name == "cancel":
-                if command.arguments:
-                    self.renderer.write_system("usage: /cancel\n")
-                elif self.session.cancel():
-                    self.renderer.write_system("cancellation requested; pending inputs cleared\n")
-                else:
-                    self.renderer.write_system("no active run\n")
-                continue
-            if command.name == "optimize" and isinstance(self.session, OptimizationClient):
-                await self._optimization_frontend().run(command.arguments)
-                continue
-            if command.name in {"candidates", "candidate"}:
-                self.renderer.write_system(f"unknown command: /{command.name}; use /optimize\n")
-                continue
-            if command.name == "config" and self.configuration is not None:
-                if command.arguments:
-                    self.renderer.write_system(
-                        "usage: /config (opens the configuration menu)\n"
-                    )
-                    continue
-                if getattr(self.session, "running", False) or getattr(
-                    self.session,
-                    "pending_count",
-                    0,
-                ):
-                    self.renderer.write_system(
-                        "finish or /cancel the active run before changing config\n"
-                    )
-                    continue
-                if self._inline_display is not None:
-                    self._suspend_inline_terminal()
-                try:
-                    with transient_screen(self.input, self.output):
-                        result = TerminalConfigurationFrontend(
-                            self.configuration,
-                            input_stream=self.input,
-                            output_stream=self.output,
-                            line_editor=self.line_editor,
-                            active_prompt_label=getattr(self.session.status, "prompt_label", ""),
-                        ).run_for_active_session()
-                    if result.start:
-                        rebuild = getattr(self.session, "rebuild", None)
-                        if rebuild is None:
-                            self.renderer.write_system(
-                                "configuration saved; the embedding host must open "
-                                "a new runtime\n"
-                            )
-                            return 0
-                        await rebuild()
-                        self.configuration = getattr(
-                            self.session,
-                            "configuration",
-                            self.configuration,
-                        )
-                    self._activate_inline_terminal()
-                    if result.start:
-                        self.renderer.write_system("\n[new session]\n")
-                        self.renderer.show_welcome(self.session.status)
-                finally:
-                    if (
-                        self._inline_display is not None
-                        and not self._inline_display.active
-                    ):
-                        self._activate_inline_terminal()
-                continue
-            if command.name == "resume" and hasattr(self.session, "resume"):
-                await self._resume(command.arguments)
-                continue
-            if command.name == "eval" and self.evaluation is not None:
-                if command.arguments:
-                    self.renderer.write_system("usage: /eval\n")
-                    continue
-                if getattr(self.session, "running", False) or getattr(
-                    self.session, "pending_count", 0
-                ):
-                    self.renderer.write_system(
-                        "finish or /cancel the active run before starting eval\n"
-                    )
-                    continue
-                if self._inline_display is not None:
-                    self._suspend_inline_terminal()
-                try:
-                    result = await TerminalEvaluationFrontend(
-                        self.evaluation,
-                        input_stream=self.input,
-                        output_stream=self.output,
-                        line_editor=self.line_editor,
-                    ).run()
-                except (OSError, RuntimeError, TypeError, ValueError) as exc:
-                    result = None
-                    self.renderer.write_system(f"could not run evaluation: {exc}\n")
-                finally:
-                    if self._inline_display is not None:
-                        self._activate_inline_terminal()
-                if result is not None:
-                    self.renderer.write_system(
-                        f"\n[evaluation {result.status}: {result.evaluation_id}]\n"
-                        f"report: {result.report_markdown}\n"
-                        f"json: {result.report_json}\n"
-                    )
-                continue
-            result = self.command_router.execute(command, self.session)
+            result = await self.commands.execute(command)
+            if result is None:
+                result = self.command_router.execute(command, self.session)
             if result.text:
                 self.renderer.write_system(result.text)
             if result.should_exit:
-                cancel = getattr(self.session, "cancel", None)
-                if cancel is not None:
-                    cancel()
-                wait = getattr(self.session, "wait_until_idle", None)
+                self.bindings.cancel()
+                wait = self.bindings.wait
                 if wait is not None:
                     await wait()
                 return 0
 
     def _authorization_pending(self):
-        service = getattr(self.session, "authorization", None)
+        service = self.bindings.authorization()
         return service.pending if service is not None else None
 
     async def _render_event(self, event):
@@ -317,7 +223,7 @@ class TerminalFrontend:
         await self.renderer.render(event)
 
     def _answer_authorization(self, line):
-        service = getattr(self.session, "authorization", None)
+        service = self.bindings.authorization()
         pending = self._authorization_pending()
         if service is None or pending is None:
             return
@@ -327,7 +233,7 @@ class TerminalFrontend:
             if identity != pending.request_id:
                 return
         if text == "/cancel":
-            self.session.cancel()
+            self.bindings.cancel()
             return
         choice = {"": "once", "1": "once", "2": "session", "3": "deny", "deny": "deny", "\x1b": "deny"}.get(text)
         if choice is None:
@@ -344,7 +250,7 @@ class TerminalFrontend:
                     try:
                         line = await self._read_prompt_line()
                         if line is None:
-                            self.session.cancel()
+                            self.bindings.cancel()
                         else:
                             self._answer_authorization(line)
                     except InputInterrupted as exc:
@@ -367,11 +273,11 @@ class TerminalFrontend:
         second = self._last_interrupt > 0 and now - self._last_interrupt <= 3.0
         self._last_interrupt = now
         if second:
-            self.session.cancel()
+            self.bindings.cancel()
             self._interrupt_exit = True
             self.renderer.write_system("exiting; stopping active work\n")
             return True
-        if self.session.cancel():
+        if self.bindings.cancel():
             self.renderer.write_system("cancellation requested; pending inputs cleared. Press Ctrl+C again within 3s to exit.\n")
         else:
             self.renderer.write_system("input cleared. Press Ctrl+C again within 3s to exit, or use /exit.\n")
@@ -398,9 +304,7 @@ class TerminalFrontend:
         try:
             while not reader.done():
                 await asyncio.wait({reader}, timeout=0.5)
-                self._show_optimization_activity()
-                self._show_optimization_notice()
-                self._show_candidate_notice()
+                self._notifications.show()
             return await reader
         finally:
             if not reader.done():
@@ -409,127 +313,32 @@ class TerminalFrontend:
                     interrupt()
                 reader.cancel()
 
-    def _show_optimization_activity(self):
-        progress = getattr(self.session, "optimization_progress", None)
-        if progress is None or progress.status != "running" or progress.activity is None:
-            return
-        identity = (progress.sequence, progress.activity)
-        if identity == self._last_optimization_activity:
-            return
-        self._last_optimization_activity = identity
-        self.renderer.write_system("[optimization] " + safe_terminal_text(format_optimization_activity(progress.activity)) + "\n")
+    def show_notifications(self) -> None:
+        self._notifications.show()
 
-    def _show_optimization_notice(self):
-        progress = getattr(self.session, "optimization_progress", None)
-        if progress is None or progress.status in {"idle", "running"} or progress.sequence == self._last_optimization_notice:
-            return
-        self._last_optimization_notice = progress.sequence
-        self.renderer.write_system(f"Optimization {progress.status}" +
-                                   (f": {safe_terminal_text(progress.error)}" if progress.error else "") + "\n")
+    @property
+    def configuration(self):
+        return self._configuration_override or self.bindings.configuration()
 
-    def _show_candidate_notice(self) -> None:
-        if getattr(self.session, "running", False) or getattr(self.session, "pending_count", 0):
-            return
-        peek = getattr(self.session, "candidate_notice", None)
-        acknowledge = getattr(self.session, "acknowledge_candidate_notice", None)
-        if peek is None or acknowledge is None:
-            return
+    @contextmanager
+    def menu_scope(self):
+        """Lend terminal input/display to one menu and restore it on every exit."""
+        self._suspend_inline_terminal()
         try:
-            candidate_ids = peek()
-            if candidate_ids:
-                self.renderer.write_system(
-                    f"\n[{len(candidate_ids)} candidate(s) ready; not active. "
-                    "Use /optimize to review.]\n"
-                )
-                acknowledge(candidate_ids)
-        except (OSError, ValueError, RuntimeError) as exc:
-            self.renderer.write_system(f"candidate notice unavailable: {exc}\n")
+            with transient_screen(self.input, self.output):
+                yield
+        finally:
+            self._activate_inline_terminal()
 
-    def _optimization_frontend(self) -> TerminalOptimizationFrontend:
+    def optimization_frontend(self) -> TerminalOptimizationFrontend:
         return TerminalOptimizationFrontend(
             self.session, self.renderer, self.line_editor, self.menu_input, self.menu_renderer,
+            clients=self._improvement_clients,
         )
 
-    async def _resume(self, arguments: tuple[str, ...]) -> None:
-        if getattr(self.session, "running", False) or getattr(
-            self.session,
-            "pending_count",
-            0,
-        ):
-            self.renderer.write_system(
-                "finish or /cancel the active run before resuming another session\n"
-            )
-            return
-
-        path: Path | None = None
-        if arguments:
-            value = " ".join(arguments)
-            path = Path(value)
-            if not path.is_absolute():
-                path = Path(self.session.status.working_directory) / path
-            path = path.resolve()
-        else:
-            discover = getattr(self.session, "resumable_sessions", None)
-            if discover is None:
-                self.renderer.write_system(
-                    "the /resume session picker is unavailable in this frontend\n"
-                )
-                return
-            try:
-                sessions = discover()
-            except (
-                OSError,
-                RuntimeError,
-                TypeError,
-                ValueError,
-            ) as exc:
-                self.renderer.write_system(f"could not list sessions: {exc}\n")
-                return
-            if not sessions:
-                self.renderer.write_system(
-                    "no compatible non-empty sessions are available\n"
-                )
-                return
-            if self._inline_display is not None:
-                self._suspend_inline_terminal()
-            try:
-                with transient_screen(self.input, self.output):
-                    selected = TerminalResumeFrontend(
-                        sessions,
-                        input_stream=self.input,
-                        output_stream=self.output,
-                        line_editor=self.line_editor,
-                    ).run()
-                path = Path(selected.path) if selected is not None else None
-            finally:
-                if self._inline_display is not None:
-                    self._activate_inline_terminal()
-
-        if path is None:
-            return
-        try:
-            await self.session.resume(path)
-        except (
-            OSError,
-            RuntimeError,
-            TypeError,
-            ValueError,
-        ) as exc:
-            self.renderer.write_system(f"could not resume session: {exc}\n")
-            return
-        self.configuration = getattr(
-            self.session,
-            "configuration",
-            self.configuration,
-        )
-        self.renderer.write_system(f"\n[resumed {path}]\n")
-        self.renderer.show_welcome(self.session.status)
-
-        await self._show_history()
-
-    async def _show_history(self) -> None:
+    async def show_history(self) -> None:
         # History is optional for existing embedding hosts implementing TerminalSession.
-        conversation = getattr(self.session, "conversation", None)
+        conversation = self.bindings.conversation
         if callable(conversation):
             await self.renderer.show_history(conversation())
 

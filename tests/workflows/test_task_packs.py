@@ -200,7 +200,7 @@ class TaskPackApplicationTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_ansi_correction_confirmation_uses_same_public_operations(self):
         from types import SimpleNamespace
-        from fruitfly_agent.interactive.terminal.menu import RawTerminalMenuInput
+        from fruitfly_agent.interactive.terminal.io.menu import RawTerminalMenuInput
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp).resolve()
             app, _, provider = await self.open_app(root)
@@ -213,7 +213,7 @@ class TaskPackApplicationTests(unittest.IsolatedAsyncioTestCase):
             keys = iter((b"\r", b"\r", b"\x1b[A", b"\r"))
             frontend.menu_input = SimpleNamespace(read_event=lambda: RawTerminalMenuInput.decode(next(keys)))
             frontend.menu_renderer.ansi = True
-            await frontend._optimization_frontend().save_correction()
+            await frontend.optimization_frontend().save_correction()
             files = list(root.glob(".fruitfly/optimization/task-packs/*/pack.json"))
             self.assertEqual(1, len(files))
             self.assertEqual("answer", load_pack(root, files[0]).material["train"][0]["expected"])
@@ -226,9 +226,9 @@ class TaskPackApplicationTests(unittest.IsolatedAsyncioTestCase):
             install(root)
             app, _, provider = await self.open_app(root, "opro")
             source = app._handle.optimization
-            names = ("optimization_preview", "optimize", "cancel_optimization", "candidates", "candidate_notice",
-                     "acknowledge_candidate_notice", "candidate_detail", "candidate_action")
+            names = ("optimization_preview", "optimize", "cancel_optimization")
             app._handle.optimization = SimpleNamespace(**{name: getattr(source, name) for name in names})
+            app._handle.task_packs = None
             self.assertFalse(app.task_packs_available)
             with self.assertRaisesRegex(RuntimeError, "service is unavailable"):
                 app.task_packs()

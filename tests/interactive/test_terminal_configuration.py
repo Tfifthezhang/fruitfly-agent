@@ -5,9 +5,7 @@ import io
 import unittest
 
 from fruitfly_agent.interactive import TerminalConfigurationFrontend
-from fruitfly_agent.interactive.configuration import (
-    ConfigurationLaunchResult,
-)
+from fruitfly_agent.interactive.contracts.configuration import ConfigurationLaunchResult
 from tests.support.terminal import ScriptedLines
 
 

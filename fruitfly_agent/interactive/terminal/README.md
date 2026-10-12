@@ -78,19 +78,46 @@ See [Optimization](../../lab/optimization/README.md) for model budgets and [Task
 
 The frontend waits for evaluation to return; ordinary chat and the optimization cancellation panel are not available during it. Five-second job snapshots do not show precise image download/build progress. Model requests and containers may incur costs. Full logs and event archives belong to [Eval](../../../eval/README.md).
 
-## Files
+## Register a command
 
-| Files | Responsibility |
+`TerminalFrontend(command_handlers={...})` accepts synchronous or asynchronous handlers. Each receives an `InteractiveCommand` and returns a `CommandResult`. The frontend writes its result and handles exit; handlers capture only the service operations they need. Registered terminal commands run before the frontend-neutral CommandRouter fallback.
+
+```python
+from fruitfly_agent.interactive.interaction.commands import CommandResult
+from fruitfly_agent.interactive.terminal import TerminalFrontend
+
+# application is an already constructed host. This example makes no model request.
+async def describe(command):
+    return CommandResult(text=f"Runtime: {application.runtime_manifest['digest']}\n")
+
+frontend = TerminalFrontend(application, command_handlers={"describe": describe})
+# await frontend.run() starts terminal input.
+```
+
+Names are lowercase, path-free tokens. Duplicate registration raises an error. `frontend.commands.register(name, handler, replace=True)` explicitly replaces a registered terminal handler. `/quit` is parsed as `/exit`. Custom commands are not added to `/help` automatically. Handler exceptions propagate through the frontend's normal cleanup; handlers own their service-specific diagnostics.
+
+[Built-in features](features/README.md) register configuration, evaluation, recovery, optimization, and cancellation outside the input loop. The frontend owns stdin and lending/restoring the menu display. A handler needing a menu can use `frontend.menu_scope()` while the main loop is dispatching it; do not start a second reader. Operations that change work or runtimes must call Application's public APIs so its state checks remain authoritative.
+
+## Bind optional host operations
+
+[TerminalBindings](bindings.py) names queueing, waiting, recovery, configuration readers, history, authorization, and notification operations. `from_session()` provides the default adapter for existing embedding hosts; `TerminalFrontend(bindings=...)` permits explicit binding. Compatibility discovery is confined to this adapter. Live readers follow runtime replacement.
+
+`ImprovementClients` independently injects search, candidate review, task materials, and activation clients. Pass it as `improvement_clients=` when these capabilities come from different objects. The optimization menu offers only the supplied capabilities. Material-only hosts can save corrections without offering search afterward. `optimization_frontend()` returns the current menu view; `show_history()` and `show_notifications()` expose observation without granting execution.
+
+`ModelFormIO` in [model_setup.py](features/configuration/model_setup.py) supplies menu selection, input, rendering, and staging callbacks. Forms do not receive a configuration frontend or use its private methods. The host model service still owns validation and persistence. No new environment variables or independent lifecycle state.
+
+## Modules
+
+| File / package | Responsibility |
 |---|---|
-| [frontend.py](frontend.py), [renderer.py](renderer.py) | Input routing and event display |
-| [history.py](history.py) | Static canonical conversation display, separate from live events |
-| [live.py](live.py), [input.py](input.py) | TTY editing and live input |
-| [menu.py](menu.py), [screen.py](screen.py) | Navigation and temporary menu display |
-| [configuration.py](configuration.py), [resume.py](resume.py), [evaluation.py](evaluation.py) | Service-driven menus |
-| [model_setup.py](model_setup.py) | Generic model form, review, and secret input with echo restoration |
-| [optimization.py](optimization.py) | Search confirmation, candidate review, and corrected-task menus with injected services |
-| [markdown.py](markdown.py), [text.py](text.py) | Safe content rendering |
-| [welcome.py](welcome.py), [branding.py](branding.py) | Welcome and identity display |
+| [frontend.py](frontend.py) | Single input owner, menu lending, and command dispatch |
+| [bindings.py](bindings.py), [commands.py](commands.py) | Optional host capabilities and asynchronous command registration |
+| [notifications.py](notifications.py) | Deduplicated improvement progress and candidate notices |
+| [I/O](io/README.md) | Line/key readers, live terminal control, menu primitives, and shared safe text utilities |
+| [Rendering](rendering/README.md) | Events, history, Markdown, welcome, and branding |
+| [Features](features/README.md) | Configuration, restoration, evaluation, and optimization; each package keeps its handler and menu together |
+
+I/O does not import rendering or feature modules. Rendering consumes I/O primitives and frontend contracts. Feature packages consume contracts, bindings, and I/O/rendering interfaces; they do not import one another. TerminalFrontend and feature assembly compose them through callbacks.
 
 ```bash
 .venv/bin/python -m unittest discover -s tests/interactive -t . -v

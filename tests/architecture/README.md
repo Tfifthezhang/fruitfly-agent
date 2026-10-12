@@ -14,6 +14,10 @@ Protect dependency direction, Core SDK independence, generic algorithm hosts, pr
 
 Do not widen dependency allowances to make checks pass. Static checks do not analyze arbitrary reflection or execution.
 
+Run service checks reject dependencies on its composition Factory, whole-controller constructor arguments, foreign private attributes, and reversed internal responsibility edges. Public composition entries can bind concrete services; leaf services consume explicit capabilities.
+
+Interactive checks reject private cross-module access in helpers/feature handlers, feature branches in the terminal input loop, and bundled search/material/candidate contracts. Terminal import checks include all nested feature modules. Directory checks reject reversed responsibility edges, cross-feature dependencies, and implementation imports from Contracts; root layout checks prevent flat module accumulation.
+
 ```bash
 .venv/bin/python -m unittest discover -s tests/architecture -t . -v
 ```

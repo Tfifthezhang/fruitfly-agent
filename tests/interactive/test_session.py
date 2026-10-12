@@ -24,17 +24,7 @@ from fruitfly_agent.core.extensions.hooks import (
 )
 from fruitfly_agent.core.session import Session
 from fruitfly_agent.core.tool_runtime import AgentTool
-from fruitfly_agent.interactive import (
-    AssistantTextDelta,
-    CompactionStarted,
-    InteractiveSession,
-    RunActivityChanged,
-    RunFinished,
-    RunStarted,
-    ToolFinished,
-    ToolOutput,
-    ToolStarted,
-)
+from fruitfly_agent.interactive import AssistantTextDelta, CompactionStarted, InteractiveSession, RunActivityChanged, RunFinished, RunStarted, ToolFinished, ToolOutput, ToolStarted
 from tests.support.faux_provider import FauxProvider
 
 

@@ -202,6 +202,20 @@ class SearchContractTests(unittest.IsolatedAsyncioTestCase):
         result = await OproOptimizer().search(p, s)
         self.assertEqual([c.text for c in result.candidates], ["better", "worse"])
         self.assertEqual(result.seed_score, 2)
+        first_proposal = provider.calls[2]
+        self.assertEqual(first_proposal["system_prompt"],
+                         "Optimize the declared text target using historical solutions and their measured objective values. "
+                         "Return only a JSON array of new candidate strings, no Markdown.")
+        self.assertEqual(json.loads(first_proposal["messages"][0].content), {
+            "direction": "improve",
+            "objective": {"metric": "loss", "direction": "min"},
+            "baseline": "seed",
+            "history": [{"text": "seed", "score": 2.0}],
+            "training_examples": [{"input": "train", "expected": "A"}],
+            "training_feedback": [{"input": "train", "output": "2", "score": 2.0,
+                                   "feedback": "scored by loss-v1"}],
+            "candidate_count": 2,
+        })
         second_prompt = json.loads(provider.calls[-1]["messages"][0].content)
         self.assertEqual([h["score"] for h in second_prompt["history"]], [3, 2, 1])
         self.assertNotIn("select", provider.calls[-1]["messages"][0].content)

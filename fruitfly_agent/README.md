@@ -17,6 +17,12 @@ FruitFlyAgent separates the Agent loop, model adapters, Application lifecycle, a
 
 Eval consumes public runtime capabilities. Removing it must leave normal Agent use and algorithm development intact.
 
+Independent optimization methods are packages within Lab's [Optimization](lab/optimization/README.md#optimization-methods) module. They use shared search services and object-owned target adapters; Run assembles them without implementing algorithm-specific search logic.
+
+Run separates [configuration](run/configuration/README.md), [runtime preparation](run/runtime/README.md), [storage](run/storage/README.md), [improvement hosting](run/improvement/README.md), and [adapters](run/adapters/README.md). Its Factory composes these services; leaf services receive explicit capabilities and own their local state.
+
+Interactive separates Contracts, Application, Session, Interaction, and Terminal. It keeps lifecycle authority in Application and exposes independent search, candidate, and task material contracts. Its terminal uses [registered command handlers](interactive/terminal/README.md#register-a-command); feature flows consume explicit capabilities and share one input owner.
+
 ## Follow a request
 
 | Step | Owner | Action |

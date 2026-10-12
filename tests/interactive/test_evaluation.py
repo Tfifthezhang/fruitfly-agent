@@ -3,16 +3,9 @@ from __future__ import annotations
 import io
 import unittest
 
-from fruitfly_agent.interactive import (
-    EvaluationBenchmarkOption,
-    EvaluationLaunchResult,
-    EvaluationModeOption,
-    EvaluationMechanismOption,
-    EvaluationSnapshot,
-    EvaluationVariantOption,
-)
-from fruitfly_agent.interactive.terminal.evaluation import TerminalEvaluationFrontend
-from fruitfly_agent.interactive.terminal.menu import MenuAction, MenuEvent
+from fruitfly_agent.interactive import EvaluationBenchmarkOption, EvaluationLaunchResult, EvaluationModeOption, EvaluationMechanismOption, EvaluationSnapshot, EvaluationVariantOption
+from fruitfly_agent.interactive.terminal.features.evaluation.menu import TerminalEvaluationFrontend
+from fruitfly_agent.interactive.terminal.io.menu import MenuAction, MenuEvent
 
 
 class _MenuInput:
@@ -194,7 +187,7 @@ class TerminalEvaluationTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("truncated", output.getvalue())
 
     async def test_eval_logs_and_trial_errors_are_not_truncated(self) -> None:
-        from fruitfly_agent.interactive.terminal.renderer import TerminalRenderer
+        from fruitfly_agent.interactive.terminal.rendering.renderer import TerminalRenderer
         output = io.StringIO()
         frontend = TerminalEvaluationFrontend(_Controller(), input_stream=io.StringIO(), output_stream=output)
         renderer = TerminalRenderer(output)
@@ -207,7 +200,7 @@ class TerminalEvaluationTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("setup timed out", output.getvalue())
 
     async def test_log_chunks_preserve_lines_without_repeated_source_headers(self) -> None:
-        from fruitfly_agent.interactive.terminal.renderer import TerminalRenderer
+        from fruitfly_agent.interactive.terminal.rendering.renderer import TerminalRenderer
         output = io.StringIO()
         frontend = TerminalEvaluationFrontend(_Controller(), input_stream=io.StringIO(), output_stream=output)
         renderer = TerminalRenderer(output)

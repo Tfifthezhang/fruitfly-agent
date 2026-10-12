@@ -14,13 +14,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from fruitfly_agent.interactive.terminal.input import (
-    ReadlineLineEditor,
-    StreamLineEditor,
-    create_line_editor,
-    read_field_line,
-)
-from fruitfly_agent.interactive.terminal.live import InlineTerminalDisplay
+from fruitfly_agent.interactive.terminal.io.input import ReadlineLineEditor, StreamLineEditor, create_line_editor, read_field_line
+from fruitfly_agent.interactive.terminal.io.live import InlineTerminalDisplay
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -261,7 +256,7 @@ class TerminalInputPtyRegressionTest(unittest.TestCase):
     def test_form_frame_uses_field_name_then_restores_conversation_label(self) -> None:
         code = (
             "import sys; "
-            "from fruitfly_agent.interactive.terminal.input import create_line_editor, read_field_line; "
+            "from fruitfly_agent.interactive.terminal.io.input import create_line_editor, read_field_line; "
             "editor=create_line_editor(sys.stdin,sys.stdout); "
             "first=read_field_line(editor,'Model label'); second=editor.read_line(); "
             "print('RESULT='+repr((first,second)),flush=True)"
@@ -274,7 +269,7 @@ class TerminalInputPtyRegressionTest(unittest.TestCase):
     def test_model_key_input_hides_value_and_restores_echo(self) -> None:
         code = (
             "import sys, termios; "
-            "from fruitfly_agent.interactive.terminal.model_setup import read_secret; "
+            "from fruitfly_agent.interactive.terminal.features.configuration.model_setup import read_secret; "
             "value=read_secret(sys.stdin, sys.stdout); "
             "print('RESULT='+str(value=='offline-placeholder'),flush=True); "
             "print('ECHO='+str(bool(termios.tcgetattr(sys.stdin)[3]&termios.ECHO)),flush=True)"
@@ -286,7 +281,7 @@ class TerminalInputPtyRegressionTest(unittest.TestCase):
 
     def test_bracketed_multiline_paste_is_one_submission(self) -> None:
         code = (
-            "from fruitfly_agent.interactive.terminal.live import "
+            "from fruitfly_agent.interactive.terminal.io.live import "
             "IsolatedLineEditor, InlineTerminalDisplay; "
             "import sys; "
             "display = InlineTerminalDisplay(sys.stdout, rows=12, columns=50); "
@@ -309,7 +304,7 @@ class TerminalInputPtyRegressionTest(unittest.TestCase):
 
     def test_up_arrow_recalls_the_previous_submission(self) -> None:
         code = (
-            "from fruitfly_agent.interactive.terminal.live import "
+            "from fruitfly_agent.interactive.terminal.io.live import "
             "IsolatedLineEditor, InlineTerminalDisplay; "
             "import sys; "
             "display = InlineTerminalDisplay(sys.stdout, rows=12, columns=50); "
@@ -325,7 +320,7 @@ class TerminalInputPtyRegressionTest(unittest.TestCase):
 
     def test_isolated_editor_preserves_buffer_during_stream_output(self) -> None:
         code = (
-            "from fruitfly_agent.interactive.terminal.live import "
+            "from fruitfly_agent.interactive.terminal.io.live import "
             "IsolatedLineEditor, InlineTerminalDisplay; "
             "import sys, threading, time; "
             "display = InlineTerminalDisplay(sys.stdout, rows=12, columns=50); "
@@ -398,7 +393,7 @@ class TerminalInputPtyRegressionTest(unittest.TestCase):
 
     def _run_editor(self, keys: bytes) -> str:
         code = (
-            "from fruitfly_agent.interactive.terminal.input "
+            "from fruitfly_agent.interactive.terminal.io.input "
             "import create_line_editor; "
             "import sys; "
             "value = create_line_editor(sys.stdin, sys.stdout).read_line(); "

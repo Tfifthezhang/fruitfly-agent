@@ -1,14 +1,28 @@
 """Renderer-neutral interaction boundary and the built-in terminal frontend."""
 
-from .optimization import TaskPackView, CorrectionView, TaskPackClient, TaskPackService, OptimizationPreview, CandidateView, OptimizationService, CandidateActivationService, CandidateActivationClient
+from fruitfly_agent.interactive.contracts.optimization import OptimizationPreview, OptimizationService
+from fruitfly_agent.interactive.contracts.candidates import (
+    CandidateView,
+    CandidateSection,
+    CandidateService,
+    CandidateClient,
+    CandidateActivationService,
+    CandidateActivationClient,
+)
+from fruitfly_agent.interactive.contracts.task_packs import (
+    TaskPackView,
+    CorrectionView,
+    TaskPackClient,
+    TaskPackService,
+)
 
-from .application import (
+from fruitfly_agent.interactive.application import (
     AgentApplication,
     ApplicationState,
     RuntimeFactory,
     RuntimeHandle,
 )
-from .configuration import (
+from fruitfly_agent.interactive.contracts.configuration import (
     ConfigurationActionResult,
     ConfigurationController,
     ConfigurationLaunchResult,
@@ -17,7 +31,7 @@ from .configuration import (
     ConfigurationParameter,
     ConfigurationSnapshot,
 )
-from .events import (
+from fruitfly_agent.interactive.contracts.events import (
     AssistantTextDelta,
     AssistantThinkingDelta,
     CompactionStarted,
@@ -31,7 +45,7 @@ from .events import (
     ToolStarted,
     event_from_dict,
 )
-from .evaluation import (
+from fruitfly_agent.interactive.contracts.evaluation import (
     EvaluationBenchmarkOption,
     EvaluationController,
     EvaluationEventSink,
@@ -42,10 +56,17 @@ from .evaluation import (
     EvaluationSnapshot,
     EvaluationVariantOption,
 )
-from .dispatch import EventSink
-from .models import ConversationBlock, ConversationMessage, InteractiveMechanism, InteractiveStatus, ResumableSession
-from .session import InteractiveSession
-from .terminal import (
+from fruitfly_agent.interactive.contracts.events import EventSink
+from fruitfly_agent.interactive.contracts.models import (
+    ConversationBlock,
+    ConversationMessage,
+    InteractiveMechanism,
+    InteractiveStatus,
+    ResumableSession,
+)
+from fruitfly_agent.interactive.session import InteractiveSession
+from fruitfly_agent.interactive.contracts.runtime import RuntimeSession
+from fruitfly_agent.interactive.terminal import (
     LineEditor,
     TerminalConfigurationFrontend,
     TerminalEvaluationFrontend,
@@ -63,6 +84,9 @@ __all__ = [
     "TaskPackService",
     "OptimizationPreview",
     "CandidateView",
+    "CandidateSection",
+    "CandidateService",
+    "CandidateClient",
     "OptimizationService",
     "CandidateActivationService",
     "CandidateActivationClient",
@@ -70,6 +94,7 @@ __all__ = [
     "ApplicationState",
     "RuntimeFactory",
     "RuntimeHandle",
+    "RuntimeSession",
     "ConfigurationParameter",
     "ConfigurationMechanism",
     "ConfigurationSelectionGroup",

@@ -7,14 +7,9 @@ import unittest
 from pathlib import Path
 
 from fruitfly_agent.core.data_model import AgentLoopResult
-from fruitfly_agent.interactive import (
-    AgentApplication,
-    ApplicationState,
-    ResumableSession,
-    RuntimeHandle,
-)
+from fruitfly_agent.interactive import AgentApplication, ApplicationState, ResumableSession, RuntimeHandle
 from tests.support.application import _Factory, offline_session
-from fruitfly_agent.interactive.optimization import CandidateView
+from fruitfly_agent.interactive.contracts.candidates import CandidateView
 
 
 class AgentApplicationTest(unittest.IsolatedAsyncioTestCase):
@@ -56,7 +51,7 @@ class AgentApplicationTest(unittest.IsolatedAsyncioTestCase):
                     return candidate
                 handle = await super().open(resume=resume, session_path=session_path)
                 handle.close_callback = close_first
-                handle.optimization = handle.candidate_activation = Service()
+                handle.candidates = handle.candidate_activation = Service()
                 return handle
 
         app = AgentApplication(Factory([first]))

@@ -75,7 +75,7 @@ class ResumeHistoryTest(unittest.IsolatedAsyncioTestCase):
 
             with patch.object(cli, "load_env", return_value={}), patch.object(
                 cli, "TerminalConfigurationFrontend", return_value=setup
-            ), patch("fruitfly_agent.run.assembly.default_registry", return_value=registry), patch.object(
+            ), patch("fruitfly_agent.run.runtime.assembly.default_registry", return_value=registry), patch.object(
                 cli, "TerminalFrontend", side_effect=frontend
             ), contextlib.redirect_stdout(output):
                 code = await cli.run_cli(_args(cwd=tmp, session=str(path), resume=True))
@@ -136,7 +136,7 @@ class ResumeHistoryTest(unittest.IsolatedAsyncioTestCase):
             provider.respond_text("new answer")
             output = io.StringIO()
             with patch.object(cli, "load_env", return_value={}), patch(
-                "fruitfly_agent.run.assembly.default_registry", return_value=registry
+                "fruitfly_agent.run.runtime.assembly.default_registry", return_value=registry
             ), patch.object(cli, "TerminalConfigurationFrontend") as startup, contextlib.redirect_stdout(output):
                 code = await cli.run_cli(_args(task="new question", cwd=tmp, session=str(path), resume=True))
             self.assertEqual(code, 0)

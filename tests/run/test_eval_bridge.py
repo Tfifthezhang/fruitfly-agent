@@ -8,11 +8,12 @@ import unittest
 from unittest.mock import patch
 from fruitfly_agent.interactive import EvaluationLaunchRequest
 from fruitfly_agent.run.evaluation import (
-    FULL_EVALUATION_TIMEOUT_SECONDS,
-    SMOKE_EVALUATION_TIMEOUT_SECONDS,
     RunEvaluationController,
-    _default_timeout_seconds,
 )
+
+
+from fruitfly_agent.run.adapters.evaluation import (FULL_EVALUATION_TIMEOUT_SECONDS,
+    SMOKE_EVALUATION_TIMEOUT_SECONDS, _default_timeout_seconds)
 
 
 class _Configuration:
@@ -89,7 +90,7 @@ class EvalBridgeTests(unittest.IsolatedAsyncioTestCase):
                 if event.get("source") == "eval stderr":
                     release.touch()
 
-            with patch("fruitfly_agent.run.evaluation.asyncio.create_subprocess_exec", new=launch):
+            with patch("fruitfly_agent.run.adapters.evaluation.asyncio.create_subprocess_exec", new=launch):
                 result = await asyncio.wait_for(controller.run(EvaluationLaunchRequest("current_setup", "terminal-bench", "smoke"), on_event=observe), timeout=5)
             self.assertEqual(result.status, "failed")
             self.assertIn("raw stdout", "".join(e.get("text", "") for e in updates))

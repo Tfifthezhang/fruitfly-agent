@@ -8,9 +8,9 @@ from unittest.mock import patch
 from types import SimpleNamespace
 
 from fruitfly_agent.interactive import TerminalConfigurationFrontend
-from fruitfly_agent.interactive.terminal.input import ReadlineLineEditor
-from fruitfly_agent.interactive.terminal.menu import RawTerminalMenuInput
-from fruitfly_agent.interactive.terminal.model_setup import _capabilities
+from fruitfly_agent.interactive.terminal.io.input import ReadlineLineEditor
+from fruitfly_agent.interactive.terminal.io.menu import RawTerminalMenuInput
+from fruitfly_agent.interactive.terminal.features.configuration.model_setup import _capabilities
 from fruitfly_agent.providers import ProviderRegistry
 from fruitfly_agent.providers.config import load_env
 from fruitfly_agent.providers.registry import load_model_specs
@@ -181,7 +181,7 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
     def test_save_failure_restores_files_and_retains_draft_for_retry(self):
         (self.root / ".fruitfly/secrets.env").write_text("# original\nOTHER=value\n")
         self.stage()
-        with patch("fruitfly_agent.run.profiles.save_harness_config", side_effect=OSError("offline write failure")):
+        with patch("fruitfly_agent.run.configuration.controller.save_harness_config", side_effect=OSError("offline write failure")):
             with self.assertRaises(OSError):
                 self.controller.save()
         self.assertFalse((self.root / ".fruitfly/models.yaml").exists())
@@ -254,7 +254,7 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
     def test_interactive_first_run_uses_workspace_catalog_instead_of_checkout(self):
         fallback = self.root / "shared-models.yaml"
         _write_catalog(fallback, {"shared": "shared-model"})
-        with patch("fruitfly_agent.run.model_selection.default_model_catalog_path", return_value=fallback):
+        with patch("fruitfly_agent.run.configuration.resolution.default_model_catalog_path", return_value=fallback):
             factory = RunApplicationFactory(cwd=self.root, environment={}, allow_incomplete=True)
             self.assertEqual(factory.configuration.snapshot().model_profiles, ())
             self.assertEqual(factory.configuration.snapshot().model_catalog, "models.yaml")

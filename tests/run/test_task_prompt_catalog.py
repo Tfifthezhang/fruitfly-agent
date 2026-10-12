@@ -7,17 +7,17 @@ import tempfile
 import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock
-from fruitfly_agent.interactive.configuration import ConfigurationSnapshot
-from fruitfly_agent.interactive.terminal.menu import RawTerminalMenuInput
-from fruitfly_agent.run.artifacts import DataArtifactStore
-from fruitfly_agent.run.optimization import CandidateStore
-from fruitfly_agent.run.retention import compact_candidates
-from fruitfly_agent.run.task_results import save_task_result
+from fruitfly_agent.interactive.contracts.configuration import ConfigurationSnapshot
+from fruitfly_agent.interactive.terminal.io.menu import RawTerminalMenuInput
+from fruitfly_agent.run.storage.artifacts import DataArtifactStore
+from fruitfly_agent.run.storage.candidates import CandidateStore
+from fruitfly_agent.run.storage.retention import compact_candidates
+from fruitfly_agent.run.storage.results import save_task_result
 from fruitfly_agent.run.profiles import RunConfigurationController, resolve_harness_selection
 from fruitfly_agent.lab.catalog import builtin_catalog
 from fruitfly_agent.lab.base_prompt import DEFAULT_PROMPT, builtins
 from fruitfly_agent.lab.base_prompt.target import BasePromptTarget
-from fruitfly_agent.interactive.terminal.configuration import TerminalConfigurationFrontend
+from fruitfly_agent.interactive.terminal.features.configuration.menu import TerminalConfigurationFrontend
 from tests.support.run import _write_catalog
 
 
@@ -161,7 +161,7 @@ class TaskPromptTests(unittest.TestCase):
 
     def test_numbered_dropdown_can_select_second_task(self):
         frontend, controller, output = self._grouped_frontend(())
-        from fruitfly_agent.interactive.terminal.menu import LineMenuInput
+        from fruitfly_agent.interactive.terminal.io.menu import LineMenuInput
         editor = SimpleNamespace(read_line=iter(('2', '4', '1')).__next__)
         frontend.menu_input = LineMenuInput(editor)
         frontend.renderer.ansi = False

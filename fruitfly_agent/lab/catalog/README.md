@@ -2,7 +2,7 @@
 
 [Up: Lab](../README.md)
 
-Register mechanisms, validate selections, and assemble a runtime deterministically. Run supplies workspace, Session, and Provider bindings; Catalog owns the definitions and installers.
+Register mechanisms, validate selections, and assemble a runtime deterministically. Run supplies workspace, Session, and Provider bindings; Catalog owns registration and assembly contracts. Independent optimization method packages own their definitions and installers.
 
 ## Register a mechanism
 
@@ -15,6 +15,8 @@ Register mechanisms, validate selections, and assemble a runtime deterministical
 | 5 | Verify assembly, Application use, and cleanup offline. |
 
 The [offline example](../../../examples/extensions/README.md) completes this path. The CLI does not scan Python packages for plugins.
+
+An optimization package exposes its own definition factory; built-ins explicitly collect [OPRO's definition](../optimization/opro/README.md). External methods can supply definitions through `builtin_catalog().extended(definitions)`. Shared text optimizer assembly belongs to [Optimization](../optimization/README.md#extend-search), so Catalog does not implement search strategies or declare their method-specific parameters.
 
 ## Files
 

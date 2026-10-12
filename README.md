@@ -140,3 +140,5 @@ FruitFlyAgent is released under the [MIT License](LICENSE). See [Third-party not
 | [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) | Inspiration for externalizing context into a programmable Python environment; see [Programmatic context](fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md). |
 
 Research sources and the scope of each adaptation are documented in the corresponding algorithm modules.
+
+Terminal features use the [Interactive command extension interface](fruitfly_agent/interactive/terminal/README.md#register-a-command). Application owns lifecycle permission; search, candidate review, and task material services are independently injected.

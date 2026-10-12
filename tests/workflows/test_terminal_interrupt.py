@@ -98,7 +98,7 @@ PERMISSION_CODE = CODE.replace(
     from fruitfly_agent.core.tool_runtime import AgentTool
     from fruitfly_agent.core.tool_runtime.authorization import ToolPermission
     from fruitfly_agent.lab.environment.permissions import PermissionPolicy, PermissionAuthorizer
-    from fruitfly_agent.interactive.authorization import AuthorizationService
+    from fruitfly_agent.interactive.interaction.authorization import AuthorizationService
     from tests.support.faux_provider import FauxProvider
     effects = []
     def execute(ctx):

@@ -5,9 +5,9 @@ from __future__ import annotations
 import unittest
 from dataclasses import replace
 
-from fruitfly_agent.interactive.models import InteractiveStatus
-from fruitfly_agent.interactive.terminal.text import cell_width, truncate_cells
-from fruitfly_agent.interactive.terminal.welcome import render_welcome
+from fruitfly_agent.interactive.contracts.models import InteractiveStatus
+from fruitfly_agent.interactive.terminal.io.text import cell_width, truncate_cells
+from fruitfly_agent.interactive.terminal.rendering.welcome import render_welcome
 
 
 class TerminalTextTest(unittest.TestCase):

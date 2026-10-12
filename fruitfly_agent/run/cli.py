@@ -10,17 +10,12 @@ from pathlib import Path
 import sys
 
 from fruitfly_agent.core.errors import SessionCorruptError
-from fruitfly_agent.interactive import (
-    AgentApplication,
-    TerminalConfigurationFrontend,
-    TerminalFrontend,
-    TerminalRenderer,
-)
+from fruitfly_agent.interactive import AgentApplication, TerminalConfigurationFrontend, TerminalFrontend, TerminalRenderer
 from fruitfly_agent.interactive.terminal import transient_screen
 from fruitfly_agent.providers.config import load_env
 from fruitfly_agent.providers.workspace import WorkspacePaths
 
-from .application import RunApplicationFactory, resolve_session_path as _resolve_path
+from fruitfly_agent.run.application import RunApplicationFactory, resolve_session_path as _resolve_path
 from .evaluation import RunEvaluationController
 
 

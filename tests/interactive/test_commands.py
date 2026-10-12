@@ -4,15 +4,10 @@ from __future__ import annotations
 
 import unittest
 
-from fruitfly_agent.interactive.commands import (
-    HELP_TEXT,
-    CommandResult,
-    CommandRouter,
-    InteractiveCommand,
-    parse_command,
-)
-from fruitfly_agent.interactive.events import RunStarted
-from fruitfly_agent.interactive.models import InteractiveMechanism, InteractiveStatus
+from fruitfly_agent.interactive.interaction.commands import HELP_TEXT, CommandRouter, parse_command
+from fruitfly_agent.interactive.contracts.commands import CommandResult, InteractiveCommand
+from fruitfly_agent.interactive.contracts.events import RunStarted
+from fruitfly_agent.interactive.contracts.models import InteractiveMechanism, InteractiveStatus
 
 
 class _Context:

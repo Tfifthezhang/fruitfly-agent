@@ -2,7 +2,7 @@
 import asyncio
 import unittest
 from fruitfly_agent.core.tool_runtime.authorization import AuthorizationPrompt
-from fruitfly_agent.interactive.authorization import AuthorizationService
+from fruitfly_agent.interactive.interaction.authorization import AuthorizationService
 
 class AuthorizationServiceTests(unittest.IsolatedAsyncioTestCase):
     def prompt(self, identity='one', operation='read', targets=('/outside/a.txt',)):

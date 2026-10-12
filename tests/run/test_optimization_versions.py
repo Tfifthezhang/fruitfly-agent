@@ -9,14 +9,14 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, AsyncMock, patch
 from fruitfly_agent.interactive import AgentApplication
-from fruitfly_agent.interactive.optimization import CandidateSection
+from fruitfly_agent.interactive.contracts.candidates import CandidateSection
 from fruitfly_agent.interactive import TerminalFrontend
-from fruitfly_agent.interactive.terminal.configuration import TerminalConfigurationFrontend
-from fruitfly_agent.interactive.terminal.menu import RawTerminalMenuInput, TerminalMenuRenderer
+from fruitfly_agent.interactive.terminal.features.configuration.menu import TerminalConfigurationFrontend
+from fruitfly_agent.interactive.terminal.io.menu import RawTerminalMenuInput, TerminalMenuRenderer
 from fruitfly_agent.run.application import RunApplicationFactory
-from fruitfly_agent.run.artifacts import DataArtifactStore
-from fruitfly_agent.run.optimization import CandidateStore
-from fruitfly_agent.run.retention import compact_candidates
+from fruitfly_agent.run.storage.artifacts import DataArtifactStore
+from fruitfly_agent.run.storage.candidates import CandidateStore
+from fruitfly_agent.run.storage.retention import compact_candidates
 from fruitfly_agent.run.startup_versions import RunStartupVersions
 from fruitfly_agent.lab.base_prompt.target import BasePromptTarget
 from fruitfly_agent.lab.context_manager.augmentation.skills.target import SkillGuidanceTarget
@@ -131,7 +131,7 @@ class StartupVersionsTests(unittest.IsolatedAsyncioTestCase):
                 old=self.candidate(app,factory,'previous pending')
                 old=replace(old, task_pack_id='configured-cases', task_pack_name='Configured task cases')
                 factory.candidate_store._write(old, create=False)
-                from fruitfly_agent.run.task_results import save_task_result
+                from fruitfly_agent.run.storage.results import save_task_result
                 output = save_task_result(root, old, 'previous pending')
                 for error in (RuntimeError('failed'),asyncio.CancelledError()):
                     with patch.object(factory._current_optimizer,'search',new=AsyncMock(side_effect=error)):
@@ -310,13 +310,14 @@ class StartupVersionsTests(unittest.IsolatedAsyncioTestCase):
             evidence=(),sections=(CandidateSection('Overview','summary'),CandidateSection('Evaluation','score'),
                                  CandidateSection('Changes','diff',initial=True),CandidateSection('Original text','first\n'*20),
                                  CandidateSection('Candidate text','new')))
-        session=SimpleNamespace(set_event_sink=Mock(),candidate_detail=lambda _: (record,'diff'),candidate_action=Mock())
+        session=SimpleNamespace(set_event_sink=Mock(),candidate_detail=lambda _: (record,'diff'),candidate_action=Mock(),
+            candidates=lambda: (record,), candidate_notice=lambda: (), acknowledge_candidate_notice=Mock())
         output=io.StringIO();frontend=TerminalFrontend(session,input_stream=io.StringIO(),output_stream=output)
         sequence=iter((b'\x1b[A',b'n',b'\x1b[6~',b'n',b'p',b'\x1b'))
         frontend.menu_input=SimpleNamespace(read_event=lambda:RawTerminalMenuInput.decode(next(sequence)))
         frontend.menu_renderer=TerminalMenuRenderer(output)
         frontend.menu_renderer.ansi=True
-        await frontend._optimization_frontend().candidate_detail('candidate-1')
+        await frontend.optimization_frontend().candidate_detail('candidate-1')
         self.assertIn('Original text (2/3)',output.getvalue())
         self.assertIn('Candidate text (1/1)',output.getvalue())
         frames=[f for f in output.getvalue().split('\x1b[2J\x1b[H') if f.startswith('Candidate candidate-')]

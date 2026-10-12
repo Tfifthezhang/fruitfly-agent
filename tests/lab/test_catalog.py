@@ -241,6 +241,57 @@ class CatalogTest(unittest.TestCase):
                 self.assertEqual(parameters["cases_path"], ".fruitfly/optimization/cases.json")
                 self.assertFalse(any("reflection" in name for name in parameters))
 
+    def test_opro_package_definition_assembles_without_running_search(self) -> None:
+        from fruitfly_agent.lab.algorithms.targets import TEXT_TARGET_PREFIX
+        from fruitfly_agent.lab.base_prompt.target import BasePromptTarget
+        from fruitfly_agent.lab.optimization.opro import OproOptimizer, definition
+        from fruitfly_agent.lab.optimization.task_packs import TaskPackCatalog, TASK_PACK_COMPONENT
+        from fruitfly_agent.lab.optimization.text_optimizer import (
+            TEXT_OPTIMIZER_COMPONENT, TEXT_OPTIMIZATION_TARGET_COMPONENT,
+        )
+
+        for profile in ("", "auxiliary"):
+            with self.subTest(profile=profile), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                main, auxiliary = FauxProvider(), FauxProvider()
+                resolutions, owned = [], []
+
+                def resolve(name, limit):
+                    resolutions.append((name, limit))
+                    return ProviderBinding(auxiliary, "optimizer-model", name,
+                                           context_window=4000, max_output_tokens=256)
+
+                catalog = LabCatalog((definition(),), bootstrap=lambda state, context: (
+                    state.with_component(TEXT_TARGET_PREFIX + "base_prompt", BasePromptTarget("seed"))
+                    .with_component(TASK_PACK_COMPONENT, TaskPackCatalog(context.workspace))
+                ))
+                result = assemble_lab(
+                    AgentLoopConfig(provider=main, model="main-model", system_prompt="seed"),
+                    catalog=catalog,
+                    selections=(MechanismSelection("opro", parameters={"optimizer_profile": profile}),),
+                    context=AssemblyContext(root, object(), "main-model", resolve, resource_sink=owned),
+                )
+                optimizer = result.components[TEXT_OPTIMIZER_COMPONENT]
+                try:
+                    self.assertIsInstance(optimizer.strategy, OproOptimizer)
+                    self.assertIn(optimizer, owned)
+                    self.assertEqual(result.components[TEXT_OPTIMIZATION_TARGET_COMPONENT], "base_prompt")
+                    self.assertEqual(optimizer.spec.implementation_id, "opro-text-v2")
+                    self.assertIs(optimizer.config.provider, main)
+                    if profile:
+                        self.assertEqual(resolutions, [("auxiliary", 1024)])
+                        self.assertIs(optimizer.role_configs["optimizer"].provider, auxiliary)
+                        self.assertEqual(optimizer.role_configs["optimizer"].max_tokens, 256)
+                        self.assertEqual(optimizer.role_configs["optimizer"].context_window, 4000)
+                    else:
+                        self.assertEqual(resolutions, [])
+                        self.assertEqual(optimizer.role_configs, {})
+                    self.assertEqual(main.calls, [])
+                    self.assertEqual(auxiliary.calls, [])
+                    self.assertEqual(list(root.iterdir()), [])
+                finally:
+                    optimizer.close()
+
     def test_ipython_and_rlm_descriptors_have_separate_effects(self) -> None:
         catalog = builtin_catalog()
         descriptor = catalog.get("rlm-ipython").descriptor

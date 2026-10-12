@@ -25,10 +25,8 @@ from fruitfly_agent.lab.context_manager.externalization.adapter import (
     install_ipython_tool,
     install_rlm_ipython,
 )
-from fruitfly_agent.lab.optimization.host import HostedTextOptimizer
 from fruitfly_agent.lab.optimization.task_packs import TaskPackCatalog, TASK_PACK_COMPONENT
-from fruitfly_agent.lab.optimization.opro import OproOptimizer
-from fruitfly_agent.lab.optimization.text_optimizer import TEXT_OPTIMIZER_COMPONENT, TEXT_OPTIMIZATION_TARGET_COMPONENT
+from fruitfly_agent.lab.optimization.opro import definition as opro_definition
 from fruitfly_agent.lab.context_manager.augmentation.skills import (
     SkillCatalogTransformer, load_skills, render_skills_xml,
 )
@@ -257,45 +255,12 @@ def builtin_catalog() -> LabCatalog:
                 writes_files=True,
             ),
         ),
-        _native_optimizer_definition(OproOptimizer, "OPRO", order=76, roles=("optimizer",),
-            extra_parameters=(ParameterDescriptor("batch_size", "integer", "Proposal batch", "Maximum proposals per round.", 2, minimum=1, maximum=5),)),
+        opro_definition(),
     )
     return LabCatalog(definitions, bootstrap=lambda state, context: (
         state.with_component(TEXT_TARGET_PREFIX + "base_prompt", BasePromptTarget(state.config.system_prompt))
         .with_component(TASK_PACK_COMPONENT, TaskPackCatalog(context.workspace, context.task_pack_sources))
     ))
-
-
-def _native_optimizer_definition(strategy_type, label, *, order, roles, extra_parameters=()):
-    spec = strategy_type.spec
-    def install(state, context, parameters):
-        source = state.components[TASK_PACK_COMPONENT].with_legacy(parameters["cases_path"])
-        optimizer = HostedTextOptimizer(strategy_type(), state.config, context.workspace, parameters,
-            target=state.components.get(TEXT_TARGET_PREFIX + parameters["target"]), label=label,
-            role_configs=_search_role_configs(state, context, parameters), task_source=source)
-        return (
-            state.with_component(TEXT_OPTIMIZER_COMPONENT, context.own(optimizer))
-            .with_component(TASK_PACK_COMPONENT, source)
-            .with_component(TEXT_OPTIMIZATION_TARGET_COMPONENT, parameters["target"])
-        )
-    return _definition(spec.algorithm_id, layer="optimization", family="context", label=label,
-        description="Search an enabled text target through shared evaluation, history and budgets.",
-        install=install, exclusive_group="text-optimizer", selection_group="text-optimizer",
-        selection_group_label="Text optimizer", order=order, implementation_id=spec.implementation_id,
-        parameters=(
-            ParameterDescriptor("target", "string", "Text target", "Enabled named target.", "base_prompt"),
-            _path_parameter("cases_path", ".fruitfly/optimization/cases.json", "Default task pack or legacy cases JSON"),
-            ParameterDescriptor("rounds", "integer", "Search rounds", "Maximum bounded rounds.", 2, minimum=1, maximum=20),
-            ParameterDescriptor("history_limit", "integer", "History view", "Maximum attempts included in generation context.", 5, minimum=1, maximum=20),
-            ParameterDescriptor("max_metric_calls", "integer", "Trial budget", "Root trial call limit.", 32, minimum=1, maximum=200),
-            ParameterDescriptor("max_model_calls", "integer", "Model budget", "Root Provider attempt limit for all roles and trials.", 64, minimum=1, maximum=300),
-            ParameterDescriptor("output_max_tokens", "integer", "Output limit", "Per request output token cap.", 1024, minimum=128, maximum=4096),
-            ParameterDescriptor("call_timeout_seconds", "integer", "Call timeout", "Maximum seconds per operation.", 30, minimum=1, maximum=180),
-            *(ParameterDescriptor(role + "_profile", "string", role.title() + " model", "Optional model profile; empty uses the active Provider.", "")
-              for role in roles),
-            *extra_parameters,
-        ), effects=MechanismEffects(uses_provider=True, uses_network=True, writes_files=True,
-            cost_notice="Explicit search invokes the configured Provider and stores research history; calls may incur charges."))
 
 
 def _definition(
@@ -361,18 +326,6 @@ def _path_parameter(name: str, default: str, label: str) -> ParameterDescriptor:
         "Workspace-relative path; escaping the workspace is rejected.",
         default,
     )
-
-
-def _search_role_configs(state, context, parameters):
-    roles = {}
-    for role in ("optimizer", "meta", "base"):
-        profile = parameters.get(role + "_profile")
-        if profile:
-            binding = context.provider_resolver(profile, parameters["output_max_tokens"])
-            roles[role] = replace(state.config, provider=binding.provider, model=binding.model,
-                context_window=binding.context_window or state.config.context_window,
-                max_tokens=binding.max_output_tokens or state.config.max_tokens)
-    return roles
 
 
 def _integer_parameters(

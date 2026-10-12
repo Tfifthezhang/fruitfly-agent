@@ -13,11 +13,7 @@ from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.core.data_model import UserMessage
 from fruitfly_agent.core.context import ContextFrame
 from fruitfly_agent.core.session import Session
-from fruitfly_agent.interactive import (
-    ConfigurationLaunchResult,
-    InteractiveSession,
-    RuntimeHandle,
-)
+from fruitfly_agent.interactive import ConfigurationLaunchResult, InteractiveSession, RuntimeHandle
 
 
 from fruitfly_agent.run import DataArtifactStore, RunConfigurationController, create_parser, resolve_session_path
@@ -226,7 +222,7 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
             registry = Mock()
             registry.create.return_value = provider
             with patch.object(cli, "load_env", return_value={}), patch(
-                "fruitfly_agent.run.assembly.default_registry",
+                "fruitfly_agent.run.runtime.assembly.default_registry",
                 return_value=registry,
             ), patch.object(
                 cli, "TerminalConfigurationFrontend"
@@ -273,7 +269,7 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
             registry = Mock()
             registry.create.return_value = first
             with patch.object(cli, "load_env", return_value={}), patch(
-                "fruitfly_agent.run.assembly.default_registry",
+                "fruitfly_agent.run.runtime.assembly.default_registry",
                 return_value=registry,
             ), contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(
@@ -285,7 +281,7 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
             _write_catalog(model_path, {"offline": "model-new"})
             errors = io.StringIO()
             with patch.object(cli, "load_env", return_value={}), patch(
-                "fruitfly_agent.run.assembly.default_registry",
+                "fruitfly_agent.run.runtime.assembly.default_registry",
                 return_value=registry,
             ), contextlib.redirect_stderr(errors):
                 code = await cli.run_cli(
@@ -316,7 +312,7 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
             registry = Mock()
             registry.create.return_value = provider
             with patch.object(cli, "load_env", return_value={}), patch(
-                "fruitfly_agent.run.assembly.default_registry",
+                "fruitfly_agent.run.runtime.assembly.default_registry",
                 return_value=registry,
             ), contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(
@@ -330,7 +326,7 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
             with patch.object(cli, "load_env", return_value={}), patch.object(
                 cli, "TerminalConfigurationFrontend", return_value=startup
             ), patch(
-                "fruitfly_agent.run.assembly.default_registry",
+                "fruitfly_agent.run.runtime.assembly.default_registry",
                 return_value=registry,
             ), patch.object(cli, "TerminalFrontend", FakeFrontend):
                 code = await cli.run_cli(

@@ -5,10 +5,7 @@ from __future__ import annotations
 import re
 import unittest
 
-from fruitfly_agent.interactive.terminal.markdown import (
-    MarkdownStreamPresenter,
-    TerminalMarkdownRenderer,
-)
+from fruitfly_agent.interactive.terminal.rendering.markdown import MarkdownStreamPresenter, TerminalMarkdownRenderer
 
 
 ANSI = re.compile(r"\x1b\[[0-9;]*m")

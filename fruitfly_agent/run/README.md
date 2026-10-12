@@ -24,29 +24,33 @@ Real tasks call the configured model service and may incur charges. See [Getting
 
 Interactive recovery displays original saved conversation through the same terminal history component for both entry points. Startup selection uses the configured workspace/profile; incompatible sessions are rejected rather than silently skipped. In-terminal discovery lists compatible candidates. Neither entry merges sessions or replays model/tool execution.
 
-## Files and ownership
+## Modules and ownership
 
-| File / module | Responsibility |
+| Module | Owns | Limits |
+|---|---|---|
+| [Configuration](configuration/README.md) | YAML, drafts, selection, model setup, and save/reset | No Provider construction or search |
+| [Runtime](runtime/README.md) | Assembly, manifest, preparation, recovery, and permission bindings | Application owns lifecycle and switching |
+| [Storage](storage/README.md) | Text artifacts, candidate records, result exports, retention | No quality decisions or activation |
+| [Improvement host](improvement/README.md) | Search jobs, candidate rules, evolution capabilities, startup choices | Lab owns algorithms and the RSI state machine |
+| [Adapters](adapters/README.md) | Interactive views and optional Eval bridge | No algorithm-specific decisions |
+
+[application.py](application.py) is the composition root. `RunApplicationFactory` constructs services, owns active runtime bindings, and delegates operations. Search services own preview receipts, startup services own choice receipts, and configuration owns its draft. Services use injected queries and operations instead of receiving the Factory or inspecting private fields.
+
+## Public composition entries
+
+| Entry | Responsibility |
 |---|---|
-| [Configuration](configuration/README.md) | Harness YAML, validation, persistence, and digest |
-| [profiles.py](profiles.py) | Next-session draft editing, dependency changes, and persistence |
-| [model_selection.py](model_selection.py) | Harness discovery and model catalog resolution |
-| [migrate_configuration.py](migrate_configuration.py) | Explicit offline configuration relocation; see [commands and limits](../../CONFIGURATION.md#relocate-workspace-configuration) |
-| [model_setup.py](model_setup.py) | Stage model additions and credentials, preserve local file contents, and coordinate save/rollback |
-| [configuration_views.py](configuration_views.py) | Mechanism, algorithm-group, and prompt menu projections |
-| [assembly.py](assembly.py) | Provider construction, Lab assembly, and actual manifest |
-| [application.py](application.py) | `RunApplicationFactory`, runtime preparation, and candidate activation |
-| [search_jobs.py](search_jobs.py) | Preview receipts, frozen search inputs, and proposal persistence |
-| [recovery.py](recovery.py) | Session discovery, saved prompt/artifact references, and full manifest verification |
-| [optimization.py](optimization.py) | Candidate records and durable inbox |
-| [optimization_service.py](optimization_service.py) | Generic Interactive views and candidate preparation |
-| [retention.py](retention.py), [task_results.py](task_results.py) | Reference-protected cleanup and readable exports |
-| [startup_versions.py](startup_versions.py) | Optional version selection service for embedding hosts |
-| [evolution.py](evolution.py) | Explicit verifier and durable evolution host |
-| [evaluation.py](evaluation.py) | Optional Eval subprocess bridge; no top-level Eval import |
-| [cli.py](cli.py) | Startup arguments and process exit |
+| [__init__.py](__init__.py) | Stable Run exports |
+| [cli.py](cli.py) | Startup arguments, frontend connection, and process exit |
+| [application.py](application.py) | RuntimeFactory interface and concrete service composition |
+| [assembly.py](assembly.py) | Public assembly/manifest/prompt-resolution exports |
+| [profiles.py](profiles.py) | Configuration controller composed with candidate-backed prompt views |
+| [evolution.py](evolution.py) | Bind Application and storage operations to the evolution host |
+| [evaluation.py](evaluation.py) | Bind host queries to the optional Eval adapter |
+| [startup_versions.py](startup_versions.py) | Public startup-selection composition entry |
+| [migrate_configuration.py](migrate_configuration.py) | Explicit migration function and CLI; see [commands and limits](../../CONFIGURATION.md#relocate-workspace-configuration) |
 
-Run consumes public [Catalog](../lab/catalog/README.md) and [Optimization](../lab/optimization/README.md) contracts. It does not implement search, task policies, scoring, or concrete algorithm branches.
+Composition entries delegate to one owning implementation. Internal consumers import the owning module. Run consumes public [Catalog](../lab/catalog/README.md) and [Optimization](../lab/optimization/README.md) contracts; it does not implement search, scoring, or concrete algorithm branches.
 
 ## Text artifacts
 
@@ -81,7 +85,7 @@ Assembly occurs at `factory.open()` or `Application.start()`. See the [offline A
 
 ## Recovery
 
-[recovery.py](recovery.py) owns discovery and manifest checks. The existing exports from `run.application` remain available.
+[runtime/recovery.py](runtime/recovery.py) owns discovery and manifest checks. The existing exports from `run.application` remain available.
 
 | Concern | Rule |
 |---|---|
@@ -97,7 +101,7 @@ Canonical data and record semantics belong to [Session](../core/session/README.m
 
 ## Candidate jobs
 
-[search_jobs.py](search_jobs.py) coordinates previews and searches against the factory's active runtime. The factory retains runtime ownership and exposes the existing host methods.
+[improvement/search_jobs.py](improvement/search_jobs.py) owns preview receipts and uses injected optimizer, target, task, storage, and active-version queries. The Factory retains active bindings and exposes the public host methods.
 
 | Step | Run's responsibility |
 |---|---|
@@ -141,7 +145,7 @@ Run exposes an optional `configuration.model_setup` service to the terminal. Mod
 
 ## Bind host permission policy
 
-[permissions.py](permissions.py) constructs the standard file policy and minimal process environment. `build_runtime(..., permission_policy=None)` and `RunApplicationFactory(..., permission_policy=None)` accept an optional host-owned `PermissionPolicy`, exported by Lab Catalog. Its workspace must match the runtime workspace. Defaults allow ordinary workspace reads/writes, protect known credentials, and require confirmation for external paths and local execution.
+[runtime/permissions.py](runtime/permissions.py) constructs the standard file policy and minimal process environment. `build_runtime(..., permission_policy=None)` and `RunApplicationFactory(..., permission_policy=None)` accept an optional host-owned `PermissionPolicy`, exported by Lab Catalog. Its workspace must match the runtime workspace. Defaults allow ordinary workspace reads/writes, protect known credentials, and require confirmation for external paths and local execution.
 
 After Lab installation, Run applies the policy to the final config and environment. It creates a fresh Interactive authorization service, binds it to Session frontend events, and protects the active Session file from tool writes. The normalized effective policy identity enters `RuntimeManifest.permissions`; recovery compares it with the rest of the manifest. Missing or changed permission identities do not silently resume. The current Session path is an additional per-handle protection, not part of reusable policy identity.
 

@@ -28,6 +28,8 @@ Add tools, execution backends, context strategies, and improvement algorithms th
 
 Optimization can run independently. Human adoption of a prompt is not a complete RSI process. Persistent RSI requires an injected host and independent verifier; only confirmed activation advances the version. Code replacement and arbitrary learning-state evolution are unsupported.
 
+Independent optimization methods live in their own packages under `optimization/`, with shared hosting and trial services outside those packages. Methods remain Lab algorithms. Object adapters stay with the modules that define the objects; see [Optimization methods](optimization/README.md#optimization-methods).
+
 ## Develop an algorithm
 
 Start with the complete offline example:
