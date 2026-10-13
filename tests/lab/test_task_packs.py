@@ -61,6 +61,69 @@ class TaskPackageTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "group_id"):
             validate_material(payload)
 
+    def test_validator_reports_named_document_and_case_rules(self):
+        mutations = (
+            ("unknown manifest field", lambda p: p.update(unknown=True), "invalid task package fields; schema 1 needs explicit migration"),
+            ("boolean version", lambda p: p.update(schema_version=True), "unsupported task package schema_version; migrate to schema 2"),
+            ("escaping file", lambda p: p["files"].update(cases="../cases.json"), "task file must be a local JSON filename"),
+            ("same file", lambda p: p["files"].update(holdout="cases.json"), "task file references must be distinct"),
+            ("unknown acceptance", lambda p: p["train"][0].update(extra=True), "invalid acceptance for single-turn-text-v1"),
+            ("invalid tags", lambda p: p["train"][0].update(tags=[1]), "invalid tags"),
+            ("invalid source", lambda p: p["train"][0].update(source={"value": 1}), "invalid source metadata"),
+        )
+        for name, mutate, message in mutations:
+            with self.subTest(rule=name):
+                payload = package()
+                mutate(payload)
+                with self.assertRaises(ValueError) as failure:
+                    validate_material(payload)
+                self.assertEqual(message, str(failure.exception))
+
+    def test_validator_keeps_error_precedence_across_boundaries(self):
+        payload = package()
+        payload.update(schema_version=True)
+        payload["files"]["cases"] = "../cases.json"
+        with self.assertRaisesRegex(ValueError, "unsupported task package schema_version"):
+            validate_material(payload)
+        payload = package()
+        payload["validation"][0].update(id="train-1", expected="")
+        with self.assertRaisesRegex(ValueError, "invalid or duplicate case id"):
+            validate_material(payload)
+        payload = package()
+        payload["train"][0]["group_id"] = "shared"
+        payload["validation"][0].update(group_id="shared", tags=[1])
+        with self.assertRaisesRegex(ValueError, "group_id overlaps task partitions"):
+            validate_material(payload)
+
+    def test_acceptance_rejections_match_validation_and_save_without_writes(self):
+        for acceptance in ({}, {"input": "other", "expected": "A"}, {"expected": "A", "extra": True}):
+            with self.subTest(acceptance=acceptance):
+                manifest, cases, holdout = package_documents(package())
+                cases["train"][0]["acceptance"] = acceptance
+                before = {p.name: p.read_bytes() for p in self.path.parent.iterdir() if p.is_file()}
+                with self.assertRaises(ValueError) as validation:
+                    validate_pack(manifest, cases=cases, holdout=holdout)
+                with self.assertRaises(ValueError) as saving:
+                    self.catalog.save_training("project", "new", "A", acceptance=acceptance,
+                                               expected_hash=self.catalog.source_hash("project"))
+                self.assertEqual("invalid acceptance for single-turn-text-v1", str(validation.exception))
+                self.assertEqual(str(validation.exception), str(saving.exception))
+                for name, data in before.items():
+                    self.assertEqual(data, (self.path.parent / name).read_bytes())
+
+    def test_partition_limit_and_normalized_input_overlap(self):
+        payload = package()
+        payload["train"] = [dict(id=f"train-{i}", input=f"question {i}", expected="A") for i in range(12)]
+        self.assertEqual(12, len(validate_material(payload)["train"]))
+        payload["train"].append(dict(id="train-12", input="question 12", expected="A"))
+        with self.assertRaisesRegex(ValueError, "train must contain at most 12 cases"):
+            validate_material(payload)
+        payload = package()
+        payload["train"][0]["input"] = "caf\u00e9"
+        payload["holdout"][0]["input"] = " cafe\u0301 "
+        with self.assertRaisesRegex(ValueError, "duplicate input or conflicting answers across task partitions"):
+            validate_material(payload)
+
     def test_append_idempotency_explicit_replace_and_cas(self):
         original = load_pack(self.root, self.path).material
         identity = self.catalog.source_hash("project")

@@ -63,31 +63,28 @@ class CliSurfaceTest(unittest.TestCase):
             args.resume = True
             self.assertEqual(resolve_session_path(args, root), older.resolve())
 
-    def test_session_discovery_filters_current_locked_and_incompatible_logs(self) -> None:
+    def test_discovery_shows_changed_environments_and_locked_or_corrupt_history(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             sessions = root / ".fruitfly" / "sessions"
-            current = sessions / "current.jsonl"
-            compatible = sessions / "compatible.jsonl"
-            incompatible = sessions / "incompatible.jsonl"
-            locked = sessions / "locked.jsonl"
+            current, changed, locked, corrupt = (sessions / f"{name}.jsonl" for name in ("current", "changed", "locked", "corrupt"))
             _seed_resumable_session(current)
-            _seed_resumable_session(compatible)
-            _seed_resumable_session(incompatible, digest="sha256:other")
+            _seed_resumable_session(changed, digest="another-environment")
             _seed_resumable_session(locked)
-            os.utime(compatible, ns=(4, 4))
-
+            corrupt.write_text('{"id":1}\nnot json\n{"id":2}\n')
+            before = {p: p.read_bytes() for p in (changed, locked, corrupt)}
             with Session(locked):
-                found = discover_resumable_sessions(
-                    root,
-                    current_path=current,
-                    manifest_digest="sha256:test",
-                )
+                found = {Path(item.path).name: item for item in discover_resumable_sessions(root, current_path=current)}
+                self.assertEqual({"changed.jsonl", "locked.jsonl", "corrupt.jsonl"}, set(found))
+                self.assertTrue(found["changed.jsonl"].available)
+                self.assertEqual("offline-model", found["changed.jsonl"].model)
+                self.assertFalse(found["locked.jsonl"].available)
+                self.assertIn("locked", found["locked.jsonl"].reason)
+                self.assertFalse(found["corrupt.jsonl"].available)
+                self.assertIn("invalid", found["corrupt.jsonl"].reason)
+            for p, contents in before.items():
+                self.assertEqual(contents, p.read_bytes())
 
-        self.assertEqual([Path(item.path).name for item in found], ["compatible.jsonl"])
-        self.assertEqual(found[0].message_count, 1)
-        self.assertEqual(found[0].profile, "default")
-        self.assertEqual(found[0].model, "offline-model")
 
 class CliRunTest(unittest.IsolatedAsyncioTestCase):
     async def test_cwd_selects_env_file_and_process_values_take_precedence(self) -> None:
@@ -110,7 +107,7 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(environment.get("TEST_SETTING"), "process")
             self.assertEqual(environment.get("FILE_ONLY"), "present")
 
-    async def test_resume_reloads_the_exact_bound_data_artifact(self) -> None:
+    async def test_resume_uses_current_bindings_instead_of_historical_guidance(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             _write_catalog(root / "models.yaml", {"offline": "offline-model"})
@@ -140,6 +137,7 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
                 resume=False,
                 session_path=session_path,
             )
+            initial.activate_callback()
             initial_manifest = initial.manifest
             await initial.session.submit("exercise the bound guidance")
             self.assertIn(
@@ -154,8 +152,7 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
                     {"message": UserMessage(content="continue").to_dict()},
                 )
 
-            # The resumed runtime resolves the artifact recorded in the Session,
-            # even if the caller no longer supplies the original binding.
+            # Current bindings govern continuation; historical guidance is not required.
             resumed_factory = RunApplicationFactory(
                 cwd=root,
                 environment={},
@@ -166,7 +163,8 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
                 session_path=session_path,
             )
             try:
-                self.assertEqual(resumed.manifest, initial_manifest)
+                self.assertNotEqual(resumed.manifest, initial_manifest)
+                self.assertEqual([], resumed.manifest.get("data_artifacts", []))
                 stage = next(
                     item for item in resumed.components["context-pipeline"].stages
                     if item.stage_id == "skill-catalog"
@@ -174,10 +172,7 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
                 transformed = stage.mechanism.transform(
                     ContextFrame("base", (), (), "offline-model", 32)
                 )
-                self.assertIn(
-                    "Pinned skill catalog guidance",
-                    transformed.frame.system_prompt,
-                )
+                self.assertIsNone(transformed)
             finally:
                 await resumed.close()
 
@@ -258,7 +253,7 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
             "offline-model",
         )
 
-    async def test_resume_rejects_a_changed_profile_before_runtime_assembly(self) -> None:
+    async def test_resume_continues_with_a_changed_model_in_the_same_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             path = root / "session.jsonl"
@@ -279,6 +274,7 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
                     0,
                 )
             _write_catalog(model_path, {"offline": "model-new"})
+            first.respond_text("continued")
             errors = io.StringIO()
             with patch.object(cli, "load_env", return_value={}), patch(
                 "fruitfly_agent.run.runtime.assembly.default_registry",
@@ -288,8 +284,9 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
                     _args(task="resume", cwd=tmp, session=str(path), resume=True)
                 )
 
-        self.assertEqual(code, 2)
-        self.assertIn("start a new session", errors.getvalue())
+        self.assertEqual(code, 0)
+        self.assertEqual("model-new", first.calls[-1]["model"])
+        self.assertEqual("first", first.calls[-1]["messages"][0].content)
 
     async def test_interactive_resume_injects_next_session_controller(self) -> None:
         captured: list[tuple[int, object, object]] = []

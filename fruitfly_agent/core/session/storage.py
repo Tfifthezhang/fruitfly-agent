@@ -48,7 +48,100 @@ class SessionEntry:
         )
 
 
-class Session:
+class _SessionReader:
+    _entries: list[SessionEntry]
+
+    # -- reads ----------------------------------------------------------------
+
+    def read_all(self) -> list[SessionEntry]:
+        return list(self._entries)
+
+    def tail(self, n: int = 100) -> list[SessionEntry]:
+        return self._entries[-n:]
+
+    def messages(self) -> list[AgentMessage]:
+        """Return the latest committed model projection plus newer messages.
+
+        New entries store an algorithm-neutral ``messages`` projection.  The
+        legacy summary/retainedTail shape remains readable for old sessions.
+        """
+        from ..data_model.messages import CUSTOM_KIND_COMPACTION, CustomMessage
+
+        latest_compaction: SessionEntry | None = None
+        for entry in self._entries:
+            if entry.type == "compaction" or (
+                entry.type == "meta" and "contextProjection" in entry.payload
+            ):
+                latest_compaction = entry
+        if latest_compaction is not None:
+            payload = latest_compaction.payload
+            if latest_compaction.type == "meta":
+                payload = payload["contextProjection"]
+                if not isinstance(payload, dict) or "messages" not in payload:
+                    raise SessionCorruptError("invalid contextProjection metadata")
+            projected: list[AgentMessage] = []
+            raw_projection = payload.get("messages")
+            if raw_projection is not None:
+                if not isinstance(raw_projection, list):
+                    raise SessionCorruptError("compaction messages is not a list")
+                for m in raw_projection:
+                    if not isinstance(m, dict):
+                        raise SessionCorruptError("compaction messages entry is not an object")
+                    projected.append(message_from_dict(m))
+            else:
+                summary = CustomMessage(
+                    kind=CUSTOM_KIND_COMPACTION,
+                    text=payload.get("summary") or "",
+                    timestamp=latest_compaction.timestamp,
+                )
+                projected.append(summary)
+                for m in payload.get("retainedTail") or []:
+                    if not isinstance(m, dict):
+                        raise SessionCorruptError(
+                            "compaction retainedTail entry is not an object"
+                        )
+                    projected.append(message_from_dict(m))
+            appended: list[AgentMessage] = []
+            for entry in self._entries:
+                if entry.id <= latest_compaction.id or entry.type != "message":
+                    continue
+                message = entry.payload.get("message")
+                if not isinstance(message, dict):
+                    raise SessionCorruptError(
+                        f"session entry {entry.id}: missing message payload"
+                    )
+                appended.append(message_from_dict(message))
+            return [*projected, *appended]
+        return self.canonical_messages()
+
+    def canonical_messages(self) -> list[AgentMessage]:
+        """Return every original message entry, ignoring model projections."""
+
+        return [item.message for item in self.context_items()]
+
+    def context_items(self) -> list[ContextItem]:
+        """Return canonical transcript items with durable session-entry IDs."""
+
+        out: list[ContextItem] = []
+        for entry in self._entries:
+            if entry.type != "message":
+                continue
+            message = entry.payload.get("message")
+            if not isinstance(message, dict):
+                raise SessionCorruptError(f"session entry {entry.id}: missing message payload")
+            out.append(ContextItem(id=f"session:{entry.id}", message=message_from_dict(message)))
+        return out
+
+
+class SessionSnapshot(_SessionReader):
+    """Validated read-only session view; inspection never repairs or creates files."""
+
+    def __init__(self, entries: list[SessionEntry], *, locked: bool) -> None:
+        self._entries = entries
+        self.locked = locked
+
+
+class Session(_SessionReader):
     """Append-only session log. Holds an exclusive flock for its lifetime."""
 
     def __init__(self, path: str | Path, *, lane: str = "main") -> None:
@@ -79,22 +172,41 @@ class Session:
 
     # -- load / validation --------------------------------------------------
 
+    @classmethod
+    def inspect(cls, path: str | Path) -> SessionSnapshot:
+        """Read the valid prefix without acquiring ownership or repairing a torn tail."""
+        source = Path(path)
+        entries, _, _ = cls._read_entries(source)
+        locked = False
+        lock_path = source.with_suffix(source.suffix + ".lock")
+        try:
+            with lock_path.open("rb") as lock:
+                try:
+                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    locked = True
+                else:
+                    fcntl.flock(lock, fcntl.LOCK_UN)
+        except FileNotFoundError:
+            pass
+        return SessionSnapshot(entries, locked=locked)
+
     def _load(self) -> None:
         if not self.path.exists():
             return
-        raw = self.path.read_bytes()
-        if not raw:
-            return
-        if not raw.endswith(b"\n"):
-            # Missing trailing newline: repair on the next append.
-            self._repair_newline = True
-        text = raw.decode("utf-8", errors="replace")
-        lines = text.split("\n")
-        last_non_empty = max(
-            (i for i, line in enumerate(lines) if line.strip()), default=-1
-        )
+        entries, torn, self._repair_newline = self._read_entries(self.path)
+        if torn:
+            self._rewrite_valid_prefix(entries)
+            self._repair_newline = False
+        self._entries = entries
+
+    @classmethod
+    def _read_entries(cls, path: Path) -> tuple[list[SessionEntry], bool, bool]:
+        raw = path.read_bytes()
+        lines = raw.decode("utf-8", errors="replace").split("\n")
+        last_non_empty = max((i for i, line in enumerate(lines) if line.strip()), default=-1)
         entries: list[SessionEntry] = []
-        torn = 0
+        torn = False
         for i, line in enumerate(lines):
             if not line.strip():
                 continue
@@ -102,17 +214,14 @@ class Session:
                 obj = json.loads(line)
             except json.JSONDecodeError:
                 if i == last_non_empty:
-                    # Torn tail: an unacknowledged append. Keep the valid prefix.
-                    torn = 1
+                    torn = True
                     break
                 raise SessionCorruptError(
-                    f"session {self.path}: invalid JSON on line {i + 1} (not a torn tail)"
+                    f"session {path}: invalid JSON on line {i + 1} (not a torn tail)"
                 ) from None
-            entries.append(self._parse_entry(obj, i + 1))
-        if torn:
-            self._rewrite_valid_prefix(entries)
-        self._entries = entries
-        self._validate(entries)
+            entries.append(cls._parse_entry(obj, i + 1))
+        cls._validate(entries)
+        return entries, torn, bool(raw) and not raw.endswith(b"\n")
 
     @staticmethod
     def _parse_entry(obj: Any, line_no: int) -> SessionEntry:
@@ -201,81 +310,6 @@ class Session:
                 os.fsync(f.fileno())
         self._entries.append(entry)
         return entry
-
-    # -- reads ----------------------------------------------------------------
-
-    def read_all(self) -> list[SessionEntry]:
-        return list(self._entries)
-
-    def tail(self, n: int = 100) -> list[SessionEntry]:
-        return self._entries[-n:]
-
-    def messages(self) -> list[AgentMessage]:
-        """Return the latest committed model projection plus newer messages.
-
-        New entries store an algorithm-neutral ``messages`` projection.  The
-        legacy summary/retainedTail shape remains readable for old sessions.
-        """
-        from ..data_model.messages import CUSTOM_KIND_COMPACTION, CustomMessage
-
-        latest_compaction: SessionEntry | None = None
-        for entry in self._entries:
-            if entry.type == "compaction":
-                latest_compaction = entry
-        if latest_compaction is not None:
-            payload = latest_compaction.payload
-            projected: list[AgentMessage] = []
-            raw_projection = payload.get("messages")
-            if raw_projection is not None:
-                if not isinstance(raw_projection, list):
-                    raise SessionCorruptError("compaction messages is not a list")
-                for m in raw_projection:
-                    if not isinstance(m, dict):
-                        raise SessionCorruptError("compaction messages entry is not an object")
-                    projected.append(message_from_dict(m))
-            else:
-                summary = CustomMessage(
-                    kind=CUSTOM_KIND_COMPACTION,
-                    text=payload.get("summary") or "",
-                    timestamp=latest_compaction.timestamp,
-                )
-                projected.append(summary)
-                for m in payload.get("retainedTail") or []:
-                    if not isinstance(m, dict):
-                        raise SessionCorruptError(
-                            "compaction retainedTail entry is not an object"
-                        )
-                    projected.append(message_from_dict(m))
-            appended: list[AgentMessage] = []
-            for entry in self._entries:
-                if entry.id <= latest_compaction.id or entry.type != "message":
-                    continue
-                message = entry.payload.get("message")
-                if not isinstance(message, dict):
-                    raise SessionCorruptError(
-                        f"session entry {entry.id}: missing message payload"
-                    )
-                appended.append(message_from_dict(message))
-            return [*projected, *appended]
-        return self.canonical_messages()
-
-    def canonical_messages(self) -> list[AgentMessage]:
-        """Return every original message entry, ignoring model projections."""
-
-        return [item.message for item in self.context_items()]
-
-    def context_items(self) -> list[ContextItem]:
-        """Return canonical transcript items with durable session-entry IDs."""
-
-        out: list[ContextItem] = []
-        for entry in self._entries:
-            if entry.type != "message":
-                continue
-            message = entry.payload.get("message")
-            if not isinstance(message, dict):
-                raise SessionCorruptError(f"session entry {entry.id}: missing message payload")
-            out.append(ContextItem(id=f"session:{entry.id}", message=message_from_dict(message)))
-        return out
 
     def close(self) -> None:
         try:

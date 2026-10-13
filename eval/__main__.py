@@ -9,8 +9,7 @@ import sys
 
 from .catalog import builtin_catalog
 from .contracts import EvaluationRequest
-from .execution import execute_plan
-from .planning import create_plan
+from .execution import execute_request
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -19,12 +18,9 @@ def _parser() -> argparse.ArgumentParser:
         description="standardized, external evaluation consumer for FruitFlyAgent",
     )
     sub = parser.add_subparsers(dest="command", required=True)
-    catalog = sub.add_parser("catalog", help="show registered modes and benchmarks")
+    catalog = sub.add_parser("catalog", help="show registered benchmarks")
     catalog.add_argument("--json", action="store_true", help="emit the versioned JSON catalog")
-    plan = sub.add_parser("plan", help="validate a request and freeze an execution plan")
-    plan.add_argument("--request", required=True, help="evaluation request JSON")
-    plan.add_argument("--output", help="write the plan to this path")
-    run = sub.add_parser("run", help="plan and execute an evaluation request")
+    run = sub.add_parser("run", help="execute an evaluation request")
     run.add_argument("--request", required=True, help="evaluation request JSON")
     run.add_argument("--output-root", help="override .fruitfly/eval")
     run.add_argument("--events", choices=("jsonl",), help="emit stable progress events")
@@ -61,23 +57,8 @@ def main(argv: list[str] | None = None) -> int:
                         for problem in problems:
                             print(f"  {variant['id']}: {problem}")
             return 0
-        if args.command == "plan":
-            request = EvaluationRequest.read(args.request)
-            plan = create_plan(request)
-            payload = plan.to_dict()
-            if args.output:
-                Path(args.output).write_text(
-                    json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-                    encoding="utf-8",
-                )
-            else:
-                _print_json(payload)
-            return 0
         if args.command == "run":
             request = EvaluationRequest.read(args.request)
-            plan = create_plan(request)
-            if args.events:
-                _event("planned", evaluation_id=plan.evaluation_id)
             output_root = (
                 Path(args.output_root).resolve()
                 if args.output_root
@@ -87,16 +68,16 @@ def main(argv: list[str] | None = None) -> int:
             )
             def progress(payload: dict[str, object]) -> None:
                 if args.events:
-                    _print_json({"schema_version": 1, "evaluation_id": plan.evaluation_id, **payload})
+                    _print_json({"schema_version": 1, **payload})
 
-            report, store = execute_plan(
-                plan, output_root=output_root,
+            report, store = execute_request(
+                request, output_root=output_root,
                 progress=progress if args.events else None,
             )
             if args.events:
                 _event(
                     "finished",
-                    evaluation_id=plan.evaluation_id,
+                    evaluation_id=report.evaluation_id,
                     status=report.status,
                     report_json=str(store.path / "report.json"),
                     report_markdown=str(store.path / "report.md"),

@@ -214,7 +214,7 @@ class TerminalFrontend:
         choices = getattr(self.line_editor, "set_choices", None)
         if isinstance(event, AuthorizationRequested):
             if choices is not None:
-                choices(("1. Allow once", "2. Allow for this session", "3. Deny"), event.request_id)
+                choices(("1. Allow once (Enter)", "2. " + event.session_label, "3. Deny (Esc)"), event.request_id)
         elif isinstance(event, AuthorizationResolved):
             if choices is not None:
                 choices()

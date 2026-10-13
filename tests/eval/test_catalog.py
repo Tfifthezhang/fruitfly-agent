@@ -11,10 +11,7 @@ class BenchmarkCatalogTests(unittest.TestCase):
         with patch("eval.benchmarks.harbor._harbor_executable", return_value=None):
             with patch("eval.benchmarks.harbor.shutil.which", return_value=None):
                 payload = builtin_catalog().to_dict()
-        self.assertEqual(
-            [item["id"] for item in payload["modes"]],
-            ["current_setup", "mechanism_comparison"],
-        )
+        self.assertNotIn("modes", payload)
         self.assertEqual(
             [item["id"] for item in payload["benchmarks"]],
             ["swe-bench", "terminal-bench"],

@@ -6,7 +6,7 @@ Use `TerminalEvaluationFrontend` as the menu entry and `evaluation_handler` to b
 
 | File | Responsibility |
 |---|---|
-| [menu.py](menu.py) | Generic evaluation selections, cost confirmation, events, and diagnostics |
+| [menu.py](menu.py) | Benchmark/variant selection, cost confirmation, events, and diagnostics |
 | [command.py](command.py) | Busy feedback, menu lending, launch coordination, and report paths |
 
 EvaluationController describes and launches an optional external evaluation. This feature does not import Eval or benchmark implementations. The controller owns subprocesses, artifacts, and external effects. Existing explicit confirmation precedes launch.

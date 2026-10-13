@@ -126,6 +126,45 @@ class TestSession(unittest.TestCase):
             with self.assertRaises(SessionCorruptError):
                 Session(self.path)
 
+    def test_readonly_inspection_reports_lock_and_does_not_repair_torn_tail(self):
+        with Session(self.path) as session:
+            session.append("message", _msg_entry(UserMessage(content="saved")))
+            self.assertTrue(Session.inspect(self.path).locked)
+        with self.path.open("a") as stream:
+            stream.write('{"id":2')
+        before = self.path.read_bytes()
+        snapshot = Session.inspect(self.path)
+        self.assertFalse(snapshot.locked)
+        self.assertEqual([UserMessage(content="saved")], snapshot.messages())
+        self.assertEqual(before, self.path.read_bytes())
+        with Session(self.path) as session:
+            self.assertEqual([1], [entry.id for entry in session.read_all()])
+        self.assertNotEqual(before, self.path.read_bytes())
+
+    def test_readonly_inspection_creates_no_lock_file(self):
+        self.path.write_text('{"id":1,"type":"message","message":{"role":"user","content":"saved"}}\n')
+        before = set(self.root.iterdir())
+        self.assertEqual("saved", Session.inspect(self.path).messages()[0].content)
+        self.assertEqual(before, set(self.root.iterdir()))
+
+    def test_atomic_metadata_projection_preserves_facts_and_new_messages(self):
+        old, new = UserMessage(content="old"), UserMessage(content="new")
+        with Session(self.path) as session:
+            session.append("message", _msg_entry(old))
+            session.append("compaction", {"messages": [UserMessage(content="summary").to_dict()]})
+            session.append("meta", {"kind": "fixture", "contextProjection": {"messages": [old.to_dict()]}})
+            session.append("message", _msg_entry(new))
+            self.assertEqual([old, new], session.messages())
+            self.assertEqual([old, new], session.canonical_messages())
+        self.assertEqual([old, new], Session.inspect(self.path).messages())
+
+    def test_corrupt_prefix_is_not_rewritten_when_tail_is_torn(self):
+        self.path.write_text('{"id":2,"type":"meta"}\n{"id":3')
+        before = self.path.read_bytes()
+        with self.assertRaises(SessionCorruptError):
+            Session(self.path)
+        self.assertEqual(before, self.path.read_bytes())
+
     def test_compaction_projection(self):
         with Session(self.path) as s:
             s.append("message", _msg_entry(UserMessage(content="old")))

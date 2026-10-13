@@ -15,6 +15,8 @@ Define components and hooks that Core calls directly. Concrete strategies and Pr
 
 Core invokes active handlers before passive observers and isolates ordinary handler failures. Use existing hooks or callbacks before adding a new Core protocol. Algorithms belong in [Lab](../../lab/README.md); assembly belongs in [Run](../../run/README.md). No module-specific environment variables.
 
+`RecoveryValidator.validate_recovery(messages)` lets an assembled component check only persisted dependencies needed by the restored model projection. Run invokes it before activation. Validation is offline, must not mutate messages or replay operations, and may reject missing/corrupt required material. Concrete dependency formats belong to the owning component.
+
 ```bash
 .venv/bin/python -m unittest tests.core.test_protocols tests.core.test_hooks -v
 ```

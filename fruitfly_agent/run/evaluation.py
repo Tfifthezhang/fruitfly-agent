@@ -8,8 +8,6 @@ class RunEvaluationController(EvaluationAdapter):
             application, workspace=lambda: factory.cwd,
             environment=lambda: factory.environment,
             selection=lambda: factory.selection,
-            labels=lambda: {item.mechanism_id: item.label
-                            for item in factory.configuration.snapshot().mechanisms},
             python_executable=python_executable,
         )
 

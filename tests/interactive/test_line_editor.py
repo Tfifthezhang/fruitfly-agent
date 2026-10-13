@@ -16,12 +16,55 @@ from unittest.mock import patch
 
 from fruitfly_agent.interactive.terminal.io.input import ReadlineLineEditor, StreamLineEditor, create_line_editor, read_field_line
 from fruitfly_agent.interactive.terminal.io.live import InlineTerminalDisplay
+from tests.support.terminal import TtyStringIO
 
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 class LineEditorUnitTest(unittest.TestCase):
+    def test_permission_choices_move_highlight_without_committing_menu_to_history(self) -> None:
+        for no_color in (False, True):
+            with self.subTest(no_color=no_color), patch.dict(
+                os.environ, {"TERM": "xterm-256color", **({"NO_COLOR": "1"} if no_color else {})}, clear=True,
+            ):
+                output = TtyStringIO()
+                display = InlineTerminalDisplay(output, rows=12, columns=90)
+                display.activate()
+                labels = ("1. Allow once", "2. Allow reads in /outside for this session", "3. Deny")
+                display.set_choices(labels)
+                start = len(output.getvalue())
+                display.set_choices(labels, selected=1)
+                selected = output.getvalue()[start:]
+                self.assertIn("❯ 2. Allow reads in /outside for this session", selected)
+                self.assertNotIn("❯ 1.", selected)
+                self.assertIn("↑↓ move · Enter select · Esc deny", selected)
+                if no_color:
+                    self.assertNotIn("\x1b[1;36m", selected)
+                else:
+                    self.assertIn("\x1b[1;36m❯ 2.", selected)
+                self.assertEqual(display._pending_output, "")
+                display.write("permission: session\n")
+                start = len(output.getvalue())
+                display.set_choices()
+                self.assertNotIn("Allow once", output.getvalue()[start:])
+                self.assertIn("╭─ prompt", output.getvalue()[start:])
+                self.assertEqual(output.getvalue().count("permission: session"), 1)
+                display.suspend()
+
+    def test_permission_choices_fit_small_terminal_and_keep_selection_visible(self) -> None:
+        output = io.StringIO()
+        display = InlineTerminalDisplay(output, rows=6, columns=20)
+        display.activate()
+        display.set_activity("Waiting for permission")
+        start = len(output.getvalue())
+        display.set_choices(("1. Allow once", "2. Allow for this session", "3. Deny"), selected=2)
+        visible = output.getvalue()[start:]
+        self.assertIn("❯ 3. Deny", visible)
+        self.assertLessEqual(display._live_rows, 6)
+        self.assertNotIn("\x1b[2J", visible)
+        display.suspend()
+
     def test_inline_display_redraws_input_after_stream_output(self) -> None:
         output = io.StringIO()
         display = InlineTerminalDisplay(output, rows=10, columns=40)
@@ -253,6 +296,45 @@ class LineEditorUnitTest(unittest.TestCase):
 
 @unittest.skipUnless(os.name == "posix", "PTY regression requires a POSIX terminal")
 class TerminalInputPtyRegressionTest(unittest.TestCase):
+    def test_isolated_control_keys_keep_text_and_cursor_consistent(self) -> None:
+        for keys, value in (
+            (b"one two   \x17X\r", "one X"),
+            (b"abc\x01X\x05Y\r", "XabcY"),
+            (b"abc\x1b[D\x04\r", "ab"),
+            (b"abc\x1b[D\x15X\r", "Xc"),
+        ):
+            with self.subTest(keys=keys):
+                self.assertIn(f"RESULT={[value]!r}", self._run_isolated_editor(keys))
+
+    def test_isolated_history_navigation_restores_the_unsubmitted_draft(self) -> None:
+        output = self._run_isolated_editor(b"first\rnew\x1b[A\x1b[B!\r", submissions=2)
+        self.assertIn("RESULT=['first', 'new!']", output)
+
+    def test_isolated_permission_selection_returns_only_the_request_reply(self) -> None:
+        for keys, decision in ((b"\r", 1), (b"\x1b[B\r", 2), (b"\x1b[A\r", 3),
+                               (b"\x1bOB\r", 2), (b"1", 1), (b"2", 2), (b"3", 3), (b"\x1b", 3)):
+            with self.subTest(keys=keys):
+                output = self._run_isolated_editor(keys, choices=("Once", "Session", "Deny"))
+                expected = ["\x00authorize:request:" + str(decision)]
+                self.assertIn(f"RESULT={expected!r}", output)
+                self.assertIn("❯ Once", output)
+                if keys in (b"\x1b[B\r", b"\x1bOB\r"):
+                    self.assertIn("❯ Session", output)
+                if keys == b"\x1b[A\r":
+                    self.assertIn("❯ Deny", output)
+
+    def _run_isolated_editor(self, keys: bytes, *, submissions=1, choices=()) -> str:
+        code = (
+            "import sys; "
+            "from fruitfly_agent.interactive.terminal.io.live import IsolatedLineEditor, InlineTerminalDisplay; "
+            "display=InlineTerminalDisplay(sys.stdout,rows=12,columns=50); "
+            "editor=IsolatedLineEditor(sys.stdin,display); "
+            f"editor.set_choices({choices!r},'request'); display.activate(); "
+            f"values=[editor.read_line() for _ in range({submissions})]; "
+            "display.suspend(); editor.stop(); print('RESULT='+repr(values),flush=True)"
+        )
+        return self._run_pty_code(code, keys)
+
     def test_form_frame_uses_field_name_then_restores_conversation_label(self) -> None:
         code = (
             "import sys; "

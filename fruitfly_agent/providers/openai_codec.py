@@ -37,13 +37,13 @@ def convert_to_openai(messages: list[AgentMessage]) -> list[dict]:
             texts = [b.text for b in message.content if isinstance(b, TextBlock)]
             if texts:
                 out.append({"role": "assistant", "content": "".join(texts)})
-            for block in message.content:
-                if isinstance(block, ToolCallBlock):
+            for call in message.content:
+                if isinstance(call, ToolCallBlock):
                     out.append({
                         "type": "function_call",
-                        "call_id": block.id,
-                        "name": block.name,
-                        "arguments": json.dumps(block.input),
+                        "call_id": call.id,
+                        "name": call.name,
+                        "arguments": json.dumps(call.input),
                     })
         elif isinstance(message, ToolResultMessage):
             out.append({

@@ -16,6 +16,8 @@ Saving applies to a future session. The command requests rebuild through the inj
 
 Input and terminal control come from [I/O](../../io/README.md); display comes from [Rendering](../../rendering/README.md). This feature cannot import other features or Application/Session implementations. No new environment variables.
 
+Category layout projects declared selectors and independent capabilities into rows and actions before handling input. The menu retains remembered selections and expansion state; shared I/O navigation handles arrows and numbered choices. Layout construction does not stage or save configuration.
+
 ```bash
 .venv/bin/python -m unittest tests.interactive.test_terminal_configuration tests.run.test_model_setup tests.interactive.test_extensions -v
 ```

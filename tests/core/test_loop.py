@@ -13,6 +13,7 @@ from fruitfly_agent.core.data_model import (
     UserMessage,
 )
 from fruitfly_agent.core.extensions.hooks import (
+    REQUEST_PREPARED,
     BEFORE_REQUEST,
     BEFORE_TOOL,
     HookRegistry,
@@ -297,6 +298,38 @@ class TestLoop(unittest.IsolatedAsyncioTestCase):
         self.assertEqual("hook-model", self.provider.calls[0]["model"])
         self.assertEqual(123, self.provider.calls[0]["max_tokens"])
         self.assertEqual("hook-model", result.model)
+
+    async def test_abort_during_request_preparation_stops_at_the_correct_boundary(self):
+        for cancel_at in ("budget", "observation"):
+            with self.subTest(cancel_at=cancel_at):
+                provider = FauxProvider()
+                provider.respond_text("unused")
+                signal = asyncio.Event()
+                observed = []
+                hooks = HookRegistry()
+
+                class Reducer:
+                    def estimate(self, ctx):
+                        return 7
+
+                    async def check_budget(self, ctx):
+                        if cancel_at == "budget":
+                            signal.set()
+                        return None
+
+                    async def react_to_overflow(self, ctx, error):
+                        return None
+
+                def observe(event):
+                    observed.append(event.estimated_tokens)
+                    signal.set()
+
+                hooks.on(REQUEST_PREPARED, observe)
+                result = await run_agent_loop(make_config(provider, hooks=hooks),
+                    [UserMessage(content="go")], signal=signal, context_pipeline=Reducer())
+                self.assertEqual("aborted", result.stop_reason)
+                self.assertEqual([], provider.calls)
+                self.assertEqual([] if cancel_at == "budget" else [7], observed)
 
     # --- G4: prepareNextTurn / steering / abort ------------------------------
 

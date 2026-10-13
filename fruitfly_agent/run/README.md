@@ -22,7 +22,7 @@ Real tasks call the configured model service and may incur charges. See [Getting
 | `/resume` / `/resume PATH` | Choose or switch a session from an idle terminal. |
 | `"TASK" --resume [--session PATH]` | Execute one new task with saved context; historical chat is not printed. Model requests may incur charges. |
 
-Interactive recovery displays original saved conversation through the same terminal history component for both entry points. Startup selection uses the configured workspace/profile; incompatible sessions are rejected rather than silently skipped. In-terminal discovery lists compatible candidates. Neither entry merges sessions or replays model/tool execution.
+Interactive recovery displays original saved conversation through the same history component for both entry points. Startup selects the latest available non-empty session in the workspace. The picker shows unavailable files with reasons. Both paths use the selected current configuration and continue the original file without tool/model replay.
 
 ## Modules and ownership
 
@@ -89,13 +89,16 @@ Assembly occurs at `factory.open()` or `Application.start()`. See the [offline A
 
 | Concern | Rule |
 |---|---|
-| RuntimeManifest | Schema 5 fixes actual model, normalized transport defaults/overrides and implementation identity when published by the Provider, effective selections/parameters, prompt content, and consumed artifacts. |
-| Resume | Reload artifacts, verify hashes, and compare the complete manifest, including transport policy. A manifest missing a matching transport identity is rejected; do not overwrite or silently adopt new defaults. |
-| Built-in prompt changes | A different reference or text hash requires a new session; do not substitute new instructions into an existing Session. |
-| Catalog changes | Unused model entries do not affect identity; changed active implementation or text does. |
-| Compatibility | Accepted only when original prompt provenance and the rest of assembly can be established; never overwrite the stored manifest. |
-| Configuration edits | Apply to a new session; do not relabel the active runtime. |
-| Source / state | No source hot reload, source snapshot, arbitrary heap restoration, or paid-call replay. |
+| RuntimeManifest | Schema 5 records assembled model/transport, mechanisms, prompt, artifacts, and current permissions. |
+| History validation | Validate each saved manifest against its own digest and validate messages/projections. Known schema 3/4/5 contents remain readable; missing newer fields are not fabricated. |
+| Configuration changes | Model/profile names, transport, prompts, permissions, and mechanism changes do not by themselves block continuation. Use the selected current configuration. |
+| Environment recording | Append a complete snapshot after startup succeeds when the environment changes. Runs belong to the most recent preceding snapshot; original records remain intact. |
+| Context changes | Rebuild the projection from canonical messages when mechanisms change; record it atomically with the environment snapshot. This does not count as a compaction. |
+| Required material | Validate current artifact bindings and selected components' RecoveryValidator dependencies. Unused historical bindings do not force restoration. |
+| Permissions | Apply current host policy with a fresh approval service. Historical grants are never replayed. |
+| Failure | Corrupt data, writer locks, invalid current configuration, or unavailable required dependencies reject recovery with a reason. Failed startup does not append a runtime snapshot. |
+| Activation | Optimization/RSI parent identity checks remain enforced to prevent stale activation. |
+| State | Restore stored conversation/projections and explicit supported dependencies; no arbitrary heap restoration or paid-call replay. |
 
 Canonical data and record semantics belong to [Session](../core/session/README.md). Configuration format belongs to [Harness configuration](configuration/README.md).
 
@@ -147,7 +150,7 @@ Run exposes an optional `configuration.model_setup` service to the terminal. Mod
 
 [runtime/permissions.py](runtime/permissions.py) constructs the standard file policy and minimal process environment. `build_runtime(..., permission_policy=None)` and `RunApplicationFactory(..., permission_policy=None)` accept an optional host-owned `PermissionPolicy`, exported by Lab Catalog. Its workspace must match the runtime workspace. Defaults allow ordinary workspace reads/writes, protect known credentials, and require confirmation for external paths and local execution.
 
-After Lab installation, Run applies the policy to the final config and environment. It creates a fresh Interactive authorization service, binds it to Session frontend events, and protects the active Session file from tool writes. The normalized effective policy identity enters `RuntimeManifest.permissions`; recovery compares it with the rest of the manifest. Missing or changed permission identities do not silently resume. The current Session path is an additional per-handle protection, not part of reusable policy identity.
+After Lab installation, Run applies the policy to the final config and environment. It creates a fresh Interactive authorization service, binds it to Session frontend events, and protects the active Session file from tool writes. The normalized effective policy enters `RuntimeManifest.permissions` as a record of the active environment. Recovery uses current policy even when the historical policy differs or is absent. The current Session path is an additional per-handle protection, not part of reusable policy identity.
 
 Only host constructor parameters select additional roots and protection paths. Model-edited profile files do not expand permission scope. Algorithm configuration/state remains accessible within authorized roots. User-driven model setup continues to persist credentials through its owning host interface, and Provider construction can obtain its required key. Shell/IPython do not receive those keys automatically.
 

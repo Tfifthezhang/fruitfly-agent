@@ -10,7 +10,8 @@ Store and replay the canonical conversation in an append-only JSONL file.
 |---|---|
 | Messages | Valid user, assistant, and tool messages |
 | Context decisions | Committed reduction decisions |
-| RuntimeManifest | Runtime identity written and checked by Run |
+| RuntimeManifest | Complete assembled environment snapshots written and validated by Run |
+| Metadata contextProjection | Atomic replacement of the model projection when restoring with changed mechanisms; canonical facts remain intact |
 | Run start/end | Model, message/turn/tool counts, stop reason, usage, and bounded error summaries |
 | Provider failure | Error category, harness request count, and recovered or terminal disposition |
 | Request context / receipt | Final projection estimate/source, configured limits, model, timestamp, and available input receipt; never cumulative occupancy |
@@ -25,10 +26,13 @@ Sessions do not copy every Provider request, token event, or tool event. Use fro
 | Need | Interface |
 |---|---|
 | Default persistence | Construct `Session` with a JSONL path. |
+| Read-only discovery | `Session.inspect(path)` returns a validated snapshot and writer-lock status without creating files or repairing a torn tail. |
 | Custom persistence | Implement `SessionLike` and inject it into `AgentLoopConfig`. |
 | Resume an application | Follow [Run recovery](../../run/README.md#recovery). |
 
 Records carry schema and kind identifiers. Append validates the consecutive entry ID and earlier parent reference before writing. Replay applies the same validation; incompatible data fails explicitly. An incomplete final JSON line can be discarded while retaining the valid prefix. A Session holds a POSIX writer lock for its lifetime. Failure to append a concise run record is logged and does not change the Agent result.
+
+Run records belong to the most recent environment snapshot preceding their start entry. A changed environment appends a snapshot in the same file after successful startup. A metadata `contextProjection` uses the same validated messages shape as compaction, replaces only model context, and does not increment compaction counts. Inspection validates the prefix without repairing it; the writer performs supported tail repair after acquiring ownership.
 
 | File | Responsibility |
 |---|---|

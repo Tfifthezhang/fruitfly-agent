@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, patch
 import yaml
 
 from eval.benchmarks.harbor import (
-    _condition_runtime_files,
+    _runtime_files,
     _harbor_executable,
     _load_harbor_job_result,
     _forward_agent_events,
@@ -25,6 +25,7 @@ from eval.benchmarks.harbor import (
 from eval.benchmarks.swe_bench import SWEBenchAdapter
 from eval.benchmarks.base import PreflightResult
 from eval.installation import resolve_installation, validate_installation
+from tests.support.evaluation import request_payload
 from tests.support.harbor import InstalledAgentDouble, load_harbor_agent
 
 FruitFlyHarborAgent = load_harbor_agent()
@@ -36,17 +37,18 @@ class HarborAdapterTests(unittest.TestCase):
         (root / ".fruitfly").mkdir()
         (root / ".env").write_text("LEGACY_ONLY=old\nTEST_API_KEY=old-placeholder\n")
         (root / ".fruitfly/secrets.env").write_text("NEW_ONLY=present\nTEST_API_KEY=new-placeholder\n")
-        plan = root / "plan.json"
-        plan.write_text(json.dumps({"request": {"runtime": {"working_directory": str(root), "profile": "default"},
-            "execution": {}}, "reproducibility": {}, "conditions": [{"condition_id": "current"}]}))
+        request = root / "request.json"
+        payload = request_payload()
+        payload["runtime"]["working_directory"] = str(root)
+        request.write_text(json.dumps(payload))
         adapter = SWEBenchAdapter()
         with patch.dict("os.environ", {"TEST_API_KEY": "process-placeholder"}, clear=True), patch.object(
             adapter, "preflight", return_value=PreflightResult(True, (), ("offline-harbor",))
-        ), patch("eval.benchmarks.harbor._condition_runtime_files", return_value=(root / "config", root / "models", ("TEST_API_KEY",))), patch(
+        ), patch("eval.benchmarks.harbor._runtime_files", return_value=(root / "config", root / "models", ("TEST_API_KEY",))), patch(
             "eval.benchmarks.harbor._run_harbor_job", return_value=(1, "offline stop")
         ) as job, patch("eval.benchmarks.harbor.resolve_installation", return_value=root), patch("sys.stderr"):
             with self.assertRaisesRegex(RuntimeError, "offline stop"):
-                adapter.run(plan_path=plan, result_path=root / "result.json", variant="smoke")
+                adapter.run(request_path=request, result_path=root / "result.json", variant="smoke")
         env = job.call_args.kwargs["environment"]
         self.assertEqual(env["TEST_API_KEY"], "process-placeholder")
         self.assertEqual(env["NEW_ONLY"], "present")
@@ -67,8 +69,8 @@ class HarborAdapterTests(unittest.TestCase):
             updates = []
             code, detail = _run_harbor_job(
                 [sys.executable, "-c", script], environment={}, timeout=5,
-                condition_root=root, progress=updates.append,
-                condition_id="current",
+                job_root=root, progress=updates.append,
+                job_id="current",
             )
             self.assertEqual((code, detail), (0, ""))
             self.assertEqual(next(item for item in updates if item["type"] == "agent_event")["event"]["type"], "run_started")
@@ -92,7 +94,7 @@ class HarborAdapterTests(unittest.TestCase):
 
             code, detail = _run_harbor_job(
                 [sys.executable, "-c", script], environment={}, timeout=5,
-                condition_root=root, progress=observe, condition_id="current",
+                job_root=root, progress=observe, job_id="current",
             )
             self.assertEqual((code, detail), (0, ""))
             event = updates[0]
@@ -121,7 +123,7 @@ class HarborAdapterTests(unittest.TestCase):
 
             code, _ = _run_harbor_job(
                 [sys.executable, "-u", "-c", script], environment={}, timeout=5,
-                condition_root=root, progress=observe, condition_id="current",
+                job_root=root, progress=observe, job_id="current",
             )
             self.assertEqual(code, 0)
             expected = "early output\n" + "E"*10000 + "tail without newline"
@@ -171,9 +173,10 @@ class HarborAdapterTests(unittest.TestCase):
     def test_invalid_installation_material_fails_before_environment_access(self) -> None:
         root = Path(self.enterContext(tempfile.TemporaryDirectory()))
         adapter = SWEBenchAdapter()
+        (root / "request.json").write_text(json.dumps(request_payload()))
         with patch.dict("os.environ", {"FRUITFLY_EVAL_PACKAGE": str(root)}), patch.object(adapter, "preflight") as preflight:
             with self.assertRaisesRegex(ValueError, "incomplete FruitFlyAgent source"):
-                adapter.run(plan_path=root / "plan.json", result_path=root / "result.json", variant="smoke")
+                adapter.run(request_path=root / "request.json", result_path=root / "result.json", variant="smoke")
         preflight.assert_not_called()
         with self.assertRaisesRegex(ValueError, "FRUITFLY_EVAL_PACKAGE"):
             resolve_installation(None, checkout=root)
@@ -282,7 +285,7 @@ class HarborAdapterTests(unittest.TestCase):
                 "sys.exit(1 if n==1 else 0)"
             )
             updates = []
-            code, _ = _run_harbor_job([sys.executable, "-u", "-c", script], environment={}, timeout=5, condition_root=root, progress=updates.append, condition_id="current")
+            code, _ = _run_harbor_job([sys.executable, "-u", "-c", script], environment={}, timeout=5, job_root=root, progress=updates.append, job_id="current")
             self.assertEqual(code, 0)
             self.assertEqual(count.read_text(), "2")
             self.assertIn("ConnectError", (root / "harbor-attempt-1.log").read_text())
@@ -296,7 +299,7 @@ class HarborAdapterTests(unittest.TestCase):
             root = Path(directory)
             (root / "job").mkdir()
             script = "print('ConnectError: Error getting dataset terminal-bench@2.0'); raise SystemExit(1)"
-            code, _ = _run_harbor_job([sys.executable, "-c", script], environment={}, timeout=5, condition_root=root, progress=None, condition_id="current")
+            code, _ = _run_harbor_job([sys.executable, "-c", script], environment={}, timeout=5, job_root=root, progress=None, job_id="current")
             self.assertEqual(code, 1)
             self.assertFalse((root / "harbor-attempt-1.log").exists())
 
@@ -433,7 +436,7 @@ class HarborAdapterTests(unittest.TestCase):
                     },
                 ]
             },
-            condition_id="current",
+            job_id="current",
         )
         self.assertEqual([item["status"] for item in trials], ["passed", "failed"])
         values = {item["name"]: item["value"] for item in metrics}
@@ -442,9 +445,42 @@ class HarborAdapterTests(unittest.TestCase):
         self.assertEqual(values["input_tokens"], 18)
         self.assertEqual(values["latency_ms"], 2000)
 
+    def test_reward_shapes_preserve_unknown_values_and_single_metric_fallback(self) -> None:
+        for name, verifier, reward, status in (
+            ("missing", None, None, "failed"),
+            ("non-mapping rewards", {"rewards": []}, None, "failed"),
+            ("null rewards", {"rewards": None}, None, "failed"),
+            ("single official metric", {"rewards": {"score": 1}}, 1.0, "passed"),
+            ("ambiguous metrics", {"rewards": {"a": 1, "b": 0}}, None, "failed"),
+            ("explicit reward", {"rewards": {"reward": 0, "other": 1}}, 0.0, "failed"),
+        ):
+            with self.subTest(shape=name):
+                trials, metrics = parse_harbor_job_result(
+                    {"trial_results": [{"verifier_result": verifier}]}, job_id="current")
+                values = {item["name"]: item["value"] for item in metrics}
+                self.assertEqual(status, trials[0]["status"])
+                self.assertEqual(reward, values["official_reward"])
+                self.assertIsNone(values["input_tokens"])
+                self.assertIsNone(values["cost_usd"])
+
+    def test_timeout_is_reported_and_retains_available_usage(self) -> None:
+        trials, metrics = parse_harbor_job_result({"trial_results": [{
+            "verifier_result": {"rewards": {"reward": 1}},
+            "agent_result": {"n_input_tokens": 0, "cost_usd": 0.0},
+            "exception_info": {"exception_type": "AgentTimeout", "exception_message": "deadline"},
+        }]}, job_id="current")
+        self.assertEqual("AgentTimeout", trials[0]["error"]["type"])
+        self.assertEqual([], trials[0]["metrics"])
+        values = {item["name"]: item["value"] for item in metrics}
+        self.assertIsNone(values["official_reward"])
+        self.assertEqual(1.0, values["error_rate"])
+        self.assertEqual(1.0, values["timeout_rate"])
+        self.assertEqual(0, values["input_tokens"])
+        self.assertEqual(0.0, values["cost_usd"])
+
     def test_empty_harbor_job_is_not_reported_as_a_completed_benchmark(self) -> None:
         with self.assertRaisesRegex(ValueError, "no trials"):
-            parse_harbor_job_result({"trial_results": []}, condition_id="current")
+            parse_harbor_job_result({"trial_results": []}, job_id="current")
 
     def test_harbor_job_loads_separate_trial_results(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -473,8 +509,7 @@ class HarborAdapterTests(unittest.TestCase):
 
             trials, metrics = parse_harbor_job_result(
                 _load_harbor_job_result(job / "result.json"),
-                condition_id="current",
-                expected_manifest_digest="sha256:frozen",
+                job_id="current",
             )
 
             self.assertEqual(trials[0]["status"], "passed")
@@ -489,30 +524,20 @@ class HarborAdapterTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "0 of 1 trial result files"):
                 _load_harbor_job_result(path)
 
-    def test_frozen_runtime_digest_mismatch_is_an_infrastructure_error(self) -> None:
-        trials, metrics = parse_harbor_job_result(
-            {
-                "trial_results": [
-                    {
-                        "id": "trial-1",
-                        "task_name": "task-a",
-                        "verifier_result": {"rewards": {"reward": 1}},
-                        "agent_result": {
-                            "metadata": {"runtime_manifest_digest": "sha256:other"}
-                        },
-                    }
-                ]
-            },
-            condition_id="current",
-            expected_manifest_digest="sha256:frozen",
-        )
-        self.assertEqual(trials[0]["status"], "error")
-        self.assertEqual(trials[0]["error"]["type"], "RuntimeManifestMismatch")
-        values = {item["name"]: item["value"] for item in metrics}
-        self.assertEqual(values["success_rate"], 0)
-        self.assertEqual(values["error_rate"], 1)
+    def test_actual_runtime_is_reported_without_comparing_it_to_a_frozen_identity(self):
+        actual = {"digest": "sha256:actual", "models": {"main": {"model": "actual-model"}}}
+        trials, metrics = parse_harbor_job_result({"trial_results": [{
+            "id": "trial-1", "task_name": "task-a", "verifier_result": {"rewards": {"reward": 1}},
+            "agent_result": {"metadata": {"runtime_manifest": actual}},
+        }]}, job_id="current")
+        self.assertEqual("passed", trials[0]["status"])
+        self.assertEqual(actual, trials[0]["runtime"])
+        self.assertIsNone(trials[0]["error"])
+        self.assertNotIn("condition_id", trials[0])
+        self.assertEqual(1.0, next(item["value"] for item in metrics if item["name"] == "success_rate"))
 
-    def test_harbor_setup_error_is_not_hidden_by_missing_manifest(self) -> None:
+
+    def test_harbor_setup_error_is_reported_without_runtime_metadata(self) -> None:
         trials, metrics = parse_harbor_job_result(
             {
                 "trial_results": [
@@ -527,8 +552,7 @@ class HarborAdapterTests(unittest.TestCase):
                     }
                 ]
             },
-            condition_id="current",
-            expected_manifest_digest="sha256:frozen",
+            job_id="current",
         )
         self.assertEqual(trials[0]["error"]["type"], "RuntimeError")
         self.assertIn("Docker Hub", trials[0]["error"]["message"])
@@ -537,7 +561,7 @@ class HarborAdapterTests(unittest.TestCase):
             1.0,
         )
 
-    def test_condition_config_relocates_catalog_and_applies_only_override(self) -> None:
+    def test_selected_config_is_copied_with_its_enabled_mechanisms(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             config_path = root / "config.yaml"
@@ -569,13 +593,10 @@ profiles:
 """,
                 encoding="utf-8",
             )
-            output = root / "condition"
+            output = root / "runtime"
             output.mkdir()
-            generated, copied_models, secret_names = _condition_runtime_files(
+            generated, copied_models, secret_names = _runtime_files(
                 runtime={"config_path": str(config_path), "profile": "default"},
-                condition={
-                    "mechanism_overrides": {"compaction": {"enabled": False}}
-                },
                 output_dir=output,
             )
             payload = yaml.safe_load(generated.read_text(encoding="utf-8"))
@@ -585,7 +606,7 @@ profiles:
                 profile["model"]["catalog"],
                 "/installed-agent/fruitfly/runtime/models.yaml",
             )
-            self.assertEqual(enabled, {"compaction": False})
+            self.assertEqual(enabled, {"compaction": True})
             self.assertEqual(copied_models.read_text(), models_path.read_text())
             self.assertEqual(secret_names, ("TEST_API_KEY",))
 

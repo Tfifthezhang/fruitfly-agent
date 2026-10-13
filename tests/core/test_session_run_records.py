@@ -4,17 +4,46 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
-from fruitfly_agent.core.data_model import UserMessage
+from fruitfly_agent.core.data_model import Usage, UserMessage
+from fruitfly_agent.core.extensions.hooks import AFTER_RESPONSE, HookRegistry
 from fruitfly_agent.core.loop import run_agent_loop
 from fruitfly_agent.core.session import Session
 
 from tests.support.faux_provider import FauxProvider
-from tests.support.loop import make_config
+from tests.support.loop import make_config, make_tool
 
 
 class SessionRunRecordTests(unittest.IsolatedAsyncioTestCase):
+    async def test_hook_adjusted_receipts_are_persisted_before_response_observation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            provider = FauxProvider()
+            provider.respond_tool_call("count", {"value": "one"})
+            provider.respond_text("done")
+            usage = [Usage(3, 2, 1, 4), None]
+            observed = []
+            hooks = HookRegistry()
+            with Session(Path(directory) / "session.jsonl") as session:
+                def adjust(event):
+                    event.assistant = replace(event.assistant, usage=usage.pop(0))
+
+                def observe(event):
+                    receipts = [entry.payload["data"] for entry in session.read_all()
+                                if entry.type == "meta" and entry.payload.get("event") == "request_receipt"]
+                    self.assertEqual(event.receipt_timestamp, receipts[-1]["timestamp"])
+                    observed.append(receipts[-1]["input_tokens"])
+                    self.assertEqual(event.assistant, session.canonical_messages()[-1])
+
+                hooks.add(AFTER_RESPONSE, adjust)
+                hooks.on(AFTER_RESPONSE, observe)
+                result = await run_agent_loop(make_config(provider, [make_tool()[0]],
+                    session=session, hooks=hooks), [UserMessage(content="go")])
+                self.assertFalse(result.is_error)
+                self.assertEqual([3, None], observed)
+                self.assertEqual(Usage(3, 2, 1, 4), result.usage)
+
     async def test_success_records_run_bounds_and_keeps_messages_canonical(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             provider = FauxProvider()

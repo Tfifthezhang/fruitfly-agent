@@ -175,6 +175,7 @@ class FruitFlyHarborAgent(BaseInstalledAgent):  # type: ignore[misc]
         input_tokens = 0
         output_tokens = 0
         digest = None
+        runtime_manifest = None
         try:
             for line in session_path.read_text(encoding="utf-8").splitlines():
                 entry = json.loads(line)
@@ -184,6 +185,7 @@ class FruitFlyHarborAgent(BaseInstalledAgent):  # type: ignore[misc]
                     and isinstance(entry.get("manifest"), dict)
                 ):
                     digest = entry["manifest"].get("digest")
+                    runtime_manifest = entry.get("manifest")
                 message = entry.get("message", {})
                 usage = message.get("usage", {}) if isinstance(message, dict) else {}
                 input_tokens += _usage_int(usage, "inputTokens", "input_tokens")
@@ -194,6 +196,7 @@ class FruitFlyHarborAgent(BaseInstalledAgent):  # type: ignore[misc]
         metadata.update({"harness": "fruitfly-agent", "native_tools_preserved": True})
         if isinstance(digest, str):
             metadata["runtime_manifest_digest"] = digest
+            metadata["runtime_manifest"] = runtime_manifest
         context.metadata = metadata
         context.n_input_tokens = input_tokens or None
         context.n_output_tokens = output_tokens or None

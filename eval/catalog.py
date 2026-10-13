@@ -50,18 +50,6 @@ class BenchmarkCatalog:
             )
         return {
             "schema_version": 1,
-            "modes": [
-                {
-                    "id": "current_setup",
-                    "label": "Test current setup",
-                    "description": "Measure the complete active harness configuration",
-                },
-                {
-                    "id": "mechanism_comparison",
-                    "label": "Compare a mechanism",
-                    "description": "Hold all conditions fixed and remove one active mechanism",
-                },
-            ],
             "benchmarks": benchmarks,
         }
 

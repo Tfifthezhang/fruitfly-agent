@@ -2,11 +2,11 @@
 
 [Up: Tests](../README.md)
 
-Verify optional evaluation plans, Harbor mapping, artifacts, and reports offline.
+Verify single-configuration requests, Harbor mapping, artifacts, and reports offline.
 
 | Files | Protects |
 |---|---|
-| `test_catalog.py / test_planning.py` | Availability, studies, and frozen conditions |
+| `test_catalog.py / test_execution.py` | Availability, execution, failure handling, and reports |
 | `test_harbor.py` | Commands, reported project version, setup, complete logs/events, registry retry boundaries, and parsing |
 | `test_cli.py` | CLI and saved reports |
 | `../support/harbor.py` | Isolated optional SDK substitute |

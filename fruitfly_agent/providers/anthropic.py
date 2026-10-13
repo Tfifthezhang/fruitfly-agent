@@ -12,7 +12,10 @@ from __future__ import annotations
 import asyncio
 from dataclasses import asdict
 import json
-from typing import Any, AsyncIterator
+from typing import TYPE_CHECKING, Any, AsyncIterator, NotRequired, TypedDict, cast
+
+if TYPE_CHECKING:
+    from anthropic.types import MessageParam, ToolParam
 
 from fruitfly_agent.core.data_model import (
     AssistantMessage,
@@ -45,6 +48,14 @@ _STOP_REASON_MAP = {
     "max_tokens": "length",
     "refusal": "stop",
 }
+
+
+class _MessageRequest(TypedDict):
+    model: str
+    system: str
+    messages: list[MessageParam]
+    max_tokens: int
+    tools: NotRequired[list[ToolParam]]
 
 def classify_error(exc: Exception, *, status_code: int | None = None) -> TaggedError:
     """Classify a provider failure. Overflow is NEVER retried — it goes to the ladder."""
@@ -126,15 +137,16 @@ class AnthropicProvider:
     async def _stream_once(
         self, view: ProviderView, signal: asyncio.Event | None, *, deadline: AttemptDeadline
     ) -> AsyncIterator[StreamEvent]:
-        request = {
+        request: _MessageRequest = {
             "model": view.model or self.model,
             "system": view.system_prompt,
-            "messages": convert_to_anthropic(view.messages),
+            # The codec owns serialization; this cast describes its SDK wire shape.
+            "messages": cast("list[MessageParam]", convert_to_anthropic(view.messages)),
             "max_tokens": min(self.max_tokens, view.max_tokens) if view.max_tokens > 0 else self.max_tokens,
         }
         tools = [t.to_schema() for t in view.tools if not t.hide_from_model]
         if tools:
-            request["tools"] = tools
+            request["tools"] = cast("list[ToolParam]", tools)
 
         manager = self._client.messages.stream(**request)
         entered = False

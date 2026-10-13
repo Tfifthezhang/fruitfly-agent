@@ -205,7 +205,7 @@ __all__ = [
 ]
 
 
-def navigate_menu(event, selected: int, size: int):
+def navigate_menu(event: MenuEvent, selected: int, size: int) -> tuple[int, bool]:
     if event.index is not None:
         return (event.index, False) if 0 <= event.index < size else (selected, True)
     if event.action == MenuAction.UP:

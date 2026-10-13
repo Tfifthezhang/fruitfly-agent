@@ -142,7 +142,7 @@ class TerminalAuthorizationWorkflowTests(unittest.TestCase):
                 process.read_until('permission: once')
                 # The second approval is a distinct request; inspect the appended transcript.
                 deadline = time.monotonic() + 3
-                while process.output.count(b'3. Deny (Esc)') < 2:
+                while process.output.count(b'Permission required:') < 2:
                     self.assertLess(time.monotonic(), deadline)
                     process._read()
                 process.send(b'3' + (b'\r' if term == 'dumb' else b''))
@@ -162,7 +162,7 @@ class TerminalAuthorizationWorkflowTests(unittest.TestCase):
                 process.read_until('DONE-TWO')
                 process.send(b'/exit\r')
                 output = process.finish()
-                self.assertEqual(1, output.count('3. Deny (Esc)'))
+                self.assertEqual(1, output.count('Permission required:'))
                 self.assertIn('EFFECT-COUNT=2', output)
 
     def test_escape_denies_and_ctrl_c_cancels_without_effects(self):

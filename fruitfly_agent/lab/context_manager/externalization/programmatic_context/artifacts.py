@@ -10,7 +10,8 @@ from pathlib import Path
 import re
 import tempfile
 import time
-from typing import Any
+from typing import Any, Sequence
+from fruitfly_agent.core.data_model.messages import AgentMessage, TextBlock
 
 
 _REF = re.compile(r"^(?:context://sha256/)?([0-9a-f]{64})$")
@@ -106,6 +107,27 @@ class SessionArtifactStore:
         if len(data) != artifact.size_bytes:
             raise ValueError(f"context artifact size mismatch: {reference}")
         return artifact
+
+    def validate_recovery(self, messages: Sequence[AgentMessage]) -> None:
+        """Validate references emitted by the externalizer in saved model context."""
+        for message in messages:
+            content = message.content if hasattr(message, "content") else []
+            texts = (
+                [content] if isinstance(content, str)
+                else [block.text for block in content if isinstance(block, TextBlock)]
+            )
+            for text in texts:
+                if not text.startswith("[External context stored by rlm-ipython]\n"):
+                    continue
+                match = re.search(
+                    r"^reference: (context://sha256/[0-9a-f]{64})$", text, re.MULTILINE,
+                )
+                if match is None:
+                    raise ValueError("saved external context has an invalid artifact reference")
+                try:
+                    self.stat(match.group(1))
+                except (KeyError, OSError, TypeError, ValueError) as exc:
+                    raise ValueError(f"cannot restore external context: {exc}") from exc
 
     def read(self, reference: str, *, offset: int = 0, limit: int = 20_000) -> str:
         if offset < 0:

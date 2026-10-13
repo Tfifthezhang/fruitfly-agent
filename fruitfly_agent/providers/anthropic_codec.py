@@ -56,8 +56,10 @@ def convert_to_anthropic(messages: list[AgentMessage]) -> list[dict]:
         if isinstance(message, ToolResultMessage):
             # Merge consecutive tool results into ONE user message (API contract).
             results: list[dict] = []
-            while i < len(messages) and isinstance(messages[i], ToolResultMessage):
+            while i < len(messages):
                 result = messages[i]
+                if not isinstance(result, ToolResultMessage):
+                    break
                 if result.tool_call_id in assistant_ids:
                     results.append(
                         {
@@ -96,13 +98,13 @@ def convert_to_anthropic(messages: list[AgentMessage]) -> list[dict]:
             continue
 
         if isinstance(message, AssistantMessage):
-            content: list[dict] = []
+            assistant_content: list[dict] = []
             for block in message.content:
                 if isinstance(block, TextBlock):
-                    content.append({"type": "text", "text": block.text})
+                    assistant_content.append({"type": "text", "text": block.text})
                 elif isinstance(block, ToolCallBlock):
                     if block.id in result_ids:
-                        content.append(
+                        assistant_content.append(
                             {
                                 "type": "tool_use",
                                 "id": block.id,
@@ -111,7 +113,7 @@ def convert_to_anthropic(messages: list[AgentMessage]) -> list[dict]:
                             }
                         )
                 # ThinkingBlock: dropped at the API boundary (not replayable).
-            out.append({"role": "assistant", "content": content})
+            out.append({"role": "assistant", "content": assistant_content})
             i += 1
             continue
 

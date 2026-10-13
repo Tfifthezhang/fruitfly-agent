@@ -36,8 +36,8 @@ class _Factory:
     def new_session_path(self) -> Path:
         return Path(f"session-{len(self.opened) + 1}.jsonl")
 
-    def resumable_sessions(self, *, current_path, manifest_digest):
-        self.discovery = (current_path, manifest_digest)
+    def resumable_sessions(self, *, current_path):
+        self.discovery = current_path
         return self.candidates
 
 async def open_task_app(self, root, algorithm=None):

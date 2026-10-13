@@ -58,7 +58,7 @@ class BenchmarkAdapter(Protocol):
     def preflight(self, variant: str) -> PreflightResult: ...
 
     def run(
-        self, *, plan_path: Path, result_path: Path, variant: str,
+        self, *, request_path: Path, result_path: Path, variant: str,
         progress: ProgressSink | None = None,
     ) -> None: ...
 

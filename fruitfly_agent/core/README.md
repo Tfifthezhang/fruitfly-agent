@@ -48,4 +48,6 @@ Concrete algorithms belong in Lab. Extend Core only when an existing public prot
 
 `REQUEST_PREPARED` observes the final request projection after context transformations and budgeting. Estimates use the selected reducer; no estimator means unknown. Core records request statistics and Provider activity without storing complete request bodies. See [Session records](session/README.md) and [Provider waiting policy](../providers/PROVIDER_GUIDE.md#bound-waiting-and-retries).
 
+The loop keeps turn/tool budgets and termination decisions in one control flow. Request preparation commits hook changes, applies context stages, checks the reduction budget, and records the final projection before calling the Provider. Response recording persists the hook-adjusted assistant and receipt, updates cumulative usage, and then notifies observers. Cancellation after budgeting or request observation prevents the next Provider call.
+
 `AgentLoopConfig.tool_authorizer` is an execution-scoped generic authorization seam. It runs after final tool argument validation and does not use ordinary fail-open Hook callbacks. See [Tool authorization](tool_runtime/README.md#authorize-final-calls). Direct Core callers without an authorizer remain unrestricted; standard Run installs a policy.

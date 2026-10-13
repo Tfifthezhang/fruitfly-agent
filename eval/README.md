@@ -2,21 +2,11 @@
 
 [Up: FruitFlyAgent](../README.md)
 
-Optional benchmark evaluation using the Agent's existing public capabilities. Harbor owns task containers and official verifiers; Eval freezes conditions and reports results.
-
-## Available evaluations
-
-| Item | Current support |
-|---|---|
-| Studies | `current_setup`, `mechanism_comparison` |
-| Benchmarks | Terminal-Bench 2.0, SWE-bench Verified |
-| Backend | Local Docker through Harbor |
-| Formats | Request, frozen plan, trial, and report schema v1 |
-| Artifacts | `.fruitfly/eval/<evaluation-id>/` |
+Run a benchmark with one selected harness configuration and generate task results and reports. Harbor owns task containers and official verifiers. Eval remains an optional external consumer of the normal Agent.
 
 ## Install and inspect
 
-Harbor requires Python 3.12+, Docker Engine, and Compose v2. Installation downloads dependencies; real evaluations download tasks/images and call models, potentially incurring charges.
+Harbor requires Python 3.12+, Docker Engine, and Compose v2. Real evaluations download tasks/images and call models, potentially incurring charges.
 
 ```bash
 .venv/bin/python -m pip install -e '.[benchmarks]'
@@ -25,46 +15,48 @@ docker compose version
 .venv/bin/python -m eval catalog --json
 ```
 
-Use `/eval` in an idle Agent session, or run the standalone CLI with an `EvaluationRequest`. Catalog inspection does not run a benchmark or request a model. See the [developer guide](DEVELOPER_GUIDE.md) for complete setup, request creation, logs, and extension.
-
-| Variant | Behavior |
+| Item | Support |
 |---|---|
-| `smoke` | Fixed single task; connectivity and execution check |
-| `no_gpu` | Full dataset without NVIDIA preflight |
-| `gpu` | Full dataset with NVIDIA-tool preflight |
+| Benchmarks | Terminal-Bench 2.0, SWE-bench Verified |
+| Backend | Local Docker through Harbor |
+| Variants | Fixed single-task `smoke`, full `no_gpu`, full `gpu` |
+| Formats | Request, runner result, trial, and report schema 2 |
+| Output | `.fruitfly/eval/<evaluation-id>/` |
 
-Resource labels do not override task CPU/RAM/time limits. Preflight does not prove image availability, architecture compatibility, free disk space, or Provider connectivity.
+Preflight checks executable/Engine/Compose availability. It does not prove image availability, free disk space, architecture compatibility, or model connectivity.
 
-## Select installation material
+## Run and read reports
 
-Harbor installs the complete validated source checkout by default when running from source or an editable installation. Wheel installations must set `FRUITFLY_EVAL_PACKAGE` to an absolute path to a complete FruitFlyAgent source directory or a built wheel. An explicit value also overrides checkout discovery. Material must identify `fruitfly-agent` version `0.1`; missing build inputs or invalid wheels fail before container task startup.
-
-Source installation stages Python package files, `pyproject.toml`, `README.md`, and license notices. It excludes local secrets, caches, and sessions. Wheel installation uploads the selected wheel. Neither path snapshots arbitrary learning state or proves source equivalence; retain the exact source/artifact and its hash for research. Dependency installation inside real containers still uses the network. The benchmark runner reads workspace `.fruitfly/secrets.env`, falling back to root `.env` only when absent; files are not merged and process environment values take precedence. See [Configuration](../CONFIGURATION.md#files-and-precedence).
-
-## Commands and results
+Use `/eval` in an idle Agent session, select a benchmark and resource variant, and confirm **Run**. It uses the selected saved configuration and creates independent task sessions. See the [developer guide](DEVELOPER_GUIDE.md) for request examples, logs, and adapter development.
 
 | Command | Purpose |
 |---|---|
-| `python -m eval catalog --json` | Inspect modes, benchmarks, variants, and availability. |
-| `python -m eval plan --request request.json` | Validate and freeze declared conditions. |
-| `python -m eval run --request request.json` | Run an explicitly authorized evaluation. |
-| `python -m eval report EVALUATION_ID --json` | Read a saved report. |
+| `python -m eval catalog --json` | Inspect benchmarks, variants, and availability |
+| `python -m eval run --request request.json` | Execute one explicitly authorized benchmark request |
+| `python -m eval report EVALUATION_ID --json` | Read a stored report |
 
-`completed` means report generation finished, not that every task passed. Missing usage is unknown, not zero. Synthetic adapters and single-task smoke runs do not establish benchmark capability.
+Reports include the selected configuration, execution settings, scores, available usage/cost/latency, errors, and artifact paths. Task records include actual runtime manifests when Harbor supplies them. Missing measurements remain unknown. `completed` means report generation finished; inspect task outcomes. A smoke run does not establish general capability.
+
+Requests reject unsupported experiment fields. Stored JSON and Markdown reports are read directly without regeneration. Eval has no controlled-comparison or frozen-plan workflow.
+
+## Select installation material
+
+Harbor installs the validated source checkout when available. Wheel installations must set `FRUITFLY_EVAL_PACKAGE` to an absolute path to complete FruitFlyAgent source or a built wheel. An explicit value overrides checkout discovery. Material must identify `fruitfly-agent` version `0.1`; invalid material fails before task startup.
+
+Source installation stages package files, build inputs, README, and license notices. It excludes secrets, caches, and sessions. The selected profile and model catalog are copied into runner artifacts; secret values stay in the process environment. Workspace `.fruitfly/secrets.env` is used, with root `.env` fallback only when absent; process values take precedence. See [Configuration](../CONFIGURATION.md#files-and-precedence).
 
 ## Modules
 
-| Module / file | Responsibility |
+| File / module | Responsibility |
 |---|---|
-| [Benchmarks](benchmarks/README.md) | Dataset identities, preflight, runner commands, and official results |
-| [Studies](studies/README.md) | Conditions and controlled mechanism ablations |
-| [contracts.py](contracts.py), [planning.py](planning.py) | Requests and frozen conditions |
+| [Benchmarks](benchmarks/README.md) | Preflight, runner commands, official results, and logs |
+| [contracts.py](contracts.py) | Single-configuration requests and task results |
 | [execution.py](execution.py), [storage.py](storage.py) | Execution, reports, and artifacts |
-| [harbor_agent.py](harbor_agent.py) | Install and run the normal Agent in task containers |
-| [installation.py](installation.py) | Validate source build inputs or wheel identity before installation |
-| [Developer guide](DEVELOPER_GUIDE.md) | Running, diagnosis, and extension |
+| [report.py](report.py) | JSON and Markdown reports |
+| [harbor_agent.py](harbor_agent.py) | Install/run the normal Agent inside task containers |
+| [installation.py](installation.py) | Validate source or wheel build inputs |
 
-Eval does not define production lifecycle or algorithm interfaces. Removing it must leave normal interaction intact.
+Removing Eval leaves normal interaction and Lab development intact.
 
 ```bash
 .venv/bin/python -m unittest discover -s tests/eval -t . -v

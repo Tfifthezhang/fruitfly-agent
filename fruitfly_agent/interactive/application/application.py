@@ -181,18 +181,14 @@ class AgentApplication:
         return self._require_handle().session.conversation()
 
     def resumable_sessions(self) -> tuple[ResumableSession, ...]:
-        """Return compatible non-empty sessions without exposing storage details."""
+        """Return persisted sessions and availability without transcript contents."""
 
         handle = self._require_handle()
         discover = getattr(self._factory, "resumable_sessions", None)
         if discover is None:
             raise RuntimeError("this runtime factory does not support session discovery")
-        digest = handle.manifest.get("digest")
-        if not isinstance(digest, str) or not digest:
-            raise RuntimeError("the active runtime has no manifest digest")
         return discover(
             current_path=Path(handle.session.status.session_path),
-            manifest_digest=digest,
         )
 
     def _check_submission_state(self, operation: str) -> None:

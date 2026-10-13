@@ -4,10 +4,11 @@ import asyncio
 import io
 import os
 import unittest
+from dataclasses import replace
 from unittest.mock import patch
 
 from fruitfly_agent.interactive import TerminalRenderer
-from fruitfly_agent.interactive.contracts.events import AssistantTextDelta, CompactionStarted, RunActivityChanged, RunStarted, ToolOutput, ToolStarted
+from fruitfly_agent.interactive.contracts.events import AssistantTextDelta, AssistantThinkingDelta, CompactionStarted, RunActivityChanged, RunStarted, ToolOutput, ToolStarted
 from tests.support.application import offline_session
 from tests.support.terminal import TtyStringIO, run_finished
 
@@ -22,6 +23,76 @@ class _ActivityTtyStringIO(TtyStringIO):
 
 
 class TerminalRendererTests(unittest.IsolatedAsyncioTestCase):
+    async def test_hidden_reasoning_preserves_answer_stream_and_markdown(self) -> None:
+        answer = (
+            AssistantTextDelta(run_id="run-1", text="**Complete"),
+            AssistantTextDelta(run_id="run-1", text=" answer**\n"),
+            run_finished(),
+        )
+        for tty, no_color in ((False, False), (True, False), (True, True)):
+            with self.subTest(tty=tty, no_color=no_color):
+                expected = await self.render_events(*answer, tty=tty, no_color=no_color)
+                actual = await self.render_events(
+                    AssistantThinkingDelta(run_id="run-1", text="hidden before answer"),
+                    answer[0],
+                    AssistantThinkingDelta(run_id="run-1", text="hidden inside Markdown"),
+                    answer[1], answer[2],
+                    tty=tty, no_color=no_color,
+                )
+                self.assertEqual(actual, expected)
+                self.assertNotIn("thinking>", actual)
+
+    async def test_redirected_reasoning_has_one_status_and_no_text(self) -> None:
+        activity = RunActivityChanged(run_id="run-1", phase="receiving_thinking")
+        rendered = await self.render_events(
+            activity,
+            AssistantThinkingDelta(run_id="run-1", text="hidden first chunk"),
+            activity,
+            AssistantThinkingDelta(run_id="run-1", text="hidden second chunk"),
+            RunActivityChanged(run_id="run-1", phase="receiving_answer"),
+            AssistantTextDelta(run_id="run-1", text="answer"),
+            finish_line=True,
+        )
+        self.assertEqual(rendered, (
+            "[activity] Receiving model reasoning\n"
+            "[activity] Receiving answer\n🪰 answer\n"
+        ))
+
+    async def test_reasoning_activity_survives_deltas_and_clears_on_all_end_paths(self) -> None:
+        endings = (
+            run_finished(),
+            replace(run_finished(), stop_reason="aborted"),
+            replace(run_finished(), is_error=True, error_details="offline failure"),
+            None,
+        )
+        for ending in endings:
+            with self.subTest(ending=ending), patch.dict(
+                os.environ, {"TERM": "xterm-256color"}, clear=True,
+            ):
+                output = _ActivityTtyStringIO()
+                renderer = TerminalRenderer(output)
+                try:
+                    await renderer.render(RunActivityChanged(
+                        run_id="run-1", phase="receiving_thinking",
+                    ))
+                    self.assertIn("Receiving model reasoning", output.activities[-1])
+                    initial_activities = list(output.activities)
+                    for chunk in ("hidden first chunk", "hidden second chunk"):
+                        await renderer.render(AssistantThinkingDelta(run_id="run-1", text=chunk))
+                    self.assertEqual(output.activities, initial_activities)
+                    self.assertEqual(output.getvalue(), "")
+                    if ending is not None:
+                        await renderer.render(ending)
+                        self.assertEqual(output.activities[-1], "")
+                    await renderer.close()
+                    self.assertEqual(output.activities[-1], "")
+                    if ending is not None and ending.is_error:
+                        self.assertIn("offline failure", output.getvalue())
+                    if ending is not None and ending.stop_reason == "aborted":
+                        self.assertIn("run cancelled", output.getvalue())
+                finally:
+                    await renderer.close()
+
     async def render_events(self, *events, tty=False, no_color=False, finish_line=False):
         output = TtyStringIO() if tty else io.StringIO()
         environment = {"TERM": "xterm-256color"}

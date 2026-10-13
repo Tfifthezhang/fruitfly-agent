@@ -18,7 +18,7 @@ from fruitfly_agent.interactive.terminal.io.menu import (
 
 
 class TerminalResumeFrontend:
-    """Choose one compatible session without reading storage directly."""
+    """Choose saved history and show unavailable files without reading storage directly."""
 
     def __init__(
         self,
@@ -42,6 +42,7 @@ class TerminalResumeFrontend:
 
     def run(self) -> ResumableSession | None:
         selected = 0
+        notice = ""
         rows = tuple(self._row(item) for item in self.sessions) + (
             MenuRow("Back", "Keep using the current session"),
         )
@@ -49,11 +50,11 @@ class TerminalResumeFrontend:
             self.renderer.render(
                 title="FruitFlyAgent · resume",
                 subtitle=(
-                    "Choose a compatible persisted session. Sessions are switched, "
-                    "not merged."
+                    "Continue saved history using the selected current configuration."
                 ),
                 rows=rows,
                 selected=selected,
+                notice=notice,
                 instructions=(
                     "↑↓ move · Enter resume · Esc back · q close menu"
                     if self.renderer.ansi
@@ -78,6 +79,9 @@ class TerminalResumeFrontend:
                 continue
             if selected == len(self.sessions):
                 return None
+            if not self.sessions[selected].available:
+                notice = self.sessions[selected].reason
+                continue
             return self.sessions[selected]
 
     @staticmethod
@@ -91,6 +95,8 @@ class TerminalResumeFrontend:
             value for value in (session.profile, session.model, f"{session.prompt_label} {session.prompt_hash[:15]}…" if session.prompt_label else "") if value
         )
         detail = f"{runtime} · {session.path}" if runtime else session.path
+        if not session.available:
+            detail = f"Unavailable: {session.reason} · {session.path}"
         return MenuRow(label, detail)
 
 

@@ -9,14 +9,17 @@ state, while an update can no longer overwrite already displayed conversation.
 from __future__ import annotations
 
 import codecs
+from dataclasses import dataclass, field
 import os
 import re
 import select
 import threading
-from typing import TextIO
+from typing import Sequence, TextIO
 
 from fruitfly_agent.interactive.terminal.io.text import (
     cell_width,
+    colors_enabled,
+    safe_terminal_text,
     supports_ansi,
     terminal_columns,
     truncate_cells,
@@ -49,7 +52,7 @@ def prompt_frame_lines(columns: int, label: str = "prompt") -> tuple[str, str]:
 class InputInterrupted(Exception):
     """An editor control key; never a process-level KeyboardInterrupt."""
 
-    def __init__(self, *, handled: bool = False):
+    def __init__(self, *, handled: bool = False) -> None:
         super().__init__("input interrupted")
         self.handled = handled
 
@@ -75,6 +78,8 @@ class InlineTerminalDisplay:
         self._activity = ""
         self._input = ""
         self._cursor = 0
+        self._choices: tuple[str, ...] = ()
+        self._selected_choice = 0
         self._live_rows = 0
         self._cursor_live_row = 0
         self._lock = threading.RLock()
@@ -187,6 +192,16 @@ class InlineTerminalDisplay:
                 self._render_live_locked()
                 self.output.flush()
 
+    def set_choices(self, labels: Sequence[str] = (), selected: int = 0) -> None:
+        """Replace the input frame with transient, keyboard-selectable choices."""
+        with self._lock:
+            self._choices = tuple(
+                safe_terminal_text(label).replace("\n", " ").replace("\t", " ")
+                for label in labels
+            )
+            self._selected_choice = min(max(selected, 0), max(0, len(self._choices) - 1))
+            self.set_input("", 0)
+
     def _measure_locked(self) -> None:
         if self._fixed_rows is not None and self._fixed_columns is not None:
             rows, columns = self._fixed_rows, self._fixed_columns
@@ -241,6 +256,10 @@ class InlineTerminalDisplay:
             self._cursor,
             input_width,
         )
+        if self._choices:
+            all_input_lines = [truncate_cells(label, input_width) for label in self._choices]
+            cursor_line, cursor_cells = self._selected_choice, 0
+        choice_footer = int(bool(self._choices))
         pending_lines = (
             _visual_lines(self._pending_output, max(4, self._columns - 1))
             if self._pending_output
@@ -261,7 +280,7 @@ class InlineTerminalDisplay:
         )
         preview_budget = max(
             0,
-            self._rows - len(pending_lines) - len(activity_lines) - 4,
+            self._rows - len(pending_lines) - len(activity_lines) - 4 - choice_footer,
         )
         preview_lines = (
             all_preview_lines[-preview_budget:] if preview_budget else []
@@ -274,13 +293,14 @@ class InlineTerminalDisplay:
             - len(pending_lines)
             - len(preview_lines)
             - len(activity_lines)
-            - 3,
+            - 3
+            - choice_footer,
         )
         input_start = max(0, cursor_line - max_input_lines + 1)
         input_lines = all_input_lines[input_start : input_start + max_input_lines]
         cursor_line -= input_start
 
-        top, bottom = prompt_frame_lines(self._columns)
+        top, bottom = prompt_frame_lines(self._columns, "permission" if self._choices else "prompt")
         rows: list[str] = [
             *pending_lines,
             *preview_lines,
@@ -288,9 +308,18 @@ class InlineTerminalDisplay:
             top,
         ]
         for index, input_text in enumerate(input_lines, start=input_start):
-            prefix = "❯ " if index == 0 else "│ "
-            rows.append(f"{prefix}{input_text}")
+            if self._choices:
+                selected = index == self._selected_choice
+                row = f"{'❯' if selected else ' '} {input_text}"
+                if selected and colors_enabled(self.output):
+                    row = f"\x1b[1;36m{row}{_RESET_STYLE}"
+                rows.append(row)
+            else:
+                prefix = "❯ " if index == 0 else "│ "
+                rows.append(f"{prefix}{input_text}")
         rows.append(bottom)
+        if self._choices:
+            rows.append(truncate_cells("↑↓ move · Enter select · Esc deny · 1/2/3 select", self._columns - 1))
         for index, row in enumerate(rows):
             self.output.write(f"{_RESET_STYLE}{_CLEAR_LINE}{row}")
             if index < len(rows) - 1:
@@ -312,6 +341,72 @@ class InlineTerminalDisplay:
         self._cursor_live_row = input_row
 
 
+@dataclass
+class _InputBuffer:
+    """One line's text, cursor, and temporary history navigation state."""
+    history_index: int
+    characters: list[str] = field(default_factory=list)
+    cursor: int = 0
+    draft: str = ""
+
+    def control(self, first: bytes) -> None:
+        if first == b"\x04":
+            if self.cursor < len(self.characters):
+                del self.characters[self.cursor]
+        elif first in {b"\x7f", b"\x08"}:
+            if self.cursor:
+                self.cursor -= 1
+                del self.characters[self.cursor]
+        elif first == b"\x01":
+            self.cursor = 0
+        elif first == b"\x05":
+            self.cursor = len(self.characters)
+        elif first == b"\x15":
+            del self.characters[:self.cursor]
+            self.cursor = 0
+        elif first == b"\x17":
+            while self.cursor and self.characters[self.cursor - 1].isspace():
+                self.cursor -= 1
+                del self.characters[self.cursor]
+            while self.cursor and not self.characters[self.cursor - 1].isspace():
+                self.cursor -= 1
+                del self.characters[self.cursor]
+
+    def escape(self, sequence: bytes, descriptor: int, encoding: str, history: Sequence[str]) -> None:
+        if sequence == _BRACKETED_PASTE_START:
+            pasted = _decode_paste(
+                _read_bracketed_paste(descriptor),
+                encoding,
+            )
+            if pasted:
+                self.characters[self.cursor:self.cursor] = pasted
+                self.cursor += len(pasted)
+        elif sequence in {b"\x1b[A", b"\x1bOA"} and history:
+            if self.history_index == len(history):
+                self.draft = "".join(self.characters)
+            self.history_index = max(0, self.history_index - 1)
+            self.characters = list(history[self.history_index])
+            self.cursor = len(self.characters)
+        elif sequence in {b"\x1b[B", b"\x1bOB"}:
+            if self.history_index < len(history) - 1:
+                self.history_index += 1
+                self.characters = list(history[self.history_index])
+            elif self.history_index == len(history) - 1:
+                self.history_index = len(history)
+                self.characters = list(self.draft)
+            self.cursor = len(self.characters)
+        elif sequence in {b"\x1b[D", b"\x1bOD"}:
+            self.cursor = max(0, self.cursor - 1)
+        elif sequence in {b"\x1b[C", b"\x1bOC"}:
+            self.cursor = min(len(self.characters), self.cursor + 1)
+        elif sequence in {b"\x1b[H", b"\x1bOH", b"\x1b[1~"}:
+            self.cursor = 0
+        elif sequence in {b"\x1b[F", b"\x1bOF", b"\x1b[4~"}:
+            self.cursor = len(self.characters)
+        elif sequence == b"\x1b[3~" and self.cursor < len(self.characters):
+            del self.characters[self.cursor]
+
+
 class IsolatedLineEditor:
     """POSIX non-canonical editor with persistent submission history."""
 
@@ -319,20 +414,17 @@ class IsolatedLineEditor:
         self.input = input_stream
         self.display = display
         self._interrupted = threading.Event()
-        self._previous_terminal_state = None
+        self._previous_terminal_state: list | None = None
         self._history: list[str] = []
         self._choices: tuple[str, ...] = ()
         self._selected_choice = 0
         self._choice_request = ""
 
-    def set_choices(self, labels=(), request_id=""):
+    def set_choices(self, labels: Sequence[str] = (), request_id: str = "") -> None:
         self._choice_request = request_id
         self._choices = tuple(labels)
         self._selected_choice = 0
-        if labels:
-            self.display.set_input("permission: " + labels[0], 0)
-        else:
-            self.display.set_input("", 0)
+        self.display.set_choices(self._choices)
 
     def interrupt(self) -> None:
         self._interrupted.set()
@@ -376,10 +468,7 @@ class IsolatedLineEditor:
 
     def read_line(self) -> str | None:
         descriptor = self.input.fileno()
-        characters: list[str] = []
-        cursor = 0
-        history_index = len(self._history)
-        draft = ""
+        buffer = _InputBuffer(len(self._history))
         encoding = getattr(self.input, "encoding", None) or "utf-8"
         decoder = codecs.getincrementaldecoder(encoding)(errors="replace")
         owns_terminal_state = self._previous_terminal_state is None
@@ -400,20 +489,12 @@ class IsolatedLineEditor:
                     self.display.set_input("", 0)
                     return None
                 if self._choices and first != b"\x03":
-                    if first in {b"\r", b"\n"}:
-                        return "\x00authorize:" + self._choice_request + ":" + str(self._selected_choice + 1)
-                    if first in {b"1", b"2", b"3"}:
-                        return "\x00authorize:" + self._choice_request + ":" + first.decode()
-                    if first == b"\x1b":
-                        sequence = _read_escape_sequence(descriptor, first)
-                        if sequence == b"\x1b":
-                            return "\x00authorize:" + self._choice_request + ":3"
-                        if sequence in {b"\x1b[A", b"\x1b[B"}:
-                            self._selected_choice = (self._selected_choice + (-1 if sequence.endswith(b"A") else 1)) % 3
-                    self.display.set_input("permission: " + self._choices[self._selected_choice], 0)
+                    choice = self._read_choice(descriptor, first)
+                    if choice is not None:
+                        return choice
                     continue
                 if first in {b"\r", b"\n"}:
-                    value = "".join(characters)
+                    value = "".join(buffer.characters)
                     if value and (not self._history or self._history[-1] != value):
                         self._history.append(value)
                     self.display.set_input("", 0)
@@ -421,74 +502,38 @@ class IsolatedLineEditor:
                 if first == b"\x03":
                     self.display.set_input("", 0)
                     raise InputInterrupted
-                if first == b"\x04":
-                    if not characters:
-                        self.display.set_input("", 0)
-                        return None
-                    if cursor < len(characters):
-                        del characters[cursor]
-                elif first in {b"\x7f", b"\x08"}:
-                    if cursor:
-                        cursor -= 1
-                        del characters[cursor]
-                elif first == b"\x01":
-                    cursor = 0
-                elif first == b"\x05":
-                    cursor = len(characters)
-                elif first == b"\x15":
-                    del characters[:cursor]
-                    cursor = 0
-                elif first == b"\x17":
-                    while cursor and characters[cursor - 1].isspace():
-                        cursor -= 1
-                        del characters[cursor]
-                    while cursor and not characters[cursor - 1].isspace():
-                        cursor -= 1
-                        del characters[cursor]
-                elif first == b"\x1b":
-                    sequence = _read_escape_sequence(descriptor, first)
-                    if sequence == _BRACKETED_PASTE_START:
-                        pasted = _decode_paste(
-                            _read_bracketed_paste(descriptor),
-                            encoding,
-                        )
-                        if pasted:
-                            characters[cursor:cursor] = pasted
-                            cursor += len(pasted)
-                    elif sequence in {b"\x1b[A", b"\x1bOA"} and self._history:
-                        if history_index == len(self._history):
-                            draft = "".join(characters)
-                        history_index = max(0, history_index - 1)
-                        characters = list(self._history[history_index])
-                        cursor = len(characters)
-                    elif sequence in {b"\x1b[B", b"\x1bOB"}:
-                        if history_index < len(self._history) - 1:
-                            history_index += 1
-                            characters = list(self._history[history_index])
-                        elif history_index == len(self._history) - 1:
-                            history_index = len(self._history)
-                            characters = list(draft)
-                        cursor = len(characters)
-                    elif sequence in {b"\x1b[D", b"\x1bOD"}:
-                        cursor = max(0, cursor - 1)
-                    elif sequence in {b"\x1b[C", b"\x1bOC"}:
-                        cursor = min(len(characters), cursor + 1)
-                    elif sequence in {b"\x1b[H", b"\x1bOH", b"\x1b[1~"}:
-                        cursor = 0
-                    elif sequence in {b"\x1b[F", b"\x1bOF", b"\x1b[4~"}:
-                        cursor = len(characters)
-                    elif sequence == b"\x1b[3~" and cursor < len(characters):
-                        del characters[cursor]
+                if first == b"\x04" and not buffer.characters:
+                    self.display.set_input("", 0)
+                    return None
+                if first == b"\x1b":
+                    buffer.escape(_read_escape_sequence(descriptor, first), descriptor, encoding, self._history)
+                elif first in {b"\x04", b"\x7f", b"\x08", b"\x01", b"\x05", b"\x15", b"\x17"}:
+                    buffer.control(first)
                 else:
                     decoded = decoder.decode(first, final=False)
                     for character in decoded:
                         if character.isprintable():
-                            characters.insert(cursor, character)
-                            cursor += 1
-                self.display.set_input("".join(characters), cursor)
+                            buffer.characters.insert(buffer.cursor, character)
+                            buffer.cursor += 1
+                self.display.set_input("".join(buffer.characters), buffer.cursor)
         finally:
             if owns_terminal_state:
                 self.stop()
+
+    def _read_choice(self, descriptor: int, first: bytes) -> str | None:
+        """Consume a permission-selection key without changing the prompt buffer."""
+        if first in {b"\r", b"\n"}:
+            return "\x00authorize:" + self._choice_request + ":" + str(self._selected_choice + 1)
+        if first in {b"1", b"2", b"3"}:
+            return "\x00authorize:" + self._choice_request + ":" + first.decode()
+        if first == b"\x1b":
+            sequence = _read_escape_sequence(descriptor, first)
+            if sequence == b"\x1b":
+                return "\x00authorize:" + self._choice_request + ":3"
+            if sequence in {b"\x1b[A", b"\x1b[B", b"\x1bOA", b"\x1bOB"}:
+                self._selected_choice = (self._selected_choice + (-1 if sequence.endswith(b"A") else 1)) % len(self._choices)
+        self.display.set_choices(self._choices, self._selected_choice)
+        return None
 
 
 def create_inline_terminal(
@@ -514,7 +559,7 @@ def _read_escape_sequence(descriptor: int, first: bytes) -> bytes:
     sequence = first
     while len(sequence) < 16 and select.select([descriptor], [], [], 0.02)[0]:
         sequence += os.read(descriptor, 1)
-        if sequence[-1:] in b"~ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz":
+        if sequence != b"\x1bO" and sequence[-1:] in b"~ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz":
             break
     return sequence
 

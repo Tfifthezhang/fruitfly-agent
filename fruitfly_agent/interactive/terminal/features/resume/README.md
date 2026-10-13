@@ -6,10 +6,10 @@ Use `TerminalResumeFrontend` as the menu entry and `resume_handler` to bind the 
 
 | File | Responsibility |
 |---|---|
-| [menu.py](menu.py) | Compatible persisted-session picker |
+| [menu.py](menu.py) | Persisted-session picker with availability and reasons |
 | [command.py](command.py) | Relative-path resolution, discovery, restoration request, and post-success history |
 
-The host discovers sessions and validates persisted contents/manifests. This feature only selects a path and calls the public resume capability. Successful restoration displays canonical history; failure or cancellation retains the current conversation and does not display target history.
+The host inspects sessions without repairing them, reports availability, and validates persisted contents/manifests. Continuation uses current configuration; historical environment differences do not hide sessions. This feature only selects a path and calls the public resume capability. Successful restoration displays canonical history; failure or cancellation retains the current conversation and does not display target history.
 
 Menu selection borrows the existing reader/display. No model calls, tool replay, configuration writes, or session merging. Recovery validation and storage belong to Run.
 

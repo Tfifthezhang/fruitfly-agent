@@ -5,6 +5,7 @@ from inspect import isawaitable
 from pathlib import Path
 
 from fruitfly_agent.core.session.storage import Session
+from fruitfly_agent.core.extensions.protocols import RecoveryValidator
 from fruitfly_agent.interactive import InteractiveSession
 from fruitfly_agent.interactive.application import RuntimeHandle
 from fruitfly_agent.lab.algorithms.targets import TEXT_TARGET_PREFIX, TextTarget
@@ -13,7 +14,7 @@ from fruitfly_agent.run.configuration.resolution import resolve_profile_models
 from fruitfly_agent.run.configuration.profile import HarnessProfile
 from .assembly import RuntimeAssembly
 from .recovery import (new_session_path, check_session_manifest, record_session_manifest,
-                       session_artifact_bindings, session_prompt_reference)
+                       session_manifests)
 
 
 @dataclass(frozen=True)
@@ -27,7 +28,7 @@ class PreparedRuntime:
 
 class RuntimePreparer:
     def __init__(self, *, workspace, catalog, environment, artifacts, provider_registry,
-                 pinned_bindings, task_pack_sources, permission_policy, stock_catalog, build, describe):
+                 pinned_bindings, task_pack_sources, permission_policy, build, describe):
         self.cwd = workspace
         self.catalog = catalog
         self.environment = environment
@@ -36,7 +37,6 @@ class RuntimePreparer:
         self.data_artifact_bindings = dict(pinned_bindings)
         self.task_pack_sources = task_pack_sources
         self.permission_policy = permission_policy
-        self.stock_catalog = stock_catalog
         self.build = build
         self.describe = describe
 
@@ -62,19 +62,7 @@ class RuntimePreparer:
             if resume and not messages:
                 raise ValueError("nothing to resume")
             artifact_bindings = {**selection.profile.artifact_bindings, **self.data_artifact_bindings}
-            if resume:
-                saved_bindings = session_artifact_bindings(session)
-                if saved_bindings:
-                    if self.data_artifact_bindings and self.data_artifact_bindings != saved_bindings:
-                        raise ValueError(
-                            "runtime data artifact bindings differ from this session"
-                        )
-                    artifact_bindings = saved_bindings
             profile = selection.profile
-            if resume:
-                saved_prompt = session_prompt_reference(session)
-                if saved_prompt is not None:
-                    profile = replace(profile, prompt=saved_prompt)
             runtime = self.build(
                 profile,
                 config_path=selection.config_path,
@@ -89,11 +77,20 @@ class RuntimePreparer:
                 task_pack_sources=self.task_pack_sources,
                 permission_policy=self.permission_policy,
             )
-            check_session_manifest(
-                session, runtime, resume=resume,
-                allow_legacy_default_prompt=self.stock_catalog,
-            )
-            record_session_manifest(session, runtime)
+            check_session_manifest(session, runtime, resume=resume)
+            saved = session_manifests(session)
+            reset_projection = False
+            if resume and saved and (
+                saved[-1].get("components") != runtime.manifest.to_dict()["components"]
+                or saved[-1].get("context_pipeline") != runtime.manifest.context_pipeline
+            ):
+                # Rebuild projections from canonical facts when context/tool implementations change.
+                messages = session.canonical_messages()
+                reset_projection = True
+            if resume:
+                for component in runtime.components.values():
+                    if isinstance(component, RecoveryValidator):
+                        component.validate_recovery(tuple(messages))
             visible_mechanism_ids, details, tool_categories = self.describe(runtime)
             interaction = InteractiveSession(
                 runtime.config,
@@ -127,6 +124,7 @@ class RuntimePreparer:
                 raise TypeError("named text targets must implement TextTarget")
 
             def activate():
+                record_session_manifest(session, runtime, messages=messages if reset_projection else None)
                 activated(PreparedRuntime(runtime, profile, optimizer, targets, resume))
             handle.activate_callback = activate
             return handle

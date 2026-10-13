@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 import sys
 import tempfile
-from typing import Callable
+from typing import Awaitable, Callable, Sequence
 
 from .search import TaskCase
 
@@ -21,7 +21,7 @@ class ScoreResult:
     score: float
     feedback: str = ""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if isinstance(self.score, bool) or not isinstance(self.score, (float, int)) or not math.isfinite(self.score):
             raise ValueError("score must be a finite number")
         if not isinstance(self.feedback, str) or len(self.feedback) > 1000:
@@ -36,23 +36,23 @@ class TaskPolicy:
     execution_id: str
     required_fields: frozenset[str]
     optional_fields: frozenset[str]
-    project: Callable
-    score: Callable
+    project: Callable[[dict], TaskCase]
+    score: Callable[[str, TaskCase], ScoreResult | Awaitable[ScoreResult]]
     execution_notice: str = "No generated code execution."
-    check_available: Callable = lambda: None
+    check_available: Callable[[], None] = lambda: None
     acceptance_example: str = ""
 
 
-def _text_case(row):
+def _text_case(row: dict) -> TaskCase:
     return TaskCase(row["input"], row["expected"])
 
 
-def _text_score(output, case):
+def _text_score(output: str, case: TaskCase) -> ScoreResult:
     return ScoreResult(float(" ".join(output.casefold().split()) == " ".join(case.expected.casefold().split())),
                        "scored by normalized-exact-v1")
 
 
-def _json_value(value, depth=0):
+def _json_value(value: object, depth: int = 0) -> None:
     if depth > 8:
         raise ValueError("test data exceeds depth 8")
     if value is None or isinstance(value, bool):
@@ -72,7 +72,7 @@ def _json_value(value, depth=0):
     raise ValueError("tests must contain bounded JSON data")
 
 
-def python_case(row):
+def python_case(row: dict) -> TaskCase:
     """Only literal call checks, never executable test code supplied by a package."""
     entry = row.get("entry_point")
     if not isinstance(entry, str) or not entry.isidentifier() or keyword.iskeyword(entry) or entry.startswith("_") or len(entry) > 80:
@@ -96,7 +96,7 @@ def python_case(row):
     return TaskCase(row["input"], row.get("expected", "Pass all declared function tests."), verification)
 
 
-def _code(output):
+def _code(output: str) -> str:
     source = output.strip()
     if source.startswith("```"):
         lines = source.splitlines()
@@ -108,7 +108,9 @@ def _code(output):
     return source
 
 
-async def score_python(output, case, *, worker=None, timeout=4.0):
+async def score_python(
+    output: str, case: TaskCase, *, worker: str | None = None, timeout: float = 4.0,
+) -> ScoreResult:
     """Run the restricted subset in a short-lived process; kill/reap on cancellation."""
     if os.name != "posix":
         raise RuntimeError("restricted Python function tests currently require POSIX")
@@ -159,15 +161,15 @@ async def score_python(output, case, *, worker=None, timeout=4.0):
     return ScoreResult(result["score"], result["feedback"][:1000])
 
 
-def _python_available():
+def _python_available() -> None:
     if os.name != "posix":
         raise ValueError("restricted Python function tests currently require POSIX")
 
 
-def builtin_task_policies():
+def builtin_task_policies() -> tuple[TaskPolicy, ...]:
     worker = Path(__file__).with_name("python_worker.py").read_text()
     implementation = hashlib.sha256(worker.encode() + Path(__file__).read_bytes()).hexdigest()
-    async def python_score(output, case):
+    async def python_score(output: str, case: TaskCase) -> ScoreResult:
         return await score_python(output, case, worker=worker)
     return (
         TaskPolicy("normalized-exact-v1", "single-turn-text-v1", "accuracy", "normalized-exact-v1",
@@ -180,7 +182,7 @@ def builtin_task_policies():
     )
 
 
-def task_policy(policy_id, *, policies=None):
+def task_policy(policy_id: object, *, policies: Sequence[TaskPolicy] | None = None) -> TaskPolicy:
     matches = [p for p in (builtin_task_policies() if policies is None else policies) if p.policy_id == policy_id]
     if len(matches) != 1:
         raise ValueError("unknown or duplicate task policy: " + str(policy_id))

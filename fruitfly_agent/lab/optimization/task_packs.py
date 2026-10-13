@@ -12,31 +12,53 @@ import re
 import tempfile
 import unicodedata
 from uuid import uuid4
-from typing import Protocol
+from typing import Iterator, NotRequired, Protocol, Sequence, TypedDict, cast
 
-from .tasks import load_task_cases
+from .tasks import TaskSuite, load_task_cases
 from .search import TaskCase
-from .scoring import builtin_task_policies, task_policy
+from .scoring import TaskPolicy, builtin_task_policies, task_policy
 
 TASK_PACK_COMPONENT = "optimization-task-packs"
 LEGACY_PACK_ID = "configured-cases"
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 
 
+class _Objective(TypedDict):
+    policy_id: str
+    direction: str
+
+
+class _TaskMaterial(TypedDict):
+    """Validated metadata and policy-defined case mappings, never a raw JSON input."""
+    schema_version: int
+    id: str
+    name: str
+    description: str
+    task_schema: str
+    target_schema: str
+    compatible_targets: list[str]
+    objective: _Objective
+    files: dict[str, str]
+    default_direction: NotRequired[str]
+    train: list[dict]
+    validation: list[dict]
+    holdout: NotRequired[list[dict]]
+
+
 def digest(value: bytes) -> str:
     return "sha256:" + hashlib.sha256(value).hexdigest()
 
 
-def encoded(value) -> bytes:
+def encoded(value: object) -> bytes:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
 
 
-def readable_json(value) -> bytes:
+def readable_json(value: object) -> bytes:
     """Readable package JSON: expand structure, keep deeply nested values together.
 
     This controls presentation only; content-addressed receipts still use encoded().
     """
-    def render(item, depth=0):
+    def render(item: object, depth: int = 0) -> str:
         compact = json.dumps(item, ensure_ascii=False, allow_nan=False)
         if not isinstance(item, (dict, list)) or not item:
             return compact
@@ -81,8 +103,8 @@ def read_bytes(workspace: Path, path: Path) -> bytes:
     return data
 
 
-def _unique_keys(pairs):
-    result = {}
+def _unique_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
     for key, value in pairs:
         if key in result:
             raise ValueError(f"duplicate JSON field: {key}")
@@ -90,11 +112,7 @@ def _unique_keys(pairs):
     return result
 
 
-def validate_pack(payload, *, cases=None, holdout=None, policies=None):
-    """Validate a v2 manifest and declared data; return projected material for services.
-
-    The returned mapping is internal material, not an on-disk manifest.
-    """
+def _validate_manifest_fields(payload: object) -> dict:
     required = {"schema_version", "id", "name", "description", "task_schema", "target_schema", "compatible_targets", "objective", "files"}
     if not isinstance(payload, dict) or not required <= payload.keys() or payload.keys() - required - {"default_direction"}:
         raise ValueError("invalid task package fields; schema 1 needs explicit migration")
@@ -106,7 +124,10 @@ def validate_pack(payload, *, cases=None, holdout=None, policies=None):
         value = payload.get(key, "")
         if not isinstance(value, str) or len(value) > limit or key in {"name", "description"} and not value.strip():
             raise ValueError(f"invalid task package {key}")
-    files = payload["files"]
+    return payload
+
+
+def _validate_documents(files: object, cases: object, holdout: object) -> dict:
     if not isinstance(files, dict) or "cases" not in files or files.keys() - {"cases", "holdout"}:
         raise ValueError("files must declare cases and optional holdout")
     for filename in files.values():
@@ -121,6 +142,10 @@ def validate_pack(payload, *, cases=None, holdout=None, policies=None):
             raise ValueError("declared holdout.json must contain only holdout")
     elif holdout is not None:
         raise ValueError("holdout data must be declared in files")
+    return cases
+
+
+def _validate_policy(payload: dict, policies: Sequence[TaskPolicy] | None) -> TaskPolicy:
     objective = payload["objective"]
     if not isinstance(objective, dict) or set(objective) != {"policy_id", "direction"} or objective["direction"] != "max":
         raise ValueError("unsupported objective policy")
@@ -130,22 +155,67 @@ def validate_pack(payload, *, cases=None, holdout=None, policies=None):
     targets = payload["compatible_targets"]
     if not isinstance(targets, list) or not targets or len(targets) > 16 or any(not isinstance(t, str) or not t.strip() for t in targets) or len(set(targets)) != len(targets):
         raise ValueError("invalid compatible_targets")
+    return policy
+
+
+def _validate_acceptance(acceptance: object, policy: TaskPolicy) -> dict:
+    if not isinstance(acceptance, dict):
+        raise ValueError("invalid acceptance for " + policy.task_schema)
+    required = policy.required_fields - {"input"}
+    allowed = policy.required_fields | policy.optional_fields
+    if not required <= acceptance.keys() or acceptance.keys() - allowed or "input" in acceptance:
+        raise ValueError("invalid acceptance for " + policy.task_schema)
+    return acceptance
+
+
+def _project_envelope(envelope: object, policy: TaskPolicy) -> dict:
+    metadata = {"id", "tags", "group_id", "reason", "source"}
+    if not isinstance(envelope, dict):
+        raise ValueError("invalid task case envelope")
+    if not {"id", "input", "acceptance"} <= envelope.keys() or envelope.keys() - metadata - {"input", "acceptance"}:
+        raise ValueError("invalid task case envelope")
+    acceptance = _validate_acceptance(envelope["acceptance"], policy)
+    row = {k: v for k, v in envelope.items() if k != "acceptance"}
+    row.update(acceptance)
+    return row
+
+
+def _validate_case_metadata(row: dict) -> None:
+    if not isinstance(row.get("reason", ""), str) or len(row.get("reason", "")) > 1000:
+        raise ValueError("reason exceeds 1000 characters")
+    tags = row.get("tags", [])
+    if not isinstance(tags, list) or len(tags) > 20 or any(not isinstance(t, str) or len(t) > 120 for t in tags):
+        raise ValueError("invalid tags")
+    source = row.get("source", {})
+    if not isinstance(source, dict) or len(source) > 8 or any(not isinstance(k, str) or not isinstance(v, str) or len(k) > 80 or len(v) > 1000 for k, v in source.items()):
+        raise ValueError("invalid source metadata")
+
+
+def validate_pack(
+    payload: object, *, cases: object = None, holdout: object = None,
+    policies: Sequence[TaskPolicy] | None = None,
+) -> _TaskMaterial:
+    """Validate raw v2 documents in order; return policy-projected service material."""
+    manifest = _validate_manifest_fields(payload)
+    documents = _validate_documents(manifest["files"], cases, holdout)
+    policy = _validate_policy(manifest, policies)
+    return _validate_partitions(manifest, documents, holdout, policy)
+
+
+def _validate_partitions(payload: dict, cases: dict, holdout: object, policy: TaskPolicy) -> _TaskMaterial:
     material = dict(payload)
-    ids, inputs, groups = set(), {}, {}
+    ids: set[str] = set()
+    inputs: dict[str, str] = {}
+    groups: dict[str, str] = {}
     for partition in ("train", "validation", "holdout"):
-        rows = (holdout or {}).get(partition, []) if partition == "holdout" else cases[partition]
+        rows = holdout.get(partition, []) if partition == "holdout" and isinstance(holdout, dict) else (
+            [] if partition == "holdout" else cases[partition]
+        )
         if not isinstance(rows, list) or len(rows) > 12:
             raise ValueError(f"{partition} must contain at most 12 cases")
         projected = []
         for envelope in rows:
-            metadata = {"id", "tags", "group_id", "reason", "source"}
-            if not isinstance(envelope, dict) or not {"id", "input", "acceptance"} <= envelope.keys() or envelope.keys() - metadata - {"input", "acceptance"}:
-                raise ValueError("invalid task case envelope")
-            acceptance = envelope["acceptance"]
-            if not isinstance(acceptance, dict) or not (policy.required_fields - {"input"}) <= acceptance.keys() or acceptance.keys() - (policy.required_fields | policy.optional_fields) or "input" in acceptance:
-                raise ValueError("invalid acceptance for " + policy.task_schema)
-            row = {k: v for k, v in envelope.items() if k != "acceptance"}
-            row.update(acceptance)
+            row = _project_envelope(envelope, policy)
             projected.append(row)
             if not isinstance(row["id"], str) or not _ID.fullmatch(row["id"]) or row["id"] in ids:
                 raise ValueError("invalid or duplicate case id")
@@ -162,26 +232,20 @@ def validate_pack(payload, *, cases=None, holdout=None, policies=None):
                 raise ValueError("group_id overlaps task partitions")
             if group:
                 groups[group] = partition
-            if not isinstance(row.get("reason", ""), str) or len(row.get("reason", "")) > 1000:
-                raise ValueError("reason exceeds 1000 characters")
-            tags = row.get("tags", [])
-            if not isinstance(tags, list) or len(tags) > 20 or any(not isinstance(t, str) or len(t) > 120 for t in tags):
-                raise ValueError("invalid tags")
-            source = row.get("source", {})
-            if not isinstance(source, dict) or len(source) > 8 or any(not isinstance(k, str) or not isinstance(v, str) or len(k) > 80 or len(v) > 1000 for k, v in source.items()):
-                raise ValueError("invalid source metadata")
+            _validate_case_metadata(row)
         material[partition] = projected
     if len(encoded(payload)) + len(encoded(cases)) + 2 + (len(encoded(holdout)) + 1 if holdout is not None else 0) > 100_000:
         raise ValueError("task package exceeds 100 KB")
-    return material
+    # Only the completed validation path may label raw mappings as service material.
+    return cast(_TaskMaterial, material)
 
 
-def package_documents(material):
+def package_documents(material: _TaskMaterial) -> tuple[dict, dict, dict | None]:
     """Serialize projected task material into the single canonical v2 layout."""
-    manifest = {k: v for k, v in material.items() if k not in {"train", "validation", "holdout"}}
-    def envelopes(partition):
+    manifest: dict = {k: v for k, v in material.items() if k not in {"train", "validation", "holdout"}}
+    def envelopes(partition: str) -> list[dict]:
         result = []
-        for row in material.get(partition, []):
+        for row in _partition(material, partition):
             base = {k: v for k, v in row.items() if k in {"id", "input", "tags", "group_id", "reason", "source"}}
             base["acceptance"] = {k: v for k, v in row.items() if k not in base}
             result.append(base)
@@ -191,14 +255,22 @@ def package_documents(material):
     return manifest, cases, holdout
 
 
+def _partition(material: _TaskMaterial, name: str) -> list[dict]:
+    if name == "train":
+        return material.get("train", [])
+    if name == "validation":
+        return material.get("validation", [])
+    return material.get("holdout", [])
+
+
 @dataclass(frozen=True)
 class LoadedTaskPack:
-    material: dict
+    material: _TaskMaterial
     source_hash: str
     file_hashes: tuple[tuple[str, str], ...]
 
 
-def load_pack(workspace, path, *, policies=None):
+def load_pack(workspace: Path, path: Path, *, policies: Sequence[TaskPolicy] | None = None) -> LoadedTaskPack:
     """Read a consistent, bounded v2 package. No model or code execution."""
     workspace, path = Path(workspace).resolve(), Path(path)
     manifest_bytes = read_bytes(workspace, path)
@@ -274,7 +346,10 @@ class TaskSource(Protocol):
 
 class TaskPackCatalog:
     """Workspace catalog; no models, no runtime configuration or adoption rights."""
-    def __init__(self, workspace, registrations=(), *, legacy_path=None, policies=None):
+    def __init__(
+        self, workspace: Path, registrations: Sequence[TaskPackRegistration] = (), *,
+        legacy_path: str | None = None, policies: Sequence[TaskPolicy] | None = None,
+    ) -> None:
         self.workspace = Path(workspace).resolve()
         self.root = self.workspace / ".fruitfly/optimization/task-packs"
         self.registrations = tuple(registrations)
@@ -282,17 +357,17 @@ class TaskPackCatalog:
         self.policies = tuple(builtin_task_policies() if policies is None else policies)
 
     @property
-    def default_pack_id(self):
+    def default_pack_id(self) -> str | None:
         """Optional configured default; consumers do not inspect source formats."""
         configured = self._configured_package()
-        if configured is not None:
+        if configured is not None and self.legacy_path is not None:
             return load_pack(self.workspace, Path(self.legacy_path), policies=self.policies).material["id"]
         return LEGACY_PACK_ID if self.legacy_path else None
 
-    def with_legacy(self, path):
+    def with_legacy(self, path: str | None) -> TaskPackCatalog:
         return type(self)(self.workspace, self.registrations, legacy_path=path, policies=self.policies)
 
-    def _configured_package(self):
+    def _configured_package(self) -> dict | None:
         if not self.legacy_path:
             return None
         try:
@@ -301,7 +376,7 @@ class TaskPackCatalog:
             return None
         return payload if isinstance(payload, dict) and "schema_version" in payload else None
 
-    def _sources(self):
+    def _sources(self) -> list[tuple[Path, bool]]:
         sources = []
         roots = (TaskPackRegistration(self.root, True), *self.registrations)
         for registration in roots:
@@ -320,7 +395,7 @@ class TaskPackCatalog:
                     sources.append((source, registration.writable))
                     if len(sources) > 100:
                         raise ValueError("task package catalog exceeds 100 sources")
-        if self._configured_package() is not None:
+        if self._configured_package() is not None and self.legacy_path is not None:
             configured = safe_path(self.workspace, Path(self.legacy_path))
             if all(path != configured for path, _ in sources):
                 sources.append((configured, False))
@@ -331,11 +406,11 @@ class TaskPackCatalog:
             raise ValueError("duplicate task package source registration")
         return sources
 
-    def _read(self, path):
+    def _read(self, path: Path) -> tuple[_TaskMaterial, str]:
         loaded = load_pack(self.workspace, path, policies=self.policies)
         return loaded.material, loaded.source_hash
 
-    def _missing_optional_legacy_source(self):
+    def _missing_optional_legacy_source(self) -> bool:
         """The conventional legacy file is optional for package-based interaction."""
         if not self.legacy_path:
             return False
@@ -345,7 +420,7 @@ class TaskPackCatalog:
         except (OSError, ValueError):
             return False
 
-    def summaries(self, target_id=None):
+    def summaries(self, target_id: str | None = None) -> tuple[TaskPackSummary, ...]:
         summaries = []
         for path, writable in self._sources():
             try:
@@ -371,7 +446,7 @@ class TaskPackCatalog:
                 summaries.append(TaskPackSummary(LEGACY_PACK_ID, "Configured task cases", error=str(exc)))
         return tuple(sorted(summaries, key=lambda s: (bool(s.error), s.name, s.pack_id)))
 
-    def _locate(self, pack_id):
+    def _locate(self, pack_id: str) -> tuple[Path, bool, _TaskMaterial, str]:
         found = []
         for path, writable in self._sources():
             try:
@@ -384,16 +459,16 @@ class TaskPackCatalog:
             raise ValueError("unknown or duplicate task package id")
         return found[0]
 
-    def source_hash(self, pack_id):
+    def source_hash(self, pack_id: str) -> str:
         if pack_id == LEGACY_PACK_ID:
             if not self.legacy_path:
                 raise ValueError("no configured task source")
             return load_task_cases(self.workspace, self.legacy_path).digest
         return self._locate(pack_id)[3]
 
-    def freeze(self, pack_id, target_id):
+    def freeze(self, pack_id: str, target_id: str) -> FrozenTaskSuite:
         if pack_id == LEGACY_PACK_ID:
-            suite = load_task_cases(self.workspace, self.legacy_path)
+            suite = self._legacy_cases()
             return FrozenTaskSuite(suite.train, suite.validation, suite.digest, pack_id,
                                    "Configured task cases", suite.digest, target_id)
         path, _, payload, identity = self._locate(pack_id)
@@ -406,13 +481,13 @@ class TaskPackCatalog:
             raise ValueError("need independent validation and training cases before optimization")
         policy = task_policy(payload["objective"]["policy_id"], policies=self.policies)
         policy.check_available()
-        projection = {p: [policy.project(c).__dict__ for c in payload[p]] for p in ("train", "validation")}
+        projection = {p: [policy.project(c).__dict__ for c in _partition(payload, p)] for p in ("train", "validation")}
         return FrozenTaskSuite(tuple(TaskCase(**c) for c in projection["train"]),
             tuple(TaskCase(**c) for c in projection["validation"]), digest(encoded(projection)),
             pack_id, payload["name"], identity, target_id, payload["objective"]["policy_id"],
-            tuple((c["id"], encoded(c.get("source", {})).decode("utf-8")) for p in ("train", "validation") for c in payload[p]), policy.execution_id, policy, loaded.file_hashes)
+            tuple((c["id"], encoded(c.get("source", {})).decode("utf-8")) for p in ("train", "validation") for c in _partition(payload, p)), policy.execution_id, policy, loaded.file_hashes)
 
-    def holdout(self, pack_id):
+    def holdout(self, pack_id: str) -> tuple[TaskCase, ...]:
         if pack_id == LEGACY_PACK_ID:
             return ()
         payload = self._locate(pack_id)[2]
@@ -420,7 +495,7 @@ class TaskPackCatalog:
         return tuple(policy.project(c) for c in payload.get("holdout", []))
 
     @contextmanager
-    def _writer(self):
+    def _writer(self) -> Iterator[None]:
         safe_path(self.workspace, self.root).mkdir(parents=True, exist_ok=True)
         path = safe_path(self.workspace, self.root / ".write.lock")
         with path.open("a") as stream:
@@ -433,7 +508,7 @@ class TaskPackCatalog:
             finally:
                 fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
 
-    def _atomic_write(self, path, data):
+    def _atomic_write(self, path: Path, data: bytes) -> None:
         path = safe_path(self.workspace, path)
         path.parent.mkdir(parents=True, exist_ok=True)
         fd, name = tempfile.mkstemp(prefix=".pack-", dir=path.parent)
@@ -446,7 +521,7 @@ class TaskPackCatalog:
         finally:
             Path(name).unlink(missing_ok=True)
 
-    def _write(self, path, payload, *, original_hash=None):
+    def _write(self, path: Path, payload: _TaskMaterial, *, original_hash: str | None = None) -> str:
         manifest, cases, holdout = package_documents(payload)
         validate_pack(manifest, cases=cases, holdout=holdout, policies=self.policies)
         path = safe_path(self.workspace, path)
@@ -486,7 +561,12 @@ class TaskPackCatalog:
                     temporary.rmdir()
         return payload["id"]
 
-    def save_training(self, pack_id, input, expected, *, expected_hash="", name="", target_id="base_prompt", reason="", source=None, replace=False, copy=False, acceptance=None):
+    def save_training(
+        self, pack_id: str, input: str, expected: str, *, expected_hash: str = "",
+        name: str = "", target_id: str = "base_prompt", reason: str = "",
+        source: dict[str, str] | None = None, replace: bool = False, copy: bool = False,
+        acceptance: dict[str, object] | None = None,
+    ) -> str:
         """Explicitly save a human answer to train; never edit validation/holdout."""
         if acceptance is None:
             TaskCase(input, expected)
@@ -495,11 +575,12 @@ class TaskPackCatalog:
         with self._writer():
             if pack_id:
                 if pack_id == LEGACY_PACK_ID:
-                    suite = load_task_cases(self.workspace, self.legacy_path)
+                    suite = self._legacy_cases()
                     payload = self._new(name or "Imported task cases", target_id)
-                    payload.update(train=[{"id": "train-" + str(i), "input": c.input, "expected": c.expected} for i,c in enumerate(suite.train)],
-                                   validation=[{"id": "validation-" + str(i), "input": c.input, "expected": c.expected} for i,c in enumerate(suite.validation)])
-                    identity, writable, path = suite.digest, False, None
+                    payload["train"] = [{"id": "train-" + str(i), "input": c.input, "expected": c.expected} for i,c in enumerate(suite.train)]
+                    payload["validation"] = [{"id": "validation-" + str(i), "input": c.input, "expected": c.expected} for i,c in enumerate(suite.validation)]
+                    identity, writable = suite.digest, False
+                    path = self.root / payload["id"] / "pack.json"
                 else:
                     path, writable, payload, identity = self._locate(pack_id)
                 if not expected_hash or expected_hash != identity:
@@ -518,7 +599,7 @@ class TaskPackCatalog:
                 path = self.root / payload["id"] / "pack.json"
                 writable = False
             key = input_key(input)
-            if any(input_key(c["input"]) == key for p in ("validation", "holdout") for c in payload.get(p, [])):
+            if any(input_key(c["input"]) == key for p in ("validation", "holdout") for c in _partition(payload, p)):
                 raise ValueError("this input belongs to validation/holdout; change the partition explicitly first")
             found = next((c for c in payload["train"] if input_key(c["input"]) == key), None)
             policy = task_policy(payload["objective"]["policy_id"], policies=self.policies)
@@ -526,8 +607,7 @@ class TaskPackCatalog:
                 if policy.required_fields - {"input", "expected"}:
                     raise ValueError("this policy needs declared entry_point/tests acceptance; edit cases.json or provide acceptance")
                 acceptance = {"expected": expected}
-            if not isinstance(acceptance, dict) or not (policy.required_fields - {"input"}) <= acceptance.keys() or acceptance.keys() - (policy.required_fields | policy.optional_fields) or "input" in acceptance:
-                raise ValueError("invalid acceptance for " + policy.task_schema)
+            _validate_acceptance(acceptance, policy)
             policy.project({"input": input, **acceptance})
             existing = {k: v for k, v in (found or {}).items() if k in policy.required_fields | policy.optional_fields and k != "input"}
             if found and existing == acceptance:
@@ -547,19 +627,23 @@ class TaskPackCatalog:
             return self._write(path, payload, original_hash=identity if writable else None)
 
     @staticmethod
-    def _new(name, target_id):
+    def _new(name: str, target_id: str) -> _TaskMaterial:
         return {"schema_version": 2, "description": "Human-corrected regression tasks", "files": {"cases": "cases.json"}, "id": "task-" + uuid4().hex[:12], "name": name,
             "task_schema": "single-turn-text-v1", "target_schema": "text-v1", "compatible_targets": [target_id],
             "objective": {"policy_id": "normalized-exact-v1", "direction": "max"}, "train": [], "validation": []}
 
+    def _legacy_cases(self) -> TaskSuite:
+        # The legacy loader owns path validation, including rejection of a missing source.
+        return load_task_cases(self.workspace, cast(str, self.legacy_path))
+
 
 class TaskSnapshotStore:
     """Atomic content-addressed search receipts; rejects relocation and corruption."""
-    def __init__(self, workspace):
+    def __init__(self, workspace: Path) -> None:
         self.workspace = Path(workspace).resolve()
         self.root = self.workspace / ".fruitfly/optimization/task-snapshots"
 
-    def freeze(self, payload):
+    def freeze(self, payload: object) -> tuple[Path, str]:
         data = encoded(payload)
         identity = digest(data)
         path = safe_path(self.workspace, self.root / (identity[7:] + ".json"))
@@ -579,7 +663,7 @@ class TaskSnapshotStore:
             Path(temporary).unlink(missing_ok=True)
         return path, identity
 
-    def verify(self, path, identity):
+    def verify(self, path: Path, identity: str) -> None:
         source = safe_path(self.workspace, path)
         if digest(source.read_bytes()) != identity:
             raise ValueError("optimization snapshot corrupted")

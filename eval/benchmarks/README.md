@@ -13,11 +13,13 @@ Describe datasets, resources, preflight, Harbor jobs, and official results. Adap
 
 The installed-agent bridge reports project version `0.1`, matching package metadata.
 
+Harbor result parsing separates official reward selection, trial status, and aggregate metric formatting. Runner exceptions determine error status; available actual runtime manifests are retained in task records. Error trials contribute no reward, while available usage, cost, and latency remain reportable. Missing measurements remain unknown; a single numeric reward with another name is accepted when no numeric `reward` field is available.
+
 | Contract | Requirement |
 |---|---|
 | Identity | Unique benchmark ID, dataset/version, adapter version, and exact smoke task |
 | Resources | Explicit variants, network surfaces, timeout, and backend constraints |
-| Results | Official rewards, missing data, errors, and manifest mismatch handling |
+| Results | Official rewards, missing data, errors, and actual runtime metadata |
 | Progress | Job/Agent/trial events; no precise image preparation percentage |
 | Installation | Existing Python/venv preferred; bounded fallback setup with preserved logs |
 | Retries | Connection-only, before job creation; bounded attempts with all logs retained |

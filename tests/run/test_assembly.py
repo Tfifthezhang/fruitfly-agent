@@ -43,7 +43,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
             config_path=kwargs.pop("config_path", self.root / "config.yaml"), **kwargs,
         )
 
-    def test_permission_identity_and_standard_authorizer_are_required_for_recovery(self):
+    def test_changed_permissions_allow_recovery_with_current_authorizer(self):
         from fruitfly_agent.lab.catalog import PermissionPolicy
         from fruitfly_agent.lab.environment.guarded import GuardedEnv
         catalog = builtin_catalog()
@@ -56,14 +56,13 @@ class RuntimeAssemblyTest(unittest.TestCase):
             record_session_manifest(session, original)
             changed = self.assemble(profile, session, catalog=catalog,
                 permission_policy=PermissionPolicy(self.root, read_roots=(self.root.parent,)))
-            with self.assertRaisesRegex(ValueError, "differs"):
-                check_session_manifest(session, changed, resume=True)
+            check_session_manifest(session, changed, resume=True)
             identical = self.assemble(profile, session, catalog=catalog)
             check_session_manifest(session, identical, resume=True)
             self.assertEqual(0, identical.components['authorization'].status()['grants'])
             self.assertFalse(identical.config.env.write_file(str(session.path), 'corrupt').is_ok)
 
-    def test_effective_transport_defaults_and_changes_bind_recovery_identity(self):
+    def test_transport_identity_is_recorded_but_changes_allow_recovery(self):
         from tests.support.provider_streams import adapter
 
         catalog = builtin_catalog()
@@ -84,14 +83,12 @@ class RuntimeAssemblyTest(unittest.TestCase):
                 check_session_manifest(session, equivalent, resume=True)
                 self.registry.create.return_value = changed
                 incompatible = self.assemble(profile, session, catalog=catalog)
-                with self.assertRaisesRegex(ValueError, "differs"):
-                    check_session_manifest(session, incompatible, resume=True)
+                check_session_manifest(session, incompatible, resume=True)
                 self.registry.create.return_value = FauxProvider()
                 missing = self.assemble(profile, session, catalog=catalog)
-                with self.assertRaisesRegex(ValueError, "differs"):
-                    check_session_manifest(session, missing, resume=True)
+                check_session_manifest(session, missing, resume=True)
 
-    def test_algorithm_version_and_effective_defaults_bind_session_identity(self):
+    def test_algorithm_identity_is_recorded_but_changes_allow_recovery(self):
         from dataclasses import asdict, replace
         from fruitfly_agent.lab.catalog import LabCatalog
         from fruitfly_agent.lab.context_manager.reduction import SummarizingCompactorConfig
@@ -105,8 +102,6 @@ class RuntimeAssemblyTest(unittest.TestCase):
             component = next(c for c in runtime.manifest.components if c["id"] == "compaction")
             self.assertEqual("summarizing-v2", component["implementation_id"])
             self.assertEqual(asdict(SummarizingCompactorConfig()), component["parameters"])
-            with self.assertRaisesRegex(ValueError, "algorithm identity"):
-                runtime.manifest.legacy_dict(3)
             record_session_manifest(session, runtime)
             changed_catalog = LabCatalog(tuple(
                 replace(d, implementation_id="summarizing-v3") if d.descriptor.mechanism_id == "compaction" else d
@@ -114,8 +109,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
             ))
             changed = self.assemble(profile, session, catalog=changed_catalog)
             self.assertNotEqual(runtime.manifest.digest, changed.manifest.digest)
-            with self.assertRaisesRegex(ValueError, "differs"):
-                check_session_manifest(session, changed, resume=True)
+            check_session_manifest(session, changed, resume=True)
 
     def test_base_prompt_artifact_changes_runtime_identity_and_verified_default_recovers(self) -> None:
         root = self.root
@@ -133,7 +127,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
             session.append("message", {"message": UserMessage(content="saved").to_dict()})
             check_session_manifest(session, original, resume=True)
         discovered = discover_resumable_sessions(
-            root, manifest_digests={original.manifest.digest}
+            root
         )
         self.assertEqual(discovered[0].prompt_label, DEFAULT_PROMPT.label)
         self.assertEqual(discovered[0].prompt_hash, DEFAULT_PROMPT.content_hash)
@@ -148,40 +142,30 @@ class RuntimeAssemblyTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "hash check"):
                 self.assemble(candidate, session, catalog=catalog, artifact_store=store)
 
-    def test_sessions_without_prompt_identity_require_verified_provenance(self) -> None:
-        root = self.root
-        model_path = self.model_path
+    def test_legacy_manifests_are_validated_without_reconstructing_old_defaults(self):
+        from fruitfly_agent.run.runtime.manifest import digest_manifest
         catalog = builtin_catalog()
-        profile = HarnessProfile(
-            "default", str(model_path), "offline",
-            tuple(s for s in catalog.default_selections() if s.mechanism_id != "compaction"),
-        )
-        for schema_version in (3, 4):
-            with self.subTest(schema_version=schema_version):
-                path = root / f"schema-{schema_version}.jsonl"
-                with Session(path) as session:
-                    runtime = self.assemble(profile, session, catalog=catalog)
-                    session.append("meta", {
-                        "kind": "runtimeManifest",
-                        "manifest": runtime.manifest.legacy_dict(schema_version),
-                    }, sync=True)
-                    contents = path.read_bytes()
-                    for allow in (False, True):
-                        with self.subTest(allow=allow):
-                            with self.assertRaisesRegex(ValueError, "prompt identity cannot be verified"):
-                                check_session_manifest(
-                                    session, runtime, resume=True, allow_legacy_default_prompt=allow
-                                )
-                    with patch(
-                        "fruitfly_agent.run.runtime.recovery._LEGACY_DEFAULT_PROMPT_HASH",
-                        DEFAULT_PROMPT.content_hash,
-                    ):
-                        check_session_manifest(
-                            session, runtime, resume=True, allow_legacy_default_prompt=True
-                        )
-                        with self.assertRaisesRegex(ValueError, "cannot be verified"):
-                            check_session_manifest(session, runtime, resume=True)
-                    self.assertEqual(contents, path.read_bytes())
+        profile = HarnessProfile("default", str(self.model_path), "offline", ())
+        for version in (3, 4, 5):
+            with self.subTest(version=version), Session(self.root / f"legacy-{version}.jsonl") as session:
+                runtime = self.assemble(profile, session, catalog=catalog)
+                stored = runtime.manifest.to_dict()
+                stored.pop("digest")
+                stored.pop("permissions")
+                stored["schema_version"] = version
+                if version < 5:
+                    stored.pop("base_prompt")
+                stored["digest"] = digest_manifest(stored)
+                session.append("meta", {"kind": "runtimeManifest", "manifest": stored}, sync=True)
+                before = session.path.read_bytes()
+                check_session_manifest(session, runtime, resume=True)
+                self.assertEqual(before, session.path.read_bytes())
+                record_session_manifest(session, runtime)
+                self.assertEqual(stored, session.read_all()[0].payload["manifest"])
+                self.assertEqual(runtime.manifest.to_dict(), session.read_all()[-1].payload["manifest"])
+                record_session_manifest(session, runtime)
+                self.assertEqual(2, len(session.read_all()))
+
 
     def test_data_artifact_store_is_content_addressed_and_detects_tampering(self) -> None:
         store = DataArtifactStore(self.root / "artifacts")

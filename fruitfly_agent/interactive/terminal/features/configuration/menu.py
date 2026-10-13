@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import sys
-from typing import Any, TextIO
+from typing import Any, Callable, Mapping, TextIO
 
 from fruitfly_agent.interactive.contracts.configuration import (
     ConfigurationController,
+    ConfigurationActionResult,
     ConfigurationLaunchResult,
     ConfigurationMechanism,
     ConfigurationSnapshot,
@@ -19,11 +20,11 @@ from fruitfly_agent.interactive.terminal.features.configuration.model_setup impo
 )
 from fruitfly_agent.interactive.terminal.io.menu import (
     MenuAction,
-    MenuEvent,
     MenuInput,
     MenuRow,
     TerminalMenuRenderer,
     create_menu_input,
+    navigate_menu,
 )
 
 
@@ -99,7 +100,7 @@ class TerminalConfigurationFrontend:
                          subtitle="Ready to start. Open configuration only when needed.",
                          rows=rows, selected=selected)
             event = self.menu_input.read_event()
-            selected, handled = _navigate(event, selected, len(rows))
+            selected, handled = navigate_menu(event, selected, len(rows))
             if handled:
                 continue
             if event.action == MenuAction.QUIT:
@@ -122,7 +123,7 @@ class TerminalConfigurationFrontend:
                     self.configuration.reset()
                 return ConfigurationLaunchResult(start=False)
 
-    def _preview_prompt(self, label, content_hash, content):
+    def _preview_prompt(self, label: str, content_hash: str, content: str) -> tuple[bool, object]:
         """Preview complete prompt text before staging a future-session choice."""
         import textwrap
         lines = [part for line in content.splitlines()
@@ -136,7 +137,7 @@ class TerminalConfigurationFrontend:
                          + '\nPageUp/PageDown: text pages',
                 rows=tuple(MenuRow(value) for value in values), selected=selected)
             event = self.menu_input.read_event()
-            selected, handled = _navigate(event, selected, len(values))
+            selected, handled = navigate_menu(event, selected, len(values))
             if handled:
                 continue
             if event.action == MenuAction.PAGE_UP:
@@ -181,7 +182,7 @@ class TerminalConfigurationFrontend:
                 selected=selected,
             )
             event = self.menu_input.read_event()
-            selected, handled = _navigate(event, selected, len(rows))
+            selected, handled = navigate_menu(event, selected, len(rows))
             if handled:
                 continue
             if event.action == MenuAction.QUIT:
@@ -228,7 +229,7 @@ class TerminalConfigurationFrontend:
                 selected=selected,
             )
             event = self.menu_input.read_event()
-            selected, handled = _navigate(event, selected, len(rows))
+            selected, handled = navigate_menu(event, selected, len(rows))
             if handled:
                 continue
             if event.action == MenuAction.BACK:
@@ -262,7 +263,7 @@ class TerminalConfigurationFrontend:
                 selected=selected,
             )
             event = self.menu_input.read_event()
-            selected, handled = _navigate(event, selected, len(rows))
+            selected, handled = navigate_menu(event, selected, len(rows))
             if handled:
                 continue
             if event.action == MenuAction.QUIT:
@@ -317,7 +318,7 @@ class TerminalConfigurationFrontend:
 
     def _choose_prompt(self, snapshot: ConfigurationSnapshot) -> bool:
         selected = 0
-        expanded = set()
+        expanded: set[str] = set()
         while True:
             snapshot = self.configuration.snapshot()
             labels = dict(snapshot.prompt_option_labels)
@@ -338,13 +339,13 @@ class TerminalConfigurationFrontend:
                                         "Preview before applying", marker="✓" if reference == snapshot.prompt_reference else " "))
                     actions.append(("prompt", reference))
             rows.append(MenuRow("Back", "Return to configuration"))
-            actions.append(("back", None))
+            actions.append(("back", ""))
             selected = min(selected, len(rows) - 1)
             self._render(title="prompt · next session",
                          subtitle="Built-in prompts and task / scenario adaptations. Preview before applying.",
                          rows=tuple(rows), selected=selected)
             event = self.menu_input.read_event()
-            selected, handled = _navigate(event, selected, len(rows))
+            selected, handled = navigate_menu(event, selected, len(rows))
             if handled:
                 continue
             if event.action == MenuAction.QUIT:
@@ -376,45 +377,17 @@ class TerminalConfigurationFrontend:
 
     def _category_loop(self, category: str) -> bool:
         selected = 0
-        expanded = None
-        remembered = {}
+        expanded: str | None = None
+        remembered: dict[str, str] = {}
         while True:
             snapshot = self.configuration.snapshot()
-            mechanisms = tuple(item for item in snapshot.mechanisms
-                               if item.category == category and item.visible)
-            by_id = {item.mechanism_id: item for item in mechanisms}
-            groups = [group for group in snapshot.selection_groups
-                      if group.category == category and all(option in by_id for option in group.option_ids)]
-            grouped_ids = {option for group in groups for option in group.option_ids}
-            # Independent capabilities remain composable, with the same inline
-            # selector shape as declared groups, even when only one option exists.
-            entries = [(group.group_id, group.group_id, group.option_ids, group.selected_id,
-                        group.allow_disabled, True) for group in groups]
-            entries += [(item.mechanism_id, item.mechanism_id, (item.mechanism_id,),
-                         item.mechanism_id if item.enabled else None, True, False)
-                        for item in mechanisms if item.mechanism_id not in grouped_ids]
-            rows = []
-            actions = []
-            for key, label, options, active, allow_disabled, declared in entries:
-                if active is not None:
-                    remembered[key] = active
-                description = next((group.label for group in groups if group.group_id == key), by_id[key].label if key in by_id else "")
-                rows.append(MenuRow(label, detail=description if description != label else "", marker="✓" if active else " "))
-                actions.append(("toggle", key, options, active, allow_disabled, declared))
-                if active is not None:
-                    rows.append(MenuRow(f"  id: {active} {'▴' if expanded == key else '▾'}"))
-                    actions.append(("expand", key, options, active, allow_disabled, declared))
-                    if expanded == key:
-                        for option in options:
-                            rows.append(MenuRow(f"    {option}", detail=by_id[option].label if by_id[option].label != option else "", marker="✓" if option == active else " "))
-                            actions.append(("choose", key, options, option, allow_disabled, declared))
-            rows.append(MenuRow("Back", "Return to configuration"))
+            rows, actions = _category_rows(snapshot, category, expanded, remembered)
             selected = min(selected, len(rows) - 1)
             self._render(title=_category_label(category),
                          subtitle="Check a module, then expand its algorithm dropdown. Changes apply to the next session.",
                          rows=tuple(rows), selected=selected, toggle=True)
             event = self.menu_input.read_event()
-            selected, handled = _navigate(event, selected, len(rows))
+            selected, handled = navigate_menu(event, selected, len(rows))
             if handled:
                 continue
             if event.action == MenuAction.QUIT:
@@ -458,8 +431,8 @@ class TerminalConfigurationFrontend:
         subtitle: str,
         values: tuple[Any, ...],
         current: Any,
-        labels=None,
-        details=None,
+        labels: Mapping[str, str] | None = None,
+        details: Mapping[str, str] | None = None,
     ) -> tuple[bool, Any]:
         if not values:
             self.notice = (
@@ -488,7 +461,7 @@ class TerminalConfigurationFrontend:
                 selected=selected,
             )
             event = self.menu_input.read_event()
-            selected, handled = _navigate(event, selected, len(rows))
+            selected, handled = navigate_menu(event, selected, len(rows))
             if handled:
                 continue
             if event.action == MenuAction.QUIT:
@@ -519,7 +492,7 @@ class TerminalConfigurationFrontend:
                 selected=selected,
             )
             event = self.menu_input.read_event()
-            selected, handled = _navigate(event, selected, len(rows))
+            selected, handled = navigate_menu(event, selected, len(rows))
             if handled:
                 continue
             if event.action == MenuAction.QUIT:
@@ -550,7 +523,9 @@ class TerminalConfigurationFrontend:
             return None
         return ConfigurationLaunchResult(start=True, saved=True)
 
-    def _call(self, function, *args, **kwargs) -> None:
+    def _call(
+        self, function: Callable[..., ConfigurationActionResult], *args: object, **kwargs: object,
+    ) -> None:
         try:
             result = function(*args, **kwargs)
         except (OSError, TypeError, ValueError) as exc:
@@ -599,16 +574,45 @@ class TerminalConfigurationFrontend:
 _CANCELLED = object()
 
 
-def _navigate(event: MenuEvent, selected: int, size: int) -> tuple[int, bool]:
-    if event.index is not None:
-        if 0 <= event.index < size:
-            return event.index, False
-        return selected, True
-    if event.action == MenuAction.UP:
-        return (selected - 1) % size, True
-    if event.action == MenuAction.DOWN:
-        return (selected + 1) % size, True
-    return selected, False
+_CategoryEntry = tuple[str, str, tuple[str, ...], str | None, bool, bool]
+_CategoryAction = tuple[str, str, tuple[str, ...], str | None, bool, bool]
+
+
+def _category_rows(
+    snapshot: ConfigurationSnapshot, category: str, expanded: str | None,
+    remembered: dict[str, str],
+) -> tuple[list[MenuRow], list[_CategoryAction]]:
+    """Project declared selectors and independent capabilities into menu actions."""
+    mechanisms = tuple(item for item in snapshot.mechanisms
+                       if item.category == category and item.visible)
+    by_id = {item.mechanism_id: item for item in mechanisms}
+    groups = [group for group in snapshot.selection_groups
+              if group.category == category and all(option in by_id for option in group.option_ids)]
+    grouped_ids = {option for group in groups for option in group.option_ids}
+    # Independent capabilities remain composable, with the same inline
+    # selector shape as declared groups, even when only one option exists.
+    entries: list[_CategoryEntry] = [(group.group_id, group.group_id, group.option_ids, group.selected_id,
+                group.allow_disabled, True) for group in groups]
+    entries += [(item.mechanism_id, item.mechanism_id, (item.mechanism_id,),
+                 item.mechanism_id if item.enabled else None, True, False)
+                for item in mechanisms if item.mechanism_id not in grouped_ids]
+    rows = []
+    actions: list[_CategoryAction] = []
+    for key, label, options, active, allow_disabled, declared in entries:
+        if active is not None:
+            remembered[key] = active
+        description = next((group.label for group in groups if group.group_id == key), by_id[key].label if key in by_id else "")
+        rows.append(MenuRow(label, detail=description if description != label else "", marker="✓" if active else " "))
+        actions.append(("toggle", key, options, active, allow_disabled, declared))
+        if active is not None:
+            rows.append(MenuRow(f"  id: {active} {'▴' if expanded == key else '▾'}"))
+            actions.append(("expand", key, options, active, allow_disabled, declared))
+            if expanded == key:
+                for option in options:
+                    rows.append(MenuRow(f"    {option}", detail=by_id[option].label if by_id[option].label != option else "", marker="✓" if option == active else " "))
+                    actions.append(("choose", key, options, option, allow_disabled, declared))
+    rows.append(MenuRow("Back", "Return to configuration"))
+    return rows, actions
 
 
 def _group_mechanisms(

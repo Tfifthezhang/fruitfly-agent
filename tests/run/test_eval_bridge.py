@@ -91,7 +91,7 @@ class EvalBridgeTests(unittest.IsolatedAsyncioTestCase):
                     release.touch()
 
             with patch("fruitfly_agent.run.adapters.evaluation.asyncio.create_subprocess_exec", new=launch):
-                result = await asyncio.wait_for(controller.run(EvaluationLaunchRequest("current_setup", "terminal-bench", "smoke"), on_event=observe), timeout=5)
+                result = await asyncio.wait_for(controller.run(EvaluationLaunchRequest("terminal-bench", "smoke"), on_event=observe), timeout=5)
             self.assertEqual(result.status, "failed")
             self.assertIn("raw stdout", "".join(e.get("text", "") for e in updates))
             self.assertIn("Ｈｉ stderr", "".join(e.get("text", "") for e in updates))
@@ -121,17 +121,17 @@ class EvalBridgeTests(unittest.IsolatedAsyncioTestCase):
                 snapshot = controller.snapshot()
                 result = await controller.run(
                     EvaluationLaunchRequest(
-                        "current_setup", "swe-bench", "smoke"
+                        "swe-bench", "smoke"
                     ), on_event=observe,
                 )
 
             self.assertEqual(snapshot.benchmarks[0].benchmark_id, "swe-bench")
-            self.assertEqual(snapshot.mechanisms[0].mechanism_id, "opro")
+            self.assertFalse(hasattr(snapshot, "mechanisms"))
             self.assertEqual(result.status, "blocked")
             self.assertTrue(Path(result.report_json).is_file())
             self.assertEqual(
                 [item["type"] for item in updates],
-                ["planned", "preflight", "report_written", "finished"],
+                ["started", "preflight", "report_written", "finished"],
             )
 
 

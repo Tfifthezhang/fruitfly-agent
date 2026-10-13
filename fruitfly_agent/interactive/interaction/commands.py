@@ -20,7 +20,7 @@ HELP_TEXT = """Commands:
   /config        open the model and mechanism selection menu
   /optimize [TEXT]  open optimization, review candidates, or start a search
   /eval          test the current setup or compare one mechanism
-  /resume [PATH] switch to a compatible persisted session
+  /resume [PATH] continue saved history using current configuration
   /cancel        cooperatively stop the active run
   /permissions clear  revoke temporary approvals\n  /trace [N]     show the latest N frontend events (default: 12)
   /exit          leave the interactive session"""

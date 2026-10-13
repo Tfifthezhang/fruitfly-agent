@@ -10,13 +10,6 @@ EvaluationEventSink = Callable[[Mapping[str, Any]], Awaitable[None]]
 
 
 @dataclass(frozen=True)
-class EvaluationModeOption:
-    mode_id: str
-    label: str
-    description: str
-
-
-@dataclass(frozen=True)
 class EvaluationVariantOption:
     variant_id: str
     label: str
@@ -35,24 +28,14 @@ class EvaluationBenchmarkOption:
 
 
 @dataclass(frozen=True)
-class EvaluationMechanismOption:
-    mechanism_id: str
-    label: str
-
-
-@dataclass(frozen=True)
 class EvaluationSnapshot:
-    modes: tuple[EvaluationModeOption, ...]
     benchmarks: tuple[EvaluationBenchmarkOption, ...]
-    mechanisms: tuple[EvaluationMechanismOption, ...]
 
 
 @dataclass(frozen=True)
 class EvaluationLaunchRequest:
-    mode: str
     benchmark_id: str
     variant: str
-    mechanism_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -79,8 +62,6 @@ __all__ = [
     "EvaluationEventSink",
     "EvaluationLaunchRequest",
     "EvaluationLaunchResult",
-    "EvaluationMechanismOption",
-    "EvaluationModeOption",
     "EvaluationSnapshot",
     "EvaluationVariantOption",
 ]

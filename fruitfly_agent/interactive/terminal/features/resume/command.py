@@ -22,7 +22,7 @@ def resume_handler(*, resume, discover, status, busy, menu_scope, input_stream,
             except (OSError, RuntimeError, TypeError, ValueError) as exc:
                 return CommandResult(text=f"could not list sessions: {exc}\n")
             if not sessions:
-                return CommandResult(text="no compatible non-empty sessions are available\n")
+                return CommandResult(text="no saved non-empty sessions are available\n")
             with menu_scope():
                 selected = TerminalResumeFrontend(
                     sessions, input_stream=input_stream, output_stream=output_stream,
@@ -35,7 +35,7 @@ def resume_handler(*, resume, discover, status, busy, menu_scope, input_stream,
             await resume(path)
         except (OSError, RuntimeError, TypeError, ValueError) as exc:
             return CommandResult(text=f"could not resume session: {exc}\n")
-        write(f"\n[resumed {path}]\n")
+        write(f"\n[resumed {path} using current configuration]\n")
         welcome(status())
         await show_history()
         return CommandResult()

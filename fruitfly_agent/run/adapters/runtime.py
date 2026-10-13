@@ -1,9 +1,13 @@
 """Project assembled runtime metadata to Interactive's public descriptions."""
 from fruitfly_agent.interactive import InteractiveMechanism
 from fruitfly_agent.run.configuration.views import display_group, display_section
+from fruitfly_agent.lab.catalog import LabCatalog
+from fruitfly_agent.run.runtime.assembly import RuntimeAssembly
 
 
-def describe_runtime(runtime, catalog):
+def describe_runtime(
+    runtime: RuntimeAssembly, catalog: LabCatalog,
+) -> tuple[tuple[str, ...], tuple[InteractiveMechanism, ...], dict[str, str]]:
     visible_mechanism_ids = tuple(
         mechanism_id
         for mechanism_id in runtime.mechanism_ids

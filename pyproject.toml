@@ -30,6 +30,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "mypy==2.4.0",
+    "types-PyYAML==6.0.12.20260906",
 ]
 benchmarks = [
     "harbor==0.23.0",
@@ -82,4 +83,35 @@ files = [
     "fruitfly_agent/run/configuration/controller.py",
     "fruitfly_agent/run/runtime/recovery.py",
     "fruitfly_agent/run/improvement/search_jobs.py",
+    "fruitfly_agent/lab/optimization/task_packs.py",
+    "fruitfly_agent/lab/optimization/scoring.py",
+    "fruitfly_agent/lab/optimization/tasks.py",
+    "fruitfly_agent/interactive/terminal/io/live.py",
+    "fruitfly_agent/interactive/terminal/io/menu.py",
+    "fruitfly_agent/interactive/terminal/features/configuration/menu.py",
+    "fruitfly_agent/providers",
+    "fruitfly_agent/run/storage",
+    "fruitfly_agent/run/adapters",
+    "eval/benchmarks",
+    "eval/catalog.py",
+    "eval/contracts.py",
+    "eval/execution.py",
+    "eval/report.py",
+    "eval/storage.py",
+    "eval/installation.py",
 ]
+
+[[tool.mypy.overrides]]
+module = [
+    "fruitfly_agent.core.loop",
+    "fruitfly_agent.lab.optimization.task_packs",
+    "fruitfly_agent.lab.optimization.scoring",
+    "fruitfly_agent.interactive.terminal.io.live",
+    "fruitfly_agent.interactive.terminal.io.menu",
+    "fruitfly_agent.interactive.terminal.features.configuration.menu",
+    "fruitfly_agent.providers.openai_codec",
+    "fruitfly_agent.providers.anthropic_codec",
+    "fruitfly_agent.run.adapters.runtime",
+    "eval.benchmarks.harbor",
+]
+disallow_untyped_defs = true

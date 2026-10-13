@@ -273,7 +273,7 @@ class AgentApplicationTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(application.resumable_sessions(), factory.candidates)
         self.assertEqual(
             factory.discovery,
-            (Path("first.jsonl"), "sha256:test"),
+            Path("first.jsonl"),
         )
 
         await application.resume("second.jsonl")

@@ -56,6 +56,8 @@ To add a frontend, consume Application's public operations and the capability pr
 
 Replacement paths share preparation and retirement: start resources, bind events, invoke activation, then switch the active handle. Failed replacement keeps the active handle; failure to retire the previous handle is exposed through `last_error` after a successful switch. Configuration writes and external side effects do not automatically roll back. No source hot reload or cross-process activation transaction. Optimization progress covers the current batch, not overall search completion.
 
+Resume continues canonical history in the original file with the selected current configuration. Discovery exposes availability/reasons rather than filtering by the active manifest digest. Run records changed environments after successful startup; history display never triggers model/tool replay. `/eval` selects a benchmark and resource variant, runs the saved configuration in independent task sessions, and produces reports.
+
 ## Modules
 
 | Package | Owns | May consume |

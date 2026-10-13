@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import unittest
 
-from fruitfly_agent.interactive import EvaluationBenchmarkOption, EvaluationLaunchResult, EvaluationModeOption, EvaluationMechanismOption, EvaluationSnapshot, EvaluationVariantOption
+from fruitfly_agent.interactive import EvaluationBenchmarkOption, EvaluationLaunchResult, EvaluationSnapshot, EvaluationVariantOption
 from fruitfly_agent.interactive.terminal.features.evaluation.menu import TerminalEvaluationFrontend
 from fruitfly_agent.interactive.terminal.io.menu import MenuAction, MenuEvent
 
@@ -21,7 +21,6 @@ class _Controller:
 
     def snapshot(self) -> EvaluationSnapshot:
         return EvaluationSnapshot(
-            modes=(EvaluationModeOption("current_setup", "Test current setup", "all"),),
             benchmarks=(
                 EvaluationBenchmarkOption(
                     "terminal-bench",
@@ -38,7 +37,6 @@ class _Controller:
                     ),
                 ),
             ),
-            mechanisms=(),
         )
 
     async def run(self, request, on_event=None):
@@ -46,7 +44,7 @@ class _Controller:
         if on_event is not None:
             await on_event({"type": "preflight", "available": True})
             await on_event({
-                "type": "agent_event", "condition_id": "current", "trial_id": "trial-1",
+                "type": "agent_event", "job_id": "current", "trial_id": "trial-1",
                 "event": {"type": "assistant_text_delta", "run_id": "run-1", "text": "hello"},
             })
         return EvaluationLaunchResult(
@@ -58,7 +56,6 @@ class TerminalEvaluationTests(unittest.IsolatedAsyncioTestCase):
     async def test_unavailable_variant_cannot_start_a_paid_run(self) -> None:
         controller = _Controller()
         controller.snapshot = lambda: EvaluationSnapshot(
-            modes=(EvaluationModeOption("current_setup", "Test current setup", "all"),),
             benchmarks=(
                 EvaluationBenchmarkOption(
                     "terminal-bench",
@@ -68,10 +65,8 @@ class TerminalEvaluationTests(unittest.IsolatedAsyncioTestCase):
                     (EvaluationVariantOption("smoke", "Smoke", "one task", False, ("start Docker",)),),
                 ),
             ),
-            mechanisms=(),
         )
         menu = _MenuInput(
-            MenuEvent(MenuAction.ACTIVATE),
             MenuEvent(MenuAction.ACTIVATE),
             MenuEvent(MenuAction.ACTIVATE),
         )
@@ -90,7 +85,6 @@ class TerminalEvaluationTests(unittest.IsolatedAsyncioTestCase):
         menu = _MenuInput(
             MenuEvent(MenuAction.ACTIVATE),
             MenuEvent(MenuAction.ACTIVATE),
-            MenuEvent(MenuAction.ACTIVATE),
             MenuEvent(MenuAction.ACTIVATE, 0),
         )
         result = await TerminalEvaluationFrontend(
@@ -101,7 +95,6 @@ class TerminalEvaluationTests(unittest.IsolatedAsyncioTestCase):
         ).run()
 
         self.assertEqual(result.status, "completed")
-        self.assertEqual(controller.request.mode, "current_setup")
         self.assertEqual(controller.request.benchmark_id, "terminal-bench")
         self.assertEqual(controller.request.variant, "smoke")
         self.assertIn("[preflight ready]", output.getvalue())
@@ -111,40 +104,29 @@ class TerminalEvaluationTests(unittest.IsolatedAsyncioTestCase):
         controller = _Controller()
         output = io.StringIO()
         menu = _MenuInput(
-            MenuEvent(MenuAction.ACTIVATE),  # mode -> benchmark
             MenuEvent(MenuAction.ACTIVATE),  # benchmark -> variant
             MenuEvent(MenuAction.ACTIVATE),  # variant -> confirm
             MenuEvent(MenuAction.BACK),      # confirm -> variant
             MenuEvent(MenuAction.BACK),      # variant -> benchmark
-            MenuEvent(MenuAction.BACK),      # benchmark -> mode
             MenuEvent(MenuAction.QUIT),
         )
         result = await TerminalEvaluationFrontend(controller, input_stream=io.StringIO(), output_stream=output, menu_input=menu).run()
         self.assertIsNone(result)
         self.assertIsNone(controller.request)
         titles = [line for line in output.getvalue().splitlines() if line in {"Evaluation", "Benchmark", "Terminal-Bench", "Confirm evaluation"}]
-        self.assertEqual(titles, ["Evaluation", "Benchmark", "Terminal-Bench", "Confirm evaluation", "Terminal-Bench", "Benchmark", "Evaluation"])
+        self.assertEqual(titles, ["Benchmark", "Terminal-Bench", "Confirm evaluation", "Terminal-Bench", "Benchmark"])
 
-    async def test_comparison_back_preserves_selection_and_confirmation_defaults_to_back(self) -> None:
+    async def test_confirmation_defaults_to_back_and_preserves_variant(self):
         controller = _Controller()
-        snapshot = controller.snapshot()
-        controller.snapshot = lambda: EvaluationSnapshot(
-            modes=(EvaluationModeOption("mechanism_comparison", "Compare", "one mechanism"),),
-            benchmarks=snapshot.benchmarks,
-            mechanisms=(EvaluationMechanismOption("first", "First"), EvaluationMechanismOption("second", "Second")),
-        )
         output = io.StringIO()
-        menu = _MenuInput(
-            MenuEvent(MenuAction.ACTIVATE), MenuEvent(MenuAction.ACTIVATE), MenuEvent(MenuAction.ACTIVATE),
-            MenuEvent(MenuAction.ACTIVATE, 1),  # second mechanism -> confirm
-            MenuEvent(MenuAction.ACTIVATE),     # default Back -> mechanism
-            MenuEvent(MenuAction.ACTIVATE),     # retained second mechanism
-            MenuEvent(MenuAction.ACTIVATE, 0),  # explicit Run
-        )
+        menu = _MenuInput(MenuEvent(MenuAction.ACTIVATE), MenuEvent(MenuAction.ACTIVATE),
+            MenuEvent(MenuAction.ACTIVATE), MenuEvent(MenuAction.ACTIVATE), MenuEvent(MenuAction.ACTIVATE, 0))
         result = await TerminalEvaluationFrontend(controller, input_stream=io.StringIO(), output_stream=output, menu_input=menu).run()
-        self.assertEqual(result.status, "completed")
-        self.assertEqual(controller.request.mechanism_id, "second")
-        self.assertEqual(output.getvalue().count("Compare a mechanism\n"), 2)
+        self.assertEqual("completed", result.status)
+        self.assertEqual("smoke", controller.request.variant)
+        self.assertEqual(2, output.getvalue().count("Confirm evaluation\n"))
+        self.assertNotIn("Compare a mechanism", output.getvalue())
+
 
     async def test_quit_from_nested_page_does_not_reopen_parent(self) -> None:
         controller = _Controller()
@@ -158,11 +140,11 @@ class TerminalEvaluationTests(unittest.IsolatedAsyncioTestCase):
         output = io.StringIO()
 
         async def run(request, on_event):
-            await on_event({"type": "job_progress", "condition_id": "current", "elapsed_seconds": 5, "completed": 0, "agent_runs_started": 0, "active_agents": 0})
+            await on_event({"type": "job_progress", "job_id": "current", "elapsed_seconds": 5, "completed": 0, "agent_runs_started": 0, "active_agents": 0})
             self.assertIn("Harbor preparing tasks", output.getvalue())
             await on_event({"type": "agent_event", "trial_id": "one", "event": {"type": "tool_started", "run_id": "run-1", "tool_call_id": "call-1", "tool_name": "bash", "arguments": {"command": "ls"}}})
             self.assertIn("bash", output.getvalue())
-            await on_event({"type": "job_progress", "condition_id": "current", "elapsed_seconds": 10, "completed": 1, "agent_runs_started": 1, "active_agents": 0})
+            await on_event({"type": "job_progress", "job_id": "current", "elapsed_seconds": 10, "completed": 1, "agent_runs_started": 1, "active_agents": 0})
             self.assertIn("1 trials completed", output.getvalue())
             return EvaluationLaunchResult("completed", "eval-1", "report.md", "report.json")
 
@@ -192,7 +174,7 @@ class TerminalEvaluationTests(unittest.IsolatedAsyncioTestCase):
         frontend = TerminalEvaluationFrontend(_Controller(), input_stream=io.StringIO(), output_stream=output)
         renderer = TerminalRenderer(output)
         text = "install output " * 1000 + "final detail\n"
-        await frontend._show_event(renderer, {"type": "log", "source": "job/trial/agent/setup.log", "condition_id": "current", "text": text})
+        await frontend._show_event(renderer, {"type": "log", "source": "job/trial/agent/setup.log", "job_id": "current", "text": text})
         await frontend._show_event(renderer, {"type": "trial_finished", "error": {"exception_type": "AgentSetupTimeoutError", "exception_message": "setup timed out"}})
         await renderer.close()
         self.assertIn(text, output.getvalue())
@@ -206,12 +188,12 @@ class TerminalEvaluationTests(unittest.IsolatedAsyncioTestCase):
         renderer = TerminalRenderer(output)
         text = "│ trace line " + "x" * 9000 + " │\nfinal partial line"
         for start in range(0, len(text), 4096):
-            await frontend._show_event(renderer, {"type": "log", "source": "harbor.log", "condition_id": "current", "text": text[start:start+4096]})
-        await frontend._show_event(renderer, {"type": "log", "source": "exception.txt", "condition_id": "current", "text": "exception\n"})
+            await frontend._show_event(renderer, {"type": "log", "source": "harbor.log", "job_id": "current", "text": text[start:start+4096]})
+        await frontend._show_event(renderer, {"type": "log", "source": "exception.txt", "job_id": "current", "text": "exception\n"})
         await renderer.close()
         self.assertIn(text, output.getvalue())
-        self.assertEqual(output.getvalue().count("[condition current · harbor.log]"), 1)
-        self.assertIn("final partial line\n[condition current · exception.txt]", output.getvalue())
+        self.assertEqual(output.getvalue().count("[job current · harbor.log]"), 1)
+        self.assertIn("final partial line\n[job current · exception.txt]", output.getvalue())
 
 
 if __name__ == "__main__":

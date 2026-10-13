@@ -11,7 +11,7 @@ import sys
 import tempfile
 from typing import Any, Mapping, Callable
 
-from fruitfly_agent.interactive import AgentApplication, EvaluationBenchmarkOption, EvaluationLaunchRequest, EvaluationLaunchResult, EvaluationMechanismOption, EvaluationModeOption, EvaluationSnapshot, EvaluationVariantOption, EvaluationEventSink
+from fruitfly_agent.interactive import AgentApplication, EvaluationBenchmarkOption, EvaluationLaunchRequest, EvaluationLaunchResult, EvaluationSnapshot, EvaluationVariantOption, EvaluationEventSink
 
 
 SMOKE_EVALUATION_TIMEOUT_SECONDS = 60 * 60
@@ -28,14 +28,12 @@ class RunEvaluationController:
         workspace: Path | Callable[[], Path],
         environment: Mapping[str, str] | Callable[[], Mapping[str, str]],
         selection,
-        labels,
         python_executable: str | None = None,
     ) -> None:
         self.application = application
         self._workspace = workspace
         self._host_environment = environment
         self.selection = selection
-        self.labels = labels
         self.python_executable = python_executable or sys.executable
 
     @property
@@ -60,12 +58,6 @@ class RunEvaluationController:
         if completed.returncode != 0:
             raise RuntimeError(completed.stderr.strip() or "could not load eval catalog")
         payload = json.loads(completed.stdout)
-        modes = tuple(
-            EvaluationModeOption(
-                str(item["id"]), str(item["label"]), str(item["description"])
-            )
-            for item in payload.get("modes", [])
-        )
         benchmarks = []
         for item in payload.get("benchmarks", []):
             variants = []
@@ -95,30 +87,7 @@ class RunEvaluationController:
                     tuple(variants),
                 )
             )
-        labels = self.labels()
-        mechanisms = []
-        for component in self.application.runtime_manifest.get("components", []):
-            if not isinstance(component, Mapping):
-                continue
-            contributions = component.get("contributions", [])
-            if not any(
-                isinstance(value, Mapping) and value.get("layer") != "capability"
-                for value in contributions
-            ):
-                continue
-            mechanism_id = str(component.get("id", ""))
-            if mechanism_id:
-                mechanisms.append(
-                    EvaluationMechanismOption(
-                        mechanism_id,
-                        labels.get(mechanism_id, mechanism_id),
-                    )
-                )
-        return EvaluationSnapshot(
-            modes=modes,
-            benchmarks=tuple(benchmarks),
-            mechanisms=tuple(mechanisms),
-        )
+        return EvaluationSnapshot(benchmarks=tuple(benchmarks))
 
     async def run(
         self, request: EvaluationLaunchRequest,
@@ -126,27 +95,18 @@ class RunEvaluationController:
     ) -> EvaluationLaunchResult:
         if self.application.running or self.application.pending_count:
             raise RuntimeError("finish or cancel active work before starting eval")
-        manifest = self.application.runtime_manifest
         selection = self.selection()
         payload: dict[str, Any] = {
-            "schema_version": 1,
-            "mode": request.mode,
+            "schema_version": 2,
             "runtime": {
-                "manifest": manifest,
                 "config_path": str(selection.config_path),
                 "profile": selection.profile.profile_id,
                 "working_directory": str(self.workspace),
             },
             "benchmark": {"id": request.benchmark_id, "variant": request.variant},
-            "comparison": (
-                {"mechanism_id": request.mechanism_id}
-                if request.mechanism_id is not None
-                else None
-            ),
             "execution": {
                 "attempts": 1,
                 "concurrency": 1,
-                "seed": 0,
                 "timeout_seconds": _default_timeout_seconds(request.variant),
             },
         }

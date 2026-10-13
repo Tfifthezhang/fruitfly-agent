@@ -7,12 +7,24 @@ import os
 import unittest
 from unittest.mock import patch
 
-from fruitfly_agent.interactive.terminal.io.menu import LineMenuInput, MenuAction, MenuRow, RawTerminalMenuInput, TerminalMenuRenderer
+from fruitfly_agent.interactive.terminal.io.menu import LineMenuInput, MenuAction, MenuEvent, MenuRow, RawTerminalMenuInput, TerminalMenuRenderer, navigate_menu
 from fruitfly_agent.interactive.terminal.io.screen import transient_screen
 from tests.support.terminal import ScriptedLines, TtyStringIO
 
 
 class MenuInputTest(unittest.TestCase):
+    def test_shared_navigation_wraps_and_rejects_invalid_numbered_choices(self) -> None:
+        for event, selected, expected in (
+            (MenuEvent(MenuAction.UP), 0, (2, True)),
+            (MenuEvent(MenuAction.DOWN), 2, (0, True)),
+            (MenuEvent(MenuAction.ACTIVATE, 1), 0, (1, False)),
+            (MenuEvent(MenuAction.ACTIVATE, -1), 1, (1, True)),
+            (MenuEvent(MenuAction.ACTIVATE, 3), 1, (1, True)),
+            (MenuEvent(MenuAction.BACK), 1, (1, False)),
+        ):
+            with self.subTest(event=event, selected=selected):
+                self.assertEqual(expected, navigate_menu(event, selected, 3))
+
     def test_raw_terminal_keys_map_to_generic_actions(self) -> None:
         for key, action in (
             (b"\x1b[A", MenuAction.UP),

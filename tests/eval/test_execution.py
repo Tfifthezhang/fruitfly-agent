@@ -4,12 +4,12 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from eval.benchmarks import BenchmarkDescriptor, BenchmarkVariant, PreflightResult
 from eval.catalog import BenchmarkCatalog
 from eval.contracts import EvaluationRequest
-from eval.execution import execute_plan
-from eval.planning import create_plan
+from eval.execution import execute_request
 from eval.report import report_from_runner_result
 from tests.support.evaluation import request_payload
 
@@ -31,11 +31,11 @@ class FakeAdapter:
     def preflight(self, variant: str) -> PreflightResult:
         return PreflightResult(True, ({"id": "fixture", "ok": True},))
 
-    def run(self, *, plan_path: Path, result_path: Path, variant: str, progress=None) -> None:
+    def run(self, *, request_path: Path, result_path: Path, variant: str, progress=None) -> None:
         result_path.write_text(
             json.dumps(
                 {
-                    "schema_version": 1,
+                    "schema_version": 2,
                     "status": "completed",
                     "metrics": [
                         {
@@ -44,18 +44,15 @@ class FakeAdapter:
                             "unit": "ratio",
                             "direction": "higher_is_better",
                             "scope": "benchmark",
-                            "condition_id": "current",
                             "aggregation": "mean",
                             "sample_count": 4,
                         }
                     ],
-                    "comparisons": [],
                     "errors": {},
                     "artifacts": [],
                     "trials": [
                         {
                             "trial_id": "t1",
-                            "condition_id": "current",
                             "task_id": "task-1",
                             "status": "passed",
                         }
@@ -67,17 +64,39 @@ class FakeAdapter:
 
 
 class ExecutionTests(unittest.TestCase):
+    def test_runner_and_result_failures_still_produce_readable_reports(self) -> None:
+        request = EvaluationRequest.from_dict(request_payload())
+        cases = (
+            (None, "runner"),
+            ({"schema_version": 1, "status": "completed"}, "runner"),
+            ({"schema_version": 2, "status": "completed",
+              "metrics": [{"name": "score", "value": "not numeric"}]}, "result_validation"),
+        )
+        for payload, error_key in cases:
+            with self.subTest(payload=payload), tempfile.TemporaryDirectory() as directory:
+                adapter = FakeAdapter()
+
+                def run(**kwargs):
+                    if payload is None:
+                        raise RuntimeError("offline runner failed")
+                    kwargs["result_path"].write_text(json.dumps(payload), encoding="utf-8")
+
+                with patch.object(adapter, "run", side_effect=run):
+                    report, store = execute_request(request, output_root=Path(directory),
+                                                    catalog=BenchmarkCatalog((adapter,)))
+                self.assertEqual(report.status, "failed")
+                self.assertIn(error_key, report.errors)
+                self.assertEqual(json.loads((store.path / "report.json").read_text())["status"], "failed")
+                self.assertIn(error_key, (store.path / "report.md").read_text())
+
     def test_completed_report_surfaces_trial_errors(self) -> None:
         catalog = BenchmarkCatalog((FakeAdapter(),))
-        plan = create_plan(
-            EvaluationRequest.from_dict(request_payload()), catalog=catalog
-        )
+        request = EvaluationRequest.from_dict(request_payload())
         report = report_from_runner_result(
-            plan,
+            request,
             {
                 "status": "completed",
                 "metrics": [],
-                "comparisons": [],
                 "errors": {},
                 "trials": [
                     {
@@ -87,48 +106,45 @@ class ExecutionTests(unittest.TestCase):
                     }
                 ],
             },
+            evaluation_id="fixture", benchmark={"benchmark": "swe-bench", "variant": "smoke"},
             started_at="2026-01-01T00:00:00Z",
             completed_at="2026-01-01T00:00:01Z",
         )
         self.assertEqual(report.status, "completed")
         self.assertEqual(report.errors["trials"][0]["path"], "trials/000000.json")
-        self.assertIn("Trial errors: 1", report.render_markdown())
+        self.assertIn("trials/000000.json", report.render_markdown())
         self.assertIn("DockerError", report.render_markdown())
 
     def test_fixed_artifact_layout_and_reports(self) -> None:
         adapter = FakeAdapter()
         catalog = BenchmarkCatalog((adapter,))
-        plan = create_plan(
-            EvaluationRequest.from_dict(request_payload()), catalog=catalog
-        )
+        request = EvaluationRequest.from_dict(request_payload())
         with tempfile.TemporaryDirectory() as directory:
-            report, store = execute_plan(
-                plan, output_root=Path(directory), catalog=catalog
+            report, store = execute_request(
+                request, output_root=Path(directory), catalog=catalog
             )
             self.assertEqual(report.status, "completed")
             self.assertEqual(report.metrics[0].value, 0.75)
+            self.assertFalse((store.path / "plan.json").exists())
+            self.assertEqual(json.loads((store.path / "request.json").read_text()), request.to_dict())
             self.assertEqual(
                 set(report.to_dict()),
                 {
                     "schema_version",
                     "evaluation_id",
                     "status",
-                    "mode",
                     "started_at",
                     "completed_at",
                     "benchmark",
                     "runtime",
                     "execution",
-                    "conditions",
                     "metrics",
-                    "comparisons",
                     "errors",
                     "artifacts",
                 },
             )
             for relative in (
                 "request.json",
-                "plan.json",
                 "trials/000000.json",
                 "report.json",
                 "report.md",
@@ -137,13 +153,10 @@ class ExecutionTests(unittest.TestCase):
             markdown = (store.path / "report.md").read_text(encoding="utf-8")
             for heading in (
                 "## Summary",
-                "## Experimental Conditions",
-                "## Primary Results",
-                "## Quality, Cost, and Reliability",
-                "## Comparison",
+                "## Configuration",
+                "## Results",
                 "## Task Results",
                 "## Failures",
-                "## Reproducibility",
                 "## Artifacts",
             ):
                 self.assertIn(heading, markdown)

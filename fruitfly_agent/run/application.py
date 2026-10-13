@@ -25,7 +25,7 @@ from .runtime.assembly import build_runtime
 from .runtime.manifest import RuntimeManifest
 from .runtime.preparation import RuntimePreparer, PreparedRuntime
 from .runtime.recovery import (check_session_manifest, discover_resumable_sessions,
-    new_session_path, record_session_manifest, resolve_session_path, known_legacy_default)
+    new_session_path, record_session_manifest, resolve_session_path)
 from .improvement.candidates import RunCandidates
 from .improvement.search_jobs import RunSearchJobs
 from .improvement.startup_versions import RunStartupVersions
@@ -73,7 +73,6 @@ class RunApplicationFactory:
             self.artifact_store,
         )
         self._allow_incomplete = allow_incomplete
-        self._stock_catalog = catalog is None
         self._current_runtime_manifest: RuntimeManifest | None = None
         self._current_components: Mapping[str, Any] = {}
         self._current_runtime_config: AgentLoopConfig | None = None
@@ -95,7 +94,7 @@ class RunApplicationFactory:
             workspace=self.cwd, catalog=self.catalog, environment=self.environment,
             artifacts=self.artifact_store, provider_registry=self.provider_registry,
             pinned_bindings=self.data_artifact_bindings, task_pack_sources=self.task_pack_sources,
-            permission_policy=self.permission_policy, stock_catalog=self._stock_catalog,
+            permission_policy=self.permission_policy,
             describe=lambda runtime: describe_runtime(runtime, self.catalog),
             build=lambda *args, **kwargs: build_runtime(
                 *args, **{**kwargs, "provider_registry": self.provider_registry}),
@@ -157,22 +156,8 @@ class RunApplicationFactory:
     def new_session_path(self) -> Path:
         return new_session_path(self.cwd)
 
-    def resumable_sessions(
-        self,
-        *,
-        current_path: Path,
-        manifest_digest: str,
-    ) -> tuple[ResumableSession, ...]:
-        accepted = {manifest_digest}
-        manifest = self._current_runtime_manifest
-        if self._stock_catalog and known_legacy_default() and manifest is not None and manifest.digest == manifest_digest and not any("implementation_id" in item for item in manifest.components):
-            if manifest.base_prompt["reference"] == DEFAULT_PROMPT_ID:
-                accepted.add(manifest.legacy_dict(4 if manifest.data_artifacts else 3)["digest"])
-        return discover_resumable_sessions(
-            self.cwd,
-            current_path=current_path,
-            manifest_digests=accepted,
-        )
+    def resumable_sessions(self, *, current_path: Path) -> tuple[ResumableSession, ...]:
+        return discover_resumable_sessions(self.cwd, current_path=current_path)
 
     def _resolve(self) -> HarnessSelection:
         return resolve_harness_selection(

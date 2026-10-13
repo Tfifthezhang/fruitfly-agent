@@ -22,6 +22,8 @@ Use FruitFlyAgent through stdin/stdout, menus, and live events. Application owns
 
 POSIX ANSI terminals support live input, history, cancellation, and bracketed paste. Non-ANSI POSIX TTY input uses a stoppable canonical reader and handles SIGINT while a run is waiting. Redirected input uses sequential line-based fallback and cannot consume `/cancel` during a run. Display limits do not alter model context or stored messages. `NO_COLOR` and terminal capabilities affect rendering.
 
+Live reasoning text is hidden. The existing activity display indicates reasoning, answer reception, and tool execution; redirected output keeps brief activity milestones without animation. Reasoning summaries are also hidden. This presentation policy adds no model requests and does not change reasoning usage. Ordinary assistant text and bounded tool output remain visible.
+
 ## Restore a conversation
 
 After successful `/resume` or interactive startup with `--resume`, the terminal appends the original conversation in chronological order, followed by an end marker and the normal input prompt. User and assistant text is complete; ANSI terminals format assistant Markdown. Use terminal scrollback to review earlier turns. Existing scrollback is retained, and menus do not replay history.
@@ -127,7 +129,7 @@ Waiting/retry/timeout activity includes request and adapter attempt identities. 
 
 ## Respond to permission requests
 
-The real interactive terminal presents the tool, operation, canonical targets, command/code when applicable, and the scope of session approval. Choose **1 / Enter** to allow once, **2** to allow the displayed scope for this runtime session, or **3 / Esc** to deny. The ANSI editor also supports Up/Down then Enter. Ctrl+C cancels the run.
+The real interactive terminal presents the tool, operation, canonical targets, command/code when applicable, and the scope of session approval. The ANSI permission frame shows English options with a moving `❯` and a highlighted current row; NO_COLOR keeps the marker. Up/Down moves the selection and Enter confirms the selected option. The initial selection is Allow once. Numeric shortcuts **1**, **2**, and **3** choose Allow once, the displayed scope for this runtime session, and Deny respectively; Esc also denies. The menu clears after resolution. Ctrl+C cancels the run.
 
 The existing input reader routes approval keys; no second stdin reader is started. Ordinary non-ANSI TTY input uses numbered choices followed by Enter. Redirected input does not enable confirmations and therefore cannot silently approve local execution or external file operations. `/permissions clear` revokes remembered approvals while normal command input is available; use Esc to deny an active prompt.
 

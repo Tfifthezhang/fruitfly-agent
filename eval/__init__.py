@@ -1,32 +1,8 @@
-"""Optional standardized evaluation consumer for FruitFlyAgent."""
-
+"""Optional single-configuration benchmark runner and reports."""
 from .catalog import BenchmarkCatalog, builtin_catalog
-from .contracts import (
-    BenchmarkSelection,
-    ComparisonSelection,
-    EvaluationPlan,
-    EvaluationRequest,
-    ExecutionOptions,
-    RuntimeReference,
-    TrialRecord,
-)
-from .execution import execute_plan, execute_request
-from .planning import create_plan
+from .contracts import BenchmarkSelection, EvaluationRequest, ExecutionOptions, RuntimeReference, TrialRecord
+from .execution import execute_request
 from .report import EvaluationReport, MetricRecord
 
-__all__ = [
-    "BenchmarkCatalog",
-    "BenchmarkSelection",
-    "ComparisonSelection",
-    "EvaluationPlan",
-    "EvaluationReport",
-    "EvaluationRequest",
-    "ExecutionOptions",
-    "MetricRecord",
-    "RuntimeReference",
-    "TrialRecord",
-    "builtin_catalog",
-    "create_plan",
-    "execute_plan",
-    "execute_request",
-]
+__all__ = ["BenchmarkCatalog", "BenchmarkSelection", "EvaluationReport", "EvaluationRequest",
+           "ExecutionOptions", "MetricRecord", "RuntimeReference", "TrialRecord", "builtin_catalog", "execute_request"]

@@ -26,7 +26,18 @@ The development runner rejects integration/support and non-test modules. It does
 
 ## Static types
 
-Install the optional development dependencies with `pip install -e '.[dev]'` (network download), then run `.venv/bin/python -m mypy` offline. The explicit module list in `pyproject.toml` covers Core loop/tool/session contracts, Application ownership, independent improvement capabilities, optimization jobs, correction materials, terminal command registration/bindings, and Run configuration/recovery. The gate also includes authorization contracts, Interactive confirmation, Lab permission/environment wrappers, and Run policy construction. Imported types are analyzed silently outside that list; terminal rendering/menu and algorithm implementations are not covered by this gate.
+Install the optional development dependencies with `pip install -e '.[dev]'` (network download), then run `.venv/bin/python -m mypy` offline. Development dependencies include pinned mypy and PyYAML stubs. The module list and per-module rules in `pyproject.toml` define the gate.
+
+| Checked area | Scope |
+|---|---|
+| Core and Application | Loop/tool/session contracts, lifecycle ownership, authorization, improvement capabilities, and correction materials |
+| Lab | Permission/environment wrappers, task packages, task loading, and scoring policies |
+| Providers | The complete package, including message codecs, transport, model setup, and registry |
+| Run | Configuration/recovery, optimization jobs, permission construction, storage, and host adapters |
+| Terminal | Command registration/bindings, live input, generic menus, and configuration menus |
+| Eval | Benchmark adapters, catalog, requests, execution, reports, storage, and installation |
+
+The Core loop, task packages/scoring, message codecs, runtime-description adapter, live input, generic/configuration menus, and Harbor result adapter also reject definitions with missing annotations. Policy-defined case mappings and SDK/JSON boundaries retain dynamic data where needed; this is not a fully strict whole-project check. Imported types outside the selected modules are analyzed silently. Terminal rendering, other feature menus, most algorithm implementations, the Eval CLI, and the optional installed Harbor Agent bridge remain outside the gate.
 
 ## Groups
 
@@ -40,7 +51,7 @@ Install the optional development dependencies with `pip install -e '.[dev]'` (ne
 | [Interactive](interactive/README.md) | Application, events, menus, and terminal behavior |
 | [Run](run/README.md) | Configuration, assembly, manifest, candidates, recovery, and subprocess bridges |
 | [Workflows](workflows/README.md) | Complete offline user paths across modules |
-| [Eval](eval/README.md) | Optional benchmark plans, adapters, artifacts, and reports |
+| [Eval](eval/README.md) | Optional single-configuration benchmarks, artifacts, and reports |
 | [Support](support/README.md) | Shared substitutes and temporary material, no TestCases |
 | [Integration](integration/README.md) | Explicit real Provider smoke requests |
 

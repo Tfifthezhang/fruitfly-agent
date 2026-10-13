@@ -13,7 +13,7 @@ FruitFlyAgent separates the Agent loop, model adapters, Application lifecycle, a
 | [Interactive](interactive/README.md) | Application lifecycle, multi-turn state, events, and terminal | Core and Interactive |
 | [Lab](lab/README.md) | Tools, environments, context strategies, optimization, and RSI | Core and Lab |
 | [Run](run/README.md) | Configuration, Provider construction, assembly, and CLI | All runtime layers |
-| [Eval](../eval/README.md) | Optional benchmark conditions, runners, and reports | Core, Providers, Lab, and Eval |
+| [Eval](../eval/README.md) | Optional single-configuration benchmark execution and reports | Core, Providers, Lab, and Eval |
 
 Eval consumes public runtime capabilities. Removing it must leave normal Agent use and algorithm development intact.
 
@@ -48,7 +48,7 @@ The Session keeps canonical conversation facts. The model projection is the cont
 
 Core enforces per-turn tool allowances and bounds consecutive truncated responses; see [runtime rules](core/README.md#runtime-rules). Provider retries and monetary cost require separate accounting.
 
-Recovery checks artifact contents and the full manifest. It does not restore arbitrary Python objects, snapshot algorithm source, or replay requests with unknown cost. Details belong to [Run](run/README.md#recovery) and [Session](core/session/README.md).
+Recovery validates recorded contents and required artifacts, then continues with current configuration. Complete environment snapshots are appended in the same Session when they change. It does not restore arbitrary Python objects, snapshot algorithm source, or replay requests with unknown cost. Details belong to [Run](run/README.md#recovery) and [Session](core/session/README.md).
 
 ## Choose an extension point
 

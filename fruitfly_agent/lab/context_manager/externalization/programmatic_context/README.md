@@ -55,6 +55,8 @@ Based on Zhang et al., [Recursive Language Models](https://arxiv.org/abs/2512.24
 
 Register subprocess resources immediately with `context.own` and expose them in assembly components. Define schema, serialization errors, reset, and cancellation for added state. See [Catalog](../../../catalog/README.md) and [Known limitations](../../../ALGORITHM_AUDIT.md).
 
+SessionArtifactStore implements Core's RecoveryValidator for saved externalizer projections. It checks the emitted reference format and artifact contents before activation; missing/corrupt referenced objects reject that projection. A changed mechanism selection rebuilds model context from canonical facts through Run. IPython namespaces start fresh, and callers explicitly load supported JSON state.
+
 ```bash
 .venv/bin/python -m unittest tests.lab.test_rlm -v
 ```

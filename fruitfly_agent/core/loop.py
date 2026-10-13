@@ -148,22 +148,7 @@ async def _run(
     hooks = config.hooks or HookRegistry(session=ctx.session)
     provider = config.provider
 
-    # --- before_run: generic run-boundary extension point ---
-    event = await hooks.run(
-        BEFORE_RUN, BeforeRunEvent(messages=ctx.messages, system_prompt=ctx.system_prompt, model=ctx.model)
-    )
-    ctx.messages = event.messages
-    ctx.system_prompt = event.system_prompt
-    ctx.model = event.model
-    ctx.session_run_id = uuid.uuid4().hex
-    _append_session_record(
-        ctx,
-        "start",
-        {"model": ctx.model, "initial_message_count": len(ctx.messages)},
-    )
-    await hooks.emit(
-        BEFORE_RUN, BeforeRunEvent(messages=ctx.messages, system_prompt=ctx.system_prompt, model=ctx.model)
-    )
+    await _start_run(ctx, hooks)
 
     turn_count = 0
     tool_call_count = 0
@@ -212,50 +197,8 @@ async def _run(
             if _aborted(signal):
                 return await _finish(config, ctx, hooks, "aborted", turn_count, tool_call_count)
 
-            # --- request preparation ---
-            # Active changes are committed to ctx before budgeting so the
-            # reducer and provider see the same prompt/messages/tools/model.
-            request_ctx = _request_ctx(ctx)
-            request_event = await hooks.run(BEFORE_REQUEST, request_ctx)
-            ctx.system_prompt = request_event.system_prompt
-            ctx.messages = list(request_event.messages)
-            ctx.tools = list(request_event.tools)
-            ctx.model = request_event.model
-            ctx.max_tokens = request_event.max_tokens
-            await hooks.emit(BEFORE_REQUEST, request_event)
-
-            # Core owns the fixed context order. Generic request hooks run first;
-            # Lab transformations then prepare the final projection for budgeting.
-            if isinstance(context_pipeline, ContextPipeline):
-                await context_pipeline.prepare(ctx)
-
-            # --- reduction budget check before every Provider request ---
-            await _check_budget(ctx, hooks, context_pipeline)
-            if _aborted(signal):
-                return await _finish(config, ctx, hooks, "aborted", turn_count, tool_call_count)
-
-            # Rebuild after compaction because it may replace ctx.messages.
-            request_ctx = _request_ctx(ctx)
-
-            estimate = None
-            source = ""
-            has_estimator = context_pipeline is not None and (
-                not isinstance(context_pipeline, ContextPipeline)
-                or context_pipeline.reduction_stage is not None
-            )
-            if context_pipeline is not None and has_estimator:
-                try:
-                    value = context_pipeline.estimate(snapshot(ctx, "budget"))
-                    if type(value) is int and value >= 0:
-                        estimate = value
-                        source = str(getattr(context_pipeline, "estimate_source", "context reducer"))
-                except Exception:
-                    logger.warning("request context estimate unavailable", exc_info=True)
-            prepared = RequestPreparedEvent(ctx.model, ctx.context_window, ctx.max_tokens,
-                                            estimate, source, time.time())
-            _append_session_record(ctx, "request_context", asdict(prepared))
-            await hooks.emit(REQUEST_PREPARED, prepared)
-            if _aborted(signal):
+            request_ctx = await _prepare_request(ctx, hooks, context_pipeline, signal)
+            if request_ctx is None:
                 return await _finish(config, ctx, hooks, "aborted", turn_count, tool_call_count)
 
             ctx.provider_attempt_count += 1
@@ -285,37 +228,11 @@ async def _run(
                     )
                 continue  # ladder handled it: retry this iteration
 
-            response_event = await hooks.run(
-                AFTER_RESPONSE, AfterResponseEvent(assistant=assistant)
-            )
-            assistant = response_event.assistant
-            _append(ctx, assistant)
-            ctx.last_input_tokens = assistant.usage.input_tokens if assistant.usage else None
-            response_event.receipt_timestamp = time.time()
-            _append_session_record(ctx, "request_receipt", {
-                "model": ctx.model, "input_tokens": ctx.last_input_tokens,
-                "timestamp": response_event.receipt_timestamp,
-            })
-            ctx.overflow_attempt = 0
-            ctx.usage = Usage(
-                input_tokens=ctx.usage.input_tokens + (assistant.usage.input_tokens if assistant.usage else 0),
-                output_tokens=ctx.usage.output_tokens + (assistant.usage.output_tokens if assistant.usage else 0),
-                cache_read_tokens=ctx.usage.cache_read_tokens + (assistant.usage.cache_read_tokens if assistant.usage else 0),
-                cache_creation_tokens=ctx.usage.cache_creation_tokens + (assistant.usage.cache_creation_tokens if assistant.usage else 0),
-            )
-            await hooks.emit(AFTER_RESPONSE, response_event)
+            assistant = await _record_response(ctx, hooks, assistant)
 
             # Truncated responses must not execute any tool calls in the batch.
             if assistant.stop_reason == "length":
-                for tc in assistant.tool_calls:
-                    _append(
-                        ctx,
-                        ToolResultMessage(
-                            tool_call_id=tc.id,
-                            content=[TextBlock(text=_TRUNCATED_TOOL_ERROR.format(name=tc.name))],
-                            is_error=True,
-                        ),
-                    )
+                _record_truncated_calls(ctx, assistant)
                 truncated_responses += 1
                 if truncated_responses >= _MAX_CONSECUTIVE_TRUNCATED_RESPONSES:
                     return await _finish(
@@ -374,6 +291,122 @@ async def _run(
 # ---------------------------------------------------------------------------
 
 
+def _record_truncated_calls(ctx: AgentLoopContext, assistant: AssistantMessage) -> None:
+    """Pair each skipped truncated call with its error result without executing tools."""
+    for tc in assistant.tool_calls:
+        _append(
+            ctx,
+            ToolResultMessage(
+                tool_call_id=tc.id,
+                content=[TextBlock(text=_TRUNCATED_TOOL_ERROR.format(name=tc.name))],
+                is_error=True,
+            ),
+        )
+
+
+async def _start_run(ctx: AgentLoopContext, hooks: HookRegistry) -> None:
+    """Commit start-hook changes and the run identity before entering the turn loop."""
+    # --- before_run: generic run-boundary extension point ---
+    event = await hooks.run(
+        BEFORE_RUN, BeforeRunEvent(messages=ctx.messages, system_prompt=ctx.system_prompt, model=ctx.model)
+    )
+    ctx.messages = event.messages
+    ctx.system_prompt = event.system_prompt
+    ctx.model = event.model
+    ctx.session_run_id = uuid.uuid4().hex
+    _append_session_record(
+        ctx,
+        "start",
+        {"model": ctx.model, "initial_message_count": len(ctx.messages)},
+    )
+    await hooks.emit(
+        BEFORE_RUN, BeforeRunEvent(messages=ctx.messages, system_prompt=ctx.system_prompt, model=ctx.model)
+    )
+
+
+async def _prepare_request(
+    ctx: AgentLoopContext,
+    hooks: HookRegistry,
+    context_pipeline: ContextPipeline | ContextReducer | None,
+    signal: asyncio.Event | None,
+) -> BeforeRequestEvent | None:
+    """Commit request changes and observations; return no request after cancellation."""
+    # --- request preparation ---
+    # Active changes are committed to ctx before budgeting so the
+    # reducer and provider see the same prompt/messages/tools/model.
+    request_ctx = _request_ctx(ctx)
+    request_event = await hooks.run(BEFORE_REQUEST, request_ctx)
+    ctx.system_prompt = request_event.system_prompt
+    ctx.messages = list(request_event.messages)
+    ctx.tools = list(request_event.tools)
+    ctx.model = request_event.model
+    ctx.max_tokens = request_event.max_tokens
+    await hooks.emit(BEFORE_REQUEST, request_event)
+
+    # Core owns the fixed context order. Generic request hooks run first;
+    # Lab transformations then prepare the final projection for budgeting.
+    if isinstance(context_pipeline, ContextPipeline):
+        await context_pipeline.prepare(ctx)
+
+    # --- reduction budget check before every Provider request ---
+    await _check_budget(ctx, hooks, context_pipeline)
+    if _aborted(signal):
+        return None
+
+    # Rebuild after compaction because it may replace ctx.messages.
+    request_ctx = _request_ctx(ctx)
+
+    estimate = None
+    source = ""
+    has_estimator = context_pipeline is not None and (
+        not isinstance(context_pipeline, ContextPipeline)
+        or context_pipeline.reduction_stage is not None
+    )
+    if context_pipeline is not None and has_estimator:
+        try:
+            value = context_pipeline.estimate(snapshot(ctx, "budget"))
+            if type(value) is int and value >= 0:
+                estimate = value
+                source = str(getattr(context_pipeline, "estimate_source", "context reducer"))
+        except Exception:
+            logger.warning("request context estimate unavailable", exc_info=True)
+    prepared = RequestPreparedEvent(ctx.model, ctx.context_window, ctx.max_tokens,
+                                    estimate, source, time.time())
+    _append_session_record(ctx, "request_context", asdict(prepared))
+    await hooks.emit(REQUEST_PREPARED, prepared)
+    if _aborted(signal):
+        return None
+
+    return request_ctx
+
+
+async def _record_response(
+    ctx: AgentLoopContext, hooks: HookRegistry, assistant: AssistantMessage,
+) -> AssistantMessage:
+    """Commit the hook-adjusted response and receipt before notifying observers."""
+    response_event = await hooks.run(
+        AFTER_RESPONSE, AfterResponseEvent(assistant=assistant)
+    )
+    assistant = response_event.assistant
+    _append(ctx, assistant)
+    ctx.last_input_tokens = assistant.usage.input_tokens if assistant.usage else None
+    response_event.receipt_timestamp = time.time()
+    _append_session_record(ctx, "request_receipt", {
+        "model": ctx.model, "input_tokens": ctx.last_input_tokens,
+        "timestamp": response_event.receipt_timestamp,
+    })
+    ctx.overflow_attempt = 0
+    ctx.usage = Usage(
+        input_tokens=ctx.usage.input_tokens + (assistant.usage.input_tokens if assistant.usage else 0),
+        output_tokens=ctx.usage.output_tokens + (assistant.usage.output_tokens if assistant.usage else 0),
+        cache_read_tokens=ctx.usage.cache_read_tokens + (assistant.usage.cache_read_tokens if assistant.usage else 0),
+        cache_creation_tokens=ctx.usage.cache_creation_tokens + (assistant.usage.cache_creation_tokens if assistant.usage else 0),
+    )
+    await hooks.emit(AFTER_RESPONSE, response_event)
+
+    return assistant
+
+
 class TaggedFailure:
     """A provider failure carried back from _stream_once."""
 
@@ -391,7 +424,10 @@ def _request_ctx(ctx: AgentLoopContext) -> BeforeRequestEvent:
     )
 
 
-async def _stream_once(provider: Provider, request_ctx: BeforeRequestEvent, signal: asyncio.Event | None, ctx: AgentLoopContext):
+async def _stream_once(
+    provider: Provider, request_ctx: BeforeRequestEvent,
+    signal: asyncio.Event | None, ctx: AgentLoopContext,
+) -> AssistantMessage | TaggedFailure:
     """Run one provider stream; returns AssistantMessage or TaggedFailure."""
     # Pass only the public ProviderView fields to the model adapter.
     view = ProviderView(

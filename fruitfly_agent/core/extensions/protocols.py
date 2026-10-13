@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from typing import Protocol, runtime_checkable
+from typing import Protocol, Sequence, runtime_checkable
+from ..data_model.messages import AgentMessage
 
 from ..data_model.context import ContextDecision, ContextSnapshot
 from ..data_model.runtime import AgentLoopContext, ProviderView
@@ -40,6 +41,12 @@ class PrepareNextTurnResult:
     model: str | None = None
 
 
+@runtime_checkable
+class RecoveryValidator(Protocol):
+    """Validate only persisted dependencies needed by the restored projection."""
+    def validate_recovery(self, messages: Sequence[AgentMessage]) -> None: ...
+
+
 __all__ = [
     "Provider",
     "SessionLike",
@@ -49,4 +56,5 @@ __all__ = [
     "ExecutionEnv",
     "FileSystem",
     "Shell",
+    "RecoveryValidator",
 ]

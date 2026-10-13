@@ -15,9 +15,10 @@ from unittest.mock import patch
 from fruitfly_agent.interactive import ResumableSession, TerminalFrontend
 from fruitfly_agent.interactive.contracts.commands import CommandResult
 from fruitfly_agent.interactive.interaction.commands import CommandRouter
-from fruitfly_agent.interactive.contracts.events import AssistantTextDelta
+from fruitfly_agent.interactive.contracts.events import AssistantTextDelta, AuthorizationRequested, AuthorizationResolved
 from fruitfly_agent.interactive.terminal.io.input import ReadlineLineEditor
-from fruitfly_agent.interactive.terminal.io.live import InlineTerminalDisplay
+from fruitfly_agent.interactive.terminal.io.live import InlineTerminalDisplay, IsolatedLineEditor
+from fruitfly_agent.interactive.terminal.rendering.renderer import TerminalRenderer
 from tests.support.faux_provider import FauxProvider
 from tests.support.application import offline_session
 from tests.support.configuration import MockConfiguration
@@ -44,6 +45,39 @@ class _TerminalSessionStub:
 
 
 class TerminalFrontendTest(unittest.IsolatedAsyncioTestCase):
+    async def test_permission_menu_uses_exact_scope_and_clears_on_resolution(self) -> None:
+        session = offline_session()
+        output = TtyStringIO()
+        display = InlineTerminalDisplay(output, rows=12, columns=100)
+        editor = IsolatedLineEditor(io.StringIO(), display)
+        with patch.dict("os.environ", {"TERM": "xterm-256color"}, clear=True):
+            renderer = TerminalRenderer(display)
+            frontend = TerminalFrontend(session, input_stream=io.StringIO(), output_stream=output,
+                                        line_editor=editor, renderer=renderer)
+            display.activate()
+            try:
+                await frontend._render_event(AuthorizationRequested(
+                    run_id="", request_id="request-1", tool_name="read", operation="read",
+                    targets=("/outside/file.txt",), summary="Read the requested file",
+                    session_label="Allow reads in /outside for this session",
+                ))
+                self.assertEqual(editor._choices[1], "2. Allow reads in /outside for this session")
+                self.assertIn("❯ 1. Allow once", output.getvalue())
+                self.assertIn("target: /outside/file.txt", output.getvalue())
+                self.assertIn("Read the requested file", output.getvalue())
+                start = len(output.getvalue())
+                await frontend._render_event(AuthorizationResolved(
+                    run_id="", request_id="request-1", operation="read", choice="deny",
+                ))
+                self.assertEqual(editor._choices, ())
+                resolved = output.getvalue()[start:]
+                self.assertNotIn("Allow reads", resolved)
+                self.assertIn("permission: deny", resolved)
+                self.assertIn("╭─ prompt", resolved)
+            finally:
+                await renderer.close()
+                display.suspend()
+
     async def test_opro_command_confirms_cost_and_reviews_candidate(self) -> None:
         candidate_id = "a" * 32
         record = SimpleNamespace(

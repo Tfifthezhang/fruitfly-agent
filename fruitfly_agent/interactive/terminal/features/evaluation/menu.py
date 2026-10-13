@@ -60,69 +60,32 @@ class TerminalEvaluationFrontend:
 
     def _select_request(self) -> EvaluationLaunchRequest | None:
         snapshot = self.controller.snapshot()
-        page = "mode"
+        page = "benchmark"
         choices: dict[str, int] = {}
         while True:
-            mode = snapshot.modes[choices.get("mode", 0)] if snapshot.modes else None
-            benchmark = (
-                snapshot.benchmarks[choices.get("benchmark", 0)]
-                if snapshot.benchmarks else None
-            )
-            if page == "mode":
-                title = "Evaluation"
-                subtitle = "Choose what to measure. Runs use an independent process and session."
-                rows = tuple(MenuRow(item.label, item.description) for item in snapshot.modes)
-                previous, following = None, "benchmark"
-            elif page == "benchmark":
-                title, subtitle = "Benchmark", "Choose a standardized benchmark adapter."
-                rows = tuple(
-                    MenuRow(item.label, f"{item.version} · {item.description}")
-                    for item in snapshot.benchmarks
-                )
-                previous, following = "mode", "variant"
+            if not snapshot.benchmarks:
+                return None
+            benchmark = snapshot.benchmarks[choices.get("benchmark", 0)]
+            if page == "benchmark":
+                title, subtitle = "Benchmark", "Run the selected configuration in an independent Agent session."
+                rows = tuple(MenuRow(item.label, f"{item.version} · {item.description}") for item in snapshot.benchmarks)
+                previous, following = None, "variant"
             elif page == "variant":
-                assert benchmark is not None and mode is not None
-                title = benchmark.label
-                subtitle = "Choose one resource profile. Availability is determined by Harbor preflight."
-                rows = tuple(
-                    MenuRow(
-                        item.label,
-                        item.description if item.available else f"Unavailable · {'; '.join(item.preflight)}",
-                        marker="✓" if item.available else "!",
-                    )
-                    for item in benchmark.variants
-                )
-                previous = "benchmark"
-                following = "mechanism" if mode.mode_id == "mechanism_comparison" else "confirm"
-            elif page == "mechanism":
-                title = "Compare a mechanism"
-                subtitle = "Baseline removes exactly one active mechanism; all other conditions stay fixed."
-                rows = tuple(MenuRow(item.label, item.mechanism_id) for item in snapshot.mechanisms)
-                if not rows:
-                    rows = (MenuRow("Back", "No active optional mechanism can be compared."),)
-                previous, following = "variant", "confirm"
+                title, subtitle = benchmark.label, "Choose a resource profile. Availability is determined by Harbor preflight."
+                rows = tuple(MenuRow(item.label, item.description if item.available else
+                    f"Unavailable · {'; '.join(item.preflight)}", marker="✓" if item.available else "!")
+                    for item in benchmark.variants)
+                previous, following = "benchmark", "confirm"
             else:
-                assert benchmark is not None and mode is not None
                 variant = benchmark.variants[choices["variant"]]
                 title = "Confirm evaluation"
-                subtitle = f"{mode.label} · {benchmark.label} / {variant.label}. Provider requests may incur cost."
-                rows = (
-                    MenuRow("Run", "Create a frozen plan and start the isolated runner"),
-                    MenuRow("Back", "Return to the previous selection"),
-                )
-                previous = "mechanism" if mode.mode_id == "mechanism_comparison" else "variant"
-                following = None
-            choice = self._choose(
-                title, subtitle, rows,
-                selected=choices.get(page, 1 if page == "confirm" else 0),
-            )
+                subtitle = f"{benchmark.label} / {variant.label}. Provider requests may incur cost."
+                rows = (MenuRow("Run", "Start the isolated runner and generate a report"), MenuRow("Back"))
+                previous, following = "variant", None
+            choice = self._choose(title, subtitle, rows, selected=choices.get(page, 1 if page == "confirm" else 0))
             if choice == MenuAction.QUIT:
                 return None
-            if (
-                choice is None
-                or (page == "confirm" and choice == 1)
-                or (page == "mechanism" and not snapshot.mechanisms)
-            ):
+            if choice is None or (page == "confirm" and choice == 1):
                 if previous is None:
                     return None
                 page = previous
@@ -131,22 +94,11 @@ class TerminalEvaluationFrontend:
             choices[page] = choice
             if page == "benchmark" and old_choice != choice:
                 choices.pop("variant", None)
-            if page == "variant":
-                assert benchmark is not None
-                variant = benchmark.variants[choice]
-                if not variant.available:
-                    raise RuntimeError(
-                        f"{benchmark.label} / {variant.label} is unavailable: "
-                        + "; ".join(variant.preflight)
-                    )
+            if page == "variant" and not benchmark.variants[choice].available:
+                raise RuntimeError(f"{benchmark.label} / {benchmark.variants[choice].label} is unavailable: "
+                                   + "; ".join(benchmark.variants[choice].preflight))
             if page == "confirm":
-                assert mode is not None and benchmark is not None
-                return EvaluationLaunchRequest(
-                    mode=mode.mode_id,
-                    benchmark_id=benchmark.benchmark_id,
-                    variant=benchmark.variants[choices["variant"]].variant_id,
-                    mechanism_id=(snapshot.mechanisms[choices["mechanism"]].mechanism_id if mode.mode_id == "mechanism_comparison" else None),
-                )
+                return EvaluationLaunchRequest(benchmark.benchmark_id, benchmark.variants[choices["variant"]].variant_id)
             assert following is not None
             page = following
 
@@ -162,7 +114,7 @@ class TerminalEvaluationFrontend:
                 if payload.get("type") == "run_started":
                     renderer.write_system(
                         f"\n[trial {event.get('trial_id', '?')} · "
-                        f"{event.get('condition_id', '?')}]\n"
+                        f"{event.get('job_id', '?')}]\n"
                     )
                     prompt = payload.get("prompt")
                     if isinstance(prompt, str):
@@ -172,22 +124,20 @@ class TerminalEvaluationFrontend:
                 except (TypeError, ValueError):
                     pass
         elif event_type == "log":
-            source = (event.get("condition_id", "?"), event.get("source", "eval"))
+            source = (event.get("job_id", "?"), event.get("source", "eval"))
             if self._log_source != source:
-                renderer.write_system(f"[condition {source[0]} · {source[1]}]\n")
+                renderer.write_system(f"[job {source[0]} · {source[1]}]\n")
                 self._log_source = source
             renderer.write_log(str(event.get("text", "")))
-        elif event_type == "planned":
-            renderer.write_system(f"[plan {event.get('evaluation_id', '?')}]\n")
+        elif event_type == "started":
+            renderer.write_system(f"[evaluation {event.get('evaluation_id', '?')}]\n")
         elif event_type == "preflight":
             renderer.write_system(
                 "[preflight ready]\n" if event.get("available") else "[preflight blocked]\n"
             )
         elif event_type == "job_started":
             renderer.write_system(
-                f"[condition {event.get('condition_index', '?')}/"
-                f"{event.get('condition_total', '?')}: {event.get('condition_id', '?')} "
-                "· Harbor job running]\n"
+                f"[job {event.get('job_id', '?')} · Harbor job running]\n"
                 f"[artifacts: {event.get('artifacts_path', 'unknown')}]\n"
             )
         elif event_type == "job_progress":
@@ -197,7 +147,7 @@ class TerminalEvaluationFrontend:
                 else "Agent execution / verification"
             )
             renderer.write_system(
-                f"[condition {event.get('condition_id', '?')} · "
+                f"[job {event.get('job_id', '?')} · "
                 f"{event.get('elapsed_seconds', 0)}s elapsed · "
                 f"{event.get('completed', 0)} trials completed · "
                 f"{event.get('active_agents', 0)} Agent runs active · "
@@ -205,12 +155,12 @@ class TerminalEvaluationFrontend:
             )
         elif event_type == "job_finished":
             renderer.write_system(
-                f"[condition {event.get('condition_id', '?')} finished · "
+                f"[job {event.get('job_id', '?')} finished · "
                 f"{event.get('completed', '?')} trials collected]\n"
             )
         elif event_type == "trial_finished":
             renderer.write_system(
-                f"[condition {event.get('condition_id', '?')} · "
+                f"[job {event.get('job_id', '?')} · "
                 f"{event.get('completed', '?')} trials completed]\n"
             )
             error = event.get("error")

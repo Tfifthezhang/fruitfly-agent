@@ -28,6 +28,36 @@ from tests.support.faux_provider import FauxProvider
 
 
 class SessionArtifactStoreTest(unittest.TestCase):
+    def test_recovery_checks_required_artifacts_without_replaying_operations(self) -> None:
+        from fruitfly_agent.core.extensions.protocols import RecoveryValidator
+
+        with tempfile.TemporaryDirectory() as tmp:
+            store = SessionArtifactStore(Path(tmp), max_artifact_bytes=10_000)
+            self.assertIsInstance(store, RecoveryValidator)
+            artifact = store.put_text("saved context")
+            message = UserMessage(content=(
+                "[External context stored by rlm-ipython]\n"
+                f"reference: {artifact.reference}\n"
+            ))
+            store.validate_recovery([message])
+            object_path = store.objects / f"{artifact.sha256}.txt"
+            object_path.write_text("tampered", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "cannot restore.*integrity"):
+                store.validate_recovery([message])
+            object_path.unlink()
+            with self.assertRaisesRegex(ValueError, "cannot restore.*unknown"):
+                store.validate_recovery([message])
+            self.assertFalse(object_path.exists())
+
+    def test_recovery_rejects_invalid_generated_references_but_allows_plain_text(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = SessionArtifactStore(Path(tmp), max_artifact_bytes=10_000)
+            store.validate_recovery([UserMessage(content="Discuss context://sha256/missing")])
+            with self.assertRaisesRegex(ValueError, "invalid artifact reference"):
+                store.validate_recovery([UserMessage(content=(
+                    "[External context stored by rlm-ipython]\nreference: invalid\n"
+                ))])
+
     def test_content_artifacts_are_addressed_searched_and_integrity_checked(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             store = SessionArtifactStore(Path(tmp), max_artifact_bytes=10_000)

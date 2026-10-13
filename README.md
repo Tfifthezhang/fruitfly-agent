@@ -35,7 +35,7 @@ Our ambition is **recursive self-improvement (RSI)**: agents that improve their 
 |---|---|
 | Stable Core, pluggable Lab, explicit Catalog assembly | Replace tools, context strategies, execution backends, or search algorithms through public contracts; keep the change identifiable. |
 | Target-owned trial adapters and injected search services | Separate what changes from how candidates are generated and evaluated; supply model roles, evaluators, and budgets explicitly. |
-| Frozen search inputs, candidate journals, and runtime manifests | Bind comparisons to a baseline, tasks, policy, and execution identity; retain observations and check the actual runtime on recovery. |
+| Frozen search inputs, candidate journals, and runtime manifests | Bind comparisons to a baseline, tasks, policy, and execution identity; retain observations; ordinary recovery continues history with current configuration and records environment changes. |
 | Separate proposal, verification, and adoption | Search results do not grant activation authority. Verification binds the candidate and policy before adoption. |
 | Version-bound task and improver implementations | The RSI driver resolves the improver again after adoption, so the next generation can use an improved improvement process. |
 | Explicit lifecycle and durable evolution phases | Own resource startup and cleanup; reconcile interrupted activation and avoid blindly replaying work with unknown cost. |

@@ -84,6 +84,5 @@ class RuntimeFactory(Protocol):
         self,
         *,
         current_path: Path,
-        manifest_digest: str,
     ) -> tuple[ResumableSession, ...]: ...
 

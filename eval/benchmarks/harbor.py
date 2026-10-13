@@ -17,6 +17,8 @@ import yaml
 from fruitfly_agent.providers.config import load_env
 from fruitfly_agent.providers.workspace import WorkspacePaths
 from eval.installation import resolve_installation
+from eval.contracts import EvaluationRequest, SCHEMA_VERSION
+from dataclasses import asdict
 
 from .base import BenchmarkDescriptor, PreflightResult, ProgressSink
 
@@ -147,122 +149,52 @@ class HarborBenchmarkAdapter:
         )
 
     def run(
-        self, *, plan_path: Path, result_path: Path, variant: str,
+        self, *, request_path: Path, result_path: Path, variant: str,
         progress: ProgressSink | None = None,
     ) -> None:
-        source_root = resolve_installation(
-            os.environ.get("FRUITFLY_EVAL_PACKAGE"),
-            checkout=Path(__file__).resolve().parents[2],
-        )
+        request = EvaluationRequest.read(request_path)
+        if request.benchmark.benchmark_id != self.descriptor.benchmark_id or request.benchmark.variant != variant:
+            raise ValueError("runner benchmark selection differs from request")
+        source_root = resolve_installation(os.environ.get("FRUITFLY_EVAL_PACKAGE"),
+                                           checkout=Path(__file__).resolve().parents[2])
         preflight = self.preflight(variant)
         if not preflight.available:
-            failed = next(item for item in preflight.checks if not item["ok"])
-            raise RuntimeError(str(failed["detail"]))
-        plan = _load_object(plan_path)
-        request = _mapping(plan.get("request"), "plan.request")
-        runtime = _mapping(request.get("runtime"), "plan.request.runtime")
-        execution = _mapping(request.get("execution"), "plan.request.execution")
-        reproducibility = _mapping(
-            plan.get("reproducibility"), "plan.reproducibility"
-        )
-        conditions = plan.get("conditions")
-        if not isinstance(conditions, list) or not conditions:
-            raise ValueError("plan.conditions must be a non-empty list")
-
-        timeout = int(execution.get("timeout_seconds", 3600))
-        jobs_root = result_path.parent / "harbor"
-        jobs_root.mkdir(parents=True, exist_ok=True)
-        workspace_paths = WorkspacePaths(Path(str(runtime.get("working_directory", ""))))
-        for notice in workspace_paths.notices():
+            raise RuntimeError(str(next(item for item in preflight.checks if not item["ok"])["detail"]))
+        runtime, execution = asdict(request.runtime), asdict(request.execution)
+        job_root = result_path.parent / "harbor"
+        job_root.mkdir(parents=True, exist_ok=True)
+        paths = WorkspacePaths(Path(request.runtime.working_directory))
+        for notice in paths.notices():
             print(f"notice: {notice}", file=sys.stderr)
-        runner_environment = {**load_env(workspace_paths.secret_file()), **os.environ}
-        all_trials: list[dict[str, Any]] = []
-        all_metrics: list[dict[str, Any]] = []
-        artifacts: list[dict[str, Any]] = []
-        for condition_index, condition in enumerate(conditions, 1):
-            condition = _mapping(condition, "plan condition")
-            condition_id = str(condition.get("condition_id", ""))
-            if not condition_id:
-                raise ValueError("plan condition has no condition_id")
-            condition_root = jobs_root / condition_id
-            condition_root.mkdir(parents=True, exist_ok=True)
-            config_path, model_catalog, secret_names = _condition_runtime_files(
-                runtime=runtime,
-                condition=condition,
-                output_dir=condition_root,
-            )
-            job_name = f"{self.descriptor.benchmark_id}-{condition_id}"
-            command = self._command(
-                executable=preflight.command[0],
-                dataset=self.descriptor.dataset,
-                variant=variant,
-                execution=execution,
-                jobs_dir=condition_root,
-                job_name=job_name,
-                source_root=source_root,
-                config_path=config_path,
-                model_catalog=model_catalog,
-                profile=str(runtime.get("profile")),
-                secret_names=secret_names,
-            )
-            if progress is not None:
-                progress({
-                    "type": "job_started", "condition_id": condition_id,
-                    "condition_index": condition_index, "condition_total": len(conditions),
-                    "artifacts_path": str(condition_root),
-                })
-            returncode, detail = _run_harbor_job(
-                command, environment=runner_environment,
-                timeout=timeout, condition_root=condition_root,
-                progress=progress, condition_id=condition_id,
-            )
-            if returncode != 0:
-                raise RuntimeError(
-                    f"Harbor exited with {returncode}"
-                    + (f": {detail[-2000:]}" if detail else "")
-                    + f"\nFull runner log: {condition_root / 'harbor.log'}"
-                )
-            job_dir = condition_root / job_name
-            job_result_path = job_dir / "result.json"
-            if not job_result_path.is_file():
-                candidates = tuple(condition_root.glob("*/result.json"))
-                if len(candidates) != 1:
-                    raise RuntimeError("Harbor did not create a unique job result")
-                job_result_path = candidates[0]
-                job_dir = job_result_path.parent
-            trials, metrics = parse_harbor_job_result(
-                _load_harbor_job_result(job_result_path),
-                condition_id=condition_id,
-                expected_manifest_digest=(
-                    str(reproducibility.get("runtime_manifest_digest"))
-                    if not condition.get("mechanism_overrides")
-                    else None
-                ),
-            )
-            all_trials.extend(trials)
-            all_metrics.extend(metrics)
-            artifacts.append({"kind": "harbor_job", "path": str(job_dir)})
-            artifacts.append({"kind": "harbor_log", "path": str(condition_root / "harbor.log")})
-            if progress is not None:
-                progress({
-                    "type": "job_finished", "condition_id": condition_id,
-                    "completed": len(all_trials),
-                    "total": len(all_trials) if variant == "smoke" else None,
-                })
-
-        payload = {
-            "schema_version": 1,
-            "status": "completed",
-            "metrics": all_metrics,
-            "comparisons": _comparisons(all_metrics),
-            "errors": {},
-            "artifacts": artifacts,
-            "trials": all_trials,
-        }
-        result_path.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
+        environment = {**load_env(paths.secret_file()), **os.environ}
+        config_path, model_catalog, secret_names = _runtime_files(runtime=runtime, output_dir=job_root)
+        job_name = self.descriptor.benchmark_id
+        command = self._command(executable=preflight.command[0], dataset=self.descriptor.dataset,
+            variant=variant, execution=execution, jobs_dir=job_root, job_name=job_name,
+            source_root=source_root, config_path=config_path, model_catalog=model_catalog,
+            profile=request.runtime.profile, secret_names=secret_names)
+        if progress is not None:
+            progress({"type": "job_started", "job_id": job_name, "artifacts_path": str(job_root)})
+        code, detail = _run_harbor_job(command, environment=environment,
+            timeout=request.execution.timeout_seconds, job_root=job_root, progress=progress, job_id=job_name)
+        if code:
+            raise RuntimeError(f"Harbor exited with {code}: {detail[-2000:]}\nFull runner log: {job_root / 'harbor.log'}")
+        job_result_path = job_root / job_name / "result.json"
+        if not job_result_path.is_file():
+            candidates = tuple(job_root.glob("*/result.json"))
+            if len(candidates) != 1:
+                raise RuntimeError("Harbor did not create a unique job result")
+            job_result_path = candidates[0]
+        trials, metrics = parse_harbor_job_result(_load_harbor_job_result(job_result_path), job_id=job_name)
+        payload = {"schema_version": SCHEMA_VERSION, "status": "completed", "metrics": metrics,
+            "errors": {}, "trials": trials,
+            "artifacts": [{"kind": "harbor_job", "path": str(job_result_path.parent)},
+                          {"kind": "harbor_log", "path": str(job_root / "harbor.log")},
+                          {"kind": "runtime_config", "path": str(config_path)},
+                          {"kind": "model_catalog", "path": str(model_catalog)}]}
+        result_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        if progress is not None:
+            progress({"type": "job_finished", "job_id": job_name, "completed": len(trials)})
 
     def _command(
         self,
@@ -320,7 +252,7 @@ class HarborBenchmarkAdapter:
 
 def _run_harbor_job(
     command: list[str], *, environment: Mapping[str, str], timeout: int,
-    condition_root: Path, progress: ProgressSink | None, condition_id: str,
+    job_root: Path, progress: ProgressSink | None, job_id: str,
 ) -> tuple[int, str]:
     """Retry transient registry errors only before Harbor creates a job."""
 
@@ -332,27 +264,27 @@ def _run_harbor_job(
             raise RuntimeError(f"Harbor job timed out after {timeout} seconds")
         code, detail = _run_harbor_job_once(
             command, environment=environment, timeout=remaining,
-            condition_root=condition_root, progress=progress,
-            condition_id=condition_id, log_offsets=log_offsets,
+            job_root=job_root, progress=progress,
+            job_id=job_id, log_offsets=log_offsets,
         )
-        path = condition_root / "harbor.log"
+        path = job_root / "harbor.log"
         text = path.read_text(encoding="utf-8", errors="replace")
         transient_registry_failure = (
             code != 0 and "Error getting dataset " in text
             and any(error in text for error in ("ConnectError", "ConnectTimeout", "ReadTimeout"))
             # Harbor creates its job directory after dataset resolution. Once
             # any directory exists, model/task side effects cannot be ruled out.
-            and not any(item.is_dir() for item in condition_root.iterdir())
+            and not any(item.is_dir() for item in job_root.iterdir())
         )
         if not transient_registry_failure or attempt == 3 or deadline - time.monotonic() <= 1:
             return code, detail
-        archive = condition_root / f"harbor-attempt-{attempt}.log"
+        archive = job_root / f"harbor-attempt-{attempt}.log"
         path.replace(archive)
         log_offsets[archive] = archive.stat().st_size
         log_offsets.pop(path, None)
         if progress is not None:
             progress({
-                "type": "log", "condition_id": condition_id, "source": "registry",
+                "type": "log", "job_id": job_id, "source": "registry",
                 "text": f"Registry connection failed before job creation; retry {attempt + 1}/3. Previous output: {archive.name}\n",
             })
         time.sleep(1)
@@ -360,8 +292,8 @@ def _run_harbor_job(
 
 
 def _run_harbor_job_once(
-    command: list[str], *, environment: Mapping[str, str], timeout: int,
-    condition_root: Path, progress: ProgressSink | None, condition_id: str,
+    command: list[str], *, environment: Mapping[str, str], timeout: float,
+    job_root: Path, progress: ProgressSink | None, job_id: str,
     log_offsets: dict[Path, int],
 ) -> tuple[int, str]:
     """Stream ephemeral display events; the normal session remains the record."""
@@ -384,7 +316,7 @@ def _run_harbor_job_once(
             progress(event)
 
     log_fragments: dict[Path, bytes] = {}
-    output_path = condition_root / "harbor.log"
+    output_path = job_root / "harbor.log"
     with output_path.open("w+b") as output:
         process = subprocess.Popen(
             command, stdout=output, stderr=subprocess.STDOUT,
@@ -397,16 +329,16 @@ def _run_harbor_job_once(
             while process.poll() is None:
                 if progress is not None:
                     _forward_agent_events(
-                        condition_root, condition_id, offsets, fragments, observe
+                        job_root, job_id, offsets, fragments, observe
                     )
                     _forward_trial_results(
-                        condition_root, condition_id, finished_trials, observe
+                        job_root, job_id, finished_trials, observe
                     )
-                    _forward_logs(condition_root, condition_id, log_offsets, log_fragments, progress)
+                    _forward_logs(job_root, job_id, log_offsets, log_fragments, progress)
                     now = time.monotonic()
                     if now >= next_update:
                         progress({
-                            "type": "job_progress", "condition_id": condition_id,
+                            "type": "job_progress", "job_id": job_id,
                             "elapsed_seconds": int(now - started_at),
                             "completed": len(finished_trials),
                             "agent_runs_started": len(started_agents),
@@ -420,10 +352,10 @@ def _run_harbor_job_once(
                 time.sleep(0.2)
             if progress is not None:
                 _forward_agent_events(
-                    condition_root, condition_id, offsets, fragments, observe
+                    job_root, job_id, offsets, fragments, observe
                 )
                 _forward_trial_results(
-                    condition_root, condition_id, finished_trials, observe
+                    job_root, job_id, finished_trials, observe
                 )
         finally:
             if process.poll() is None:
@@ -431,11 +363,11 @@ def _run_harbor_job_once(
                 process.wait()
             if progress is not None:
                 _forward_logs(
-                    condition_root, condition_id, log_offsets, log_fragments,
+                    job_root, job_id, log_offsets, log_fragments,
                     progress, final=True,
                 )
             # Archive the complete event stream for post-run inspection.
-            for path in condition_root.glob("*/*/agent/live-events.jsonl"):
+            for path in job_root.glob("*/*/agent/live-events.jsonl"):
                 path.replace(path.with_name("events.jsonl"))
         output.seek(0, os.SEEK_END)
         output.seek(max(0, output.tell() - 4000))
@@ -443,16 +375,16 @@ def _run_harbor_job_once(
 
 
 def _forward_logs(
-    condition_root: Path, condition_id: str,
+    job_root: Path, job_id: str,
     offsets: dict[Path, int], fragments: dict[Path, bytes],
     progress: ProgressSink, *, final: bool = False,
 ) -> None:
     """Tail durable runner/setup/verifier logs, including partial final lines."""
 
-    paths = {condition_root / "harbor.log"}
-    paths.update(condition_root.rglob("*.log"))
-    paths.update(condition_root.rglob("exception.txt"))
-    paths.update(condition_root.glob("*/*/verifier/*.txt"))
+    paths = {job_root / "harbor.log"}
+    paths.update(job_root.rglob("*.log"))
+    paths.update(job_root.rglob("exception.txt"))
+    paths.update(job_root.glob("*/*/verifier/*.txt"))
     for path in sorted(paths):
         previous = offsets.get(path, 0)
         try:
@@ -475,18 +407,18 @@ def _forward_logs(
         # Keep each JSONL envelope below the subprocess reader's line limit.
         for start in range(0, len(text), 4096):
             progress({
-                "type": "log", "condition_id": condition_id,
-                "source": str(path.relative_to(condition_root)),
+                "type": "log", "job_id": job_id,
+                "source": str(path.relative_to(job_root)),
                 "text": text[start:start + 4096],
             })
 
 
 def _forward_agent_events(
-    condition_root: Path, condition_id: str,
+    job_root: Path, job_id: str,
     offsets: dict[Path, int], fragments: dict[Path, bytes],
     progress: ProgressSink,
 ) -> None:
-    for path in condition_root.glob("*/*/agent/live-events.jsonl"):
+    for path in job_root.glob("*/*/agent/live-events.jsonl"):
         previous = offsets.get(path, 0)
         try:
             with path.open("rb") as handle:
@@ -507,16 +439,16 @@ def _forward_agent_events(
                 continue
             if isinstance(event, dict) and isinstance(event.get("type"), str):
                 progress({
-                    "type": "agent_event", "condition_id": condition_id,
+                    "type": "agent_event", "job_id": job_id,
                     "trial_id": path.parent.parent.name, "event": event,
                 })
 
 
 def _forward_trial_results(
-    condition_root: Path, condition_id: str,
+    job_root: Path, job_id: str,
     seen: set[Path], progress: ProgressSink,
 ) -> None:
-    for path in condition_root.glob("*/*/result.json"):
+    for path in job_root.glob("*/*/result.json"):
         if path in seen:
             continue
         try:
@@ -527,16 +459,15 @@ def _forward_trial_results(
             continue
         seen.add(path)
         progress({
-            "type": "trial_finished", "condition_id": condition_id,
+            "type": "trial_finished", "job_id": job_id,
             "trial_id": path.parent.name, "completed": len(seen),
             "error": value.get("exception_info"),
         })
 
 
-def _condition_runtime_files(
+def _runtime_files(
     *,
     runtime: Mapping[str, Any],
-    condition: Mapping[str, Any],
     output_dir: Path,
 ) -> tuple[Path, Path, tuple[str, ...]]:
     original_config = Path(str(runtime.get("config_path", ""))).resolve()
@@ -558,23 +489,12 @@ def _condition_runtime_files(
     source_catalog = source_catalog.resolve()
     if not source_catalog.is_file():
         raise FileNotFoundError(f"model catalog not found: {source_catalog}")
-    overrides = _mapping(condition.get("mechanism_overrides", {}), "mechanism overrides")
-    adjusted_mechanisms: list[dict[str, Any]] = []
-    for raw_item in mechanisms:
-        if not isinstance(raw_item, Mapping) or not isinstance(raw_item.get("id"), str):
-            raise ValueError("harness mechanism selections must have a string id")
-        item = dict(raw_item)
-        mechanism_id = item["id"]
-        if mechanism_id in overrides:
-            override = _mapping(overrides[mechanism_id], "mechanism override")
-            item["enabled"] = bool(override.get("enabled", item.get("enabled", True)))
-        adjusted_mechanisms.append(item)
     remote_catalog = "/installed-agent/fruitfly/runtime/models.yaml"
     adjusted_profile = dict(profile)
     adjusted_model = dict(model)
     adjusted_model["catalog"] = remote_catalog
     adjusted_profile["model"] = adjusted_model
-    adjusted_profile["mechanisms"] = adjusted_mechanisms
+    adjusted_profile["mechanisms"] = mechanisms
     adjusted = {
         "schema_version": raw_config.get("schema_version", 1),
         "default_profile": profile_id,
@@ -632,8 +552,7 @@ def _load_harbor_job_result(path: Path) -> Mapping[str, Any]:
 def parse_harbor_job_result(
     data: Mapping[str, Any],
     *,
-    condition_id: str,
-    expected_manifest_digest: str | None = None,
+    job_id: str,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     raw_trials = data.get("trial_results", [])
     if not isinstance(raw_trials, list):
@@ -653,59 +572,11 @@ def parse_harbor_job_result(
     for index, raw in enumerate(raw_trials):
         trial = _mapping(raw, "Harbor trial")
         exception = trial.get("exception_info")
-        verifier = trial.get("verifier_result")
-        reward_map = (
-            verifier.get("rewards")
-            if isinstance(verifier, Mapping)
-            and isinstance(verifier.get("rewards"), Mapping)
-            else {}
-        )
-        numeric_rewards = [
-            float(value)
-            for value in reward_map.values()
-            if isinstance(value, (int, float)) and not isinstance(value, bool)
-        ]
-        reward = (
-            float(reward_map["reward"])
-            if isinstance(reward_map.get("reward"), (int, float))
-            else (numeric_rewards[0] if len(numeric_rewards) == 1 else None)
-        )
+        reward = _official_reward(trial)
         agent_result = trial.get("agent_result")
-        metadata = (
-            agent_result.get("metadata") if isinstance(agent_result, Mapping) else None
-        )
-        actual_manifest_digest = (
-            metadata.get("runtime_manifest_digest")
-            if isinstance(metadata, Mapping)
-            else None
-        )
-        manifest_mismatch = (
-            expected_manifest_digest is not None
-            and actual_manifest_digest != expected_manifest_digest
-        )
-        if isinstance(exception, Mapping):
-            errors += 1
-            exception_type = str(exception.get("exception_type", ""))
-            if "timeout" in exception_type.lower():
-                timeouts += 1
-            error = {
-                "type": exception_type or "HarborTrialError",
-                "message": str(exception.get("exception_message", "")),
-            }
-            status = "error"
-        elif manifest_mismatch:
-            errors += 1
-            error = {
-                "type": "RuntimeManifestMismatch",
-                "message": (
-                    "Harbor trial did not run the frozen FruitFlyAgent runtime "
-                    f"({actual_manifest_digest!r} != {expected_manifest_digest!r})"
-                ),
-            }
-            status = "error"
-        else:
-            error = None
-            status = "passed" if reward is not None and reward >= 1.0 else "failed"
+        status, error, timed_out = _trial_status(exception, reward)
+        errors += int(error is not None)
+        timeouts += int(timed_out)
         if error is None and reward is not None:
             rewards.append(reward)
         if isinstance(agent_result, Mapping):
@@ -730,13 +601,12 @@ def parse_harbor_job_result(
         )
         trials.append(
             {
-                "trial_id": str(trial.get("id") or f"{condition_id}-{index}"),
-                "condition_id": condition_id,
+                "trial_id": str(trial.get("id") or f"{job_id}-{index}"),
                 "task_id": task_id,
                 "status": status,
                 "metrics": metrics,
                 "error": error,
-                "state_policy": "clean",
+                "runtime": _runtime_metadata(agent_result),
             }
         )
     count = len(raw_trials)
@@ -751,6 +621,40 @@ def parse_harbor_job_result(
         "cost_usd": costs if cost_samples else None,
         "latency_ms": sum(latencies) / len(latencies) if latencies else None,
     }
+    return trials, _benchmark_metrics(values, count)
+
+
+def _official_reward(trial: Mapping[str, Any]) -> float | None:
+    verifier = trial.get("verifier_result")
+    raw_rewards = verifier.get("rewards") if isinstance(verifier, Mapping) else None
+    reward_map = raw_rewards if isinstance(raw_rewards, Mapping) else {}
+    numeric_rewards = [
+        float(value) for value in reward_map.values()
+        if isinstance(value, (int, float)) and not isinstance(value, bool)
+    ]
+    return (
+        float(reward_map["reward"])
+        if isinstance(reward_map.get("reward"), (int, float))
+        else (numeric_rewards[0] if len(numeric_rewards) == 1 else None)
+    )
+
+
+def _runtime_metadata(agent_result: object) -> dict | None:
+    metadata = agent_result.get("metadata") if isinstance(agent_result, Mapping) else None
+    manifest = metadata.get("runtime_manifest") if isinstance(metadata, Mapping) else None
+    return dict(manifest) if isinstance(manifest, Mapping) else None
+
+
+def _trial_status(exception: object, reward: float | None) -> tuple[str, dict[str, str] | None, bool]:
+    if isinstance(exception, Mapping):
+        kind = str(exception.get("exception_type", ""))
+        return "error", {"type": kind or "HarborTrialError", "message": str(exception.get("exception_message", ""))}, "timeout" in kind.lower()
+    return ("passed" if reward is not None and reward >= 1.0 else "failed"), None, False
+
+
+def _benchmark_metrics(
+    values: Mapping[str, int | float | None], count: int,
+) -> list[dict[str, Any]]:
     units = {
         "success_rate": "ratio",
         "official_reward": "score",
@@ -769,7 +673,6 @@ def parse_harbor_job_result(
             "unit": units[name],
             "direction": "lower_is_better" if name in lower else "higher_is_better",
             "scope": "benchmark",
-            "condition_id": condition_id,
             "aggregation": (
                 "mean"
                 if name not in {"input_tokens", "output_tokens", "cost_usd"}
@@ -779,29 +682,10 @@ def parse_harbor_job_result(
         }
         for name, value in values.items()
     ]
-    return trials, metrics
+    return metrics
 
 
-def _comparisons(metrics: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    by_condition = {
-        (str(item.get("condition_id")), str(item.get("name"))): item.get("value")
-        for item in metrics
-    }
-    comparisons = []
-    names = {name for condition, name in by_condition if condition == "candidate"}
-    for name in sorted(names):
-        baseline = by_condition.get(("baseline", name))
-        candidate = by_condition.get(("candidate", name))
-        if isinstance(baseline, (int, float)) and isinstance(candidate, (int, float)):
-            comparisons.append(
-                {
-                    "metric": name,
-                    "baseline": baseline,
-                    "candidate": candidate,
-                    "delta": candidate - baseline,
-                }
-            )
-    return comparisons
+
 
 
 def _duration_ms(value: Any) -> float | None:

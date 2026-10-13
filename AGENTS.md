@@ -36,7 +36,7 @@ Follow the dependency table in [Runtime architecture](fruitfly_agent/README.md#m
 | Add algorithm-specific branches to Run or the terminal | Register a definition and installer in [Catalog](fruitfly_agent/lab/catalog/README.md); extend a generic host contract only when required. |
 | Let a benchmark dictate runtime, configuration, lifecycle, or algorithm interfaces | Extend [Eval](eval/DEVELOPER_GUIDE.md#add-a-benchmark) as a consumer. Normal interaction must work without Eval. |
 | Bypass boundaries with hidden imports, dynamic imports, or copied code | Use the owning module's public interface. |
-| Restore a session using configuration alone | Verify artifact contents and the full manifest through [Run recovery](fruitfly_agent/run/README.md#recovery). |
+| Restore a session using configuration alone | Validate history and required artifacts, use current configuration, and record its environment through [Run recovery](fruitfly_agent/run/README.md#recovery). |
 | Leave shadow packages after a directory move | Update imports, examples, and tests; add compatibility only when explicitly chosen. |
 
 ## Protect the workspace
@@ -98,7 +98,6 @@ Keep default tests offline, deterministic, isolated, and fast. Use [Tests](tests
 | Add an algorithm | [Lab development](fruitfly_agent/lab/README.md#develop-an-algorithm): select the contract; declare state/reset/recovery, injected dependencies, budgets, and failure/cancellation behavior. |
 | Assemble resources | [Catalog assembly](fruitfly_agent/lab/catalog/README.md#assembly-contract): register ownership and test failed construction, startup, and cleanup. |
 | Search or evolve text | [Optimization](fruitfly_agent/lab/optimization/README.md) and [RSI](fruitfly_agent/lab/rsi/README.md): keep generation, verification, and activation responsibilities separate. |
-| Conduct a formal experiment | [Lab evidence requirements](fruitfly_agent/lab/README.md#test-and-evaluate) and [Evaluation reproducibility](eval/DEVELOPER_GUIDE.md#reproducibility-limits): fix hypothesis, baseline, principal variable, exact identities, repeats/seeds, budgets, metrics, failure rules, and raw evidence. |
 | Use learning state in comparisons | Record initial state, data splits, update/reset rules, and sharing across conditions. Keep evaluation answers out of learning data; change prompt/scorer only as a declared research variable. |
 | Prepare a release | [Build and publish](CONTRIBUTING.md#build-and-publish): inspect source/distribution contents and verify installed entry points outside the checkout. |
 

@@ -1,6 +1,7 @@
 """CLI inputs and persisted session fixtures."""
 import argparse
 from pathlib import Path
+from fruitfly_agent.run.runtime.manifest import digest_manifest
 from fruitfly_agent.core.session import Session
 from fruitfly_agent.core.data_model import UserMessage
 
@@ -40,20 +41,18 @@ def _seed_resumable_session(
     digest: str = "sha256:test",
     message: str | None = "saved",
 ) -> None:
+    manifest = {
+        "schema_version": 3, "profile": "default", "model_profile": "offline",
+        "models": {"main": {"model": "offline-model"}}, "components": [], "context_pipeline": None,
+        "fixture_environment": digest,
+    }
+    manifest["digest"] = digest_manifest(manifest)
     with Session(path) as session:
         session.append(
             "meta",
             {
                 "kind": "runtimeManifest",
-                "manifest": {
-                    "schema_version": 3,
-                    "profile": "default",
-                    "model_profile": "offline",
-                    "models": {"main": {"model": "offline-model"}},
-                    "components": [],
-                    "context_pipeline": None,
-                    "digest": digest,
-                },
+                "manifest": manifest,
             },
             sync=True,
         )

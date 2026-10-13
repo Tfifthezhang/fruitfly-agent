@@ -51,8 +51,6 @@ from fruitfly_agent.interactive.contracts.evaluation import (
     EvaluationEventSink,
     EvaluationLaunchRequest,
     EvaluationLaunchResult,
-    EvaluationMechanismOption,
-    EvaluationModeOption,
     EvaluationSnapshot,
     EvaluationVariantOption,
 )
@@ -107,8 +105,6 @@ __all__ = [
     "EvaluationEventSink",
     "EvaluationLaunchRequest",
     "EvaluationLaunchResult",
-    "EvaluationMechanismOption",
-    "EvaluationModeOption",
     "EvaluationSnapshot",
     "EvaluationVariantOption",
     "FrontendEvent",

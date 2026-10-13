@@ -84,7 +84,6 @@ class TerminalRenderer:
         self._tool_output_limit = tool_output_limit
         self.output = output or sys.stdout
         self._line_open = False
-        self._thinking_open = False
         self._terminal_ui = supports_ansi(self.output)
         self._color = colors_enabled(self.output)
         self._markdown = (
@@ -140,7 +139,6 @@ class TerminalRenderer:
         self._flush_markdown()
         await self._stop_activity()
         self.finish_line()
-        self._thinking_open = False
         self.write_system("\n[Restored conversation]\n\n")
         for message in messages:
             self.output.write(render_history_message(
@@ -177,7 +175,8 @@ class TerminalRenderer:
             self.write_system(safe_terminal_text(event.summary) + "\n")
             if event.operation == "execute":
                 self.write_system("Local code runs with current user permissions; file/network isolation is unavailable.\n")
-            self.write_system("1. Allow once (Enter)\n2. " + safe_terminal_text(event.session_label) + "\n3. Deny (Esc)\n")
+            if not callable(getattr(self.output, "set_choices", None)):
+                self.write_system("1. Allow once (Enter)\n2. " + safe_terminal_text(event.session_label) + "\n3. Deny (Esc)\n")
             return
         if isinstance(event, AuthorizationResolved):
             self.write_system("permission: " + event.choice + "\n")
@@ -190,17 +189,9 @@ class TerminalRenderer:
             self._set_activity(_format_activity_label(event))
             return
         if isinstance(event, AssistantThinkingDelta):
-            self._flush_markdown()
-            if not self._thinking_open:
-                self._write("thinking> ", _DIM)
-                self._thinking_open = True
-            self._write(event.text, _DIM)
-            self._line_open = True
+            # RunActivityChanged carries progress; reasoning never enters the transcript.
             return
         if isinstance(event, AssistantTextDelta):
-            if self._thinking_open:
-                self._newline()
-                self._thinking_open = False
             if self._markdown is not None:
                 text = event.text
                 if not self._assistant_markdown_started:

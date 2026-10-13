@@ -1,7 +1,6 @@
 """Exact assembled runtime identity and supported serialization forms."""
 import hashlib
 import json
-from fruitfly_agent.lab.base_prompt import DEFAULT_PROMPT_ID
 from dataclasses import dataclass
 from typing import Any, Mapping
 
@@ -37,23 +36,6 @@ class RuntimeManifest:
             result["permissions"] = dict(self.permissions)
         if self.data_artifacts:
             result["data_artifacts"] = [dict(value) for value in self.data_artifacts]
-        return result
-
-    def legacy_dict(self, schema_version: int) -> dict[str, Any]:
-        """Reconstruct a pre-prompt manifest only for known default sessions."""
-        if schema_version not in (3, 4):
-            raise ValueError("unsupported legacy runtime manifest schema")
-        if self.base_prompt["reference"] != DEFAULT_PROMPT_ID:
-            raise ValueError("legacy sessions require the built-in default prompt")
-        if any("implementation_id" in item for item in self.components):
-            raise ValueError("legacy runtime algorithm identity cannot be verified; start a new session")
-        result = self.to_dict()
-        result.pop("base_prompt")
-        result["schema_version"] = schema_version
-        if schema_version == 3:
-            result.pop("data_artifacts", None)
-        payload = {key: value for key, value in result.items() if key != "digest"}
-        result["digest"] = digest_manifest(payload)
         return result
 
 

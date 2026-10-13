@@ -78,8 +78,7 @@ Catalog checks declared parameters, dependencies, conflicts, stage shape, and re
 |---|---|
 | Offline regression | Public behavior, assembly, Application use, and resource handling |
 | Live model checks | Actual model behavior; explicit network and cost authorization required |
-| Formal experiment | Fixed hypothesis, baseline, principal variable, model ID, mechanism parameters, task version, repeats/seeds, budgets, metrics, and failure rules |
 
-For learning mechanisms, record initial state, data splits, reset rules, and state sharing across conditions. A RuntimeManifest is not a source or learning-state snapshot. [Eval](../../eval/README.md) can consume public capabilities, but must not define their production interfaces.
+Researchers manage formal experiments and their records externally. Learning mechanisms still define initial state, data splits, reset rules, and state sharing. A RuntimeManifest is not a source or learning-state snapshot. [Eval](../../eval/README.md) can consume public capabilities, but must not define their production interfaces.
 
 Lab has no shared environment variables and does not read API keys. [Configuration](../../CONFIGURATION.md) selects mechanisms; each child guide describes its own external effects.

@@ -47,6 +47,8 @@ Harness call budgets do not count individual adapter retry attempts or guarantee
 
 Implement Core's Provider protocol, register the adapter, and test messages, streaming, errors, limits, cancellation, and cleanup offline. Providers do not read Session, Lab, or Eval state. API keys come from the prepared environment; no Provider-specific `FRUITFLY_*` variables.
 
+The offline type gate checks this complete package and requires annotated codec definitions. Anthropic request fields use a typed SDK wire shape inside the adapter; codecs remain SDK-independent and own message serialization. SDK type descriptions do not validate remote service compatibility.
+
 ```bash
 .venv/bin/python -m tests --area providers -v
 ```

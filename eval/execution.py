@@ -1,122 +1,74 @@
-"""Execute frozen plans through benchmark-owned isolated runners."""
-
+"""Run one selected configuration and persist its task results and report."""
 from __future__ import annotations
-
 from datetime import UTC, datetime
-import json
 from pathlib import Path
+import json
+import uuid
 from typing import Any, Mapping
-
 from .benchmarks.base import ProgressSink
 from .catalog import BenchmarkCatalog, builtin_catalog
-from .contracts import EvaluationPlan, EvaluationRequest, TrialRecord
+from .contracts import EvaluationRequest, TrialRecord, SCHEMA_VERSION
 from .report import EvaluationReport, report_from_runner_result
 from .storage import EvaluationStore
 
 
-def execute_plan(
-    plan: EvaluationPlan,
-    *,
-    output_root: Path,
-    catalog: BenchmarkCatalog | None = None,
+def execute_request(
+    request: EvaluationRequest, *, output_root: Path, catalog: BenchmarkCatalog | None = None,
     progress: ProgressSink | None = None,
 ) -> tuple[EvaluationReport, EvaluationStore]:
-    benchmarks = catalog or builtin_catalog()
-    adapter = benchmarks.get(str(plan.benchmark["benchmark"]))
-    variant = str(plan.benchmark["variant"])
-    store = EvaluationStore(output_root, plan.evaluation_id)
+    # Validate constructed requests as well as JSON requests before external effects.
+    request = EvaluationRequest.from_dict(request.to_dict())
+    adapter = (catalog or builtin_catalog()).get(request.benchmark.benchmark_id)
+    descriptor = adapter.descriptor
+    variant = request.benchmark.variant
+    if variant not in {item.variant_id for item in descriptor.variants}:
+        raise ValueError(f"unknown {descriptor.benchmark_id} variant: {variant}")
+    evaluation_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8]
+    store = EvaluationStore(output_root, evaluation_id)
     store.create()
-    store.write_json("request.json", dict(plan.request))
-    plan_path = store.write_json("plan.json", plan.to_dict())
+    request_path = store.write_json("request.json", request.to_dict())
     started_at = _timestamp()
     result_path = store.artifacts / "runner-result.json"
-    preflight = adapter.preflight(variant)
     if progress is not None:
-        progress({"type": "preflight", "available": preflight.available})
-    if not preflight.available:
-        result: Mapping[str, Any] = {
-            "status": "blocked",
-            "metrics": [],
-            "comparisons": [],
-            "errors": {"preflight": [dict(item) for item in preflight.checks]},
-            "artifacts": [],
-        }
-    else:
-        try:
-            adapter.run(
-                plan_path=plan_path, result_path=result_path,
-                variant=variant, progress=progress,
-            )
+        progress({"type": "started", "evaluation_id": evaluation_id})
+    try:
+        preflight = adapter.preflight(variant)
+        if progress is not None:
+            progress({"type": "preflight", "available": preflight.available})
+        if not preflight.available:
+            result: Mapping[str, Any] = {"status": "blocked", "errors": {"preflight": [dict(c) for c in preflight.checks]}}
+        else:
+            adapter.run(request_path=request_path, result_path=result_path, variant=variant, progress=progress)
             loaded = json.loads(result_path.read_text(encoding="utf-8"))
-            if not isinstance(loaded, Mapping):
-                raise ValueError("runner result must be a JSON object")
-            if loaded.get("schema_version") != 1:
+            if not isinstance(loaded, Mapping) or loaded.get("schema_version") != SCHEMA_VERSION:
                 raise ValueError("unsupported runner result schema_version")
-            result = loaded
             trials = loaded.get("trials", [])
             if not isinstance(trials, list):
                 raise ValueError("runner result trials must be a list")
-            condition_ids = {
-                str(item.get("condition_id")) for item in plan.conditions
-            }
             for index, trial in enumerate(trials):
                 if not isinstance(trial, Mapping):
                     raise ValueError("runner trial must be an object")
-                record = TrialRecord.from_dict(trial)
-                if record.condition_id not in condition_ids:
-                    raise ValueError(
-                        f"trial references unknown condition {record.condition_id!r}"
-                    )
-                store.write_json(f"trials/{index:06d}.json", record.to_dict())
-        except (OSError, RuntimeError, TypeError, ValueError, json.JSONDecodeError) as exc:
-            result = {
-                "status": "failed",
-                "metrics": [],
-                "comparisons": [],
-                "errors": {"runner": str(exc)},
-                "artifacts": [],
-            }
+                store.write_json(f"trials/{index:06d}.json", TrialRecord.from_dict(trial).to_dict())
+            result = loaded
+    except (OSError, RuntimeError, TypeError, ValueError) as exc:
+        result = {"status": "failed", "errors": {"runner": str(exc)}}
+    benchmark = {"benchmark": descriptor.benchmark_id, "version": descriptor.version,
+                 "variant": variant, "adapter_version": descriptor.adapter_version, "dataset": descriptor.dataset}
     try:
-        report = report_from_runner_result(
-            plan,
-            result,
-            started_at=started_at,
-            completed_at=_timestamp(),
-        )
+        report = report_from_runner_result(request, result, evaluation_id=evaluation_id, benchmark=benchmark,
+                                          started_at=started_at, completed_at=_timestamp())
     except (TypeError, ValueError) as exc:
-        report = report_from_runner_result(
-            plan,
-            {
-                "status": "failed",
-                "metrics": [],
-                "comparisons": [],
-                "errors": {"result_validation": str(exc)},
-                "artifacts": [],
-            },
-            started_at=started_at,
-            completed_at=_timestamp(),
-        )
+        report = report_from_runner_result(request, {"status": "failed", "errors": {"result_validation": str(exc)}},
+            evaluation_id=evaluation_id, benchmark=benchmark, started_at=started_at, completed_at=_timestamp())
     store.write_json("report.json", report.to_dict())
     store.write_text("report.md", report.render_markdown())
     if progress is not None:
-        progress({"type": "report_written", "status": report.status})
+        progress({"type": "report_written", "status": report.status, "evaluation_id": evaluation_id})
     return report, store
-
-
-def execute_request(
-    request: EvaluationRequest,
-    *,
-    output_root: Path,
-    catalog: BenchmarkCatalog | None = None,
-) -> tuple[EvaluationReport, EvaluationStore]:
-    from .planning import create_plan
-
-    plan = create_plan(request, catalog=catalog)
-    return execute_plan(plan, output_root=output_root, catalog=catalog)
 
 
 def _timestamp() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
-__all__ = ["execute_plan", "execute_request"]
+__all__ = ["execute_request"]

@@ -82,6 +82,8 @@ Omit the holdout file and declaration when none is available. These cases illust
 
 Input deduplication uses Unicode NFC and trimmed whitespace; semantic overlap still needs review. A textual input does not reproduce files, tool state, or a complete interactive task.
 
+`validate_pack` checks manifest fields, declared documents, policy/target compatibility, then cases in train/validation/holdout order, followed by the total size. Case checks preserve ID, policy projection, input overlap, group overlap, and metadata order. Training saves use the same acceptance-field rule before policy projection. Returned material has typed metadata and policy-defined case mappings; type annotations do not replace validation of raw JSON.
+
 ## Python function cases
 
 Use `task_schema=python-function-v1` and `policy_id=python-function-tests-v1`:

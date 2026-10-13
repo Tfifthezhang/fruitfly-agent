@@ -49,7 +49,7 @@ Meaningful output includes nonempty text, thinking, and tool-call starts/argumen
 
 Before partial delivery, retry transient failures within the attempt and total limits; honor numeric or HTTP-date `Retry-After` hints. After content delivery, failures are terminal, so already displayed content is not duplicated. No output does not establish that the remote request was unexecuted or free. Usage on failed attempts can be unknown. Core call budgets still count harness invocations rather than adapter attempts.
 
-Adapters publish effective defaults and overrides through `transport_parameters`; Run includes this identity in the full manifest. A resumed session must match it. `StreamActivity` is public Core observation vocabulary; consumers should handle its waiting/retrying/timeout phases or ignore it, and call `AssistantMessageEventStream.aclose()` when stopping consumption.
+Adapters publish effective defaults and overrides through `transport_parameters`; Run includes this identity in the full manifest. Continuation may use changed transport settings; Run records the new environment snapshot. `StreamActivity` is public Core observation vocabulary; consumers should handle its waiting/retrying/timeout phases or ignore it, and call `AssistantMessageEventStream.aclose()` when stopping consumption.
 
 Keep nonsecret specifications in `.fruitfly/models.yaml` and keys in `.fruitfly/secrets.env`. Install both SDKs using the same environment that runs the Agent:
 

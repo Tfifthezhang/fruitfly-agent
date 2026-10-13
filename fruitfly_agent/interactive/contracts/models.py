@@ -39,7 +39,7 @@ class InteractiveMechanism:
 
 @dataclass(frozen=True)
 class ResumableSession:
-    """Renderer-neutral metadata for one compatible persisted session."""
+    """Renderer-neutral history metadata and current availability."""
 
     path: str
     modified_at: float
@@ -48,6 +48,8 @@ class ResumableSession:
     model: str
     prompt_label: str = ""
     prompt_hash: str = ""
+    available: bool = True
+    reason: str = ""
 
 
 @dataclass(frozen=True)
