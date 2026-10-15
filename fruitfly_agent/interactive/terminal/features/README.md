@@ -8,8 +8,7 @@ Keep each user-facing function's command flow and menus in one package. Features
 |---|---|
 | [Configuration](configuration/README.md) | Future-session choices, model forms, and rebuild requests |
 | [Resume](resume/README.md) | Session selection, restoration requests, and history display |
-| [Evaluation](evaluation/README.md) | Optional external evaluation selection, confirmation, and reports |
-| [Optimization](optimization/README.md) | Search confirmation, candidate review/activation, and task corrections |
+| [Improvement](improvement/README.md) | Task source selection, iterative improvement, candidate review/activation, and saved cases |
 | [assembly.py](assembly.py): bind_commands | Bind available built-in features and cancellation to the terminal registry |
 
 Each feature exports its menu entry and a handler factory. Factories return synchronous/asynchronous handlers accepted by [TerminalCommandRegistry](../commands.py). CommandResult lets the input loop display output and handle exit. Application's public methods remain authoritative for work exclusion and runtime switching.

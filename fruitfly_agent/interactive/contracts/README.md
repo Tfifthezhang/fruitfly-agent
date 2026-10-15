@@ -13,7 +13,7 @@ Define the data and capabilities shared by hosts, Application, Session, and fron
 | [optimization.py](optimization.py) | Search preview/execution, activity, and progress contracts |
 | [candidates.py](candidates.py) | Candidate views, review, and isolated preparation/activation contracts |
 | [task_packs.py](task_packs.py) | Task material and correction views/services |
-| [evaluation.py](evaluation.py) | Optional external evaluation selection, launch, and event contracts |
+| [evaluation.py](evaluation.py) | Optional benchmark task selection, improvement previews, and event contracts |
 
 Implement only the capabilities a host supplies. Optimization, candidates, and task materials are independently injected. Candidate preparation returns a handle satisfying this package's RuntimeHandle protocol. The concrete constructor belongs to [Application](../application/README.md) and is exported as `fruitfly_agent.interactive.RuntimeHandle`.
 
@@ -25,3 +25,5 @@ No environment variables, model calls, filesystem writes, or resource ownership.
 .venv/bin/python -m unittest tests.architecture.test_boundaries tests.contracts.test_public_api tests.contracts.test_signatures -v
 .venv/bin/python -m mypy
 ```
+
+`BenchmarkImprovementController` and `BenchmarkImprovementRequest` in [evaluation.py](evaluation.py) provide optional bounded task-source selection and offline improvement previews. A one-use token launches task preparation and iteration through Application. The preview and candidate values reuse the independent optimization and candidate contracts. Standalone evaluation belongs to the optional Eval CLI.

@@ -55,6 +55,14 @@ class OproOptimizer(Algorithm):
                                     training_score=train.score, selection_score=selection.score)
                     if train.score is not None and selection.score is not None:
                         scored.append((text, selection.score))
+                        observer = getattr(services, "candidate_evaluated", None)
+                        if observer is not None:
+                            stop = await observer(text, train, selection)
+                            if type(stop) is not bool:
+                                raise ValueError("candidate observer must return a boolean")
+                            if stop:
+                                return SearchResult((SearchCandidate(text, selection.score),), seed,
+                                                    "ready_for_confirmation")
         except BudgetExhausted:
             reason = "budget_exhausted"
         scored.sort(key=lambda c: problem.policy.utility(c[1]), reverse=True)

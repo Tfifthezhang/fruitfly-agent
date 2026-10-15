@@ -18,7 +18,7 @@ from types import ModuleType
 from typing import Protocol, TextIO
 
 from fruitfly_agent.interactive.terminal.io.live import prompt_frame_lines, InputInterrupted
-from fruitfly_agent.interactive.terminal.io.text import is_tty, supports_ansi, terminal_columns
+from fruitfly_agent.interactive.terminal.io.text import is_tty, terminal_columns
 
 
 class LineEditor(Protocol):
@@ -75,7 +75,7 @@ class PollingLineEditor:
 
 
 class ReadlineLineEditor:
-    """Framed TTY input backed by the platform's Python readline module."""
+    """TTY editing with plain prompts and optional explicitly requested form frames."""
 
     _CLEAR_LINE = "\x1b[2K"
     _MOVE_UP = "\x1b[1A"
@@ -87,7 +87,7 @@ class ReadlineLineEditor:
         *,
         reader=builtins.input,
         prompt: str = "❯ ",
-        framed: bool = True,
+        framed: bool = False,
     ) -> None:
         self.output = output_stream
         self.reader = reader
@@ -98,7 +98,7 @@ class ReadlineLineEditor:
     def read_line(self) -> str | None:
         if not self.framed:
             try:
-                return self.reader("you> " if self.frame_label == "prompt" else f"{self.frame_label}> ")
+                return self.reader(self.prompt if self.frame_label == "prompt" else f"{self.frame_label}> ")
             except EOFError:
                 return None
         top, bottom = self._frame_lines(self._terminal_columns(), self.frame_label)
@@ -171,7 +171,7 @@ def create_line_editor(
     ):
         return ReadlineLineEditor(
             output_stream,
-            framed=supports_ansi(output_stream),
+            framed=False,
         )
     return StreamLineEditor(input_stream, output_stream)
 

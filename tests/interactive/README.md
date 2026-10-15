@@ -13,8 +13,9 @@ Verify Application state/lifecycle, resource cleanup, events, menus, commands, a
 | `test_conversation.py` | Immutable original history after reduction, safe content projection, and static display bounds |
 | `test_terminal_configuration.py / test_menu.py` | Configuration drafts, startup confirmation, and generic menu navigation |
 | `test_terminal_renderer.py / test_markdown.py / test_welcome.py` | Event presentation, output bounds, ANSI handling, and layouts |
-| `test_evaluation.py` | Generic Eval menu and complete diagnostic display |
-| `test_line_editor.py` | PTY input, explicit TERM, redirected fallback, and model-key echo suppression/restoration |
+| `test_improvement.py / test_improvement_back.py / test_benchmark_events.py` | Parent navigation, draft/selection retention, unified task-source menu, cost confirmation, cancellation, complete original-task diagnostics, and benchmark outcomes after ANSI screen restoration |
+| `test_input_emphasis.py` | Dark/light/unknown terminal palettes, NO_COLOR, editor-only fill, and readable submitted/restored input |
+| `test_line_editor.py` | PTY resize without keystrokes, draft/cursor/history preservation, input, explicit TERM, redirected fallback, and model-key echo suppression/restoration |
 
 Local PTYs and fake models. Assembly/CLI belong to Run; complete multi-module paths belong to Workflows.
 

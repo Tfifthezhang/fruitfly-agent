@@ -4,13 +4,15 @@
 
 Search and compare improvements to a fixed target. Optimization proposes candidates; Run stores them; Application activates a reviewed candidate in a new session. [RSI](../rsi/README.md) can coordinate independent verification and adoption across generations.
 
+[Automatic text search](automatic/README.md) optionally connects original-task baselines, independent [failure processing](failure_processing/README.md), learning exercises, original-task comparison and one holdout confirmation. A confirmed candidate waits for human adoption. Daily tasks without declared acceptance are not collected by this workflow. [Original task experiments](experiments/README.md) connect official benchmark evidence and isolated full-Application trials to the same workflow.
+
 ## Start a search
 
 | Step | Action |
 |---|---|
 | 1 | Prepare a [task pack](TASK_PACKS.md) and run its offline checks. |
 | 2 | In **Configure → mechanisms · optimization**, enable **text-optimizer**, select **opro**, save, and start a new session. |
-| 3 | Use `/optimize [DIRECTION]`, select the pack, and review target, model, budget, and execution policy. |
+| 3 | Use `/improvement [DIRECTION]`, select the pack, and review target, model, budget, and execution policy. |
 | 4 | Confirm **Start search**; monitor live terminal progress or use `/cancel`. `/status` shows the application state and pending candidate count. |
 | 5 | Review the complete candidate and evidence; save it for later or confirm a new session. |
 
@@ -39,6 +41,8 @@ OPRO is the only built-in method. Its guide documents the research basis, implem
 | Text host | `HostedTextOptimizer` projects a search result to `TextProposal`. |
 | Production candidate | Run saves the preferred complete proposal and its evidence. |
 | Adoption | Human review or explicitly injected independent RSI policy |
+| Learning material | Independently selected [failure processor](failure_processing/README.md); derived exercises retain source, review and scoring identity |
+| Automatic confirmation | Optional [workflow](automatic/README.md); fixed original tasks determine whether a learned candidate is publishable |
 
 The shared contract does not require a particular generate/reflect/select sequence. Problems retain fixed task, policy, target, execution, and parent identities. Missing or infrastructure-failed observations have no valid score; task failures may receive zero or partial credit according to policy.
 
@@ -57,7 +61,7 @@ The shared contract does not require a particular generate/reflect/select sequen
 | `call_timeout_seconds` | 30 | Model/evaluation timeout |
 | `optimizer_profile` | Empty | Reuse the active Provider, or resolve an explicit model profile. |
 
-Detailed parameters live in YAML. Model trials use independent, single-turn, no-Session, no-tool Core loops with the target adapter's projection. They do not measure the full interactive harness. Validation is repeatedly used for selection; independent holdout evaluation is manual.
+Detailed parameters live in YAML. Default model trials use independent, single-turn, no-Session, no-tool Core loops with the target adapter's projection. They do not measure the full interactive harness. Validation is repeatedly used for selection. Holdout is manual in ordinary search and automatically checked once by the optional automatic workflow. Injected [trial executors](automatic/README.md#inspect-evidence-and-extend-execution) can run fresh task-owned tool harnesses.
 
 ## Budgets, progress, and failure
 
@@ -104,6 +108,9 @@ Latest does not mean better. Failed, cancelled, or empty searches do not replace
 | [task_packs.py](task_packs.py), [tasks.py](tasks.py) | Pack catalog, freezing, editing, and read-only case loading |
 | [verification.py](verification.py) | Offline material validation, reference checks, scoring, and format conversion |
 | [Task packs](TASK_PACKS.md) | Pack format and task-authoring workflow |
+| [Failure processing](failure_processing/README.md) | Independent replay, model-generated exercises and material review |
+| [Automatic search](automatic/README.md) | Original-task gates, early stopping and independent confirmation |
+| [trials.py](trials.py), [execution.py](execution.py) | Batch receipts and isolated task-harness executor contracts |
 
 ## Extend search
 
@@ -121,9 +128,9 @@ The optional tool-Agent service uses a private text workspace, no Bash or user f
 |---|---|
 | Text prompts and catalog guidance | Skill file bodies, multi-file code, arbitrary stateful targets |
 | Exact-text and restricted Python scoring | General project-command verification |
-| Human review or explicit RSI host | Default background search, automatic holdout execution, automatic quality gate |
+| Human review, optional automatic confirmation, or explicit RSI host | Default background search, autonomous adoption, weak-feedback daily-task learning |
 
-No module-specific environment variables; dependencies and model roles are injected. Examples: [Python functions](../../../examples/optimization/python_functions/README.md) and [ticket triage](../../../examples/optimization/ticket_triage/README.md).
+No module-specific environment variables; dependencies and model roles are injected. Examples: [Python functions](../../../examples/optimization/python_functions/README.md), [ticket triage](../../../examples/optimization/ticket_triage/README.md), and [offline automatic search](../../../examples/optimization/automatic_text/README.md).
 
 ```bash
 .venv/bin/python -m unittest tests.lab.test_search tests.workflows.test_decoupling tests.workflows.test_optimization -v

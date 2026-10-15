@@ -43,7 +43,7 @@ cp -R examples/optimization/ticket_triage .fruitfly/optimization/task-packs/tick
 |---|---|
 | 1 | Enable OPRO in Optimization and start a new session. |
 | 2 | Record the active target hash; `baseline.txt` is not loaded automatically. |
-| 3 | `/optimize` → **Start optimization** → select the installed ticket pack. |
+| 3 | `/improvement` → **Start improvement** → select the installed ticket pack. |
 | 4 | Review direction, model, cases, and budgets; explicitly start the paid search. |
 | 5 | Review evidence and changes; save or confirm a new session. |
 

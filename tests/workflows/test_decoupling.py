@@ -46,7 +46,7 @@ class DecouplingTests(unittest.IsolatedAsyncioTestCase):
                     output = io.StringIO()
                     frontend = TerminalFrontend(app, input_stream=io.StringIO(), output_stream=output, line_editor=editor)
                     async def drive():
-                        editor.send('/optimize improve', '1', *(("1",) if algorithm in ('opro',) else ()), '1')
+                        editor.send('/improvement improve', '1', *(("1",) if algorithm in ('opro',) else ()), '1')
                         for _ in range(100):
                             if app.optimization_progress.sequence > 0:
                                 break
@@ -54,7 +54,7 @@ class DecouplingTests(unittest.IsolatedAsyncioTestCase):
                         await app.wait_for_optimization()
                         self.assertIsNone(app.last_error)
                         candidate = app.candidates()[0]
-                        editor.send('/optimize', '2', '1', 'up', 'up', 'up', '1', '1', '/exit')
+                        editor.send('/improvement', '2', '1', 'up', 'up', 'up', '1', '1', 'q', '/exit')
                         return candidate
                     ui = asyncio.create_task(frontend.run())
                     candidate = await drive()
@@ -79,7 +79,7 @@ class DecouplingTests(unittest.IsolatedAsyncioTestCase):
             app = AgentApplication(factory)
             await app.start()
             editor = QueueEditor()
-            editor.send('/optimize improve', '1', '', '/exit')
+            editor.send('/improvement improve', '1', '', 'q', '/exit')
             output = io.StringIO()
             await TerminalFrontend(app, input_stream=io.StringIO(), output_stream=output, line_editor=editor).run()
             self.assertEqual(factory._current_optimizer.calls, 0)
@@ -171,7 +171,7 @@ class DecouplingTests(unittest.IsolatedAsyncioTestCase):
             editor = QueueEditor()
             output = io.StringIO()
             frontend = TerminalFrontend(app, input_stream=io.StringIO(), output_stream=output, line_editor=editor)
-            editor.send('/optimize improve', '1', '1')
+            editor.send('/improvement improve', '1', '1')
             task = asyncio.create_task(frontend.run())
             await started.wait()
             editor.send('/status', 'ordinary message', '/cancel', '/exit')

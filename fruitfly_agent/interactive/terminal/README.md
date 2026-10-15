@@ -17,10 +17,11 @@ Use FruitFlyAgent through stdin/stdout, menus, and live events. Application owns
 | Clear a draft | First Ctrl+C while idle; normal submitted input resets the double-press interval. |
 | Restore a conversation | `/resume` to choose a session; `/resume PATH` to switch directly. |
 | Review live details | `/trace` |
-| Search or review candidates | `/optimize [DIRECTION]` |
-| Run external evaluation while idle | `/eval` |
+| Search or review candidates | `/improvement [DIRECTION]` |
 
 POSIX ANSI terminals support live input, history, cancellation, and bracketed paste. Non-ANSI POSIX TTY input uses a stoppable canonical reader and handles SIGINT while a run is waiting. Redirected input uses sequential line-based fallback and cannot consume `/cancel` during a run. Display limits do not alter model context or stored messages. `NO_COLOR` and terminal capabilities affect rendering.
+
+The editable input area has a contrasting background, an emphasized `❯` prefix, and vertical spacing without full-width borders. Submitted inputs retain an emphasized prefix and blank lines, without background fill. The input uses a neutral gray background and the terminal’s default text color, with light/dark hints and capability fallbacks described in [I/O](io/README.md); `NO_COLOR` keeps the text and spacing. Terminal resizing refreshes the editable layout while retaining the draft and cursor. Completed transcript lines remain in terminal scrollback.
 
 Live reasoning text is hidden. The existing activity display indicates reasoning, answer reception, and tool execution; redirected output keeps brief activity milestones without animation. Reasoning summaries are also hidden. This presentation policy adds no model requests and does not change reasoning usage. Ordinary assistant text and bounded tool output remain visible.
 
@@ -46,17 +47,17 @@ Cancelled or failed restoration keeps the current session and does not display t
 
 Expanding a prompt group does not change configuration. Choosing a prompt opens a full preview and confirmation. Active and resumed sessions retain their manifest. See [Configuration](../../../CONFIGURATION.md).
 
-Selecting a service replaces the choice menu with one field per screen. Each field shows the selected service, step count, its purpose, and any default. Input frames use the field name; normal conversation frames keep their prompt label. Official and custom services have separate address instructions. `models.<name>` is the menu name; `model` is the service's exact identifier. Other fields use their YAML keys.
+Selecting a service replaces the choice menu with one field per screen. Each field shows the selected service, step count, its purpose, and any default. Field prompts use the field name; conversation input uses `❯`. Official and custom services have separate address instructions. `models.<name>` is the menu name; `model` is the service's exact identifier. Other fields use their YAML keys.
 
 The `capabilities` page renders host-provided booleans as checkboxes with defaults. Space or Enter toggles the selected capability; Continue confirms. Choices limited to one value remain fixed and explain the requirement. Checked values are staged as `true`, unchecked values as `false`; cancel discards the page. The host remains responsible for capability validation.
 
 Model forms accept `/cancel` or EOF without staging. Review includes the selected service and defaults to Cancel. API key input disables TTY echo and bypasses readline/history; redirected input is read directly without writing its value to output. The host validates and saves settings; the terminal performs no Provider requests or filesystem configuration writes.
 
-## Optimize and review
+## Improve against a task set
 
 | Action | Behavior |
 |---|---|
-| Start optimization | Choose a pack, direction, and explicit cost confirmation. |
+| Start improvement | Choose saved task packages or benchmark tasks, then inspect objective, budget and cost confirmation. |
 | Save a failed task | Supply self-contained input and real acceptance criteria; confirm train-only saving. |
 | Review candidates | Overview, evaluation, usage, changes, original/candidate text, scope, and evidence |
 | `n` / `p` | Change section; fallback uses `next` / `previous`. |
@@ -64,21 +65,17 @@ Model forms accept `/cancel` or EOF without staging. Review includes the selecte
 | Save for later | Set next-session default. |
 | Use for a new session | Confirm activation of a new empty session. |
 
-Confirmation defaults to cancel; review actions default to Back. Arrow keys only move selection; Enter performs it. Progress updates appear at most every 0.5 seconds while waiting for normal ANSI input and only when changed. Non-ANSI input uses `/status` or input boundaries. Progress measures the current batch, not total search completion.
+Back or Esc returns one menu level, preserving the parent selection and list pagination. Confirmation Cancel returns to task selection or candidate details. Only Back at the Improvement home page, **Return to chat**, or `q` exits the menu; `q` works at any selection page. Confirmation defaults to cancel on every visit; review actions default to Back. Arrow keys only move selection; Enter performs it. Progress updates appear at most every 0.5 seconds while waiting for normal ANSI input and only when changed. Non-ANSI input uses `/status` or input boundaries. Progress measures the current batch, not total search completion.
 
 See [Optimization](../../lab/optimization/README.md) for model budgets and [Task packs](../../lab/optimization/TASK_PACKS.md) for acceptance rules. Candidates do not guarantee improvement.
 
-## Evaluation
+## Use benchmark tasks
 
-| Step / control | Behavior |
-|---|---|
-| Selection | Mode → benchmark → resource variant → optional mechanism → cost confirmation |
-| Esc / `back` / `b` | Return one level, retaining selections. |
-| `q` | Return to the conversation. |
-| **Run** | Explicitly start a separate evaluation process. |
-| Display | Condition, artifacts, Agent activity, task completion, and complete setup/runner diagnostics |
+Select **Start improvement → Benchmark tasks**, choose a bounded CPU task set and confirm **Start improvement**. One Application job downloads/freeze tasks and performs baseline, failure processing, candidate search, original-task comparisons and independent confirmation. No separate initial evaluation is required. The terminal displays original-task activity, complete runner logs and the current improvement phase. Ctrl+C cancels active work and restores chat; redirected input cannot consume commands while awaiting a benchmark job.
 
-The frontend waits for evaluation to return; ordinary chat and the optimization cancellation panel are not available during it. Five-second job snapshots do not show precise image download/build progress. Model requests and containers may incur costs. Full logs and event archives belong to [Eval](../../../eval/README.md).
+Enable an optimizer, a failure processor and **Automatic text improvement** in `/config`, then save and start a new session. An unavailable workflow returns a configuration hint in the chat transcript. Environment checks, errors and final outcomes remain visible after the menu screen closes.
+
+Benchmark selection is optional; saved cases remain usable without Eval. Standalone reports can be generated with the [Eval CLI](../../../eval/README.md). Containers, networks and real model calls can incur cost. Current source choices use five tasks and a 3/1/1 split, suitable for examining control flow rather than establishing general quality.
 
 ## Register a command
 
@@ -98,13 +95,13 @@ frontend = TerminalFrontend(application, command_handlers={"describe": describe}
 
 Names are lowercase, path-free tokens. Duplicate registration raises an error. `frontend.commands.register(name, handler, replace=True)` explicitly replaces a registered terminal handler. `/quit` is parsed as `/exit`. Custom commands are not added to `/help` automatically. Handler exceptions propagate through the frontend's normal cleanup; handlers own their service-specific diagnostics.
 
-[Built-in features](features/README.md) register configuration, evaluation, recovery, optimization, and cancellation outside the input loop. The frontend owns stdin and lending/restoring the menu display. A handler needing a menu can use `frontend.menu_scope()` while the main loop is dispatching it; do not start a second reader. Operations that change work or runtimes must call Application's public APIs so its state checks remain authoritative.
+[Built-in features](features/README.md) register configuration, recovery, improvement, and cancellation outside the input loop. The frontend owns stdin and lending/restoring the menu display. A handler needing a menu can use `frontend.menu_scope()` while the main loop is dispatching it; do not start a second reader. Operations that change work or runtimes must call Application's public APIs so its state checks remain authoritative.
 
 ## Bind optional host operations
 
 [TerminalBindings](bindings.py) names queueing, waiting, recovery, configuration readers, history, authorization, and notification operations. `from_session()` provides the default adapter for existing embedding hosts; `TerminalFrontend(bindings=...)` permits explicit binding. Compatibility discovery is confined to this adapter. Live readers follow runtime replacement.
 
-`ImprovementClients` independently injects search, candidate review, task materials, and activation clients. Pass it as `improvement_clients=` when these capabilities come from different objects. The optimization menu offers only the supplied capabilities. Material-only hosts can save corrections without offering search afterward. `optimization_frontend()` returns the current menu view; `show_history()` and `show_notifications()` expose observation without granting execution.
+`ImprovementClients` independently injects search, candidate review, task materials, and activation clients. Pass it as `improvement_clients=` when these capabilities come from different objects. The improvement menu offers only the supplied capabilities. Material-only hosts can save corrections without offering search afterward. `improvement_frontend()` returns the current menu view; `show_history()` and `show_notifications()` expose observation without granting execution.
 
 `ModelFormIO` in [model_setup.py](features/configuration/model_setup.py) supplies menu selection, input, rendering, and staging callbacks. Forms do not receive a configuration frontend or use its private methods. The host model service still owns validation and persistence. No new environment variables or independent lifecycle state.
 
@@ -117,7 +114,7 @@ Names are lowercase, path-free tokens. Duplicate registration raises an error. `
 | [notifications.py](notifications.py) | Deduplicated improvement progress and candidate notices |
 | [I/O](io/README.md) | Line/key readers, live terminal control, menu primitives, and shared safe text utilities |
 | [Rendering](rendering/README.md) | Events, history, Markdown, welcome, and branding |
-| [Features](features/README.md) | Configuration, restoration, evaluation, and optimization; each package keeps its handler and menu together |
+| [Features](features/README.md) | Configuration, restoration, and improvement; each package keeps its handler and menu together |
 
 I/O does not import rendering or feature modules. Rendering consumes I/O primitives and frontend contracts. Feature packages consume contracts, bindings, and I/O/rendering interfaces; they do not import one another. TerminalFrontend and feature assembly compose them through callbacks.
 

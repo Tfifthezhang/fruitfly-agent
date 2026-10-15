@@ -21,7 +21,7 @@ my-task-pack/
 | `pack.json` | Declare and validate the pack | Frozen metadata |
 | `cases.json`: `train` | Generation feedback | Yes |
 | `cases.json`: `validation` | Repeated candidate selection | Yes; not independent validation |
-| `holdout.json` | Manual testing after search | No content access through search services |
+| `holdout.json` | Manual testing or one automatic confirmation after generation stops | No content access through the optimizer or failure processor |
 
 `default_direction` describes desired changes; it does not change scoring. To measure brevity or reliability, the policy must define those metrics.
 
@@ -154,13 +154,13 @@ cp -R examples/optimization/python_functions .fruitfly/optimization/task-packs/p
 | Step | Action |
 |---|---|
 | 1 | Enable Text optimizer / OPRO and start a new session. |
-| 2 | `/optimize` → **Start optimization** → select the pack. |
+| 2 | `/improvement` → **Start improvement** → select the pack. |
 | 3 | Supply direction, or accept the pack default. |
 | 4 | Review target, cases, policy, model, budgets, and execution notice. |
 | 5 | Explicitly confirm the paid search; default selection is cancel. |
 | 6 | Review results and choose whether to save or activate. |
 
-Selecting a pack changes one job, not the YAML or runtime manifest. `/optimize TEXT` prefills direction, not a path. Search only changes target text, not Python task outputs. See [Optimization](README.md) for budgets, results, and retention.
+Selecting a pack changes one job, not the YAML or runtime manifest. `/improvement TEXT` prefills direction, not a path. Search only changes target text, not Python task outputs. See [Optimization](README.md) for budgets, results, and retention.
 
 Embedding hosts can register read-only sources with `TaskPackRegistration` via `RunApplicationFactory(task_pack_sources=...)`. The default CLI scans the workspace task-packs directory, not arbitrary examples or Session directories.
 
@@ -170,7 +170,7 @@ Catalog discovery skips hidden directories and directories without a `pack.json`
 
 | Action | Behavior |
 |---|---|
-| `/optimize` → **Save a failed task** | Select from up to 20 completed canonical text tasks. |
+| `/improvement` → **Save a failed task** | Select from up to 20 completed canonical text tasks. |
 | Complete the input | Supply all context needed to reproduce it. |
 | Supply acceptance | Expected text, or policy-specific declarative JSON for an existing Python pack. |
 | Confirm | Append to train only; no model request or automatic search/adoption. |
@@ -192,7 +192,9 @@ The new-pack form creates text packs; developers prepare Python manifests. Editi
 | Search feedback | May contain policy-authorized acceptance facts; not all acceptance material is secret from feedback. |
 | Holdout | Send only each input in a new empty session with the same model, save all responses, then score offline. |
 
-Host services exclude holdout contents; this is not a filesystem sandbox for arbitrary Python plugins. Automatic holdout execution and adoption gates are unsupported.
+The optional [automatic workflow](automatic/README.md) requires nonempty holdout and privately freezes its contents. It uses generated or replayed learning material without rewriting the pack, keeps original selection cases fixed, and confirms one selected candidate before human review. Ordinary search retains manual independent testing. Derived exercises have their own policy and source identities; their scores do not replace original-task performance.
+
+Host services exclude holdout contents from generation and material review; this is not a filesystem sandbox for arbitrary Python plugins. Confirmation is once per automatic job, not a guarantee of independence across repeated jobs. No automatic adoption is performed.
 
 | Example | Purpose |
 |---|---|

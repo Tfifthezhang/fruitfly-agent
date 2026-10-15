@@ -8,10 +8,13 @@ Describe datasets, resources, preflight, Harbor jobs, and official results. Adap
 |---|---|
 | [base.py](base.py) | Descriptor and adapter protocol |
 | [harbor.py](harbor.py) | Shared runner, progress, logs, and result parsing |
-| [terminal_bench.py](terminal_bench.py) | Terminal-Bench 2.0 identity and fixed smoke task |
+| [terminal_bench.py](terminal_bench.py) | Terminal-Bench 2.0 identity, fixed smoke and five-task starter |
 | [swe_bench.py](swe_bench.py) | SWE-bench Verified identity and smoke task |
+| [Public tasks](TASKS.md) | Task formats, selected exercises, resources, and interactive execution |
 
 The installed-agent bridge reports project version `0.1`, matching package metadata.
+
+`BenchmarkVariant.task_names` optionally declares a fixed subset of distinct exact registry names. Empty keeps ordinary smoke/full behavior. Selected subsets use exact Harbor filters and a task cap; returned task and attempt counts must match. The catalog includes declared names for inspection. Request/report schema versions remain 2; the new selector is an additional variant, not an experiment format.
 
 Harbor result parsing separates official reward selection, trial status, and aggregate metric formatting. Runner exceptions determine error status; available actual runtime manifests are retained in task records. Error trials contribute no reward, while available usage, cost, and latency remain reportable. Missing measurements remain unknown; a single numeric reward with another name is accepted when no numeric `reward` field is available.
 

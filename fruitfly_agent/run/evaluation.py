@@ -7,8 +7,9 @@ class RunEvaluationController(EvaluationAdapter):
         super().__init__(
             application, workspace=lambda: factory.cwd,
             environment=lambda: factory.environment,
-            selection=lambda: factory.selection,
             python_executable=python_executable,
+            improvement_available=lambda: getattr(factory, "benchmark_improvement_available", False),
+            benchmark_preview=getattr(factory, "benchmark_task_preview", None),
         )
 
 

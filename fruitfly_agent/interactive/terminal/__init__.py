@@ -3,7 +3,7 @@
 from fruitfly_agent.interactive.terminal.bindings import TerminalBindings, TerminalSession, ImprovementClients
 from fruitfly_agent.interactive.terminal.commands import TerminalCommandHandler, TerminalCommandRegistry
 from fruitfly_agent.interactive.terminal.features.configuration.menu import TerminalConfigurationFrontend
-from fruitfly_agent.interactive.terminal.features.evaluation.menu import TerminalEvaluationFrontend
+from fruitfly_agent.interactive.terminal.features.improvement import TerminalImprovementFrontend
 from fruitfly_agent.interactive.terminal.frontend import TerminalFrontend
 from fruitfly_agent.interactive.terminal.io.input import (
     LineEditor,
@@ -17,7 +17,7 @@ from fruitfly_agent.interactive.terminal.io.screen import transient_screen
 
 __all__ = [
     "TerminalConfigurationFrontend",
-    "TerminalEvaluationFrontend",
+    "TerminalImprovementFrontend",
     "LineEditor",
     "ReadlineLineEditor",
     "StreamLineEditor",

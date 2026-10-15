@@ -8,6 +8,13 @@ class RunOptimizationService:
         self.jobs = jobs
         self.activity = activity
         self.cancel = cancel
+        self.experiment_routes = {}
+
+    def register_benchmark(self, host, selection, executor, direction=""):
+        value = host.preview_selection(selection, executor, direction=direction)
+        self.experiment_routes[value.preview_token] = host
+        return OptimizationPreview(value.algorithm, value.label, value.cost_notice, value.details,
+                                   value.target_id, value.preview_token)
 
     def optimization_preview(self, manifest, *, pack_id=None, direction=""):
         value = self.jobs.optimization_preview(manifest, pack_id=pack_id, direction=direction)
@@ -15,7 +22,8 @@ class RunOptimizationService:
                                    value.target_id, value.preview_token)
 
     async def optimize(self, manifest, direction, *, preview_token=""):
-        return tuple(candidate_view(r) for r in await self.jobs.optimize(manifest, direction, preview_token=preview_token))
+        host = self.experiment_routes.pop(preview_token, self.jobs)
+        return tuple(candidate_view(r) for r in await host.optimize(manifest, direction, preview_token=preview_token))
 
     def optimization_activity(self):
         value = self.activity()

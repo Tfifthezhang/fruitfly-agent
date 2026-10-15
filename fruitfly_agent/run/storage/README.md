@@ -25,3 +25,5 @@ Formats and locations remain unchanged. Exports are not runtime inputs. Malforme
 ```bash
 .venv/bin/python -m unittest tests.lab.test_base_prompt tests.run.test_optimization_versions tests.run.test_task_prompt_catalog -v
 ```
+
+[snapshots.py](snapshots.py) stores verified text trees and materializes fresh directories. [versions.py](versions.py) stores H/I/S and modification manifests with verified referenced contents. Source snapshots include package Python files and declared build inputs, excluding local sessions, secrets and caches. Candidate compaction follows structured artifact references and protects experiment manifests before collecting obsolete prompt text. Hashes describing task/trace identities need not identify stored artifacts.

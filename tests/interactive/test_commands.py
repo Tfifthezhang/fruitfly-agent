@@ -143,7 +143,7 @@ class CommandRouterTest(unittest.TestCase):
         self.assertNotIn("/steer", HELP_TEXT)
         self.assertNotIn("/candidates", HELP_TEXT)
         self.assertNotIn("/candidate ID", HELP_TEXT)
-        self.assertIn("/optimize [TEXT]", HELP_TEXT)
+        self.assertIn("/improvement [TEXT]", HELP_TEXT)
         self.assertEqual(
             self.router.execute(InteractiveCommand(name="steer"), self.context).text,
             "unknown command: /steer; use /help\n",
@@ -176,11 +176,14 @@ class CommandRouterTest(unittest.TestCase):
         self.assertIn("/resume [PATH]", HELP_TEXT)
         self.assertIn("session picker is unavailable", result.text)
 
-    def test_eval_has_help_and_an_embedded_frontend_fallback(self) -> None:
-        result = self.router.execute(InteractiveCommand("eval"), self.context)
-
-        self.assertIn("/eval", HELP_TEXT)
-        self.assertIn("selection menu is unavailable", result.text)
+    def test_improvement_replaces_eval_and_optimize_without_aliases(self):
+        result = self.router.execute(InteractiveCommand("improvement"), self.context)
+        self.assertIn("/improvement [TEXT]", HELP_TEXT)
+        self.assertIn("menu is unavailable", result.text)
+        for name in ("eval", "optimize"):
+            self.assertNotIn("/" + name, HELP_TEXT)
+            self.assertEqual(self.router.execute(InteractiveCommand(name), self.context).text,
+                             f"unknown command: /{name}; use /help\n")
 
 
 if __name__ == "__main__":

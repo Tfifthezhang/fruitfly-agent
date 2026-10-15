@@ -18,6 +18,7 @@ from .search import Evaluation, TrialObservation, content_id
 from .scoring import ScoreResult, task_policy
 from .text_optimizer import SearchActivity
 from .reporting import TokenUsage
+from .trials import BatchEvaluation, BatchObservation, TrialOutcome
 
 
 class BudgetExhausted(RuntimeError):
@@ -79,10 +80,11 @@ def isolated_config(config, **changes):
 
 
 class NativeSearchServices:
-    capabilities = frozenset({"evaluate", "complete", "agent", "history"})
+    capabilities = frozenset({"evaluate", "complete", "agent", "history", "workflow-trials"})
 
     def __init__(self, problem, config, target, *, budget, journal, stop=None,
-                 timeout=30, max_tokens=1024, role_configs=None, scorer=None, evaluator=None):
+                 timeout=30, max_tokens=1024, role_configs=None, scorer=None, evaluator=None,
+                 trial_executor=None):
         self.problem, self.config, self.target = problem, config, target
         self.budget, self.journal = budget, journal
         if journal.problem != problem:
@@ -93,6 +95,7 @@ class NativeSearchServices:
         self.role_configs = dict(role_configs or {})
         self._budget_exhausted = False
         self.evaluator = evaluator
+        self.trial_executor = trial_executor
         self.scorer = scorer or task_policy(problem.policy.policy_id).score
         self._phase, self._completed, self._total, self._failed_trials = "Preparing", 0, 0, 0
         self._tokens = TokenUsage()
@@ -104,10 +107,16 @@ class NativeSearchServices:
             replace(self._tokens, missing_calls=max(0, self.budget.used['model'] - self._tokens.reported_calls)))
 
     def check(self):
-        if self.stop.is_set() or self.signal.is_set():
-            raise asyncio.CancelledError("search cancelled")
+        self.check_cancellation()
         if self._budget_exhausted:
             raise BudgetExhausted("model call budget exhausted")
+
+    def check_cancellation(self):
+        if self.stop.is_set() or self.signal.is_set():
+            raise asyncio.CancelledError("search cancelled")
+
+    def set_phase(self, phase):
+        self._phase, self._completed, self._total = phase, 0, 0
 
     def validate(self, text):
         self.target.validate(text)
@@ -191,6 +200,8 @@ class NativeSearchServices:
             self._completed += 1
             self._failed_trials += int(status == "error")
             self.record("trial", **asdict(observation))
+            self.record("trial-output", evaluation_id=evaluation_id, output=output,
+                        output_hash=content_id(output))
         score = (sum(o.score for o in observations) / len(observations)
                  if all(o.status == "ok" for o in observations) else None)
         self.record("evaluation", candidate_id=content_id(text), text=text, partition=partition,
@@ -198,6 +209,9 @@ class NativeSearchServices:
         return Evaluation(text, tuple(observations), score)
 
     async def _trial(self, text, case, evaluation_id):
+        return await self.execute_case(text, case, evaluation_id)
+
+    async def execute_case(self, text, case, evaluation_id, *, external=True, scorer=None, policy_id=None):
         if self.evaluator is not None:
             score = self.evaluator(text, case)
             if isawaitable(score):
@@ -208,6 +222,23 @@ class NativeSearchServices:
         config = self.target.prepare_trial(self.config, text)
         provider = self._provider(config, "trial", evaluation_id=evaluation_id,
                                   candidate_id=content_id(text), case_id=case.case_id)
+        if external and self.trial_executor is not None:
+            # The executor constructs task-owned tools/environment; never borrow
+            # the production Session, environment, callbacks or tool objects.
+            config = isolated_config(config, provider=provider,
+                                     max_tokens=min(config.max_tokens, self.max_tokens))
+            try:
+                outcome = await asyncio.wait_for(
+                    self.trial_executor.run(config, case, signal=self.signal), self.timeout)
+            except Exception:
+                if self._budget_exhausted:
+                    raise BudgetExhausted("model call budget exhausted") from None
+                raise
+            if not isinstance(outcome, TrialOutcome):
+                raise ValueError("external trial executor must return TrialOutcome")
+            if self._budget_exhausted:
+                raise BudgetExhausted("model call budget exhausted")
+            return outcome.output, outcome.score, outcome.feedback
         config = isolated_config(config, provider=provider,
                                  max_tokens=min(config.max_tokens, self.max_tokens), max_turns=1, max_tool_calls_per_turn=0)
         result = await asyncio.wait_for(run_agent_loop(config, [UserMessage(content=case.input)],
@@ -220,14 +251,68 @@ class NativeSearchServices:
         if not answers or answers[-1].stop_reason != "stop" or answers[-1].tool_calls:
             raise ValueError("trial returned incomplete or non-text output")
         output = "".join(m.text for m in result.messages if isinstance(m, AssistantMessage)).strip()
-        scored = self.scorer(output, case)
+        scored = (scorer or self.scorer)(output, case)
         if isawaitable(scored):
             scored = await asyncio.wait_for(scored, self.timeout)
         if isinstance(scored, ScoreResult):
             return output, scored.score, scored.feedback
         if isinstance(scored, bool):
             raise ValueError("metric must be a finite number, not boolean")
-        return output, float(scored), "scored by " + self.problem.policy.policy_id
+        return output, float(scored), "scored by " + (policy_id or self.problem.policy.policy_id)
+
+    async def run_cases(self, text, cases, *, stage, repeats=1, policy=None):
+        """Learning and confirmation have separate receipts from original selection.
+
+        The workflow owns the frozen case authorization. Strategies only receive
+        its restricted search view, never this confirmation capability.
+        """
+        self.check()
+        if stage not in {"learning", "confirmation"}:
+            raise ValueError("invalid workflow trial stage")
+        if type(repeats) is not int or not 1 <= repeats <= 5:
+            raise ValueError("workflow trial repeats must be 1–5")
+        cases = tuple(cases)
+        if not 1 <= len(cases) <= 12 or len({c.case_id for c in cases}) != len(cases):
+            raise ValueError("workflow trial batch requires 1–12 distinct tasks")
+        if text != self.problem.baseline.text:
+            self.validate(text)
+        self._phase = "Evaluating learning exercises" if stage == "learning" else "Independent confirmation"
+        self._completed, self._total = 0, len(cases) * repeats
+        observations = []
+        for repeat in range(repeats):
+            for case in cases:
+                self.check()
+                self.budget.reserve("trial")
+                evaluation_id = self.record("batch-trial-start", candidate_id=content_id(text),
+                    case_id=case.case_id, stage=stage, repeat=repeat,
+                    task_policy_id=policy.policy_id if policy is not None else self.problem.policy.policy_id,
+                    task_execution_id=policy.execution_id if policy is not None else self.problem.execution_id)
+                output, score, feedback, status = "", None, "", "ok"
+                try:
+                    output, score, feedback = await self.execute_case(
+                        text, case, evaluation_id, external=stage == "confirmation",
+                        scorer=policy.score if policy is not None else None,
+                        policy_id=policy.policy_id if policy is not None else None)
+                    self.problem.policy.utility(score)
+                except (BudgetExhausted, asyncio.CancelledError):
+                    self.record("batch-trial-stop", evaluation_id=evaluation_id, stage=stage,
+                                status="interrupted")
+                    raise
+                except Exception as exc:
+                    status, score, feedback = "error", None, type(exc).__name__
+                observation = BatchObservation(evaluation_id, content_id(text), case.case_id,
+                    stage, repeat, status, score, output[:4000], feedback[:1000])
+                observations.append(observation)
+                self.record("batch-trial", **asdict(observation))
+                self.record("trial-output", evaluation_id=evaluation_id, output=output,
+                            output_hash=content_id(output))
+                self._completed += 1
+                self._failed_trials += int(status == "error")
+        score = (sum(o.score for o in observations) / len(observations)
+                 if all(o.status == "ok" for o in observations) else None)
+        self.record("batch-evaluation", candidate_id=content_id(text), stage=stage,
+                    score=score, observation_ids=[o.evaluation_id for o in observations])
+        return BatchEvaluation(tuple(observations), score)
 
     async def complete(self, role, system, prompt):
         self.check()

@@ -1,76 +1,91 @@
-from __future__ import annotations
+"""Optional benchmark task selection and subprocess execution stay offline."""
 from pathlib import Path
 from types import SimpleNamespace
 import tempfile
 import asyncio
 import sys
+import json
 import unittest
-from unittest.mock import patch
-from fruitfly_agent.interactive import EvaluationLaunchRequest
-from fruitfly_agent.run.evaluation import (
-    RunEvaluationController,
-)
+from unittest.mock import AsyncMock, Mock, patch
 
-
-from fruitfly_agent.run.adapters.evaluation import (FULL_EVALUATION_TIMEOUT_SECONDS,
-    SMOKE_EVALUATION_TIMEOUT_SECONDS, _default_timeout_seconds)
-
-
-class _Configuration:
-    def snapshot(self):
-        return SimpleNamespace(
-            mechanisms=(SimpleNamespace(mechanism_id="opro", label="OPRO"),)
-        )
-
-
-class _Application:
-    running = False
-    pending_count = 0
-    runtime_manifest = {
-        "digest": "sha256:test",
-        "components": [
-            {
-                "id": "opro",
-                "contributions": [{"layer": "optimization", "family": "context"}],
-                "activation": "runtime",
-                "parameters": {},
-            }
-        ],
-    }
+from fruitfly_agent.interactive.contracts.evaluation import BenchmarkImprovementRequest
+from fruitfly_agent.run.evaluation import RunEvaluationController
+from fruitfly_agent.run.adapters.benchmark_trials import BenchmarkTrialClient
 
 
 class EvalBridgeTests(unittest.IsolatedAsyncioTestCase):
-    def test_default_timeout_does_not_apply_smoke_limit_to_full_profiles(self) -> None:
-        self.assertEqual(
-            _default_timeout_seconds("smoke"), SMOKE_EVALUATION_TIMEOUT_SECONDS
-        )
-        self.assertEqual(
-            _default_timeout_seconds("no_gpu"), FULL_EVALUATION_TIMEOUT_SECONDS
-        )
-        self.assertEqual(
-            _default_timeout_seconds("gpu"), FULL_EVALUATION_TIMEOUT_SECONDS
-        )
+    def controller(self, cwd, *, environment=None, available=True):
+        application = SimpleNamespace(running=False, pending_count=0, optimize=AsyncMock(return_value=()))
+        preview = SimpleNamespace(preview_token='one-use')
+        factory = SimpleNamespace(cwd=cwd, environment=environment or {},
+            benchmark_improvement_available=available, benchmark_task_preview=Mock(return_value=preview))
+        return RunEvaluationController(application, factory), application, factory
 
-    def test_controller_environment_includes_factory_loaded_secrets(self) -> None:
-        factory = SimpleNamespace(
-            cwd=Path("/tmp"),
-            environment={"FRUITFLY_TEST_SECRET": "loaded-from-dotenv"},
-        )
-        controller = RunEvaluationController(_Application(), factory)
-        environment = controller._environment()
-        self.assertEqual(
-            environment["FRUITFLY_TEST_SECRET"], "loaded-from-dotenv"
-        )
+    async def test_preview_is_offline_and_execution_consumes_one_token(self):
+        with tempfile.TemporaryDirectory() as directory:
+            controller, application, factory = self.controller(Path(directory))
+            request = BenchmarkImprovementRequest('terminal-bench', 'starter')
+            preview = controller.benchmark_preview(request, 'Improve task success')
+            selection, executor, direction = factory.benchmark_task_preview.call_args.args
+            self.assertEqual(selection, {'benchmark_id': 'terminal-bench', 'variant': 'starter', 'task_limit': 5})
+            self.assertIsInstance(executor, BenchmarkTrialClient)
+            application.optimize.assert_not_awaited()
+            events = AsyncMock()
+            self.assertEqual(await controller.improve(preview.preview_token, on_event=events), ())
+            self.assertIs(executor.on_event, events)
+            application.optimize.assert_awaited_once_with(direction, preview_token='one-use')
+            with self.assertRaisesRegex(ValueError, 'consumed'):
+                await controller.improve(preview.preview_token)
+            self.assertEqual(controller.improvement_previews, {})
 
-    async def test_stderr_and_non_json_stdout_are_visible_before_child_finishes(self) -> None:
+    async def test_failed_execution_still_consumes_preview(self):
+        with tempfile.TemporaryDirectory() as directory:
+            controller, application, _ = self.controller(Path(directory))
+            application.optimize.side_effect = RuntimeError('failure')
+            preview = controller.benchmark_preview(BenchmarkImprovementRequest('terminal-bench', 'starter'))
+            with self.assertRaisesRegex(RuntimeError, 'failure'):
+                await controller.improve(preview.preview_token)
+            with self.assertRaisesRegex(ValueError, 'consumed'):
+                await controller.improve(preview.preview_token)
+            self.assertEqual(controller.improvement_previews, {})
+
+    def test_unavailable_or_busy_application_rejects_before_preview(self):
+        with tempfile.TemporaryDirectory() as directory:
+            controller, application, factory = self.controller(Path(directory), available=False)
+            request = BenchmarkImprovementRequest('terminal-bench', 'starter')
+            with self.assertRaisesRegex(ValueError, 'enable an optimizer'):
+                controller.benchmark_preview(request)
+            factory.benchmark_improvement_available = True
+            for running, pending in ((True, 0), (False, 1)):
+                application.running, application.pending_count = running, pending
+                with self.assertRaisesRegex(RuntimeError, 'active work'):
+                    controller.benchmark_preview(request)
+            factory.benchmark_task_preview.assert_not_called()
+
+    def test_controller_environment_includes_factory_loaded_values(self):
+        controller, _, _ = self.controller(Path('/tmp'), environment={'FRUITFLY_TEST_SECRET': 'fake-value'})
+        self.assertEqual(controller._environment()['FRUITFLY_TEST_SECRET'], 'fake-value')
+
+    def test_catalog_works_outside_checkout_without_container_access(self):
+        with tempfile.TemporaryDirectory() as directory:
+            controller, application, factory = self.controller(Path(directory))
+            environment = controller._environment()
+            environment['PATH'] = ''  # Preflight cannot reach an installed Docker.
+            with patch.object(controller, '_environment', return_value=environment):
+                snapshot = controller.improvement_snapshot()
+            terminal = next(b for b in snapshot.benchmarks if b.benchmark_id == 'terminal-bench')
+            starter = next(v for v in terminal.variants if v.variant_id == 'starter')
+            self.assertIn('5 CPU tasks', starter.label)
+            self.assertFalse(starter.available)
+            self.assertTrue(starter.preflight)
+            factory.benchmark_task_preview.assert_not_called()
+            application.optimize.assert_not_awaited()
+            self.assertFalse((Path(directory) / '.fruitfly').exists())
+
+    async def test_stderr_and_raw_stdout_are_visible_before_child_finishes(self):
         with tempfile.TemporaryDirectory() as directory:
             cwd = Path(directory)
-            release = cwd / "release"
-            factory = SimpleNamespace(
-                cwd=cwd, environment={},
-                selection=SimpleNamespace(config_path=cwd / "config.yaml", profile=SimpleNamespace(profile_id="test")),
-            )
-            controller = RunEvaluationController(_Application(), factory)
+            release = cwd / 'release'
             updates = []
             create_process = asyncio.create_subprocess_exec
             script = (
@@ -79,61 +94,45 @@ class EvalBridgeTests(unittest.IsolatedAsyncioTestCase):
                 "sys.stderr.buffer.write('Ｈｉ stderr'.encode()); sys.stderr.flush(); "
                 f"p=Path({str(release)!r}); "
                 "exec('while not p.exists():\\n time.sleep(0.01)'); "
-                "print(json.dumps({'type':'finished','status':'failed','evaluation_id':'test'}),flush=True)"
+                "print(json.dumps({'type':'task-set-prepared'}),flush=True)"
             )
-
             async def launch(*args, **kwargs):
-                return await create_process(sys.executable, "-u", "-c", script, **kwargs)
-
+                return await create_process(sys.executable, '-u', '-c', script, **kwargs)
             async def observe(event):
                 updates.append(event)
-                if event.get("source") == "eval stderr":
+                if event.get('source') == 'eval stderr':
                     release.touch()
+            client = BenchmarkTrialClient(workspace=cwd, environment={}, on_event=observe)
+            with patch('fruitfly_agent.run.adapters.benchmark_trials.asyncio.create_subprocess_exec', new=launch):
+                result = await asyncio.wait_for(client._execute(('prepare',), root=cwd, timeout=2,
+                    result_type='task-set-prepared'), timeout=5)
+            self.assertEqual(result['type'], 'task-set-prepared')
+            self.assertIn('raw stdout', ''.join(e.get('text', '') for e in updates))
+            self.assertIn('Ｈｉ stderr', ''.join(e.get('text', '') for e in updates))
 
-            with patch("fruitfly_agent.run.adapters.evaluation.asyncio.create_subprocess_exec", new=launch):
-                result = await asyncio.wait_for(controller.run(EvaluationLaunchRequest("terminal-bench", "smoke"), on_event=observe), timeout=5)
-            self.assertEqual(result.status, "failed")
-            self.assertIn("raw stdout", "".join(e.get("text", "") for e in updates))
-            self.assertIn("Ｈｉ stderr", "".join(e.get("text", "") for e in updates))
-            self.assertEqual(result.detail, "Ｈｉ stderr")
-
-    async def test_catalog_and_blocked_report_work_outside_source_cwd(self) -> None:
+    async def test_observer_failure_does_not_abort_external_task(self):
         with tempfile.TemporaryDirectory() as directory:
             cwd = Path(directory)
-            factory = SimpleNamespace(
-                cwd=cwd,
-                environment={},
-                configuration=_Configuration(),
-                selection=SimpleNamespace(
-                    config_path=cwd / "config.yaml",
-                    profile=SimpleNamespace(profile_id="test"),
-                ),
-            )
-            controller = RunEvaluationController(_Application(), factory)
-            environment = controller._environment()
-            environment["PATH"] = ""  # Child must remain offline even when Docker is installed.
-            updates = []
+            create_process = asyncio.create_subprocess_exec
+            async def launch(*args, **kwargs):
+                return await create_process(sys.executable, '-u', '-c',
+                    "print('raw log'); print('{\"type\":\"task-set-prepared\"}')", **kwargs)
+            client = BenchmarkTrialClient(workspace=cwd, environment={},
+                on_event=AsyncMock(side_effect=RuntimeError('observer failed')))
+            with patch('fruitfly_agent.run.adapters.benchmark_trials.asyncio.create_subprocess_exec', new=launch):
+                result = await client._execute(('prepare',), root=cwd, timeout=2, result_type='task-set-prepared')
+            self.assertEqual(result['type'], 'task-set-prepared')
+            client.on_event.assert_awaited()
 
-            async def observe(event):
-                updates.append(event)
-
-            with patch.object(controller, "_environment", return_value=environment):
-                snapshot = controller.snapshot()
-                result = await controller.run(
-                    EvaluationLaunchRequest(
-                        "swe-bench", "smoke"
-                    ), on_event=observe,
-                )
-
-            self.assertEqual(snapshot.benchmarks[0].benchmark_id, "swe-bench")
-            self.assertFalse(hasattr(snapshot, "mechanisms"))
-            self.assertEqual(result.status, "blocked")
-            self.assertTrue(Path(result.report_json).is_file())
-            self.assertEqual(
-                [item["type"] for item in updates],
-                ["started", "preflight", "report_written", "finished"],
-            )
-
-
-if __name__ == "__main__":
-    unittest.main()
+    def test_removed_evaluation_launch_api_is_not_exported(self):
+        import fruitfly_agent.interactive as interactive
+        import fruitfly_agent.interactive.contracts.evaluation as contracts
+        for name in ('TerminalEvaluationFrontend', 'EvaluationController', 'EvaluationLaunchRequest',
+                     'EvaluationLaunchResult', 'EvaluationImprovementController'):
+            self.assertFalse(hasattr(interactive, name), name)
+            self.assertFalse(hasattr(contracts, name), name)
+        controller, _, factory = self.controller(Path('/tmp'))
+        self.assertFalse(hasattr(controller, 'run'))
+        self.assertFalse(hasattr(controller, 'improvement_preview'))
+        from fruitfly_agent.run.application import RunApplicationFactory
+        self.assertFalse(hasattr(RunApplicationFactory, 'benchmark_improvement_preview'))

@@ -1,5 +1,5 @@
 """Observe optional improvement services and write terminal notices."""
-from fruitfly_agent.interactive.terminal.features.optimization.formatting import format_optimization_activity
+from fruitfly_agent.interactive.terminal.features.improvement.formatting import format_optimization_activity
 from fruitfly_agent.interactive.terminal.io.text import safe_terminal_text
 
 
@@ -33,7 +33,7 @@ class ImprovementNotifications:
         try:
             ids = self.notice()
             if ids:
-                self.write(f"\n[{len(ids)} candidate(s) ready; not active. Use /optimize to review.]\n")
+                self.write(f"\n[{len(ids)} candidate(s) ready; not active. Use /improvement to review.]\n")
                 self.acknowledge(ids)
         except (OSError, ValueError, RuntimeError) as exc:
             self.write(f"candidate notice unavailable: {exc}\n")

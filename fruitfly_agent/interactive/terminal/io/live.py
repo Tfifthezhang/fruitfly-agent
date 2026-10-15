@@ -19,6 +19,7 @@ from typing import Sequence, TextIO
 from fruitfly_agent.interactive.terminal.io.text import (
     cell_width,
     colors_enabled,
+    input_styles,
     safe_terminal_text,
     supports_ansi,
     terminal_columns,
@@ -82,6 +83,8 @@ class InlineTerminalDisplay:
         self._selected_choice = 0
         self._live_rows = 0
         self._cursor_live_row = 0
+        self._rendered_rows: tuple[str, ...] = ()
+        self._cursor_column = 0
         self._lock = threading.RLock()
 
     @property
@@ -202,6 +205,20 @@ class InlineTerminalDisplay:
             self._selected_choice = min(max(selected, 0), max(0, len(self._choices) - 1))
             self.set_input("", 0)
 
+    def refresh(self) -> None:
+        """Redraw on a size change without changing the input buffer or transcript."""
+        with self._lock:
+            if not self._active:
+                return
+            previous = self._rows, self._columns
+            self._measure_locked()
+            if previous == (self._rows, self._columns):
+                return
+            self._erase_live_locked()
+            self._commit_ready_output_locked()
+            self._render_live_locked()
+            self.output.flush()
+
     def _measure_locked(self) -> None:
         if self._fixed_rows is not None and self._fixed_columns is not None:
             rows, columns = self._fixed_rows, self._fixed_columns
@@ -211,8 +228,18 @@ class InlineTerminalDisplay:
                 rows, columns = size.lines, size.columns
             except (AttributeError, OSError, ValueError):
                 rows, columns = 24, terminal_columns(self.output)
-        self._rows = max(6, rows)
-        self._columns = max(8, columns)
+        new_rows, new_columns = max(6, rows), max(8, columns)
+        if self._live_rows and self._columns != new_columns:
+            # Each rendered row ends in an explicit newline. A narrower terminal
+            # can wrap it into several physical rows before we get to repaint.
+            lengths = [max(1, len(_visual_lines(row, new_columns))) for row in self._rendered_rows]
+            cursor_row = sum(lengths[:self._cursor_live_row]) + min(
+                self._cursor_column // new_columns, lengths[self._cursor_live_row] - 1)
+            total = sum(lengths)
+            clipped = max(0, total - new_rows)
+            self._live_rows = min(total, new_rows)
+            self._cursor_live_row = max(0, cursor_row - clipped)
+        self._rows, self._columns = new_rows, new_columns
 
     def _commit_ready_output_locked(self) -> None:
         """Commit every complete logical or visual line to terminal history."""
@@ -248,6 +275,7 @@ class InlineTerminalDisplay:
             self.output.write(f"\x1b[{self._live_rows - 1}A\r")
         self._live_rows = 0
         self._cursor_live_row = 0
+        self._rendered_rows = ()
 
     def _render_live_locked(self) -> None:
         input_width = max(1, self._columns - cell_width("❯ ") - 2)
@@ -260,6 +288,7 @@ class InlineTerminalDisplay:
             all_input_lines = [truncate_cells(label, input_width) for label in self._choices]
             cursor_line, cursor_cells = self._selected_choice, 0
         choice_footer = int(bool(self._choices))
+        input_padding = 0 if self._choices else 2
         pending_lines = (
             _visual_lines(self._pending_output, max(4, self._columns - 1))
             if self._pending_output
@@ -280,7 +309,7 @@ class InlineTerminalDisplay:
         )
         preview_budget = max(
             0,
-            self._rows - len(pending_lines) - len(activity_lines) - 4 - choice_footer,
+            self._rows - len(pending_lines) - len(activity_lines) - 2 - choice_footer - input_padding,
         )
         preview_lines = (
             all_preview_lines[-preview_budget:] if preview_budget else []
@@ -293,20 +322,30 @@ class InlineTerminalDisplay:
             - len(pending_lines)
             - len(preview_lines)
             - len(activity_lines)
-            - 3
-            - choice_footer,
+            - 1
+            - choice_footer
+            - input_padding,
         )
         input_start = max(0, cursor_line - max_input_lines + 1)
         input_lines = all_input_lines[input_start : input_start + max_input_lines]
         cursor_line -= input_start
 
-        top, bottom = prompt_frame_lines(self._columns, "permission" if self._choices else "prompt")
         rows: list[str] = [
             *pending_lines,
             *preview_lines,
             *activity_lines,
-            top,
         ]
+        input_base = len(rows)
+        fill, accent = input_styles(self.output)
+
+        def input_row_text(prefix: str, text: str) -> str:
+            if not fill:
+                return prefix + text
+            padding = " " * max(0, self._columns - 1 - cell_width(prefix + text))
+            return f"{fill}{accent}{prefix}\x1b[22m{fill}{text}{padding}{_RESET_STYLE}"
+
+        if input_padding:
+            rows.append(input_row_text("", ""))
         for index, input_text in enumerate(input_lines, start=input_start):
             if self._choices:
                 selected = index == self._selected_choice
@@ -316,20 +355,20 @@ class InlineTerminalDisplay:
                 rows.append(row)
             else:
                 prefix = "❯ " if index == 0 else "│ "
-                rows.append(f"{prefix}{input_text}")
-        rows.append(bottom)
+                rows.append(input_row_text(prefix, input_text))
+        if input_padding:
+            rows.append(input_row_text("", ""))
         if self._choices:
             rows.append(truncate_cells("↑↓ move · Enter select · Esc deny · 1/2/3 select", self._columns - 1))
         for index, row in enumerate(rows):
-            self.output.write(f"{_RESET_STYLE}{_CLEAR_LINE}{row}")
+            reset = _RESET_STYLE if colors_enabled(self.output) else ""
+            self.output.write(f"{reset}{_CLEAR_LINE}{row}")
             if index < len(rows) - 1:
                 self.output.write("\r\n")
 
         input_row = (
-            len(pending_lines)
-            + len(preview_lines)
-            + len(activity_lines)
-            + 1
+            input_base
+            + int(bool(input_padding))
             + cursor_line
         )
         bottom_row = len(rows) - 1
@@ -339,6 +378,8 @@ class InlineTerminalDisplay:
         self.output.write(f"\r\x1b[{cursor_column}C")
         self._live_rows = len(rows)
         self._cursor_live_row = input_row
+        self._cursor_column = cursor_column
+        self._rendered_rows = tuple(rows)
 
 
 @dataclass
@@ -481,6 +522,7 @@ class IsolatedLineEditor:
                     self._interrupted.clear()
                     self.display.set_input("", 0)
                     raise InputInterrupted(handled=True)
+                self.display.refresh()
                 ready, _, _ = select.select([descriptor], [], [], 0.1)
                 if not ready or self._interrupted.is_set():
                     continue

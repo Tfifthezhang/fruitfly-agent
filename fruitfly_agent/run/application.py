@@ -6,7 +6,7 @@ from typing import Any, Mapping
 from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.interactive import ResumableSession
 from fruitfly_agent.interactive.application import RuntimeHandle
-from fruitfly_agent.lab.algorithms.targets import TextTarget
+from fruitfly_agent.lab.algorithms.targets import TextTarget, STATE_SNAPSHOTS_COMPONENT, EXPERIMENT_BLOCKERS_COMPONENT
 from fruitfly_agent.lab.catalog import LabCatalog, builtin_catalog, PermissionPolicy
 from fruitfly_agent.lab.base_prompt import DEFAULT_PROMPT_ID
 from fruitfly_agent.lab.optimization.text_optimizer import (
@@ -29,6 +29,11 @@ from .runtime.recovery import (check_session_manifest, discover_resumable_sessio
 from .improvement.candidates import RunCandidates
 from .improvement.search_jobs import RunSearchJobs
 from .improvement.startup_versions import RunStartupVersions
+from .improvement.versions import RunVersions
+from .improvement.experiments import RunExperiments
+from .configuration.profile import HarnessConfig, save_harness_config
+from .configuration.resolution import model_catalog_path
+from fruitfly_agent.providers.registry import load_model_specs
 from .adapters.optimization import RunOptimizationService
 from .adapters.candidates import RunCandidateService
 from .adapters.task_packs import RunTaskPackService
@@ -99,6 +104,11 @@ class RunApplicationFactory:
             build=lambda *args, **kwargs: build_runtime(
                 *args, **{**kwargs, "provider_registry": self.provider_registry}),
         )
+        self._versions = RunVersions(
+            workspace=self.cwd, artifacts=self.artifact_store, manifest=self.system_manifest,
+            improvement_identity=lambda: getattr(self._current_optimizer, "improvement_identity")(),
+            state_sources=lambda: self._current_components.get(STATE_SNAPSHOTS_COMPONENT, ()),
+        )
         self._candidate_service = RunCandidates(
             workspace=self.cwd, store=self.candidate_store, artifacts=self.artifact_store,
             scope=self.candidate_scope, profile=lambda: self.selection.profile,
@@ -109,6 +119,8 @@ class RunApplicationFactory:
             target=lambda identity: self._current_targets.get(identity),
             pinned_bindings=self.data_artifact_bindings,
             prepare_runtime=self._prepare_profile, reload_configuration=self.reload_configuration,
+            version_guard=self.check_candidate_version,
+            activation_guard=self.check_candidate_runtime,
         )
         self._search_jobs = RunSearchJobs(
             workspace=self.cwd, artifacts=self.artifact_store, candidates=self.candidate_store,
@@ -119,6 +131,13 @@ class RunApplicationFactory:
         )
         self._optimization_service = RunOptimizationService(
             jobs=self._search_jobs, activity=self.optimization_activity, cancel=self.cancel_optimization,
+        )
+        self._experiments = RunExperiments(
+            workspace=self.cwd, artifacts=self.artifact_store, versions=self._versions,
+            manifest=self.system_manifest, optimizer=lambda: self._current_optimizer,
+            target=lambda: self._target(self.system_manifest(), target_id=getattr(self._current_optimizer, "experiment_target_id")()),
+            scope=self.candidate_scope, freeze_runtime=self.freeze_experiment_runtime,
+            candidates=self.candidate_store, compact=self._candidate_service.compact_candidates,
         )
         self._candidate_adapter = RunCandidateService(
             workspace=self.cwd, candidates=self._candidate_service,
@@ -240,6 +259,66 @@ class RunApplicationFactory:
 
     def candidate_scope(self):
         return str(self.selection.config_path.resolve()), self.selection.profile.profile_id
+
+    def system_manifest(self):
+        if self._current_runtime_manifest is None:
+            raise RuntimeError("no active runtime")
+        return self._current_runtime_manifest.to_dict()
+
+    def system_version(self):
+        blockers = self._current_components.get(EXPERIMENT_BLOCKERS_COMPONENT, ())
+        if blockers:
+            raise ValueError("runtime dependencies cannot be frozen: " + "; ".join(blockers))
+        return self._versions.freeze()
+
+    def check_candidate_version(self, record):
+        reference = dict(record.evidence).get("Version candidate")
+        if reference is None:
+            return
+        candidate = self._versions.versions.read_candidate(reference)
+        if candidate.parent != self.system_version():
+            self.candidate_store.update(record.candidate_id, status="stale")
+            raise ValueError("candidate parent H/I/S changed; create a new experiment")
+        if len(candidate.changes) != 1 or candidate.changes[0].after != record.artifact_id:
+            raise ValueError("candidate artifact differs from its declared version change")
+
+    @property
+    def benchmark_improvement_available(self):
+        return self._experiments.available
+
+    def benchmark_task_preview(self, selection, executor, direction=""):
+        self.system_version()
+        return self._optimization_service.register_benchmark(self._experiments, selection, executor, direction)
+
+    def check_candidate_runtime(self, record, manifest):
+        reference = dict(record.evidence).get("Version candidate")
+        if reference:
+            import json
+            path = self.cwd / dict(record.evidence)["Experiment"]
+            if (not path.resolve().is_relative_to(self.cwd)
+                    or any(p.is_symlink() for p in (path, *path.parents))):
+                raise ValueError("candidate experiment must remain in its owned workspace")
+            experiment = json.loads(path.read_text(encoding="utf-8"))
+            if manifest["models"] != experiment["models"] or manifest.get("permissions") != experiment["permissions"]:
+                raise ValueError("prepared runtime model or permission conditions changed from the experiment")
+            candidate = self._versions.versions.read_candidate(reference)
+            if self._versions.freeze(manifest=manifest) != candidate.version:
+                raise ValueError("prepared runtime differs from the verified candidate H/I/S")
+
+    def freeze_experiment_runtime(self, root):
+        from dataclasses import replace
+        profile = self._active_profile or self.selection.profile
+        catalog = model_catalog_path(profile, self.selection.config_path)
+        load_model_specs(catalog)
+        runtime = root / "runtime"
+        runtime.mkdir()
+        models = runtime / "models.yaml"
+        models.write_bytes(catalog.read_bytes())
+        profile = replace(profile, model_catalog=str(models),
+            artifact_bindings={**profile.artifact_bindings, **self.data_artifact_bindings})
+        config = runtime / "config.yaml"
+        save_harness_config(config, HarnessConfig(profile.profile_id, {profile.profile_id: profile}))
+        return {"config_path": str(config), "profile": profile.profile_id, "working_directory": str(self.cwd)}
 
     def startup_versions(self):
         return RunStartupVersions(

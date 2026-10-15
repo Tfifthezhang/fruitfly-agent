@@ -36,11 +36,11 @@ class UnifiedPackApplicationTests(unittest.IsolatedAsyncioTestCase):
             app,_,provider=await fixtures.open_task_app(self,root,'opro')
             view=next(p for p in app.task_packs() if p.pack_id=='coding')
             self.assertEqual(payload['default_direction'],view.default_direction)
-            editor=QueueEditor();editor.send('/optimize','1','1','','2','/exit')
+            editor=QueueEditor();editor.send('/improvement','1','1','','2','q','/exit')
             output=io.StringIO()
             await TerminalFrontend(app,input_stream=io.StringIO(),output_stream=output,line_editor=editor).run()
             self.assertIn('blank uses Improve boundary handling',output.getvalue())
-            self.assertIn('Confirm optimization',output.getvalue())
+            self.assertIn('Confirm improvement',output.getvalue())
             self.assertEqual([],provider.calls)
 
     async def test_coding_correction_saves_checks_without_request_or_reference_code(self):
@@ -52,9 +52,9 @@ class UnifiedPackApplicationTests(unittest.IsolatedAsyncioTestCase):
                 await app.submit('Implement triple(x), returning x * 3.')
                 acceptance={'entry_point':'triple','tests':[{'args':[2],'expected':6}]}
                 editor=QueueEditor()
-                values=['/optimize','3','1','1','',json.dumps(acceptance),'human checked',confirm]
-                if confirm=='1':values+=['1'] # return to chat after save
-                editor.send(*values,'/exit')
+                values=['/improvement','3','1','1','',json.dumps(acceptance),'human checked',confirm]
+                if confirm=='1':values+=['1'] # return to package selection after save
+                editor.send(*values,'q','/exit')
                 output=io.StringIO()
                 await TerminalFrontend(app,input_stream=io.StringIO(),output_stream=output,line_editor=editor).run()
                 rows=json.loads((path.parent/'cases.json').read_text())['train']

@@ -40,6 +40,8 @@ class FruitFlyHarborAgent(BaseInstalledAgent):  # type: ignore[misc]
             _required(kwargs.pop("model_catalog_path", None), "model_catalog_path")
         )
         self.profile = _required(kwargs.pop("profile", None), "profile")
+        trial_request = kwargs.pop("trial_request_path", None)
+        self.trial_request_path = Path(trial_request) if trial_request else None
         names = str(kwargs.pop("secret_names", ""))
         inherited = dict(kwargs.pop("extra_env", None) or {})
         for name in filter(None, (item.strip() for item in names.split(","))):
@@ -101,6 +103,9 @@ class FruitFlyHarborAgent(BaseInstalledAgent):  # type: ignore[misc]
             self.model_catalog_path,
             "/installed-agent/fruitfly/runtime/models.yaml",
         )
+        if getattr(self, "trial_request_path", None) is not None:
+            await environment.upload_file(self.trial_request_path,
+                                          "/installed-agent/fruitfly/runtime/trial-request.json")
         if use_existing_python:
             command = (
                 "python3 -m venv /installed-agent/fruitfly/venv && "
@@ -149,6 +154,19 @@ class FruitFlyHarborAgent(BaseInstalledAgent):  # type: ignore[misc]
         environment: BaseEnvironment,
         context: AgentContext,
     ) -> None:
+        if getattr(self, "trial_request_path", None) is not None:
+            packet = json.loads(self.trial_request_path.read_text(encoding="utf-8"))
+            packet["instruction"] = instruction
+            with tempfile.TemporaryDirectory(prefix="fruitfly-trial-") as directory:
+                request_path = Path(directory) / "request.json"
+                request_path.write_text(json.dumps(packet, ensure_ascii=False), encoding="utf-8")
+                await environment.upload_file(request_path, "/installed-agent/fruitfly/runtime/trial-request.json")
+            command = " ".join(("/installed-agent/fruitfly/venv/bin/python", "-m", "fruitfly_agent.run.trial",
+                "--request", "/installed-agent/fruitfly/runtime/trial-request.json",
+                "--config", "/installed-agent/fruitfly/runtime/config.yaml", "--profile", shlex.quote(self.profile),
+                "--source", "/installed-agent/fruitfly/source", "--output", "/logs/agent", "--cwd", "."))
+            await self.exec_as_agent(environment, command=command)
+            return
         command = " ".join(
             (
                 "FRUITFLY_EVENT_STREAM_PATH=/logs/agent/live-events.jsonl",

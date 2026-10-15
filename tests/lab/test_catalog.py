@@ -220,6 +220,9 @@ class CatalogTest(unittest.TestCase):
                 "compaction",
                 "rlm-ipython",
                 "opro",
+                "failure-replay",
+                "failure-distillation",
+                "automatic-text-search",
             },
         )
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 import os
 from pathlib import Path
 import shutil
@@ -186,9 +187,19 @@ class HarborBenchmarkAdapter:
                 raise RuntimeError("Harbor did not create a unique job result")
             job_result_path = candidates[0]
         trials, metrics = parse_harbor_job_result(_load_harbor_job_result(job_result_path), job_id=job_name)
+        selected_names = next(item.task_names for item in self.descriptor.variants if item.variant_id == variant)
+        if selected_names:
+            expected = Counter({name: request.execution.attempts for name in selected_names})
+            if Counter(trial["task_id"] for trial in trials) != expected:
+                raise ValueError("Harbor results do not match the selected task batch and attempt count")
+        from eval.evidence import export_harbor_evidence
+        evidence_root = job_root / "evidence"
+        export_harbor_evidence(job_result_path.parent, dataset=self.descriptor.dataset,
+                               output_directory=evidence_root)
         payload = {"schema_version": SCHEMA_VERSION, "status": "completed", "metrics": metrics,
             "errors": {}, "trials": trials,
             "artifacts": [{"kind": "harbor_job", "path": str(job_result_path.parent)},
+                          {"kind": "benchmark_evidence", "path": str(evidence_root / "evidence.json")},
                           {"kind": "harbor_log", "path": str(job_root / "harbor.log")},
                           {"kind": "runtime_config", "path": str(config_path)},
                           {"kind": "model_catalog", "path": str(model_catalog)}]}
@@ -240,13 +251,20 @@ class HarborBenchmarkAdapter:
             "--agent-kwarg",
             f"secret_names={','.join(secret_names)}",
         ]
-        if variant == "smoke":
+        selected = next((item for item in self.descriptor.variants if item.variant_id == variant), None)
+        if selected is None:
+            raise ValueError(f"unknown execution profile {variant!r}")
+        task_names = selected.task_names
+        if variant == "smoke" and not task_names:
             if not self.descriptor.smoke_task:
                 raise ValueError(
                     f"{self.descriptor.benchmark_id} does not declare a smoke task"
                 )
-            command.extend(("--include-task-name", self.descriptor.smoke_task))
-            command.extend(("--n-tasks", "1"))
+            task_names = (self.descriptor.smoke_task,)
+        if task_names:
+            for name in task_names:
+                command.extend(("--include-task-name", name))
+            command.extend(("--n-tasks", str(len(task_names))))
         return command
 
 

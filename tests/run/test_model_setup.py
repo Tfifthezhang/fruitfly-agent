@@ -71,6 +71,7 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
         screens = []
         lines = iter(("1", "/cancel", "3"))
         def reader(_prompt):
+            output.write(_prompt)
             screens.append(output.getvalue().rsplit("\x1b[2J\x1b[H", 1)[-1])
             return next(lines)
         frontend = TerminalConfigurationFrontend(self.controller, input_stream=io.StringIO(),
@@ -80,7 +81,8 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
         field_screen = screens[1]
         self.assertIn("Step 1 of 8", field_screen)
         self.assertIn("Service: OpenAI official", field_screen)
-        self.assertIn("╭─ models.<name> ", field_screen)
+        self.assertIn("models.<name>> ", field_screen)
+        self.assertNotIn("╭", field_screen)
         self.assertNotIn("╭─ prompt ", field_screen)
         self.assertNotIn("1. OpenAI", field_screen)
         self.assertNotIn("↑↓", field_screen)

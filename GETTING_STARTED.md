@@ -94,7 +94,7 @@ cp -R examples/optimization/python_functions .fruitfly/optimization/task-packs/p
 .venv/bin/python -m fruitfly_agent.lab.optimization.verification self-check .fruitfly/optimization/task-packs/python-functions/pack.json
 ```
 
-The checks are offline. In **Configure → mechanisms · optimization**, enable **text-optimizer**, select **opro**, save, and start a new session. Use `/optimize` to select the pack and review the model, budget, and execution policy before confirming a paid search. The active target supplies the baseline; `baseline.txt` is an optional reference.
+The checks are offline. In **Configure → mechanisms · optimization**, enable **text-optimizer**, select **opro**, save, and start a new session. Use `/improvement` to select the pack and review the model, budget, and execution policy before confirming a paid search. The active target supplies the baseline; `baseline.txt` is an optional reference.
 
 | Next step | Guide |
 |---|---|

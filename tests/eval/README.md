@@ -8,6 +8,7 @@ Verify single-configuration requests, Harbor mapping, artifacts, and reports off
 |---|---|
 | `test_catalog.py / test_execution.py` | Availability, execution, failure handling, and reports |
 | `test_harbor.py` | Commands, reported project version, setup, complete logs/events, registry retry boundaries, and parsing |
+| `test_task_batches.py` | Exact subset filters, task caps, official task/attempt coverage, and catalog declarations |
 | `test_cli.py` | CLI and saved reports |
 | `../support/harbor.py` | Isolated optional SDK substitute |
 

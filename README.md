@@ -47,7 +47,9 @@ Our ambition is **recursive self-improvement (RSI)**: agents that improve their 
 | [Optimization](fruitfly_agent/lab/optimization/README.md) | Search and compare candidates for a fixed target under a defined objective. It can run independently. |
 | [RSI](fruitfly_agent/lab/rsi/README.md) | Verify and adopt changes to the system or its improver, then continue with the adopted implementation across generations. |
 
-The built-in `/optimize` workflow searches prompt and guidance text. Broader harness experiments use the public mechanism contracts and researcher-supplied evaluators, version bindings, and adoption hosts. The generic RSI driver accepts host-bound implementation references; the built-in durable Run host handles text artifacts. See [Lab](fruitfly_agent/lab/README.md#optimization-and-rsi) for these implementation boundaries. Runtime manifests record declared identities; reproducible research also needs source and learning-state records.
+The built-in `/improvement` workflow searches prompt and guidance text. Broader harness experiments use the public mechanism contracts and researcher-supplied evaluators, version bindings, and adoption hosts. The generic RSI driver accepts host-bound implementation references; the built-in durable Run host handles text artifacts. See [Lab](fruitfly_agent/lab/README.md#optimization-and-rsi) for these implementation boundaries. Runtime manifests record declared identities; reproducible research also needs source and learning-state records.
+
+Optional [automatic text search](fruitfly_agent/lab/optimization/automatic/README.md) prepares learning exercises from explicitly scored failures, compares candidates on fixed original tasks and confirms one candidate on holdout before human adoption. Its [offline demonstration](examples/optimization/automatic_text/README.md) uses scripted responses; real quality gains remain unmeasured.
 
 | At a glance | Details |
 |---|---|

@@ -73,7 +73,8 @@ class TerminalFrontendTest(unittest.IsolatedAsyncioTestCase):
                 resolved = output.getvalue()[start:]
                 self.assertNotIn("Allow reads", resolved)
                 self.assertIn("permission: deny", resolved)
-                self.assertIn("╭─ prompt", resolved)
+                self.assertIn("❯ ", resolved)
+                self.assertNotIn("╭", resolved)
             finally:
                 await renderer.close()
                 display.suspend()
@@ -126,8 +127,8 @@ class TerminalFrontendTest(unittest.IsolatedAsyncioTestCase):
             input_stream=io.StringIO(),
             output_stream=output,
             line_editor=ScriptedLines(
-                "/optimize be concise", "1", "1", "/optimize", "2", "1",
-                "up", "up", "2", "/exit",
+                "/improvement be concise", "1", "1", "/improvement", "2", "1",
+                "up", "up", "2", "q", "/exit",
             ),
         )
         self.assertEqual(await frontend.run(), 0)
@@ -260,9 +261,9 @@ class TerminalFrontendTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await frontend.run(), 0)
 
         rendered = output.getvalue()
-        first_prompt = rendered.index("╭─ prompt ")
+        first_prompt = rendered.index("❯ hello")
         response = rendered.index("🪰 response complete")
-        second_prompt = rendered.index("╭─ prompt ", first_prompt + 1)
+        second_prompt = rendered.index("❯ /exit", first_prompt + 1)
         self.assertLess(first_prompt, response)
         self.assertLess(response, second_prompt)
 

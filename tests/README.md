@@ -82,3 +82,5 @@ Contract changes require explicit authorization, independent review, caller/comp
 | CI | Dependency installation uses the network; type and test stages remain offline. |
 
 Error-isolation tests deliberately log failures; judge the final `OK`/`FAILED` and exit status. [GitHub Actions](../.github/workflows/tests.yml) runs macOS/Linux with Python 3.11–3.13 and `TERM=dumb`. See [Contributing](../CONTRIBUTING.md).
+
+Original-task improvement checks cover shared H/I/S and modification scopes, official evidence export, isolated Application invocation budgets, full fake-executor confirmation/adoption, stale memory and cancellation. The selected type gate includes these neutral contracts, Run hosts and Eval executor/export modules. Run [benchmark improvement tests](workflows/test_benchmark_improvement.py), [evidence tests](eval/test_evidence.py), [executor tests](eval/test_trials.py), and [trial budget tests](run/test_trial_budget.py) offline. Real model quality, Harbor containers and Docker image identity require separately authorized integration work.

@@ -25,16 +25,11 @@ Preflight locates Harbor/Docker, checks Engine/Compose within five seconds, and 
 
 Use `FRUITFLY_EVAL_PACKAGE` to select complete source or wheel material when needed; see [installation material](README.md#select-installation-material).
 
-## Run through the terminal
+## Use benchmark tasks in improvement
 
-| Step | Action |
-|---|---|
-| 1 | Save the desired harness configuration and start an Agent session. |
-| 2 | Enter `/eval` while idle. |
-| 3 | Choose a benchmark and resource variant. |
-| 4 | Review cost requirements and explicitly choose **Run**. |
+Open `/improvement` while idle. Select **Start improvement → Benchmark tasks**, choose a bounded CPU task set, inspect budget/acceptance/version details, then confirm **Start improvement**. Cancel is selected by default. The same Application job prepares task material and performs baseline, learning, candidate comparisons and confirmation; no preliminary evaluation is required. Original tasks and verifiers remain owned by Eval. A confirmed candidate still requires explicit human adoption.
 
-Esc/back returns one page; q returns to chat. Confirmation defaults to Back. Evaluation uses an independent process and task sessions. The terminal waits for completion and restores its display on cancellation/error.
+For standalone benchmark scores and reports, use the CLI request below. Terminal-Bench's `starter` runs its fixed five-task batch; `smoke` runs one task. See [task formats](benchmarks/TASKS.md).
 
 ## Create a CLI request
 
@@ -76,7 +71,7 @@ The next command executes the paid/network/container path:
 | Exit codes | completed 0, failed 1, input/file error 2, blocked 3 |
 | Request validation | Requires schema 2; unknown fields and experiment inputs are rejected |
 
-The runner copies the selected profile and catalog before starting Harbor. Per-task records include available actual runtime manifests. Source code, live Python heaps, and external services are not snapshotted. Researchers manage experiments and their own records externally.
+The runner copies the selected profile and catalog before starting Harbor. Per-task records include available actual runtime manifests. Source code, live Python heaps, and external services are not snapshotted. Ordinary evaluation does not freeze runtime source or learning state. The separately authorized [original-task improvement host](../fruitfly_agent/lab/optimization/experiments/README.md) does so before controlled trials.
 
 ## Follow execution and reports
 
@@ -91,7 +86,7 @@ The runner copies the selected profile and catalog before starting Harbor. Per-t
 | `artifacts/harbor/harbor-attempt-*.log` | Earlier registry connection attempts |
 | Harbor job/trial directories | Setup/session/events, verifier logs, exceptions, and official results |
 
-Setup prefers an existing Python 3.11+ with venv, otherwise uses system/uv fallback. Setup commands are limited to 300 seconds; Harbor's default overall setup is 360 seconds. Interactive job limits are one hour for smoke and seven days for full datasets; individual task/verifier limits remain task-defined.
+Setup prefers an existing Python 3.11+ with venv, otherwise uses system/uv fallback. Setup commands are limited to 300 seconds; Harbor's default overall setup is 360 seconds. Interactive job limits are one hour for smoke, four hours for starter, and seven days for full datasets; individual task/verifier limits remain task-defined.
 
 Agent events are read around every 0.2 seconds and archived on completion. Job progress is emitted every five seconds. Setup, runner, verifier, exceptions, stderr, and non-JSON stdout are forwarded without log-body truncation. No observed Agent event can mean setup is still running.
 
@@ -120,3 +115,13 @@ Registry connection failures retry at most three times, within the same timeout,
 | 5 | Inspect catalog/menu output; authorize real smoke separately. |
 
 `BenchmarkAdapter.run(request_path=..., result_path=..., variant=..., progress=...)` consumes the single-configuration request and writes schema-2 results containing status, metrics, errors, artifacts, and trials. A custom Harbor task needs instructions, task.toml, an environment, and an independent verifier. The terminal does not accept arbitrary image/path fields. Other runners implement the same request/result interface; runtime ownership stays outside Eval.
+
+## Consume official execution evidence
+
+The [evidence exporter](evidence.py) resolves the trial task through Harbor `TaskConfig.get_local_path()`, preserves complete task files and verifies the copied material hash. See the [upstream task configuration](https://github.com/laude-institute/harbor/blob/main/src/harbor/models/trial/config.py). This project pins Harbor 0.23.0. Export errors stay explicit. Boolean/missing rewards and runner exceptions do not become scored learning failures. Whole task snapshots include hidden verifier material for official reruns, but Lab's training projection does not send those files to the model.
+
+The single-task [trial executor](trial.py) validates task/source identity before starting Harbor. It consumes a separately versioned Run-generated request, installs the frozen source and profile, and retrieves the actual Application invocation receipt. New runners can implement the injected original-task executor without changing Lab algorithms or ordinary evaluation requests. Default tests must use fake executors and Providers.
+
+## Prepare a task set without Agent calls
+
+[task_sets.py](task_sets.py) resolves the selected dataset with Harbor 0.23.0 `DatasetConfig.get_task_configs()` and downloads selected original bytes using `TaskClient.download_tasks()`. These APIs are used by [upstream task construction](https://github.com/laude-institute/harbor/blob/v0.23.0/src/harbor/trial/trial.py). Select exact fixed names or the first bounded CPU sample sorted by registry name. Freeze source revision, full material, instruction and verifier identities before any baseline runs. Unsupported multi-step/GPU tasks and changed copies fail explicitly. Preparation emits a task set, not an evaluation report or fabricated scores.

@@ -9,6 +9,7 @@ Exercise actual Application, Run assembly, and terminal paths with offline model
 | `test_terminal_interrupt.py` | Actual Ctrl+C/SIGINT, quiet-run continuation, clean exit, and terminal restoration in ANSI and non-ANSI terminals |
 | `test_decoupling.py / test_offline_example.py` | Public extensions and interchangeable optimizers/targets |
 | `test_optimization.py / test_evolution.py` | Preview, adoption, explicit policy, and interrupted activation reconciliation |
+| `test_automatic_optimization.py` | Separate learning material, original scoring, holdout confirmation, terminal preview and explicit adoption |
 | `test_task_packs.py / test_coding_optimization.py / test_unified_packs.py` | Discovery, frozen tasks, corrections, and scoring |
 | `test_optimization_activity.py` | Real local search activity mapped to frontend progress |
 | `test_optional_eval.py` | Normal CLI and offline conversation with Eval imports prohibited |

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 from pathlib import Path
 import sys
@@ -20,6 +21,7 @@ def _parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
     catalog = sub.add_parser("catalog", help="show registered benchmarks")
     catalog.add_argument("--json", action="store_true", help="emit the versioned JSON catalog")
+    catalog.add_argument("--improvement", action="store_true", help="show bounded task sources for improvement")
     run = sub.add_parser("run", help="execute an evaluation request")
     run.add_argument("--request", required=True, help="evaluation request JSON")
     run.add_argument("--output-root", help="override .fruitfly/eval")
@@ -28,6 +30,16 @@ def _parser() -> argparse.ArgumentParser:
     report.add_argument("evaluation_id")
     report.add_argument("--output-root", default=".fruitfly/eval")
     report.add_argument("--json", action="store_true")
+    trial = sub.add_parser("trial", help="run one original task with an isolated versioned runtime")
+    trial.add_argument("--request", required=True)
+    trial.add_argument("--output-root", required=True)
+    trial.add_argument("--events", choices=("jsonl",))
+    prepare = sub.add_parser("prepare", help="download and freeze official tasks without executing an Agent")
+    prepare.add_argument("--benchmark", required=True)
+    prepare.add_argument("--variant", required=True)
+    prepare.add_argument("--task-limit", type=int, default=5)
+    prepare.add_argument("--output-root", required=True)
+    prepare.add_argument("--events", choices=("jsonl",))
     return parser
 
 
@@ -37,6 +49,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "catalog":
             payload = builtin_catalog().to_dict()
+            if args.improvement:
+                from .task_sets import improvement_catalog
+                payload = improvement_catalog(builtin_catalog())
             if args.json:
                 _print_json(payload)
             else:
@@ -86,6 +101,22 @@ def main(argv: list[str] | None = None) -> int:
                 print(report.render_markdown(), end="")
                 print(f"[report: {store.path / 'report.md'}]")
             return {"completed": 0, "blocked": 3}.get(report.status, 1)
+        if args.command == "trial":
+            from .trial import run_trial
+            def trial_progress(payload):
+                if args.events:
+                    _print_json({"schema_version": 1, **payload})
+            payload = run_trial(json.loads(Path(args.request).read_text(encoding="utf-8")),
+                output_root=Path(args.output_root), progress=trial_progress)
+            _print_json({"type": "trial-result", **payload})
+            return 0
+        if args.command == "prepare":
+            from .task_sets import prepare_task_set
+            payload = asyncio.run(prepare_task_set(args.benchmark, args.variant, args.task_limit,
+                output_root=Path(args.output_root),
+                progress=lambda row: _print_json({"schema_version": 1, **row}) if args.events else None))
+            _print_json({"type": "task-set-prepared", **payload})
+            return 0
         report_path = Path(args.output_root) / args.evaluation_id / "report.json"
         if args.json:
             payload = json.loads(report_path.read_text(encoding="utf-8"))
@@ -93,7 +124,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(report_path.with_name("report.md").read_text(encoding="utf-8"), end="")
         return 0
-    except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+    except (OSError, TypeError, ValueError, RuntimeError, ImportError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 

@@ -206,9 +206,9 @@ class ExtensionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_menu_accepts_distinct_feature_clients(self):
         for clients, shown, absent in (
-            (ImprovementClients(search=SimpleNamespace()), "Start optimization", "Review candidates"),
-            (ImprovementClients(candidates=SimpleNamespace(candidates=lambda: ())), "Review candidates", "Start optimization"),
-            (ImprovementClients(materials=SimpleNamespace(task_packs_available=True)), "Save a failed task", "Start optimization"),
+            (ImprovementClients(search=SimpleNamespace()), "Start improvement", "Review candidates"),
+            (ImprovementClients(candidates=SimpleNamespace(candidates=lambda: ())), "Review candidates", "Start improvement"),
+            (ImprovementClients(materials=SimpleNamespace(task_packs_available=True)), "Save a failed task", "Start improvement"),
         ):
             with self.subTest(feature=shown):
                 provider = FauxProvider()
@@ -216,7 +216,7 @@ class ExtensionTests(unittest.IsolatedAsyncioTestCase):
                 frontend = TerminalFrontend(
                     offline_session(provider=provider), improvement_clients=clients,
                     input_stream=io.StringIO(), output_stream=output,
-                    line_editor=ScriptedLines("/optimize", "2", "/exit"),
+                    line_editor=ScriptedLines("/improvement", "2", "/exit"),
                 )
                 await frontend.run()
                 self.assertIn(shown, output.getvalue())

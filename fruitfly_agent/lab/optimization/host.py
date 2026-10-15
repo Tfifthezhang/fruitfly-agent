@@ -9,6 +9,8 @@ from .search import OptimizationProblem, ObjectivePolicy, content_id
 from .services import NativeSearchServices, SearchBudget, SearchJournal
 from .text_optimizer import SearchPreview, TextProposal, SearchActivitySource
 from .reporting import build_report
+from fruitfly_agent.lab.algorithms.versions import SystemVersion
+from fruitfly_agent.lab.algorithms.candidates import VersionCandidate
 
 
 class HostedTextOptimizer:
@@ -30,6 +32,111 @@ class HostedTextOptimizer:
         self._services = None
         self._preview_suite = None
         self._last_progress = None
+        self.workflow = None
+        self._prepared_workflow = None
+
+    def configure_workflow(self, workflow, *, role_configs=None):
+        """Attach a generic workflow before use; construction starts no research."""
+        if self._stop is not None or self._preview_suite is not None:
+            raise RuntimeError("configure a workflow before previewing or running a search")
+        if "workflow-trials" not in self.services_factory.capabilities:
+            raise ValueError("automatic workflow requires workflow trial services")
+        self.workflow = workflow
+        self.role_configs = {**(self.role_configs or {}), **(role_configs or {})}
+
+    def improvement_identity(self):
+        from dataclasses import asdict
+        return {"algorithm": self.spec.algorithm_id, "implementation": self.spec.implementation_id,
+                "parameters": self.parameters,
+                "workflow": self.workflow.implementation_id if self.workflow else None,
+                "workflow_policy": asdict(self.workflow.policy) if self.workflow else None,
+                "failure_processing": self.workflow.processor.implementation_id if self.workflow else None}
+
+    def experiment_target_id(self):
+        return self.target.snapshot().target_id
+
+    def experiment_available(self):
+        return self.workflow is not None
+
+    def experiment_timeout_seconds(self):
+        if self.workflow is None:
+            raise ValueError("benchmark improvement requires an automatic workflow")
+        return self.workflow.policy.external_timeout_seconds
+
+    def preview_experiment_plan(self, task_count):
+        if self.workflow is None:
+            raise ValueError("benchmark improvement requires a configured automatic workflow")
+        if type(task_count) is not int or not 3 <= task_count <= 12:
+            raise ValueError("benchmark improvement needs 3–12 tasks")
+        policy = self.workflow.policy
+        return SearchPreview(self.spec.algorithm_id, self.label,
+            "Download and freeze the selected tasks, then run one bounded improvement job. "
+            "Baseline, learning, candidates and confirmation share the displayed budgets. "
+            "Model, network and container operations may incur cost. Adoption requires human review.",
+            (("Training cases", str(task_count - 2)), ("Selection cases", "1"), ("Independent cases", "1"),
+             ("Maximum model calls", str(self.parameters["max_model_calls"])),
+             ("Maximum task trials", str(self.parameters["max_metric_calls"])),
+             ("Maximum output tokens per call", str(self.parameters["output_max_tokens"])),
+             ("External task model allocation", str(policy.external_trial_model_calls)),
+             ("External task timeout seconds", str(policy.external_trial_timeout_seconds)),
+             ("Experiment deadline seconds", str(policy.external_timeout_seconds)),
+             ("Minimum score gain", str(policy.min_improvement)),
+             ("Maximum per-case regression", str(policy.max_case_regression)),
+             ("Failure processing", self.workflow.processor.implementation_id)),
+            target_id=self.experiment_target_id())
+
+    def preview_experiment(self, context):
+        from .experiments.runner import BenchmarkTaskSource
+        if self.workflow is None:
+            raise ValueError("benchmark improvement requires a configured automatic workflow")
+        if self._stop is not None:
+            raise RuntimeError("an optimization job is already running")
+        source = BenchmarkTaskSource(context.tasks)
+        suite = source.freeze(source.default_pack_id, self.parameters["target"])
+        prepared = self.workflow.prepare(suite, source)
+        original = self.workflow.preview(suite, prepared)
+        return SearchPreview(self.spec.algorithm_id, self.label,
+            "This experiment runs original tasks, prepares material, searches candidates and confirms once. "
+            "Container/model/network calls may incur cost. Adoption remains a separate decision.",
+            (("Parent H/I/S", context.parent.version_id), ("Task set", context.tasks.digest),
+             ("Training cases", str(len(context.tasks.train))), ("Selection cases", str(len(context.tasks.validation))),
+             ("Maximum model calls", str(self.parameters["max_model_calls"])),
+             ("Maximum task trials", str(self.parameters["max_metric_calls"])),
+             ("External task model allocation", str(self.workflow.policy.external_trial_model_calls)),
+             ("External task timeout seconds", str(self.workflow.policy.external_trial_timeout_seconds)),
+             ("Experiment deadline seconds", str(self.workflow.policy.external_timeout_seconds)), *original),
+            target_id=self.parameters["target"])
+
+    async def search_experiment(self, context):
+        from dataclasses import replace
+        from .automatic.workflow import AutomaticWorkflow
+        from .experiments.runner import BenchmarkTaskSource, BenchmarkSearchServices
+        self.preview_experiment(context)
+        host_policy = self.workflow.policy
+        class ExternalServices(BenchmarkSearchServices):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs, context=context, policy=host_policy)
+        previous = self.task_source, self.services_factory, self.workflow
+        source = BenchmarkTaskSource(context.tasks)
+        suite = source.freeze(source.default_pack_id, self.parameters["target"])
+        self.task_source, self.services_factory = source, ExternalServices
+        self.workflow = AutomaticWorkflow(self.workflow.processor,
+            replace(host_policy, timeout_seconds=host_policy.external_timeout_seconds))
+        try:
+            proposals = await self.search(context.baseline, context.direction,
+                parent_manifest=context.parent_manifest, task=suite)
+            result = []
+            for proposal in proposals:
+                packet = context.packet_for_text(proposal.text)
+                candidate = packet["candidate"]
+                result.append(replace(proposal, evidence=(*proposal.evidence,
+                    ("Parent system version", context.parent.version_id),
+                    ("Candidate system version", SystemVersion.from_dict(candidate["version"]).version_id),
+                    ("Version candidate", VersionCandidate.from_dict(candidate).candidate_id),
+                    ("Original task source", context.original_evidence_id))))
+            return tuple(result)
+        finally:
+            self.task_source, self.services_factory, self.workflow = previous
 
     def progress(self):
         if isinstance(self._services, SearchActivitySource):
@@ -40,8 +147,14 @@ class HostedTextOptimizer:
         # Execution uses the same immutable suite; changing a file requires a new preview.
         self._preview_suite = task or self._preview_suite or self.task_source.freeze(self.task_source.default_pack_id, self.parameters["target"])
         params = self.parameters
+        workflow_details = ()
+        if self.workflow is not None:
+            self._prepared_workflow = self.workflow.prepare(self._preview_suite, self.task_source)
+            workflow_details = self.workflow.preview(self._preview_suite, self._prepared_workflow)
         return SearchPreview(self.spec.algorithm_id, self.label,
-            "Authorized task cases, direction and search evidence are sent to the configured Provider; calls may incur cost. Trials have no tools or Session.",
+            "Authorized task cases, direction and search evidence are sent to the configured Provider; calls may incur cost. "
+            + ("Automatic search includes material preparation and independent confirmation; adoption requires human review."
+               if self.workflow is not None else "Trials have no tools or Session."),
             (("Cases", self._preview_suite.name),
              ("Training cases", str(len(self._preview_suite.train))),
              ("Selection validation cases", str(len(self._preview_suite.validation))),
@@ -52,7 +165,8 @@ class HostedTextOptimizer:
              ("Trial model", self.config.model),
              ("Evaluation policy", self._preview_suite.policy_id),
              ("Code execution", self._preview_suite.evaluation_policy.execution_notice if self._preview_suite.evaluation_policy else "No generated code execution."),
-             *((f"{role} model", cfg.model) for role, cfg in sorted((self.role_configs or {}).items()))),
+             *((f"{role} model", cfg.model) for role, cfg in sorted((self.role_configs or {}).items())),
+             *workflow_details),
             target_id=params["target"])
 
     async def search(self, prompt, direction, *, parent_manifest, task=None):
@@ -62,6 +176,7 @@ class HostedTextOptimizer:
         snapshot = self.target.snapshot()
         if snapshot.text != prompt:
             raise ValueError("target changed since host snapshot")
+        prepared = self.workflow.prepare(suite, self.task_source) if self.workflow is not None else None
         self._last_progress = None
         search_id = uuid4().hex
         problem = OptimizationProblem(search_id, parent_manifest, snapshot, direction,
@@ -88,8 +203,14 @@ class HostedTextOptimizer:
                            parameters=dict(problem.parameters))
             journal.append('report-context', train_count=len(problem.train), validation_count=len(problem.validation),
                            metric=problem.policy.metric, objective_direction=problem.policy.direction)
-            result = await self.strategy.search(problem, services)
-            services.check()
+            if self.workflow is None:
+                result = await self.strategy.search(problem, services)
+                services.check()
+            else:
+                journal.append("workflow", implementation=self.workflow.implementation_id,
+                               material_source_hash=prepared.source_hash)
+                result = await self.workflow.search(self.strategy, problem, services, prepared)
+                services.check_cancellation()
             for candidate in result.candidates:
                 self.target.validate(candidate.text)
             journal.append("search-result", status=result.stop_reason, usage=budget.used, exhausted_kind=budget.exhausted_kind,
@@ -122,6 +243,7 @@ class HostedTextOptimizer:
                 self._last_progress = None
             self._stop = self._services = None
             self._preview_suite = None
+            self._prepared_workflow = None
 
     def cancel(self):
         if self._stop is None:

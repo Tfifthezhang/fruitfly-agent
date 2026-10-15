@@ -47,10 +47,7 @@ from fruitfly_agent.interactive.contracts.events import (
 )
 from fruitfly_agent.interactive.contracts.evaluation import (
     EvaluationBenchmarkOption,
-    EvaluationController,
     EvaluationEventSink,
-    EvaluationLaunchRequest,
-    EvaluationLaunchResult,
     EvaluationSnapshot,
     EvaluationVariantOption,
 )
@@ -67,7 +64,7 @@ from fruitfly_agent.interactive.contracts.runtime import RuntimeSession
 from fruitfly_agent.interactive.terminal import (
     LineEditor,
     TerminalConfigurationFrontend,
-    TerminalEvaluationFrontend,
+    TerminalImprovementFrontend,
     TerminalFrontend,
     TerminalRenderer,
     TerminalResumeFrontend,
@@ -101,10 +98,7 @@ __all__ = [
     "ConfigurationLaunchResult",
     "ConfigurationController",
     "EvaluationBenchmarkOption",
-    "EvaluationController",
     "EvaluationEventSink",
-    "EvaluationLaunchRequest",
-    "EvaluationLaunchResult",
     "EvaluationSnapshot",
     "EvaluationVariantOption",
     "FrontendEvent",
@@ -127,7 +121,7 @@ __all__ = [
     "ResumableSession",
     "TerminalFrontend",
     "TerminalConfigurationFrontend",
-    "TerminalEvaluationFrontend",
+    "TerminalImprovementFrontend",
     "TerminalRenderer",
     "TerminalResumeFrontend",
 ]

@@ -48,3 +48,12 @@ def digest_manifest(payload: Mapping[str, Any]) -> str:
     ).encode("utf-8")
     return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
+
+def execution_version_payload(manifest: Mapping[str, Any], source: str) -> dict[str, Any]:
+    """Execution identity excludes the independently versioned improvement strategy."""
+    return {"source": source, "components": [c for c in manifest["components"]
+            if not any(x.get("layer") == "optimization" for x in c.get("contributions", ()))],
+            "context_pipeline": manifest.get("context_pipeline"),
+            "base_prompt": {"content_hash": manifest["base_prompt"]["content_hash"]},
+            "data_artifacts": manifest.get("data_artifacts", ())}
+

@@ -10,6 +10,8 @@ from fruitfly_agent.lab.algorithms.targets import TEXT_TARGET_PREFIX
 from .host import HostedTextOptimizer
 from .task_packs import TASK_PACK_COMPONENT
 from .text_optimizer import TEXT_OPTIMIZER_COMPONENT, TEXT_OPTIMIZATION_TARGET_COMPONENT
+from .services import NativeSearchServices
+from .trials import TRIAL_SERVICES_COMPONENT
 
 if TYPE_CHECKING:
     from fruitfly_agent.lab.catalog.assembly import AssemblyContext, AssemblyState
@@ -61,6 +63,7 @@ def install_text_optimizer(
         strategy, state.config, context.workspace, parameters,
         target=state.components.get(TEXT_TARGET_PREFIX + parameters["target"]),
         label=label, role_configs=role_configs, task_source=source,
+        services_factory=state.components.get(TRIAL_SERVICES_COMPONENT, NativeSearchServices),
     )
     context.own(optimizer)
     return (

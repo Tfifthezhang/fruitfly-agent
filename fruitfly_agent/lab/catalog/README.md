@@ -72,3 +72,7 @@ No Catalog-specific environment variables. Catalog itself makes no model request
 [permissions.py](permissions.py) exports `PermissionPolicy` and `apply_permission_policy`. The latter attaches a generic authorizer and wraps the assembled execution environment. Run imports these public host entry points rather than concrete environment implementation modules. This host policy is not a selectable research algorithm and cannot be disabled by a model-edited mechanism selection.
 
 `AssemblyContext.process_environment` supplies an explicit minimal environment to owned process backends. IPython uses it at process startup; Providers retain host-managed credentials.
+
+## Register experiment dependencies
+
+Built-in file memory, workspace skill files and local knowledge register initial text snapshot sources through `persistent-state-snapshots`. Live HTTP context registers an `experiment-blockers` reason because responses cannot be frozen. Installers register capabilities without taking snapshots or starting model work. Custom mechanisms must register each persistent dependency they read; arbitrary plugin heap state and external services remain unsupported. See [Algorithm versions](../algorithms/README.md) and [Original task experiments](../optimization/experiments/README.md).

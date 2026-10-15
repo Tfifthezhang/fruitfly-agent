@@ -37,6 +37,8 @@ The mechanism is `opro`, with implementation identity `opro-text-v2`; it is disa
 
 Search calls the configured Provider and may incur charges. Shared trial services run isolated single-turn, no-tool evaluations; they do not measure a complete interactive Harness. Selection validation is reused during search. Independent verification and adoption belong to the host and optional [RSI coordinator](../../rsi/README.md).
 
+The optional [automatic workflow](../automatic/README.md) supplies derived learning cases and fixed original selection cases through the same search contract. Its `candidate_evaluated` callback may stop generation at the first eligible candidate; it then performs original-task regression checks and separate confirmation. Ordinary OPRO retains its configured round limit. Independent [failure processors](../failure_processing/README.md) do not live inside OPRO. Learning scores remain feedback; candidate ranking uses original selection scores.
+
 This package exposes no target for modifying its own strategy. Prompt constants are implementation details, not runtime artifact bindings. It performs no model training and has no module-specific environment variables.
 
 ## Files

@@ -6,6 +6,7 @@ import errno
 import io
 import os
 import pty
+import re
 import select
 import signal
 import sys
@@ -48,7 +49,8 @@ class LineEditorUnitTest(unittest.TestCase):
                 start = len(output.getvalue())
                 display.set_choices()
                 self.assertNotIn("Allow once", output.getvalue()[start:])
-                self.assertIn("╭─ prompt", output.getvalue()[start:])
+                self.assertIn("❯ ", output.getvalue()[start:])
+                self.assertNotIn("╭", output.getvalue()[start:])
                 self.assertEqual(output.getvalue().count("permission: session"), 1)
                 display.suspend()
 
@@ -83,7 +85,7 @@ class LineEditorUnitTest(unittest.TestCase):
         self.assertIn("\x1b[?2004h", rendered)
         self.assertIn("\x1b[?2004l", rendered)
         self.assertIn(
-            "assistant> streamed\r\n\x1b[0m\x1b[2K╭─ prompt",
+            "assistant> streamed\r\n\x1b[2K\r\n\x1b[2K❯ ",
             rendered,
         )
         self.assertIn("\r\x1b[6C", rendered)
@@ -101,7 +103,7 @@ class LineEditorUnitTest(unittest.TestCase):
 
         rendered = output.getvalue()
         self.assertIn("\x1b[2K❯ Ｉｎ    Ｏｕ\r\n", rendered)
-        self.assertIn("\x1b[2K│ ＩＤ    Ｑｔ\r\n", rendered)
+        self.assertIn("\x1b[2K│ ＩＤ    Ｑｔ\r\n\x1b[2K\x1b[1A\r\x1b[14C", rendered)
         self.assertIn("\r\x1b[14C", rendered)
 
     def test_inline_cursor_column_has_no_extra_gap(self) -> None:
@@ -221,6 +223,28 @@ class LineEditorUnitTest(unittest.TestCase):
         self.assertNotIn("\x1b[2J", output.getvalue())
         display.suspend()
 
+    def test_resize_refresh_preserves_draft_cursor_and_committed_history(self):
+        output = io.StringIO()
+        display = InlineTerminalDisplay(output, rows=14, columns=50)
+        display.activate()
+        display.write("committed-once\n")
+        text = "甲乙丙丁abcdefgh\nsecond line"
+        display.set_input(text, 5)
+        for columns in (12, 70, 9, 50):
+            display._fixed_columns = columns
+            display.refresh()
+            self.assertEqual(display._input, text)
+            self.assertEqual(display._cursor, 5)
+            self.assertEqual(display._columns, columns)
+            self.assertLessEqual(display._live_rows, display._rows)
+            before = output.getvalue()
+            display.refresh()
+            self.assertEqual(output.getvalue(), before)
+        display.suspend()
+        self.assertEqual(output.getvalue().count("committed-once"), 1)
+        self.assertNotIn("╭", output.getvalue())
+        self.assertNotIn("\x1b[2J", output.getvalue())
+
     def test_redirected_streams_use_plain_ansi_free_fallback(self) -> None:
         input_stream = io.StringIO("hello\n")
         output_stream = io.StringIO()
@@ -273,7 +297,7 @@ class LineEditorUnitTest(unittest.TestCase):
         def interrupt(_prompt: str) -> str:
             raise KeyboardInterrupt
 
-        editor = ReadlineLineEditor(output_stream, reader=interrupt)
+        editor = ReadlineLineEditor(output_stream, reader=interrupt, framed=True)
 
         with self.assertRaises(KeyboardInterrupt):
             editor.read_line()
@@ -290,12 +314,56 @@ class LineEditorUnitTest(unittest.TestCase):
         editor = ReadlineLineEditor(output_stream, reader=read, framed=False)
 
         self.assertEqual(editor.read_line(), "hello")
-        self.assertEqual(output_stream.getvalue(), "you> ")
+        self.assertEqual(output_stream.getvalue(), "❯ ")
         self.assertNotIn("\x1b", output_stream.getvalue())
 
 
 @unittest.skipUnless(os.name == "posix", "PTY regression requires a POSIX terminal")
 class TerminalInputPtyRegressionTest(unittest.TestCase):
+    def test_idle_resize_rewraps_draft_without_keys_and_preserves_editing(self):
+        import fcntl
+        import struct
+        import termios
+        code = (
+            "import sys; from fruitfly_agent.interactive.terminal.io.live import InlineTerminalDisplay, IsolatedLineEditor; "
+            "display=InlineTerminalDisplay(sys.stdout); editor=IsolatedLineEditor(sys.stdin,display); "
+            "display.activate(); display.write('committed-once\\n'); value=editor.read_line(); "
+            "display.suspend(); editor.stop(); print('RESULT='+repr(value),flush=True)"
+        )
+        pid, master = pty.fork()
+        if pid == 0:
+            os.chdir(ROOT)
+            os.environ["TERM"] = "xterm-256color"
+            os.environ.pop("NO_COLOR", None)
+            os.environ["COLORFGBG"] = "15;0"
+            os.execl(sys.executable, sys.executable, "-c", code)
+        chunks = []
+        try:
+            fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack('HHHH', 20, 60, 0, 0))
+            self._read_until(master, "❯ ".encode(), chunks)
+            os.write(master, "甲乙丙丁abcdefgh".encode())
+            self._read_until(master, "❯ 甲乙丙丁abcdefgh".encode(), chunks)
+            fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack('HHHH', 20, 12, 0, 0))
+            narrow = []
+            self._read_until(master, "│ abcdefgh".encode(), narrow)
+            chunks.extend(narrow)
+            fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack('HHHH', 20, 50, 0, 0))
+            wide = []
+            self._read_until(master, "❯ 甲乙丙丁abcdefgh".encode(), wide)
+            chunks.extend(wide)
+            os.write(master, b'\x1b[DX\r')
+            self._read_until_exit(pid, master, chunks)
+            self._drain(master, chunks)
+        except BaseException:
+            self._kill_and_reap(pid)
+            raise
+        finally:
+            os.close(master)
+        output = b''.join(chunks).decode(errors='replace')
+        self.assertIn("RESULT='甲乙丙丁abcdefgXh'", output)
+        self.assertEqual(output.count('committed-once'), 1)
+        self.assertNotIn('╭', output)
+
     def test_isolated_control_keys_keep_text_and_cursor_consistent(self) -> None:
         for keys, value in (
             (b"one two   \x17X\r", "one X"),
@@ -343,9 +411,10 @@ class TerminalInputPtyRegressionTest(unittest.TestCase):
             "first=read_field_line(editor,'Model label'); second=editor.read_line(); "
             "print('RESULT='+repr((first,second)),flush=True)"
         )
-        output = self._run_pty_code(code, b"work-model\rnext\r")
-        self.assertIn("╭─ Model label ", output)
-        self.assertIn("╭─ prompt ", output)
+        output = self._run_pty_code(code, b"work-model\rnext\r", prompt=b"Model label> ")
+        self.assertIn("Model label> ", output)
+        self.assertIn("❯ ", output)
+        self.assertNotIn("╭", output)
         self.assertIn("RESULT=('work-model', 'next')", output)
 
     def test_model_key_input_hides_value_and_restores_echo(self) -> None:
@@ -442,7 +511,7 @@ class TerminalInputPtyRegressionTest(unittest.TestCase):
         with patch.dict(os.environ, {"TERM": "dumb"}):
             output = self._run_editor(b"abc\x7f\r")
         self.assertIn("RESULT='ab'", output)
-        self.assertIn("╰", output)
+        self.assertNotIn("╰", output)
 
     def test_backspace_edits_the_buffer_instead_of_only_the_display(self) -> None:
         output = self._run_editor(b"abc\x7f\r")
@@ -466,7 +535,7 @@ class TerminalInputPtyRegressionTest(unittest.TestCase):
         output = self._run_editor(b"\x04")
 
         self.assertIn("RESULT=None", output)
-        self.assertIn("╰", output)
+        self.assertNotIn("╰", output)
 
     def test_unicode_input_is_preserved(self) -> None:
         output = self._run_editor("Ｈｉ🙂\r".encode())
@@ -510,7 +579,7 @@ class TerminalInputPtyRegressionTest(unittest.TestCase):
         chunks: list[bytes],
     ) -> None:
         deadline = time.monotonic() + 5
-        while marker not in b"".join(chunks):
+        while marker not in re.sub(rb"\x1b\[[0-9;]*m", b"", b"".join(chunks)):
             if time.monotonic() >= deadline:
                 self.fail(f"terminal prompt did not appear: {b''.join(chunks)!r}")
             readable, _, _ = select.select([fd], [], [], 0.1)

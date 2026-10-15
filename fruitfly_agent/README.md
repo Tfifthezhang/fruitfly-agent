@@ -19,6 +19,8 @@ Eval consumes public runtime capabilities. Removing it must leave normal Agent u
 
 Independent optimization methods are packages within Lab's [Optimization](lab/optimization/README.md#optimization-methods) module. They use shared search services and object-owned target adapters; Run assembles them without implementing algorithm-specific search logic.
 
+Optional [automatic text search](lab/optimization/automatic/README.md) separates original tasks, derived learning material and confirmation. [Failure processing](lab/optimization/failure_processing/README.md) is independently replaceable. A confirmed candidate enters human review; Application still owns activation. [Original task experiments](lab/optimization/experiments/README.md) freeze H/I/S, consume official task evidence and reuse this human adoption path.
+
 Run separates [configuration](run/configuration/README.md), [runtime preparation](run/runtime/README.md), [storage](run/storage/README.md), [improvement hosting](run/improvement/README.md), and [adapters](run/adapters/README.md). Its Factory composes these services; leaf services receive explicit capabilities and own their local state.
 
 Interactive separates Contracts, Application, Session, Interaction, and Terminal. It keeps lifecycle authority in Application and exposes independent search, candidate, and task material contracts. Its terminal uses [registered command handlers](interactive/terminal/README.md#register-a-command); feature flows consume explicit capabilities and share one input owner.

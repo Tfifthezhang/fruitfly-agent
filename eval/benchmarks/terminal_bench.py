@@ -12,12 +12,19 @@ class TerminalBenchAdapter(HarborBenchmarkAdapter):
         label="Terminal-Bench",
         description="Terminal agent tasks scored by the official Harbor verifier",
         version="2.0",
-        adapter_version="3",
+        adapter_version="4",
         variants=(
             BenchmarkVariant(
                 "smoke",
                 "Low-resource smoke",
                 "One deterministic task for validating the complete evaluation path",
+            ),
+            BenchmarkVariant(
+                "starter",
+                "Starter batch · 5 CPU tasks",
+                "Run fix-git, log-summary-date-ranges, regex-log, cancel-async-tasks, and fix-code-vulnerability.",
+                task_names=("fix-git", "log-summary-date-ranges", "regex-log",
+                            "cancel-async-tasks", "fix-code-vulnerability"),
             ),
             BenchmarkVariant(
                 "no_gpu",

@@ -27,3 +27,13 @@ No independent configuration, secrets, or model requests.
 ```bash
 .venv/bin/python -m unittest tests.workflows.test_decoupling -v
 ```
+
+## Bind execution, improvement and persistent state
+
+[versions.py](versions.py) defines immutable `SystemVersion(harness, improver, state)`, `SnapshotFile` and `StateSnapshot`. References use SHA-256 content identities; model, permission, verifier, budget and environment conditions remain outside the modifiable triple. [candidates.py](candidates.py) binds a modification set to its exact parent. Declared H/I/S roles must match the axes that changed; `TargetRegistry` rejects unregistered role/target/schema adapters.
+
+[snapshots.py](snapshots.py) freezes bounded registered workspace text dependencies. Catalog exposes snapshot sources through `persistent-state-snapshots`; dynamic dependencies can declare `experiment-blockers`. Snapshots record roots even when empty and trials receive independent copies. Arbitrary plugin objects are not captured. The [original-task experiment host](../optimization/experiments/README.md) currently changes H base prompt only. Workflow/code, I and S changes require explicit target and comparison implementations.
+
+```bash
+.venv/bin/python -m unittest tests.lab.test_experiment_contracts -v
+```

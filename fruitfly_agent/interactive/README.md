@@ -46,7 +46,7 @@ Frontends consume Application and Interactive events. They do not construct Prov
 | `task_packs`: [TaskPackService](contracts/task_packs.py) | Read task materials and save corrections. Does not require optimization or candidate services. |
 | `authorization`: [AuthorizationService](interaction/authorization.py) | Serialize permission requests and retain grants for this runtime only. |
 
-Configuration and model setup come from the injected RuntimeFactory/controller. Evaluation is an optional frontend controller. Run binds concrete implementations; Interactive imports neither Run, Lab, Providers, nor Eval.
+Configuration and model setup come from the injected RuntimeFactory/controller. Benchmark task selection is an optional frontend capability; confirmed work uses Application improvement jobs. Run binds concrete implementations; Interactive imports neither Run, Lab, Providers, nor Eval.
 
 Each runtime capability is optional and independently injected. Use explicit `candidates=` and `task_packs=` fields even when one object implements several contracts. Missing query capabilities return empty candidate lists or unavailable material status; operations requiring a missing service raise an explicit error. Protocol and view definitions belong to `contracts/`. The package-level `fruitfly_agent.interactive` API exports the usual Application, concrete RuntimeHandle, Session, views, and terminal entries. Internal consumers import their owning modules directly.
 
@@ -56,7 +56,7 @@ To add a frontend, consume Application's public operations and the capability pr
 
 Replacement paths share preparation and retirement: start resources, bind events, invoke activation, then switch the active handle. Failed replacement keeps the active handle; failure to retire the previous handle is exposed through `last_error` after a successful switch. Configuration writes and external side effects do not automatically roll back. No source hot reload or cross-process activation transaction. Optimization progress covers the current batch, not overall search completion.
 
-Resume continues canonical history in the original file with the selected current configuration. Discovery exposes availability/reasons rather than filtering by the active manifest digest. Run records changed environments after successful startup; history display never triggers model/tool replay. `/eval` selects a benchmark and resource variant, runs the saved configuration in independent task sessions, and produces reports.
+Resume continues canonical history in the original file with the selected current configuration. Discovery exposes availability/reasons rather than filtering by the active manifest digest. Run records changed environments after successful startup; history display never triggers model/tool replay. `/improvement` selects saved task packages or benchmark tasks for a bounded iterative improvement job. It also saves scored daily cases and reviews candidates. Benchmark preparation, baseline and iteration share the Application job lifecycle; standalone evaluation remains in the optional Eval CLI.
 
 ## Modules
 

@@ -24,3 +24,9 @@ Manifest schema remains 5. Recovery validates each recorded manifest against its
 ```
 
 Checks use fake Providers and temporary state.
+
+## Bound isolated task execution
+
+[trial_budget.py](trial_budget.py) provides `TrialInvocationBudget` and `BudgetedRegistry`: reserve before each main or auxiliary Provider call, cap output requests, share one allocation, and preserve normal resource cleanup. The generic [trial.py](../trial.py) entry composes the normal Application using frozen H/source/S and copied artifacts. It verifies resolved mechanisms and models before submitting the complete task, writes actual runtime/invocation receipts, and rejects changed source material.
+
+The external executor owns environment isolation. A trial packet explicitly authorizes ordinary local operations in its isolated workspace; standard protected credential paths remain denied. This does not change normal interactive authorization. Frozen state copies may change within a trial and are discarded as production learning state. Cancellation writes the available receipt and closes owned resources. Pre-construction errors may have no invocation receipt; unknown work is not assumed free or replayed. See [Original task experiments](../../lab/optimization/experiments/README.md).

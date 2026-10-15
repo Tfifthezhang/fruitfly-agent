@@ -1,9 +1,11 @@
-"""Renderer-neutral values for launching optional external evaluations."""
+"""Renderer-neutral benchmark task selection and improvement capabilities."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Mapping, Protocol
+from typing import Any, Awaitable, Callable, Mapping, Protocol, runtime_checkable
+from .optimization import OptimizationPreview
+from .candidates import CandidateView
 
 
 EvaluationEventSink = Callable[[Mapping[str, Any]], Awaitable[None]]
@@ -33,35 +35,30 @@ class EvaluationSnapshot:
 
 
 @dataclass(frozen=True)
-class EvaluationLaunchRequest:
+class BenchmarkImprovementRequest:
     benchmark_id: str
     variant: str
+    task_limit: int = 5
+
+    def __post_init__(self):
+        if type(self.task_limit) is not int or not 3 <= self.task_limit <= 12:
+            raise ValueError("improvement task limit must be 3–12")
 
 
-@dataclass(frozen=True)
-class EvaluationLaunchResult:
-    status: str
-    evaluation_id: str
-    report_markdown: str
-    report_json: str
-    detail: str = ""
-
-
-class EvaluationController(Protocol):
-    def snapshot(self) -> EvaluationSnapshot: ...
-
-    async def run(
-        self, request: EvaluationLaunchRequest,
-        on_event: EvaluationEventSink | None = None,
-    ) -> EvaluationLaunchResult: ...
+@runtime_checkable
+class BenchmarkImprovementController(Protocol):
+    @property
+    def improvement_available(self) -> bool: ...
+    def improvement_snapshot(self) -> EvaluationSnapshot: ...
+    def benchmark_preview(self, request: BenchmarkImprovementRequest, direction: str = "") -> OptimizationPreview: ...
+    async def improve(self, preview_token: str, on_event: EvaluationEventSink | None = None) -> tuple[CandidateView, ...]: ...
 
 
 __all__ = [
     "EvaluationBenchmarkOption",
-    "EvaluationController",
     "EvaluationEventSink",
-    "EvaluationLaunchRequest",
-    "EvaluationLaunchResult",
     "EvaluationSnapshot",
     "EvaluationVariantOption",
+    "BenchmarkImprovementRequest",
+    "BenchmarkImprovementController",
 ]

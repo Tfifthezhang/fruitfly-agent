@@ -86,7 +86,14 @@ class RunCandidateService:
                 usage = 'Token consumption unknown: Provider usage not reported' if report.model_calls else 'Tokens: 0 (no model calls)'
             consumption = (f'Stop: {stop}\nTrial evaluations: {report.trial_calls}/{report.trial_limit}; '
                            f'model requests: {report.model_calls}/{report.model_limit}\n{usage}')
-        evaluation += '\nIndependent verification: not provided by search'
+        evidence = dict(record.evidence)
+        if evidence.get('Independent confirmation'):
+            evaluation += ('\nIndependent confirmation: ' + evidence['Independent confirmation']
+                           + '\nIndependent score: ' + evidence.get('Confirmation baseline score', 'unknown')
+                           + ' → ' + evidence.get('Confirmation candidate score', 'unknown')
+                           + '\nConfirmation repeats: ' + evidence.get('Confirmation repeats', 'unknown'))
+        else:
+            evaluation += '\nIndependent verification: not provided by search'
         sections = (
             CandidateSection('Overview', f'Algorithm: {record.algorithm}\nTarget: {record.target}\nStatus: {record.status}\nDirection: {record.direction}',
                              summary=f'Task: {record.task_pack_name or record.task_pack_id or "not recorded"}\nDirection: {record.direction}'),

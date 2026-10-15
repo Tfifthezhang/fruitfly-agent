@@ -4,6 +4,9 @@ import hashlib
 import re
 from typing import Literal, Protocol, runtime_checkable
 from fruitfly_agent.core.config import AgentLoopConfig
+from .versions import (SystemVersion, StateSnapshot, SnapshotFile, STATE_SNAPSHOTS_COMPONENT, EXPERIMENT_BLOCKERS_COMPONENT,
+                       canonical_json, content_hash)
+from .candidates import VersionCandidate, TargetChange, TargetRegistry
 
 TEXT_TARGET_PREFIX = 'text-target:'
 

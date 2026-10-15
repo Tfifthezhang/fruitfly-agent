@@ -187,7 +187,7 @@ class InteractiveDirectoryTests(unittest.TestCase):
                     if not target.startswith(prefixes):
                         violations.append(f"{path.relative_to(interactive)} imports {target}")
         features = interactive / "terminal" / "features"
-        for feature in ("configuration", "resume", "evaluation", "optimization"):
+        for feature in ("configuration", "resume", "improvement"):
             prefixes = (base + "contracts.", base + "terminal.io.", base + "terminal.rendering.",
                         base + "terminal.bindings.", base + "terminal.commands.",
                         base + f"terminal.features.{feature}.")

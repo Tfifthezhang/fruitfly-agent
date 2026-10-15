@@ -75,3 +75,5 @@ Use the actual workspace's Skill path if running elsewhere. Resolve diagnostics 
 | [target.py](target.py) | `SkillGuidanceTarget`; snapshot, validation, and temporary trials |
 
 The named target `skill-catalog.guidance` can replace rendered catalog text through an explicit artifact binding. It does not change or snapshot `SKILL.md` bodies or references. An empty catalog is a valid baseline; published replacement text must be nonempty and fit the projection budget. See [Optimization](../../../optimization/README.md) and [Run artifacts](../../../../run/README.md#text-artifacts).
+
+When guidance is read from workspace skill files, Catalog registers those Markdown/text dependencies for [original-task experiments](../../../optimization/experiments/README.md). Initial files are copied into independent trial workspaces. Bound guidance instead uses its existing immutable artifact. This does not implement optimization of skill bodies.

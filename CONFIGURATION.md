@@ -109,6 +109,8 @@ The capability page uses arrows and Space/Enter to toggle, then **Continue** to 
 | Skill catalog | Read `.skills/`; enable in **mechanisms · context-manager → skill-catalog**. | [Skills](fruitfly_agent/lab/context_manager/augmentation/skills/README.md) |
 | Reduction | Summarizing; configure parameters in YAML. | [Reduction](fruitfly_agent/lab/context_manager/reduction/README.md) |
 | Text optimizer | Disabled; OPRO is the built-in algorithm. | [Optimization](fruitfly_agent/lab/optimization/README.md) |
+| Failure processing | Disabled; choose `failure-replay` or `failure-distillation` independently of OPRO. | [Failure processing](fruitfly_agent/lab/optimization/failure_processing/README.md) |
+| Automatic text search | Disabled; enable `automatic-text-search` with a text optimizer and one failure processor. Requires holdout; publishes confirmed improvements for human review. | [Automatic workflow and parameters](fruitfly_agent/lab/optimization/automatic/README.md) |
 | Programmatic context | Explicitly enable `ipython-tool` or `rlm-ipython`. | [Programmatic context](fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md) |
 | RSI | Host-injected capabilities and verification policy; no default CLI switch. | [RSI](fruitfly_agent/lab/rsi/README.md) |
 
@@ -165,3 +167,7 @@ Referenced results remain protected. Failed or cancelled searches do not replace
 The standard Run host uses a lightweight file and local-execution policy. Additional roots and sensitive paths are supplied through `RunApplicationFactory(permission_policy=...)` or `build_runtime(permission_policy=...)`, using `PermissionPolicy` from `fruitfly_agent.lab.catalog`. They are not YAML model or harness parameters. See [Run permission policy](fruitfly_agent/run/README.md#bind-host-permission-policy) and [Environment permissions](fruitfly_agent/lab/environment/README.md#apply-lightweight-permissions).
 
 Model setup owns credential persistence. Restricting model file tools does not disable Add model or Set API key. Runtime approval is temporary and never saved as a permanent grant. Approved local code still has current-user permissions; isolation is not implemented.
+
+### Configure original-task experiment limits
+
+`automatic-text-search` also accepts `external_trial_model_calls` (24), `external_trial_timeout_seconds` (1800), and `external_timeout_seconds` (14400), all positive integers. They bound each original-task model allocation, individual task deadline and whole benchmark improvement deadline. Original tasks, derived exercises, material preparation and candidate search share the optimizer root budget. Configuring these values starts no model work. See [Original task experiments](fruitfly_agent/lab/optimization/experiments/README.md).

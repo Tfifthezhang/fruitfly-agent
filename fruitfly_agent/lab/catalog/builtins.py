@@ -27,11 +27,17 @@ from fruitfly_agent.lab.context_manager.externalization.adapter import (
 )
 from fruitfly_agent.lab.optimization.task_packs import TaskPackCatalog, TASK_PACK_COMPONENT
 from fruitfly_agent.lab.optimization.opro import definition as opro_definition
+from fruitfly_agent.lab.optimization.failure_processing import definitions as failure_definitions
+from fruitfly_agent.lab.optimization.automatic import definition as automatic_definition
 from fruitfly_agent.lab.context_manager.augmentation.skills import (
     SkillCatalogTransformer, load_skills, render_skills_xml,
 )
 from fruitfly_agent.lab.context_manager.augmentation.skills.target import SKILL_CATALOG_GUIDANCE_KEY, SkillGuidanceTarget
 from fruitfly_agent.lab.algorithms.targets import TEXT_TARGET_PREFIX
+from fruitfly_agent.lab.algorithms.versions import STATE_SNAPSHOTS_COMPONENT
+from fruitfly_agent.lab.context_manager.augmentation.information.file_memory.snapshots import FileMemorySnapshots
+from fruitfly_agent.lab.algorithms.snapshots import WorkspaceTextSnapshots
+from fruitfly_agent.lab.algorithms.versions import EXPERIMENT_BLOCKERS_COMPONENT
 from fruitfly_agent.lab.base_prompt.target import BasePromptTarget
 from fruitfly_agent.lab.tools import (
     create_bash_tool,
@@ -256,6 +262,8 @@ def builtin_catalog() -> LabCatalog:
             ),
         ),
         opro_definition(),
+        *failure_definitions(),
+        automatic_definition(),
     )
     return LabCatalog(definitions, bootstrap=lambda state, context: (
         state.with_component(TEXT_TARGET_PREFIX + "base_prompt", BasePromptTarget(state.config.system_prompt))
@@ -434,6 +442,8 @@ def _install_skill_catalog(state: AssemblyState, context: AssemblyContext, param
         root = require_workspace_path(context.workspace, parameters["root"], name="skill root")
         result = load_skills(root)
         guidance = render_skills_xml(result.skills)
+        state = state.with_component(STATE_SNAPSHOTS_COMPONENT,
+            (*state.components.get(STATE_SNAPSHOTS_COMPONENT, ()), WorkspaceTextSnapshots(root, context.workspace)))
     return state.with_component(TEXT_TARGET_PREFIX + SKILL_CATALOG_GUIDANCE_KEY, SkillGuidanceTarget(guidance, parameters["max_chars"])).with_context_stage(
         ContextStage(
             "skill-catalog",
@@ -463,13 +473,15 @@ def _install_memory_files(state: AssemblyState, context: AssemblyContext, parame
         "File memory is stored as Markdown. Use read, write and edit tools to "
         "inspect or maintain MEMORY.md and topic notes."
     )
-    return state
+    return state.with_component(STATE_SNAPSHOTS_COMPONENT,
+        (*state.components.get(STATE_SNAPSHOTS_COMPONENT, ()), FileMemorySnapshots(root, context.workspace)))
 
 
 def _install_knowledge_files(state: AssemblyState, context: AssemblyContext, parameters: Mapping[str, Any]) -> AssemblyState:
     root = require_workspace_path(context.workspace, parameters["root"], name="knowledge root")
     state.components["information"].register(create_local_knowledge_space(root))
-    return state
+    return state.with_component(STATE_SNAPSHOTS_COMPONENT,
+        (*state.components.get(STATE_SNAPSHOTS_COMPONENT, ()), WorkspaceTextSnapshots(root, context.workspace)))
 
 
 def _install_live_http(state: AssemblyState, context: AssemblyContext, parameters: Mapping[str, Any]) -> AssemblyState:
@@ -479,7 +491,8 @@ def _install_live_http(state: AssemblyState, context: AssemblyContext, parameter
             timeout=parameters["timeout_seconds"],
         )
     )
-    return state
+    return state.with_component(EXPERIMENT_BLOCKERS_COMPONENT,
+        (*state.components.get(EXPERIMENT_BLOCKERS_COMPONENT, ()), "Live HTTP context has no frozen response snapshot"))
 
 
 def _install_compaction(state: AssemblyState, context: AssemblyContext, parameters: Mapping[str, Any]) -> AssemblyState:

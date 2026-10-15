@@ -41,6 +41,7 @@ class TaskPolicy:
     execution_notice: str = "No generated code execution."
     check_available: Callable[[], None] = lambda: None
     acceptance_example: str = ""
+    learning_allowed: bool = True
 
 
 def _text_case(row: dict) -> TaskCase:

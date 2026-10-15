@@ -23,6 +23,13 @@ class _ActivityTtyStringIO(TtyStringIO):
 
 
 class TerminalRendererTests(unittest.IsolatedAsyncioTestCase):
+    def test_submission_history_has_no_width_dependent_frame(self):
+        output = io.StringIO()
+        renderer = TerminalRenderer(output)
+        renderer.write_user_input("/improvement\nsecond line")
+        self.assertEqual(output.getvalue(), "\n❯ /improvement\n│ second line\n\n")
+        self.assertNotIn("─", output.getvalue())
+
     async def test_hidden_reasoning_preserves_answer_stream_and_markdown(self) -> None:
         answer = (
             AssistantTextDelta(run_id="run-1", text="**Complete"),

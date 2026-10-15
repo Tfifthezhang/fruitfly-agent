@@ -27,11 +27,11 @@ from fruitfly_agent.interactive.contracts.events import (
 from fruitfly_agent.interactive.contracts.models import ConversationMessage, InteractiveStatus
 from fruitfly_agent.interactive.terminal.rendering.history import render_history_message
 from fruitfly_agent.interactive.terminal.rendering.branding import FRUIT_FLY_ICON
-from fruitfly_agent.interactive.terminal.io.live import prompt_frame_lines
 from fruitfly_agent.interactive.terminal.rendering.markdown import MarkdownStreamPresenter, MarkdownUpdate
 from fruitfly_agent.interactive.terminal.io.text import (
     safe_terminal_text,
     colors_enabled,
+    input_styles,
     supports_ansi,
     terminal_columns,
     truncate_cells,
@@ -162,9 +162,14 @@ class TerminalRenderer:
         """Copy a fixed-editor submission into the scrolling transcript."""
 
         self.finish_line()
-        top, bottom = prompt_frame_lines(terminal_columns(self.output))
-        displayed = text.replace("\n", "\n│ ")
-        self.output.write(f"{top}\n❯ {displayed}\n{bottom}\n")
+        _, accent = input_styles(self.output)
+        reset = "\x1b[0m" if accent else ""
+        lines = text.split("\n")
+        self.output.write("\n")
+        for index, line in enumerate(lines):
+            prefix = "❯ " if index == 0 else "│ "
+            self.output.write(f"{accent}{prefix}{reset}{line}\n")
+        self.output.write("\n")
         self.output.flush()
 
     async def render(self, event: InteractiveEvent) -> None:

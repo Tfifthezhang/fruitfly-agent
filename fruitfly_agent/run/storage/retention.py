@@ -66,6 +66,10 @@ def compact_candidates(workspace, store, config_path):
                                 walk(json.loads(line), evolution=evolution)
                     else:
                         walk(json.loads(path.read_text()), evolution=evolution)
+        for path in (workspace / '.fruitfly/optimization/experiments').rglob('experiment.json'):
+            if path.is_symlink():
+                return ()
+            walk(json.loads(path.read_text()))
     except (OSError, ValueError, yaml.YAMLError):
         return ()
 
@@ -86,6 +90,30 @@ def compact_candidates(workspace, store, config_path):
         if record.candidate_id in keep:
             references.update((record.artifact_id, record.parent_target_reference))
             walk(dict(record.evidence))
+    # Version manifests and candidates reference other immutable artifacts.
+    # Follow that graph before collecting obsolete prompt contents.
+    pending, visited = list(references), set()
+    try:
+        while pending:
+            reference = pending.pop()
+            if reference in visited or not _HASH.fullmatch(reference):
+                continue
+            visited.add(reference)
+            if len(visited) > 4096:
+                return ()
+            path = store.artifacts.root / reference.removeprefix('sha256:')
+            if not path.exists() and not path.is_symlink():
+                continue  # Task/trace hashes are identities, not stored artifacts.
+            body = store.artifacts.read_text(reference)
+            try:
+                value = json.loads(body)
+            except ValueError:
+                continue  # Ordinary prompt text has no structured references.
+            before = set(references)
+            walk(value)
+            pending.extend(references - before)
+    except (OSError, ValueError):
+        return ()
     for record in removed:
         store.delete(record.candidate_id)
     # Never sweep arbitrary artifacts: only text owned by obsolete records.

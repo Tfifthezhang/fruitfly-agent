@@ -18,8 +18,7 @@ HELP_TEXT = """Commands:
   /status        show model, workspace, session, and context state
   /lab           show active experimental mechanisms by category
   /config        open the model and mechanism selection menu
-  /optimize [TEXT]  open optimization, review candidates, or start a search
-  /eval          test the current setup or compare one mechanism
+  /improvement [TEXT]  iterate on a task set, save cases, or review improvements
   /resume [PATH] continue saved history using current configuration
   /cancel        cooperatively stop the active run
   /permissions clear  revoke temporary approvals\n  /trace [N]     show the latest N frontend events (default: 12)
@@ -52,9 +51,8 @@ class CommandRouter:
     ) -> None:
         self._handlers = dict(_BUILTIN_HANDLERS)
         self._handlers["config"] = _configuration_unavailable
-        self._handlers["eval"] = _evaluation_unavailable
         self._handlers["resume"] = _resume_unavailable
-        self._handlers["optimize"] = _optimization_unavailable
+        self._handlers["improvement"] = _improvement_unavailable
         if handlers is not None:
             self._handlers.update(handlers)
 
@@ -189,8 +187,8 @@ def _category_label(category: str) -> str:
     return category.replace("-", " ").replace("_", " ").title()
 
 
-def _optimization_unavailable(command: InteractiveCommand, context: CommandContext) -> CommandResult:
-    return CommandResult(text="optimization commands require the interactive application\n")
+def _improvement_unavailable(command: InteractiveCommand, context: CommandContext) -> CommandResult:
+    return CommandResult(text="the /improvement menu is unavailable in this embedded frontend\n")
 
 
 def _trace(
@@ -231,15 +229,6 @@ def _resume_unavailable(
 ) -> CommandResult:
     return CommandResult(
         text="the /resume session picker is unavailable in this embedded frontend\n"
-    )
-
-
-def _evaluation_unavailable(
-    command: InteractiveCommand,
-    context: CommandContext,
-) -> CommandResult:
-    return CommandResult(
-        text="the /eval selection menu is unavailable in this embedded frontend\n"
     )
 
 

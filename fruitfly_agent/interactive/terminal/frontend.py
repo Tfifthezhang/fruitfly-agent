@@ -17,7 +17,7 @@ from fruitfly_agent.interactive.terminal.features.assembly import bind_commands
 from fruitfly_agent.interactive.terminal.notifications import ImprovementNotifications
 
 from fruitfly_agent.interactive.contracts.configuration import ConfigurationController
-from fruitfly_agent.interactive.contracts.evaluation import EvaluationController
+from fruitfly_agent.interactive.contracts.evaluation import BenchmarkImprovementController
 from fruitfly_agent.interactive.interaction.commands import CommandRouter, parse_command
 from fruitfly_agent.interactive.terminal.io.input import LineEditor, create_line_editor, PollingLineEditor
 from fruitfly_agent.interactive.terminal.io.live import (
@@ -27,7 +27,7 @@ from fruitfly_agent.interactive.terminal.io.live import (
 )
 from fruitfly_agent.interactive.terminal.rendering.renderer import TerminalRenderer
 from fruitfly_agent.interactive.terminal.io.screen import transient_screen
-from fruitfly_agent.interactive.terminal.features.optimization.menu import TerminalOptimizationFrontend
+from fruitfly_agent.interactive.terminal.features.improvement.menu import TerminalImprovementFrontend
 
 
 class TerminalFrontend:
@@ -43,7 +43,7 @@ class TerminalFrontend:
         line_editor: LineEditor | None = None,
         command_router: CommandRouter | None = None,
         configuration: ConfigurationController | None = None,
-        evaluation: EvaluationController | None = None,
+        evaluation: BenchmarkImprovementController | None = None,
         command_handlers: Mapping[str, TerminalCommandHandler] | None = None,
         bindings: TerminalBindings | None = None,
         improvement_clients: ImprovementClients | None = None,
@@ -71,7 +71,7 @@ class TerminalFrontend:
         self._improvement_clients = improvement_clients
         self.menu_input = None
         self.menu_renderer = None
-        if (improvement_clients or ImprovementClients.from_session(session)).available:
+        if (improvement_clients or ImprovementClients.from_session(session)).available or evaluation is not None:
             from fruitfly_agent.interactive.terminal.io.menu import create_menu_input, TerminalMenuRenderer
             self.menu_input = create_menu_input(self.input, self.output, self.line_editor)
             self.menu_renderer = TerminalMenuRenderer(self.output)
@@ -82,11 +82,11 @@ class TerminalFrontend:
         self.commands = TerminalCommandRegistry()
         bind_commands(
             self.commands, bindings=self.bindings, configuration=lambda: self.configuration,
-            evaluation=evaluation, status=lambda: self.session.status, cancel=self.bindings.cancel,
+            status=lambda: self.session.status, cancel=self.bindings.cancel,
             menu_scope=self.menu_scope, input_stream=self.input, output_stream=self.output,
             line_editor=lambda: self.line_editor, write=self.renderer.write_system,
             welcome=self.renderer.show_welcome, show_history=self.show_history,
-            optimization_frontend=self.optimization_frontend if self.menu_input is not None else None,
+            improvement_frontend=self.improvement_frontend if self.menu_input is not None else None,
         )
         for name, handler in (command_handlers or {}).items():
             self.commands.register(name, handler)
@@ -330,10 +330,10 @@ class TerminalFrontend:
         finally:
             self._activate_inline_terminal()
 
-    def optimization_frontend(self) -> TerminalOptimizationFrontend:
-        return TerminalOptimizationFrontend(
+    def improvement_frontend(self) -> TerminalImprovementFrontend:
+        return TerminalImprovementFrontend(
             self.session, self.renderer, self.line_editor, self.menu_input, self.menu_renderer,
-            clients=self._improvement_clients,
+            clients=self._improvement_clients, benchmark=self.evaluation,
         )
 
     async def show_history(self) -> None:

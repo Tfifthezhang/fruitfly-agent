@@ -124,7 +124,7 @@ class TaskPackApplicationTests(unittest.IsolatedAsyncioTestCase):
                 provider.respond_text("wrong")
                 await app.submit("self-contained question")
                 editor = QueueEditor()
-                editor.send("/optimize", "3", "1", "1", "Corrections", "", "correct", "reason", confirm, "/exit")
+                editor.send("/improvement", "3", "1", "1", "Corrections", "", "correct", "reason", confirm, "q", "/exit")
                 output = io.StringIO()
                 await TerminalFrontend(app, input_stream=io.StringIO(), output_stream=output, line_editor=editor).run()
                 files = tuple(root.glob(".fruitfly/optimization/task-packs/*/pack.json"))
@@ -143,14 +143,14 @@ class TaskPackApplicationTests(unittest.IsolatedAsyncioTestCase):
             app, _, provider = await self.open_app(root, "opro")
             editor = QueueEditor()
             # The absent conventional legacy file is optional; only the managed pack is offered.
-            editor.send("/optimize improve", "1", "1", "2", "/exit")
+            editor.send("/improvement improve", "1", "1", "2", "q", "/exit")
             output = io.StringIO()
             await TerminalFrontend(app, input_stream=io.StringIO(), output_stream=output, line_editor=editor).run()
             self.assertIn("Choose task package", output.getvalue())
             self.assertIn("Project regression", output.getvalue())
             self.assertNotIn("Configured task cases", output.getvalue())
             self.assertNotIn("cases file is unavailable", output.getvalue())
-            self.assertIn("Confirm optimization", output.getvalue())
+            self.assertIn("Confirm improvement", output.getvalue())
             self.assertEqual([], provider.calls)
             self.assertEqual((), app.candidates())
 
@@ -213,7 +213,7 @@ class TaskPackApplicationTests(unittest.IsolatedAsyncioTestCase):
             keys = iter((b"\r", b"\r", b"\x1b[A", b"\r"))
             frontend.menu_input = SimpleNamespace(read_event=lambda: RawTerminalMenuInput.decode(next(keys)))
             frontend.menu_renderer.ansi = True
-            await frontend.optimization_frontend().save_correction()
+            await frontend.improvement_frontend().save_correction()
             files = list(root.glob(".fruitfly/optimization/task-packs/*/pack.json"))
             self.assertEqual(1, len(files))
             self.assertEqual("answer", load_pack(root, files[0]).material["train"][0]["expected"])
@@ -236,7 +236,7 @@ class TaskPackApplicationTests(unittest.IsolatedAsyncioTestCase):
             calls = []
             app._handle.optimization.optimization_preview = lambda *args, **kwargs: calls.append(kwargs) or source.optimization_preview(*args, pack_id="project", direction=kwargs["direction"])
             editor = QueueEditor()
-            editor.send("/optimize improve", "1", "2", "/exit")
+            editor.send("/improvement improve", "1", "2", "q", "/exit")
             output = io.StringIO()
             await TerminalFrontend(app, input_stream=io.StringIO(), output_stream=output, line_editor=editor).run()
             self.assertEqual(1, len(calls))

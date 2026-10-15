@@ -335,6 +335,7 @@ class FrozenTaskSuite:
     execution_id: str = "normalized-exact-v1"
     evaluation_policy: object = None
     material_files: tuple[tuple[str, str], ...] = ()
+    case_ids: tuple[tuple[str, str], ...] = ()
 
 
 class TaskSource(Protocol):
@@ -485,7 +486,8 @@ class TaskPackCatalog:
         return FrozenTaskSuite(tuple(TaskCase(**c) for c in projection["train"]),
             tuple(TaskCase(**c) for c in projection["validation"]), digest(encoded(projection)),
             pack_id, payload["name"], identity, target_id, payload["objective"]["policy_id"],
-            tuple((c["id"], encoded(c.get("source", {})).decode("utf-8")) for p in ("train", "validation") for c in _partition(payload, p)), policy.execution_id, policy, loaded.file_hashes)
+            tuple((c["id"], encoded(c.get("source", {})).decode("utf-8")) for p in ("train", "validation") for c in _partition(payload, p)), policy.execution_id, policy, loaded.file_hashes,
+            tuple((policy.project(c).case_id, c["id"]) for p in ("train", "validation") for c in _partition(payload, p)))
 
     def holdout(self, pack_id: str) -> tuple[TaskCase, ...]:
         if pack_id == LEGACY_PACK_ID:

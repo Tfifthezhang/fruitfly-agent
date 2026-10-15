@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import re
 from typing import Any, Callable, Mapping, Protocol
 
 
@@ -15,13 +16,24 @@ class BenchmarkVariant:
     variant_id: str
     label: str
     description: str
+    task_names: tuple[str, ...] = ()
 
-    def to_dict(self) -> dict[str, str]:
-        return {
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "task_names", tuple(self.task_names))
+        if (any(not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_./-]*", name)
+                or ".." in name for name in self.task_names)
+                or len(set(self.task_names)) != len(self.task_names)):
+            raise ValueError("variant task names must be distinct exact registry names")
+
+    def to_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
             "id": self.variant_id,
             "label": self.label,
             "description": self.description,
         }
+        if self.task_names:
+            result["task_names"] = list(self.task_names)
+        return result
 
 
 @dataclass(frozen=True)

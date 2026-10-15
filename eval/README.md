@@ -19,7 +19,7 @@ docker compose version
 |---|---|
 | Benchmarks | Terminal-Bench 2.0, SWE-bench Verified |
 | Backend | Local Docker through Harbor |
-| Variants | Fixed single-task `smoke`, full `no_gpu`, full `gpu` |
+| Variants | Fixed single-task `smoke`, Terminal-Bench five-task `starter`, full `no_gpu`, full `gpu` |
 | Formats | Request, runner result, trial, and report schema 2 |
 | Output | `.fruitfly/eval/<evaluation-id>/` |
 
@@ -27,7 +27,7 @@ Preflight checks executable/Engine/Compose availability. It does not prove image
 
 ## Run and read reports
 
-Use `/eval` in an idle Agent session, select a benchmark and resource variant, and confirm **Run**. It uses the selected saved configuration and creates independent task sessions. See the [developer guide](DEVELOPER_GUIDE.md) for request examples, logs, and adapter development.
+Use the Eval CLI to run a selected saved configuration and create independent task sessions. Use `/improvement → Start improvement → Benchmark tasks` for iterative improvement against a bounded original task set. See the [developer guide](DEVELOPER_GUIDE.md) for request examples, logs, and adapter development.
 
 | Command | Purpose |
 |---|---|
@@ -37,7 +37,9 @@ Use `/eval` in an idle Agent session, select a benchmark and resource variant, a
 
 Reports include the selected configuration, execution settings, scores, available usage/cost/latency, errors, and artifact paths. Task records include actual runtime manifests when Harbor supplies them. Missing measurements remain unknown. `completed` means report generation finished; inspect task outcomes. A smoke run does not establish general capability.
 
-Requests reject unsupported experiment fields. Stored JSON and Markdown reports are read directly without regeneration. Eval has no controlled-comparison or frozen-plan workflow.
+For a small standalone evaluation, set the Terminal-Bench request variant to `starter`. The improvement menu also offers **Terminal-Bench → Starter batch · 5 CPU tasks**. See [public task formats and selected tasks](benchmarks/TASKS.md). The interactive starter uses one attempt and concurrency one, with a four-hour whole-job deadline.
+
+Requests reject unsupported experiment fields. Stored JSON and Markdown reports are read directly without regeneration. Run and Lab own controlled improvement experiments; Eval supplies an optional official-task executor and evidence export.
 
 ## Select installation material
 
@@ -61,3 +63,13 @@ Removing Eval leaves normal interaction and Lab development intact.
 ```bash
 .venv/bin/python -m unittest discover -s tests/eval -t . -v
 ```
+
+## Export tasks for improvement
+
+[evidence.py](evidence.py) exports complete original task snapshots, canonical trajectories, official results and verifier logs under `artifacts/harbor/evidence/`. Missing task material is recorded as an export error without changing ordinary evaluation scores. Original schema-2 requests and reports remain unchanged. Evidence uses a separate schema-1 format.
+
+[trial.py](trial.py) executes one frozen original task through Harbor with an injected versioned runtime packet. The bridge installs the frozen source and invokes the generic Run Application trial host; Harbor owns the original environment and verifier. This path requires source material, Harbor, Docker and authorized model/network calls. It rejects changed task material, unsupported datasets and incomplete receipts. `python -m eval trial --request REQUEST --output-root NEW_DIRECTORY --events jsonl` consumes a Run-generated request; it is not a schema-2 evaluation request.
+
+`/improvement` can directly prepare a benchmark task set and start one explicitly confirmed improvement job, without preliminary Agent evaluation. See [Original task experiments](../fruitfly_agent/lab/optimization/experiments/README.md) for the task split, fixed versions, shared budgets, human adoption and limits.
+
+[task_sets.py](task_sets.py) supplies `prepare_task_set` and the improvement-specific bounded CPU catalog. `python -m eval prepare --benchmark terminal-bench --variant starter --task-limit 5 --output-root NEW_DIRECTORY --events jsonl` downloads and freezes official tasks without constructing an Agent or inventing feedback. This operation requires Harbor, registry/network access, and a ready task environment; runtime improvement still owns model budgets and adoption.

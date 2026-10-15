@@ -36,7 +36,7 @@ These checks make no model requests. See [Task packs](../../../fruitfly_agent/la
 |---|---|
 | 1 | Start the terminal; enable **text-optimizer → opro**, save, and start a new session. |
 | 2 | Record the active prompt hash from `/status`. |
-| 3 | `/optimize` → **Start optimization** → select the installed Python pack. |
+| 3 | `/improvement` → **Start improvement** → select the installed Python pack. |
 | 4 | Accept or edit direction; verify 8 train / 4 selection, model, budgets, and restricted execution policy. |
 | 5 | Explicitly confirm search. **Model requests may incur charges.** |
 | 6 | Review evaluation, usage, differences, text, and scope. |
@@ -52,7 +52,7 @@ For each of the 6 holdout cases, send only its input in a new empty session with
 .venv/bin/python -m fruitfly_agent.lab.optimization.verification score examples/optimization/python_functions/pack.json --case holdout-001 --answer-file /tmp/function-answer.py
 ```
 
-Compare baseline and candidate under the same model, materials, and policy. Selection scores are not independent holdout evidence. Automatic holdout execution and adoption quality gates are not implemented.
+Compare baseline and candidate under the same model, materials, and policy. Selection scores are not independent holdout evidence. The optional [automatic workflow](../../../fruitfly_agent/lab/optimization/automatic/README.md) runs holdout confirmation before publishing a candidate; ordinary search uses the manual procedure above. Adoption remains a separate human decision.
 
 | Boundary | Scope |
 |---|---|

@@ -60,7 +60,7 @@ class CodingOptimizationTests(unittest.IsolatedAsyncioTestCase):
                          "def add_one(x): return x+1", "def double(x): return x*2", '["Coding guidance"]'):
                 provider.respond_text(text)
             editor = QueueEditor()
-            editor.send("/optimize improve", "1", "1", "1")
+            editor.send("/improvement improve", "1", "1", "1")
             output = io.StringIO()
             frontend = TerminalFrontend(app, input_stream=io.StringIO(), output_stream=output, line_editor=editor)
             running = asyncio.create_task(frontend.run())
@@ -74,4 +74,4 @@ class CodingOptimizationTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(1, len(app.candidates()))
             self.assertIn("Code execution", output.getvalue())
             self.assertIn("python-function-tests-v1", output.getvalue())
-            self.assertIn("Optimization submitted", output.getvalue())
+            self.assertIn("Improvement submitted", output.getvalue())

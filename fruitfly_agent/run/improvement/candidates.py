@@ -16,7 +16,7 @@ from fruitfly_agent.run.configuration.operations import BindingEditor
 class RunCandidates:
     def __init__(self, *, workspace, store, artifacts, scope, profile, resolved_profile,
                  configuration: Callable[[], BindingEditor], active_manifest, active_profile, target, pinned_bindings,
-                 prepare_runtime, reload_configuration):
+                 prepare_runtime, reload_configuration, version_guard=None, activation_guard=None):
         self.workspace = workspace
         self.store = store
         self.artifacts = artifacts
@@ -30,6 +30,12 @@ class RunCandidates:
         self.pinned_bindings = dict(pinned_bindings)
         self.prepare_runtime = prepare_runtime
         self.reload_configuration = reload_configuration
+        self.version_guard = version_guard
+        self.activation_guard = activation_guard
+
+    def check_version(self, record):
+        if self.version_guard is not None:
+            self.version_guard(record)
 
     def reconcile(self, manifest, targets):
         """Reconcile saved intent only after a fresh runtime actually activates."""
@@ -45,6 +51,8 @@ class RunCandidates:
                 target = targets.get(candidate.target)
                 if target is not None and candidate.status == "selected_for_next_session":
                     if candidate.artifact_id == target.snapshot().content_hash:
+                        if self.activation_guard is not None:
+                            self.activation_guard(candidate, manifest.to_dict())
                         self.store.update(candidate.candidate_id, status="adopted",
                                           activated_manifest_digest=manifest.digest)
             self.compact_candidates()
@@ -95,6 +103,7 @@ class RunCandidates:
             return self.store.update(candidate_id, status=status)
         if action != "adopt":
             raise ValueError("candidate action must be review, defer, reject or adopt")
+        self.check_version(record)
         manifest = self.active_manifest()
         if manifest is None or active_manifest.get("digest") != manifest.digest:
             raise RuntimeError("active runtime changed before candidate adoption")
@@ -139,6 +148,7 @@ class RunCandidates:
         """Validate one candidate against the exact active parent and binding."""
         record = self.store.read(candidate_id)
         self.check_scope(record)
+        self.check_version(record)
         if record.status not in {"proposed", "reviewed", "deferred", "selected_for_next_session"}:
             raise ValueError("candidate is no longer adoptable")
         if self.active_manifest() is None or active_manifest.get("digest") != self.active_manifest().digest or record.parent_manifest_digest != active_manifest.get("digest"):
@@ -172,6 +182,9 @@ class RunCandidates:
         handle = await self.prepare_runtime(profile)
         def activate():
             # Recheck after potentially asynchronous startup, before persistence.
+            self.check_version(record)
+            if self.activation_guard is not None:
+                self.activation_guard(record, handle.manifest)
             current_profile = self.resolved_profile()
             valid_current = current_profile == self.profile() and not self.configuration().changed
             valid_saved = record.status == "selected_for_next_session" and current_profile == self._saved_candidate_profile(record)

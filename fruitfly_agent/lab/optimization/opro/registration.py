@@ -43,6 +43,7 @@ def definition() -> MechanismDefinition:
         ),
         _install,
         implementation_id=OproOptimizer.spec.implementation_id,
+        provides=frozenset({"text-optimizer"}),
         selection_group="text-optimizer",
         selection_group_label="Text optimizer",
     )

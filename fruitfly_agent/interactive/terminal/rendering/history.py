@@ -11,6 +11,8 @@ def render_history_message(
     message: ConversationMessage, *, columns: int, terminal_ui: bool, color: bool,
 ) -> str:
     label = {"user": "You", "assistant": "FruitFlyAgent", "tool": "Tool"}[message.role]
+    if message.role == "user" and color:
+        label = f"\x1b[1m{label}\x1b[0m"
     if message.role == "tool":
         label += f" · {safe_terminal_text(message.tool_name)}"
         if message.is_error:

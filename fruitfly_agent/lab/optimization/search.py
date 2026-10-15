@@ -163,6 +163,12 @@ class SearchServices(Protocol):
     async def agent(self, role: str, system: str, prompt: str, *, files: dict[str, str], output_path: str) -> str: ...
 
 
+class CandidateObserver(Protocol):
+    """Optional strategy callback; true stops generation without granting adoption."""
+    async def candidate_evaluated(self, text: str, training: Evaluation,
+                                  selection: Evaluation) -> bool: ...
+
+
 class Optimizer(Protocol):
     spec: AlgorithmSpec
     supported_schemas: frozenset[str]

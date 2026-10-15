@@ -317,7 +317,7 @@ class StartupVersionsTests(unittest.IsolatedAsyncioTestCase):
         frontend.menu_input=SimpleNamespace(read_event=lambda:RawTerminalMenuInput.decode(next(sequence)))
         frontend.menu_renderer=TerminalMenuRenderer(output)
         frontend.menu_renderer.ansi=True
-        await frontend.optimization_frontend().candidate_detail('candidate-1')
+        await frontend.improvement_frontend().candidate_detail('candidate-1')
         self.assertIn('Original text (2/3)',output.getvalue())
         self.assertIn('Candidate text (1/1)',output.getvalue())
         frames=[f for f in output.getvalue().split('\x1b[2J\x1b[H') if f.startswith('Candidate candidate-')]

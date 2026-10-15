@@ -2,7 +2,9 @@
 
 [Up: Examples](../README.md)
 
-Task packs for the normal `/optimize` workflow. They are manually authored demonstrations, not formal benchmarks or measured improvement claims.
+The [offline automatic workflow](automatic_text/README.md) demonstrates model-generated learning material, original-task comparison, independent confirmation and explicit human adoption with a scripted Provider.
+
+Task packs for the normal `/improvement` workflow. They are manually authored demonstrations, not formal benchmarks or measured improvement claims.
 
 | Pack | Scoring | Search / independent cases |
 |---|---|---|

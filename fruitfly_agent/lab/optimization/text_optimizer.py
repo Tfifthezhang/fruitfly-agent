@@ -5,6 +5,8 @@ import math
 import re
 from fruitfly_agent.lab.algorithms.targets import validate_text
 from .reporting import SearchReport, TokenUsage, restore_search_report
+from .contracts import BenchmarkContext, ExperimentOptimizer
+from .experiments.models import TaskReference, TaskRunEvidence, EvidenceArtifact, ExperimentTasks
 
 TEXT_OPTIMIZER_COMPONENT = 'text-optimizer'
 TEXT_OPTIMIZATION_TARGET_COMPONENT = 'optimization-target-id'

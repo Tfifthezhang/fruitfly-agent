@@ -23,6 +23,25 @@ def colors_enabled(stream: TextIO) -> bool:
     return supports_ansi(stream) and "NO_COLOR" not in os.environ
 
 
+def input_styles(stream: TextIO) -> tuple[str, str]:
+    """Return a neutral input surface, retaining the terminal foreground."""
+    if not colors_enabled(stream):
+        return "", ""
+    # COLORFGBG is a palette hint, not an exact background measurement.
+    # Use the last field: some terminals include an intermediate default field.
+    background = os.environ.get("COLORFGBG", "").split(";")[-1]
+    light = background in {"7", "15"}
+    term = os.environ.get("TERM", "").lower()
+    if os.environ.get("COLORTERM", "").lower() in {"truecolor", "24bit"}:
+        gray = 242 if light else 48
+        fill = f"\x1b[48;2;{gray};{gray};{gray};39m"
+    elif "256color" in term:
+        fill = f"\x1b[48;5;{255 if light else 236};39m"
+    else:
+        fill = f"\x1b[{47 if light else 100};39m"
+    return fill, "\x1b[1m"
+
+
 def terminal_columns(stream: TextIO, *, fallback: int = 80) -> int:
     try:
         columns = os.get_terminal_size(stream.fileno()).columns
@@ -73,6 +92,7 @@ __all__ = [
     "cell_width",
     "colors_enabled",
     "is_tty",
+    "input_styles",
     "pad_cells",
     "supports_ansi",
     "terminal_columns",

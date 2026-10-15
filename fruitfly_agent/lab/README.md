@@ -30,6 +30,8 @@ Optimization can run independently. Human adoption of a prompt is not a complete
 
 Independent optimization methods live in their own packages under `optimization/`, with shared hosting and trial services outside those packages. Methods remain Lab algorithms. Object adapters stay with the modules that define the objects; see [Optimization methods](optimization/README.md#optimization-methods).
 
+[Automatic text search](optimization/automatic/README.md) can prepare learning material with an independently selected [failure processor](optimization/failure_processing/README.md), compare text candidates on fixed original tasks, and confirm once on holdout. It stops for human adoption and does not collect weak-feedback daily tasks or modify the improver.
+
 ## Develop an algorithm
 
 Start with the complete offline example:
