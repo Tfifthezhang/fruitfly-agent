@@ -1,4 +1,4 @@
-"""Fixed base prompt as a named text optimization target."""
+"""Fixed base prompt as a named text improvement target."""
 from dataclasses import replace
 from fruitfly_agent.lab.algorithms.targets import TargetBinding, TargetSnapshot, validate_text
 

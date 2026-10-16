@@ -1,4 +1,4 @@
-"""Public optimization contracts, native execution and multi-strategy regression."""
+"""Public improvement contracts, native execution and multi-strategy regression."""
 import asyncio
 from dataclasses import replace
 from pathlib import Path
@@ -9,12 +9,12 @@ import unittest
 from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.core.data_model import AssistantMessage, ToolCallBlock, TextBlock, Usage
 from fruitfly_agent.lab.base_prompt.target import BasePromptTarget
-from fruitfly_agent.lab.optimization.search import (
-    TaskCase, OptimizationProblem, ObjectivePolicy, TrialObservation, content_id,
+from fruitfly_agent.lab.improvement.contracts.search import (
+    TaskCase, ImprovementProblem, ObjectivePolicy, TrialObservation, content_id,
 )
-from fruitfly_agent.lab.optimization.services import NativeSearchServices, SearchBudget, SearchJournal, BudgetExhausted
-from fruitfly_agent.lab.optimization.opro import OproOptimizer
-from fruitfly_agent.lab.optimization.host import HostedTextOptimizer
+from fruitfly_agent.lab.improvement.runtime.services import NativeSearchServices, SearchBudget, SearchJournal, BudgetExhausted
+from fruitfly_agent.lab.improvement.methods.opro import OproImprover
+from fruitfly_agent.lab.improvement.runtime.host import HostedTextImprover
 from fruitfly_agent.lab.algorithms import Algorithm, AlgorithmSpec
 from tests.support.faux_provider import FauxProvider
 from tests.support.search import problem, services, tool_calls, engineer
@@ -90,7 +90,7 @@ class SearchContractTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_new_model_free_strategy_uses_frozen_host_problem_and_shared_history(self):
         from tests.support.materials import _write_cases
-        from fruitfly_agent.lab.optimization.search import SearchCandidate, SearchResult
+        from fruitfly_agent.lab.improvement.contracts.search import SearchCandidate, SearchResult
         class Enumerate(Algorithm):
             spec = AlgorithmSpec("enumerate", "enumerate-v1")
             supported_schemas = frozenset({"text-v1"})
@@ -108,9 +108,9 @@ class SearchContractTests(unittest.IsolatedAsyncioTestCase):
             root = Path(tmp)
             _write_cases(root)
             provider, strategy = FauxProvider(), Enumerate()
-            parameters = {"target": "base_prompt", "cases_path": ".fruitfly/optimization/cases.json",
+            parameters = {"target": "base_prompt", "cases_path": ".fruitfly/improvement/cases.json",
                           "max_metric_calls": 4, "max_model_calls": 1, "call_timeout_seconds": 1, "output_max_tokens": 128}
-            host = HostedTextOptimizer(strategy, AgentLoopConfig(provider=provider), root, parameters,
+            host = HostedTextImprover(strategy, AgentLoopConfig(provider=provider), root, parameters,
                 target=BasePromptTarget("seed"), label="Enumerate", services_factory=DeterministicServices)
             host.preview()
             (root / parameters["cases_path"]).write_text("corrupt changed file")
@@ -127,7 +127,7 @@ class SearchContractTests(unittest.IsolatedAsyncioTestCase):
             rows = [json.loads(line) for line in history.read_text().splitlines()]
             self.assertEqual(rows[-1]["usage"], {"model": 0, "trial": 2})
             with self.assertRaisesRegex(ValueError, "unavailable"):
-                HostedTextOptimizer(OproOptimizer(), AgentLoopConfig(provider=provider), root, parameters,
+                HostedTextImprover(OproImprover(), AgentLoopConfig(provider=provider), root, parameters,
                     target=BasePromptTarget("seed"), label="OPRO", services_factory=DeterministicServices)
             _write_cases(root)
             class FlakyServices(DeterministicServices):
@@ -137,7 +137,7 @@ class SearchContractTests(unittest.IsolatedAsyncioTestCase):
                     if self.attempts == 1:
                         raise ValueError("service construction failed")
                     super().__init__(*args, **kwargs)
-            host = HostedTextOptimizer(strategy, AgentLoopConfig(provider=provider), root, parameters,
+            host = HostedTextImprover(strategy, AgentLoopConfig(provider=provider), root, parameters,
                 target=BasePromptTarget("seed"), label="Enumerate", services_factory=FlakyServices)
             with self.assertRaisesRegex(ValueError, "construction failed"):
                 await host.search("seed", "improve", parent_manifest="frozen-parent")
@@ -169,7 +169,7 @@ class SearchContractTests(unittest.IsolatedAsyncioTestCase):
         from fruitfly_agent.core.model_stream import AssistantMessageEventStream
         provider.script.append(lambda *_args, **_kwargs: AssistantMessageEventStream(blocked_events()))
         s = services(provider)
-        task = asyncio.create_task(s.complete("optimizer", "s", "p"))
+        task = asyncio.create_task(s.complete("improver", "s", "p"))
         await entered.wait()
         task.cancel()
         with self.assertRaises(asyncio.CancelledError):
@@ -199,12 +199,12 @@ class SearchContractTests(unittest.IsolatedAsyncioTestCase):
             provider.respond_text(text)
         p = problem(policy=ObjectivePolicy("loss-v1", "loss", "min"))
         s = services(provider, p=p, scorer=lambda output, _case: float(output))
-        result = await OproOptimizer().search(p, s)
+        result = await OproImprover().search(p, s)
         self.assertEqual([c.text for c in result.candidates], ["better", "worse"])
         self.assertEqual(result.seed_score, 2)
         first_proposal = provider.calls[2]
         self.assertEqual(first_proposal["system_prompt"],
-                         "Optimize the declared text target using historical solutions and their measured objective values. "
+                         "Improve the declared text target using historical solutions and their measured objective values. "
                          "Return only a JSON array of new candidate strings, no Markdown.")
         self.assertEqual(json.loads(first_proposal["messages"][0].content), {
             "direction": "improve",
@@ -226,7 +226,7 @@ class SearchContractTests(unittest.IsolatedAsyncioTestCase):
         for text in ("wrong", "wrong", "not JSON", '["candidate"]', "A", "B"):
             provider.respond_text(text)
         s = services(provider, model_calls=5)
-        result = await OproOptimizer().search(s.problem, s)
+        result = await OproImprover().search(s.problem, s)
         self.assertEqual(result.stop_reason, "budget_exhausted")
         self.assertEqual(result.candidates, ())  # no complete selection receipt
         self.assertEqual(len(provider.calls), 5)

@@ -5,7 +5,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from fruitfly_agent.lab.optimization.task_packs import (
+from fruitfly_agent.lab.improvement.tasks import (
     TaskPackCatalog, TaskPackRegistration, TaskSnapshotStore, validate_pack, LEGACY_PACK_ID,
     package_documents, load_pack,
 )
@@ -243,7 +243,7 @@ class TaskPackageTests(unittest.TestCase):
             store.freeze({"tasks": ["one"]})
 
     def test_optional_default_legacy_source_is_absent_from_package_choices(self):
-        for path in (".fruitfly/optimization/cases.json", str(self.root / ".fruitfly/optimization/cases.json")):
+        for path in (".fruitfly/improvement/cases.json", str(self.root / ".fruitfly/improvement/cases.json")):
             catalog = TaskPackCatalog(self.root, legacy_path=path)
             with self.subTest(path=path):
                 self.assertEqual(["project"], [s.pack_id for s in catalog.summaries("base_prompt")])
@@ -251,7 +251,7 @@ class TaskPackageTests(unittest.TestCase):
         # Explicit custom paths and broken existing files must retain actionable errors.
         custom = TaskPackCatalog(self.root, legacy_path="my-missing-cases.json")
         self.assertTrue(next(s for s in custom.summaries() if s.pack_id == LEGACY_PACK_ID).error)
-        source = self.root / ".fruitfly/optimization/cases.json"
+        source = self.root / ".fruitfly/improvement/cases.json"
         source.write_text("broken json")
         default = TaskPackCatalog(self.root, legacy_path=str(source))
         self.assertTrue(next(s for s in default.summaries() if s.pack_id == LEGACY_PACK_ID).error)

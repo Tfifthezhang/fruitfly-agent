@@ -1,4 +1,4 @@
-"""Run-owned durable human-review inbox for text optimizer proposals."""
+"""Run-owned durable human-review inbox for text improver proposals."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from typing import Any, Mapping
 
 
 from fruitfly_agent.run.storage.artifacts import DataArtifactStore
-from fruitfly_agent.lab.optimization.text_optimizer import SearchReport
+from fruitfly_agent.lab.improvement.api import SearchReport
 
 
 _CANDIDATE_ID = re.compile(r"^[0-9a-f]{32}$")
@@ -52,14 +52,17 @@ class CandidateRecord:
     task_pack_id: str = ""
     task_pack_name: str = ""
     task_pack_hash: str = ""
+    role: str = "H"
 
     def __post_init__(self) -> None:
+        if self.role not in {'H', 'S', 'I'}:
+            raise ValueError('candidate role must be H, S or I')
         if any(not isinstance(v, str) for v in (self.task_pack_id, self.task_pack_name, self.task_pack_hash)):
             raise ValueError('candidate task attribution must be text')
         if not _CANDIDATE_ID.fullmatch(self.candidate_id):
-            raise ValueError("invalid Optimization candidate id")
+            raise ValueError("invalid Improvement candidate id")
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", self.algorithm) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", self.target):
-            raise ValueError("unsupported optimization candidate")
+            raise ValueError("unsupported improvement candidate")
         if self.binding_kind not in {"prompt", "artifact"} or (self.binding_kind == "artifact" and not self.binding_key):
             raise ValueError("invalid candidate binding")
         if not isinstance(self.metric_calls, int) or isinstance(self.metric_calls, bool) or self.metric_calls < 0:
@@ -68,7 +71,7 @@ class CandidateRecord:
             raise ValueError("candidate evidence must contain text label/value pairs")
         object.__setattr__(self, "evidence", tuple(tuple(pair) for pair in self.evidence))
         if self.status not in _STATUSES:
-            raise ValueError("invalid Optimization candidate status")
+            raise ValueError("invalid Improvement candidate status")
         if not isinstance(self.config_path, str) or not isinstance(self.profile_id, str) or bool(self.config_path) != bool(self.profile_id):
             raise ValueError('candidate configuration/profile scope must be paired text')
         if self.report is not None:
@@ -107,6 +110,7 @@ class CandidateStore:
             candidate_id=uuid.uuid4().hex,
             algorithm=algorithm,
             target=snapshot.target_id,
+            role=snapshot.role,
             parent_manifest_digest=str(parent_manifest["digest"]),
             parent_target_reference=parent_artifact.artifact_id,
             parent_target_hash=snapshot.content_hash,
@@ -220,6 +224,6 @@ class CandidateStore:
 
 def validate_candidate_text(text: str) -> None:
     if not isinstance(text, str) or not text.strip() or len(text) > 30_000:
-        raise ValueError("Optimization candidate text must contain 1–30,000 characters")
+        raise ValueError("Improvement candidate text must contain 1–30,000 characters")
     if any(ord(char) < 32 and char not in "\n\t" for char in text):
-        raise ValueError("Optimization candidate text contains control characters")
+        raise ValueError("Improvement candidate text contains control characters")

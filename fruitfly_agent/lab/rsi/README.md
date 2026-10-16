@@ -4,16 +4,16 @@
 
 Coordinate proposal, independent verification, adoption, and continued improvement across versions. The host supplies capabilities and binds versions to actual implementations.
 
-## Relationship to Optimization
+## Relationship to Improvement
 
 | Layer | Question | Authority |
 |---|---|---|
 | Target module | What changes, and how does it run? | Defines snapshots and valid changes. |
-| [Optimization](../optimization/README.md) | How are better candidates found? | Searches and reports evidence. |
+| [Improvement](../improvement/README.md) | How are better candidates found? | Searches and reports evidence. |
 | RSI driver | Which verified version runs next? | Coordinates an injected host and adoption policy. |
 | [Run](../../run/README.md) / Application | How is a candidate stored and activated? | Persists identity and safely switches runtimes. |
 
-Optimization does not require RSI. Human adoption alone is not a complete RSI loop. A self-improvement process targets its own harness or improver and uses the adopted version in subsequent generations.
+Improvement does not require RSI. Human adoption alone is not a complete RSI loop. A self-improvement process targets its own harness or improver and uses the adopted version in subsequent generations.
 
 ## Drivers
 

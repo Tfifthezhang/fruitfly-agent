@@ -6,12 +6,14 @@ import asyncio
 from collections import deque
 import copy
 import math
+from uuid import uuid4
 from dataclasses import replace
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Mapping
 
-from fruitfly_agent.core.data_model import AgentLoopResult
+from fruitfly_agent.core.data_model import AgentLoopResult, AssistantMessage, UserMessage
+from fruitfly_agent.interactive.contracts.learning import CompletedTask
 
 from fruitfly_agent.interactive.contracts.configuration import ConfigurationController
 from fruitfly_agent.interactive.contracts.events import EventSink
@@ -22,14 +24,14 @@ from fruitfly_agent.interactive.contracts.models import (
     ResumableSession,
 )
 from fruitfly_agent.interactive.contracts.runtime import RuntimeFactory, RuntimeHandle
-from fruitfly_agent.interactive.contracts.optimization import (
-    OptimizationService,
-    OptimizationPreview,
-    OptimizationProgress,
+from fruitfly_agent.interactive.contracts.improvement import (
+    ImprovementService,
+    ImprovementPreview,
+    ImprovementProgress,
 )
 from fruitfly_agent.interactive.contracts.candidates import CandidateView, CandidateService
 from fruitfly_agent.interactive.contracts.task_packs import TaskPackService
-from fruitfly_agent.interactive.application.jobs import OptimizationJob
+from fruitfly_agent.interactive.application.jobs import ImprovementJob
 from fruitfly_agent.interactive.session.materials import TaskMaterials
 
 
@@ -37,7 +39,7 @@ class ApplicationState(StrEnum):
     STARTING = "starting"
     IDLE = "idle"
     RUNNING = "running"
-    OPTIMIZING = "optimizing"
+    IMPROVING = "improving"
     REBUILDING = "rebuilding"
     RESUMING = "resuming"
     CLOSING = "closing"
@@ -62,7 +64,8 @@ class AgentApplication:
         self._authorization_handler = None
         self._last_result: AgentLoopResult | None = None
         self._last_error: BaseException | None = None
-        self._optimization_job = OptimizationJob()
+        self._learning_task: asyncio.Task[bool] | None = None
+        self._improvement_job = ImprovementJob()
         self._materials = TaskMaterials(
             service=self._task_pack_service,
             items=lambda: self._require_handle().session.canonical_items(),
@@ -202,6 +205,26 @@ class AgentApplication:
             try:
                 result = await self._require_handle().session.submit(prompt)
                 self._last_result = result
+                learning = getattr(self._require_handle(), 'learning', None)
+                if learning is not None:
+                    start = max((i for i, m in enumerate(result.messages) if isinstance(m, UserMessage)), default=-1)
+                    output = '\n'.join(m.text for m in result.messages[start + 1:] if isinstance(m, AssistantMessage))
+                    items = self._require_handle().session.canonical_items()
+                    message_id = next((item.id for item in reversed(items) if isinstance(item.message, UserMessage)), uuid4().hex)
+                    task = CompletedTask(self.status.session_path + '#' + message_id, prompt, output, result.stop_reason,
+                                         str(self.runtime_manifest.get('digest', '')), self.status.session_path)
+                    try:
+                        self._learning_task = asyncio.create_task(learning.observe(task))
+                        await self._learning_task
+                    except asyncio.CancelledError:
+                        current = asyncio.current_task()
+                        if current is not None and current.cancelling():
+                            raise
+                        self._last_error = RuntimeError('learning material collection cancelled')
+                    except Exception as exc:
+                        self._last_error = exc
+                    finally:
+                        self._learning_task = None
                 return result
             finally:
                 if self._state == ApplicationState.RUNNING:
@@ -223,14 +246,17 @@ class AgentApplication:
     def cancel(self) -> bool:
         had_pending = bool(self._pending)
         self._pending.clear()
-        if self._state == ApplicationState.OPTIMIZING:
-            return self._optimization_job.cancel()
+        if self._learning_task is not None and not self._learning_task.done():
+            self._learning_task.cancel()
+            return True
+        if self._state == ApplicationState.IMPROVING:
+            return self._improvement_job.cancel()
         return self._require_handle().session.cancel() or had_pending
 
-    def _optimization_service(self) -> OptimizationService:
-        service = self._require_handle().optimization
+    def _improvement_service(self) -> ImprovementService:
+        service = self._require_handle().improvement
         if service is None:
-            raise RuntimeError("this runtime has no optimization service")
+            raise RuntimeError("this runtime has no improvement service")
         return service
 
     @property
@@ -257,46 +283,57 @@ class AgentApplication:
             raise RuntimeError("finish active work before saving a task")
         return self._materials.save(task_id, pack_id, input, expected, **options)
 
-    def optimization_preview(self, *, pack_id=None, direction="") -> OptimizationPreview:
+    def improvement_preview(self, *, pack_id=None, direction="", method_id=None, target_id=None, parameters=None) -> ImprovementPreview:
         if self._state != ApplicationState.IDLE or self._pending:
-            raise RuntimeError("finish active work before starting optimization")
-        return self._optimization_service().optimization_preview(self.runtime_manifest, pack_id=pack_id, direction=direction)
+            raise RuntimeError("finish active work before starting improvement")
+        selection = {} if method_id is None and target_id is None and parameters is None else {
+            'method_id': method_id, 'target_id': target_id, 'parameters': parameters}
+        return self._improvement_service().improvement_preview(self.runtime_manifest, pack_id=pack_id,
+            direction=direction, **selection)
 
-    def start_optimization(self, direction: str, *, preview_token="") -> asyncio.Task[tuple[CandidateView, ...]]:
+    def improvement_methods(self, role, target_id):
+        query = getattr(self._improvement_service(), 'improvement_methods', None)
+        return query(role, target_id) if query is not None else ()
+
+    def improvement_targets(self):
+        query = getattr(self._improvement_service(), 'improvement_targets', None)
+        return query() if query is not None else ()
+
+    def start_improvement(self, direction: str, *, preview_token="") -> asyncio.Task[tuple[CandidateView, ...]]:
         """Own confirmed work while allowing the frontend to continue reading input."""
         if self._state != ApplicationState.IDLE or self._pending:
-            raise RuntimeError("finish active work before starting optimization")
-        service = self._optimization_service()
+            raise RuntimeError("finish active work before starting improvement")
+        service = self._improvement_service()
         manifest = self.runtime_manifest
-        self._state = ApplicationState.OPTIMIZING
+        self._state = ApplicationState.IMPROVING
         self._last_error = None
         async def execute(operation):
             try:
                 async with self._submission_lock:
                     return await operation()
             finally:
-                if self._state == ApplicationState.OPTIMIZING:
+                if self._state == ApplicationState.IMPROVING:
                     self._state = ApplicationState.IDLE
 
         def finished(error):
-            if self._state == ApplicationState.OPTIMIZING:
+            if self._state == ApplicationState.IMPROVING:
                 self._state = ApplicationState.IDLE
             self._last_error = error
 
-        return self._optimization_job.start(
+        return self._improvement_job.start(
             service, manifest, direction, preview_token=preview_token,
             execute=execute, finished=finished,
         )
 
-    async def optimize(self, direction: str, *, preview_token="") -> tuple[CandidateView, ...]:
-        return await self.start_optimization(direction, preview_token=preview_token)
+    async def improve(self, direction: str, *, preview_token="") -> tuple[CandidateView, ...]:
+        return await self.start_improvement(direction, preview_token=preview_token)
 
     @property
-    def optimization_progress(self) -> OptimizationProgress:
-        return self._optimization_job.progress
+    def improvement_progress(self) -> ImprovementProgress:
+        return self._improvement_job.progress
 
-    async def wait_for_optimization(self) -> None:
-        await self._optimization_job.wait()
+    async def wait_for_improvement(self) -> None:
+        await self._improvement_job.wait()
 
     def _candidate_service(self) -> CandidateService:
         service = self._require_handle().candidates
@@ -369,7 +406,7 @@ class AgentApplication:
         """Bound retirement waits without closing a still-active handle."""
         try:
             async with asyncio.timeout(self._shutdown_timeout):
-                await self.wait_for_optimization()
+                await self.wait_for_improvement()
                 await self.wait_until_idle()
                 async with self._submission_lock:
                     pass
@@ -383,8 +420,8 @@ class AgentApplication:
 
         if self._handle is None:
             raise RuntimeError("application is not started")
-        if self._state == ApplicationState.OPTIMIZING:
-            raise RuntimeError("cancel or finish optimization before rebuilding")
+        if self._state == ApplicationState.IMPROVING:
+            raise RuntimeError("cancel or finish improvement before rebuilding")
         self._state = ApplicationState.REBUILDING
         self._pending.clear()
         self.cancel()
@@ -509,7 +546,7 @@ class AgentApplication:
     async def close(self) -> None:
         if self._state == ApplicationState.CLOSED and self._handle is None:
             return
-        if self._state == ApplicationState.OPTIMIZING:
+        if self._state == ApplicationState.IMPROVING:
             self.cancel()
         self._state = ApplicationState.CLOSING
         self._pending.clear()

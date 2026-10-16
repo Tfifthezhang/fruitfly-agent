@@ -31,7 +31,7 @@ task-name/
     └── solve.sh
 ```
 
-Instructions describe the goal. Configuration declares resources and deadlines. Environment material prepares initial state. The verifier writes a numerical reward under `/logs/verifier/`. The optional reference solution validates the task and is not Agent input. Additional files and alternative environment definitions may be present. Harbor downloads selected task material when the job starts; these tasks are not converted into Optimization's small task packs.
+Instructions describe the goal. Configuration declares resources and deadlines. Environment material prepares initial state. The verifier writes a numerical reward under `/logs/verifier/`. The optional reference solution validates the task and is not Agent input. Additional files and alternative environment definitions may be present. Harbor downloads selected task material when the job starts; these tasks are not converted into Improvement's small task packs.
 
 ## Run the five-task starter
 
@@ -53,10 +53,10 @@ Interactive execution makes one attempt per task, runs one trial at a time and h
 
 ## Prepare and inspect a run
 
-Install the benchmark extra and start Docker Engine using the [environment guide](../DEVELOPER_GUIDE.md#prepare-the-environment). Enable the optimizer, failure processing and automatic workflow, save the intended model/harness configuration and start a session. Enter `/improvement`, select benchmark tasks and the starter, and confirm **Start improvement**. **Launching downloads tasks/images and makes real model requests that may incur charges.** Working container, registry and Provider connections are required.
+Install the benchmark extra and start Docker Engine using the [environment guide](../DEVELOPER_GUIDE.md#prepare-the-environment). Enable the improver, failure processing and automatic workflow, save the intended model/harness configuration and start a session. Enter `/improvement`, select benchmark tasks and the starter, and confirm **Start improvement**. **Launching downloads tasks/images and makes real model requests that may incur charges.** Working container, registry and Provider connections are required.
 
 Standalone Eval results live in `.fruitfly/eval/<evaluation-id>/`: `report.md`, `report.json`, parsed `trials/`, and Harbor artifacts with task sessions, events and setup/verifier logs. A completed report does not imply all tasks passed. Inspect infrastructure errors separately from failed tasks. See [artifact paths](../DEVELOPER_GUIDE.md#follow-execution-and-reports).
 
-This selected exercise set is not a representative benchmark score or an optimization training/holdout split. Reports are not automatically ingested by the [automatic text workflow](../../fruitfly_agent/lab/optimization/automatic/README.md). Preserve original environment and verifier identities when deriving future learning material.
+This selected exercise set is not a representative benchmark score or an improvement training/holdout split. Reports are not automatically ingested by the [automatic text workflow](../../fruitfly_agent/lab/improvement/automatic/README.md). Preserve original environment and verifier identities when deriving future learning material.
 
-Direct improvement task material lives in `.fruitfly/optimization/task-sources/`; experiments, source snapshots, search journals and reviewed candidates use the [original-task improvement layout](../../fruitfly_agent/lab/optimization/experiments/README.md#read-artifacts-and-extend-execution).
+Direct improvement task material lives in `.fruitfly/improvement/task-sources/`; experiments, source snapshots, search journals and reviewed candidates use the [original-task improvement layout](../../fruitfly_agent/lab/improvement/experiments/README.md#read-artifacts-and-extend-execution).

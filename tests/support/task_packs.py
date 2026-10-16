@@ -1,6 +1,6 @@
 """Text task-pack materials and temporary installation."""
 import json
-from fruitfly_agent.lab.optimization.task_packs import package_documents, validate_pack
+from fruitfly_agent.lab.improvement.tasks import package_documents, validate_pack
 
 
 def package():
@@ -20,7 +20,7 @@ def validate_material(payload):
 
 def install(root, payload=None):
     payload = payload or package()
-    path = root / ".fruitfly/optimization/task-packs" / payload["id"] / "pack.json"
+    path = root / ".fruitfly/improvement/task-packs" / payload["id"] / "pack.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     manifest, cases, holdout = package_documents(payload)
     path.write_text(json.dumps(manifest), encoding="utf-8")

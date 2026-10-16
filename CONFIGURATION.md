@@ -108,13 +108,13 @@ The capability page uses arrows and Space/Enter to toggle, then **Continue** to 
 | Base prompt | `assistant-default`; choose another prompt in **Configure → prompt**. | [Base prompt](fruitfly_agent/lab/base_prompt/README.md) |
 | Skill catalog | Read `.skills/`; enable in **mechanisms · context-manager → skill-catalog**. | [Skills](fruitfly_agent/lab/context_manager/augmentation/skills/README.md) |
 | Reduction | Summarizing; configure parameters in YAML. | [Reduction](fruitfly_agent/lab/context_manager/reduction/README.md) |
-| Text optimizer | Disabled; OPRO is the built-in algorithm. | [Optimization](fruitfly_agent/lab/optimization/README.md) |
-| Failure processing | Disabled; choose `failure-replay` or `failure-distillation` independently of OPRO. | [Failure processing](fruitfly_agent/lab/optimization/failure_processing/README.md) |
-| Automatic text search | Disabled; enable `automatic-text-search` with a text optimizer and one failure processor. Requires holdout; publishes confirmed improvements for human review. | [Automatic workflow and parameters](fruitfly_agent/lab/optimization/automatic/README.md) |
+| Improvement methods | Select OPRO, Tree search or DreamRSI directly in `/improvement`; no enable switch. | [Improvement](fruitfly_agent/lab/improvement/README.md) |
+| Failure processing | Optional YAML workflow dependency; benchmark jobs use failed-task replay on demand. | [Failure processing](fruitfly_agent/lab/improvement/failure_processing/README.md) |
+| Automatic text search | Benchmark jobs assemble confirmation on demand. Optional YAML `automatic-text-search` also supports saved packages with holdout; adoption requires human review. | [Automatic workflow and parameters](fruitfly_agent/lab/improvement/automatic/README.md) |
 | Programmatic context | Explicitly enable `ipython-tool` or `rlm-ipython`. | [Programmatic context](fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md) |
 | RSI | Host-injected capabilities and verification policy; no default CLI switch. | [RSI](fruitfly_agent/lab/rsi/README.md) |
 
-Menus show mechanism switches and algorithm choices. Edit `.fruitfly/config.yaml` for detailed parameters. Summaries, optimization, and auxiliary model queries may incur model charges.
+Menus show mechanism switches and algorithm choices. Edit `.fruitfly/config.yaml` for detailed parameters. Summaries, improvement, and auxiliary model queries may incur model charges.
 
 ## Information sources
 
@@ -155,12 +155,12 @@ With no initial choice, a sole catalog entry is selected automatically. Multiple
 | Data | Location / behavior |
 |---|---|
 | Sessions | `.fruitfly/sessions/`; canonical messages, context decisions, manifest, and concise run records |
-| Candidates | `.fruitfly/optimization/candidates/`; latest complete result per configuration, profile, target, and task pack |
+| Candidates | `.fruitfly/improvement/candidates/`; latest complete result per configuration, profile, target, and task pack |
 | Text contents | `.fruitfly/artifacts/`; immutable content-addressed artifacts |
-| Readable task results | `.fruitfly/optimization/task-results/<pack-id>/<config-profile-scope>/<target>/`; `latest.txt` and `latest.json` |
+| Readable task results | `.fruitfly/improvement/task-results/<pack-id>/<config-profile-scope>/<target>/`; `latest.txt` and `latest.json` |
 | Explicit evolution jobs | `.fruitfly/evolution/`; host-owned phases, policy, and activation evidence |
 
-Referenced results remain protected. Failed or cancelled searches do not replace a complete candidate. Editing a readable export does not change the runtime. See [Optimization](fruitfly_agent/lab/optimization/README.md#results-and-retention) for retention and [Run](fruitfly_agent/run/README.md#recovery) for compatibility rules.
+Referenced results remain protected. Failed or cancelled searches do not replace a complete candidate. Editing a readable export does not change the runtime. See [Improvement](fruitfly_agent/lab/improvement/README.md#results-and-retention) for retention and [Run](fruitfly_agent/run/README.md#recovery) for compatibility rules.
 
 ## Configure host permissions
 
@@ -170,4 +170,44 @@ Model setup owns credential persistence. Restricting model file tools does not d
 
 ### Configure original-task experiment limits
 
-`automatic-text-search` also accepts `external_trial_model_calls` (24), `external_trial_timeout_seconds` (1800), and `external_timeout_seconds` (14400), all positive integers. They bound each original-task model allocation, individual task deadline and whole benchmark improvement deadline. Original tasks, derived exercises, material preparation and candidate search share the optimizer root budget. Configuring these values starts no model work. See [Original task experiments](fruitfly_agent/lab/optimization/experiments/README.md).
+`automatic-text-search` also accepts `external_trial_model_calls` (24), `external_trial_timeout_seconds` (1800), and `external_timeout_seconds` (14400), all positive integers. They bound each original-task model allocation, individual task deadline and whole benchmark improvement deadline. Original tasks, derived exercises, material preparation and candidate search share the improver root budget. Configuring these values starts no model work. See [Original task experiments](fruitfly_agent/lab/improvement/experiments/README.md).
+
+## Configure daily learning material
+
+Enable **mechanisms · learning → Learning materials → task-material-recording**
+to record completed tasks without enabling an improver. Configure `trigger`
+(`task`, `session`, or `batch`), `batch_size`, `max_records`, and `max_chars` in
+YAML; see [Learning](fruitfly_agent/lab/learning/README.md). Records under
+`.fruitfly/learning/materials/` remain pending until a registered method supplies
+validated acceptance evidence. Recording does not call a model, change H/S/I,
+start a search, or assign observations to independent confirmation.
+
+## Relocate improvement data
+
+Use the explicit offline entry to preview, then apply the namespace migration:
+
+```bash
+.venv/bin/python -m fruitfly_agent.run.migrate_improvement --workspace /path/to/workspace
+.venv/bin/python -m fruitfly_agent.run.migrate_improvement --workspace /path/to/workspace --apply
+```
+
+`/path/to/workspace` is a placeholder. The operation makes no network or model
+requests. It rejects conflicting data roots and symlinks, preserves original
+configuration and data under `.fruitfly/migration-backups/`, and updates only
+supported legacy parameter names and paths. User comments remain intact.
+Immutable journals, task snapshots, source snapshots and content-addressed
+artifacts retain their original bytes and hashes. Migrated candidate evidence
+paths point to the relocated files; pending candidates become stale and need
+fresh evaluation before adoption. Historical Session manifests remain unchanged.
+The runtime uses only the new namespace and rejects an unmigrated data root.
+Custom legacy targets require explicit role classification before migration.
+Run one migration coordinator while the Agent is stopped; there is no
+cross-process transaction. Repeating a completed migration makes no changes.
+
+## Choose a method for one improvement job
+
+The configuration menu has no improvement category. `/improvement` discovers registered compatible methods, binds the selected method on demand and previews its requirements and budget. Search confirmation offers **Edit parameters** for JSON overrides. Confirmed choices persist separately under `.fruitfly/improvement/preferences/`, scoped to configuration/profile/target; they do not change YAML or the parent optimizer version. Existing YAML method entries remain optional parameter defaults; disabled entries do not prevent command selection. Legacy enabled hosts remain supported. The preview shows the selected implementation and normalized parameters. New auxiliary model profiles still require configuration and a new session. See [Method selection](fruitfly_agent/lab/improvement/README.md#select-methods-without-changing-defaults).
+
+## Configure DreamRSI
+
+Tree search registers its I exploration-policy target independently of method enablement. Optional disabled YAML method entries can store replay/confirmation parameter defaults. Registration performs no search. Collect H discovery histories, then explicitly choose DreamRSI for the I policy target. [DreamRSI](fruitfly_agent/lab/improvement/methods/dream_rsi/README.md#configure-method-entries) describes task packs, feedback, history paths and paired confirmation budgets. Generated policy JSON is stored as an I artifact; it is not executed as Python.

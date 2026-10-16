@@ -3,8 +3,8 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
-from fruitfly_agent.lab.optimization.reporting import token_usage, build_report, restore_search_report
-from fruitfly_agent.lab.optimization.search import content_id
+from fruitfly_agent.lab.improvement.runtime.reporting import token_usage, build_report, restore_search_report
+from fruitfly_agent.lab.improvement.contracts.search import content_id
 
 
 class ReportingTests(unittest.TestCase):
@@ -43,8 +43,8 @@ class ReportingTests(unittest.TestCase):
                      'score': 1., 'observation_ids': ['new-case']},
                     {'kind': 'search-result', 'status': 'budget_exhausted',
                      'candidates': ['new'], 'usage': {'model': 3, 'trial': 4}}]
-            history = '.fruitfly/optimization/searches/search.jsonl'
-            snapshot = '.fruitfly/optimization/task-snapshots/task.json'
+            history = '.fruitfly/improvement/searches/search.jsonl'
+            snapshot = '.fruitfly/improvement/task-snapshots/task.json'
             (root / history).parent.mkdir(parents=True)
             (root / snapshot).parent.mkdir()
             encoded = '\n'.join(json.dumps({**row, **identity}) for row in rows)

@@ -23,7 +23,7 @@ The [offline example](../../examples/extensions/README.md) demonstrates `start â
 
 | Item | Meaning |
 |---|---|
-| Lifecycle | starting, idle, running, optimizing, rebuilding, resuming, closing, closed |
+| Lifecycle | starting, idle, running, improving, rebuilding, resuming, closing, closed |
 | Event envelope | Serializable event type, run ID, and sequence metadata for frontend ordering |
 | Run events | Start/finish and activity snapshots |
 | Assistant events | Text and thinking deltas |
@@ -40,30 +40,30 @@ Frontends consume Application and Interactive events. They do not construct Prov
 | RuntimeHandle field / contract | Responsibility |
 |---|---|
 | `session`: [RuntimeSession](contracts/runtime.py) | Public conversation, observation, cancellation, and submission operations; InteractiveSession is the default implementation. |
-| `optimization`: [OptimizationService](contracts/optimization.py) | Preview, confirmed search, and cancellation. Optional OptimizationActivityService supplies progress observations. |
+| `improvement`: [ImprovementService](contracts/improvement.py) | Preview, confirmed search, and cancellation. Optional ImprovementActivityService supplies progress observations. |
 | `candidates`: [CandidateService](contracts/candidates.py) | List, inspect, acknowledge, and review candidates. Does not require a search service. |
 | `candidate_activation`: [CandidateActivationService](contracts/candidates.py) | Prepare an isolated handle. Application owns startup and switching. |
-| `task_packs`: [TaskPackService](contracts/task_packs.py) | Read task materials and save corrections. Does not require optimization or candidate services. |
+| `task_packs`: [TaskPackService](contracts/task_packs.py) | Read task materials and save corrections. Does not require improvement or candidate services. |
 | `authorization`: [AuthorizationService](interaction/authorization.py) | Serialize permission requests and retain grants for this runtime only. |
 
 Configuration and model setup come from the injected RuntimeFactory/controller. Benchmark task selection is an optional frontend capability; confirmed work uses Application improvement jobs. Run binds concrete implementations; Interactive imports neither Run, Lab, Providers, nor Eval.
 
 Each runtime capability is optional and independently injected. Use explicit `candidates=` and `task_packs=` fields even when one object implements several contracts. Missing query capabilities return empty candidate lists or unavailable material status; operations requiring a missing service raise an explicit error. Protocol and view definitions belong to `contracts/`. The package-level `fruitfly_agent.interactive` API exports the usual Application, concrete RuntimeHandle, Session, views, and terminal entries. Internal consumers import their owning modules directly.
 
-Application retains the only application lifecycle state and submission lock. [OptimizationJob](application/jobs.py) owns a task, progress, cancellation, and observer isolation through execution/completion callbacks; it cannot grant execution permission or activate a runtime. [TaskMaterials](session/materials.py) reads public canonical items and creates correction provenance. Application checks that saving is allowed before delegating. Task examples support Harness optimization and evaluation; saving does not train a model or alter conversation facts.
+Application retains the only application lifecycle state and submission lock. [ImprovementJob](application/jobs.py) owns a task, progress, cancellation, and observer isolation through execution/completion callbacks; it cannot grant execution permission or activate a runtime. [TaskMaterials](session/materials.py) reads public canonical items and creates correction provenance. Application checks that saving is allowed before delegating. Task examples support Harness improvement and evaluation; saving does not train a model or alter conversation facts.
 
 To add a frontend, consume Application's public operations and the capability protocols. To add a terminal command, use the [command extension interface](terminal/README.md#register-a-command). Concrete mechanisms and scoring stay with Lab and the host.
 
-Replacement paths share preparation and retirement: start resources, bind events, invoke activation, then switch the active handle. Failed replacement keeps the active handle; failure to retire the previous handle is exposed through `last_error` after a successful switch. Configuration writes and external side effects do not automatically roll back. No source hot reload or cross-process activation transaction. Optimization progress covers the current batch, not overall search completion.
+Replacement paths share preparation and retirement: start resources, bind events, invoke activation, then switch the active handle. Failed replacement keeps the active handle; failure to retire the previous handle is exposed through `last_error` after a successful switch. Configuration writes and external side effects do not automatically roll back. No source hot reload or cross-process activation transaction. Improvement progress covers the current batch, not overall search completion.
 
-Resume continues canonical history in the original file with the selected current configuration. Discovery exposes availability/reasons rather than filtering by the active manifest digest. Run records changed environments after successful startup; history display never triggers model/tool replay. `/improvement` selects saved task packages or benchmark tasks for a bounded iterative improvement job. It also saves scored daily cases and reviews candidates. Benchmark preparation, baseline and iteration share the Application job lifecycle; standalone evaluation remains in the optional Eval CLI.
+Resume continues canonical history in the original file with the selected current configuration. Discovery exposes availability/reasons rather than filtering by the active manifest digest. Run records changed environments after successful startup; history display never triggers model/tool replay. `/improvement` selects saved task packages or benchmark tasks for a bounded iterative improvement job. It selects H/S/I targets and reviews candidates. Daily material recording is independently configured under learning. Benchmark preparation, baseline and iteration share the Application job lifecycle; standalone evaluation remains in the optional Eval CLI.
 
 ## Modules
 
 | Package | Owns | May consume |
 |---|---|---|
 | [Contracts](contracts/README.md) | Runtime/service protocols, command envelopes, events, and frontend views | Contracts and public Core types |
-| [Application](application/README.md) | Lifecycle, work exclusion, optimization tasks, and concrete runtime resource ownership | Contracts, Session helpers, and interaction mechanisms |
+| [Application](application/README.md) | Lifecycle, work exclusion, improvement tasks, and concrete runtime resource ownership | Contracts, Session helpers, and interaction mechanisms |
 | [Session](session/README.md) | Core integration, canonical conversation projections, and correction material extraction | Contracts, interaction mechanisms, and Core |
 | [Interaction](interaction/README.md) | Generic command routing, event dispatch, and authorization | Contracts and public Core permission types |
 | [Terminal](terminal/README.md) | Frontend composition, input, rendering, and registered features | Contracts, generic interaction commands, and terminal infrastructure |
@@ -72,7 +72,7 @@ The root contains only this guide and public exports. Contracts never import the
 
 Terminal features share input and rendering facilities through public interfaces. They cannot import other features or Application/Session implementations. Adding a feature does not change the input loop. Directory dependency checks enforce these responsibilities.
 
-No module-specific environment variables. [Run](../run/README.md) constructs the default factory; [Optimization](../lab/optimization/README.md) and [Eval](../../eval/README.md) own their execution semantics.
+No module-specific environment variables. [Run](../run/README.md) constructs the default factory; [Improvement](../lab/improvement/README.md) and [Eval](../../eval/README.md) own their execution semantics.
 
 ```bash
 .venv/bin/python -m unittest discover -s tests/interactive -t . -v

@@ -23,6 +23,8 @@ def mechanism_views(profile: HarnessProfile, catalog: LabCatalog, warnings: list
             item.mechanism_id,
         ),
     ):
+        definition = catalog.get(descriptor.mechanism_id)
+        category = definition.configuration_category or display_group(descriptor)
         selection = selections.get(descriptor.mechanism_id)
         enabled = selection.enabled if selection is not None else False
         raw_parameters = selection.parameters if selection is not None else {}
@@ -52,7 +54,7 @@ def mechanism_views(profile: HarnessProfile, catalog: LabCatalog, warnings: list
         mechanisms.append(
             ConfigurationMechanism(
                 mechanism_id=descriptor.mechanism_id,
-                category=display_group(descriptor),
+                category=category,
                 label=descriptor.label,
                 description=descriptor.description,
                 enabled=enabled,
@@ -61,7 +63,7 @@ def mechanism_views(profile: HarnessProfile, catalog: LabCatalog, warnings: list
                 family=descriptor.primary.family,
                 context_phase=descriptor.primary.context_phase,
                 display_section=display_section(descriptor),
-                visible=catalog.get(descriptor.mechanism_id).visible,
+                visible=definition.visible and category != 'improvement',
                 parameters=parameters,
                 effects=_effect_messages(descriptor.effects),
                 requires=tuple(sorted(descriptor.requires)),
@@ -143,8 +145,8 @@ def _context_phase_order(descriptor) -> int:
 def display_group(descriptor) -> str:
     """Project Core mechanism coordinates into the current application menu."""
     contribution = descriptor.primary
-    if contribution.layer == "optimization":
-        return "optimization"
+    if contribution.layer == "improvement":
+        return "improvement"
     if contribution.family == "context":
         return "context-manager"
     return contribution.family

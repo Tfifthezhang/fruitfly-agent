@@ -220,37 +220,40 @@ class CatalogTest(unittest.TestCase):
                 "compaction",
                 "rlm-ipython",
                 "opro",
+                "tree-search",
+                "dream-rsi",
                 "failure-replay",
                 "failure-distillation",
                 "automatic-text-search",
+                "task-material-recording",
             },
         )
 
     def test_unknown_mechanisms_are_rejected_even_when_disabled(self) -> None:
         catalog = builtin_catalog()
-        for mechanism in ("unregistered-optimizer", "unregistered-context", "unregistered-tool"):
+        for mechanism in ("unregistered-improver", "unregistered-context", "unregistered-tool"):
             for enabled in (True, False):
                 with self.subTest(mechanism=mechanism, enabled=enabled):
                     with self.assertRaisesRegex(ValueError, "unknown mechanism.*Remove this selection"):
                         catalog.resolve((MechanismSelection(mechanism, enabled=enabled),))
 
-    def test_native_optimizers_use_algorithm_neutral_task_path(self) -> None:
+    def test_native_improvers_use_algorithm_neutral_task_path(self) -> None:
         catalog = builtin_catalog()
         for mechanism in ("opro",):
             with self.subTest(mechanism=mechanism):
                 definition = catalog.get(mechanism)
                 self.assertFalse(definition.descriptor.default_enabled)
                 parameters = {item.name: item.default for item in definition.descriptor.parameters}
-                self.assertEqual(parameters["cases_path"], ".fruitfly/optimization/cases.json")
+                self.assertEqual(parameters["cases_path"], ".fruitfly/improvement/cases.json")
                 self.assertFalse(any("reflection" in name for name in parameters))
 
     def test_opro_package_definition_assembles_without_running_search(self) -> None:
         from fruitfly_agent.lab.algorithms.targets import TEXT_TARGET_PREFIX
         from fruitfly_agent.lab.base_prompt.target import BasePromptTarget
-        from fruitfly_agent.lab.optimization.opro import OproOptimizer, definition
-        from fruitfly_agent.lab.optimization.task_packs import TaskPackCatalog, TASK_PACK_COMPONENT
-        from fruitfly_agent.lab.optimization.text_optimizer import (
-            TEXT_OPTIMIZER_COMPONENT, TEXT_OPTIMIZATION_TARGET_COMPONENT,
+        from fruitfly_agent.lab.improvement.methods.opro import OproImprover, definition
+        from fruitfly_agent.lab.improvement.tasks import TaskPackCatalog, TASK_PACK_COMPONENT
+        from fruitfly_agent.lab.improvement.api import (
+            TEXT_IMPROVER_COMPONENT, TEXT_IMPROVEMENT_TARGET_COMPONENT,
         )
 
         for profile in ("", "auxiliary"):
@@ -261,7 +264,7 @@ class CatalogTest(unittest.TestCase):
 
                 def resolve(name, limit):
                     resolutions.append((name, limit))
-                    return ProviderBinding(auxiliary, "optimizer-model", name,
+                    return ProviderBinding(auxiliary, "improver-model", name,
                                            context_window=4000, max_output_tokens=256)
 
                 catalog = LabCatalog((definition(),), bootstrap=lambda state, context: (
@@ -271,29 +274,29 @@ class CatalogTest(unittest.TestCase):
                 result = assemble_lab(
                     AgentLoopConfig(provider=main, model="main-model", system_prompt="seed"),
                     catalog=catalog,
-                    selections=(MechanismSelection("opro", parameters={"optimizer_profile": profile}),),
+                    selections=(MechanismSelection("opro", parameters={"improver_profile": profile}),),
                     context=AssemblyContext(root, object(), "main-model", resolve, resource_sink=owned),
                 )
-                optimizer = result.components[TEXT_OPTIMIZER_COMPONENT]
+                improver = result.components[TEXT_IMPROVER_COMPONENT]
                 try:
-                    self.assertIsInstance(optimizer.strategy, OproOptimizer)
-                    self.assertIn(optimizer, owned)
-                    self.assertEqual(result.components[TEXT_OPTIMIZATION_TARGET_COMPONENT], "base_prompt")
-                    self.assertEqual(optimizer.spec.implementation_id, "opro-text-v2")
-                    self.assertIs(optimizer.config.provider, main)
+                    self.assertIsInstance(improver.strategy, OproImprover)
+                    self.assertIn(improver, owned)
+                    self.assertEqual(result.components[TEXT_IMPROVEMENT_TARGET_COMPONENT], "base_prompt")
+                    self.assertEqual(improver.spec.implementation_id, "opro-text-v2")
+                    self.assertIs(improver.config.provider, main)
                     if profile:
                         self.assertEqual(resolutions, [("auxiliary", 1024)])
-                        self.assertIs(optimizer.role_configs["optimizer"].provider, auxiliary)
-                        self.assertEqual(optimizer.role_configs["optimizer"].max_tokens, 256)
-                        self.assertEqual(optimizer.role_configs["optimizer"].context_window, 4000)
+                        self.assertIs(improver.role_configs["improver"].provider, auxiliary)
+                        self.assertEqual(improver.role_configs["improver"].max_tokens, 256)
+                        self.assertEqual(improver.role_configs["improver"].context_window, 4000)
                     else:
                         self.assertEqual(resolutions, [])
-                        self.assertEqual(optimizer.role_configs, {})
+                        self.assertEqual(improver.role_configs, {})
                     self.assertEqual(main.calls, [])
                     self.assertEqual(auxiliary.calls, [])
                     self.assertEqual(list(root.iterdir()), [])
                 finally:
-                    optimizer.close()
+                    improver.close()
 
     def test_ipython_and_rlm_descriptors_have_separate_effects(self) -> None:
         catalog = builtin_catalog()

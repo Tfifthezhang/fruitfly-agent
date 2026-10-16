@@ -33,7 +33,7 @@ Install the optional development dependencies with `pip install -e '.[dev]'` (ne
 | Core and Application | Loop/tool/session contracts, lifecycle ownership, authorization, improvement capabilities, and correction materials |
 | Lab | Permission/environment wrappers, task packages, task loading, and scoring policies |
 | Providers | The complete package, including message codecs, transport, model setup, and registry |
-| Run | Configuration/recovery, optimization jobs, permission construction, storage, and host adapters |
+| Run | Configuration/recovery, improvement jobs, permission construction, storage, and host adapters |
 | Terminal | Command registration/bindings, live input, generic menus, and configuration menus |
 | Eval | Benchmark adapters, catalog, requests, execution, reports, storage, and installation |
 

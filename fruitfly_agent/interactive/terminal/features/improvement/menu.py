@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import textwrap
+import json
+from dataclasses import replace
 
 from fruitfly_agent.interactive.terminal.bindings import ImprovementClients
 from fruitfly_agent.interactive.terminal.io.input import LineEditor
@@ -19,7 +20,7 @@ from fruitfly_agent.interactive.terminal.rendering.renderer import TerminalRende
 from fruitfly_agent.interactive.terminal.io.text import safe_terminal_text
 from fruitfly_agent.interactive.contracts.evaluation import BenchmarkImprovementController, BenchmarkImprovementRequest
 from .events import BenchmarkEventDisplay
-from .formatting import format_optimization_activity
+from .formatting import format_improvement_activity
 
 
 class TerminalImprovementFrontend:
@@ -36,8 +37,10 @@ class TerminalImprovementFrontend:
         self.benchmark = benchmark if isinstance(benchmark, BenchmarkImprovementController) else None
         self._quit = False
         self._selections = {}
-        self._drafts = {}
-        self._form_key = None
+        self.role = "H"
+        self.selected_target = 'base_prompt'
+        self.selected_method = None
+        self.parameters = {}
         self.notice = ""
         self.messages = []
 
@@ -54,53 +57,95 @@ class TerminalImprovementFrontend:
             self.renderer.write_system("improvement menu unavailable\n")
             return
         direction = " ".join(arguments).strip()
-        selected = 0
         while not self._quit:
-            progress = self.clients.progress()
-            running = progress is not None and progress.status == "running"
-            try:
-                candidates = self.clients.candidates.candidates() if self.clients.candidates is not None else ()
-            except (OSError, RuntimeError, TypeError, ValueError):
-                candidates = ()
-            pending = sum(item.status in {"proposed", "reviewed", "deferred", "selected_for_next_session"} for item in candidates)
-            actions, rows = [], []
-            if self.clients.search is not None or self.benchmark is not None:
-                actions.append("search")
-                rows.append(MenuRow("Start improvement", "Choose benchmark tasks or a saved case package", marker="!" if running else ""))
-            if self.clients.candidates is not None:
-                actions.append("review")
-                rows.append(MenuRow("Review candidates", f"{pending} pending · {len(candidates)} total"))
-            if self.clients.materials is not None and self.clients.materials.task_packs_available:
-                actions.append("correction")
-                rows.append(MenuRow("Save a failed task", "Correct a completed answer and add it to training"))
-            actions.append("back")
-            rows.append(MenuRow("Return to chat"))
-            self.menu_renderer.render(
-                title="Improvement",
-                subtitle=(f"Improvement {progress.status}" if running else "Improve against declared task acceptance; review before adoption"),
-                rows=tuple(rows), selected=selected, notice=self.notice,
-                instructions="↑↓ move · Enter select · Esc back · q close menu" if self.menu_renderer.ansi else "Enter an option number; blank selects highlighted; q closes the menu",
-            )
-            self.notice = ""
-            event = self.menu_input.read_event()
-            selected, handled = navigate_menu(event, selected, len(rows))
-            if handled:
-                continue
-            if event.action in {MenuAction.BACK, MenuAction.QUIT} or (event.action == MenuAction.ACTIVATE and selected == len(rows) - 1):
+            choice = self.choose_row('Improvement', (
+                MenuRow('H · Harness', 'Execution instructions and mechanisms'),
+                MenuRow('S · State', 'Skills, memory and retained knowledge'),
+                MenuRow('I · Improver', 'Candidate generation and improvement strategies'),
+                MenuRow('Jobs and history', 'Current progress and saved candidates'),
+            ), subtitle='Choose what changes; other roles stay fixed')
+            if choice is None:
                 return
-            if event.action != MenuAction.ACTIVATE:
+            if choice == 3:
+                progress = self.clients.progress()
+                if progress is not None:
+                    self.report(f'Current improvement job: {progress.status}\n')
+                await self.review_candidates(all_roles=True)
                 continue
-            if actions[selected] == "search":
-                if running:
-                    self.renderer.write_system("improvement is already running; use /status or /cancel\n")
+            self.role = ('H', 'S', 'I')[choice]
+            try:
+                targets = tuple(t for t in self.clients.targets() if t.role == self.role)
+            except (OSError, RuntimeError, TypeError, ValueError) as exc:
+                self.report(f'Targets unavailable: {exc}\n')
+                continue
+            if not targets:
+                self.report(f'{self.role} improvement unavailable: no executable target and comparison are registered.\n')
+                continue
+            while not self._quit:
+                index = self.choose_row(f'{self.role} · Choose target', tuple(MenuRow(
+                    t.label, t.reason if not t.available else t.target_id) for t in targets))
+                if index is None:
+                    break
+                target = targets[index]
+                if not target.available:
+                    self.report(target.reason + '\n')
                     continue
-                result = await self.start_improvement(direction)
+                result = await self.target_actions(direction, target)
                 if result is not None:
                     return result
-            elif actions[selected] == "review":
-                await self.review_candidates()
-            else:
-                await self.save_correction()
+
+    async def target_actions(self, direction, target):
+        while not self._quit:
+            choice = self.choose_row(f'{self.role} · {target.label}', (
+                MenuRow('Start improvement', 'Choose tasks, preview the budget and run'),
+                MenuRow('Review candidates', 'Inspect evidence before adoption'),
+            ))
+            if choice is None:
+                return
+            if choice == 1:
+                await self.review_candidates(target_id=target.target_id)
+                continue
+            progress = self.clients.progress()
+            if progress is not None and progress.status == 'running':
+                self.report('Improvement is already running; use /status or /cancel\n')
+                continue
+            self.selected_target = target.target_id
+            result = await self.choose_method_and_start(direction)
+            if result is not None:
+                return result
+
+    async def choose_method_and_start(self, direction):
+        self.selected_method = None
+        self.parameters = {}
+        try:
+            methods = self.clients.methods(self.role, self.selected_target)
+        except (OSError, RuntimeError, TypeError, ValueError) as exc:
+            self.report(f'Methods unavailable: {exc}\n')
+            return
+        if not methods:
+            return await self.start_improvement(direction)
+        if len(methods) == 1:
+            method = methods[0]
+            if not method.available:
+                self.report(method.reason + '\n')
+                return
+            self.selected_method = method.method_id
+            return await self.start_improvement(direction)
+        while not self._quit:
+            choice = self.choose_row('Choose improvement method', tuple(MenuRow(
+                m.label + (' · default' if m.default else ''),
+                m.description if m.available else 'Unavailable · ' + m.reason) for m in methods),
+                key=('method', self.role, self.selected_target))
+            if choice is None:
+                return
+            method = methods[choice]
+            if not method.available:
+                self.report(method.reason + '\n')
+                continue
+            self.selected_method = method.method_id
+            result = await self.start_improvement(direction)
+            if result is not None:
+                return result
 
     async def start_improvement(self, direction) -> str | None:
         if self.benchmark is None:
@@ -123,8 +168,7 @@ class TerminalImprovementFrontend:
             return
         try:
             if not self.benchmark.improvement_available:
-                self.report("Benchmark improvement unavailable. Enable an optimizer, failure processing "
-                            "and automatic improvement in /config; then start a new session.\n")
+                self.report("Benchmark improvement unavailable: no executable search and verification binding.\n")
                 return
             snapshot = self.benchmark.improvement_snapshot()
             if not snapshot.benchmarks:
@@ -150,16 +194,41 @@ class TerminalImprovementFrontend:
                         reason = "; ".join(variant.preflight) or "the selected task environment is unavailable"
                         self.report("Cannot start improvement: " + safe_terminal_text(reason) + "\n")
                         continue
-                    request = BenchmarkImprovementRequest(benchmark.benchmark_id, variant.variant_id)
+                    request = BenchmarkImprovementRequest(benchmark.benchmark_id, variant.variant_id,
+                        method_id=self.selected_method, target_id=self.selected_target if self.selected_method else None,
+                        parameters=self.parameters or None)
                     try:
                         preview = self.benchmark.benchmark_preview(request, direction)
+                        if self.selected_method is not None and preview.algorithm != self.selected_method:
+                            raise ValueError("preview differs from the selected improvement method")
+                        if preview.role != self.role or preview.target != self.selected_target:
+                            raise ValueError("benchmark comparison does not support the selected target")
                     except (OSError, RuntimeError, TypeError, ValueError) as exc:
                         self.report(f"Cannot run improvement: {safe_terminal_text(str(exc))}\n")
                         continue
-                    detail = safe_terminal_text(preview.cost_notice) + "\n" + "\n".join(
+                    detail = f"Role: {preview.role} · Target: {preview.target}\n" + safe_terminal_text(preview.cost_notice) + "\n" + "\n".join(
                         f"{safe_terminal_text(key)}: {safe_terminal_text(value)}" for key, value in preview.details)
-                    if not self.confirm_choice(title="Confirm improvement", subtitle=detail,
-                            rows=(MenuRow("Start improvement", "Prepare tasks, run baseline, iterate and confirm"), MenuRow("Cancel"))):
+                    rows = (MenuRow('Start improvement', 'Prepare tasks, run baseline, iterate and confirm'), MenuRow('Cancel'))
+                    if self.selected_method is not None:
+                        choice = self._select_row('Confirm improvement', (*rows, MenuRow('Edit parameters',
+                            'JSON overrides; preview again before starting')), subtitle=detail, selected=1)
+                        if choice == 2:
+                            self.renderer.write_system('Parameter overrides as a JSON object (blank keeps current values): ')
+                            value = await asyncio.to_thread(self.line_editor.read_line)
+                            if value is not None and value.strip():
+                                try:
+                                    values = json.loads(value)
+                                    if not isinstance(values, dict):
+                                        raise ValueError('parameters must be a JSON object')
+                                    self.benchmark.benchmark_preview(replace(request, parameters=values), direction)
+                                    self.parameters = values
+                                except (OSError, RuntimeError, ValueError, TypeError) as exc:
+                                    self.report(f'Invalid parameters: {exc}\n')
+                            continue
+                        confirmed = choice == 0
+                    else:
+                        confirmed = self.confirm_choice(title='Confirm improvement', subtitle=detail, rows=rows)
+                    if not confirmed:
                         self.report("Improvement cancelled; no task download or model calls started.\n")
                         continue
                     return await self.execute_benchmark(preview.preview_token)
@@ -178,7 +247,7 @@ class TerminalImprovementFrontend:
                     await asyncio.wait({task}, timeout=.5)
                     progress = self.clients.progress()
                     activity = progress.activity if progress is not None else None
-                    text = format_optimization_activity(activity) if activity is not None else ""
+                    text = format_improvement_activity(activity) if activity is not None else ""
                     if text and text != previous:
                         event_renderer.write_system(text + "\n")
                         previous = text
@@ -201,11 +270,12 @@ class TerminalImprovementFrontend:
         if self.clients.search is None:
             self.report("improvement service unavailable\n")
             return
+        editing_pack = None
         while not self._quit:
-            selected_pack = pack_id
+            selected_pack = editing_pack or pack_id
             packs = ()
             default_direction = ""
-            if pack_id is None and (self.clients.materials is not None and self.clients.materials.task_packs_available):
+            if pack_id is None and editing_pack is None and (self.clients.materials is not None and self.clients.materials.task_packs_available):
                 try:
                     packs = self.clients.materials.task_packs()
                     if packs:
@@ -235,21 +305,52 @@ class TerminalImprovementFrontend:
                 self.report("Search cancelled; direction must contain 1–500 characters.\n")
                 return
             try:
-                preview = self.clients.search.optimization_preview(pack_id=selected_pack, direction=direction)
+                selection = {} if self.selected_method is None else {
+                    'method_id': self.selected_method, 'target_id': self.selected_target}
+                if self.parameters:
+                    selection['parameters'] = self.parameters
+                preview = self.clients.search.improvement_preview(pack_id=selected_pack, direction=direction, **selection)
+                if self.selected_method is not None and preview.algorithm != self.selected_method:
+                    raise ValueError("preview differs from the selected improvement method")
+                if preview.role != self.role or preview.target != self.selected_target:
+                    raise ValueError("selected target differs from the configured improvement target")
             except (OSError, RuntimeError, TypeError, ValueError) as exc:
                 self.report(f"cannot start improvement: {exc}\n")
                 return
             rows = (MenuRow("Start search", f"{safe_terminal_text(preview.label)} · {safe_terminal_text(preview.target)}"), MenuRow("Cancel"))
-            detail = safe_terminal_text(preview.cost_notice) + "\n" + "\n".join(
+            detail = f"Role: {preview.role} · Target: {preview.target}\n" + safe_terminal_text(preview.cost_notice) + "\n" + "\n".join(
                 f"{safe_terminal_text(key)}: {safe_terminal_text(value)}" for key, value in preview.details
             )
-            if not self.confirm_choice(title="Confirm improvement", subtitle=detail, rows=rows):
+            if self.selected_method is not None:
+                choice = self._select_row('Confirm improvement', (*rows, MenuRow('Edit parameters',
+                    'JSON overrides for this search; validation runs before confirmation')), subtitle=detail, selected=1)
+                if choice == 2:
+                    self.renderer.write_system('Parameter overrides as a JSON object (blank keeps current values): ')
+                    value = await asyncio.to_thread(self.line_editor.read_line)
+                    if value is not None and value.strip():
+                        try:
+                            values = json.loads(value)
+                            if not isinstance(values, dict):
+                                raise ValueError('parameters must be a JSON object')
+                            self.clients.search.improvement_preview(pack_id=selected_pack, direction=direction,
+                                method_id=self.selected_method, target_id=self.selected_target, parameters=values)
+                            self.parameters = values
+                        except (ValueError, TypeError) as exc:
+                            self.report(f'Invalid parameters: {exc}\n')
+                    # Re-preview the same tasks without another direction prompt.
+                    editing_pack = selected_pack
+                    continue
+                confirmed = choice == 0
+            else:
+                confirmed = self.confirm_choice(title='Confirm improvement', subtitle=detail, rows=rows)
+            if not confirmed:
                 self.report("Search cancelled; no model calls made.\n")
-                if pack_id is None and packs:
+                if pack_id is None and (packs or editing_pack):
+                    editing_pack = None
                     continue
                 return
             try:
-                self.clients.search.start_optimization(direction, preview_token=preview.preview_token)
+                self.clients.search.start_improvement(direction, preview_token=preview.preview_token)
                 return "Improvement submitted; use /status or /cancel.\n"
             except (OSError, RuntimeError, TypeError, ValueError) as exc:
                 self.report(f"could not start improvement: {exc}\n")
@@ -289,117 +390,7 @@ class TerminalImprovementFrontend:
             if event.action == MenuAction.ACTIVATE:
                 return selected
 
-    async def _ask_correction(self, prompt):
-        self.renderer.write_system(prompt)
-        key = (self._form_key, prompt)
-        if key not in self._drafts:
-            self._drafts[key] = await asyncio.to_thread(self.line_editor.read_line)
-        return self._drafts[key]
-
-    async def save_correction(self):
-        if self.clients.materials is None:
-            self.report("task package service unavailable\n")
-            return
-        try:
-            tasks = self.clients.materials.correction_tasks()
-            if not tasks:
-                self.report("No completed text tasks available.\n")
-                return
-            while not self._quit:
-                choice = self.choose_row("Choose completed task", tuple(MenuRow(
-                    safe_terminal_text(t.input[:100]), safe_terminal_text(t.output[:100])) for t in tasks))
-                if choice is None:
-                    return
-                task = tasks[choice]
-                while not self._quit:
-                    packs = self.clients.materials.task_packs()
-                    choice = self.choose_row("Save to task package", (*tuple(MenuRow(
-                        safe_terminal_text(p.name), "Writable" if p.writable else "Save a workspace copy") for p in packs),
-                        MenuRow("Create task package", "Independent selection and confirmation must be added before automatic improvement")))
-                    if choice is None:
-                        break
-                    pack = packs[choice] if choice < len(packs) else None
-                    if await self.save_correction_form(task, pack) is not False:
-                        return
-        except (OSError, RuntimeError, TypeError, ValueError) as exc:
-            self.report(f"Cannot save task: {safe_terminal_text(str(exc))}\n")
-
-    async def save_correction_form(self, task, pack):
-        try:
-            self._form_key = (task.task_id, pack.pack_id if pack else "new")
-            name = ""
-            if pack is None:
-                name = await self._ask_correction("New task package name: ")
-                if name is None or not name.strip():
-                    return
-                name = name.strip()
-            self.renderer.write_system("Make the question self-contained; include any facts needed from earlier messages or tools.\n")
-            edited = await self._ask_correction("Question (blank keeps the original): ")
-            if edited is None:
-                return
-            question = edited.strip() or task.input
-            acceptance = None
-            if pack is not None and pack.acceptance_example:
-                answer = await self._ask_correction(f"Acceptance JSON (example {safe_terminal_text(pack.acceptance_example)}): ")
-                if answer is None or not answer.strip():
-                    self.report("Save cancelled; acceptance is required.\n")
-                    return
-                def unique_object(pairs):
-                    result = {}
-                    for key, value in pairs:
-                        if key in result:
-                            raise ValueError("duplicate acceptance JSON field: " + key)
-                        result[key] = value
-                    return result
-                acceptance = json.loads(answer, object_pairs_hook=unique_object)
-                if not isinstance(acceptance, dict):
-                    raise ValueError("acceptance must be a JSON object")
-            else:
-                answer = await self._ask_correction("Correct answer (required): ")
-                if answer is None or not answer.strip():
-                    self.report("Save cancelled; a correct answer is required.\n")
-                    return
-            reason = await self._ask_correction("Reason (optional, stored as metadata): ")
-            if reason is None:
-                return
-            copy = pack is not None and not pack.writable
-            detail = (f"Question: {safe_terminal_text(question)}\n"
-                      + (f"Correct answer: {safe_terminal_text(answer)}\n" if acceptance is None else "")
-                      + f"Package: {safe_terminal_text(pack.name if pack else name)}\n"
-                      + ("A writable workspace copy will be created.\n" if copy else "")
-                      + (f"Acceptance: {safe_terminal_text(json.dumps(acceptance, ensure_ascii=False))}\n" if acceptance is not None else "")
-                      + "Only training changes. No model calls. Confirm the question is self-contained.")
-            if not self.confirm_choice(title="Confirm training task", subtitle=detail,
-                    rows=(MenuRow("Save task"), MenuRow("Cancel"))):
-                self.report("Save cancelled.\n")
-                return False
-            options = dict(expected_hash=pack.source_hash if pack else "", name=name,
-                           reason=reason.strip(), copy=copy, acceptance=acceptance)
-            try:
-                saved = self.clients.materials.save_training_task(task.task_id, pack.pack_id if pack else "", question, answer.strip(), **options)
-            except ValueError as exc:
-                if "conflicting training answer" not in str(exc):
-                    raise
-                if not self.confirm_choice(title="Training answer already exists", subtitle="Replace its acceptance criteria?",
-                        rows=(MenuRow("Replace answer"), MenuRow("Cancel"))):
-                    return
-                saved = self.clients.materials.save_training_task(task.task_id, pack.pack_id, question, answer.strip(), replace=True, **options)
-            self.report(f"Saved to {safe_terminal_text(saved.name)} · {saved.train_count} training cases.\n")
-            if saved.error:
-                self.report(f"Before searching: {safe_terminal_text(saved.error)}.\n")
-                return
-            if self.clients.search is None:
-                return
-            choice = self._select_row("Task saved", (MenuRow("Back"), MenuRow("Improve this package")))
-            if choice == 1:
-                return await self.start_search("", pack_id=saved.pack_id)
-            return False
-        except (OSError, RuntimeError, TypeError, ValueError) as exc:
-            self._drafts = {key: value for key, value in self._drafts.items() if key[0] != self._form_key}
-            self.report(f"Cannot save task: {safe_terminal_text(str(exc))}\n")
-            return False
-
-    async def review_candidates(self) -> None:
+    async def review_candidates(self, *, target_id=None, all_roles=False) -> None:
         if self.clients.candidates is None:
             self.report("candidate service unavailable\n")
             return
@@ -408,7 +399,8 @@ class TerminalImprovementFrontend:
         page_size = 10
         while not self._quit:
             try:
-                records = self.clients.candidates.candidates()
+                records = tuple(r for r in self.clients.candidates.candidates()
+                                if all_roles or (r.role == self.role and (target_id is None or r.target == target_id)))
             except (OSError, RuntimeError, TypeError, ValueError) as exc:
                 self.report(f"candidate inbox unavailable: {exc}\n")
                 return
@@ -430,7 +422,7 @@ class TerminalImprovementFrontend:
                 rows.append(MenuRow("Previous page"))
                 row_actions.append(("page", page - 1))
             for offset, item in enumerate(shown):
-                rows.append(MenuRow(f"{item.candidate_id[:10]} · {item.algorithm} · {item.target}", _candidate_status(item.status)))
+                rows.append(MenuRow(f"{item.role} · {item.candidate_id[:10]} · {item.algorithm} · {item.target}", _candidate_status(item.status)))
                 row_actions.append(("candidate", start + offset))
             if page + 1 < page_count:
                 rows.append(MenuRow("Next page"))

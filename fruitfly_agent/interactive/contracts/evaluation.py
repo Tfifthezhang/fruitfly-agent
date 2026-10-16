@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Mapping, Protocol, runtime_checkable
-from .optimization import OptimizationPreview
+from .improvement import ImprovementPreview
 from .candidates import CandidateView
 
 
@@ -39,6 +39,9 @@ class BenchmarkImprovementRequest:
     benchmark_id: str
     variant: str
     task_limit: int = 5
+    method_id: str | None = None
+    target_id: str | None = None
+    parameters: Mapping[str, Any] | None = None
 
     def __post_init__(self):
         if type(self.task_limit) is not int or not 3 <= self.task_limit <= 12:
@@ -50,7 +53,7 @@ class BenchmarkImprovementController(Protocol):
     @property
     def improvement_available(self) -> bool: ...
     def improvement_snapshot(self) -> EvaluationSnapshot: ...
-    def benchmark_preview(self, request: BenchmarkImprovementRequest, direction: str = "") -> OptimizationPreview: ...
+    def benchmark_preview(self, request: BenchmarkImprovementRequest, direction: str = "") -> ImprovementPreview: ...
     async def improve(self, preview_token: str, on_event: EvaluationEventSink | None = None) -> tuple[CandidateView, ...]: ...
 
 

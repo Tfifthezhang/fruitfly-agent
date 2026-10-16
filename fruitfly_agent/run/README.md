@@ -32,6 +32,7 @@ Interactive recovery displays original saved conversation through the same histo
 | [Runtime](runtime/README.md) | Assembly, manifest, preparation, recovery, and permission bindings | Application owns lifecycle and switching |
 | [Storage](storage/README.md) | Text artifacts, candidate records, result exports, retention | No quality decisions or activation |
 | [Improvement host](improvement/README.md) | Search jobs, candidate rules, evolution capabilities, startup choices | Lab owns algorithms and the RSI state machine |
+| [Learning host](learning/README.md) | Configured task observation and material persistence | No search or adoption authority |
 | [Adapters](adapters/README.md) | Interactive views and optional Eval bridge | No algorithm-specific decisions |
 
 [application.py](application.py) is the composition root. `RunApplicationFactory` constructs services, owns active runtime bindings, and delegates operations. Search services own preview receipts, startup services own choice receipts, and configuration owns its draft. Services use injected queries and operations instead of receiving the Factory or inspecting private fields.
@@ -48,9 +49,10 @@ Interactive recovery displays original saved conversation through the same histo
 | [evolution.py](evolution.py) | Bind Application and storage operations to the evolution host |
 | [evaluation.py](evaluation.py) | Bind host queries to the optional Eval adapter |
 | [startup_versions.py](startup_versions.py) | Public startup-selection composition entry |
+| [migrate_improvement.py](migrate_improvement.py) | Explicit offline data/configuration migration; see [configuration](../../CONFIGURATION.md#relocate-improvement-data) |
 | [migrate_configuration.py](migrate_configuration.py) | Explicit migration function and CLI; see [commands and limits](../../CONFIGURATION.md#relocate-workspace-configuration) |
 
-Composition entries delegate to one owning implementation. Internal consumers import the owning module. Run consumes public [Catalog](../lab/catalog/README.md) and [Optimization](../lab/optimization/README.md) contracts; it does not implement search, scoring, or concrete algorithm branches.
+Composition entries delegate to one owning implementation. Internal consumers import the owning module. Run consumes public [Catalog](../lab/catalog/README.md) and [Improvement](../lab/improvement/README.md) contracts; it does not implement search, scoring, or concrete algorithm branches.
 
 ## Text artifacts
 
@@ -97,30 +99,30 @@ Assembly occurs at `factory.open()` or `Application.start()`. See the [offline A
 | Required material | Validate current artifact bindings and selected components' RecoveryValidator dependencies. Unused historical bindings do not force restoration. |
 | Permissions | Apply current host policy with a fresh approval service. Historical grants are never replayed. |
 | Failure | Corrupt data, writer locks, invalid current configuration, or unavailable required dependencies reject recovery with a reason. Failed startup does not append a runtime snapshot. |
-| Activation | Optimization/RSI parent identity checks remain enforced to prevent stale activation. |
+| Activation | Improvement/RSI parent identity checks remain enforced to prevent stale activation. |
 | State | Restore stored conversation/projections and explicit supported dependencies; no arbitrary heap restoration or paid-call replay. |
 
 Canonical data and record semantics belong to [Session](../core/session/README.md). Configuration format belongs to [Harness configuration](configuration/README.md).
 
 ## Candidate jobs
 
-[improvement/search_jobs.py](improvement/search_jobs.py) owns preview receipts and uses injected optimizer, target, task, storage, and active-version queries. The Factory retains active bindings and exposes the public host methods.
+[improvement/search_jobs.py](improvement/search_jobs.py) owns preview receipts and uses injected improver, target, task, storage, and active-version queries. The Factory retains active bindings and exposes the public host methods.
 
 | Step | Run's responsibility |
 |---|---|
 | Preview | Bind one-use token to target, direction, task material, and parent manifest. |
 | Start | Recheck source identity before model work, then freeze the job. |
-| Search | Call generic `TextOptimizer.search(text, direction, parent_manifest=..., task=...)`. |
+| Search | Call generic `TextImprover.search(text, direction, parent_manifest=..., task=...)`. |
 | Save | Persist the preferred complete proposal, artifacts, task identity, and evidence. |
 | Review | Map results to Interactive sections without parsing strategy-specific logs. |
 | Activate | Prepare a separate handle; commit host references only after successful startup. |
 | Retain | Protect configuration, Session, candidate-parent, and RSI references. |
 
-Task selection does not change runtime configuration. Lab owns pack parsing and training edits. Readable `latest.txt` exports are not runtime inputs. Failed replacement retains the active runtime; external writes and effects do not automatically roll back. See [Optimization results](../lab/optimization/README.md#results-and-retention).
+Task selection does not change runtime configuration. Lab owns pack parsing and training edits. Readable `latest.txt` exports are not runtime inputs. Failed replacement retains the active runtime; external writes and effects do not automatically roll back. See [Improvement results](../lab/improvement/README.md#results-and-retention).
 
 ## Explicit text evolution
 
-For a started Application with an enabled optimizer, an embedding host can inject an independent asynchronous verifier:
+For a started Application with an available improver, an embedding host can inject an independent asynchronous verifier:
 
 ```python
 from fruitfly_agent.lab.rsi import PersistentEvolutionDriver
@@ -158,4 +160,4 @@ Authorization audit entries contain call/tool identity, operation, outcome, and 
 
 ## Start an original-task improvement experiment
 
-Use `/improvement` to select a saved task package or a bounded benchmark task set. One explicitly confirmed benchmark job prepares original material and freezes source, H/I/S, profile, model catalog, registered text state and original task bytes; its own baseline and official verification determine improvement. It does not silently start when configuration is enabled. A confirmed candidate uses the existing human review and fresh-session adoption path. See [Original task experiments](../lab/optimization/experiments/README.md) for budgets, splits, artifacts and unsupported targets. The public [trial.py](trial.py) composition entry runs one injected isolated task through the normal Application; Eval remains optional.
+Use `/improvement` to select a saved task package or a bounded benchmark task set. One explicitly confirmed benchmark job prepares original material and freezes source, H/I/S, profile, model catalog, registered text state and original task bytes; its own baseline and official verification determine improvement. It does not silently start when configuration is enabled. A confirmed candidate uses the existing human review and fresh-session adoption path. See [Original task experiments](../lab/improvement/experiments/README.md) for budgets, splits, artifacts and unsupported targets. The public [trial.py](trial.py) composition entry runs one injected isolated task through the normal Application; Eval remains optional.

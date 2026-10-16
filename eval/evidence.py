@@ -8,8 +8,8 @@ import shutil
 import tomllib
 from typing import Any
 
-from fruitfly_agent.lab.optimization.experiments import TaskReference, TaskRunEvidence, EvidenceArtifact
-from fruitfly_agent.lab.algorithms.versions import canonical_json, content_hash, SystemVersion
+from fruitfly_agent.lab.improvement.experiments import TaskReference, TaskRunEvidence, EvidenceArtifact
+from fruitfly_agent.lab.improvement.contracts.versions import canonical_json, content_hash, SystemVersion
 
 
 def material_hash(directory: Path) -> str:

@@ -11,9 +11,10 @@ from fruitfly_agent.interactive.contracts.models import (
     InteractiveStatus,
     ResumableSession,
 )
-from fruitfly_agent.interactive.contracts.optimization import OptimizationService
+from fruitfly_agent.interactive.contracts.improvement import ImprovementService
 from fruitfly_agent.interactive.contracts.candidates import CandidateActivationService, CandidateService
 from fruitfly_agent.interactive.contracts.task_packs import TaskPackService
+from fruitfly_agent.interactive.contracts.learning import LearningService
 
 
 class RuntimeSession(Protocol):
@@ -49,11 +50,13 @@ class RuntimeHandle(Protocol):
     @property
     def manifest(self) -> Mapping[str, Any]: ...
     @property
-    def optimization(self) -> OptimizationService | None: ...
+    def improvement(self) -> ImprovementService | None: ...
     @property
     def candidates(self) -> CandidateService | None: ...
     @property
     def task_packs(self) -> TaskPackService | None: ...
+    @property
+    def learning(self) -> LearningService | None: ...
     @property
     def candidate_activation(self) -> CandidateActivationService | None: ...
     @property

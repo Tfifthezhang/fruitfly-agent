@@ -30,3 +30,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+
+## Dream-RSI research attribution
+
+The native [DreamRSI method](fruitfly_agent/lab/improvement/methods/dream_rsi/README.md) is based on Zheng et al., [Dream-RSI: Recursive Self-Improvement through Evolving Worlds](https://arxiv.org/abs/2609.14858). The implementation was written from the paper's described mechanisms; no upstream implementation code or paper figures are included. It uses a restricted declarative policy family and adds real-search holdout confirmation. Published benchmark results are not reproduced.

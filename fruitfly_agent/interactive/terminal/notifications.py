@@ -1,5 +1,5 @@
 """Observe optional improvement services and write terminal notices."""
-from fruitfly_agent.interactive.terminal.features.improvement.formatting import format_optimization_activity
+from fruitfly_agent.interactive.terminal.features.improvement.formatting import format_improvement_activity
 from fruitfly_agent.interactive.terminal.io.text import safe_terminal_text
 
 
@@ -20,10 +20,10 @@ class ImprovementNotifications:
                 identity = (progress.sequence, progress.activity)
                 if identity != self._last_activity:
                     self._last_activity = identity
-                    self.write("[optimization] " + safe_terminal_text(format_optimization_activity(progress.activity)) + "\n")
+                    self.write("[improvement] " + safe_terminal_text(format_improvement_activity(progress.activity)) + "\n")
             elif progress.status not in {"idle", "running"} and progress.sequence != self._last_notice:
                 self._last_notice = progress.sequence
-                self.write(f"Optimization {progress.status}" +
+                self.write(f"Improvement {progress.status}" +
                            (f": {safe_terminal_text(progress.error)}" if progress.error else "") + "\n")
         self.show_candidates()
 

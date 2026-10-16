@@ -11,6 +11,8 @@ from .assembly import (
     require_workspace_path,
 )
 from .builtins import builtin_catalog
+from fruitfly_agent.lab.learning.engine import build_learning
+from fruitfly_agent.lab.learning.registration import LEARNING_POLICY_COMPONENT, LEARNING_PROCESSOR_COMPONENT
 from .catalog import LabCatalog
 from .models import (
     ActivationScope,
@@ -28,7 +30,11 @@ from .models import (
     ResolvedMechanism,
 )
 
+from fruitfly_agent.lab.improvement.migration import migrate_legacy_improvement_config_text, migrate_legacy_improvement_candidate
+
 __all__ = [
+    "build_method_selection", "build_learning", "LEARNING_POLICY_COMPONENT", "LEARNING_PROCESSOR_COMPONENT",
+    "migrate_legacy_improvement_config_text", "migrate_legacy_improvement_candidate",
     "PermissionPolicy", "apply_permission_policy",
     "ActivationScope",
     "ContextPhase",
@@ -56,3 +62,5 @@ __all__ = [
 ]
 
 from .permissions import PermissionPolicy, apply_permission_policy
+
+from fruitfly_agent.lab.improvement.runtime.selection import build_method_selection

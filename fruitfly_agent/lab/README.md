@@ -14,23 +14,24 @@ Add tools, execution backends, context strategies, and improvement algorithms th
 | [Tools](tools/README.md) | Model-callable file, shell, and IPython operations |
 | [Environment](environment/README.md) | Local filesystem and process backend |
 | [Base prompt](base_prompt/README.md) | Built-in prompt text and its target adapter |
-| [Optimization](optimization/README.md) | Candidate search, scoring, task packs, budgets, and OPRO |
+| [Improvement](improvement/README.md) | Candidate search, scoring, task packs, budgets, and OPRO |
+| [Learning](learning/README.md) | Independently configured daily task-material production |
 | [RSI](rsi/README.md) | Verified adoption and continuation across generations |
 | [Known limitations](ALGORITHM_AUDIT.md) | Current budget, I/O, cancellation, and composition limits |
 
-## Optimization and RSI
+## Improvement and RSI
 
 | Question | Owner | Example |
 |---|---|---|
 | What runs, and what can change? | Object module and target adapter | Base prompt or Skill catalog guidance |
-| How are improvements proposed and compared? | Optimization | OPRO searches scored text candidates. |
+| How are improvements proposed and compared? | Improvement | OPRO searches scored text candidates. |
 | Who verifies, adopts, and continues? | Human or explicit RSI host | Review one result, or run verified text evolution. |
 
-Optimization can run independently. Human adoption of a prompt is not a complete RSI process. Persistent RSI requires an injected host and independent verifier; only confirmed activation advances the version. Code replacement and arbitrary learning-state evolution are unsupported.
+Improvement can run independently. Human adoption of a prompt is not a complete RSI process. Persistent RSI requires an injected host and independent verifier; only confirmed activation advances the version. A registered declarative I exploration policy can be compared and activated through DreamRSI. Code replacement and arbitrary learning-state evolution remain unsupported.
 
-Independent optimization methods live in their own packages under `optimization/`, with shared hosting and trial services outside those packages. Methods remain Lab algorithms. Object adapters stay with the modules that define the objects; see [Optimization methods](optimization/README.md#optimization-methods).
+Independent improvement methods live under `improvement/methods/` and declare supported H/S/I targets, with shared hosting and trial services outside those packages. Methods remain Lab algorithms. Object adapters stay with the modules that define the objects; see [Improvement methods](improvement/README.md#improvement-methods).
 
-[Automatic text search](optimization/automatic/README.md) can prepare learning material with an independently selected [failure processor](optimization/failure_processing/README.md), compare text candidates on fixed original tasks, and confirm once on holdout. It stops for human adoption and does not collect weak-feedback daily tasks or modify the improver.
+[Automatic text search](improvement/automatic/README.md) can prepare learning material with an independently selected [failure processor](improvement/failure_processing/README.md), compare text candidates on fixed original tasks, and confirm once on holdout. It stops for human adoption and does not collect weak-feedback daily tasks or modify the improver.
 
 ## Develop an algorithm
 
@@ -51,7 +52,7 @@ It registers a context transformer, assembles it through Run, and submits a task
 | Add an operation | `AgentTool` | [Tools](tools/README.md) |
 | Replace file or shell access | `ExecutionEnv` | [Environment](environment/README.md) |
 | Collect feedback or update experience | Active hook or passive observer | [Core extensions](../core/extensions/README.md) |
-| Search candidates | `Optimizer` or `TextOptimizer` | [Optimization](optimization/README.md#extend-search) |
+| Search candidates | `Improver` or `TextImprover` | [Improvement](improvement/README.md#extend-search) |
 | Verify and adopt across generations | `EvolutionHost` and explicit policy | [RSI](rsi/README.md) |
 
 ## Implementation rules

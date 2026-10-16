@@ -47,7 +47,7 @@ Unknown fields and unsupported schema versions raise `ValueError`. Catalog valid
 
 `profile()`, `stage_profile()`, and `changed` expose draft operations without allowing other services to access private fields. Model setup receives these callbacks and a configuration path. It writes only on save, preserves unrelated content, rolls back ordinary failures, and updates the secret environment after success. No model requests occur during configuration.
 
-The public `RunConfigurationController` in [Run](../README.md) composes this controller with candidate-backed prompt presentation. The configuration implementation receives an artifact store and optional prompt-choice callback; it does not discover candidate paths or depend on runtime preparation. Default workspace paths and environment precedence are documented in the configuration reference below.
+The public `RunConfigurationController` in [Run](../README.md) composes this controller with candidate-backed prompt presentation. The configuration implementation receives an artifact store and optional prompt-choice callback; it does not discover candidate paths or depend on runtime preparation. Default workspace paths and environment precedence are documented in the configuration reference below. Improvement methods have no configuration-menu category; `/improvement` owns method selection and per-job parameter overrides. Existing YAML entries remain optional defaults. Method-owned artifact slots registered independently of enablement remain valid adoption targets.
 
 | Reference | Purpose |
 |---|---|

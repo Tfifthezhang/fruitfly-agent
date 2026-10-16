@@ -8,8 +8,8 @@ import tomllib
 
 from eval.catalog import builtin_catalog
 from eval.evidence import material_hash
-from fruitfly_agent.lab.optimization.experiments import TaskReference
-from fruitfly_agent.lab.algorithms.versions import canonical_json, content_hash
+from fruitfly_agent.lab.improvement.experiments import TaskReference
+from fruitfly_agent.lab.improvement.contracts.versions import canonical_json, content_hash
 
 
 async def resolve_materials(dataset, task_names, limit, cache):

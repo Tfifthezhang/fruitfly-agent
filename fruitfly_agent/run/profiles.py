@@ -11,7 +11,7 @@ from .adapters.configuration import candidate_prompt_choices
 class RunConfigurationController(ConfigurationController):
     def __init__(self, selection, catalog, artifact_store=None):
         store = artifact_store or DataArtifactStore(selection.config_path.parent / "artifacts")
-        candidates = CandidateStore(store.root.parent / "optimization/candidates", store)
+        candidates = CandidateStore(store.root.parent / "improvement/candidates", store)
         super().__init__(selection, catalog, store,
             prompt_choices_provider=lambda profile: candidate_prompt_choices(
                 profile, read_text=store.read_text, records=candidates.list,

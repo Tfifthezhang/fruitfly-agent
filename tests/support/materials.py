@@ -1,4 +1,4 @@
-"""Small offline model and optimization materials."""
+"""Small offline model and improvement materials."""
 import json
 from pathlib import Path
 
@@ -13,7 +13,7 @@ def _write_models(root: Path) -> None:
 
 
 def _write_cases(root: Path) -> None:
-    path = root / ".fruitfly" / "optimization" / "cases.json"
+    path = root / ".fruitfly" / "improvement" / "cases.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({
         "train": [{"input": "say A", "expected": "A"}],

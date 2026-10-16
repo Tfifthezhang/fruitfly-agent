@@ -3,13 +3,13 @@ from dataclasses import replace
 from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.core.data_model import AssistantMessage, ToolCallBlock, Usage
 from fruitfly_agent.lab.base_prompt.target import BasePromptTarget
-from fruitfly_agent.lab.optimization.search import TaskCase, OptimizationProblem
-from fruitfly_agent.lab.optimization.services import NativeSearchServices, SearchBudget, SearchJournal
+from fruitfly_agent.lab.improvement.contracts.search import TaskCase, ImprovementProblem
+from fruitfly_agent.lab.improvement.runtime.services import NativeSearchServices, SearchBudget, SearchJournal
 from tests.support.faux_provider import FauxProvider
 
 
 def problem(**changes):
-    return replace(OptimizationProblem("search-1", "parent-1", BasePromptTarget("seed").snapshot(),
+    return replace(ImprovementProblem("search-1", "parent-1", BasePromptTarget("seed").snapshot(),
         "improve", (TaskCase("train", "A"),), (TaskCase("select", "B"),), "cases-1", "runtime-1",
         parameters=(("rounds", 2), ("batch_size", 2), ("history_limit", 5),
                     ("max_metric_calls", 12))), **changes)

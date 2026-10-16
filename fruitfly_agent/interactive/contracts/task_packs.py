@@ -1,4 +1,4 @@
-"""Task material views and services, independent of optimization execution."""
+"""Task material views and services, independent of improvement execution."""
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable

@@ -12,7 +12,7 @@ Verify configuration, model selection, assembly, manifest, CLI, candidates, rete
 | `test_model_setup.py` | First-run form, secret isolation, preservation, cancel/discard, rollback, and immediate offline assembly |
 | `test_assembly.py / test_resources.py` | Runtime identity and failed assembly cleanup |
 | `test_cli.py` | Startup, one-shot, resume, and rebuild |
-| `test_optimization_versions.py / test_task_prompt_catalog.py / test_base_prompt_flow.py` | Candidate scope, prompt selection, and recovery |
+| `test_improvement_versions.py / test_task_prompt_catalog.py / test_base_prompt_flow.py` | Candidate scope, prompt selection, and recovery |
 | `test_eval_bridge.py` | Optional benchmark catalog, one-use improvement dispatch, live subprocess logs, and removed launch APIs; no benchmark scoring |
 
 Fake Providers and temporary files. No model fees or benchmark containers.

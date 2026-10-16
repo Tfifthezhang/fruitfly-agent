@@ -11,13 +11,13 @@
 
 [Quickstart](#quickstart) · [Configuration](CONFIGURATION.md) · [Architecture](fruitfly_agent/README.md) · [RSI](fruitfly_agent/lab/rsi/README.md) · [Contributing](CONTRIBUTING.md)
 
-**A lightweight Python agent harness for research into optimization and recursive self-improvement.**
+**A lightweight Python agent harness for research into improvement and recursive self-improvement.**
 
 Agent research needs a system you can understand, change, and test. FruitFlyAgent keeps the essential runtime in a small Python core, with replaceable algorithms in a pluggable Lab. Small, focused source files make mechanisms easy to inspect and modify, for both developers and coding agents.
 
 Its Python runtime is adapted from [Pi](https://github.com/earendil-works/pi). [RLM-inspired programmatic context externalization](fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md) is one optional, pluggable Lab mechanism that you can enable for an experiment.
 
-The research object is the **whole harness**: context, tools, execution, optimization, and adoption. Python and public extension contracts let you study these mechanisms in the same language as your experiments.
+The research object is the **whole harness**: context, tools, execution, improvement, and adoption. Python and public extension contracts let you study these mechanisms in the same language as your experiments.
 
 Named after **Thomas Hunt Morgan's fruit-fly research**, FruitFlyAgent uses simple systems to understand agent mechanisms. Our philosophy is **simple systems, controlled changes, rapid validation, repeatable observation, and respect for anomalous evidence**:
 
@@ -40,16 +40,16 @@ Our ambition is **recursive self-improvement (RSI)**: agents that improve their 
 | Version-bound task and improver implementations | The RSI driver resolves the improver again after adoption, so the next generation can use an improved improvement process. |
 | Explicit lifecycle and durable evolution phases | Own resource startup and cleanup; reconcile interrupted activation and avoid blindly replaying work with unknown cost. |
 
-**Optimization and RSI serve different roles:**
+**Improvement and RSI serve different roles:**
 
 | Capability | Role |
 |---|---|
-| [Optimization](fruitfly_agent/lab/optimization/README.md) | Search and compare candidates for a fixed target under a defined objective. It can run independently. |
+| [Improvement](fruitfly_agent/lab/improvement/README.md) | Search and compare candidates for a fixed target under a defined objective. It can run independently. |
 | [RSI](fruitfly_agent/lab/rsi/README.md) | Verify and adopt changes to the system or its improver, then continue with the adopted implementation across generations. |
 
-The built-in `/improvement` workflow searches prompt and guidance text. Broader harness experiments use the public mechanism contracts and researcher-supplied evaluators, version bindings, and adoption hosts. The generic RSI driver accepts host-bound implementation references; the built-in durable Run host handles text artifacts. See [Lab](fruitfly_agent/lab/README.md#optimization-and-rsi) for these implementation boundaries. Runtime manifests record declared identities; reproducible research also needs source and learning-state records.
+The built-in `/improvement` menu selects H/S/I targets. H supports OPRO and tree search over prompt/guidance text. [DreamRSI](fruitfly_agent/lab/improvement/methods/dream_rsi/README.md) improves a registered I exploration-policy artifact; S and arbitrary I code remain unsupported. Daily [learning material recording](fruitfly_agent/lab/learning/README.md) is separately configured and produces pending observations without inferred scores. Broader harness experiments use the public mechanism contracts and researcher-supplied evaluators, version bindings, and adoption hosts. The generic RSI driver accepts host-bound implementation references; the built-in durable Run host handles text artifacts. See [Lab](fruitfly_agent/lab/README.md#improvement-and-rsi) for these implementation boundaries. Runtime manifests record declared identities; reproducible research also needs source and learning-state records.
 
-Optional [automatic text search](fruitfly_agent/lab/optimization/automatic/README.md) prepares learning exercises from explicitly scored failures, compares candidates on fixed original tasks and confirms one candidate on holdout before human adoption. Its [offline demonstration](examples/optimization/automatic_text/README.md) uses scripted responses; real quality gains remain unmeasured.
+Optional [automatic text search](fruitfly_agent/lab/improvement/automatic/README.md) prepares learning exercises from explicitly scored failures, compares candidates on fixed original tasks and confirms one candidate on holdout before human adoption. Its [offline demonstration](examples/improvement/automatic_text/README.md) uses scripted responses; real quality gains remain unmeasured.
 
 | At a glance | Details |
 |---|---|
@@ -80,9 +80,9 @@ Expected output: `Offline response: example-guidance is active.` The example reg
 
 ## Choose your mechanisms
 
-Use the terminal configuration menu to assemble the harness for your task or experiment. Select a model and base prompt, enable or disable mechanisms, and choose their registered algorithms. Context management, tools, environment, and optimization are configurable through the same interface.
+Use the terminal configuration menu to assemble the harness for your task or experiment. Select a model and base prompt, enable or disable mechanisms, and choose their registered algorithms. Context management, tools, environment, and improvement are configurable through the same interface.
 
-![Compose a FruitFlyAgent harness: choose a model and base prompt, configure context, environment, tools, and optimization, then assemble a new Agent session](assets/mechanism-selection.svg)
+![Compose a FruitFlyAgent harness: choose a model and base prompt, configure context, environment, tools, and improvement, then assemble a new Agent session](assets/mechanism-selection.svg)
 
 *A composition overview. Mechanisms are selectable; RLM-inspired externalization is optional and requires the IPython tool.*
 
@@ -101,7 +101,7 @@ For example, enable RLM-inspired externalization together with the IPython tool 
 | Use terminal commands and menus | [Terminal](fruitfly_agent/interactive/terminal/README.md) |
 | Inspect externalized context through Python | [Programmatic context](fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md) |
 | Add an algorithm | [Lab](fruitfly_agent/lab/README.md) · [Offline extension example](examples/extensions/README.md) |
-| Investigate and optimize harness mechanisms | [Lab](fruitfly_agent/lab/README.md#optimization-and-rsi) · [Optimization](fruitfly_agent/lab/optimization/README.md) |
+| Investigate and improve harness mechanisms | [Lab](fruitfly_agent/lab/README.md#improvement-and-rsi) · [Improvement](fruitfly_agent/lab/improvement/README.md) |
 | Verify, adopt, and continue across harness or improver versions | [RSI](fruitfly_agent/lab/rsi/README.md) |
 | Run external benchmarks | [Eval](eval/README.md) |
 | Develop and test | [Contributing](CONTRIBUTING.md) · [Tests](tests/README.md) |
@@ -112,7 +112,7 @@ For example, enable RLM-inspired externalization together with the IPython tool 
 |---|---|
 | [fruitfly_agent/](fruitfly_agent/README.md) | Runtime architecture and module entry points |
 | [eval/](eval/README.md) | Optional benchmark execution and reports |
-| [examples/](examples/README.md) | Runnable extensions and optimization task packs |
+| [examples/](examples/README.md) | Runnable extensions and improvement task packs |
 | [tests/](tests/README.md) | Offline contract, architecture, and behavior checks |
 | [AGENTS.md](AGENTS.md) | Engineering instructions for AI-assisted development |
 
@@ -139,6 +139,7 @@ FruitFlyAgent is released under the [MIT License](LICENSE). See [Third-party not
 | Source | Contribution |
 |---|---|
 | [Pi](https://github.com/earendil-works/pi) | Runtime design and adapted Agent loop, Session, and tool infrastructure; code attribution and the upstream license are recorded in [Third-party notices](THIRD_PARTY_NOTICES.md). |
+| [Dream-RSI](https://arxiv.org/abs/2609.14858) | Research basis for prefix-only replay and exploration-policy refinement; [implemented scope](fruitfly_agent/lab/improvement/methods/dream_rsi/README.md). |
 | [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) | Inspiration for externalizing context into a programmable Python environment; see [Programmatic context](fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md). |
 
 Research sources and the scope of each adaptation are documented in the corresponding algorithm modules.

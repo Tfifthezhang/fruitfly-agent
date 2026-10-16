@@ -29,20 +29,37 @@ class RunVersions:
         source = self.freeze_source()
         harness = execution_version_payload(manifest, source)
         h = self.artifacts.put_text(canonical_json(harness)).artifact_id
-        i = self.artifacts.put_text(canonical_json({"source": source, "strategy": self.improvement_identity()})).artifact_id
+        i = self.artifacts.put_text(canonical_json({"source": source, "strategy": self.improvement_identity(),
+            "artifacts": sorted((a for a in manifest.get("data_artifacts", ()) if a.get("role") == "I"), key=lambda a: a["key"])})).artifact_id
         version = SystemVersion(h, i, self.freeze_state())
         self.versions.put(version)
         return version
 
     def text_candidate(self, parent, snapshot, text):
+        if snapshot.role not in {'H', 'I'} or (snapshot.role == 'I' and snapshot.binding.kind != 'artifact'):
+            raise ValueError('no version adapter for this role and binding')
         before = self.artifacts.put_text(snapshot.text).artifact_id
         after = self.artifacts.put_text(text).artifact_id
+        if snapshot.role == 'I':
+            import json
+            payload = json.loads(self.artifacts.read_text(parent.improver))
+            payload['artifacts'] = sorted([a for a in payload.get('artifacts', ()) if a['key'] != snapshot.binding.key] + [
+                {'key': snapshot.binding.key, 'id': after, 'role': 'I', 'media_type': 'application/json',
+                 'size_bytes': len(text.encode('utf-8'))}], key=lambda a: a['key'])
+            identity = self.artifacts.put_text(canonical_json(payload)).artifact_id
+            candidate = VersionCandidate(parent, SystemVersion(parent.harness, identity, parent.state),
+                (TargetChange('I', snapshot.target_id, snapshot.schema, before, after),))
+            self.versions.put_candidate(candidate)
+            return candidate
         import json
         harness = json.loads(self.artifacts.read_text(parent.harness))
         if snapshot.binding.kind == "prompt":
             harness["base_prompt"] = {"content_hash": after}
         else:
-            harness["target_overrides"] = {snapshot.binding.key: after}
+            artifacts = [a for a in harness.get('data_artifacts', ()) if a.get('key') != snapshot.binding.key]
+            artifacts.append({'key': snapshot.binding.key, 'id': after,
+                'media_type': 'text/plain; charset=utf-8', 'size_bytes': len(text.encode('utf-8'))})
+            harness['data_artifacts'] = sorted(artifacts, key=lambda a: a['key'])
         h = self.artifacts.put_text(canonical_json(harness)).artifact_id
         candidate = VersionCandidate(parent, SystemVersion(h, parent.improver, parent.state),
             (TargetChange("H", snapshot.target_id, snapshot.schema, before, after),))

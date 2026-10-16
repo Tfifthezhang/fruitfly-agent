@@ -9,7 +9,7 @@ import unittest
 from fruitfly_agent.interactive import AgentApplication, ApplicationState
 from fruitfly_agent.interactive.contracts.candidates import CandidateView
 from fruitfly_agent.interactive.contracts.commands import CommandResult, InteractiveCommand
-from fruitfly_agent.interactive.contracts.optimization import OptimizationPreview
+from fruitfly_agent.interactive.contracts.improvement import ImprovementPreview
 from fruitfly_agent.interactive.contracts.task_packs import TaskPackView
 from fruitfly_agent.interactive.terminal import TerminalFrontend, TerminalCommandRegistry, TerminalBindings, ImprovementClients
 from fruitfly_agent.interactive.terminal.features.configuration.command import configuration_handler
@@ -61,10 +61,10 @@ class ExtensionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(task.task_id, saved[0][3]["source"]["message_id"])
         self.assertEqual(app.runtime_manifest["digest"], saved[0][3]["source"]["parent_manifest"])
         self.assertEqual((), app.candidates())
-        with self.assertRaisesRegex(RuntimeError, "no optimization service"):
-            app.optimization_preview()
+        with self.assertRaisesRegex(RuntimeError, "no improvement service"):
+            app.improvement_preview()
 
-    async def test_candidate_review_works_without_optimization(self):
+    async def test_candidate_review_works_without_improvement(self):
         view = CandidateView("candidate", "proposed", "custom", "text", "artifact", "improve", "parent")
         actions = []
 
@@ -87,18 +87,18 @@ class ExtensionTests(unittest.IsolatedAsyncioTestCase):
         entered = asyncio.Event()
 
         class Search:
-            def optimization_preview(self, manifest, **options):
-                return OptimizationPreview("custom", "Custom", "offline")
-            async def optimize(self, manifest, direction, **options):
+            def improvement_preview(self, manifest, **options):
+                return ImprovementPreview("custom", "Custom", "offline")
+            async def improve(self, manifest, direction, **options):
                 entered.set()
                 await asyncio.Event().wait()
                 return ()
-            def cancel_optimization(self): return True
+            def cancel_improvement(self): return True
 
-        app, provider = await self.app(optimization=Search())
-        task = app.start_optimization("improve")
+        app, provider = await self.app(improvement=Search())
+        task = app.start_improvement("improve")
         await entered.wait()
-        self.assertEqual(ApplicationState.OPTIMIZING, app.state)
+        self.assertEqual(ApplicationState.IMPROVING, app.state)
         with self.assertRaisesRegex(RuntimeError, "cannot queue"):
             app.enqueue("next")
         with self.assertRaisesRegex(RuntimeError, "finish active work"):
@@ -106,30 +106,30 @@ class ExtensionTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(app.cancel())
         with self.assertRaises(asyncio.CancelledError):
             await task
-        await app.wait_for_optimization()
+        await app.wait_for_improvement()
         self.assertEqual(ApplicationState.IDLE, app.state)
-        self.assertEqual("cancelled", app.optimization_progress.status)
+        self.assertEqual("cancelled", app.improvement_progress.status)
         self.assertEqual([], provider.calls)
 
     async def test_cancel_before_job_starts_restores_application_and_allows_next_job(self):
         calls = []
 
         class Search:
-            async def optimize(self, manifest, direction, **options):
+            async def improve(self, manifest, direction, **options):
                 calls.append(direction)
                 return ()
-            def cancel_optimization(self): return True
+            def cancel_improvement(self): return True
 
-        app, _ = await self.app(optimization=Search())
-        task = app.start_optimization("first")
+        app, _ = await self.app(improvement=Search())
+        task = app.start_improvement("first")
         app.cancel()
         with self.assertRaises(asyncio.CancelledError):
             await task
-        await app.wait_for_optimization()
+        await app.wait_for_improvement()
         self.assertEqual(ApplicationState.IDLE, app.state)
-        await app.optimize("second")
+        await app.improve("second")
         self.assertEqual(["second"], calls)
-        self.assertEqual("completed", app.optimization_progress.status)
+        self.assertEqual("completed", app.improvement_progress.status)
 
     async def test_async_command_extension_does_not_submit_to_model(self):
         app, provider = await self.app()
@@ -205,23 +205,24 @@ class ExtensionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([], provider.calls)
 
     async def test_menu_accepts_distinct_feature_clients(self):
-        for clients, shown, absent in (
-            (ImprovementClients(search=SimpleNamespace()), "Start improvement", "Review candidates"),
-            (ImprovementClients(candidates=SimpleNamespace(candidates=lambda: ())), "Review candidates", "Start improvement"),
-            (ImprovementClients(materials=SimpleNamespace(task_packs_available=True)), "Save a failed task", "Start improvement"),
+        from fruitfly_agent.interactive.contracts.improvement import ImprovementTargetView
+        targets = lambda: (ImprovementTargetView('H', 'base_prompt', 'Base prompt'),)
+        for clients in (
+            ImprovementClients(search=SimpleNamespace(), targets=targets),
+            ImprovementClients(candidates=SimpleNamespace(candidates=lambda: ()), targets=targets),
+            ImprovementClients(materials=SimpleNamespace(task_packs_available=True)),
         ):
-            with self.subTest(feature=shown):
-                provider = FauxProvider()
-                output = io.StringIO()
-                frontend = TerminalFrontend(
-                    offline_session(provider=provider), improvement_clients=clients,
-                    input_stream=io.StringIO(), output_stream=output,
-                    line_editor=ScriptedLines("/improvement", "2", "/exit"),
-                )
-                await frontend.run()
-                self.assertIn(shown, output.getvalue())
-                self.assertNotIn(absent, output.getvalue())
-                self.assertEqual([], provider.calls)
+            provider = FauxProvider()
+            output = io.StringIO()
+            frontend = TerminalFrontend(offline_session(provider=provider), improvement_clients=clients,
+                input_stream=io.StringIO(), output_stream=output,
+                line_editor=ScriptedLines('/improvement', 'q', '/exit'))
+            await frontend.run()
+            self.assertIn('H · Harness', output.getvalue())
+            self.assertIn('S · State', output.getvalue())
+            self.assertIn('I · Improver', output.getvalue())
+            self.assertNotIn('Save a failed task', output.getvalue())
+            self.assertEqual([], provider.calls)
 
     async def test_previous_job_completion_cannot_reset_new_job_state(self):
         second_started, release = asyncio.Event(), asyncio.Event()
@@ -229,24 +230,24 @@ class ExtensionTests(unittest.IsolatedAsyncioTestCase):
         app = None
 
         class Search:
-            async def optimize(self, manifest, direction, **options):
+            async def improve(self, manifest, direction, **options):
                 if direction == "first":
                     asyncio.get_running_loop().call_soon(
-                        lambda: tasks.append(app.start_optimization("second"))
+                        lambda: tasks.append(app.start_improvement("second"))
                     )
                     return ()
                 second_started.set()
                 await release.wait()
                 return ()
-            def cancel_optimization(self): return True
+            def cancel_improvement(self): return True
 
-        app, _ = await self.app(optimization=Search())
-        await app.optimize("first")
+        app, _ = await self.app(improvement=Search())
+        await app.improve("first")
         await second_started.wait()
         try:
-            self.assertEqual(ApplicationState.OPTIMIZING, app.state)
-            self.assertEqual("running", app.optimization_progress.status)
-            self.assertEqual(2, app.optimization_progress.sequence)
+            self.assertEqual(ApplicationState.IMPROVING, app.state)
+            self.assertEqual("running", app.improvement_progress.status)
+            self.assertEqual(2, app.improvement_progress.sequence)
         finally:
             release.set()
             await tasks[0]

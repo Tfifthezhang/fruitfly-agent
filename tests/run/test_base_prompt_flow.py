@@ -11,7 +11,7 @@ from tests.support.materials import _write_models, _write_cases
 
 
 class BasePromptFlowTests(unittest.IsolatedAsyncioTestCase):
-    async def test_each_prompt_can_be_selected_optimized_adopted_and_restored(self):
+    async def test_each_prompt_can_be_selected_improved_adopted_and_restored(self):
         for reference in ('assistant-default',):
             with self.subTest(reference=reference), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
@@ -32,7 +32,7 @@ class BasePromptFlowTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(get_builtin(reference).content_hash, app.runtime_manifest['base_prompt']['content_hash'])
                     for text in ('wrong','wrong','["Improved coding instructions"]','A','B','["Improved coding instructions"]'):
                         provider.respond_text(text)
-                    candidate = (await app.optimize('improve'))[0]
+                    candidate = (await app.improve('improve'))[0]
                     self.assertEqual(get_builtin(reference).content_hash, factory.candidate_store.read(candidate.candidate_id).parent_target_hash)
                     self.assertEqual(get_builtin(reference).text, provider.calls[0]['system_prompt'])
                     await app.adopt_candidate(candidate.candidate_id)

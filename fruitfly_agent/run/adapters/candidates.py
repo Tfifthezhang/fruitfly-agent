@@ -1,7 +1,7 @@
 """Present and prepare candidates independently of search execution."""
 from dataclasses import replace
 from fruitfly_agent.interactive.contracts.candidates import CandidateView, CandidateSection
-from fruitfly_agent.lab.optimization.text_optimizer import SearchReport, restore_search_report
+from fruitfly_agent.lab.improvement.api import SearchReport, restore_search_report
 
 
 def candidate_view(record):
@@ -17,6 +17,7 @@ def candidate_view(record):
     return CandidateView(
         record.candidate_id, record.status, record.algorithm, record.target,
         record.artifact_id, record.direction, record.parent_manifest_digest, tuple(evidence),
+        role=record.role,
     )
 
 
@@ -71,6 +72,10 @@ class RunCandidateService:
                           f'{result("candidate", "train", report.train_count)}\nSelection: '
                           f'{result("baseline", "validation", report.validation_count)} → '
                           f'{result("candidate", "validation", report.validation_count)}')
+            if record.role != 'H':
+                conclusion = {'tied': 'Tied on declared objective', 'improved': 'Improved on declared objective',
+                    'worse': 'Worse on declared objective', 'unavailable': 'Comparison unavailable'}[report.conclusion]
+                evaluation = f'{conclusion}\nObjective ({report.metric}): {record.seed_score} → {record.validation_score}'
             stop = report.stop_reason or 'unknown'
             if stop == 'budget_exhausted':
                 kind = {'trial': 'Trial evaluation', 'model': 'Model request'}.get(report.exhausted_kind, 'Search call')

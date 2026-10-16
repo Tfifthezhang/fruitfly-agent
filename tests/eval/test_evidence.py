@@ -5,7 +5,7 @@ import tempfile
 import unittest
 
 from eval.evidence import export_harbor_evidence, material_hash
-from fruitfly_agent.lab.optimization.experiments import TaskRunEvidence
+from fruitfly_agent.lab.improvement.experiments import TaskRunEvidence
 
 
 class EvidenceExportTests(unittest.TestCase):

@@ -6,8 +6,8 @@ import tempfile
 import unittest
 
 from fruitfly_agent.lab.algorithms.targets import SystemVersion, StateSnapshot, SnapshotFile, TargetChange, VersionCandidate, TargetRegistry, content_hash
-from fruitfly_agent.lab.optimization.experiments import TaskReference, TaskRunEvidence, EvidenceArtifact, ExperimentTasks
-from fruitfly_agent.lab.optimization.failure_processing.projection import EvidenceProjection
+from fruitfly_agent.lab.improvement.experiments import TaskReference, TaskRunEvidence, EvidenceArtifact, ExperimentTasks
+from fruitfly_agent.lab.improvement.failure_processing.projection import EvidenceProjection
 from fruitfly_agent.run.storage.artifacts import DataArtifactStore
 from fruitfly_agent.run.storage.snapshots import SnapshotStore
 

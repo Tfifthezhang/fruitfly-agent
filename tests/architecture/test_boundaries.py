@@ -105,7 +105,7 @@ class RunAlgorithmBoundaryTests(unittest.TestCase):
 
     def test_run_only_imports_public_lab_host_contracts(self):
         allowed = {"fruitfly_agent.lab.catalog", "fruitfly_agent.lab.catalog.models",
-                   "fruitfly_agent.lab.base_prompt", "fruitfly_agent.lab.optimization.text_optimizer", "fruitfly_agent.lab.optimization.task_packs",
+                   "fruitfly_agent.lab.base_prompt", "fruitfly_agent.lab.improvement.api", "fruitfly_agent.lab.improvement.tasks",
                    "fruitfly_agent.lab.algorithms.targets", "fruitfly_agent.lab.algorithms.evolution"}
         violations = []
         for path in (ROOT / "fruitfly_agent" / "run").rglob("*.py"):
@@ -159,13 +159,13 @@ class InteractiveExtensibilityTests(unittest.TestCase):
         self.assertEqual([], branches, "Register a terminal handler instead of branching in the input loop")
 
     def test_services_do_not_bundle_unrelated_capabilities(self):
-        from fruitfly_agent.interactive.contracts.optimization import OptimizationService
+        from fruitfly_agent.interactive.contracts.improvement import ImprovementService
         from fruitfly_agent.interactive.contracts.candidates import CandidateService
         from fruitfly_agent.interactive.contracts.task_packs import TaskPackService
-        self.assertFalse(hasattr(OptimizationService, "candidates"))
-        self.assertFalse(hasattr(OptimizationService, "task_packs"))
-        self.assertFalse(hasattr(CandidateService, "optimize"))
-        self.assertFalse(hasattr(TaskPackService, "optimize"))
+        self.assertFalse(hasattr(ImprovementService, "candidates"))
+        self.assertFalse(hasattr(ImprovementService, "task_packs"))
+        self.assertFalse(hasattr(CandidateService, "improve"))
+        self.assertFalse(hasattr(TaskPackService, "improve"))
 
 
 class InteractiveDirectoryTests(unittest.TestCase):
@@ -210,7 +210,7 @@ class InteractiveDirectoryTests(unittest.TestCase):
         from tests.support.application import offline_session
         from typing import get_type_hints
         handle = RuntimeHandle(offline_session(), {})
-        for name in ("start", "health", "close", "session", "manifest", "optimization", "candidates",
+        for name in ("start", "health", "close", "session", "manifest", "improvement", "candidates",
                      "task_packs", "candidate_activation", "authorization", "activate_callback"):
             self.assertTrue(hasattr(handle, name), name)
         from fruitfly_agent.interactive.contracts.candidates import CandidateActivationService

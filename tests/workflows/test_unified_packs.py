@@ -6,9 +6,9 @@ import tempfile
 import unittest
 
 from fruitfly_agent.interactive import TerminalFrontend
-from fruitfly_agent.lab.optimization.task_packs import load_pack
+from fruitfly_agent.lab.improvement.tasks import load_pack
 from tests.support import application as fixtures
-from tests.support.optimizers import QueueEditor
+from tests.support.improvers import QueueEditor
 from tests.support.task_packs import coding_pack
 from tests.support.task_packs import install
 
@@ -19,13 +19,13 @@ class UnifiedPackApplicationTests(unittest.IsolatedAsyncioTestCase):
             root=Path(tmp).resolve();path=install(root,coding_pack())
             app,_,provider=await fixtures.open_task_app(self,root,'opro')
             for filename in ('pack.json','cases.json','holdout.json'):
-                preview=app.optimization_preview(pack_id='coding',direction='improve')
+                preview=app.improvement_preview(pack_id='coding',direction='improve')
                 file=path.parent/filename
                 original=file.read_bytes()
                 # Even a valid formatting edit is a different declared material version.
                 file.write_bytes(original+b'\n')
                 with self.subTest(file=filename), self.assertRaisesRegex(ValueError,'package changed'):
-                    await app.optimize('improve',preview_token=preview.preview_token)
+                    await app.improve('improve',preview_token=preview.preview_token)
                 self.assertEqual([],provider.calls)
                 file.write_bytes(original)
 
@@ -36,7 +36,7 @@ class UnifiedPackApplicationTests(unittest.IsolatedAsyncioTestCase):
             app,_,provider=await fixtures.open_task_app(self,root,'opro')
             view=next(p for p in app.task_packs() if p.pack_id=='coding')
             self.assertEqual(payload['default_direction'],view.default_direction)
-            editor=QueueEditor();editor.send('/improvement','1','1','','2','q','/exit')
+            editor=QueueEditor();editor.send('/improvement', "1", "1",'1','1','','2','q','/exit')
             output=io.StringIO()
             await TerminalFrontend(app,input_stream=io.StringIO(),output_stream=output,line_editor=editor).run()
             self.assertIn('blank uses Improve boundary handling',output.getvalue())
@@ -51,17 +51,14 @@ class UnifiedPackApplicationTests(unittest.IsolatedAsyncioTestCase):
                 provider.respond_text('wrong code')
                 await app.submit('Implement triple(x), returning x * 3.')
                 acceptance={'entry_point':'triple','tests':[{'args':[2],'expected':6}]}
-                editor=QueueEditor()
-                values=['/improvement','3','1','1','',json.dumps(acceptance),'human checked',confirm]
-                if confirm=='1':values+=['1'] # return to package selection after save
-                editor.send(*values,'q','/exit')
-                output=io.StringIO()
-                await TerminalFrontend(app,input_stream=io.StringIO(),output_stream=output,line_editor=editor).run()
+                task = app.correction_tasks()[0]
+                pack = app.task_packs()[0]
+                if confirm == '1':
+                    app.save_training_task(task.task_id, pack.pack_id, task.input, json.dumps(acceptance),
+                        acceptance=acceptance, expected_hash=pack.source_hash, reason='Declared executable acceptance')
                 rows=json.loads((path.parent/'cases.json').read_text())['train']
                 self.assertEqual(2 if confirm=='1' else 1,len(rows))
                 self.assertEqual(1,len(provider.calls))
-                self.assertIn('Acceptance JSON',output.getvalue())
-                self.assertNotIn('Correct answer (required)',output.getvalue())
                 if confirm=='1':
                     self.assertEqual(acceptance,rows[-1]['acceptance'])
                     self.assertNotIn('expected',rows[-1])

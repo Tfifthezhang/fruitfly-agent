@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="660" viewBox="0 0 1200 660" role="img" aria-labelledby="title description">
   <title id="title">Compose your FruitFlyAgent harness</title>
-  <desc id="description">Select a model and base prompt, then configure context management, environment, tools, and optimization for a new Agent session. RLM-inspired externalization and IPython are optional mechanisms. This is a composition diagram, not an execution sequence or default configuration.</desc>
+  <desc id="description">Select a model and base prompt, then configure context management, environment, tools, and improvement for a new Agent session. RLM-inspired externalization and IPython are optional mechanisms. This is a composition diagram, not an execution sequence or default configuration.</desc>
   <defs>
     <linearGradient id="canvas" x2="1" y2="1">
       <stop stop-color="#f8fafc"/>
@@ -72,7 +72,7 @@
 
   <rect x="600" y="355" width="258" height="145" rx="18" class="card"/>
   <rect x="620" y="376" width="4" height="23" rx="2" fill="#cc9046"/>
-  <text x="635" y="394" class="heading">Optimization</text>
+  <text x="635" y="394" class="heading">Improvement</text>
   <text x="620" y="427" class="body">OPRO text search</text>
   <rect x="620" y="447" width="92" height="30" rx="15" fill="#faf0df"/>
   <text x="635" y="467" class="chip" fill="#9b6b2e">Optional</text>

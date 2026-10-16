@@ -34,6 +34,11 @@ class RunCandidates:
         self.activation_guard = activation_guard
 
     def check_version(self, record):
+        target = self.target(record.target)
+        if target is None or target.snapshot().role != record.role:
+            raise ValueError('candidate role differs from the registered target')
+        if record.role != 'H' and record.role not in getattr(target, 'adoption_roles', ()):
+            raise ValueError('this host has no adoption adapter for this role')
         if self.version_guard is not None:
             self.version_guard(record)
 
@@ -65,12 +70,12 @@ class RunCandidates:
     def candidates(self) -> tuple[CandidateRecord, ...]:
         config = str(Path(self.scope()[0]).resolve())
         profile = self.scope()[1]
-        latest: dict[tuple[str, str], CandidateRecord] = {}
+        latest: dict[tuple[str, str, str], CandidateRecord] = {}
         for record in self.store.list():
             if (record.config_path, record.profile_id) == (config, profile) or (
                     not record.config_path and self.active_manifest() is not None
                     and self.active_manifest().digest in {record.parent_manifest_digest, record.activated_manifest_digest}):
-                latest.setdefault((record.target, record.task_pack_id), record)
+                latest.setdefault((record.role, record.target, record.task_pack_id), record)
         return tuple(latest.values())
 
     def candidate_notice(self) -> tuple[str, ...]:
@@ -86,7 +91,7 @@ class RunCandidates:
         new = self.artifacts.read_text(record.artifact_id)
         diff = '\n'.join(difflib.unified_diff(
             parent.splitlines(), new.splitlines(),
-            fromfile=f'parent {record.target}', tofile='Optimization candidate', lineterm='',
+            fromfile=f'parent {record.target}', tofile='Improvement candidate', lineterm='',
         ))
         return record, diff
 
@@ -103,12 +108,12 @@ class RunCandidates:
             return self.store.update(candidate_id, status=status)
         if action != "adopt":
             raise ValueError("candidate action must be review, defer, reject or adopt")
-        self.check_version(record)
         manifest = self.active_manifest()
         if manifest is None or active_manifest.get("digest") != manifest.digest:
             raise RuntimeError("active runtime changed before candidate adoption")
         if record.status not in {"proposed", "reviewed", "deferred"}:
             raise ValueError("candidate is no longer adoptable")
+        self.check_version(record)
         if record.parent_manifest_digest != manifest.digest:
             self.store.update(candidate_id, status="stale")
             raise ValueError("candidate parent version is stale; search again")
@@ -148,9 +153,9 @@ class RunCandidates:
         """Validate one candidate against the exact active parent and binding."""
         record = self.store.read(candidate_id)
         self.check_scope(record)
-        self.check_version(record)
         if record.status not in {"proposed", "reviewed", "deferred", "selected_for_next_session"}:
             raise ValueError("candidate is no longer adoptable")
+        self.check_version(record)
         if self.active_manifest() is None or active_manifest.get("digest") != self.active_manifest().digest or record.parent_manifest_digest != active_manifest.get("digest"):
             raise ValueError("candidate parent version is stale")
         target = self.target(record.target)

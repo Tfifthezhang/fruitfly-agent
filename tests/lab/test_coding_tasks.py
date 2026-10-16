@@ -6,12 +6,12 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from fruitfly_agent.lab.optimization.scoring import python_case, score_python, task_policy
-from fruitfly_agent.lab.optimization.task_packs import TaskPackCatalog, load_pack
+from fruitfly_agent.lab.improvement.tasks.scoring import python_case, score_python, task_policy
+from fruitfly_agent.lab.improvement.tasks import TaskPackCatalog, load_pack
 from tests.support.task_packs import install
 from tests.support.task_packs import coding_pack
 
-EXAMPLE = Path(__file__).resolve().parents[2] / "examples/optimization/python_functions"
+EXAMPLE = Path(__file__).resolve().parents[2] / "examples/improvement/python_functions"
 
 
 
@@ -85,7 +85,7 @@ class CodingTaskTests(unittest.IsolatedAsyncioTestCase):
             workers.append(process)
             started.set()
             return process
-        with patch("fruitfly_agent.lab.optimization.scoring.asyncio.create_subprocess_exec", side_effect=capture):
+        with patch("fruitfly_agent.lab.improvement.tasks.scoring.asyncio.create_subprocess_exec", side_effect=capture):
             task = asyncio.create_task(score_python(code, case))
             await asyncio.wait_for(started.wait(), 1)
             task.cancel()

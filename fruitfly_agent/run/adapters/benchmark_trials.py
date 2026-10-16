@@ -40,7 +40,7 @@ class BenchmarkTrialClient:
         for path, expected in self.runtime_hashes.items():
             if "sha256:" + hashlib.sha256(self.owned_path(path).read_bytes()).hexdigest() != expected:
                 raise ValueError("frozen runtime configuration or model catalog changed")
-        root = self.owned_path(self.workspace / ".fruitfly/optimization/experiments/trials" / uuid4().hex)
+        root = self.owned_path(self.workspace / ".fruitfly/improvement/experiments/trials" / uuid4().hex)
         root.parent.mkdir(parents=True, exist_ok=True)
         request_path = root.with_suffix(".request.json")
         request = {"schema_version": 1, "runtime": self.runtime, "benchmark_id": self.benchmark_id,
@@ -57,7 +57,7 @@ class BenchmarkTrialClient:
             request_path.unlink(missing_ok=True)
 
     async def prepare_tasks(self, selection):
-        root = self.owned_path(self.workspace / ".fruitfly/optimization/task-sources" / uuid4().hex)
+        root = self.owned_path(self.workspace / ".fruitfly/improvement/task-sources" / uuid4().hex)
         root.parent.mkdir(parents=True, exist_ok=True)
         result = await self._execute(("prepare", "--benchmark", selection["benchmark_id"],
             "--variant", selection["variant"], "--task-limit", str(selection["task_limit"]),
@@ -149,7 +149,7 @@ class BenchmarkTrialClient:
         return body.decode("utf-8")
 
     def runtime_receipt(self, result):
-        from fruitfly_agent.lab.optimization.text_optimizer import TaskRunEvidence
+        from fruitfly_agent.lab.improvement.api import TaskRunEvidence
         receipt = TaskRunEvidence.from_dict(result["evidence"])
         artifacts = [a for a in receipt.artifacts if a.kind == "runtime-receipt"]
         if len(artifacts) != 1:

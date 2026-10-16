@@ -10,7 +10,7 @@ from fruitfly_agent.lab.algorithms.evolution import VerificationEvidence
 from fruitfly_agent.lab.rsi.persistent import PersistentEvolutionDriver
 from fruitfly_agent.run.evolution import RunEvolutionHost
 from fruitfly_agent.run.application import RunApplicationFactory
-from tests.support.optimizers import offline_factory
+from tests.support.improvers import offline_factory
 
 
 class PersistentEvolutionTests(unittest.IsolatedAsyncioTestCase):
@@ -24,15 +24,15 @@ class PersistentEvolutionTests(unittest.IsolatedAsyncioTestCase):
                 observed.append((record.parent_manifest_digest, text, record.artifact_id))
                 return VerificationEvidence(record.candidate_id, record.artifact_id, record.parent_manifest_digest, 'explicit-policy', True)
             host = RunEvolutionHost(app, factory, policy_id='explicit-policy', verify=verify)
-            first_optimizer = factory._current_optimizer
+            first_improver = factory._current_improver
             result = await PersistentEvolutionDriver().evolve(host, job_id='job', policy_id='explicit-policy', direction='improve', max_steps=2)
             self.assertEqual(result.phase, 'complete')
             self.assertEqual(result.steps, 2)
             self.assertEqual(len(observed), 2)
             self.assertNotEqual(observed[0][0], observed[1][0])
-            self.assertIsNot(first_optimizer, factory._current_optimizer)
-            self.assertEqual(first_optimizer.calls, 1)
-            self.assertEqual(factory._current_optimizer.calls, 0)
+            self.assertIsNot(first_improver, factory._current_improver)
+            self.assertEqual(first_improver.calls, 1)
+            self.assertEqual(factory._current_improver.calls, 0)
             self.assertEqual(host.active_manifest(), result.current_manifest)
             self.assertEqual(len(factory.candidate_store.list()), 1)
             self.assertEqual(factory.artifact_store.read_text(observed[0][2]), observed[0][1])
@@ -51,7 +51,7 @@ class PersistentEvolutionTests(unittest.IsolatedAsyncioTestCase):
             factory = offline_factory(Path(tmp))
             app = AgentApplication(factory)
             await app.start()
-            records = await app.optimize('improve')
+            records = await app.improve('improve')
             before = app.runtime_manifest
             app.candidate_action(records[0].candidate_id, 'adopt')
             host = RunEvolutionHost(app, factory, policy_id='policy', verify=lambda *args: None)
@@ -112,7 +112,7 @@ class PersistentEvolutionTests(unittest.IsolatedAsyncioTestCase):
             result = await driver.evolve(fresh_host, job_id='interrupted', policy_id='policy', direction='improve')
             self.assertEqual(result.phase, 'interrupted')
             self.assertEqual(result.steps, 1)
-            self.assertEqual(factory._current_optimizer.calls, 0)
+            self.assertEqual(factory._current_improver.calls, 0)
             await app.close()
 
     async def test_configuration_change_after_prepare_is_not_overwritten_by_activation(self):
@@ -122,7 +122,7 @@ class PersistentEvolutionTests(unittest.IsolatedAsyncioTestCase):
             await app.start()
             self.addAsyncCleanup(app.close)
             before = app.runtime_manifest
-            record = (await app.optimize('improve'))[0]
+            record = (await app.improve('improve'))[0]
             candidate = await factory.prepare_candidate(before, record.candidate_id)
             factory.configuration.set_mechanism('knowledge-files', enabled=True)
             factory.configuration.save()

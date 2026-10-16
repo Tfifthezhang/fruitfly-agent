@@ -1,4 +1,4 @@
-"""Reference-aware compaction of Run-owned optimization outputs.
+"""Reference-aware compaction of Run-owned improvement outputs.
 
 Scan before mutation. Unknown/malformed reference files prevent deletion.
 Only artifacts owned by removed candidate records are eligible for collection.
@@ -37,7 +37,7 @@ def compact_candidates(workspace, store, config_path):
                     config_refs.add(value)
             if evolution and _ID.fullmatch(value):
                 protected_ids.add(value)
-            if '.fruitfly/optimization/' in value:
+            if '.fruitfly/improvement/' in value:
                 path = Path(value)
                 paths.add((workspace / path).resolve() if not path.is_absolute() else path.resolve())
 
@@ -66,7 +66,7 @@ def compact_candidates(workspace, store, config_path):
                                 walk(json.loads(line), evolution=evolution)
                     else:
                         walk(json.loads(path.read_text()), evolution=evolution)
-        for path in (workspace / '.fruitfly/optimization/experiments').rglob('experiment.json'):
+        for path in (workspace / '.fruitfly/improvement/experiments').rglob('experiment.json'):
             if path.is_symlink():
                 return ()
             walk(json.loads(path.read_text()))
@@ -75,7 +75,7 @@ def compact_candidates(workspace, store, config_path):
 
     keep, seen, selected = set(protected_ids), set(), set()
     for record in records:  # newest first, across algorithms
-        scope = (record.config_path, record.profile_id, record.target, record.task_pack_id)
+        scope = (record.config_path, record.profile_id, record.role, record.target, record.task_pack_id)
         # Legacy attribution is unknown: preserve until a runtime can identify it.
         if not record.config_path:
             keep.add(record.candidate_id)
@@ -134,7 +134,7 @@ def compact_candidates(workspace, store, config_path):
             path = raw.resolve()
             directory = 'searches' if label == 'Search history' else 'task-snapshots'
             suffix = '.jsonl' if label == 'Search history' else '.json'
-            allowed = workspace / '.fruitfly' / 'optimization' / directory
+            allowed = workspace / '.fruitfly' / 'improvement' / directory
             if path.parent == allowed and path.suffix == suffix and path not in paths and path.is_file():
                 path.unlink()
     return tuple(r.candidate_id for r in removed)

@@ -29,12 +29,13 @@ text { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monosp
 <text x="66" y="395" class="small muted" xml:space="preserve">     3 of 6 enabled</text>
 <text x="66" y="420" class="" xml:space="preserve">  4. mechanisms · environment</text>
 <text x="66" y="440" class="small muted" xml:space="preserve">     1 of 1 enabled</text>
-<text x="66" y="465" class="" xml:space="preserve">  5. mechanisms · optimization</text>
+<text x="66" y="465" class="" xml:space="preserve">  5. mechanisms · improvement</text>
 <text x="66" y="485" class="small muted" xml:space="preserve">     1 of 1 enabled</text>
-<text x="66" y="510" class="" xml:space="preserve">  6. mechanisms · tools</text>
-<text x="66" y="530" class="small muted" xml:space="preserve">     4 of 5 enabled</text>
-<text x="66" y="555" class="" xml:space="preserve">  7. Back</text>
-<text x="66" y="575" class="small muted" xml:space="preserve">     Return to startup</text>
+<text x="66" y="510" class="" xml:space="preserve">  6. mechanisms · learning</text>
+<text x="66" y="530" class="small muted" xml:space="preserve">     0 of 1 enabled</text>
+<text x="66" y="555" class="" xml:space="preserve">  7. mechanisms · tools</text>
+<text x="66" y="575" class="small muted" xml:space="preserve">     4 of 5 enabled</text>
+<text x="66" y="605" xml:space="preserve">  8. Back</text>
 <text x="66" y="639" class="small muted" xml:space="preserve">↑↓ move · Enter select · Esc back</text>
 <text x="642" y="188" class="heading" xml:space="preserve">mechanisms · context-manager</text>
 <text x="642" y="222" class="small muted" xml:space="preserve">Check a module, then expand its algorithm.</text>

@@ -39,13 +39,14 @@ class RunEvaluationController:
 
     def benchmark_preview(self, request, direction=""):
         if not self.improvement_available or self.preview_benchmark is None:
-            raise ValueError("enable an optimizer, failure processing and automatic improvement in /config, then start a new session")
+            raise ValueError("no executable search and verification binding is available")
         if self.application.running or self.application.pending_count:
             raise RuntimeError("finish or cancel active work before starting improvement")
         from dataclasses import asdict
         executor = BenchmarkTrialClient(workspace=self.workspace, environment=self.environment,
                                         python_executable=self.python_executable)
-        preview = self.preview_benchmark(asdict(request), executor, direction)
+        selection = {key: value for key, value in asdict(request).items() if value is not None}
+        preview = self.preview_benchmark(selection, executor, direction)
         self.improvement_previews[preview.preview_token] = (
             executor, direction.strip() or "Improve completion of the frozen original benchmark tasks.")
         return preview
@@ -56,7 +57,7 @@ class RunEvaluationController:
         except KeyError as exc:
             raise ValueError("unknown or consumed improvement preview") from exc
         executor.on_event = on_event
-        return await self.application.optimize(direction, preview_token=preview_token)
+        return await self.application.improve(direction, preview_token=preview_token)
 
     @property
     def workspace(self) -> Path:

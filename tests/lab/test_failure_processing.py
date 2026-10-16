@@ -3,12 +3,12 @@ import asyncio
 import json
 import unittest
 
-from fruitfly_agent.lab.optimization.failure_processing import (
+from fruitfly_agent.lab.improvement.failure_processing import (
     FailureExample, ReplayFailureProcessor, ModelDistillationProcessor,
 )
-from fruitfly_agent.lab.optimization.scoring import task_policy
-from fruitfly_agent.lab.optimization.search import TrialObservation
-from fruitfly_agent.lab.optimization.services import BudgetExhausted
+from fruitfly_agent.lab.improvement.tasks.scoring import task_policy
+from fruitfly_agent.lab.improvement.contracts.search import TrialObservation
+from fruitfly_agent.lab.improvement.runtime.services import BudgetExhausted
 from tests.support.search import services
 from tests.support.faux_provider import FauxProvider
 

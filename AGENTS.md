@@ -97,7 +97,7 @@ Keep default tests offline, deterministic, isolated, and fast. Use [Tests](tests
 |---|---|
 | Add an algorithm | [Lab development](fruitfly_agent/lab/README.md#develop-an-algorithm): select the contract; declare state/reset/recovery, injected dependencies, budgets, and failure/cancellation behavior. |
 | Assemble resources | [Catalog assembly](fruitfly_agent/lab/catalog/README.md#assembly-contract): register ownership and test failed construction, startup, and cleanup. |
-| Search or evolve text | [Optimization](fruitfly_agent/lab/optimization/README.md) and [RSI](fruitfly_agent/lab/rsi/README.md): keep generation, verification, and activation responsibilities separate. |
+| Search or evolve text | [Improvement](fruitfly_agent/lab/improvement/README.md) and [RSI](fruitfly_agent/lab/rsi/README.md): keep generation, verification, and activation responsibilities separate. |
 | Use learning state in comparisons | Record initial state, data splits, update/reset rules, and sharing across conditions. Keep evaluation answers out of learning data; change prompt/scorer only as a declared research variable. |
 | Prepare a release | [Build and publish](CONTRIBUTING.md#build-and-publish): inspect source/distribution contents and verify installed entry points outside the checkout. |
 

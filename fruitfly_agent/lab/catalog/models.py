@@ -9,6 +9,8 @@ from typing import Any, Callable, Mapping, TYPE_CHECKING
 if TYPE_CHECKING:
     from .assembly import AssemblyContext, AssemblyState
 
+from fruitfly_agent.lab.improvement.methods import MethodDefinition
+
 from fruitfly_agent.core.mechanisms import (
     ActivationScope,
     ContextPhase,
@@ -63,8 +65,17 @@ class MechanismDefinition:
     selection_group: str | None = None
     selection_group_label: str | None = None
     selection_group_allow_disabled: bool = True
+    configuration_category: str | None = None
+    improvement: MethodDefinition | None = None
 
     def __post_init__(self) -> None:
+        if self.improvement is not None:
+            if not isinstance(self.improvement, MethodDefinition):
+                raise TypeError('improvement must be a MethodDefinition')
+            if not any(c.layer == 'improvement' for c in self.descriptor.contributions):
+                raise ValueError('an improvement method must declare its improvement contribution')
+        if self.configuration_category is not None and not _ID.fullmatch(self.configuration_category):
+            raise ValueError('configuration category must be a stable identifier')
         if self.implementation_id is not None and (
             not isinstance(self.implementation_id, str) or not _ID.fullmatch(self.implementation_id)
         ):

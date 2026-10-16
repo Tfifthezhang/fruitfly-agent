@@ -6,7 +6,7 @@ from typing import Any, Awaitable, Callable, Protocol
 
 from fruitfly_agent.interactive.contracts.events import EventSink
 from fruitfly_agent.interactive.contracts.models import InteractiveStatus
-from fruitfly_agent.interactive.contracts.optimization import OptimizationClient, OptimizationProgress
+from fruitfly_agent.interactive.contracts.improvement import ImprovementClient, ImprovementProgress
 from fruitfly_agent.interactive.contracts.candidates import CandidateClient, CandidateActivationClient
 from fruitfly_agent.interactive.contracts.task_packs import TaskPackClient
 
@@ -55,7 +55,7 @@ class TerminalBindings:
             busy=lambda: bool(getattr(session, "running", False) or getattr(session, "pending_count", 0)),
             authorization=lambda: getattr(session, "authorization", None),
             enable_authorization=getattr(session, "enable_authorization", None),
-            progress=lambda: getattr(session, "optimization_progress", None),
+            progress=lambda: getattr(session, "improvement_progress", None),
             candidate_notice=getattr(session, "candidate_notice", None),
             acknowledge_notice=getattr(session, "acknowledge_candidate_notice", None),
         )
@@ -64,20 +64,24 @@ class TerminalBindings:
 @dataclass(frozen=True)
 class ImprovementClients:
     """Menus can compose distinct feature clients without an Application object."""
-    search: OptimizationClient | None = None
+    search: ImprovementClient | None = None
     candidates: CandidateClient | None = None
     materials: TaskPackClient | None = None
     activation: CandidateActivationClient | None = None
-    progress: Callable[[], OptimizationProgress | None] = lambda: None
+    progress: Callable[[], ImprovementProgress | None] = lambda: None
+    targets: Callable = lambda: ()
+    methods: Callable = lambda role, target_id: ()
 
     @classmethod
     def from_session(cls, session: Any) -> ImprovementClients:
         return cls(
-            search=session if isinstance(session, OptimizationClient) else None,
+            search=session if isinstance(session, ImprovementClient) else None,
             candidates=session if isinstance(session, CandidateClient) else None,
             materials=session if isinstance(session, TaskPackClient) else None,
             activation=session if isinstance(session, CandidateActivationClient) else None,
-            progress=lambda: getattr(session, "optimization_progress", None),
+            progress=lambda: getattr(session, "improvement_progress", None),
+            targets=getattr(session, 'improvement_targets', lambda: ()),
+            methods=getattr(session, 'improvement_methods', lambda role, target_id: ()),
         )
 
     @property

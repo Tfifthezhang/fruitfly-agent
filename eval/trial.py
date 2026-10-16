@@ -13,8 +13,8 @@ from eval.installation import validate_installation
 from eval.benchmarks.harbor import HarborBenchmarkAdapter, _runtime_files, _run_harbor_job
 from fruitfly_agent.providers.config import load_env
 from fruitfly_agent.providers.workspace import WorkspacePaths
-from fruitfly_agent.lab.optimization.experiments import TaskReference
-from fruitfly_agent.lab.algorithms.versions import canonical_json
+from fruitfly_agent.lab.improvement.experiments import TaskReference
+from fruitfly_agent.lab.improvement.contracts.versions import canonical_json
 
 
 def run_trial(request: dict, *, output_root: Path, progress=None):

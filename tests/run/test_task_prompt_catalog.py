@@ -30,7 +30,7 @@ class TaskPromptTests(unittest.TestCase):
             selection = resolve_harness_selection(cwd=root, config_path=None, profile_id=None,
                                                  environment={}, catalog=catalog)
             artifacts = DataArtifactStore(root / '.fruitfly/artifacts')
-            store = CandidateStore(root / '.fruitfly/optimization/candidates', artifacts)
+            store = CandidateStore(root / '.fruitfly/improvement/candidates', artifacts)
             controller = RunConfigurationController(selection, catalog, artifacts)
             def create(text, task, **overrides):
                 args = dict(text=text, algorithm='opro', parent_manifest={'digest':'parent'},
@@ -57,7 +57,7 @@ class TaskPromptTests(unittest.TestCase):
             self.assertTrue(snapshot.prompt_option_groups[1][3])
             self.assertNotIn(other.artifact_id, snapshot.prompt_options)
             label = dict(snapshot.prompt_option_labels)[new.artifact_id]
-            self.assertEqual('python tasks · OPRO optimized · proposed', label)
+            self.assertEqual('python tasks · OPRO improved · proposed', label)
             self.assertEqual(label, controller.preview_prompt(new.artifact_id)[0])
             directory = save_task_result(root, new, 'A current')
             self.assertEqual('A current', (directory / 'latest.txt').read_text())
@@ -70,8 +70,8 @@ class TaskPromptTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             artifacts = DataArtifactStore(root / '.fruitfly/artifacts')
-            store = CandidateStore(root / '.fruitfly/optimization/candidates', artifacts)
-            path = root / '.fruitfly/optimization/task-snapshots/frozen.json'
+            store = CandidateStore(root / '.fruitfly/improvement/candidates', artifacts)
+            path = root / '.fruitfly/improvement/task-snapshots/frozen.json'
             path.parent.mkdir(parents=True)
             encoded = json.dumps({'task': {'pack_id': 'python', 'cases_digest': 'cases'},
                                   'preview': [['Cases', 'Python regression tasks']]})
@@ -92,8 +92,8 @@ class TaskPromptTests(unittest.TestCase):
     def test_result_export_rejects_relocated_directory(self):
         with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as outside:
             root = Path(tmp)
-            (root / '.fruitfly/optimization').mkdir(parents=True)
-            (root / '.fruitfly/optimization/task-results').symlink_to(outside, target_is_directory=True)
+            (root / '.fruitfly/improvement').mkdir(parents=True)
+            (root / '.fruitfly/improvement/task-results').symlink_to(outside, target_is_directory=True)
             record = SimpleNamespace(task_pack_id='python', config_path='config', profile_id='default', target='base_prompt')
             with self.assertRaises(ValueError):
                 save_task_result(root, record, 'text')
@@ -105,9 +105,9 @@ class TaskPromptTests(unittest.TestCase):
         frontend = TerminalConfigurationFrontend(SimpleNamespace(), input_stream=stream, output_stream=output)
         _, value = frontend._choose_value(title='Base prompt', subtitle='Choose',
                     values=('assistant-default', 'opaque'), current='assistant-default',
-                    labels={'opaque': 'Python tasks · OPRO optimized'})
+                    labels={'opaque': 'Python tasks · OPRO improved'})
         self.assertEqual('opaque', value)
-        self.assertIn('Python tasks · OPRO optimized', output.getvalue())
+        self.assertIn('Python tasks · OPRO improved', output.getvalue())
         self.assertNotIn('2.   opaque', output.getvalue())
 
     def _grouped_frontend(self, events):

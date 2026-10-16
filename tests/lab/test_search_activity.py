@@ -3,7 +3,7 @@ import asyncio
 from dataclasses import replace
 import unittest
 
-from fruitfly_agent.lab.optimization.search import TaskCase
+from fruitfly_agent.lab.improvement.contracts.search import TaskCase
 from tests.support.search import problem, services, engineer
 from tests.support.faux_provider import FauxProvider
 
@@ -50,8 +50,8 @@ class SearchActivityTests(unittest.IsolatedAsyncioTestCase):
     async def test_generation_and_tool_agent_report_common_phases(self):
         provider=FauxProvider();provider.respond_text('new prompt')
         service=services(provider)
-        await service.complete('optimizer','system','prompt')
-        self.assertEqual(('Generating (optimizer)',0,1),(service.progress().phase,service.progress().total,service.progress().model_calls))
+        await service.complete('improver','system','prompt')
+        self.assertEqual(('Generating (improver)',0,1),(service.progress().phase,service.progress().total,service.progress().model_calls))
         engineer(provider,'method',role='meta')
         await service.agent('meta','system','prompt',files={'history.json':'[]'},output_path='learning-context/SKILL.md')
         self.assertEqual('Tool agent (meta)',service.progress().phase)

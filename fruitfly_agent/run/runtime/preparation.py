@@ -9,10 +9,13 @@ from fruitfly_agent.core.extensions.protocols import RecoveryValidator
 from fruitfly_agent.interactive import InteractiveSession
 from fruitfly_agent.interactive.application import RuntimeHandle
 from fruitfly_agent.lab.algorithms.targets import TEXT_TARGET_PREFIX, TextTarget
-from fruitfly_agent.lab.optimization.text_optimizer import TEXT_OPTIMIZER_COMPONENT, TextOptimizer
+from fruitfly_agent.lab.improvement.api import TEXT_IMPROVER_COMPONENT, TextImprover
 from fruitfly_agent.run.configuration.resolution import resolve_profile_models
 from fruitfly_agent.run.configuration.profile import HarnessProfile
 from .assembly import RuntimeAssembly
+from fruitfly_agent.lab.catalog import LEARNING_POLICY_COMPONENT, LEARNING_PROCESSOR_COMPONENT, build_method_selection
+from fruitfly_agent.run.learning.service import RunLearningService
+from fruitfly_agent.run.storage.improvement_preferences import ImprovementPreferences
 from .recovery import (new_session_path, check_session_manifest, record_session_manifest,
                        session_manifests)
 
@@ -21,7 +24,7 @@ from .recovery import (new_session_path, check_session_manifest, record_session_
 class PreparedRuntime:
     runtime: RuntimeAssembly
     profile: HarnessProfile
-    optimizer: TextOptimizer | None
+    improver: TextImprover | None
     targets: dict[str, TextTarget]
     resumed: bool
 
@@ -44,7 +47,7 @@ class RuntimePreparer:
         self,
         *,
         selection,
-        optimization_service,
+        improvement_service,
         candidate_service,
         task_pack_service,
         activated,
@@ -103,29 +106,45 @@ class RuntimePreparer:
                 tool_categories=tool_categories,
             )
             approvals = runtime.components["authorization"]
+            learning = None
+            if LEARNING_POLICY_COMPONENT in runtime.components:
+                learning = RunLearningService(self.cwd, runtime.components[LEARNING_POLICY_COMPONENT],
+                    processor=runtime.components.get(LEARNING_PROCESSOR_COMPONENT))
+                runtime = replace(runtime, components={**runtime.components, 'learning-materials': learning})
             approvals.emit = interaction.emit_frontend_event
             handle = RuntimeHandle(
                 session=interaction,
                 manifest=runtime.manifest.to_dict(),
                 components=runtime.components,
                 close_callback=session.close,
-                optimization=optimization_service,
+                improvement=improvement_service,
                 candidate_activation=candidate_service,
                 candidates=candidate_service,
                 task_packs=task_pack_service,
+                learning=learning,
                 authorization=approvals,
             )
-            optimizer = runtime.components.get(TEXT_OPTIMIZER_COMPONENT)
-            if optimizer is not None and not isinstance(optimizer, TextOptimizer):
-                raise TypeError("text-optimizer component must implement TextOptimizer")
+            improver = runtime.components.get(TEXT_IMPROVER_COMPONENT)
+            if improver is not None and not isinstance(improver, TextImprover):
+                raise TypeError("text-improver component must implement TextImprover")
             targets = {key[len(TEXT_TARGET_PREFIX):]: value for key, value in runtime.components.items()
                        if key.startswith(TEXT_TARGET_PREFIX)}
             if any(not isinstance(value, TextTarget) for value in targets.values()):
                 raise TypeError("named text targets must implement TextTarget")
 
+            preferences = ImprovementPreferences(self.cwd, str(selection.config_path.resolve()) + ':' + profile.profile_id)
+            methods = build_method_selection(self.catalog, profile.mechanisms, improver, targets,
+                components=runtime.components, config=runtime.config, workspace=self.cwd,
+                preferences=preferences.load(), save_preferences=preferences.save)
+            if improver is None and methods.default_id:
+                improver = methods.lazy_default()
+            resources.append(methods)
+            runtime = replace(runtime, components={**runtime.components, 'improvement-methods': methods})
+            handle.components = {**handle.components, 'improvement-methods': methods}
+
             def activate():
                 record_session_manifest(session, runtime, messages=messages if reset_projection else None)
-                activated(PreparedRuntime(runtime, profile, optimizer, targets, resume))
+                activated(PreparedRuntime(runtime, profile, improver, targets, resume))
             handle.activate_callback = activate
             return handle
         except BaseException:

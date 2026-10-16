@@ -195,6 +195,13 @@ def assemble_lab(
             candidate,
             mechanism_ids=(*candidate.mechanism_ids, descriptor.mechanism_id),
         )
+    # Register lightweight method-owned targets independently of algorithm enablement.
+    # These callbacks may read declared artifacts, but must not create Providers or search.
+    for definition in catalog.definitions():
+        support = definition.improvement
+        if support is not None and support.prepare_targets is not None:
+            state = support.prepare_targets(state, context)
+            _own_state(state, context)
     stages = state.context_stages
     if state.reducer is not None:
         if reduction_stage_id is None:

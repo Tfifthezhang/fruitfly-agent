@@ -15,7 +15,7 @@ from fruitfly_agent.run.adapters.benchmark_trials import BenchmarkTrialClient
 
 class EvalBridgeTests(unittest.IsolatedAsyncioTestCase):
     def controller(self, cwd, *, environment=None, available=True):
-        application = SimpleNamespace(running=False, pending_count=0, optimize=AsyncMock(return_value=()))
+        application = SimpleNamespace(running=False, pending_count=0, improve=AsyncMock(return_value=()))
         preview = SimpleNamespace(preview_token='one-use')
         factory = SimpleNamespace(cwd=cwd, environment=environment or {},
             benchmark_improvement_available=available, benchmark_task_preview=Mock(return_value=preview))
@@ -29,19 +29,30 @@ class EvalBridgeTests(unittest.IsolatedAsyncioTestCase):
             selection, executor, direction = factory.benchmark_task_preview.call_args.args
             self.assertEqual(selection, {'benchmark_id': 'terminal-bench', 'variant': 'starter', 'task_limit': 5})
             self.assertIsInstance(executor, BenchmarkTrialClient)
-            application.optimize.assert_not_awaited()
+            application.improve.assert_not_awaited()
             events = AsyncMock()
             self.assertEqual(await controller.improve(preview.preview_token, on_event=events), ())
             self.assertIs(executor.on_event, events)
-            application.optimize.assert_awaited_once_with(direction, preview_token='one-use')
+            application.improve.assert_awaited_once_with(direction, preview_token='one-use')
             with self.assertRaisesRegex(ValueError, 'consumed'):
                 await controller.improve(preview.preview_token)
             self.assertEqual(controller.improvement_previews, {})
 
+    def test_explicit_method_selection_is_forwarded_without_starting_work(self):
+        with tempfile.TemporaryDirectory() as directory:
+            controller, application, factory = self.controller(Path(directory))
+            controller.benchmark_preview(BenchmarkImprovementRequest('terminal-bench', 'starter',
+                method_id='alternative', target_id='base_prompt', parameters={'rounds': 1}))
+            selection = factory.benchmark_task_preview.call_args.args[0]
+            self.assertEqual(selection['method_id'], 'alternative')
+            self.assertEqual(selection['target_id'], 'base_prompt')
+            self.assertEqual(selection['parameters'], {'rounds': 1})
+            application.improve.assert_not_awaited()
+
     async def test_failed_execution_still_consumes_preview(self):
         with tempfile.TemporaryDirectory() as directory:
             controller, application, _ = self.controller(Path(directory))
-            application.optimize.side_effect = RuntimeError('failure')
+            application.improve.side_effect = RuntimeError('failure')
             preview = controller.benchmark_preview(BenchmarkImprovementRequest('terminal-bench', 'starter'))
             with self.assertRaisesRegex(RuntimeError, 'failure'):
                 await controller.improve(preview.preview_token)
@@ -53,7 +64,7 @@ class EvalBridgeTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as directory:
             controller, application, factory = self.controller(Path(directory), available=False)
             request = BenchmarkImprovementRequest('terminal-bench', 'starter')
-            with self.assertRaisesRegex(ValueError, 'enable an optimizer'):
+            with self.assertRaisesRegex(ValueError, 'no executable search and verification binding'):
                 controller.benchmark_preview(request)
             factory.benchmark_improvement_available = True
             for running, pending in ((True, 0), (False, 1)):
@@ -79,7 +90,7 @@ class EvalBridgeTests(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(starter.available)
             self.assertTrue(starter.preflight)
             factory.benchmark_task_preview.assert_not_called()
-            application.optimize.assert_not_awaited()
+            application.improve.assert_not_awaited()
             self.assertFalse((Path(directory) / '.fruitfly').exists())
 
     async def test_stderr_and_raw_stdout_are_visible_before_child_finishes(self):

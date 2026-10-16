@@ -11,7 +11,7 @@ from eval.benchmarks.base import PreflightResult
 from eval.benchmarks.terminal_bench import TerminalBenchAdapter
 from eval.evidence import material_hash
 from eval.trial import run_trial
-from fruitfly_agent.lab.optimization.experiments import TaskReference
+from fruitfly_agent.lab.improvement.experiments import TaskReference
 from tests.support.harbor import load_harbor_agent
 
 

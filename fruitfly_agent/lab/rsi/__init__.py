@@ -1,4 +1,4 @@
-"""Host-injected recursive improvement, independent of optimization policies."""
+"""Host-injected recursive improvement, independent of improvement policies."""
 
 from .driver import CandidateAdopter, CandidateGenerator, CandidateVerifier, EvolutionDriver
 from .models import (

@@ -16,7 +16,7 @@ from eval.installation import resolve_installation
 from fruitfly_agent.lab.context_manager.externalization.programmatic_context import (
     IpythonRuntime, SessionArtifactStore,
 )
-from fruitfly_agent.lab.optimization.scoring import python_case, score_python
+from fruitfly_agent.lab.improvement.tasks.scoring import python_case, score_python
 from fruitfly_agent.interactive import TerminalConfigurationFrontend
 from fruitfly_agent.run import RunApplicationFactory
 

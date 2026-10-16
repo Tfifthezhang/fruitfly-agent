@@ -4,9 +4,9 @@ import hashlib
 import re
 from typing import Literal, Protocol, runtime_checkable
 from fruitfly_agent.core.config import AgentLoopConfig
-from .versions import (SystemVersion, StateSnapshot, SnapshotFile, STATE_SNAPSHOTS_COMPONENT, EXPERIMENT_BLOCKERS_COMPONENT,
+from fruitfly_agent.lab.improvement.contracts.versions import (SystemVersion, StateSnapshot, SnapshotFile, STATE_SNAPSHOTS_COMPONENT, EXPERIMENT_BLOCKERS_COMPONENT,
                        canonical_json, content_hash)
-from .candidates import VersionCandidate, TargetChange, TargetRegistry
+from fruitfly_agent.lab.improvement.contracts.candidates import VersionCandidate, TargetChange, TargetRegistry
 
 TEXT_TARGET_PREFIX = 'text-target:'
 
@@ -27,8 +27,11 @@ class TargetSnapshot:
     text: str
     binding: TargetBinding
     schema: str = 'text-v1'
+    role: str = 'H'
 
     def __post_init__(self):
+        if self.role not in {'H', 'S', 'I'}:
+            raise ValueError('target role must be H, S or I')
         if not isinstance(self.target_id, str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*', self.target_id):
             raise ValueError('target identity must be a stable identifier')
         if not isinstance(self.text, str) or not isinstance(self.binding, TargetBinding):

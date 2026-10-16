@@ -83,22 +83,22 @@ See [Terminal](fruitfly_agent/interactive/terminal/README.md) for daily controls
 
 This uses a temporary workspace and a fixed Provider, with no keys or network. See the [extension example](examples/extensions/README.md) for the complete registration and Application path.
 
-## Try optimization
+## Try improvement
 
-Install the [Python task pack](examples/optimization/python_functions/README.md) into a destination that does not already exist:
+Install the [Python task pack](examples/improvement/python_functions/README.md) into a destination that does not already exist:
 
 ```bash
-mkdir -p .fruitfly/optimization/task-packs
-cp -R examples/optimization/python_functions .fruitfly/optimization/task-packs/python-functions
-.venv/bin/python -m fruitfly_agent.lab.optimization.verification check .fruitfly/optimization/task-packs/python-functions/pack.json
-.venv/bin/python -m fruitfly_agent.lab.optimization.verification self-check .fruitfly/optimization/task-packs/python-functions/pack.json
+mkdir -p .fruitfly/improvement/task-packs
+cp -R examples/improvement/python_functions .fruitfly/improvement/task-packs/python-functions
+.venv/bin/python -m fruitfly_agent.lab.improvement.tasks.cases.verification check .fruitfly/improvement/task-packs/python-functions/pack.json
+.venv/bin/python -m fruitfly_agent.lab.improvement.tasks.cases.verification self-check .fruitfly/improvement/task-packs/python-functions/pack.json
 ```
 
-The checks are offline. In **Configure → mechanisms · optimization**, enable **text-optimizer**, select **opro**, save, and start a new session. Use `/improvement` to select the pack and review the model, budget, and execution policy before confirming a paid search. The active target supplies the baseline; `baseline.txt` is an optional reference.
+The checks are offline. In **Configure → mechanisms · improvement**, enable **text-improver**, select **opro**, save, and start a new session. Use `/improvement` to select the pack and review the model, budget, and execution policy before confirming a paid search. The active target supplies the baseline; `baseline.txt` is an optional reference.
 
 | Next step | Guide |
 |---|---|
-| Write your own tasks | [Task packs](fruitfly_agent/lab/optimization/TASK_PACKS.md) |
-| Review and adopt a candidate | [Optimization](fruitfly_agent/lab/optimization/README.md) |
+| Write your own tasks | [Task packs](fruitfly_agent/lab/improvement/tasks/README.md) |
+| Review and adopt a candidate | [Improvement](fruitfly_agent/lab/improvement/README.md) |
 | Run the offline suite | [Tests](tests/README.md) |
 | Make a real Provider smoke request | [Integration smoke](tests/integration/README.md) |

@@ -10,7 +10,7 @@ from typing import Any, Literal, Mapping
 ParameterKind = Literal[
     "boolean", "integer", "number", "string", "choice", "path", "string_list"
 ]
-MechanismLayer = Literal["capability", "online", "optimization"]
+MechanismLayer = Literal["capability", "online", "improvement"]
 MechanismFamily = Literal["environment", "tools", "context", "workflow"]
 ContextPhase = Literal["augmentation", "externalization", "reduction"]
 ActivationScope = Literal["live", "next_request", "new_session", "restart"]
@@ -137,7 +137,7 @@ class MechanismContribution:
     context_phase: ContextPhase | None = None
 
     def __post_init__(self) -> None:
-        if self.layer not in {"capability", "online", "optimization"}:
+        if self.layer not in {"capability", "online", "improvement"}:
             raise ValueError(f"unsupported mechanism layer: {self.layer!r}")
         if self.family not in {"environment", "tools", "context", "workflow"}:
             raise ValueError(f"unsupported mechanism family: {self.family!r}")

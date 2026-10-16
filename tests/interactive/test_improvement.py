@@ -1,12 +1,13 @@
 """One task-driven command, explicit cost approval, and no implicit adoption."""
 import asyncio
+from dataclasses import replace
 import io
 from types import SimpleNamespace
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
 from fruitfly_agent.interactive import TerminalFrontend, EvaluationSnapshot, EvaluationBenchmarkOption, EvaluationVariantOption
-from fruitfly_agent.interactive.contracts.optimization import OptimizationPreview
+from fruitfly_agent.interactive.contracts.improvement import ImprovementPreview, ImprovementTargetView
 from fruitfly_agent.interactive.terminal.bindings import ImprovementClients
 from fruitfly_agent.interactive.terminal.io.menu import LineMenuInput
 from tests.support.application import offline_session
@@ -20,11 +21,19 @@ class ImprovementFrontendTests(unittest.IsolatedAsyncioTestCase):
             improvement_snapshot=Mock(return_value=EvaluationSnapshot((EvaluationBenchmarkOption('bench', 'Benchmark',
                 'original tasks', 'fixed', (EvaluationVariantOption('starter', 'Five tasks', '3 train / 1 selection / 1 confirmation',
                     available, () if available else ('Start Docker',)),)),))),
-            benchmark_preview=Mock(return_value=OptimizationPreview('method', 'Improvement', 'Downloads tasks and makes paid model calls',
+            benchmark_preview=Mock(return_value=ImprovementPreview('method', 'Improvement', 'Downloads tasks and makes paid model calls',
                 (('Maximum model calls', '80'), ('Training cases', '3')), 'base_prompt', 'one-use')),
             improve=AsyncMock(return_value=()))
 
     async def run_frontend(self, controller, *lines, clients=None, tty=False):
+        clients = replace(clients or ImprovementClients(), targets=lambda: (
+            ImprovementTargetView('H', 'base_prompt', 'Base prompt'),))
+        expanded = []
+        for line in lines:
+            expanded.append(line)
+            if line.startswith('/improvement'):
+                expanded.extend(('1', '1'))
+        lines = tuple(expanded)
         output = TtyStringIO() if tty else io.StringIO()
         provider = FauxProvider()
         frontend = TerminalFrontend(offline_session(provider=provider), evaluation=controller,
@@ -48,20 +57,19 @@ class ImprovementFrontendTests(unittest.IsolatedAsyncioTestCase):
     async def test_missing_workflow_reason_survives_benchmark_menu_exit(self):
         controller = self.controller()
         controller.improvement_available = False
-        search = SimpleNamespace(optimization_preview=Mock(), start_optimization=Mock())
+        search = SimpleNamespace(improvement_preview=Mock(), start_improvement=Mock())
         with patch.dict('os.environ', {'TERM': 'xterm-256color'}):
             _, output = await self.run_frontend(controller, '/improvement', '1', '2', '/exit',
                 clients=ImprovementClients(search=search), tty=True)
         self.assertIn('Benchmark tasks', output)
         self.assertIn('\x1b[?1049h', output)
         transcript = output.rsplit('\x1b[?1049l', 1)[1]
-        self.assertIn('automatic improvement', transcript)
-        self.assertIn('/config', transcript)
-        self.assertIn('new session', transcript)
+        self.assertIn('no executable search and verification binding', transcript)
+        self.assertNotIn('/config', transcript)
         controller.improvement_snapshot.assert_not_called()
         controller.benchmark_preview.assert_not_called()
         controller.improve.assert_not_awaited()
-        search.start_optimization.assert_not_called()
+        search.start_improvement.assert_not_called()
 
     async def test_benchmark_errors_remain_visible_after_restoring_chat(self):
         for stage, reason in (('catalog', 'catalog failed'), ('empty', 'No benchmark task sources'),
@@ -127,13 +135,13 @@ class ImprovementFrontendTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_task_packages_and_benchmarks_share_source_menu(self):
         controller = self.controller()
-        search = SimpleNamespace(optimization_preview=Mock(), start_optimization=Mock())
+        search = SimpleNamespace(improvement_preview=Mock(), start_improvement=Mock())
         _, output = await self.run_frontend(controller, '/improvement', '1', '2', '1', '1', '2', '/exit',
             clients=ImprovementClients(search=search))
         self.assertIn('Choose task source', output)
         self.assertIn('Saved task packages', output)
         self.assertIn('Benchmark tasks', output)
-        search.optimization_preview.assert_not_called()
+        search.improvement_preview.assert_not_called()
         controller.improve.assert_not_awaited()
 
     async def test_cooperative_cancellation_returns_to_chat(self):

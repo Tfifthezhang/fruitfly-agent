@@ -25,19 +25,21 @@ from fruitfly_agent.lab.context_manager.externalization.adapter import (
     install_ipython_tool,
     install_rlm_ipython,
 )
-from fruitfly_agent.lab.optimization.task_packs import TaskPackCatalog, TASK_PACK_COMPONENT
-from fruitfly_agent.lab.optimization.opro import definition as opro_definition
-from fruitfly_agent.lab.optimization.failure_processing import definitions as failure_definitions
-from fruitfly_agent.lab.optimization.automatic import definition as automatic_definition
+from fruitfly_agent.lab.improvement.tasks import TaskPackCatalog, TASK_PACK_COMPONENT
+from fruitfly_agent.lab.improvement.methods.opro import definition as opro_definition
+from fruitfly_agent.lab.improvement.methods.tree_search import definition as tree_definition
+from fruitfly_agent.lab.improvement.methods.dream_rsi import definition as dream_definition
+from fruitfly_agent.lab.improvement.failure_processing import definitions as failure_definitions
+from fruitfly_agent.lab.improvement.automatic import definition as automatic_definition
 from fruitfly_agent.lab.context_manager.augmentation.skills import (
     SkillCatalogTransformer, load_skills, render_skills_xml,
 )
 from fruitfly_agent.lab.context_manager.augmentation.skills.target import SKILL_CATALOG_GUIDANCE_KEY, SkillGuidanceTarget
 from fruitfly_agent.lab.algorithms.targets import TEXT_TARGET_PREFIX
-from fruitfly_agent.lab.algorithms.versions import STATE_SNAPSHOTS_COMPONENT
+from fruitfly_agent.lab.improvement.contracts.versions import STATE_SNAPSHOTS_COMPONENT
 from fruitfly_agent.lab.context_manager.augmentation.information.file_memory.snapshots import FileMemorySnapshots
 from fruitfly_agent.lab.algorithms.snapshots import WorkspaceTextSnapshots
-from fruitfly_agent.lab.algorithms.versions import EXPERIMENT_BLOCKERS_COMPONENT
+from fruitfly_agent.lab.improvement.contracts.versions import EXPERIMENT_BLOCKERS_COMPONENT
 from fruitfly_agent.lab.base_prompt.target import BasePromptTarget
 from fruitfly_agent.lab.tools import (
     create_bash_tool,
@@ -47,6 +49,7 @@ from fruitfly_agent.lab.tools import (
 )
 
 from .assembly import AssemblyContext, AssemblyState, require_workspace_path
+from fruitfly_agent.lab.learning.registration import definition as learning_definition
 from .catalog import LabCatalog
 from .models import (
     MechanismDefinition,
@@ -262,6 +265,9 @@ def builtin_catalog() -> LabCatalog:
             ),
         ),
         opro_definition(),
+        tree_definition(),
+        dream_definition(),
+        learning_definition(),
         *failure_definitions(),
         automatic_definition(),
     )
@@ -416,6 +422,9 @@ def _append_tool(state: AssemblyState, tool) -> AssemblyState:
 
 def _install_skill_catalog(state: AssemblyState, context: AssemblyContext, parameters: Mapping[str, Any]) -> AssemblyState:
     artifact_key = SKILL_CATALOG_GUIDANCE_KEY
+    root = require_workspace_path(context.workspace, parameters["root"], name="skill root")
+    state = state.with_component(STATE_SNAPSHOTS_COMPONENT,
+        (*state.components.get(STATE_SNAPSHOTS_COMPONENT, ()), WorkspaceTextSnapshots(root, context.workspace)))
     artifact_id = context.artifact_bindings.get(artifact_key)
     if artifact_id is not None:
         if context.artifact_reader is None:
@@ -439,11 +448,8 @@ def _install_skill_catalog(state: AssemblyState, context: AssemblyContext, param
         }
         state = state.with_data_artifact(artifact)
     else:
-        root = require_workspace_path(context.workspace, parameters["root"], name="skill root")
         result = load_skills(root)
         guidance = render_skills_xml(result.skills)
-        state = state.with_component(STATE_SNAPSHOTS_COMPONENT,
-            (*state.components.get(STATE_SNAPSHOTS_COMPONENT, ()), WorkspaceTextSnapshots(root, context.workspace)))
     return state.with_component(TEXT_TARGET_PREFIX + SKILL_CATALOG_GUIDANCE_KEY, SkillGuidanceTarget(guidance, parameters["max_chars"])).with_context_stage(
         ContextStage(
             "skill-catalog",

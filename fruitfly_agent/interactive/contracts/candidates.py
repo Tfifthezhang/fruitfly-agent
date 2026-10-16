@@ -17,6 +17,7 @@ class CandidateView:
     parent_manifest_digest: str
     evidence: tuple[tuple[str, str], ...] = ()
     sections: tuple[CandidateSection, ...] = ()
+    role: str = 'H'
 
 
 @dataclass(frozen=True)

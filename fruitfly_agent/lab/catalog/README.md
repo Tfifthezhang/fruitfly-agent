@@ -2,7 +2,7 @@
 
 [Up: Lab](../README.md)
 
-Register mechanisms, validate selections, and assemble a runtime deterministically. Run supplies workspace, Session, and Provider bindings; Catalog owns registration and assembly contracts. Independent optimization method packages own their definitions and installers.
+Register mechanisms, validate selections, and assemble a runtime deterministically. Run supplies workspace, Session, and Provider bindings; Catalog owns registration and assembly contracts. Independent improvement method packages own their definitions and installers.
 
 ## Register a mechanism
 
@@ -16,7 +16,7 @@ Register mechanisms, validate selections, and assemble a runtime deterministical
 
 The [offline example](../../../examples/extensions/README.md) completes this path. The CLI does not scan Python packages for plugins.
 
-An optimization package exposes its own definition factory; built-ins explicitly collect [OPRO's definition](../optimization/opro/README.md). External methods can supply definitions through `builtin_catalog().extended(definitions)`. Shared text optimizer assembly belongs to [Optimization](../optimization/README.md#extend-search), so Catalog does not implement search strategies or declare their method-specific parameters.
+An improvement package exposes its own definition factory; built-ins explicitly collect [OPRO's definition](../improvement/methods/opro/README.md). External methods can supply definitions through `builtin_catalog().extended(definitions)`. Shared text improver assembly belongs to [Improvement](../improvement/README.md#extend-search), so Catalog does not implement search strategies or declare their method-specific parameters.
 
 ## Files
 
@@ -57,11 +57,19 @@ An optimization package exposes its own definition factory; built-ins explicitly
 | `provides/requires_capabilities` | Require a unique enabled provider of a capability. |
 | `artifact_slots` | Declare consumed named text bindings. |
 | `text-target:ID` component | Register an object's snapshot, validation, and trial adapter. |
-| `text-optimizer` component | Provide `preview`, `search`, and `cancel` through the shared host contract. |
+| `text-improver` component | Provide `preview`, `search`, and `cancel` through the shared host contract. |
 
-Selection groups share display placement and exclusivity. Display metadata does not enter runtime identity; effective parameters and implementation IDs do. See [Algorithms](../algorithms/README.md), [Optimization](../optimization/README.md), and [Harness configuration](../../run/configuration/README.md).
+Selection groups share display placement and exclusivity. Display metadata does not enter runtime identity; effective parameters and implementation IDs do. See [Algorithms](../algorithms/README.md), [Improvement](../improvement/README.md), and [Harness configuration](../../run/configuration/README.md).
 
 No Catalog-specific environment variables. Catalog itself makes no model requests; selected mechanisms declare their own effects.
+
+`MechanismDefinition.configuration_category` optionally declares menu placement
+without adding a Core mechanism layer. [Learning](../learning/README.md) uses the
+`learning` category. Catalog exposes `build_learning` and the policy/processor
+component keys as explicit assembly entries. The Run host supplies persistence;
+the Lab method supplies material processing. Offline legacy configuration and
+candidate classifiers are also exposed for the Run migration entry; runtime
+hosts do not branch on concrete algorithm names.
 
 ```bash
 .venv/bin/python -m unittest tests.lab.test_catalog tests.run.test_configuration tests.run.test_assembly -v
@@ -75,4 +83,8 @@ No Catalog-specific environment variables. Catalog itself makes no model request
 
 ## Register experiment dependencies
 
-Built-in file memory, workspace skill files and local knowledge register initial text snapshot sources through `persistent-state-snapshots`. Live HTTP context registers an `experiment-blockers` reason because responses cannot be frozen. Installers register capabilities without taking snapshots or starting model work. Custom mechanisms must register each persistent dependency they read; arbitrary plugin heap state and external services remain unsupported. See [Algorithm versions](../algorithms/README.md) and [Original task experiments](../optimization/experiments/README.md).
+Built-in file memory, workspace skill files and local knowledge register initial text snapshot sources through `persistent-state-snapshots`. Live HTTP context registers an `experiment-blockers` reason because responses cannot be frozen. Installers register capabilities without taking snapshots or starting model work. Custom mechanisms must register each persistent dependency they read; arbitrary plugin heap state and external services remain unsupported. See [Algorithm versions](../algorithms/README.md) and [Original task experiments](../improvement/experiments/README.md).
+
+## Declare per-job improvement support
+
+`MechanismDefinition.improvement` optionally supplies a `MethodDefinition` with supported H/S/I roles, target schemas, required execution capabilities and an offline binder. Existing `layer × family` contributions still describe system position. No new Core classification is introduced. [Method selection](../improvement/methods/README.md) checks declarations against the active target and host. Definition and method discovery must not make model requests. Registered methods are available on demand. Configuration menus omit the improvement category. Optional `prepare_targets(state, context)` registers lightweight method-owned targets and consumes declared artifacts without enabling the search algorithm or creating Providers. Per-job binders borrow runtime services and own their search state. Existing enabled hosts and YAML parameter defaults remain supported.

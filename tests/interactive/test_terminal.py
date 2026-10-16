@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fruitfly_agent.interactive.contracts.optimization import OptimizationPreview
+from fruitfly_agent.interactive.contracts.improvement import ImprovementPreview, ImprovementTargetView
 
 import asyncio
 from dataclasses import replace
@@ -85,19 +85,22 @@ class TerminalFrontendTest(unittest.IsolatedAsyncioTestCase):
             candidate_id=candidate_id, status="proposed", validation_score=1.0,
             seed_score=0.0, direction="be concise", parent_manifest_digest="parent",
             artifact_id="sha256:" + "b" * 64, cases_digest="cases", metric_calls=5,
-            algorithm="opro", target="base_prompt", evidence=(("Validation", "1.0"),),
+            algorithm="opro", target="base_prompt", role="H", evidence=(("Validation", "1.0"),),
         )
 
-        class OptimizationSession(_TerminalSessionStub):
+        class ImprovementSession(_TerminalSessionStub):
+            def improvement_targets(self):
+                return (ImprovementTargetView('H', 'base_prompt', 'Base prompt'),)
 
 
-            def optimization_preview(self, *, pack_id=None, direction=""):
-                return OptimizationPreview("opro", "OPRO", "Model requests may incur cost", (("Maximum metric calls", "8"),))
 
-            def start_optimization(self, direction, *, preview_token=""):
-                return asyncio.create_task(self.optimize(direction))
+            def improvement_preview(self, *, pack_id=None, direction=""):
+                return ImprovementPreview("opro", "OPRO", "Model requests may incur cost", (("Maximum metric calls", "8"),), target="base_prompt")
 
-            async def optimize(self, direction):
+            def start_improvement(self, direction, *, preview_token=""):
+                return asyncio.create_task(self.improve(direction))
+
+            async def improve(self, direction):
                 self.direction = direction
                 return (record,)
 
@@ -107,7 +110,7 @@ class TerminalFrontendTest(unittest.IsolatedAsyncioTestCase):
             def acknowledge_candidate_notice(self, ids):
                 self.acknowledged = True
 
-            def cancel_optimization(self):
+            def cancel_improvement(self):
                 return False
 
             def candidates(self):
@@ -120,14 +123,14 @@ class TerminalFrontendTest(unittest.IsolatedAsyncioTestCase):
                 record.status = "selected_for_next_session" if action == "adopt" else "reviewed"
                 return record
 
-        session = OptimizationSession()
+        session = ImprovementSession()
         output = io.StringIO()
         frontend = TerminalFrontend(
             session,
             input_stream=io.StringIO(),
             output_stream=output,
             line_editor=ScriptedLines(
-                "/improvement be concise", "1", "1", "/improvement", "2", "1",
+                "/improvement be concise", "1", "1", "1", "1", "/improvement", "4", "1",
                 "up", "up", "2", "q", "/exit",
             ),
         )

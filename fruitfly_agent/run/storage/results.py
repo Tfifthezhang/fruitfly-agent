@@ -15,7 +15,7 @@ def save_task_result(workspace, record, text):
         raise ValueError('invalid result task identity')
     root = Path(workspace).resolve()
     scope = hashlib.sha256(json.dumps([record.config_path, record.profile_id], ensure_ascii=False).encode()).hexdigest()[:16]
-    directory = root / '.fruitfly/optimization/task-results' / record.task_pack_id / scope / record.target
+    directory = root / '.fruitfly/improvement/task-results' / record.task_pack_id / scope / record.target
     if not directory.resolve().is_relative_to(root) or any(p.is_symlink() for p in (directory, *directory.parents) if p != root):
         raise ValueError('task results must stay in their workspace directory')
     if "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest() != record.artifact_id:

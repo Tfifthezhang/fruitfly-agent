@@ -57,15 +57,15 @@ class HarnessSelectionTest(unittest.TestCase):
         self.assertEqual(reduction.selected_id, "compaction")
         self.assertEqual(reduction.label, "Reduction")
         group = next(item for item in controller.snapshot().selection_groups
-                     if item.group_id == "text-optimizer")
-        self.assertEqual(group.option_ids, ("opro",))
-        controller.select_algorithm("text-optimizer", "opro")
+                     if item.group_id == "text-improver")
+        self.assertEqual(group.option_ids, ("opro", "tree-search"))
+        controller.select_algorithm("text-improver", "opro")
         selected_group = next(item for item in controller.snapshot().selection_groups
-                              if item.group_id == "text-optimizer")
+                              if item.group_id == "text-improver")
         self.assertEqual(selected_group.selected_id, "opro")
-        controller.select_algorithm("text-optimizer", None)
+        controller.select_algorithm("text-improver", None)
         disabled_group = next(item for item in controller.snapshot().selection_groups
-                              if item.group_id == "text-optimizer")
+                              if item.group_id == "text-improver")
         self.assertIsNone(disabled_group.selected_id)
 
     def test_reduction_group_accepts_another_algorithm_without_frontend_changes(self) -> None:
@@ -362,3 +362,21 @@ class HarnessSelectionTest(unittest.TestCase):
             controller.snapshot().model_profiles,
             ("first", "second"),
         )
+
+    def test_improvement_category_is_absent_from_configuration_menu(self):
+        import io
+        from fruitfly_agent.interactive import TerminalConfigurationFrontend
+        from tests.support.terminal import ScriptedLines
+        _write_catalog(self.root / 'models.yaml', {'only': 'model-a'})
+        controller = RunConfigurationController(self.selection(), builtin_catalog())
+        controller.set_parameter('opro', 'rounds', '3')
+        controller.save()
+        output = io.StringIO()
+        frontend = TerminalConfigurationFrontend(controller, output_stream=output,
+            line_editor=ScriptedLines('back'))
+        frontend.run_for_active_session()
+        self.assertNotIn('mechanisms · improvement', output.getvalue())
+        self.assertIn('mechanisms · context-manager', output.getvalue())
+        self.assertTrue(all(not m.visible for m in controller.snapshot().mechanisms
+                            if m.category == 'improvement'))
+        self.assertEqual(next(s for s in controller.profile().mechanisms if s.mechanism_id == 'opro').parameters['rounds'], 3)

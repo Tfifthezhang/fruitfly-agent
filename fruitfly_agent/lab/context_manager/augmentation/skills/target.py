@@ -1,4 +1,4 @@
-"""Only catalog guidance is optimized; referenced Skill files remain separate."""
+"""Only catalog guidance is improved; referenced Skill files remain separate."""
 from dataclasses import replace
 from fruitfly_agent.core.context import ContextFrame
 from .adapter import SkillCatalogTransformer

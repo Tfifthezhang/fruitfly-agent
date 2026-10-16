@@ -3,12 +3,12 @@ import json
 from pathlib import Path
 import re
 import unittest
-from fruitfly_agent.lab.optimization.task_packs import validate_pack
+from fruitfly_agent.lab.improvement.tasks import validate_pack
 
 
 class TaskPackGuideTests(unittest.TestCase):
     def test_text_and_python_examples_follow_public_schema(self):
-        text = (Path(__file__).resolve().parents[2] / 'fruitfly_agent/lab/optimization/TASK_PACKS.md').read_text()
+        text = (Path(__file__).resolve().parents[2] / 'fruitfly_agent/lab/improvement/tasks/README.md').read_text()
         examples = [json.loads(s) for s in re.findall(r'```json\n(.*?)\n```', text, re.S)]
         manifest = next(p for p in examples if p.get('schema_version') == 2)
         cases = next(p for p in examples if 'train' in p)

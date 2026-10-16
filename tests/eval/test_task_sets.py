@@ -9,7 +9,7 @@ from eval.task_sets import prepare_task_set, improvement_catalog
 from eval.catalog import builtin_catalog
 from eval.benchmarks.base import PreflightResult
 from eval.benchmarks.terminal_bench import TerminalBenchAdapter
-from fruitfly_agent.lab.optimization.experiments import TaskReference
+from fruitfly_agent.lab.improvement.experiments import TaskReference
 from eval.evidence import material_hash
 
 

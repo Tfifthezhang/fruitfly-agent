@@ -1,4 +1,4 @@
-"""Durable RSI adapter over the existing optimization inbox and Application."""
+"""Durable RSI adapter over the existing improvement inbox and Application."""
 from dataclasses import asdict
 import json
 import os

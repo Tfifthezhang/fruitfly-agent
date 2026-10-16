@@ -1,6 +1,6 @@
 """Renderer-neutral interaction boundary and the built-in terminal frontend."""
 
-from fruitfly_agent.interactive.contracts.optimization import OptimizationPreview, OptimizationService
+from fruitfly_agent.interactive.contracts.improvement import ImprovementPreview, ImprovementService
 from fruitfly_agent.interactive.contracts.candidates import (
     CandidateView,
     CandidateSection,
@@ -77,12 +77,12 @@ __all__ = [
     "CorrectionView",
     "TaskPackClient",
     "TaskPackService",
-    "OptimizationPreview",
+    "ImprovementPreview",
     "CandidateView",
     "CandidateSection",
     "CandidateService",
     "CandidateClient",
-    "OptimizationService",
+    "ImprovementService",
     "CandidateActivationService",
     "CandidateActivationClient",
     "AgentApplication",

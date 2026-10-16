@@ -18,7 +18,7 @@ HELP_TEXT = """Commands:
   /status        show model, workspace, session, and context state
   /lab           show active experimental mechanisms by category
   /config        open the model and mechanism selection menu
-  /improvement [TEXT]  iterate on a task set, save cases, or review improvements
+  /improvement [TEXT]  choose an H/S/I target, run improvement, or review candidates
   /resume [PATH] continue saved history using current configuration
   /cancel        cooperatively stop the active run
   /permissions clear  revoke temporary approvals\n  /trace [N]     show the latest N frontend events (default: 12)

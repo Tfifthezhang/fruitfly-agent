@@ -8,8 +8,8 @@ Verify Application state/lifecycle, resource cleanup, events, menus, commands, a
 |---|---|
 | `test_authorization.py` | Single/directory/session approval, stale replies, serialization, timeout, and cancellation |
 | `test_run_control.py / test_context_status.py` | Quiet cancellation, complete interrupted tool associations, queue/retirement bounds, compact context usage display, separate measurements, and restored committed-compaction counts |
-| `test_extensions.py` | Independent service injection, async commands, explicit host bindings, menu capability composition, cleanup, and optimization completion/cancellation races |
-| `test_terminal.py` | Commands, concurrent input, resume, and optimization dispatch |
+| `test_extensions.py` | Independent service injection, async commands, explicit host bindings, menu capability composition, cleanup, and improvement completion/cancellation races |
+| `test_terminal.py` | Commands, concurrent input, resume, and improvement dispatch |
 | `test_conversation.py` | Immutable original history after reduction, safe content projection, and static display bounds |
 | `test_terminal_configuration.py / test_menu.py` | Configuration drafts, startup confirmation, and generic menu navigation |
 | `test_terminal_renderer.py / test_markdown.py / test_welcome.py` | Event presentation, output bounds, ANSI handling, and layouts |

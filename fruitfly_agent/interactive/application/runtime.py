@@ -4,9 +4,10 @@ from dataclasses import dataclass, field
 from inspect import isawaitable
 from typing import Any, Awaitable, Callable, Mapping
 from fruitfly_agent.interactive.contracts.runtime import RuntimeSession, RuntimeAuthorization
-from fruitfly_agent.interactive.contracts.optimization import OptimizationService
+from fruitfly_agent.interactive.contracts.improvement import ImprovementService
 from fruitfly_agent.interactive.contracts.candidates import CandidateActivationService, CandidateService
 from fruitfly_agent.interactive.contracts.task_packs import TaskPackService
+from fruitfly_agent.interactive.contracts.learning import LearningService
 
 
 async def _call_optional(component: Any, method: str) -> Any:
@@ -25,12 +26,13 @@ class RuntimeHandle:
     manifest: Mapping[str, Any]
     components: Mapping[str, Any] = field(default_factory=dict)
     close_callback: Callable[[], Awaitable[None] | None] | None = None
-    optimization: OptimizationService | None = None
+    improvement: ImprovementService | None = None
     candidate_activation: CandidateActivationService | None = None
     activate_callback: Callable[[], None] | None = None
     authorization: RuntimeAuthorization | None = None
     candidates: CandidateService | None = None
     task_packs: TaskPackService | None = None
+    learning: LearningService | None = None
     _closed: bool = field(default=False, init=False, repr=False)
 
     async def start(self) -> None:

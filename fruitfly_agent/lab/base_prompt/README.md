@@ -2,7 +2,7 @@
 
 [Up: Lab](../README.md)
 
-Own the built-in system instructions and the adapter that makes them an optimization target.
+Own the built-in system instructions and the adapter that makes them an improvement target.
 
 | Item | Behavior |
 |---|---|
@@ -25,7 +25,7 @@ The default identifies FruitFlyAgent as a general-purpose assistant: help the us
 | [__init__.py](__init__.py) | Built-in text and lookup |
 | [target.py](target.py) | `BasePromptTarget`: snapshot, validate, and prepare a trial |
 
-Run verifies prompt contents and fixes the hash in the manifest. Skill/information augmentation is outside the base text hash. [Optimization](../optimization/README.md) searches candidates; [Run](../../run/README.md) stores them; Application manages activation. This module does not search or adopt autonomously. Loading built-ins performs no I/O and has no module-specific environment variables.
+Run verifies prompt contents and fixes the hash in the manifest. Skill/information augmentation is outside the base text hash. [Improvement](../improvement/README.md) searches candidates; [Run](../../run/README.md) stores them; Application manages activation. This module does not search or adopt autonomously. Loading built-ins performs no I/O and has no module-specific environment variables.
 
 ```bash
 .venv/bin/python -m unittest tests.lab.test_base_prompt tests.run.test_base_prompt_flow tests.workflows.test_decoupling

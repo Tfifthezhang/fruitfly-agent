@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock
 
 from fruitfly_agent.lab.algorithms.evolution import VerificationEvidence
 from fruitfly_agent.lab.base_prompt.target import BasePromptTarget
-from fruitfly_agent.lab.optimization.task_packs import TaskPackCatalog, TaskSnapshotStore
+from fruitfly_agent.lab.improvement.tasks import TaskPackCatalog, TaskSnapshotStore
 from fruitfly_agent.run.configuration.profile import HarnessProfile
 from fruitfly_agent.run.configuration.model_setup import RunModelSetup
 from fruitfly_agent.run.improvement.candidates import RunCandidates
@@ -17,7 +17,7 @@ from fruitfly_agent.run.improvement.search_jobs import RunSearchJobs
 from fruitfly_agent.run.storage.artifacts import DataArtifactStore
 from fruitfly_agent.run.storage.candidates import CandidateStore
 from tests.support.materials import _write_cases
-from tests.support.optimizers import OfflineOptimizer
+from tests.support.improvers import OfflineImprover
 
 
 class HostServiceTests(unittest.IsolatedAsyncioTestCase):
@@ -26,32 +26,32 @@ class HostServiceTests(unittest.IsolatedAsyncioTestCase):
             root = Path(tmp).resolve()
             _write_cases(root)
             artifacts = DataArtifactStore(root / '.fruitfly/artifacts')
-            candidates = CandidateStore(root / '.fruitfly/optimization/candidates', artifacts)
+            candidates = CandidateStore(root / '.fruitfly/improvement/candidates', artifacts)
             target = BasePromptTarget('seed')
-            optimizer = OfflineOptimizer('base_prompt')
-            packs = TaskPackCatalog(root, legacy_path='.fruitfly/optimization/cases.json')
+            improver = OfflineImprover('base_prompt')
+            packs = TaskPackCatalog(root, legacy_path='.fruitfly/improvement/cases.json')
             manifest = SimpleNamespace(digest='parent', to_dict=lambda: {'digest': 'parent'})
             compactions = []
             jobs = RunSearchJobs(
                 workspace=root, artifacts=artifacts, candidates=candidates,
                 snapshots=TaskSnapshotStore(root), active_manifest=lambda: manifest,
-                optimizer=lambda _manifest: optimizer,
+                improver=lambda _manifest: improver,
                 target=lambda _manifest, **_kwargs: target,
                 task_catalog=lambda: packs, selected_target=lambda: 'base_prompt',
                 scope=lambda: (str(root / 'config.yaml'), 'default'),
                 compact=lambda: compactions.append(True),
             )
-            preview = jobs.optimization_preview({'digest': 'parent'}, direction='improve')
+            preview = jobs.improvement_preview({'digest': 'parent'}, direction='improve')
             self.assertEqual(jobs.last_target('parent'), 'base_prompt')
             self.assertIsNone(jobs.last_target('another-parent'))
-            records = await jobs.optimize({'digest': 'parent'}, 'improve', preview_token=preview.preview_token)
+            records = await jobs.improve({'digest': 'parent'}, 'improve', preview_token=preview.preview_token)
             self.assertEqual(len(records), 1)
             self.assertEqual(artifacts.read_text(records[0].artifact_id), 'seed\nUse exact answers.')
-            self.assertEqual(optimizer.calls, 1)
+            self.assertEqual(improver.calls, 1)
             self.assertEqual(compactions, [True])
             with self.assertRaisesRegex(ValueError, 'consumed'):
-                await jobs.optimize({'digest': 'parent'}, 'improve', preview_token=preview.preview_token)
-            self.assertEqual(optimizer.calls, 1)
+                await jobs.improve({'digest': 'parent'}, 'improve', preview_token=preview.preview_token)
+            self.assertEqual(improver.calls, 1)
             jobs.clear()
             self.assertIsNone(jobs.last_target())
 

@@ -10,11 +10,11 @@ from unittest.mock import Mock, patch
 
 from fruitfly_agent.interactive import AgentApplication, TerminalFrontend
 from fruitfly_agent.lab.catalog import builtin_catalog, MechanismDefinition, MechanismDescriptor, MechanismContribution, ParameterDescriptor, MechanismSelection
-from fruitfly_agent.lab.optimization.text_optimizer import SearchPreview, TextProposal, TEXT_OPTIMIZER_COMPONENT
+from fruitfly_agent.lab.improvement.api import SearchPreview, TextProposal, TEXT_IMPROVER_COMPONENT
 from fruitfly_agent.run.application import RunApplicationFactory
 from tests.support.materials import _write_models, _write_cases
 from tests.support.faux_provider import FauxProvider
-from tests.support.optimizers import QueueEditor, OfflineOptimizer, custom_definition, offline_factory
+from tests.support.improvers import QueueEditor, OfflineImprover, custom_definition, offline_factory
 
 
 
@@ -33,8 +33,8 @@ class DecouplingTests(unittest.IsolatedAsyncioTestCase):
                     root = Path(tmp)
                     factory = self.factory(root, algorithm, target)
                     choices = next(group for group in factory.configuration.snapshot().selection_groups
-                                   if group.group_id == 'text-optimizer')
-                    self.assertEqual(set(choices.option_ids), {'opro', 'offline-search'})
+                                   if group.group_id == 'text-improver')
+                    self.assertEqual(set(choices.option_ids), {'opro', 'offline-search', 'tree-search'})
                     self.assertEqual(choices.selected_id, algorithm)
                     app = AgentApplication(factory)
                     await app.start()
@@ -46,15 +46,15 @@ class DecouplingTests(unittest.IsolatedAsyncioTestCase):
                     output = io.StringIO()
                     frontend = TerminalFrontend(app, input_stream=io.StringIO(), output_stream=output, line_editor=editor)
                     async def drive():
-                        editor.send('/improvement improve', '1', *(("1",) if algorithm in ('opro',) else ()), '1')
+                        editor.send('/improvement improve', '1', '2' if target == 'skill-catalog.guidance' else '1', '1', '1', *(("1",) if algorithm in ('opro',) else ()), '1')
                         for _ in range(100):
-                            if app.optimization_progress.sequence > 0:
+                            if app.improvement_progress.sequence > 0:
                                 break
                             await asyncio.sleep(.001)
-                        await app.wait_for_optimization()
+                        await app.wait_for_improvement()
                         self.assertIsNone(app.last_error)
                         candidate = app.candidates()[0]
-                        editor.send('/improvement', '2', '1', 'up', 'up', 'up', '1', '1', 'q', '/exit')
+                        editor.send('/improvement', '4', '1', 'up', 'up', 'up', '1', '1', 'q', '/exit')
                         return candidate
                     ui = asyncio.create_task(frontend.run())
                     candidate = await drive()
@@ -79,10 +79,10 @@ class DecouplingTests(unittest.IsolatedAsyncioTestCase):
             app = AgentApplication(factory)
             await app.start()
             editor = QueueEditor()
-            editor.send('/improvement improve', '1', '', 'q', '/exit')
+            editor.send('/improvement improve', '1', '1', '1', '1', '', 'q', '/exit')
             output = io.StringIO()
             await TerminalFrontend(app, input_stream=io.StringIO(), output_stream=output, line_editor=editor).run()
-            self.assertEqual(factory._current_optimizer.calls, 0)
+            self.assertEqual(factory._current_improver.calls, 0)
             self.assertEqual(app.candidates(), ())
             await app.close()
 
@@ -91,7 +91,7 @@ class DecouplingTests(unittest.IsolatedAsyncioTestCase):
             factory = self.factory(Path(tmp))
             app = AgentApplication(factory)
             await app.start()
-            candidate_record = (await app.optimize('improve'))[0]
+            candidate_record = (await app.improve('improve'))[0]
             previous = app._handle
             old_manifest = app.runtime_manifest
             closed = []
@@ -124,7 +124,7 @@ class DecouplingTests(unittest.IsolatedAsyncioTestCase):
             factory = self.factory(root)
             app = AgentApplication(factory)
             await app.start()
-            candidate = (await app.optimize('improve'))[0]
+            candidate = (await app.improve('improve'))[0]
             original_update = factory.candidate_store.update
 
             def fail_final_commit(candidate_id, **changes):
@@ -154,10 +154,10 @@ class DecouplingTests(unittest.IsolatedAsyncioTestCase):
             finally:
                 await restarted.close()
 
-    async def test_terminal_cancel_status_and_exit_during_optimization(self):
+    async def test_terminal_cancel_status_and_exit_during_improvement(self):
         started = asyncio.Event()
         cleaned = asyncio.Event()
-        class Slow(OfflineOptimizer):
+        class Slow(OfflineImprover):
             async def search(self, text, direction, *, parent_manifest, task=None):
                 started.set()
                 try:
@@ -171,7 +171,7 @@ class DecouplingTests(unittest.IsolatedAsyncioTestCase):
             editor = QueueEditor()
             output = io.StringIO()
             frontend = TerminalFrontend(app, input_stream=io.StringIO(), output_stream=output, line_editor=editor)
-            editor.send('/improvement improve', '1', '1')
+            editor.send('/improvement improve', '1', '1', '1', '1', '1')
             task = asyncio.create_task(frontend.run())
             await started.wait()
             editor.send('/status', 'ordinary message', '/cancel', '/exit')
@@ -179,7 +179,7 @@ class DecouplingTests(unittest.IsolatedAsyncioTestCase):
             await app.close()
             self.assertTrue(cleaned.is_set())
             self.assertEqual(app.candidates() if app.state.value != 'closed' else factory.candidates(), ())
-            self.assertIn('state: optimizing', output.getvalue())
+            self.assertIn('state: improving', output.getvalue())
             self.assertIn('cannot submit', output.getvalue())
             self.assertIn('cancellation requested', output.getvalue())
 

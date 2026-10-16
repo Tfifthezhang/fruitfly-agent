@@ -1,6 +1,6 @@
 """Bounded snapshots for registered workspace text dependencies."""
 from pathlib import Path
-from .versions import SnapshotFile, StateSnapshot
+from fruitfly_agent.lab.improvement.contracts.versions import SnapshotFile, StateSnapshot
 
 
 class WorkspaceTextSnapshots:

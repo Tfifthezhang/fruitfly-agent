@@ -30,13 +30,13 @@ def candidate_prompt_choices(profile: HarnessProfile, *, read_text, records, con
             continue
         hashes.add(record.artifact_id)
         name = record.task_pack_name or task or 'Unattributed task'
-        options[record.artifact_id] = f'{name} · {record.algorithm.upper()} optimized · {record.status}'
+        options[record.artifact_id] = f'{name} · {record.algorithm.upper()} improved · {record.status}'
     if profile.prompt not in options:
         label = 'Current selected prompt'
         selected = next((r for r in records if (r.config_path, r.profile_id) == scope
                          and r.target == 'base_prompt' and r.artifact_id == profile.prompt), None)
         if selected:
-            label = f'{selected.task_pack_name or selected.task_pack_id or "Unattributed task"} · {selected.algorithm.upper()} optimized · current'
+            label = f'{selected.task_pack_name or selected.task_pack_id or "Unattributed task"} · {selected.algorithm.upper()} improved · current'
         options[profile.prompt] = label
     adapted_ids = tuple(ref for ref in options if ref not in builtin_ids)
     groups = (("builtin", "Built-in prompts", builtin_ids, False),

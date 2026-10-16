@@ -1,8 +1,8 @@
-"""Render generic optimization activity for terminal observers."""
-from fruitfly_agent.interactive.contracts.optimization import OptimizationActivity
+"""Render generic improvement activity for terminal observers."""
+from fruitfly_agent.interactive.contracts.improvement import ImprovementActivity
 
 
-def format_optimization_activity(activity: OptimizationActivity) -> str:
+def format_improvement_activity(activity: ImprovementActivity) -> str:
     """Show one batch's progress separately from request budget consumption."""
     text = activity.phase
     if activity.total > 0:

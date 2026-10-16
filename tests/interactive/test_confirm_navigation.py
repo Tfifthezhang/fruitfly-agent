@@ -5,22 +5,22 @@ import unittest
 from unittest.mock import AsyncMock, Mock
 
 from fruitfly_agent.interactive import TerminalFrontend
-from fruitfly_agent.interactive.contracts.optimization import OptimizationPreview
+from fruitfly_agent.interactive.contracts.improvement import ImprovementPreview
 from fruitfly_agent.interactive.terminal.io.menu import LineMenuInput, MenuRow, RawTerminalMenuInput, TerminalMenuRenderer
 
 
 class ConfirmationNavigationTests(unittest.IsolatedAsyncioTestCase):
     def frontend(self, events):
         output = io.StringIO()
-        preview = OptimizationPreview('opro', 'OPRO', 'Model calls may incur cost.', target='base_prompt', preview_token='confirmed-token')
-        session = SimpleNamespace(set_event_sink=Mock(), optimization_preview=Mock(return_value=preview), start_optimization=Mock(),
+        preview = ImprovementPreview('opro', 'OPRO', 'Model calls may incur cost.', target='base_prompt', preview_token='confirmed-token')
+        session = SimpleNamespace(set_event_sink=Mock(), improvement_preview=Mock(return_value=preview), start_improvement=Mock(),
                                   candidates=Mock(return_value=()), candidate_notice=Mock(return_value=()),
                                   acknowledge_candidate_notice=Mock(), candidate_detail=Mock(), candidate_action=Mock())
         frontend = TerminalFrontend(session, input_stream=io.StringIO(), output_stream=output)
         sequence = iter(events)
         def read_event():
             # Moving or reading another key must never start the job.
-            session.start_optimization.assert_not_called()
+            session.start_improvement.assert_not_called()
             return RawTerminalMenuInput.decode(next(sequence))
         frontend.menu_input = SimpleNamespace(read_event=read_event)
         frontend.menu_renderer = TerminalMenuRenderer(output)
@@ -44,9 +44,9 @@ class ConfirmationNavigationTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(expected, selections)
                 self.assertTrue(all('> 1. Start search' in f or '> 2. Cancel' in f for f in frames))
                 if start:
-                    session.start_optimization.assert_called_once_with('improve', preview_token='confirmed-token')
+                    session.start_improvement.assert_called_once_with('improve', preview_token='confirmed-token')
                 else:
-                    session.start_optimization.assert_not_called()
+                    session.start_improvement.assert_not_called()
 
     def test_shared_confirmation_pages_redraw_visible_selection(self):
         for title, label in (
@@ -59,7 +59,7 @@ class ConfirmationNavigationTests(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue(frontend.improvement_frontend().confirm_choice(title=title, subtitle='Review first', rows=(MenuRow(label), MenuRow('Cancel'))))
                 self.assertIn('> 2. Cancel', output.getvalue())
                 self.assertIn(f'> 1. {label}', output.getvalue())
-                session.start_optimization.assert_not_called()
+                session.start_improvement.assert_not_called()
 
     def test_numbered_confirmation_retains_default_cancel(self):
         for value, expected in (('1', True), ('2', False), ('', False), ('q', False)):

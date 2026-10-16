@@ -1,4 +1,4 @@
-"""Bounded resumable text evolution using the same host inbox as human optimization."""
+"""Bounded resumable text evolution using the same host inbox as human improvement."""
 from dataclasses import replace
 import asyncio
 from fruitfly_agent.lab.algorithms import Algorithm, AlgorithmSpec

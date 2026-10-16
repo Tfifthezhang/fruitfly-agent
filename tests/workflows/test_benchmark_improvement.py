@@ -9,8 +9,8 @@ from unittest.mock import Mock
 
 from fruitfly_agent.interactive import AgentApplication
 from fruitfly_agent.lab.algorithms.targets import SystemVersion, canonical_json, content_hash
-from fruitfly_agent.lab.optimization.text_optimizer import TaskReference, TaskRunEvidence, EvidenceArtifact
-from fruitfly_agent.lab.optimization.failure_processing.projection import source_case
+from fruitfly_agent.lab.improvement.api import TaskReference, TaskRunEvidence, EvidenceArtifact
+from fruitfly_agent.lab.improvement.failure_processing.projection import source_case
 from fruitfly_agent.run.application import RunApplicationFactory
 from fruitfly_agent.run.adapters.benchmark_trials import BenchmarkTrialClient
 from fruitfly_agent.run.trial import execute_trial
@@ -110,7 +110,7 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
             manifest = app.runtime_manifest
             preview = factory.benchmark_task_preview({'benchmark_id': 'terminal-bench', 'variant': 'no_gpu', 'task_limit': 3}, executor)
             self.script(provider, tasks[0])
-            records = await app.optimize(factory._experiments.direction, preview_token=preview.preview_token)
+            records = await app.improve(factory._experiments.direction, preview_token=preview.preview_token)
             self.assertEqual(len(records), 1)
             self.assertEqual(len(executor.calls), 6)
             self.assertEqual(factory.system_version(), parent)
@@ -139,7 +139,7 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
             executor = ApplicationTaskExecutor(root)
             preview = factory.benchmark_task_preview({'benchmark_id': 'terminal-bench', 'variant': 'no_gpu', 'task_limit': 3}, executor)
             self.script(provider, tasks[0])
-            records = await app.optimize(factory._experiments.direction, preview_token=preview.preview_token)
+            records = await app.improve(factory._experiments.direction, preview_token=preview.preview_token)
             self.assertEqual(len(records), 1)
             manifest = app.runtime_manifest
             memory = root/'.fruitfly/memory/MEMORY.md'
@@ -158,7 +158,7 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
             executor = ApplicationTaskExecutor(root)
             preview = factory.benchmark_task_preview({'benchmark_id': 'terminal-bench', 'variant': 'no_gpu', 'task_limit': 3}, executor)
             self.script(provider, tasks[0])
-            records = await app.optimize(factory._experiments.direction, preview_token=preview.preview_token)
+            records = await app.improve(factory._experiments.direction, preview_token=preview.preview_token)
             self.assertEqual(len(records), 1)
             manifest = app.runtime_manifest
             config = factory.selection.config_path.read_bytes()
@@ -180,12 +180,12 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
                     self.assert_lifecycle()
                     return await super().prepare_tasks(selection)
             executor = Executor(root)
-            executor.assert_lifecycle = lambda: self.assertEqual(app.state.value, 'optimizing')
+            executor.assert_lifecycle = lambda: self.assertEqual(app.state.value, 'improving')
             preview = factory.benchmark_task_preview({'benchmark_id':'terminal-bench','variant':'no_gpu','task_limit':3}, executor)
             self.assertEqual(executor.prepared, 0)
             self.assertEqual(provider.calls, [])
             self.script(provider, tasks[0])
-            records = await app.optimize(factory._experiments.direction, preview_token=preview.preview_token)
+            records = await app.improve(factory._experiments.direction, preview_token=preview.preview_token)
             self.assertEqual(executor.prepared, 1)
             self.assertEqual(len(records), 1)
             self.assertEqual(len(executor.calls), 6)
@@ -209,7 +209,7 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
                     cleaned.set()
             executor.prepare_tasks = prepare
             preview = factory.benchmark_task_preview({'benchmark_id':'terminal-bench','variant':'no_gpu','task_limit':3}, executor)
-            running = app.start_optimization(factory._experiments.direction, preview_token=preview.preview_token)
+            running = app.start_improvement(factory._experiments.direction, preview_token=preview.preview_token)
             await asyncio.wait_for(entered.wait(), 5)
             with self.assertRaises(RuntimeError):
                 app.enqueue('another task')
@@ -231,7 +231,7 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
             memory.parent.mkdir(parents=True, exist_ok=True)
             memory.write_text('Changed')
             with self.assertRaisesRegex(ValueError, 'H/I/S'):
-                await app.optimize(factory._experiments.direction, preview_token=preview.preview_token)
+                await app.improve(factory._experiments.direction, preview_token=preview.preview_token)
             self.assertEqual(executor.prepared, 0)
             self.assertEqual(executor.calls, [])
             self.assertEqual(provider.calls, [])
@@ -242,7 +242,7 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
             app, factory, provider = await self.setup_app(root, budget=1)
             executor = ApplicationTaskExecutor(root)
             preview = factory.benchmark_task_preview({'benchmark_id': 'terminal-bench', 'variant': 'no_gpu', 'task_limit': 3}, executor)
-            self.assertEqual(await app.optimize(factory._experiments.direction, preview_token=preview.preview_token), ())
+            self.assertEqual(await app.improve(factory._experiments.direction, preview_token=preview.preview_token), ())
             self.assertEqual(executor.calls, [])
             self.assertEqual(provider.calls, [])
 
@@ -252,7 +252,7 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
             app, factory, provider = await self.setup_app(root)
             executor = ApplicationTaskExecutor(root, corrupt=True)
             preview = factory.benchmark_task_preview({'benchmark_id': 'terminal-bench', 'variant': 'no_gpu', 'task_limit': 3}, executor)
-            self.assertEqual(await app.optimize(factory._experiments.direction, preview_token=preview.preview_token), ())
+            self.assertEqual(await app.improve(factory._experiments.direction, preview_token=preview.preview_token), ())
             self.assertEqual(provider.calls, [])
             self.assertEqual(app.candidates(), ())
 
@@ -262,11 +262,60 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
             app, factory, provider = await self.setup_app(root)
             executor = ApplicationTaskExecutor(root, block=True)
             preview = factory.benchmark_task_preview({'benchmark_id': 'terminal-bench', 'variant': 'no_gpu', 'task_limit': 3}, executor)
-            running = app.start_optimization(factory._experiments.direction, preview_token=preview.preview_token)
+            running = app.start_improvement(factory._experiments.direction, preview_token=preview.preview_token)
             await asyncio.wait_for(executor.entered.wait(), 5)
             app.cancel()
             with self.assertRaises(asyncio.CancelledError):
                 await running
             self.assertEqual(app.candidates(), ())
-            experiments = list((root/'.fruitfly/optimization/experiments').glob('*/experiment.json'))
+            experiments = list((root/'.fruitfly/improvement/experiments').glob('*/experiment.json'))
             self.assertEqual(json.loads(experiments[0].read_text())['status'], 'interrupted')
+
+
+    async def test_selected_method_identity_is_frozen_before_task_preparation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            app, factory, provider = await self.setup_app(root)
+            executor = ApplicationTaskExecutor(root)
+            preview = factory.benchmark_task_preview({
+                'benchmark_id': 'terminal-bench', 'variant': 'no_gpu', 'task_limit': 3,
+                'method_id': 'opro', 'target_id': 'base_prompt'}, executor)
+            factory._current_components['improvement-methods'].bound[-1].parameters['rounds'] += 1
+            with self.assertRaisesRegex(ValueError, 'method changed'):
+                await app.improve(factory._experiments.direction, preview_token=preview.preview_token)
+            self.assertEqual(executor.prepared, 0)
+            self.assertEqual(provider.calls, [])
+            self.assertEqual(app.candidates(), ())
+
+    async def test_benchmark_binds_search_and_confirmation_without_configuration_switches(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            _write_models(root)
+            provider = FauxProvider()
+            registry = Mock()
+            registry.create.return_value = provider
+            factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=registry)
+            factory.configuration.save()
+            factory.reload_configuration()
+            original_config = factory.selection.config_path.read_bytes()
+            app = AgentApplication(factory)
+            await app.start()
+            try:
+                self.assertTrue(factory.benchmark_improvement_available)
+                self.assertIsNone(factory._current_improver.host)
+                parent = factory.system_version()
+                executor = ApplicationTaskExecutor(root)
+                preview = factory.benchmark_task_preview({'benchmark_id': 'terminal-bench',
+                    'variant': 'no_gpu', 'task_limit': 3, 'method_id': 'opro', 'target_id': 'base_prompt'}, executor)
+                self.assertEqual(executor.prepared, 0)
+                self.assertEqual(provider.calls, [])
+                provider.respond_text('["Improved guidance"]')
+                records = await app.improve(factory._experiments.direction, preview_token=preview.preview_token)
+                self.assertEqual(len(records), 1)
+                self.assertEqual(factory.system_version(), parent)
+                self.assertEqual(factory.selection.config_path.read_bytes(), original_config)
+                self.assertEqual(len(executor.calls), 8)
+                await app.adopt_candidate(records[0].candidate_id)
+                self.assertEqual(factory.system_version().improver, parent.improver)
+            finally:
+                await app.close()
