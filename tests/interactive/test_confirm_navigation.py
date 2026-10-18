@@ -1,12 +1,13 @@
 """Confirmation keys must update what the user sees before any action runs."""
 import io
+import re
 from types import SimpleNamespace
 import unittest
 from unittest.mock import AsyncMock, Mock
 
 from fruitfly_agent.interactive import TerminalFrontend
-from fruitfly_agent.interactive.contracts.improvement import ImprovementPreview
-from fruitfly_agent.interactive.terminal.io.menu import LineMenuInput, MenuRow, RawTerminalMenuInput, TerminalMenuRenderer
+from fruitfly_agent.interactive.contracts.improvement import ImprovementPreview, ImprovementTargetView
+from fruitfly_agent.interactive.terminal.io.menu import LineMenuInput, MenuRow, MenuEvent, MenuAction, RawTerminalMenuInput, TerminalMenuRenderer
 
 
 class ConfirmationNavigationTests(unittest.IsolatedAsyncioTestCase):
@@ -14,7 +15,7 @@ class ConfirmationNavigationTests(unittest.IsolatedAsyncioTestCase):
         output = io.StringIO()
         preview = ImprovementPreview('opro', 'OPRO', 'Model calls may incur cost.', target='base_prompt', preview_token='confirmed-token')
         session = SimpleNamespace(set_event_sink=Mock(), improvement_preview=Mock(return_value=preview), start_improvement=Mock(),
-                                  candidates=Mock(return_value=()), candidate_notice=Mock(return_value=()),
+                                  improvement_targets=lambda: (ImprovementTargetView('H','base_prompt','Base prompt'),), candidates=Mock(return_value=()), candidate_notice=Mock(return_value=()),
                                   acknowledge_candidate_notice=Mock(), candidate_detail=Mock(), candidate_action=Mock())
         frontend = TerminalFrontend(session, input_stream=io.StringIO(), output_stream=output)
         sequence = iter(events)
@@ -26,6 +27,12 @@ class ConfirmationNavigationTests(unittest.IsolatedAsyncioTestCase):
         frontend.menu_renderer = TerminalMenuRenderer(output)
         frontend.menu_renderer.ansi = True
         frontend.menu_renderer.color = False
+        self.frames = []
+        render = frontend.menu_renderer.render
+        def capture(**frame):
+            self.frames.append(frame)
+            render(**frame)
+        frontend.menu_renderer.render = capture
         return frontend, session, output
 
     async def test_search_confirmation_arrows_redraw_before_enter(self):
@@ -38,11 +45,20 @@ class ConfirmationNavigationTests(unittest.IsolatedAsyncioTestCase):
         for events, expected, start in scenarios:
             with self.subTest(events=events):
                 frontend, session, output = self.frontend(events)
-                await frontend.improvement_frontend().start_search('improve')
+                pending = iter(('Target ·', 'Base prompt', 'Start improvement', *events, b'q'))
+                def read():
+                    value = next(pending)
+                    if isinstance(value, str):
+                        index = next(i for i,r in enumerate(self.frames[-1]['rows']) if r.label.startswith(value))
+                        return MenuEvent(MenuAction.ACTIVATE, index)
+                    return RawTerminalMenuInput.decode(value)
+                frontend.menu_input = SimpleNamespace(read_event=read)
+                view = frontend.improvement_frontend()
+                await view.run(('improve',))
                 frames = [f for f in output.getvalue().split('\x1b[2J\x1b[H') if f.startswith('Confirm improvement')]
-                selections = [0 if '> 1. Start search' in f else 1 for f in frames]
+                selections = [0 if '❯ Start improvement' in f else 1 for f in frames]
                 self.assertEqual(expected, selections)
-                self.assertTrue(all('> 1. Start search' in f or '> 2. Cancel' in f for f in frames))
+                self.assertTrue(all('❯ Start improvement' in f or '❯ Cancel' in f for f in frames))
                 if start:
                     session.start_improvement.assert_called_once_with('improve', preview_token='confirmed-token')
                 else:
@@ -57,8 +73,8 @@ class ConfirmationNavigationTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(title=title):
                 frontend, session, output = self.frontend((b'\x1b[A', b'\r'))
                 self.assertTrue(frontend.improvement_frontend().confirm_choice(title=title, subtitle='Review first', rows=(MenuRow(label), MenuRow('Cancel'))))
-                self.assertIn('> 2. Cancel', output.getvalue())
-                self.assertIn(f'> 1. {label}', output.getvalue())
+                self.assertIn('❯ Cancel', output.getvalue())
+                self.assertIn(f'❯ {label}', output.getvalue())
                 session.start_improvement.assert_not_called()
 
     def test_numbered_confirmation_retains_default_cancel(self):
@@ -72,7 +88,7 @@ class ConfirmationNavigationTests(unittest.IsolatedAsyncioTestCase):
     async def test_candidate_actions_preserve_arrow_selection_and_execute_on_enter(self):
         scenarios = (
             ((b'\x1b[A', b'\r'), [3, 2], 'reject'),
-            ((b'\x1b[A', b'\x1b[A', b'\r'), [3, 2, 1], 'adopt'),
+            ((b'\x1b[A', b'\x1b[A', b'\r', b'\x1b[A', b'\r'), [3, 2, 1], 'adopt'),
             ((b'\x1b[B', b'\r', b'\x1b[A', b'\r'), [3, 0], 'activate'),
             ((b'\r',), [3], None),
             ((b'\x1b[A', b'\x1b'), [3, 2], None),
@@ -94,7 +110,8 @@ class ConfirmationNavigationTests(unittest.IsolatedAsyncioTestCase):
                 frontend.menu_input = SimpleNamespace(read_event=read_event)
                 await frontend.improvement_frontend().candidate_detail('candidate-1')
                 frames = [f for f in output.getvalue().split('\x1b[2J\x1b[H') if f.startswith('Candidate candidate-')]
-                selections = [next(i for i in range(4) if f'> {i + 1}.' in frame) for frame in frames]
+                labels = ['Set default and start a new session', 'Set as next-session default', 'Discard candidate', 'Back']
+                selections = [labels.index(re.search(r'^❯ (.+)$', frame, re.M)[1]) for frame in frames]
                 self.assertEqual(expected, selections)
                 if action == 'activate':
                     session.adopt_candidate.assert_awaited_once_with('candidate-1')
@@ -112,7 +129,8 @@ class ConfirmationNavigationTests(unittest.IsolatedAsyncioTestCase):
             candidate_id='candidate-1', status='selected_for_next_session',
             algorithm='custom', target='base_prompt', evidence=()), 'change'))
         session.candidate_action = Mock()
+        session.adopt_candidate = AsyncMock()
         await frontend.improvement_frontend().candidate_detail('candidate-1')
-        self.assertIn('> 2. Back', output.getvalue())
-        self.assertIn('> 1. Use for a new session', output.getvalue())
+        self.assertIn('❯ Back', output.getvalue())
+        self.assertIn('❯ Set default and start a new session', output.getvalue())
         session.candidate_action.assert_not_called()

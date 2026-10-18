@@ -18,6 +18,7 @@ class CandidateView:
     evidence: tuple[tuple[str, str], ...] = ()
     sections: tuple[CandidateSection, ...] = ()
     role: str = 'H'
+    assessment: str = ''
 
 
 @dataclass(frozen=True)

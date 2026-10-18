@@ -102,6 +102,9 @@ class ImprovementFlowTests(unittest.IsolatedAsyncioTestCase):
                 contributions=(MechanismContribution('improvement', 'context'),),
                 default_enabled=True, exclusive_group='text-improver'),
             lambda state, context, params: state.with_component(TEXT_IMPROVER_COMPONENT, improver),
+
+            implementation_path='tests/workflows/test_improvement.py',
+            documentation_path='tests/workflows/README.md',
         )
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -139,6 +142,9 @@ class ImprovementFlowTests(unittest.IsolatedAsyncioTestCase):
             ),
             lambda state, context, parameters: state.with_component(TEXT_IMPROVER_COMPONENT, CustomImprover()),
             implementation_id="custom-v1",
+
+            implementation_path='tests/workflows/test_improvement.py',
+            documentation_path='tests/workflows/README.md',
         )
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

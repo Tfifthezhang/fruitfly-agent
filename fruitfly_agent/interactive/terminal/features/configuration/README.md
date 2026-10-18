@@ -16,7 +16,11 @@ Saving applies to a future session. The command requests rebuild through the inj
 
 Input and terminal control come from [I/O](../../io/README.md); display comes from [Rendering](../../rendering/README.md). This feature cannot import other features or Application/Session implementations. No new environment variables.
 
-Category layout projects declared selectors and independent capabilities into rows and actions before handling input. The menu retains remembered selections and expansion state; shared I/O navigation handles arrows and numbered choices. Layout construction does not stage or save configuration.
+Each mechanism has one readable row with a checkbox, current algorithm/state and expansion indicator. Enter expands algorithms in place; Space independently enables/disables it. Algorithms show distinguishing descriptions and implementation/guide paths. Multiple implementations use radio markers; a sole implementation has no redundant selector. Internal tuning and repeated enabled flags are omitted. The page identifies the configuration file/profile and the expanded mechanism parameter location. Tune other values in YAML; inspection does not reset them or open an editor.
+
+Context uses nonselectable **Context augmentation**, **Context externalization** and **Context reduction** headings from `display_section`/`context_phase`. Skills, file memory, knowledge and HTTP are peers under augmentation. Headings consume no input indices. Back first collapses a mechanism, then returns to configuration. Focus follows the mechanism after selection; reenabling remembers the algorithm. Draft edits are marked Modified and retain the existing save/new-session flow.
+
+Only explicitly declared user inputs, such as paths, initial text and endpoints, remain editable. Their input retains the menu and focused field while showing live text, current values, descriptions and type/range hints. Enter submits, blank preserves the value and Esc or `/cancel` cancels. Invalid values preserve the previous value; the host remains authoritative. Expansion and inspection do not change configuration. Shared I/O styles distinguish focus, enabled and modified states; raw-key menus omit numbers, line-based input retains numbered actions, and small ANSI terminals scroll to the focus. `NO_COLOR` retains symbols and hierarchy. Layout construction does not stage or save configuration.
 
 ```bash
 .venv/bin/python -m unittest tests.interactive.test_terminal_configuration tests.run.test_model_setup tests.interactive.test_extensions -v

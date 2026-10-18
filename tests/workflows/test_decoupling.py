@@ -34,7 +34,8 @@ class DecouplingTests(unittest.IsolatedAsyncioTestCase):
                     factory = self.factory(root, algorithm, target)
                     choices = next(group for group in factory.configuration.snapshot().selection_groups
                                    if group.group_id == 'text-improver')
-                    self.assertEqual(set(choices.option_ids), {'opro', 'offline-search', 'tree-search'})
+                    self.assertEqual(set(choices.option_ids), {'opro', 'offline-search', 'tree-search',
+                        'workflow-search', 'skill-edit', 'memory-exploration'})
                     self.assertEqual(choices.selected_id, algorithm)
                     app = AgentApplication(factory)
                     await app.start()
@@ -44,21 +45,15 @@ class DecouplingTests(unittest.IsolatedAsyncioTestCase):
                             provider.respond_text(text)
                     editor = QueueEditor()
                     output = io.StringIO()
+                    editor.output = output
                     frontend = TerminalFrontend(app, input_stream=io.StringIO(), output_stream=output, line_editor=editor)
-                    async def drive():
-                        editor.send('/improvement improve', '1', '2' if target == 'skill-catalog.guidance' else '1', '1', '1', *(("1",) if algorithm in ('opro',) else ()), '1')
-                        for _ in range(100):
-                            if app.improvement_progress.sequence > 0:
-                                break
-                            await asyncio.sleep(.001)
-                        await app.wait_for_improvement()
-                        self.assertIsNone(app.last_error)
-                        candidate = app.candidates()[0]
-                        editor.send('/improvement', '4', '1', 'up', 'up', 'up', '1', '1', 'q', '/exit')
-                        return candidate
-                    ui = asyncio.create_task(frontend.run())
-                    candidate = await drive()
-                    self.assertEqual(await ui, 0)
+                    target_label = next(view.label for view in app.improvement_targets() if view.target_id == target)
+                    method_label = next(view.label for view in app.improvement_methods('H', target) if view.method_id == algorithm)
+                    editor.send('/improvement improve', '@Target ·', '@' + target_label, '@' + method_label,
+                        '@Start improvement', '@Start improvement', '@Review candidate',
+                        '@Set default and start a new session', '@Start a fresh session', 'q', '/exit')
+                    self.assertEqual(await asyncio.wait_for(frontend.run(), 5), 0)
+                    candidate = app.candidates()[0]
                     self.assertEqual(factory.candidate_store.read(candidate.candidate_id).status, 'adopted')
                     snapshot = factory._current_targets[target].snapshot()
                     self.assertEqual(snapshot.content_hash, candidate.artifact_id)
@@ -79,8 +74,9 @@ class DecouplingTests(unittest.IsolatedAsyncioTestCase):
             app = AgentApplication(factory)
             await app.start()
             editor = QueueEditor()
-            editor.send('/improvement improve', '1', '1', '1', '1', '', 'q', '/exit')
+            editor.send('/improvement improve', '@Target ·', '@Base prompt', '@Offline search', '@Start improvement', '', 'q', '/exit')
             output = io.StringIO()
+            editor.output = output
             await TerminalFrontend(app, input_stream=io.StringIO(), output_stream=output, line_editor=editor).run()
             self.assertEqual(factory._current_improver.calls, 0)
             self.assertEqual(app.candidates(), ())
@@ -170,10 +166,15 @@ class DecouplingTests(unittest.IsolatedAsyncioTestCase):
             await app.start()
             editor = QueueEditor()
             output = io.StringIO()
+            editor.output = output
             frontend = TerminalFrontend(app, input_stream=io.StringIO(), output_stream=output, line_editor=editor)
-            editor.send('/improvement improve', '1', '1', '1', '1', '1')
+            from types import SimpleNamespace
+            from fruitfly_agent.interactive.terminal.io.menu import LineMenuInput, MenuEvent, MenuAction
+            frontend.menu_input = SimpleNamespace(read_event=LineMenuInput(editor).read_event,
+                poll_event=lambda timeout: MenuEvent(MenuAction.BACK))
+            editor.send('/improvement improve', '@Target ·', '@Base prompt', '@Offline search', '@Start improvement', '@Start improvement')
             task = asyncio.create_task(frontend.run())
-            await started.wait()
+            await asyncio.wait_for(started.wait(), 3)
             editor.send('/status', 'ordinary message', '/cancel', '/exit')
             await task
             await app.close()

@@ -118,6 +118,10 @@ Canonical data and record semantics belong to [Session](../core/session/README.m
 | Activate | Prepare a separate handle; commit host references only after successful startup. |
 | Retain | Protect configuration, Session, candidate-parent, and RSI references. |
 
+The terminal edits one experiment panel and exposes scoped run history through the improvement service. Submitted jobs receive summaries even when cancelled before execution or completed without a candidate; native reports retain measured usage, stopping reasons and verified journal references. History protects referenced candidates without relaxing activation checks.
+
+Target views use optional object-owned readable labels, with stable-ID fallback for existing targets. Method metadata places budget/material inputs under Budget/Task and concise algorithm descriptions with implementation/guide paths under Target. Internal tuning remains in YAML or programmatic previews. Discovery omits incompatible roles/formats and retains unavailable matching methods with reasons. These presentation choices do not alter H/I/S identity or execution contracts.
+
 Task selection does not change runtime configuration. Lab owns pack parsing and training edits. Readable `latest.txt` exports are not runtime inputs. Failed replacement retains the active runtime; external writes and effects do not automatically roll back. See [Improvement results](../lab/improvement/README.md#results-and-retention).
 
 ## Explicit text evolution

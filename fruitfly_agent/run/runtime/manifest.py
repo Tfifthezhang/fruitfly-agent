@@ -55,5 +55,5 @@ def execution_version_payload(manifest: Mapping[str, Any], source: str) -> dict[
             if not any(x.get("layer") == "improvement" for x in c.get("contributions", ()))],
             "context_pipeline": manifest.get("context_pipeline"),
             "base_prompt": {"content_hash": manifest["base_prompt"]["content_hash"]},
-            "data_artifacts": sorted((a for a in manifest.get("data_artifacts", ()) if a.get('role', 'H') != 'I'), key=lambda a: a['key'])}
+            "data_artifacts": sorted((a for a in manifest.get("data_artifacts", ()) if a.get('role', 'H') == 'H'), key=lambda a: a['key'])}
 

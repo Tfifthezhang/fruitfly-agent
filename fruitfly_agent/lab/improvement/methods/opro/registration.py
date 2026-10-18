@@ -25,7 +25,7 @@ def definition() -> MechanismDefinition:
         MechanismDescriptor(
             mechanism_id=OproImprover.spec.algorithm_id,
             label="OPRO",
-            description="Search an enabled text target through shared evaluation, history and budgets.",
+            description="Generate instruction candidates from previously scored solutions and training feedback.",
             contributions=(MechanismContribution("improvement", "context"),),
             parameters=(
                 *text_target_parameters(),
@@ -44,8 +44,13 @@ def definition() -> MechanismDefinition:
         ),
         _install,
         implementation_id=OproImprover.spec.implementation_id,
+        implementation_path='fruitfly_agent/lab/improvement/methods/opro/improver.py',
+        documentation_path='fruitfly_agent/lab/improvement/methods/opro/README.md',
         improvement=MethodDefinition(OproImprover.supported_roles, OproImprover.supported_schemas,
-            OproImprover.required_capabilities, _bind, usage=OproImprover.usage),
+            OproImprover.required_capabilities, _bind, usage=OproImprover.usage,
+            budget_parameters=tuple(p.name for p in text_budget_parameters()),
+            direction_help='Optional guidance for proposing text candidates. Task scores determine candidate ranking.',
+            material_parameters=('cases_path',)),
         provides=frozenset({"text-improver"}),
         selection_group="text-improver",
         selection_group_label="Text improver",

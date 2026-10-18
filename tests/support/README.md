@@ -18,3 +18,5 @@ Reusable substitutes and temporary materials. This module contains no TestCases 
 | [evaluation.py](evaluation.py), [harbor.py](harbor.py) | Offline requests and isolated Harbor protocol |
 
 Keep local helpers local unless multiple tests need them. Do not compute reviewed expected values from implementation helpers. Production code must not import support. Its consumers verify behavior; it has no separate execution command or key requirements.
+
+`MenuScriptedLines` and the optional output-bound `QueueEditor` accept `@label` to select one currently rendered numbered row by its visible prefix. They reject absent/ambiguous choices. Plain lines remain literal chat/field input. Tests still assert independent expected labels, states, order, confirmation and effects; the helper only avoids coupling scripts to row counts when inline sections expand.

@@ -3,15 +3,19 @@ from fruitfly_agent.interactive.contracts.task_packs import TaskPackView
 
 
 class RunTaskPackService:
-    def __init__(self, *, task_catalog, selected_target):
+    def __init__(self, *, task_catalog, selected_target, task_projection=lambda identity: identity):
         self.task_catalog = task_catalog
         self.selected_target = selected_target
+        self.task_projection = task_projection
 
     def _task_target(self):
         return self.selected_target()
 
     def task_packs(self):
         return tuple(self._pack_view(s) for s in self.task_catalog().summaries(self._task_target()))
+
+    def task_packs_for_target(self, target_id):
+        return tuple(self._pack_view(s) for s in self.task_catalog().summaries(self.task_projection(target_id)))
 
     @staticmethod
     def _pack_view(s):

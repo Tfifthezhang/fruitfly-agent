@@ -19,6 +19,14 @@ Eval consumes public runtime capabilities. Removing it must leave normal Agent u
 
 Independent improvement methods declare H/S/I support in method packages within Lab's [Improvement](lab/improvement/README.md#improvement-methods) module. They use shared search services and object-owned target adapters; Run assembles them without implementing algorithm-specific search logic.
 
+Lab registrations own concise algorithm descriptions and implementation/guide paths.
+Configuration and improvement menus consume this shared metadata, show necessary
+user inputs and budgets, and leave internal tuning in configuration. Improvement
+discovery excludes methods with incompatible target roles or formats before
+checking runtime availability.
+
+[Execution workflows](lab/workflow/README.md) own bounded H stage execution. Skill and memory adapters own retained S documents. Workflow search, Skill document optimization and Exploratory memory learning use these adapters, fixed comparison tasks, host-owned independent confirmation and the normal human adoption lifecycle. S artifacts enter state identity separately from H and I.
+
 Optional [automatic text search](lab/improvement/automatic/README.md) separates original tasks, derived learning material and confirmation. [Failure processing](lab/improvement/failure_processing/README.md) is independently replaceable. A confirmed candidate enters human review; Application still owns activation. [Original task experiments](lab/improvement/experiments/README.md) freeze H/I/S, consume official task evidence and reuse this human adoption path.
 
 Run separates [configuration](run/configuration/README.md), [runtime preparation](run/runtime/README.md), [storage](run/storage/README.md), [improvement hosting](run/improvement/README.md), and [adapters](run/adapters/README.md). Its Factory composes these services; leaf services receive explicit capabilities and own their local state.

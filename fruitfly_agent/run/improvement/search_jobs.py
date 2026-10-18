@@ -34,6 +34,10 @@ class RunSearchJobs:
         self._previews = {}
         self._last_target = None
         self.freeze_version, self.candidate_version = freeze_version, candidate_version
+        self._completion = None
+
+    def completion(self):
+        return self._completion
 
     def clear(self):
         self._previews.clear()
@@ -48,10 +52,10 @@ class RunSearchJobs:
         self, active_manifest: Mapping[str, object], direction: str, *, preview_token: str = ""
     ) -> tuple[CandidateRecord, ...]:
         """Run the selected text improver and persist proposals for human review."""
-
+        self._completion = None
         direction = direction.strip()
-        if not direction or len(direction) > 500:
-            raise ValueError("Improvement direction must contain 1–500 characters")
+        if len(direction) > 500:
+            raise ValueError("Improvement direction must contain at most 500 characters")
         manifest = self.active_manifest()
         if manifest is None or active_manifest.get("digest") != manifest.digest:
             raise RuntimeError("active runtime changed; start a new search")
@@ -86,6 +90,8 @@ class RunSearchJobs:
                 self.remember_method(improver)
             proposals = await improver.search(snapshot.text, direction, parent_manifest=manifest.digest, task=task)
         finally:
+            completion = getattr(improver, 'completion', None)
+            self._completion = completion() if callable(completion) else None
             self.running_improver = None
             if self.release_method is not None:
                 self.release_method(improver)
@@ -135,7 +141,7 @@ class RunSearchJobs:
         try:
             task = None
             source = getattr(improver, "task_source", None) or self.task_catalog()
-            if pack_id is None and direction:
+            if pack_id is None:
                 pack_id = source.default_pack_id
             if pack_id:
                 task = source.freeze(pack_id, target_id or self.selected_target())
@@ -150,13 +156,9 @@ class RunSearchJobs:
             if task and task.target_id != value.target_id:
                 raise ValueError("improver target differs from task projection")
             self._last_target = (active_manifest.get("digest"), value.target_id)
-            if not direction:
-                if self.release_method is not None:
-                    self.release_method(improver)
-                return value
             direction = direction.strip()
-            if not direction or len(direction) > 500:
-                raise ValueError("direction must contain 1–500 characters")
+            if len(direction) > 500:
+                raise ValueError("direction must contain at most 500 characters")
             payload = {"parent_manifest": active_manifest, "target_hash": target.content_hash,
                        "direction": direction, "algorithm": value.algorithm,
                        "preview": value.details, "method_identity": method_identity(improver),

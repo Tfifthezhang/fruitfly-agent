@@ -36,11 +36,11 @@ These checks make no model requests. See [Task packs](../../../fruitfly_agent/la
 |---|---|
 | 1 | Start the terminal with a configured model; no improvement switch is required. |
 | 2 | Record the active prompt hash from `/status`. |
-| 3 | `/improvement` → **Start improvement** → select the installed Python pack. |
+| 3 | Open `/improvement`; expand **Target**, select the object and algorithm, then set **Task** to the installed Python pack. |
 | 4 | Accept or edit direction; verify 8 train / 4 selection, model, budgets, and restricted execution policy. |
 | 5 | Explicitly confirm search. **Model requests may incur charges.** |
 | 6 | Review evaluation, usage, differences, text, and scope. |
-| 7 | Choose **Save for later** or confirm **Use for a new session**. |
+| 7 | Confirm **Set as next-session default** or **Set default and start a new session**. |
 
 The active target supplies the baseline; selecting the pack does not load `baseline.txt`. `/status` observes progress and `/cancel` stops search. Latest candidates do not guarantee better results. Use **Configure → prompt** to preview and select task results for future sessions.
 

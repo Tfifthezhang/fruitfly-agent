@@ -73,7 +73,16 @@ Use the actual workspace's Skill path if running elsewhere. Resolve diagnostics 
 | [catalog.py](catalog.py) | `Skill`, `LoadResult`, discovery, and XML rendering |
 | [adapter.py](adapter.py) | `SkillCatalogTransformer`; bounded augmentation |
 | [target.py](target.py) | `SkillGuidanceTarget`; snapshot, validation, and temporary trials |
+| [document.py](document.py) | Explicit retained Skill body, source selection and S target registration |
 
 The named target `skill-catalog.guidance` can replace rendered catalog text through an explicit artifact binding. It does not change or snapshot `SKILL.md` bodies or references. An empty catalog is a valid baseline; published replacement text must be nonempty and fit the projection budget. See [Improvement](../../../improvement/README.md) and [Run artifacts](../../../../run/README.md#text-artifacts).
 
-When guidance is read from workspace skill files, Catalog registers those Markdown/text dependencies for [original-task experiments](../../../improvement/experiments/README.md). Initial files are copied into independent trial workspaces. Bound guidance uses its existing immutable artifact; the configured Skill directory remains an initial-state dependency because referenced files can still be read. This does not implement improvement of skill bodies.
+When guidance is read from workspace skill files, Catalog registers those Markdown/text dependencies for [original-task experiments](../../../improvement/experiments/README.md). Initial files are copied into independent trial workspaces. Bound guidance uses its existing immutable artifact; the configured Skill directory remains an initial-state dependency because referenced files can still be read. Catalog-guidance search changes H; use the separate S document target below to optimize a body.
+
+## Optimize a Skill body
+
+Enable **Reusable skill document** under **Context → Context augmentation**. This separate mechanism owns one explicitly selected reusable body. Set `source_path` to a workspace-relative `SKILL.md`, such as `.skills/code-review/SKILL.md`; the target label becomes **Skill: code-review**. Its YAML frontmatter stays outside the optimized body. With an empty source path, `initial_text` supplies a standalone procedural document. Both fields use visible text input in configuration. `max_chars=16000` bounds the complete body; oversized input is rejected rather than truncated.
+
+Select the target and [Skill document optimization](../../../improvement/methods/skill_edit/README.md) in `/improvement`. The original body seeds the search. Candidates are immutable S artifacts, independent of H catalog guidance. After explicit adoption, the full candidate body is projected into the new session as the authoritative selected Skill. Relative references retain the source directory. Production file tools still use normal permissions; tool-free native trials do not read referenced files.
+
+Source files and references are not overwritten. Registered Markdown/text dependencies and the retained body enter initial-state identity; changed dependencies invalidate pending candidates. Non-text resources and arbitrary linked programs are not frozen. An adopted artifact takes precedence over the source body; changing the starting source requires a new configuration/session and clearing the old artifact binding if it should no longer apply. One body per configured mechanism is supported, not simultaneous optimization of a Skill repository. Enabling the mechanism performs no learning or model requests.

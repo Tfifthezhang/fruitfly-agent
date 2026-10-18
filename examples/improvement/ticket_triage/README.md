@@ -41,11 +41,11 @@ cp -R examples/improvement/ticket_triage .fruitfly/improvement/task-packs/ticket
 
 | Step | Action |
 |---|---|
-| 1 | Enable OPRO in Improvement and start a new session. |
+| 1 | Start a normal session; no improvement enable switch is required. |
 | 2 | Record the active target hash; `baseline.txt` is not loaded automatically. |
-| 3 | `/improvement` → **Start improvement** → select the installed ticket pack. |
+| 3 | Open `/improvement`; expand **Target**, select the object and OPRO below it, then set **Task** to the installed ticket pack. |
 | 4 | Review direction, model, cases, and budgets; explicitly start the paid search. |
-| 5 | Review evidence and changes; save or confirm a new session. |
+| 5 | Review evidence and changes; confirm the next-session default or a new session. |
 
 Search and live answers may incur model charges. Classification instructions can change general Agent behavior; inspect their scope before adoption.
 

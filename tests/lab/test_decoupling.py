@@ -20,6 +20,9 @@ class ContractBoundaryTests(unittest.IsolatedAsyncioTestCase):
                 contributions=(MechanismContribution('capability', 'environment'),), exclusive_group='environment', install_order=999),
             lambda state, context, params: replace(state, config=replace(state.config, env=LocalEnv(str(context.workspace)))),
             provides=frozenset({'execution-env'}),
+
+            implementation_path='tests/lab/test_decoupling.py',
+            documentation_path='tests/lab/README.md',
         )
         catalog = builtin_catalog().extended((definition,))
         resolved = catalog.resolve((MechanismSelection('other-env'), MechanismSelection('read-tool')))
@@ -48,6 +51,9 @@ class ContractBoundaryTests(unittest.IsolatedAsyncioTestCase):
         definition = MechanismDefinition(
             MechanismDescriptor('broken', 'Broken', 'Constructs then fails',
                 contributions=(MechanismContribution('online', 'workflow'),), default_enabled=True), fail,
+
+            implementation_path='tests/lab/test_decoupling.py',
+            documentation_path='tests/lab/README.md',
         )
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -83,6 +89,9 @@ class ContractBoundaryTests(unittest.IsolatedAsyncioTestCase):
                     MechanismDescriptor('broken', 'Broken', 'Reject assembled state',
                         contributions=(MechanismContribution('online', 'workflow'),), default_enabled=True),
                     invalid if source == 'installer' else fail,
+
+                    implementation_path='tests/lab/test_decoupling.py',
+                    documentation_path='tests/lab/README.md',
                 )
                 base = builtin_catalog()
                 bootstrap = base.bootstrap
@@ -109,7 +118,10 @@ class ContractBoundaryTests(unittest.IsolatedAsyncioTestCase):
             catalog.resolve((MechanismSelection('read-tool'),))
         def definition(name, dependency):
             return MechanismDefinition(MechanismDescriptor(name, name, name,
-                contributions=(MechanismContribution('online', 'workflow'),), requires=frozenset({dependency})), lambda s,c,p: s)
+                contributions=(MechanismContribution('online', 'workflow'),), requires=frozenset({dependency})), lambda s,c,p: s,
+                implementation_path='tests/lab/test_decoupling.py',
+                documentation_path='tests/lab/README.md',
+            )
         with self.assertRaisesRegex(ValueError, 'cyclic'):
             catalog.extended((definition('a', 'b'), definition('b', 'a'))).resolve((MechanismSelection('a'), MechanismSelection('b')))
 
@@ -124,6 +136,9 @@ class ContractBoundaryTests(unittest.IsolatedAsyncioTestCase):
             MechanismDescriptor('extra-source', 'Extra source', 'Declared text slot',
                 contributions=(MechanismContribution('capability', 'context'),), default_enabled=True), install,
             artifact_slots=frozenset({'extra.guidance'}),
+
+            implementation_path='tests/lab/test_decoupling.py',
+            documentation_path='tests/lab/README.md',
         )
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

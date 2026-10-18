@@ -15,6 +15,8 @@ Represent modification scope, immutable parent versions and comparison evidence 
 
 Target meaning and execution remain owned by the object module. A declared role or content hash does not provide an executable adapter. Model allocation, budgets and acceptance conditions remain external to the modifiable H/I/S triple. Original-task context belongs to [Experiments](../experiments/README.md).
 
+Natural-language `direction` is optional bounded guidance, with an empty string allowed. It is separate from the required scoring/comparison policy. A method may derive its objective entirely from task feedback and its own fixed comparison rules.
+
 No configuration, filesystem operations or model requests occur here. [Runtime](../runtime/README.md) validates and consumes these values; Run persists and activates candidates.
 
 ```bash

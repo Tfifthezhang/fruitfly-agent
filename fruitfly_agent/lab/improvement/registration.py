@@ -23,7 +23,7 @@ def text_target_parameters() -> tuple[ParameterDescriptor, ...]:
         ParameterDescriptor("target", "string", "Text target", "Enabled named target.", "base_prompt"),
         ParameterDescriptor(
             "cases_path", "path", "Default task pack or legacy cases JSON",
-            "Workspace-relative path; escaping the workspace is rejected.",
+            "Workspace-relative default source; selecting a saved task pack takes precedence. Escaping the workspace is rejected.",
             ".fruitfly/improvement/cases.json",
         ),
     )
@@ -46,6 +46,7 @@ def install_text_improver(
     strategy: Improver,
     label: str,
     roles: tuple[str, ...],
+    confirm_on_holdout=False,
 ) -> AssemblyState:
     """Bind an injected strategy without starting a search or calling a model."""
     source = state.components[TASK_PACK_COMPONENT].with_legacy(parameters["cases_path"])
@@ -64,6 +65,9 @@ def install_text_improver(
         target=state.components.get(TEXT_TARGET_PREFIX + parameters["target"]),
         label=label, role_configs=role_configs, task_source=source,
         services_factory=state.components.get(TRIAL_SERVICES_COMPONENT, NativeSearchServices),
+        trial_targets=tuple(t for key, t in state.components.items()
+                            if key.startswith(TEXT_TARGET_PREFIX) and getattr(t, 'project_in_trials', False)),
+        confirm_on_holdout=confirm_on_holdout,
     )
     context.own(improver)
     return (
@@ -71,3 +75,32 @@ def install_text_improver(
         .with_component(TASK_PACK_COMPONENT, source)
         .with_component(TEXT_IMPROVEMENT_TARGET_COMPONENT, parameters["target"])
     )
+
+
+def native_method_definition(strategy_type, *, label, description, implementation_path, documentation_path,
+                             family, target, parameters, direction_help=''):
+    """Declare a native method with the shared on-demand text-artifact host."""
+    from fruitfly_agent.core.mechanisms import MechanismDescriptor, MechanismContribution, MechanismEffects
+    from fruitfly_agent.lab.catalog.models import MechanismDefinition
+    from fruitfly_agent.lab.improvement.methods import MethodDefinition
+    target_fields = tuple(replace(p, default=target) if p.name == 'target' else p
+                          for p in text_target_parameters())
+    def install(state, context, values):
+        return install_text_improver(state, context, values, strategy=strategy_type(), label=label,
+                                     roles=('improver', 'curriculum'), confirm_on_holdout=True)
+    return MechanismDefinition(MechanismDescriptor(strategy_type.spec.algorithm_id, label,
+        description,
+        contributions=(MechanismContribution('improvement', 'context'),
+                       *((MechanismContribution('improvement', family),) if family != 'context' else ())),
+        parameters=(*target_fields, *text_budget_parameters(), *parameters),
+        exclusive_group='text-improver', install_order=76,
+        effects=MechanismEffects(uses_provider=True, uses_network=True, writes_files=True,
+            cost_notice='Explicit search runs scored trials and model requests and stores evidence; calls may incur charges.')),
+        install, implementation_id=strategy_type.spec.implementation_id,
+        implementation_path=implementation_path, documentation_path=documentation_path,
+        provides=frozenset({'text-improver'}), selection_group='text-improver', selection_group_label='Text improver',
+        improvement=MethodDefinition(strategy_type.supported_roles, strategy_type.supported_schemas,
+            strategy_type.required_capabilities | frozenset({'workflow-trials'}),
+            lambda binding: binding.text_host(strategy_type(), label=label, confirm_on_holdout=True),
+            usage=strategy_type.usage, budget_parameters=tuple(p.name for p in text_budget_parameters()),
+            direction_help=direction_help, material_parameters=('cases_path',)))

@@ -21,6 +21,7 @@ from .configuration.model_setup import RunModelSetup
 from .configuration.profile import HarnessProfile
 from .storage.artifacts import DataArtifactStore
 from .storage.candidates import CandidateRecord, CandidateStore
+from .storage.improvement_runs import ImprovementRunStore
 from .runtime.assembly import build_runtime
 from .runtime.manifest import RuntimeManifest
 from .runtime.preparation import RuntimePreparer, PreparedRuntime
@@ -139,6 +140,7 @@ class RunApplicationFactory:
         self._improvement_service = RunImprovementService(
             jobs=self._search_jobs, activity=self.improvement_activity, cancel=self.cancel_improvement,
             targets=self.improvement_targets, methods=self.improvement_methods,
+            runs=ImprovementRunStore(self.cwd), scope=self.candidate_scope,
         )
         self._experiments = RunExperiments(
             workspace=self.cwd, artifacts=self.artifact_store, versions=self._versions,
@@ -155,6 +157,7 @@ class RunApplicationFactory:
 
         self._task_pack_service = RunTaskPackService(
             task_catalog=self.task_pack_catalog, selected_target=self.improvement_target_id,
+            task_projection=self.task_material_target,
         )
 
     @property
@@ -225,9 +228,15 @@ class RunApplicationFactory:
             methods = self.improvement_methods(snapshot.role, identity)
             available = any(method.available for method in methods)
             reason = '' if available else '; '.join(dict.fromkeys(method.reason for method in methods if method.reason))
-            views.append(ImprovementTargetView(snapshot.role, identity, identity, available,
+            label = getattr(target, 'label', '')
+            label = label if isinstance(label, str) and label.strip() else identity
+            views.append(ImprovementTargetView(snapshot.role, identity, label, available,
                 reason or ('' if available else 'No executable method, comparison and adoption adapter are registered.')))
         return tuple(views)
+
+    def task_material_target(self, target_id):
+        target = self._current_targets.get(target_id)
+        return getattr(target, 'task_target_id', target_id)
 
     def cancel_improvement(self) -> bool:
         improver = (self._search_jobs.running_improver

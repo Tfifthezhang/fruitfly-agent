@@ -40,7 +40,7 @@ Frontends consume Application and Interactive events. They do not construct Prov
 | RuntimeHandle field / contract | Responsibility |
 |---|---|
 | `session`: [RuntimeSession](contracts/runtime.py) | Public conversation, observation, cancellation, and submission operations; InteractiveSession is the default implementation. |
-| `improvement`: [ImprovementService](contracts/improvement.py) | Preview, confirmed search, and cancellation. Optional ImprovementActivityService supplies progress observations. |
+| `improvement`: [ImprovementService](contracts/improvement.py) | Preview, confirmed search, and cancellation. Optional ImprovementActivityService supplies progress observations; ImprovementHistoryService exposes submitted experiment results. |
 | `candidates`: [CandidateService](contracts/candidates.py) | List, inspect, acknowledge, and review candidates. Does not require a search service. |
 | `candidate_activation`: [CandidateActivationService](contracts/candidates.py) | Prepare an isolated handle. Application owns startup and switching. |
 | `task_packs`: [TaskPackService](contracts/task_packs.py) | Read task materials and save corrections. Does not require improvement or candidate services. |
@@ -56,7 +56,7 @@ To add a frontend, consume Application's public operations and the capability pr
 
 Replacement paths share preparation and retirement: start resources, bind events, invoke activation, then switch the active handle. Failed replacement keeps the active handle; failure to retire the previous handle is exposed through `last_error` after a successful switch. Configuration writes and external side effects do not automatically roll back. No source hot reload or cross-process activation transaction. Improvement progress covers the current batch, not overall search completion.
 
-Resume continues canonical history in the original file with the selected current configuration. Discovery exposes availability/reasons rather than filtering by the active manifest digest. Run records changed environments after successful startup; history display never triggers model/tool replay. `/improvement` selects saved task packages or benchmark tasks for a bounded iterative improvement job. It selects H/S/I targets and reviews candidates. Daily material recording is independently configured under learning. Benchmark preparation, baseline and iteration share the Application job lifecycle; standalone evaluation remains in the optional Eval CLI.
+Resume continues canonical history in the original file with the selected current configuration. Discovery exposes availability/reasons rather than filtering by the active manifest digest. Run records changed environments after successful startup; history display never triggers model/tool replay. `/improvement` selects saved task packages or benchmark tasks for a bounded iterative improvement job. One experiment panel edits target, tasks, goal, method and budget; H/S/I are target labels. Results and history include empty/failed/cancelled experiments, and candidates remain subject to human adoption. Daily material recording is independently configured under learning. Benchmark preparation, baseline and iteration share the Application job lifecycle; standalone evaluation remains in the optional Eval CLI.
 
 ## Modules
 

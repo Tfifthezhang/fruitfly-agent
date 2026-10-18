@@ -46,6 +46,10 @@ class DreamWorkflowTests(unittest.IsolatedAsyncioTestCase):
                 before = factory.system_version()
                 method = next(m for m in app.improvement_methods('I', 'tree-search.exploration-policy') if m.method_id == 'dream-rsi')
                 self.assertTrue(method.available)
+                material = next(p for p in app.task_packs_for_target('tree-search.exploration-policy')
+                                if p.pack_id == 'project')
+                self.assertEqual(material.error, '')
+                self.assertEqual(method.task_sources, ('saved',))
                 preview = app.improvement_preview(direction='Improve exploration', method_id='dream-rsi', pack_id='project',
                     target_id='tree-search.exploration-policy', parameters={'policy_revisions': 1,
                         'rounds': 2, 'workers': 1, 'discovery_calls': 2})

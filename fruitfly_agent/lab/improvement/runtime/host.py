@@ -7,7 +7,7 @@ from uuid import uuid4
 from fruitfly_agent.lab.improvement.tasks import TaskPackCatalog
 from fruitfly_agent.lab.improvement.contracts.search import ImprovementProblem, ObjectivePolicy, content_id
 from fruitfly_agent.lab.improvement.runtime.services import NativeSearchServices, SearchBudget, SearchJournal
-from fruitfly_agent.lab.improvement.api import SearchPreview, TextProposal, SearchActivitySource
+from fruitfly_agent.lab.improvement.api import SearchPreview, TextProposal, SearchActivitySource, SearchCompletion
 from fruitfly_agent.lab.improvement.runtime.reporting import build_report
 from .workflow import run_search
 from fruitfly_agent.lab.improvement.contracts.versions import SystemVersion
@@ -17,7 +17,8 @@ from fruitfly_agent.lab.improvement.contracts.candidates import VersionCandidate
 class HostedTextImprover:
     """Strategies only receive public contracts, never runtime or activation handles."""
     def __init__(self, strategy, config, workspace, parameters, *, target, label,
-                 role_configs=None, services_factory=NativeSearchServices, task_source=None):
+                 role_configs=None, services_factory=NativeSearchServices, task_source=None, trial_targets=(),
+                 confirm_on_holdout=False):
         if target is None:
             raise ValueError("selected improvement target is not enabled")
         if target.snapshot().schema not in strategy.supported_schemas:
@@ -26,10 +27,14 @@ class HostedTextImprover:
             raise ValueError('improver does not support the selected H/S/I role')
         if not strategy.required_capabilities <= services_factory.capabilities:
             raise ValueError("improver requires unavailable search capabilities")
+        if confirm_on_holdout and 'workflow-trials' not in services_factory.capabilities:
+            raise ValueError('independent confirmation requires workflow trial services')
         self.strategy, self.spec = strategy, strategy.spec
         self.config, self.workspace, self.target = config, workspace, target
         self.parameters, self.label = dict(parameters), label
         self.role_configs, self.services_factory = role_configs, services_factory
+        self.trial_targets = tuple(trial_targets)
+        self.confirm_on_holdout = confirm_on_holdout
         self.task_source = task_source or TaskPackCatalog(workspace, legacy_path=parameters["cases_path"])
         self._stop = None
         self._services = None
@@ -38,6 +43,10 @@ class HostedTextImprover:
         self.method_usage = getattr(strategy, "usage", None)
         self.workflow = None
         self._prepared_workflow = None
+        self._completion = None
+
+    def completion(self):
+        return self._completion
 
     def configure_workflow(self, workflow, *, role_configs=None):
         """Attach a generic workflow before use; construction starts no research."""
@@ -78,7 +87,12 @@ class HostedTextImprover:
             "Download and freeze the selected tasks, then run one bounded improvement job. "
             "Baseline, learning, candidates and confirmation share the displayed budgets. "
             "Model, network and container operations may incur cost. Adoption requires human review.",
-            (("Training cases", str(task_count - 2)), ("Selection cases", "1"), ("Independent cases", "1"),
+            (("Method implementation", self.spec.implementation_id),
+             ("Method parameters", json.dumps(self.parameters, sort_keys=True)),
+             ("Trial model", self.config.model),
+             *((f"{role} model", cfg.model) for role, cfg in sorted((self.role_configs or {}).items())),
+             ("Independent confirmation", "Required before publishing a candidate"),
+             ("Training cases", str(task_count - 2)), ("Selection cases", "1"), ("Independent cases", "1"),
              ("Maximum model calls", str(self.parameters["max_model_calls"])),
              ("Maximum task trials", str(self.parameters["max_metric_calls"])),
              ("Maximum output tokens per call", str(self.parameters["output_max_tokens"])),
@@ -156,6 +170,10 @@ class HostedTextImprover:
         if callable(getattr(self.strategy, 'check_materials', None)):
             material_details = self.strategy.check_materials(self._preview_suite, self.config) or ()
         workflow_details = ()
+        if self.confirm_on_holdout:
+            from .confirmation import freeze_confirmation
+            confirmation = freeze_confirmation(self._preview_suite, self.task_source)
+            material_details = (*material_details, ('Independent cases', str(len(confirmation))))
         if getattr(self, 'require_confirmation', False):
             confirmation = tuple(self.task_source.holdout(self._preview_suite.pack_id))
             if not confirmation:
@@ -179,6 +197,9 @@ class HostedTextImprover:
              ("Maximum output tokens per call", str(params["output_max_tokens"])),
              ("Timeout seconds per operation", str(params["call_timeout_seconds"])),
              ("Trial model", self.config.model),
+             ("Independent confirmation", "Required before publishing a candidate"
+              if self.workflow is not None or self.confirm_on_holdout or getattr(self, 'require_confirmation', False)
+              else "Not provided; selection scores only"),
              ("Evaluation policy", self._preview_suite.policy_id),
              ("Code execution", self._preview_suite.evaluation_policy.execution_notice if self._preview_suite.evaluation_policy else "No generated code execution."),
              *((f"{role} model", cfg.model) for role, cfg in sorted((self.role_configs or {}).items())),
@@ -190,6 +211,7 @@ class HostedTextImprover:
     async def search(self, prompt, direction, *, parent_manifest, task=None):
         if self._stop is not None:
             raise RuntimeError("a search is already running")
+        self._completion = None
         suite = task or self._preview_suite or self.task_source.freeze(self.task_source.default_pack_id, self.parameters["target"])
         snapshot = self.target.snapshot()
         if snapshot.role not in getattr(self.strategy, 'supported_roles', {'H'}):
@@ -197,6 +219,10 @@ class HostedTextImprover:
         if snapshot.text != prompt:
             raise ValueError("target changed since host snapshot")
         prepared = self.workflow.prepare(suite, self.task_source) if self.workflow is not None else None
+        confirmation = ()
+        if self.confirm_on_holdout:
+            from .confirmation import freeze_confirmation
+            confirmation = freeze_confirmation(suite, self.task_source)
         self._last_progress = None
         search_id = uuid4().hex
         problem = ImprovementProblem(search_id, parent_manifest, snapshot, direction,
@@ -211,8 +237,11 @@ class HostedTextImprover:
         budget = SearchBudget(self.parameters["max_model_calls"], self.parameters["max_metric_calls"])
         journal = SearchJournal(problem, path)
         self._stop = Event()
+        final_reason, proposals, seed_score = 'error', (), None
         try:
             policy_kwargs = {"scorer": suite.evaluation_policy.score} if suite.evaluation_policy is not None else {}
+            if self.trial_targets:
+                policy_kwargs['trial_targets'] = self.trial_targets
             services = self.services_factory(problem, self.config, self.target, budget=budget,
                 journal=journal, stop=self._stop, timeout=self.parameters["call_timeout_seconds"],
                 max_tokens=self.parameters["output_max_tokens"], role_configs=self.role_configs, **policy_kwargs)
@@ -229,6 +258,10 @@ class HostedTextImprover:
                                material_source_hash=prepared.source_hash)
             result = await run_search(self.strategy, problem, services,
                 controller=self.workflow, prepared=prepared)
+            if self.confirm_on_holdout:
+                from .confirmation import confirm_result
+                result = await confirm_result(problem, services, result, confirmation, policy=suite.evaluation_policy)
+            final_reason, seed_score = result.stop_reason, result.seed_score
             journal.append("search-result", status=result.stop_reason, usage=budget.used, exhausted_kind=budget.exhausted_kind,
                            candidates=[content_id(c.text) for c in result.candidates])
             history_digest = content_id(path.read_text(encoding="utf-8"))
@@ -244,8 +277,10 @@ class HostedTextImprover:
                     exhausted_kind=budget.exhausted_kind, model_calls=budget.used['model'], model_limit=budget.limits['model'],
                     trial_calls=budget.used['trial'], trial_limit=budget.limits['trial']))
                 for c in sorted(result.candidates, key=lambda c: problem.policy.utility(c.score), reverse=True))
+            services.check_cancellation()
             return proposals
         except asyncio.CancelledError:
+            final_reason = 'interrupted'
             self.cancel()
             journal.append("search-result", status="interrupted", usage=budget.used)
             raise
@@ -257,6 +292,16 @@ class HostedTextImprover:
                 self._last_progress = self.progress()
             except Exception:
                 self._last_progress = None
+            report = proposals[0].report if proposals else build_report(
+                journal.rows, baseline_id=snapshot.content_hash, candidate_id='',
+                train_count=len(problem.train), validation_count=len(problem.validation),
+                seed_score=seed_score, metric=problem.policy.metric, direction=problem.policy.direction,
+                stop_reason=final_reason, exhausted_kind=budget.exhausted_kind,
+                model_calls=budget.used['model'], model_limit=budget.limits['model'],
+                trial_calls=budget.used['trial'], trial_limit=budget.limits['trial'])
+            self._completion = SearchCompletion(report, (
+                ('Search history', str(path.relative_to(self.workspace))),
+                ('Search history hash', content_id(path.read_text(encoding='utf-8')))))
             self._stop = self._services = None
             self._preview_suite = None
             self._prepared_workflow = None

@@ -49,6 +49,9 @@ def example_definition():
         ),
         install=install_guidance,
         implementation_id='example-guidance-v1',
+
+        implementation_path='examples/extensions/offline_guidance.py',
+        documentation_path='examples/extensions/README.md',
     )
 
 

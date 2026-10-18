@@ -87,7 +87,7 @@ Keep only usable profiles. For different credentials, assign distinct `api_key_e
 
 ## Match menus to YAML
 
-Menus use YAML keys and stable IDs. Descriptive text remains beside the identifiers. Existing YAML fields and schema versions are unchanged.
+Mechanism and algorithm menus use readable registered names. Stable IDs remain in implementation details and YAML. Model forms retain their documented field names. Stored fields and schema versions are unchanged.
 
 | Menu / form name | Stored location |
 |---|---|
@@ -96,8 +96,8 @@ Menus use YAML keys and stable IDs. Descriptive text remains beside the identifi
 | `capabilities` checkbox names | Boolean fields under the entry's `capabilities` mapping |
 | `model` / `model.profile` | Harness profile's `model.profile` selection |
 | `prompt` | Harness profile's `prompt` reference |
-| `mechanisms · <category>` | Visual category of the harness `mechanisms` list; categories are not extra YAML fields |
-| Mechanism name / algorithm `id` | `mechanisms[].id`; group names such as `reduction` organize alternatives, with the chosen algorithm ID stored |
+| Context / Tools / Environment / Learning | Visual category of the harness `mechanisms` list; categories are not extra YAML fields |
+| Readable mechanism / algorithm name | `mechanisms[].id`; group names such as `reduction` organize alternatives, with the chosen algorithm ID stored |
 
 The capability page uses arrows and Space/Enter to toggle, then **Continue** to confirm. Numbered fallback toggles the selected row and offers a numbered Continue action. Checked means `true`; unchecked means `false`. Required rows remain checked. Esc, `back`, q, or EOF cancels without staging.
 
@@ -106,9 +106,12 @@ The capability page uses arrows and Space/Enter to toggle, then **Continue** to 
 | Selection | Default / behavior | Reference |
 |---|---|---|
 | Base prompt | `assistant-default`; choose another prompt in **Configure → prompt**. | [Base prompt](fruitfly_agent/lab/base_prompt/README.md) |
-| Skill catalog | Read `.skills/`; enable in **mechanisms · context-manager → skill-catalog**. | [Skills](fruitfly_agent/lab/context_manager/augmentation/skills/README.md) |
-| Reduction | Summarizing; configure parameters in YAML. | [Reduction](fruitfly_agent/lab/context_manager/reduction/README.md) |
-| Improvement methods | Select OPRO, Tree search or DreamRSI directly in `/improvement`; no enable switch. | [Improvement](fruitfly_agent/lab/improvement/README.md) |
+| Skill catalog | Read `.skills/`; enable in **Context → Context augmentation → Skill catalog** (Space toggles; the phase is a section heading). | [Skills](fruitfly_agent/lab/context_manager/augmentation/skills/README.md) |
+| Reduction | Summarizing; expand Reduction to edit typed parameters, or use YAML. | [Reduction](fruitfly_agent/lab/context_manager/reduction/README.md) |
+| Improvement methods | Select compatible methods directly in `/improvement`; no algorithm enable switch. Workflow search, Skill document optimization and Exploratory memory learning require their object mechanisms. | [Improvement](fruitfly_agent/lab/improvement/README.md) |
+| Reusable skill document | Disabled; Context augmentation. Set `source_path` to one workspace-relative Skill or enter `initial_text`; `max_chars=16000`. | [Skill body](fruitfly_agent/lab/context_manager/augmentation/skills/README.md#optimize-a-skill-body) |
+| Learned environment memory | Disabled; Context augmentation. Enter `initial_text`; `max_chars=16000`. Updates require explicit Improvement and adoption. | [Learned memory](fruitfly_agent/lab/context_manager/augmentation/information/file_memory/README.md#learn-environment-memory) |
+| Execution workflow | Disabled; a bounded sequence of model stages. One solve-and-answer step until an artifact is selected. | [Workflow](fruitfly_agent/lab/workflow/README.md) |
 | Failure processing | Optional YAML workflow dependency; benchmark jobs use failed-task replay on demand. | [Failure processing](fruitfly_agent/lab/improvement/failure_processing/README.md) |
 | Automatic text search | Benchmark jobs assemble confirmation on demand. Optional YAML `automatic-text-search` also supports saved packages with holdout; adoption requires human review. | [Automatic workflow and parameters](fruitfly_agent/lab/improvement/automatic/README.md) |
 | Programmatic context | Explicitly enable `ipython-tool` or `rlm-ipython`. | [Programmatic context](fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md) |
@@ -132,10 +135,12 @@ Source paths resolve within the workspace. All three sources require `informatio
 | Field | Meaning |
 |---|---|
 | `prompt` | Built-in prompt ID or `sha256:…` text artifact; omission selects `assistant-default`. |
-| `artifact_bindings` | Named text slots, such as `skill-catalog.guidance`, mapped to artifact IDs. |
+| `artifact_bindings` | Named slots such as `skill-catalog.guidance`, `execution-workflow`, `skill-document` and `learned-memory`, mapped to text artifact IDs. |
 | `RuntimeManifest` | Actual model, normalized mechanisms, implementation identities, prompt hash, and consumed artifacts. |
 
 Create custom text with `DataArtifactStore.put_text`; see the [Run example](fruitfly_agent/run/README.md#text-artifacts). Artifacts are plaintext model instructions. Unknown or unused bindings are rejected; recovery verifies the original contents and manifest. Keep secrets out of artifacts, configuration, sessions, and reports.
+
+`execution-workflow` validates JSON stage instructions. `skill-document` and `learned-memory` are S documents and enter persistent-state identity rather than H identity. Adopted artifacts take precedence over configured initial text. Each slot must be consumed by its enabled object mechanism. The three methods require task packs with independent holdout; they confirm one selected candidate before publication. See the [offline three-method example](examples/improvement/native_methods/README.md).
 
 ## Environment variables
 
@@ -155,6 +160,7 @@ With no initial choice, a sole catalog entry is selected automatically. Multiple
 | Data | Location / behavior |
 |---|---|
 | Sessions | `.fruitfly/sessions/`; canonical messages, context decisions, manifest, and concise run records |
+| Experiment history | `.fruitfly/improvement/runs/`; scoped run summaries, including empty, failed and cancelled jobs |
 | Candidates | `.fruitfly/improvement/candidates/`; latest complete result per configuration, profile, target, and task pack |
 | Text contents | `.fruitfly/artifacts/`; immutable content-addressed artifacts |
 | Readable task results | `.fruitfly/improvement/task-results/<pack-id>/<config-profile-scope>/<target>/`; `latest.txt` and `latest.json` |
@@ -174,10 +180,10 @@ Model setup owns credential persistence. Restricting model file tools does not d
 
 ## Configure daily learning material
 
-Enable **mechanisms · learning → Learning materials → task-material-recording**
-to record completed tasks without enabling an improver. Configure `trigger`
+Enable **Learning → Learning materials** with Space. Its built-in implementation,
+**Record completed tasks**, works without an improver. Expand it to configure `trigger`
 (`task`, `session`, or `batch`), `batch_size`, `max_records`, and `max_chars` in
-YAML; see [Learning](fruitfly_agent/lab/learning/README.md). Records under
+its inline fields or YAML; see [Learning](fruitfly_agent/lab/learning/README.md). Records under
 `.fruitfly/learning/materials/` remain pending until a registered method supplies
 validated acceptance evidence. Recording does not call a model, change H/S/I,
 start a search, or assign observations to independent confirmation.
@@ -206,7 +212,7 @@ cross-process transaction. Repeating a completed migration makes no changes.
 
 ## Choose a method for one improvement job
 
-The configuration menu has no improvement category. `/improvement` discovers registered compatible methods, binds the selected method on demand and previews its requirements and budget. Search confirmation offers **Edit parameters** for JSON overrides. Confirmed choices persist separately under `.fruitfly/improvement/preferences/`, scoped to configuration/profile/target; they do not change YAML or the parent optimizer version. Existing YAML method entries remain optional parameter defaults; disabled entries do not prevent command selection. Legacy enabled hosts remain supported. The preview shows the selected implementation and normalized parameters. New auxiliary model profiles still require configuration and a new session. See [Method selection](fruitfly_agent/lab/improvement/README.md#select-methods-without-changing-defaults).
+The configuration menu has no improvement category. `/improvement` discovers registered compatible methods, binds the selected method on demand and previews its requirements and budget. The experiment panel offers Target, Task, Budget and Evaluation. Expand Target to select the object and then its algorithm; algorithms show concise descriptions and implementation/guide paths under Target. Internal tuning stays in YAML at the displayed file/profile/mechanism location, or in programmatic previews. Task holds source/material choices and Budget holds limits. Field input preserves the page and focus while showing live text, current values and rules. The terminal offers no internal tuning list or JSON override editor. Search guidance appears only when declared by the method and may be empty; scoring and acceptance remain separate. Confirmed choices persist separately under `.fruitfly/improvement/preferences/`, scoped to configuration/profile/target; they do not change YAML or the parent optimizer version. Existing YAML method entries remain optional parameter defaults; disabled entries do not prevent command selection. Legacy enabled hosts remain supported. The preview shows the selected implementation and normalized parameters. New auxiliary model profiles still require configuration and a new session. See [Method selection](fruitfly_agent/lab/improvement/README.md#select-methods-without-changing-defaults).
 
 ## Configure DreamRSI
 

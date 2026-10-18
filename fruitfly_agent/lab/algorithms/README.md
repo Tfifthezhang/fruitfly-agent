@@ -20,7 +20,13 @@ Identify algorithms and connect named text targets to shared search and adoption
 | 2 | Register a `text-target:ID` component and declare any artifact slots. |
 | 3 | Use the shared improvement, review, and activation path. |
 
+Targets may expose an optional readable `label` for frontend selection; built-in targets do. Run falls back to the stable target ID for existing embeddings. Labels are presentation metadata and do not enter target/version identity. Target IDs remain available in experiment details.
+
 `prepare_trial` projects a candidate into a temporary Core configuration, so search need not recognize target names. H instruction targets use `text-v1`: [Base prompt](../base_prompt/README.md) and [Skill guidance](../context_manager/augmentation/skills/README.md). The [tree-search policy target](../improvement/methods/tree_search/README.md) uses `exploration-policy-v1` for a validated I JSON artifact. It requires search-level comparison rather than task-prompt projection. Code and arbitrary stateful targets remain unsupported.
+
+[retained.py](retained.py) provides immutable `RetainedText` S adapters for Skill and memory documents. `state_artifact_path(key)` in the public target contract identifies their virtual snapshot location. Sources expose `artifact_key`, `freeze()` and `freeze_text(text)` for exact prepared-runtime state verification. Overlapping source snapshots must agree on shared file contents. They do not write these virtual files in the production workspace.
+
+Targets may declare `project_in_trials` to retain their baseline document or execution when another target changes. An optional `prepare_execution(config, text)` runs after host isolation and Provider budgeting; [Workflow](../workflow/README.md) uses this to install bounded stages. The adapter must preserve the supplied model/Provider and isolated Session/tool/environment boundary. Native scoring uses the final stage answer. [Retained target tests](../../../tests/lab/test_retained_targets.py) exercise production/trial agreement and root budgets.
 
 No independent configuration, secrets, or model requests.
 

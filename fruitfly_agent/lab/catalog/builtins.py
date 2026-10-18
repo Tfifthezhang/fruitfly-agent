@@ -29,6 +29,12 @@ from fruitfly_agent.lab.improvement.tasks import TaskPackCatalog, TASK_PACK_COMP
 from fruitfly_agent.lab.improvement.methods.opro import definition as opro_definition
 from fruitfly_agent.lab.improvement.methods.tree_search import definition as tree_definition
 from fruitfly_agent.lab.improvement.methods.dream_rsi import definition as dream_definition
+from fruitfly_agent.lab.improvement.methods.workflow_search import definition as workflow_search_definition
+from fruitfly_agent.lab.improvement.methods.skill_edit import definition as skill_edit_definition
+from fruitfly_agent.lab.improvement.methods.memory_exploration import definition as memory_exploration_definition
+from fruitfly_agent.lab.workflow import definition as execution_workflow_definition
+from fruitfly_agent.lab.context_manager.augmentation.skills.document import definition as skill_document_definition
+from fruitfly_agent.lab.context_manager.augmentation.information.file_memory.learned import definition as learned_memory_definition
 from fruitfly_agent.lab.improvement.failure_processing import definitions as failure_definitions
 from fruitfly_agent.lab.improvement.automatic import definition as automatic_definition
 from fruitfly_agent.lab.context_manager.augmentation.skills import (
@@ -71,6 +77,8 @@ def builtin_catalog() -> LabCatalog:
             label="Local environment",
             description="Use the workspace filesystem and local shell.",
             install=_install_local_env,
+            implementation_path='fruitfly_agent/lab/environment/local.py',
+            documentation_path='fruitfly_agent/lab/environment/README.md',
             default=True,
             order=10,
             exclusive_group="environment",
@@ -83,6 +91,8 @@ def builtin_catalog() -> LabCatalog:
             label="Read files",
             description="Read text or image files from the selected environment.",
             install=_install_read_tool,
+            implementation_path='fruitfly_agent/lab/tools/read.py',
+            documentation_path='fruitfly_agent/lab/tools/README.md',
             default=True,
             order=20,
             requires_capabilities=frozenset({"execution-env"}),
@@ -95,6 +105,8 @@ def builtin_catalog() -> LabCatalog:
             label="Run shell commands",
             description="Execute shell commands in the selected environment.",
             install=_install_bash_tool,
+            implementation_path='fruitfly_agent/lab/tools/bash.py',
+            documentation_path='fruitfly_agent/lab/tools/README.md',
             default=True,
             order=21,
             requires_capabilities=frozenset({"execution-env"}),
@@ -107,6 +119,8 @@ def builtin_catalog() -> LabCatalog:
             label="Edit files",
             description="Apply precise replacements to existing text files.",
             install=_install_edit_tool,
+            implementation_path='fruitfly_agent/lab/tools/edit.py',
+            documentation_path='fruitfly_agent/lab/tools/README.md',
             default=True,
             order=22,
             requires_capabilities=frozenset({"execution-env"}),
@@ -119,6 +133,8 @@ def builtin_catalog() -> LabCatalog:
             label="Write files",
             description="Create or replace files in the selected environment.",
             install=_install_write_tool,
+            implementation_path='fruitfly_agent/lab/tools/write.py',
+            documentation_path='fruitfly_agent/lab/tools/README.md',
             default=True,
             order=23,
             requires_capabilities=frozenset({"execution-env"}),
@@ -131,6 +147,8 @@ def builtin_catalog() -> LabCatalog:
             label="Persistent IPython",
             description="Run Python in a persistent Session workspace with artifacts and bounded model queries.",
             install=install_ipython_tool,
+            implementation_path='fruitfly_agent/lab/context_manager/externalization/adapter.py',
+            documentation_path='fruitfly_agent/lab/context_manager/externalization/README.md',
             order=24,
             parameters=_ipython_tool_parameters(),
             effects=MechanismEffects(
@@ -150,6 +168,9 @@ def builtin_catalog() -> LabCatalog:
             label="Skill catalog",
             description="Load visible SKILL.md metadata into the system prompt.",
             install=_install_skill_catalog,
+            implementation_path='fruitfly_agent/lab/context_manager/augmentation/skills/adapter.py',
+            documentation_path='fruitfly_agent/lab/context_manager/augmentation/skills/README.md',
+            input_parameters=('root',),
             default=True,
             order=30,
             parameters=(
@@ -170,6 +191,8 @@ def builtin_catalog() -> LabCatalog:
             label="Information context",
             description="Select bounded context from independently registered information spaces.",
             install=_install_information_context,
+            implementation_path='fruitfly_agent/lab/context_manager/augmentation/information/adapter.py',
+            documentation_path='fruitfly_agent/lab/context_manager/augmentation/information/README.md',
             default=True,
             order=35,
             parameters=(
@@ -184,6 +207,9 @@ def builtin_catalog() -> LabCatalog:
             label="File memory",
             description="Load a short MEMORY.md index and topic notes; edit with normal file tools.",
             install=_install_memory_files,
+            implementation_path='fruitfly_agent/lab/context_manager/augmentation/information/file_memory/__init__.py',
+            documentation_path='fruitfly_agent/lab/context_manager/augmentation/information/file_memory/README.md',
+            input_parameters=('root',),
             default=True,
             order=40,
             requires=frozenset({"information-context"}),
@@ -196,6 +222,9 @@ def builtin_catalog() -> LabCatalog:
             label="Local knowledge",
             description="Search current Markdown and text documents in a local directory.",
             install=_install_knowledge_files,
+            implementation_path='fruitfly_agent/lab/context_manager/augmentation/information/local_knowledge/__init__.py',
+            documentation_path='fruitfly_agent/lab/context_manager/augmentation/information/local_knowledge/README.md',
+            input_parameters=('root',),
             order=41,
             requires=frozenset({"information-context"}),
             parameters=(_path_parameter("root", ".fruitfly/knowledge", "Knowledge directory"),),
@@ -207,6 +236,9 @@ def builtin_catalog() -> LabCatalog:
             label="Live HTTP information",
             description="Query a configured HTTPS text endpoint for each current question.",
             install=_install_live_http,
+            implementation_path='fruitfly_agent/lab/context_manager/augmentation/information/live_http/__init__.py',
+            documentation_path='fruitfly_agent/lab/context_manager/augmentation/information/live_http/README.md',
+            input_parameters=('endpoint',),
             order=42,
             requires=frozenset({"information-context"}),
             parameters=(
@@ -225,6 +257,8 @@ def builtin_catalog() -> LabCatalog:
             selection_group_label="Reduction",
             description="Summarize history with validated, bounded overflow recovery.",
             install=_install_compaction,
+            implementation_path='fruitfly_agent/lab/context_manager/reduction/summarizing.py',
+            documentation_path='fruitfly_agent/lab/context_manager/reduction/README.md',
             default=True,
             order=60,
             exclusive_group="compaction",
@@ -250,6 +284,8 @@ def builtin_catalog() -> LabCatalog:
                 "Externalize large context for inspection through the IPython tool."
             ),
             install=install_rlm_ipython,
+            implementation_path='fruitfly_agent/lab/context_manager/externalization/adapter.py',
+            documentation_path='fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md',
             requires=frozenset({"ipython-tool"}),
             order=65,
             parameters=(
@@ -267,6 +303,12 @@ def builtin_catalog() -> LabCatalog:
         opro_definition(),
         tree_definition(),
         dream_definition(),
+        workflow_search_definition(),
+        skill_edit_definition(),
+        memory_exploration_definition(),
+        execution_workflow_definition(),
+        skill_document_definition(),
+        learned_memory_definition(),
         learning_definition(),
         *failure_definitions(),
         automatic_definition(),
@@ -285,6 +327,9 @@ def _definition(
     label: str,
     description: str,
     install,
+    implementation_path: str,
+    documentation_path: str,
+    input_parameters: tuple[str, ...] = (),
     context_phase: str | None = None,
     parameters: tuple[ParameterDescriptor, ...] = (),
     default: bool = False,
@@ -329,6 +374,8 @@ def _definition(
         requires_capabilities=requires_capabilities, validate_parameters=validate_parameters,
         selection_group=selection_group, selection_group_label=selection_group_label,
         selection_group_allow_disabled=selection_group_allow_disabled,
+        implementation_path=implementation_path, documentation_path=documentation_path,
+        input_parameters=input_parameters,
     )
 
 

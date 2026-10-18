@@ -20,7 +20,7 @@ class ImprovementRequest:
         if self.role not in {'H', 'S', 'I'} or not self.target_id.strip():
             raise ValueError('a role and target are required')
         require_hash(self.conditions_id)
-        if not self.policy_id.strip() or not 1 <= len(self.direction.strip()) <= 500:
+        if not self.policy_id.strip() or not isinstance(self.direction, str) or len(self.direction) > 500:
             raise ValueError('a fixed policy and bounded direction are required')
 
 

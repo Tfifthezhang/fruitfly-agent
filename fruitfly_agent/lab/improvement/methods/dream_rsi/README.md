@@ -27,7 +27,7 @@ The restricted four-field policy family, text-only discovery and mandatory indep
 2. Install a schema-2 [task pack](../../tasks/README.md) with train, selection and nonempty holdout. Exact labels or restricted Python function tests provide automatic scores; no human numerical score is required.
 3. Run H tree search with the fixed discovery direction, for example `/improvement Improve task performance.`. Keep the initial H unchanged; saving an H candidate is optional and should wait if reusing the original histories.
 4. Keep the same model, task/scoring execution identity, initial text and training/selection inputs. Histories must contain at least one positive scored outcome to normalize the paper objective.
-5. Run `/improvement` → I → `tree-search.exploration-policy` → Start improvement → DreamRSI → saved task pack → review and confirm.
+5. Open `/improvement`; expand **Target**, select Exploration policy under I and DreamRSI below it, then set **Task** to the saved pack. Review the panel, choose **Start improvement** and confirm.
 
 The default history directory is `.fruitfly/improvement/discovery`. Use a separate directory per fixed context; `history_path` can also select one completed JSON history. Malformed or mismatched histories fail before model work. Zero-quality worlds cannot support the paper's normalization and are explicitly excluded and counted in preview/journal; an entirely zero-quality pool is rejected.
 
@@ -35,7 +35,9 @@ The task pack remains compatible with the underlying H target such as `base_prom
 
 ## Configure method entries
 
-Optional method defaults can be stored as mechanism entries inside the selected harness profile. They are not required for discovery or execution. Use **Edit parameters** on saved-package confirmation for per-job JSON overrides. Keep other mechanisms and model settings as required by your workspace. Legacy enabled hosts remain supported.
+Optional method defaults can be stored as mechanism entries inside the selected harness profile. They are not required for discovery or execution. Use **Budget** limits and **Task** material fields, including the fixed discovery direction, for per-job settings. **Target** shows the description and implementation/guide paths; tune internal policy parameters in YAML at the displayed configuration location or through programmatic previews. Fields show current values, descriptions and type/bounds, and display text while typing. Keep other mechanisms and model settings as required by your workspace. Legacy enabled hosts remain supported.
+
+Evaluation exposes the comparison rules; Target has no generic guidance input for this method. Replay scoring and real-search confirmation determine selection and acceptance. The separate `discovery_direction` field configures the inner H search and must match the recorded discovery histories; it does not redefine the replay objective.
 
 ```yaml
 - id: tree-search

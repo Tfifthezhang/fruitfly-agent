@@ -34,3 +34,13 @@ SOFTWARE.
 ## Dream-RSI research attribution
 
 The native [DreamRSI method](fruitfly_agent/lab/improvement/methods/dream_rsi/README.md) is based on Zheng et al., [Dream-RSI: Recursive Self-Improvement through Evolving Worlds](https://arxiv.org/abs/2609.14858). The implementation was written from the paper's described mechanisms; no upstream implementation code or paper figures are included. It uses a restricted declarative policy family and adds real-search holdout confirmation. Published benchmark results are not reproduced.
+
+## Workflow and retained-state research attribution
+
+The following native implementations were written from the papers' described mechanisms. No upstream implementation code, figures or datasets are included, and the published experiments are not reproduced.
+
+| Native method | Research source | Implemented scope |
+|---|---|---|
+| [Workflow search](fruitfly_agent/lab/improvement/methods/workflow_search/README.md) | Hu, Lu and Clune, [Automated Design of Agentic Systems](https://arxiv.org/abs/2408.08435) | Archive-conditioned generation, reflection and repair over bounded sequential workflows |
+| [Skill document optimization](fruitfly_agent/lab/improvement/methods/skill_edit/README.md) | Yang et al., [SkillOpt: Executive Strategy for Self-Evolving Agent Skills](https://arxiv.org/abs/2605.23904) | Trajectory minibatches, bounded edits, rejected-edit memory and selection gates |
+| [Exploratory memory learning](fruitfly_agent/lab/improvement/methods/memory_exploration/README.md) | Zhu et al., [RSIAgent: Autonomous Exploration for Recursive Self-improvement in New Environments](https://arxiv.org/abs/2609.15364) | Authorized broad/focused practice, evidence-grounded consolidation and frozen memory reuse |

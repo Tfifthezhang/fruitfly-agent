@@ -70,7 +70,12 @@ class ImprovementClients:
     activation: CandidateActivationClient | None = None
     progress: Callable[[], ImprovementProgress | None] = lambda: None
     targets: Callable = lambda: ()
-    methods: Callable = lambda role, target_id: ()
+    methods: Callable | None = None
+    history: Callable = lambda: ()
+    cancel: Callable[[], bool] = lambda: False
+    packs_for_target: Callable | None = None
+    history_logs: Callable | None = None
+    wait: Callable | None = None
 
     @classmethod
     def from_session(cls, session: Any) -> ImprovementClients:
@@ -81,7 +86,12 @@ class ImprovementClients:
             activation=session if isinstance(session, CandidateActivationClient) else None,
             progress=lambda: getattr(session, "improvement_progress", None),
             targets=getattr(session, 'improvement_targets', lambda: ()),
-            methods=getattr(session, 'improvement_methods', lambda role, target_id: ()),
+            methods=getattr(session, 'improvement_methods', None),
+            history=getattr(session, 'improvement_history', lambda: ()),
+            cancel=getattr(session, 'cancel', lambda: False),
+            packs_for_target=getattr(session, 'task_packs_for_target', None),
+            history_logs=getattr(session, 'improvement_run_logs', None),
+            wait=getattr(session, 'wait_for_improvement', None),
         )
 
     @property

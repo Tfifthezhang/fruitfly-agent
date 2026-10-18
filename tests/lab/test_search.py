@@ -29,6 +29,14 @@ from tests.support.search import problem, services, tool_calls, engineer
 
 
 class SearchContractTests(unittest.IsolatedAsyncioTestCase):
+    def test_search_guidance_is_optional_but_scoring_policy_remains_required(self):
+        p = replace(problem(), direction='')
+        self.assertTrue(p.policy.better(1, 0))
+        with self.assertRaisesRegex(ValueError, '500'):
+            replace(p, direction='x' * 501)
+        with self.assertRaises(ValueError):
+            ObjectivePolicy(policy_id='')
+
     def test_nonfinite_and_error_scores_are_rejected(self):
         fields = ("eval", "candidate", "case", "train", "runtime", "policy")
         for status, score in (("ok", float("nan")), ("ok", None), ("error", 0.0)):

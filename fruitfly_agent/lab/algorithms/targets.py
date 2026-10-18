@@ -11,6 +11,13 @@ from fruitfly_agent.lab.improvement.contracts.candidates import VersionCandidate
 TEXT_TARGET_PREFIX = 'text-target:'
 
 
+def state_artifact_path(key):
+    """Stable virtual snapshot location for a registered retained-text binding."""
+    if not isinstance(key, str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*', key):
+        raise ValueError('state artifact key must be a stable identifier')
+    return f'.fruitfly/retained/{key}/document.md'
+
+
 @dataclass(frozen=True)
 class TargetBinding:
     kind: Literal['prompt', 'artifact']

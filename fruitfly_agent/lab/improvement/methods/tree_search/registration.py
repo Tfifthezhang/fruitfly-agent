@@ -25,11 +25,15 @@ def definition():
         effects=MechanismEffects(uses_provider=True, uses_network=True, writes_files=True,
             cost_notice='Explicit search calls models, evaluates tasks and stores discovery histories.')),
         _install, implementation_id=TreeSearchImprover.spec.implementation_id,
+        implementation_path='fruitfly_agent/lab/improvement/methods/tree_search/improver.py',
+        documentation_path='fruitfly_agent/lab/improvement/methods/tree_search/README.md',
         artifact_slots=frozenset({POLICY_TARGET}), provides=frozenset({'text-improver', 'tree-search'}),
         selection_group='text-improver', selection_group_label='Text improver',
         improvement=MethodDefinition(TreeSearchImprover.supported_roles, TreeSearchImprover.supported_schemas,
             TreeSearchImprover.required_capabilities, _bind, usage=TreeSearchImprover.usage,
-            prepare_targets=_prepare_targets))
+            prepare_targets=_prepare_targets, budget_parameters=tuple(p.name for p in text_budget_parameters()),
+            direction_help='Optional guidance for branch proposals. Keep it fixed when reusing discovery histories.',
+            material_parameters=('cases_path', 'history_path')))
 
 
 def _prepare_targets(state, context):

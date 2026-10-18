@@ -31,7 +31,7 @@ def definition():
         'Improve an exploration policy by historical replay and same-start real-search confirmation.',
         contributions=(MechanismContribution('improvement', 'workflow'),),
         parameters=(P('target', 'string', 'Policy target', 'Registered exploration policy.', POLICY_TARGET),
-            P('cases_path', 'path', 'Task materials', 'Task pack or legacy training/selection JSON.', '.fruitfly/improvement/cases.json'),
+            P('cases_path', 'path', 'Default task materials', 'Default pack or legacy cases; selecting a saved task pack takes precedence.', '.fruitfly/improvement/cases.json'),
             *(replace(p, default=64) if p.name == "max_metric_calls" else p for p in text_budget_parameters()), *search_parameters(),
             P('policy_revisions', 'integer', 'Policy revisions', 'Bounded model proposals for policy refinement.', 3, minimum=1, maximum=32),
             P('replay_rounds', 'integer', 'Replay rounds', 'Maximum rounds in each deterministic replay.', 64, minimum=1, maximum=512),
@@ -44,9 +44,13 @@ def definition():
         install_order=78, effects=MechanismEffects(uses_provider=True, uses_network=True, writes_files=True,
             cost_notice='Replay reads frozen histories. Policy proposals and real confirmation call models; no automatic adoption.')),
         lambda state, context, parameters: state, implementation_id=DreamRsiImprover.spec.implementation_id,
+        implementation_path='fruitfly_agent/lab/improvement/methods/dream_rsi/improver.py',
+        documentation_path='fruitfly_agent/lab/improvement/methods/dream_rsi/README.md',
         requires_capabilities=frozenset({'tree-search'}),
         improvement=MethodDefinition(DreamRsiImprover.supported_roles, DreamRsiImprover.supported_schemas,
-            DreamRsiImprover.required_capabilities, _bind, usage=DreamRsiImprover.usage))
+            DreamRsiImprover.required_capabilities, _bind, usage=DreamRsiImprover.usage,
+            budget_parameters=tuple(p.name for p in text_budget_parameters()),
+            material_parameters=('cases_path', 'history_path', 'discovery_direction')))
 
 
 def _bind(binding):

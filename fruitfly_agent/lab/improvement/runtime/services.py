@@ -84,7 +84,7 @@ class NativeSearchServices:
 
     def __init__(self, problem, config, target, *, budget, journal, stop=None,
                  timeout=30, max_tokens=1024, role_configs=None, scorer=None, evaluator=None,
-                 trial_executor=None):
+                 trial_executor=None, trial_targets=()):
         self.problem, self.config, self.target = problem, config, target
         self.budget, self.journal = budget, journal
         if journal.problem != problem:
@@ -96,6 +96,7 @@ class NativeSearchServices:
         self._budget_exhausted = False
         self.evaluator = evaluator
         self.trial_executor = trial_executor
+        self.trial_targets = tuple(trial_targets)
         self.scorer = scorer or task_policy(problem.policy.policy_id).score
         self._accounting = {"tokens": TokenUsage(), "failures": 0}
         self._phase, self._completed, self._total, self._failed_trials = "Preparing", 0, 0, 0
@@ -129,6 +130,7 @@ class NativeSearchServices:
             journal=ScopedJournal(), stop=self.stop, timeout=self.timeout, max_tokens=self.max_tokens,
             role_configs=self.role_configs, scorer=self.scorer, evaluator=self.evaluator,
             trial_executor=self.trial_executor)
+        child.trial_targets = self.trial_targets
         child.signal, child._accounting = self.signal, self._accounting
         return child
 
@@ -252,13 +254,38 @@ class NativeSearchServices:
                 raise ValueError("metric must be a finite number, not boolean")
             return "", float(score), "scored by " + self.problem.policy.policy_id
         config = self.target.prepare_trial(self.config, text)
+        selected_id = self.target.snapshot().target_id
+        execution_target = self.target if callable(getattr(self.target, 'prepare_execution', None)) else None
+        for target in self.trial_targets:
+            if target.snapshot().target_id != selected_id:
+                if callable(getattr(target, 'prepare_execution', None)):
+                    if execution_target is not None:
+                        raise ValueError('multiple trial execution controllers')
+                    execution_target = target
+        execution_text = text if execution_target is self.target else execution_target.snapshot().text if execution_target else ''
+        if execution_target is not None:
+            config = execution_target.prepare_trial(config, execution_text)
+        # Substitute the candidate in its registered projection position rather
+        # than appending it after all fixed documents.
+        for target in self.trial_targets:
+            if target is not execution_target:
+                candidate_text = text if target.snapshot().target_id == selected_id else target.snapshot().text
+                config = target.prepare_trial(config, candidate_text)
         provider = self._provider(config, "trial", evaluation_id=evaluation_id,
                                   candidate_id=content_id(text), case_id=case.case_id)
+        def prepare_execution(config):
+            prepared = execution_target.prepare_execution(config, execution_text)
+            if (prepared.provider is not provider or prepared.model != config.model
+                    or prepared.session is not None or prepared.env is not None or prepared.tools):
+                raise ValueError('target execution must retain budgeted model and isolated trial boundaries')
+            return prepared
         if external and self.trial_executor is not None:
             # The executor constructs task-owned tools/environment; never borrow
             # the production Session, environment, callbacks or tool objects.
             config = isolated_config(config, provider=provider,
                                      max_tokens=min(config.max_tokens, self.max_tokens))
+            if execution_target is not None:
+                config = prepare_execution(config)
             try:
                 outcome = await asyncio.wait_for(
                     self.trial_executor.run(config, case, signal=self.signal), self.timeout)
@@ -273,6 +300,8 @@ class NativeSearchServices:
             return outcome.output, outcome.score, outcome.feedback
         config = isolated_config(config, provider=provider,
                                  max_tokens=min(config.max_tokens, self.max_tokens), max_turns=1, max_tool_calls_per_turn=0)
+        if execution_target is not None:
+            config = prepare_execution(config)
         result = await asyncio.wait_for(run_agent_loop(config, [UserMessage(content=case.input)],
                                         signal=self.signal), self.timeout)
         if self._budget_exhausted:
@@ -282,7 +311,8 @@ class NativeSearchServices:
         answers = [m for m in result.messages if isinstance(m, AssistantMessage)]
         if not answers or answers[-1].stop_reason != "stop" or answers[-1].tool_calls:
             raise ValueError("trial returned incomplete or non-text output")
-        output = "".join(m.text for m in result.messages if isinstance(m, AssistantMessage)).strip()
+        output = (answers[-1].text if execution_target is not None else
+                  "".join(m.text for m in result.messages if isinstance(m, AssistantMessage))).strip()
         scored = (scorer or self.scorer)(output, case)
         if isawaitable(scored):
             scored = await asyncio.wait_for(scored, self.timeout)

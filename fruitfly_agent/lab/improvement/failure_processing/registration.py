@@ -18,12 +18,16 @@ def definitions():
           ParameterDescriptor("material_reviewer_profile", "string", "Material reviewer model", "Empty reuses the active Provider.", "")), True),
     ):
         result.append(MechanismDefinition(
-            MechanismDescriptor(name, label, "Prepare learning material from scored training failures.",
+            MechanismDescriptor(name, label,
+                'Generate and review new exercises from measured training failures.' if uses_provider else
+                'Reuse scored failed training tasks directly, without generating new exercises.',
                 contributions=(MechanismContribution("improvement", "context"),),
                 parameters=parameters, install_order=74, exclusive_group="failure-processing",
                 effects=MechanismEffects(uses_provider=uses_provider, uses_network=uses_provider,
                     cost_notice="Material generation and model review may incur charges." if uses_provider else "No material-generation model calls.")),
             install, implementation_id=implementation, provides=frozenset({"failure-processing"}),
+            implementation_path='fruitfly_agent/lab/improvement/failure_processing/processors.py',
+            documentation_path='fruitfly_agent/lab/improvement/failure_processing/README.md',
             selection_group="failure-processing", selection_group_label="Failure processing"))
     return tuple(result)
 

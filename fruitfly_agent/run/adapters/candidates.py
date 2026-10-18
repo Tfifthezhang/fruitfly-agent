@@ -14,10 +14,20 @@ def candidate_view(record):
         evidence.append(('Cases identity', record.cases_digest))
     if record.metric_calls:
         evidence.append(('Metric calls', str(record.metric_calls)))
+    comparison = record.report.get('conclusion') if record.report is not None else None
+    assessment = {'improved': 'Measured gain on selection; independent confirmation not provided',
+                  'tied': 'Tied with baseline; no measured improvement',
+                  'worse': 'Worse than baseline', 'unavailable': 'Comparison unavailable'}.get(comparison, 'Comparison unavailable')
+    if dict(record.evidence).get('Independent confirmation') == 'passed':
+        assessment = 'Independent confirmation passed; human adoption required'
+    elif dict(record.evidence).get('Independent confirmation'):
+        assessment = dict(record.evidence)['Independent confirmation']
+    elif record.role != 'H' and comparison == 'improved':
+        assessment = 'Measured gain on the declared method objective; independent confirmation not provided'
     return CandidateView(
         record.candidate_id, record.status, record.algorithm, record.target,
         record.artifact_id, record.direction, record.parent_manifest_digest, tuple(evidence),
-        role=record.role,
+        role=record.role, assessment=assessment,
     )
 
 

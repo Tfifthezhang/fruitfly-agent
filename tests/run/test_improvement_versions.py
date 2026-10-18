@@ -302,8 +302,8 @@ class StartupVersionsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((False, 'Use for next session'),
                          frontend._preview_prompt('Python adapted', 'hash', '\n'.join(f'line {i}' for i in range(20))))
         self.assertIn('Review prompt (2/3)', output.getvalue())
-        self.assertIn('> 2. Back', output.getvalue())
-        self.assertIn('> 1. Use for next session', output.getvalue())
+        self.assertIn('❯ Back', output.getvalue())
+        self.assertIn('❯ Use for next session', output.getvalue())
 
     async def test_candidate_section_switch_keeps_action_selection_and_full_text_pages(self):
         record=SimpleNamespace(candidate_id='candidate-1',status='proposed',algorithm='custom',target='target',
@@ -311,7 +311,8 @@ class StartupVersionsTests(unittest.IsolatedAsyncioTestCase):
                                  CandidateSection('Changes','diff',initial=True),CandidateSection('Original text','first\n'*20),
                                  CandidateSection('Candidate text','new')))
         session=SimpleNamespace(set_event_sink=Mock(),candidate_detail=lambda _: (record,'diff'),candidate_action=Mock(),
-            candidates=lambda: (record,), candidate_notice=lambda: (), acknowledge_candidate_notice=Mock())
+            candidates=lambda: (record,), candidate_notice=lambda: (), acknowledge_candidate_notice=Mock(),
+            adopt_candidate=AsyncMock())
         output=io.StringIO();frontend=TerminalFrontend(session,input_stream=io.StringIO(),output_stream=output)
         sequence=iter((b'\x1b[A',b'n',b'\x1b[6~',b'n',b'p',b'\x1b'))
         frontend.menu_input=SimpleNamespace(read_event=lambda:RawTerminalMenuInput.decode(next(sequence)))
@@ -321,6 +322,6 @@ class StartupVersionsTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Original text (2/3)',output.getvalue())
         self.assertIn('Candidate text (1/1)',output.getvalue())
         frames=[f for f in output.getvalue().split('\x1b[2J\x1b[H') if f.startswith('Candidate candidate-')]
-        self.assertIn('> 4. Back',frames[0])
-        self.assertTrue(all('> 3. Discard candidate' in f for f in frames[1:]))
+        self.assertIn('❯ Back',frames[0])
+        self.assertTrue(all('❯ Discard candidate' in f for f in frames[1:]))
         session.candidate_action.assert_not_called()

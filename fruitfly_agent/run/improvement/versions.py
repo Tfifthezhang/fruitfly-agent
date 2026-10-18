@@ -1,7 +1,7 @@
 """Freeze actual execution, improvement and registered persistent-state material."""
 from pathlib import Path
 from fruitfly_agent.lab.algorithms.targets import (
-    SystemVersion, SnapshotFile, StateSnapshot, canonical_json, TargetChange, VersionCandidate,
+    SystemVersion, SnapshotFile, StateSnapshot, canonical_json, TargetChange, VersionCandidate, state_artifact_path,
 )
 from fruitfly_agent.run.storage.snapshots import SnapshotStore, capture_source_tree
 from fruitfly_agent.run.storage.versions import VersionStore
@@ -15,10 +15,24 @@ class RunVersions:
         self.snapshots = SnapshotStore(artifacts)
         self.versions = VersionStore(artifacts)
 
-    def freeze_state(self):
-        snapshots = tuple(source.freeze() for source in self.state_sources())
-        return self.snapshots.put(StateSnapshot(tuple(f for s in snapshots for f in s.files),
-                                               roots=tuple(r for s in snapshots for r in s.roots)))
+    def freeze_state(self, manifest=None):
+        manifest = manifest if manifest is not None else self.manifest()
+        bindings = {a['key']: a['id'] for a in manifest.get('data_artifacts', ()) if a.get('role') == 'S'}
+        sources = tuple(self.state_sources())
+        registered = {source.artifact_key for source in sources if getattr(source, 'artifact_key', None)}
+        if set(bindings) - registered:
+            raise ValueError('state artifact has no registered snapshot source')
+        snapshots = tuple(source.freeze_text(self.artifacts.read_text(bindings[source.artifact_key]))
+                          if getattr(source, 'artifact_key', None) in bindings else source.freeze()
+                          for source in sources)
+        files = {}
+        for snapshot in snapshots:
+            for entry in snapshot.files:
+                if entry.path in files and files[entry.path] != entry:
+                    raise ValueError('registered state sources disagree on a shared file')
+                files[entry.path] = entry
+        return self.snapshots.put(StateSnapshot(tuple(files.values()),
+                                               roots=tuple(sorted({r for s in snapshots for r in s.roots}))))
 
     def freeze_source(self):
         root = Path(__file__).resolve().parents[3]
@@ -31,15 +45,27 @@ class RunVersions:
         h = self.artifacts.put_text(canonical_json(harness)).artifact_id
         i = self.artifacts.put_text(canonical_json({"source": source, "strategy": self.improvement_identity(),
             "artifacts": sorted((a for a in manifest.get("data_artifacts", ()) if a.get("role") == "I"), key=lambda a: a["key"])})).artifact_id
-        version = SystemVersion(h, i, self.freeze_state())
+        version = SystemVersion(h, i, self.freeze_state(manifest))
         self.versions.put(version)
         return version
 
     def text_candidate(self, parent, snapshot, text):
-        if snapshot.role not in {'H', 'I'} or (snapshot.role == 'I' and snapshot.binding.kind != 'artifact'):
+        if snapshot.role not in {'H', 'S', 'I'} or (snapshot.role in {'S', 'I'} and snapshot.binding.kind != 'artifact'):
             raise ValueError('no version adapter for this role and binding')
         before = self.artifacts.put_text(snapshot.text).artifact_id
         after = self.artifacts.put_text(text).artifact_id
+        if snapshot.role == 'S':
+            state = self.snapshots.read(parent.state)
+            path = state_artifact_path(snapshot.binding.key)
+            original = next((f for f in state.files if f.path == path), None)
+            if original is None or original.digest != before:
+                raise ValueError('state target has no matching registered immutable document')
+            updated = StateSnapshot(tuple(SnapshotFile(f.path, text) if f.path == path else f
+                                          for f in state.files), state.update_rule, state.roots)
+            candidate = VersionCandidate(parent, SystemVersion(parent.harness, parent.improver,
+                self.snapshots.put(updated)), (TargetChange('S', snapshot.target_id, snapshot.schema, before, after),))
+            self.versions.put_candidate(candidate)
+            return candidate
         if snapshot.role == 'I':
             import json
             payload = json.loads(self.artifacts.read_text(parent.improver))

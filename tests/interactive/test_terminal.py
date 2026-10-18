@@ -22,7 +22,7 @@ from fruitfly_agent.interactive.terminal.rendering.renderer import TerminalRende
 from tests.support.faux_provider import FauxProvider
 from tests.support.application import offline_session
 from tests.support.configuration import MockConfiguration
-from tests.support.terminal import ScriptedLines, TtyStringIO, run_finished
+from tests.support.terminal import ScriptedLines, MenuScriptedLines, TtyStringIO, run_finished
 
 
 class _TerminalSessionStub:
@@ -129,9 +129,9 @@ class TerminalFrontendTest(unittest.IsolatedAsyncioTestCase):
             session,
             input_stream=io.StringIO(),
             output_stream=output,
-            line_editor=ScriptedLines(
-                "/improvement be concise", "1", "1", "1", "1", "/improvement", "4", "1",
-                "up", "up", "2", "q", "/exit",
+            line_editor=MenuScriptedLines(output,
+                '/improvement be concise', '@Target ·', '@Base prompt', '@Start improvement', '@Start improvement',
+                '@Review candidate', '@Set as next-session default', '@Set as next-session default', 'q', '/exit',
             ),
         )
         self.assertEqual(await frontend.run(), 0)

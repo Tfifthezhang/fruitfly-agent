@@ -14,6 +14,7 @@ Add tools, execution backends, context strategies, and improvement algorithms th
 | [Tools](tools/README.md) | Model-callable file, shell, and IPython operations |
 | [Environment](environment/README.md) | Local filesystem and process backend |
 | [Base prompt](base_prompt/README.md) | Built-in prompt text and its target adapter |
+| [Workflow](workflow/README.md) | Bounded sequential execution and its H target |
 | [Improvement](improvement/README.md) | Candidate search, scoring, task packs, budgets, and OPRO |
 | [Learning](learning/README.md) | Independently configured daily task-material production |
 | [RSI](rsi/README.md) | Verified adoption and continuation across generations |
@@ -27,7 +28,7 @@ Add tools, execution backends, context strategies, and improvement algorithms th
 | How are improvements proposed and compared? | Improvement | OPRO searches scored text candidates. |
 | Who verifies, adopts, and continues? | Human or explicit RSI host | Review one result, or run verified text evolution. |
 
-Improvement can run independently. Human adoption of a prompt is not a complete RSI process. Persistent RSI requires an injected host and independent verifier; only confirmed activation advances the version. A registered declarative I exploration policy can be compared and activated through DreamRSI. Code replacement and arbitrary learning-state evolution remain unsupported.
+Improvement can run independently. Human adoption of a prompt is not a complete RSI process. Persistent RSI requires an injected host and independent verifier; only confirmed activation advances the version. A registered declarative I exploration policy can be compared and activated through DreamRSI. Workflow search changes bounded H stage workflows; Skill document optimization and Exploratory memory learning change registered S documents. These methods require independent confirmation before human review. Code replacement and arbitrary learning-state evolution remain unsupported.
 
 Independent improvement methods live under `improvement/methods/` and declare supported H/S/I targets, with shared hosting and trial services outside those packages. Methods remain Lab algorithms. Object adapters stay with the modules that define the objects; see [Improvement methods](improvement/README.md#improvement-methods).
 
@@ -65,7 +66,7 @@ It registers a context transformer, assembles it through Run, and submits a task
 | Budgets | State which calls, bytes, tokens, time, and queue waits are actually bounded. |
 | Failure | Preserve protocol distinctions between no-op, ordinary failure, and cancellation. |
 | Resources | Register owned resources during construction; clean up failed assembly and cancellation. |
-| Registration | Declare parameters, contributions, dependencies, implementation identity, and external effects. |
+| Registration | Declare parameters, contributions, dependencies, implementation identity, external effects, a concise distinguishing description, and implementation/guide paths. Mark necessary user inputs explicitly; keep tuning in YAML. |
 | Verification | Observe useful output, disabled behavior, failure, cancellation, isolation, and recovery where applicable. |
 
 Catalog checks declared parameters, dependencies, conflicts, stage shape, and returned assembly state. It does not prove deep immutability, resource budgets, algorithm quality, or every mechanism combination. Plain interface conformance is insufficient.

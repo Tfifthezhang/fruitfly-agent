@@ -14,7 +14,7 @@ Expected output: `Offline response: example-guidance is active.` No catalog file
 |---|---|
 | `ExampleGuidance.transform` | Add guidance to a request projection. |
 | Installer | Return an `AssemblyState` with the context stage. |
-| `example_definition()` | Declare identity and contribution. |
+| `example_definition()` | Declare identity, contribution, distinguishing description, and implementation/guide paths. |
 | Extended Catalog / profile | Register and select the mechanism. |
 | Factory / Application | Assemble, start, submit, and close. |
 | Fixed Provider | Assert guidance reaches the request and return a fixed response. |

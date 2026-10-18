@@ -94,6 +94,9 @@ class AutomaticImprovementWorkflowTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(await app.improve("Improve", preview_token=preview.preview_token), ())
             self.assertEqual(app.runtime_manifest, before)
             self.assertEqual(app.candidates(), ())
+            run, = app.improvement_history()
+            self.assertEqual((run.status, run.stop_reason), ('completed', 'confirmation_failed'))
+            self.assertIn('confirmation_failed', app.improvement_run_logs(run.run_id))
             self.assertEqual(len(provider.calls), 9)
             self.assertEqual(app.improvement_progress.activity.phase,
                              "Automatic search stopped: confirmation failed")
@@ -105,8 +108,10 @@ class AutomaticImprovementWorkflowTests(unittest.IsolatedAsyncioTestCase):
             self.script(provider, "Improved guidance")
             editor = QueueEditor()
             output = io.StringIO()
+            editor.output = output
             frontend = TerminalFrontend(app, input_stream=io.StringIO(), output_stream=output, line_editor=editor)
-            editor.send("/improvement Improve", "1", "1", "1", "1", "1", "1")
+            editor.send('/improvement Improve', '@Target ·', '@Base prompt', '@OPRO', '@Start improvement',
+                'pagedown', 'pagedown', 'pagedown', 'pagedown', '@Start improvement')
             running = asyncio.create_task(frontend.run())
             try:
                 for _ in range(200):
@@ -118,7 +123,7 @@ class AutomaticImprovementWorkflowTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(len(app.candidates()), 1)
                 self.assertEqual(app.runtime_manifest, before)
                 self.assertEqual(factory.candidate_store.list()[0].status, "proposed")
-                editor.send("/exit")
+                editor.send("q", "/exit")
                 self.assertEqual(await asyncio.wait_for(running, 3), 0)
                 self.assertIn("Automatic search includes", output.getvalue())
                 self.assertIn("Independent cases", output.getvalue())

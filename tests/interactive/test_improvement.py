@@ -12,7 +12,10 @@ from fruitfly_agent.interactive.terminal.bindings import ImprovementClients
 from fruitfly_agent.interactive.terminal.io.menu import LineMenuInput
 from tests.support.application import offline_session
 from tests.support.faux_provider import FauxProvider
-from tests.support.terminal import ScriptedLines, TtyStringIO
+from tests.support.terminal import MenuScriptedLines, TtyStringIO
+
+
+TARGET = ('@Target ·', '@Base prompt')
 
 
 class ImprovementFrontendTests(unittest.IsolatedAsyncioTestCase):
@@ -28,18 +31,12 @@ class ImprovementFrontendTests(unittest.IsolatedAsyncioTestCase):
     async def run_frontend(self, controller, *lines, clients=None, tty=False):
         clients = replace(clients or ImprovementClients(), targets=lambda: (
             ImprovementTargetView('H', 'base_prompt', 'Base prompt'),))
-        expanded = []
-        for line in lines:
-            expanded.append(line)
-            if line.startswith('/improvement'):
-                expanded.extend(('1', '1'))
-        lines = tuple(expanded)
         output = TtyStringIO() if tty else io.StringIO()
         provider = FauxProvider()
         frontend = TerminalFrontend(offline_session(provider=provider), evaluation=controller,
             improvement_clients=clients or ImprovementClients(),
             input_stream=TtyStringIO() if tty else io.StringIO(), output_stream=output,
-            line_editor=ScriptedLines(*lines, None))
+            line_editor=MenuScriptedLines(output, *lines, None))
         if tty:
             frontend.menu_input = LineMenuInput(frontend.line_editor)
         self.assertEqual(await frontend.run(), 0)
@@ -57,15 +54,15 @@ class ImprovementFrontendTests(unittest.IsolatedAsyncioTestCase):
     async def test_missing_workflow_reason_survives_benchmark_menu_exit(self):
         controller = self.controller()
         controller.improvement_available = False
-        search = SimpleNamespace(improvement_preview=Mock(), start_improvement=Mock())
+        search = SimpleNamespace(improvement_preview=Mock(return_value=ImprovementPreview(
+            'method','Method','Costs',target='base_prompt')), start_improvement=Mock())
         with patch.dict('os.environ', {'TERM': 'xterm-256color'}):
-            _, output = await self.run_frontend(controller, '/improvement', '1', '2', '/exit',
+            _, output = await self.run_frontend(controller, '/improvement', *TARGET, '@Task ·', '@Benchmark tasks', 'q', '/exit',
                 clients=ImprovementClients(search=search), tty=True)
         self.assertIn('Benchmark tasks', output)
         self.assertIn('\x1b[?1049h', output)
         transcript = output.rsplit('\x1b[?1049l', 1)[1]
         self.assertIn('no executable search and verification binding', transcript)
-        self.assertNotIn('/config', transcript)
         controller.improvement_snapshot.assert_not_called()
         controller.benchmark_preview.assert_not_called()
         controller.improve.assert_not_awaited()
@@ -77,7 +74,7 @@ class ImprovementFrontendTests(unittest.IsolatedAsyncioTestCase):
                               ('preview', 'preview failed'), ('execution', 'execution failed')):
             with self.subTest(stage=stage):
                 controller = self.controller(available=stage != 'preflight')
-                choices = ['1']
+                choices = [*TARGET, '@Task ·']
                 if stage == 'catalog':
                     controller.improvement_snapshot.side_effect = RuntimeError(reason)
                 elif stage == 'empty':
@@ -85,16 +82,16 @@ class ImprovementFrontendTests(unittest.IsolatedAsyncioTestCase):
                 elif stage == 'variants':
                     controller.improvement_snapshot.return_value = EvaluationSnapshot((
                         EvaluationBenchmarkOption('bench', 'Benchmark', 'tasks', 'fixed', ()),))
-                    choices += ['1']
+                    choices += ['@Benchmark']
                 else:
-                    choices += ['1', '1']
+                    choices += ['@Benchmark / Five tasks']
                     if stage == 'preview':
                         controller.benchmark_preview.side_effect = ValueError(reason)
                     elif stage == 'execution':
                         controller.improve.side_effect = RuntimeError(reason)
-                        choices += ['1']
+                        choices += ['@Start improvement','@Start improvement']
                 with patch.dict('os.environ', {'TERM': 'xterm-256color'}):
-                    _, output = await self.run_frontend(controller, '/improvement', *choices, '/exit', tty=True)
+                    _, output = await self.run_frontend(controller, '/improvement', *choices, 'q', '/exit', tty=True)
                 transcript = output.rsplit('\x1b[?1049l', 1)[1]
                 self.assertIn(reason, transcript)
                 if stage != 'execution':
@@ -107,20 +104,23 @@ class ImprovementFrontendTests(unittest.IsolatedAsyncioTestCase):
                 if outcome == 'cancelled-job':
                     controller.improve.side_effect = asyncio.CancelledError()
                 with patch.dict('os.environ', {'TERM': 'xterm-256color'}):
-                    _, output = await self.run_frontend(controller, '/improvement', '1', '1', '1',
-                        '2' if outcome == 'cancel' else '1', '/exit', tty=True)
+                    _, output = await self.run_frontend(controller, '/improvement', *TARGET, '@Task ·','@Benchmark / Five tasks','@Start improvement',
+                        '2' if outcome == 'cancel' else '1', 'q', '/exit', tty=True)
                 transcript = output.rsplit('\x1b[?1049l', 1)[1]
                 self.assertIn('Improvement completed' if outcome == 'complete' else 'Improvement cancelled', transcript)
+                if outcome != 'cancel':
+                    self.assertIn('Improvement · Result', output)
 
     async def test_benchmark_has_one_cost_confirmation_defaulting_to_cancel(self):
         for answer, started in (('', False), ('2', False), ('1', True)):
             with self.subTest(answer=answer):
                 controller = self.controller()
-                _, output = await self.run_frontend(controller, '/improvement improve task success', '1', '1', '1', answer, '/exit')
-                self.assertIn('Confirm improvement', output)
+                _, output = await self.run_frontend(controller, '/improvement improve task success',
+                    *TARGET,'@Task ·','@Benchmark / Five tasks','@Start improvement',answer,'q','/exit')
+                self.assertEqual(output.count('Confirm improvement'),1)
                 self.assertIn('Maximum model calls: 80', output)
                 self.assertIn('Training cases: 3', output)
-                controller.benchmark_preview.assert_called_once()
+                self.assertTrue(controller.benchmark_preview.called)
                 self.assertEqual(controller.benchmark_preview.call_args.args[1], 'improve task success')
                 self.assertEqual(controller.improve.await_count, int(started))
                 if started:
@@ -128,39 +128,39 @@ class ImprovementFrontendTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_unavailable_task_environment_rejects_before_preview(self):
         controller = self.controller(available=False)
-        _, output = await self.run_frontend(controller, '/improvement', '1', '1', '1', '/exit')
+        _, output = await self.run_frontend(controller, '/improvement', *TARGET,'@Task ·','@Benchmark / Five tasks','q','/exit')
         self.assertIn('Start Docker', output)
         controller.benchmark_preview.assert_not_called()
         controller.improve.assert_not_awaited()
 
-    async def test_task_packages_and_benchmarks_share_source_menu(self):
+    async def test_task_packages_and_benchmarks_share_one_picker(self):
         controller = self.controller()
-        search = SimpleNamespace(improvement_preview=Mock(), start_improvement=Mock())
-        _, output = await self.run_frontend(controller, '/improvement', '1', '2', '1', '1', '2', '/exit',
+        search = SimpleNamespace(improvement_preview=Mock(return_value=ImprovementPreview(
+            'method','Method','Costs',target='base_prompt')),start_improvement=Mock())
+        _, output = await self.run_frontend(controller,'/improvement',*TARGET,'@Task ·','back','q','/exit',
             clients=ImprovementClients(search=search))
-        self.assertIn('Choose task source', output)
-        self.assertIn('Saved task packages', output)
-        self.assertIn('Benchmark tasks', output)
-        search.improvement_preview.assert_not_called()
+        self.assertIn('Saved tasks',output)
+        self.assertIn('Configured task cases',output)
+        self.assertIn('Benchmark / Five tasks',output)
+        self.assertNotIn('Choose task source',output)
+        search.start_improvement.assert_not_called()
         controller.improve.assert_not_awaited()
 
-    async def test_cooperative_cancellation_returns_to_chat(self):
-        controller = self.controller()
-        controller.improve.side_effect = asyncio.CancelledError()
-        _, output = await self.run_frontend(controller, '/improvement', '1', '1', '1', '1', '/exit')
-        self.assertIn('Improvement cancelled', output)
+    async def test_cooperative_cancellation_returns_to_results(self):
+        controller=self.controller()
+        controller.improve.side_effect=asyncio.CancelledError()
+        _,output=await self.run_frontend(controller,'/improvement',*TARGET,'@Task ·','@Benchmark / Five tasks','@Start improvement','1','q','/exit')
+        self.assertIn('Improvement cancelled',output)
+        self.assertIn('Improvement · Result · cancelled',output)
 
-    async def test_benchmark_tool_output_is_complete_in_unified_menu(self):
-        controller = self.controller()
-        text = 'original task tool detail ' * 1000
-
-        async def improve(token, on_event):
-            await on_event({'type': 'agent_event', 'event': {
-                'type': 'tool_output', 'run_id': 'trial', 'tool_call_id': 'call',
-                'tool_name': 'bash', 'text': text}})
+    async def test_benchmark_tool_output_is_complete_in_unified_panel(self):
+        controller=self.controller()
+        text='original task tool detail '*1000
+        async def improve(token,on_event):
+            await on_event({'type':'agent_event','event':{'type':'tool_output','run_id':'trial',
+                'tool_call_id':'call','tool_name':'bash','text':text}})
             return ()
-
-        controller.improve.side_effect = improve
-        _, output = await self.run_frontend(controller, '/improvement', '1', '1', '1', '1', '/exit')
-        self.assertIn(text, output)
-        self.assertNotIn('live tool output truncated', output)
+        controller.improve.side_effect=improve
+        _,output=await self.run_frontend(controller,'/improvement',*TARGET,'@Task ·','@Benchmark / Five tasks','@Start improvement','1','q','/exit')
+        self.assertIn(text,output)
+        self.assertNotIn('live tool output truncated',output)

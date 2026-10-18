@@ -96,6 +96,24 @@ class MethodOption:
     reason: str = ''
     default: bool = False
     contributions: tuple[tuple[str, str], ...] = ()
+    parameters: tuple[dict, ...] = ()
+    task_sources: tuple[str, ...] = ('saved',)
+    requirements: tuple[tuple[str, str], ...] = ()
+    direction_help: str = ''
+    implementation_path: str = ''
+    documentation_path: str = ''
+
+
+@dataclass(frozen=True)
+class SearchCompletion:
+    """Final measurements and evidence even when search publishes no proposal."""
+    report: SearchReport
+    evidence: tuple[tuple[str, str], ...] = ()
+
+
+@runtime_checkable
+class SearchCompletionSource(Protocol):
+    def completion(self) -> SearchCompletion | None: ...
 
 
 def method_identity(improver):

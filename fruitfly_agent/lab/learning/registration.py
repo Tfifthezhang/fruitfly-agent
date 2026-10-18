@@ -20,6 +20,8 @@ def definition():
             effects=MechanismEffects(writes_files=True,
                 cost_notice='Stores task text in workspace learning records. Recording makes no model calls and starts no search.')),
         _install, implementation_id='task-material-recording-v1',
+        implementation_path='fruitfly_agent/lab/learning/engine.py',
+        documentation_path='fruitfly_agent/lab/learning/README.md',
         selection_group='learning-materials', selection_group_label='Learning materials',
         configuration_category='learning')
 

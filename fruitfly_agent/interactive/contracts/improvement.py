@@ -2,7 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Mapping, Protocol, runtime_checkable
-from fruitfly_agent.interactive.contracts.candidates import CandidateView
+from fruitfly_agent.interactive.contracts.candidates import CandidateView, CandidateSection
 
 
 @dataclass(frozen=True)
@@ -80,3 +80,58 @@ class ImprovementMethodView:
     available: bool = True
     reason: str = ''
     default: bool = False
+    parameters: tuple[ImprovementParameterView, ...] = ()
+    task_sources: tuple[str, ...] = ('saved',)
+    requirements: tuple[tuple[str, str], ...] = ()
+    direction_help: str = ''
+    implementation_path: str = ''
+    documentation_path: str = ''
+    configuration_path: str = ''
+    configuration_profile: str = ''
+
+
+@dataclass(frozen=True)
+class ImprovementParameterView:
+    name: str
+    label: str
+    kind: str
+    value: object = None
+    minimum: float | None = None
+    maximum: float | None = None
+    group: str = 'parameters'
+    description: str = ''
+    choices: tuple[object, ...] = ()
+    nullable: bool = False
+
+
+@dataclass(frozen=True)
+class ImprovementRunView:
+    """One explicitly submitted experiment, including runs without candidates."""
+    run_id: str
+    status: str
+    algorithm: str = ''
+    target: str = ''
+    role: str = 'H'
+    direction: str = ''
+    started_at: str = ''
+    finished_at: str = ''
+    stop_reason: str = ''
+    candidate_ids: tuple[str, ...] = ()
+    sections: tuple[CandidateSection, ...] = ()
+    evidence: tuple[tuple[str, str], ...] = ()
+
+
+@runtime_checkable
+class ImprovementHistoryService(Protocol):
+    def improvement_history(self) -> tuple[ImprovementRunView, ...]: ...
+
+
+@runtime_checkable
+class ImprovementLogService(Protocol):
+    def improvement_run_logs(self, run_id: str) -> str: ...
+
+
+class ImprovementSubmissionService(Protocol):
+    """Optional host receipts; Application retains all execution authority."""
+    def improvement_submitted(self, manifest: Mapping[str, object], direction: str, *, preview_token: str = '') -> str: ...
+    def improvement_finished(self, preview_token: str, status: str, error: str = '') -> None: ...

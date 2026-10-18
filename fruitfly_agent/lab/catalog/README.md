@@ -9,7 +9,7 @@ Register mechanisms, validate selections, and assemble a runtime deterministical
 | Step | Action |
 |---|---|
 | 1 | Implement the relevant [Lab contract](../README.md#develop-an-algorithm). |
-| 2 | Define a stable ID, contributions, parameters, dependencies, effects, and installer. |
+| 2 | Define a stable ID, concise distinguishing description, implementation/guide paths, contributions, parameters, dependencies, effects, and installer. |
 | 3 | Add the definition to built-ins or use `builtin_catalog().extended(definitions)`. |
 | 4 | Select the mechanism in a harness profile and inject the catalog into `RunApplicationFactory`. |
 | 5 | Verify assembly, Application use, and cleanup offline. |
@@ -49,6 +49,20 @@ An improvement package exposes its own definition factory; built-ins explicitly 
 `AssemblyContext` supplies workspace, Session, main model, `provider_resolver(profile, max_output_tokens)`, and optional artifact readers/bindings. Installers must not run research jobs or call models during assembly. Failed assembly prevents activation but does not roll back arbitrary file writes.
 
 ## Configuration and targets
+
+Every `MechanismDefinition` declares a nonempty single-line descriptor description,
+an explicit `implementation_path` to a Python file, and `documentation_path` to a
+Markdown guide. Registration rejects missing paths, parent traversal and control
+characters. Paths are declared by the owning algorithm; frontends do not infer
+them from imports or inspect source. Built-in checks verify that files exist and
+descriptions differ. Paths describe the installed package or extension source;
+the terminal does not open an editor or execute them.
+
+`input_parameters` explicitly names user-provided resources or content that remain
+editable in ordinary configuration, such as Skill paths, initial text and HTTP
+endpoints. Other tuning parameters remain validated YAML settings. Display paths
+and field visibility do not enter runtime identity. All effective parameters and
+implementation IDs continue to do so.
 
 | Declaration | Use |
 |---|---|

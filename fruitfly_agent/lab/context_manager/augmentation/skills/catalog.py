@@ -100,6 +100,17 @@ def _load_skill_file(path: Path, *, parent_name: str | None, byte_budget: int) -
     )
 
 
+def load_skill_document(path: str | Path) -> Skill:
+    """Load one explicitly selected Skill, preserving its reference location."""
+    path = Path(path)
+    if any(p.is_symlink() for p in (path, *path.parents)):
+        raise ValueError('selected Skill cannot use symlinks')
+    skill, diagnostics, _ = _load_skill_file(path, parent_name=path.parent.name, byte_budget=128000)
+    if skill is None:
+        raise ValueError('selected Skill is unavailable: ' + '; '.join(diagnostics))
+    return skill
+
+
 def load_skills(root: str | Path) -> LoadResult:
     """Bounded scan with per-file diagnostics; skip all descendant symlinks.
 
@@ -194,4 +205,4 @@ def render_skills_xml(skills: list[Skill]) -> str:
     return "\n".join(lines)
 
 
-__all__ = ["Skill", "LoadResult", "load_skills", "render_skills_xml"]
+__all__ = ["Skill", "LoadResult", "load_skills", "load_skill_document", "render_skills_xml"]

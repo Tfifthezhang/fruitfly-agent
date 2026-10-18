@@ -207,8 +207,11 @@ class ExtensionTests(unittest.IsolatedAsyncioTestCase):
     async def test_menu_accepts_distinct_feature_clients(self):
         from fruitfly_agent.interactive.contracts.improvement import ImprovementTargetView
         targets = lambda: (ImprovementTargetView('H', 'base_prompt', 'Base prompt'),)
+        async def start(direction, **options):
+            self.fail('Navigation must not start improvement')
         for clients in (
-            ImprovementClients(search=SimpleNamespace(), targets=targets),
+            ImprovementClients(search=SimpleNamespace(improvement_preview=lambda **options:
+                ImprovementPreview('custom', 'Custom', 'offline', target='base_prompt'), start_improvement=start), targets=targets),
             ImprovementClients(candidates=SimpleNamespace(candidates=lambda: ()), targets=targets),
             ImprovementClients(materials=SimpleNamespace(task_packs_available=True)),
         ):
@@ -218,9 +221,9 @@ class ExtensionTests(unittest.IsolatedAsyncioTestCase):
                 input_stream=io.StringIO(), output_stream=output,
                 line_editor=ScriptedLines('/improvement', 'q', '/exit'))
             await frontend.run()
-            self.assertIn('H · Harness', output.getvalue())
-            self.assertIn('S · State', output.getvalue())
-            self.assertIn('I · Improver', output.getvalue())
+            self.assertIn('Improvement · Experiment', output.getvalue())
+            for field in ('Target ·', 'Task ·', 'Evaluation ·', 'Budget ·', 'Results and history'):
+                self.assertIn(field, output.getvalue())
             self.assertNotIn('Save a failed task', output.getvalue())
             self.assertEqual([], provider.calls)
 

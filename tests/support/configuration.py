@@ -84,16 +84,20 @@ class AlgorithmConfiguration(MockConfiguration):
         super().__init__(model="offline")
         self.enabled = True
         self.algorithm = "variant-b"
+        self.max_tokens = 1000
 
     def snapshot(self):
         snapshot = super().snapshot()
         options = ("variant-a", "variant-b", "variant-c")
         return replace(snapshot,
             mechanisms=tuple(ConfigurationMechanism(
-                option, "compaction", option, "Detailed algorithm tuning.",
+                option, "compaction", option.replace('-', ' ').title(), "Detailed algorithm tuning.",
                 self.enabled and self.algorithm == option, "new_session",
-                parameters=(ConfigurationParameter("max_tokens", "Maximum tokens", "Hidden tuning", "integer", 1000),),
+                parameters=(ConfigurationParameter("max_tokens", "Maximum tokens", "Output ceiling", "integer",
+                    self.max_tokens, minimum=1, maximum=10000),),
                 selection_group="reduction",
+                implementation_path='tests/support/configuration.py',
+                documentation_path='tests/support/README.md',
             ) for option in options),
             selection_groups=(ConfigurationSelectionGroup(
                 "reduction", "Reduction", "compaction", "reduction", options,
@@ -108,4 +112,10 @@ class AlgorithmConfiguration(MockConfiguration):
         self.enabled = option_id is not None
         self.changed = True
         return ConfigurationActionResult("algorithm", changed=True)
+
+    def set_parameter(self, mechanism_id, name, value):
+        assert mechanism_id == self.algorithm and name == 'max_tokens'
+        self.max_tokens = int(value)
+        self.changed = True
+        return ConfigurationActionResult('parameter', changed=True)
 

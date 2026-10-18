@@ -4,6 +4,8 @@ from fruitfly_agent.lab.algorithms.targets import TargetBinding, TargetSnapshot,
 
 
 class BasePromptTarget:
+    label = 'Base prompt'
+
     def __init__(self, text):
         self.text = text
 

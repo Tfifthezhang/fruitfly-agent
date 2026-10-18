@@ -36,10 +36,11 @@ class UnifiedPackApplicationTests(unittest.IsolatedAsyncioTestCase):
             app,_,provider=await fixtures.open_task_app(self,root,'opro')
             view=next(p for p in app.task_packs() if p.pack_id=='coding')
             self.assertEqual(payload['default_direction'],view.default_direction)
-            editor=QueueEditor();editor.send('/improvement', "1", "1",'1','1','','2','q','/exit')
+            editor=QueueEditor();editor.send('/improvement','@Target ·','@Base prompt','@OPRO','@Start improvement','@Cancel','q','/exit')
             output=io.StringIO()
+            editor.output=output
             await TerminalFrontend(app,input_stream=io.StringIO(),output_stream=output,line_editor=editor).run()
-            self.assertIn('blank uses Improve boundary handling',output.getvalue())
+            self.assertIn('Search guidance · Improve boundary handling',output.getvalue())
             self.assertIn('Confirm improvement',output.getvalue())
             self.assertEqual([],provider.calls)
 

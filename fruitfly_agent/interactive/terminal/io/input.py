@@ -10,14 +10,16 @@ from __future__ import annotations
 
 import builtins
 import importlib
+import json
 import locale
+import math
 import os
 import select
 import sys
 from types import ModuleType
 from typing import Protocol, TextIO
 
-from fruitfly_agent.interactive.terminal.io.live import prompt_frame_lines, InputInterrupted
+from fruitfly_agent.interactive.terminal.io.live import prompt_frame_lines, InputInterrupted, IsolatedLineEditor
 from fruitfly_agent.interactive.terminal.io.text import is_tty, terminal_columns
 
 
@@ -25,6 +27,72 @@ class LineEditor(Protocol):
     """Return one submitted line, or None when the input reaches EOF."""
 
     def read_line(self) -> str | None: ...
+
+
+class FieldSpec(Protocol):
+    @property
+    def name(self) -> str: ...
+    @property
+    def label(self) -> str: ...
+    @property
+    def description(self) -> str: ...
+    @property
+    def kind(self) -> str: ...
+    @property
+    def choices(self) -> tuple[object, ...]: ...
+    @property
+    def minimum(self) -> float | None: ...
+    @property
+    def maximum(self) -> float | None: ...
+    @property
+    def nullable(self) -> bool: ...
+
+
+def field_prompt(spec: FieldSpec, current: object) -> str:
+    bounds = ' · '.join(text for text in (
+        f'Minimum: {spec.minimum}' if spec.minimum is not None else '',
+        f'Maximum: {spec.maximum}' if spec.maximum is not None else '',
+        f'Choices: {json.dumps(spec.choices, ensure_ascii=False)}' if spec.choices else '') if text)
+    return (f'{spec.label}\n{spec.description}\nCurrent: {current}\nType: {spec.kind}'
+        + (f' · {bounds}' if bounds else '')
+        + ('\nUse comma-separated items.' if spec.kind == 'string_list' else '')
+        + '\nEnter submits; blank keeps current; /clear sets empty text; Esc or /cancel returns.')
+
+
+def parse_field_value(spec: FieldSpec, text: str) -> object:
+    """Parse frontend input metadata; the owning host still validates the change."""
+    text = '' if text.strip() == '/clear' else text.strip()
+    if spec.nullable and text.casefold() in {'null', 'none'}:
+        return None
+    value: object
+    if spec.kind in {'integer', 'number'}:
+        numeric = int(text) if spec.kind == 'integer' else float(text)
+        if spec.kind == 'number' and not math.isfinite(numeric):
+            raise ValueError('value must be finite')
+        if spec.minimum is not None and numeric < spec.minimum or spec.maximum is not None and numeric > spec.maximum:
+            raise ValueError('value is outside the allowed range')
+        value = numeric
+    elif spec.kind == 'boolean':
+        options = {'true': True, 'yes': True, 'on': True, 'false': False, 'no': False, 'off': False}
+        if text.casefold() not in options:
+            raise ValueError('enter true/false, yes/no or on/off')
+        value = options[text.casefold()]
+    elif spec.kind == 'choice':
+        try:
+            value = json.loads(text)
+        except ValueError:
+            value = text
+        if value not in spec.choices:
+            raise ValueError('choose one of the displayed values')
+    elif spec.kind == 'string_list':
+        value = tuple(item.strip() for item in text.split(',') if item.strip())
+    elif spec.kind in {'string', 'path'}:
+        if spec.kind == 'path' and not text:
+            raise ValueError('path must not be empty')
+        value = text
+    else:
+        raise ValueError('unsupported input type')
+    return value
 
 
 class StreamLineEditor:
@@ -140,6 +208,8 @@ class ReadlineLineEditor:
 
 def read_field_line(editor: LineEditor, label: str) -> str | None:
     """Label built-in form readers without changing the injected reader contract."""
+    if isinstance(editor, IsolatedLineEditor):
+        return editor.read_field_line(label)
     if isinstance(editor, ReadlineLineEditor):
         previous = editor.frame_label
         editor.frame_label = label

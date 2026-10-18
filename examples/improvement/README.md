@@ -6,6 +6,8 @@ The [offline DreamRSI replay](dream_rsi/README.md) compares policies on a synthe
 
 The [offline automatic workflow](automatic_text/README.md) demonstrates model-generated learning material, original-task comparison, independent confirmation and explicit human adoption with a scripted Provider.
 
+The [offline workflow, Skill and memory example](native_methods/README.md) runs the three native methods through confirmation and exact H/S adoption with scripted Providers.
+
 Task packs for the normal `/improvement` workflow. They are manually authored demonstrations, not formal benchmarks or measured improvement claims.
 
 | Pack | Scoring | Search / independent cases |

@@ -11,7 +11,7 @@ OPRO (Optimization by PROmpting) comes from Yang et al., [Large Language Models 
 | Paper idea | FruitFlyAgent implementation |
 |---|---|
 | Scored improvement history | Bounded valid candidates, ordered so the best appears last |
-| Natural-language objective and examples | Frozen direction and authorized training examples |
+| Natural-language objective and examples | Fixed scoring policy, optional frozen search guidance and authorized training examples |
 | Generate, evaluate, repeat | Baseline evaluation, JSON-array proposals, deduplication, target validation, and train/selection scoring |
 | Prompt improvement | `base_prompt` and `skill-catalog.guidance` text targets |
 | Published experiments | Not reproduced; no GSM8K/BBH gains or general improvement claims |
@@ -21,6 +21,8 @@ OPRO (Optimization by PROmpting) comes from Yang et al., [Large Language Models 
 The algorithm entry point is `from fruitfly_agent.lab.improvement.methods.opro import OproImprover`. Its `search(problem, services)` implements the shared [Improver contract](../../contracts/search.py). The method declares H/text support and a per-job binder without owning target adapters. The package also exports `definition()`, which returns a fresh Catalog definition with OPRO parameters, effects, and its installer. The built-in Catalog explicitly collects this definition; importing the package does not register it or start work.
 
 The mechanism is `opro`, with implementation identity `opro-text-v2`; it is available on demand without a configuration switch. Follow [Start a search](../../README.md#start-a-search) to select a target, task pack, model, and budget. The installer uses the [shared text assembly helpers](../../registration.py) and performs no search, file writes, or model requests.
+
+The panel exposes optional Search guidance with a visible text input. Leaving it empty keeps the task scoring objective; supplying text guides proposals without changing candidate ranking or acceptance rules. Expand Target to inspect the algorithm description and implementation/guide paths. Tune rounds, batch size and history in YAML at the displayed configuration location, or through programmatic previews. Task and Budget hold material fields and shared limits.
 
 | Concern | Behavior |
 |---|---|

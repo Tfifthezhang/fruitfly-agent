@@ -1,6 +1,7 @@
 """Finite terminal input and in-memory TTY substitutes."""
 
 import io
+import re
 
 from fruitfly_agent.interactive.contracts.events import RunFinished
 
@@ -16,6 +17,34 @@ class ScriptedLines:
 class TtyStringIO(io.StringIO):
     def isatty(self) -> bool:
         return True
+
+
+def menu_choice(label: str, text: str) -> str:
+    """Resolve a visible numbered row, keeping scripts independent of expanded size."""
+    plain = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', text)
+    matches = []
+    for line in plain.splitlines():
+        match = re.match(r'^\s*>?\s*(\d+)\.\s*(.*)$', line)
+        if match:
+            name = re.sub(r'^(?:\[[^]]*\]|[✓●○])\s*', '', match[2]).strip()
+            if name.startswith(label):
+                matches.append(match[1])
+    if len(matches) != 1:
+        raise AssertionError(f'Expected one visible menu row {label!r}, found {matches!r}: {plain}')
+    return matches[0]
+
+
+class MenuScriptedLines(ScriptedLines):
+    """Use @label for a visible row and plain text for chat or field input."""
+    def __init__(self, output, *lines):
+        super().__init__(*lines)
+        self.output, self.offset = output, 0
+
+    def read_line(self):
+        line = super().read_line()
+        rendered = self.output.getvalue()[self.offset:]
+        self.offset = len(self.output.getvalue())
+        return menu_choice(line[1:], rendered) if line is not None and line.startswith('@') else line
 
 
 def run_finished() -> RunFinished:

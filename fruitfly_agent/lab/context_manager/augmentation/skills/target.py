@@ -8,6 +8,8 @@ SKILL_CATALOG_GUIDANCE_KEY = 'skill-catalog.guidance'
 
 
 class SkillGuidanceTarget:
+    label = 'Skill catalog guidance'
+
     def __init__(self, guidance, max_chars):
         self.guidance = guidance
         self.max_chars = max_chars

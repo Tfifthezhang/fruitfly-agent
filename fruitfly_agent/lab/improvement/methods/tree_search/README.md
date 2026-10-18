@@ -6,9 +6,9 @@ Search H instruction text through parent-linked attempts and save real discovery
 
 ## Use the method
 
-Start a normal session; no improvement configuration switch is required. Prepare a [task pack](../../tasks/README.md), then use `/improvement Improve task performance.` → H → base prompt → Start improvement → Tree search → saved task package → confirm. Model generation and task evaluation may incur cost. Discovery alone provides selection evidence, not independent confirmation.
+Start a normal session; no improvement configuration switch is required. Prepare a [task pack](../../tasks/README.md), then use `/improvement Improve task performance.`; expand **Target**, select Base prompt and then Tree search below it, and set **Task** to the saved package. Choose **Start improvement** and confirm. Model generation and task evaluation may incur cost. Discovery alone provides selection evidence, not independent confirmation.
 
-The default policy opens new root branches. Lightweight target preparation registers the I target `tree-search.exploration-policy`. An activated policy artifact changes subsequent tree-search decisions without changing H or S. Both H discovery and the I target are available without enabling the tree-search mechanism. Target preparation reads a bound policy artifact but starts no searches or model clients.
+The default policy opens new root branches. Lightweight target preparation registers the I target `tree-search.exploration-policy`. An activated policy artifact changes subsequent tree-search decisions without changing H or S. Both H discovery and the I target are available without enabling the tree-search mechanism. The policy adapter exposes `task_target_id` for discovery of task packs compatible with its underlying H execution target; this metadata does not change scoring or adoption. Target preparation reads a bound policy artifact but starts no searches or model clients.
 
 | Material / signal | Contract |
 |---|---|
@@ -20,6 +20,8 @@ The default policy opens new root branches. Lightweight target preparation regis
 | History | Parent-linked text, feedback, status and score; fixed task/model/initial-target/direction/generator conditions |
 
 Use a dedicated `history_path` for each fixed task/target/model/direction context. Do not activate an H candidate if those histories are intended for DreamRSI from the original H starting point. Automatic learning workflows can change the training material; those histories are rejected when they do not match the later DreamRSI inputs.
+
+Search guidance is optional and uses a visible text field. Empty guidance is a valid fixed discovery condition. If histories will feed DreamRSI, keep its `discovery_direction` equal to the guidance used here, including an empty value. Guidance does not change the task scorer.
 
 ## Configure budgets and policy
 

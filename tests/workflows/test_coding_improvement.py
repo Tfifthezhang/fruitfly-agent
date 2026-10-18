@@ -60,18 +60,13 @@ class CodingImprovementTests(unittest.IsolatedAsyncioTestCase):
                          "def add_one(x): return x+1", "def double(x): return x*2", '["Coding guidance"]'):
                 provider.respond_text(text)
             editor = QueueEditor()
-            editor.send("/improvement improve", "1", "1", "1", "1", "1", "1")
+            editor.send('/improvement improve', '@Target ·', '@Base prompt', '@OPRO', '@Start improvement',
+                'pagedown', 'pagedown', 'pagedown', '@Start improvement', 'q', '/exit')
             output = io.StringIO()
+            editor.output = output
             frontend = TerminalFrontend(app, input_stream=io.StringIO(), output_stream=output, line_editor=editor)
-            running = asyncio.create_task(frontend.run())
-            for _ in range(200):
-                if app.improvement_progress.sequence > 0:
-                    break
-                await asyncio.sleep(.01)
-            await app.wait_for_improvement()
-            editor.send("/exit")
-            await running
+            await asyncio.wait_for(frontend.run(), 5)
             self.assertEqual(1, len(app.candidates()))
             self.assertIn("Code execution", output.getvalue())
             self.assertIn("python-function-tests-v1", output.getvalue())
-            self.assertIn("Improvement submitted", output.getvalue())
+            self.assertIn("Improvement completed", output.getvalue())

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from dataclasses import dataclass
 from typing import Any, Callable, Mapping, TextIO
 
 from fruitfly_agent.interactive.contracts.configuration import (
@@ -10,9 +11,11 @@ from fruitfly_agent.interactive.contracts.configuration import (
     ConfigurationActionResult,
     ConfigurationLaunchResult,
     ConfigurationMechanism,
+    ConfigurationParameter,
     ConfigurationSnapshot,
 )
-from fruitfly_agent.interactive.terminal.io.input import LineEditor, create_line_editor
+from fruitfly_agent.interactive.terminal.io.input import LineEditor, create_line_editor, read_field_line, field_prompt, parse_field_value
+from fruitfly_agent.interactive.terminal.io.live import InputInterrupted
 from fruitfly_agent.interactive.terminal.features.configuration.model_setup import (
     ModelFormIO,
     configure_credential,
@@ -21,6 +24,7 @@ from fruitfly_agent.interactive.terminal.features.configuration.model_setup impo
 from fruitfly_agent.interactive.terminal.io.menu import (
     MenuAction,
     MenuInput,
+    LineMenuInput,
     MenuRow,
     TerminalMenuRenderer,
     create_menu_input,
@@ -51,6 +55,7 @@ class TerminalConfigurationFrontend:
             self.line_editor,
         )
         self.renderer = TerminalMenuRenderer(self.output)
+        self.renderer.numbered = isinstance(self.menu_input, LineMenuInput)
         self.notice = ""
         self._inside_active_session = False
         self.active_prompt_label = active_prompt_label
@@ -379,23 +384,28 @@ class TerminalConfigurationFrontend:
         selected = 0
         expanded: str | None = None
         remembered: dict[str, str] = {}
+        original = self.configuration.snapshot()
+        focus: tuple[str, str, str] | None = None
         while True:
             snapshot = self.configuration.snapshot()
-            rows, actions = _category_rows(snapshot, category, expanded, remembered)
-            selected = min(selected, len(rows) - 1)
+            rows, actions = _category_rows(snapshot, category, expanded, remembered, original=original)
+            identities = [action.identity for action in actions]
+            selected = identities.index(focus) if focus in identities else min(selected, len(rows) - 1)
             self._render(title=_category_label(category),
-                         subtitle="Check a module, then expand its algorithm dropdown. Changes apply to the next session.",
+                         subtitle='Enter expands algorithms; Space enables/disables. Changes apply to the next session.'
+                             + (' Unsaved changes.' if snapshot.changed else '')
+                             + f'\nConfiguration: {snapshot.config_path} · Profile: {snapshot.selected_profile}',
                          rows=tuple(rows), selected=selected, toggle=True)
             event = self.menu_input.read_event()
             selected, handled = navigate_menu(event, selected, len(rows))
+            focus = actions[selected].identity
             if handled:
                 continue
             if event.action == MenuAction.QUIT:
                 return True
             if event.action == MenuAction.BACK:
                 if expanded is not None:
-                    selected = next(index for index, action in enumerate(actions)
-                                    if action[0] == "expand" and action[1] == expanded)
+                    focus = ('expand', expanded, '')
                     expanded = None
                     continue
                 return False
@@ -403,26 +413,43 @@ class TerminalConfigurationFrontend:
                 continue
             if selected == len(rows) - 1:
                 return False
-            action, key, options, active, allow_disabled, declared = actions[selected]
-            if action == "expand":
-                expanded = None if expanded == key else key
+            action = actions[selected]
+            if action.kind == 'back':
+                return False
+            if event.action == MenuAction.ACTIVATE and action.kind == 'expand':
+                expanded = None if expanded == action.key else action.key
                 continue
-            if action == "toggle":
-                if active is not None and not allow_disabled:
+            if event.action == MenuAction.ACTIVATE and action.kind == 'parameter':
+                spec = action.parameter
+                assert spec is not None
+                self.renderer.begin_input(field_prompt(spec, spec.value), selected=selected)
+                try:
+                    value = read_field_line(self.line_editor, spec.label)
+                    if value is not None and value.strip() and value.strip() != '/cancel':
+                        parse_field_value(spec, value)
+                        self._call(self.configuration.set_parameter, action.active, spec.name,
+                            '' if value.strip() == '/clear' else value.strip())
+                except (InputInterrupted, KeyboardInterrupt):
+                    pass
+                except ValueError as exc:
+                    self.notice = f'Invalid parameter: {exc}'
+                continue
+            if action.kind == 'info':
+                self.notice = rows[selected].detail
+                continue
+            active = next(a.active for a in actions if a.kind == 'expand' and a.key == action.key)
+            if event.action == MenuAction.TOGGLE:
+                if active is not None and not action.allow_disabled:
                     self.notice = "This module cannot be disabled."
                     continue
-                option = None if active is not None else remembered.get(key, options[0])
+                option = None if active is not None else remembered.get(action.key, action.options[0])
             else:
-                option = active
-                selected = next(index for index, action in enumerate(actions)
-                                if action[0] == "expand" and action[1] == key)
-                expanded = None
-            if declared:
-                self._call(self.configuration.select_algorithm, key, option)
+                option = action.active
+            if action.declared:
+                self._call(self.configuration.select_algorithm, action.key, option)
             else:
-                self._call(self.configuration.set_mechanism, key, enabled=option is not None)
-            if action == "toggle":
-                expanded = None
+                self._call(self.configuration.set_mechanism, action.key, enabled=option is not None)
+            focus = ('expand', action.key, '')
 
     def _choose_value(
         self,
@@ -542,7 +569,7 @@ class TerminalConfigurationFrontend:
         selected: int,
         toggle: bool = False,
     ) -> None:
-        if self.renderer.ansi:
+        if self.renderer.ansi and not self.renderer.numbered:
             instructions = "↑↓ move · Enter select"
             if toggle:
                 instructions += " · Space toggle"
@@ -574,13 +601,26 @@ class TerminalConfigurationFrontend:
 _CANCELLED = object()
 
 
-_CategoryEntry = tuple[str, str, tuple[str, ...], str | None, bool, bool]
-_CategoryAction = tuple[str, str, tuple[str, ...], str | None, bool, bool]
+@dataclass(frozen=True)
+class _CategoryAction:
+    kind: str
+    key: str = ''
+    options: tuple[str, ...] = ()
+    active: str | None = None
+    allow_disabled: bool = True
+    declared: bool = False
+    parameter: ConfigurationParameter | None = None
+
+    @property
+    def identity(self) -> tuple[str, str, str]:
+        return (self.kind, self.key, self.parameter.name if self.parameter is not None else
+                self.active or '' if self.kind == 'choose' else '')
 
 
 def _category_rows(
     snapshot: ConfigurationSnapshot, category: str, expanded: str | None,
     remembered: dict[str, str],
+    *, original: ConfigurationSnapshot | None = None,
 ) -> tuple[list[MenuRow], list[_CategoryAction]]:
     """Project declared selectors and independent capabilities into menu actions."""
     mechanisms = tuple(item for item in snapshot.mechanisms
@@ -589,29 +629,57 @@ def _category_rows(
     groups = [group for group in snapshot.selection_groups
               if group.category == category and all(option in by_id for option in group.option_ids)]
     grouped_ids = {option for group in groups for option in group.option_ids}
-    # Independent capabilities remain composable, with the same inline
-    # selector shape as declared groups, even when only one option exists.
-    entries: list[_CategoryEntry] = [(group.group_id, group.group_id, group.option_ids, group.selected_id,
-                group.allow_disabled, True) for group in groups]
-    entries += [(item.mechanism_id, item.mechanism_id, (item.mechanism_id,),
-                 item.mechanism_id if item.enabled else None, True, False)
+    entries = [(group.group_id, group.label, group.option_ids, group.selected_id,
+                group.allow_disabled, True, group.section) for group in groups]
+    entries += [(item.mechanism_id, item.label, (item.mechanism_id,),
+                 item.mechanism_id if item.enabled else None, True, False,
+                 item.display_section or item.context_phase)
                 for item in mechanisms if item.mechanism_id not in grouped_ids]
+    order = {'augmentation': 0, 'externalization': 1, 'reduction': 2}
+    entries.sort(key=lambda entry: order.get(entry[6] or '', 3))
+    before = {item.mechanism_id: item for item in original.mechanisms} if original is not None else {}
     rows = []
     actions: list[_CategoryAction] = []
-    for key, label, options, active, allow_disabled, declared in entries:
+    def references(item: ConfigurationMechanism) -> tuple[tuple[str, str], ...]:
+        return tuple((label, path) for label, path in (
+            ('Implementation', item.implementation_path), ('Guide', item.documentation_path)) if path)
+    for key, label, options, active, allow_disabled, declared, section in entries:
         if active is not None:
             remembered[key] = active
-        description = next((group.label for group in groups if group.group_id == key), by_id[key].label if key in by_id else "")
-        rows.append(MenuRow(label, detail=description if description != label else "", marker="✓" if active else " "))
-        actions.append(("toggle", key, options, active, allow_disabled, declared))
-        if active is not None:
-            rows.append(MenuRow(f"  id: {active} {'▴' if expanded == key else '▾'}"))
-            actions.append(("expand", key, options, active, allow_disabled, declared))
-            if expanded == key:
+        current = by_id[active] if active else by_id[options[0]]
+        changed = bool(before) and any(before.get(option) != by_id[option] for option in options)
+        heading = 'Context ' + section if section in order else (section or '')
+        summary = by_id[active].label if active and declared else 'Enabled' if active else 'Disabled'
+        rows.append(MenuRow(f'{label} · {summary} {"▴" if expanded == key else "▾"}',
+            marker='[✓]' if active else '[ ]', section=heading, state='enabled' if active else '', changed=changed))
+        actions.append(_CategoryAction('expand', key, options, active, allow_disabled, declared))
+        if expanded == key:
+            if len(options) > 1:
                 for option in options:
-                    rows.append(MenuRow(f"    {option}", detail=by_id[option].label if by_id[option].label != option else "", marker="✓" if option == active else " "))
-                    actions.append(("choose", key, options, option, allow_disabled, declared))
+                    item = by_id[option]
+                    rows.append(MenuRow(item.label, item.description, '●' if option == active else '○',
+                        depth=1, section=heading, state='selected' if option == active else '',
+                        references=references(item)))
+                    actions.append(_CategoryAction('choose', key, options, option, allow_disabled, declared))
+            else:
+                rows.append(MenuRow('Implementation · ' + current.label, current.description,
+                    depth=1, section=heading, references=references(current)))
+                actions.append(_CategoryAction('info', key))
+            if active:
+                for parameter in current.parameters:
+                    if parameter.name not in current.input_parameters:
+                        continue
+                    prior = before.get(active)
+                    old = next((p for p in prior.parameters if p.name == parameter.name), None) if prior else None
+                    rows.append(MenuRow(f'{parameter.label} · {parameter.value}', parameter.description,
+                        depth=1, section=heading, changed=bool(old and old.value != parameter.value)))
+                    actions.append(_CategoryAction('parameter', key, options, active, allow_disabled, declared, parameter))
+            rows.append(MenuRow('Configuration location',
+                f'profiles.{snapshot.selected_profile}.mechanisms · id: {current.mechanism_id} · parameters',
+                depth=1, section=heading))
+            actions.append(_CategoryAction('info', key))
     rows.append(MenuRow("Back", "Return to configuration"))
+    actions.append(_CategoryAction('back'))
     return rows, actions
 
 
@@ -628,7 +696,7 @@ def _group_mechanisms(
 
 
 def _category_label(category: str) -> str:
-    return f"mechanisms · {category}"
+    return 'Context' if category == 'context-manager' else category.replace('-', ' ').capitalize()
 
 
 def _category_summary(mechanisms: tuple[ConfigurationMechanism, ...]) -> str:

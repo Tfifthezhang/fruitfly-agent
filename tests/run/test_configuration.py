@@ -58,7 +58,7 @@ class HarnessSelectionTest(unittest.TestCase):
         self.assertEqual(reduction.label, "Reduction")
         group = next(item for item in controller.snapshot().selection_groups
                      if item.group_id == "text-improver")
-        self.assertEqual(group.option_ids, ("opro", "tree-search"))
+        self.assertEqual(group.option_ids, ("memory-exploration", "opro", "skill-edit", "tree-search", "workflow-search"))
         controller.select_algorithm("text-improver", "opro")
         selected_group = next(item for item in controller.snapshot().selection_groups
                               if item.group_id == "text-improver")
@@ -311,11 +311,11 @@ class HarnessSelectionTest(unittest.TestCase):
         self.assertEqual("context", before.family)
         self.assertEqual("externalization", before.context_phase)
         self.assertEqual(
-            ["augmentation", "augmentation", "augmentation", "augmentation", "externalization", "reduction"],
+            ["augmentation", "augmentation", "augmentation", "augmentation", "augmentation", "augmentation", "externalization", "reduction"],
             [item.display_section for item in context_items],
         )
         self.assertEqual(
-            {"skill-catalog", "memory-files", "knowledge-files", "live-http"},
+            {"skill-catalog", "memory-files", "knowledge-files", "live-http", "skill-document", "learned-memory"},
             {
                 item.mechanism_id
                 for item in context_items
@@ -375,8 +375,8 @@ class HarnessSelectionTest(unittest.TestCase):
         frontend = TerminalConfigurationFrontend(controller, output_stream=output,
             line_editor=ScriptedLines('back'))
         frontend.run_for_active_session()
-        self.assertNotIn('mechanisms · improvement', output.getvalue())
-        self.assertIn('mechanisms · context-manager', output.getvalue())
+        self.assertNotIn('. Improvement', output.getvalue())
+        self.assertIn('. Context', output.getvalue())
         self.assertTrue(all(not m.visible for m in controller.snapshot().mechanisms
                             if m.category == 'improvement'))
         self.assertEqual(next(s for s in controller.profile().mechanisms if s.mechanism_id == 'opro').parameters['rounds'], 3)

@@ -153,12 +153,12 @@ cp -R examples/improvement/python_functions .fruitfly/improvement/task-packs/pyt
 
 | Step | Action |
 |---|---|
-| 1 | Enable Text improver / OPRO and start a new session. |
-| 2 | `/improvement` → **H · Harness** → target → **Start improvement** → select the pack. |
-| 3 | Supply direction, or accept the pack default. |
+| 1 | Start a normal session; no improvement enable switch is required. |
+| 2 | Open `/improvement`; expand **Target**, choose the object and its algorithm, then expand **Task** on the same panel. |
+| 3 | Review evaluation and acceptance. If the method exposes **Search guidance**, keep the task default, edit it in the visible input field, or clear it. |
 | 4 | Review target, cases, policy, model, budgets, and execution notice. |
-| 5 | Explicitly confirm the paid search; default selection is cancel. |
-| 6 | Review results and choose whether to save or activate. |
+| 5 | Choose **Start improvement** and confirm the paid search; Cancel is selected initially. |
+| 6 | Inspect the result and evidence before setting the next-session default or starting a new session. |
 
 Selecting a pack changes one job, not the YAML or runtime manifest. `/improvement TEXT` prefills direction, not a path. Search only changes target text, not Python task outputs. See [Improvement](../README.md) for budgets, results, and retention.
 

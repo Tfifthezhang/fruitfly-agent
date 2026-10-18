@@ -6,7 +6,8 @@ Translate public host and Lab results into Interactive contracts. Adapters recei
 
 | File / entry | Responsibility |
 |---|---|
-| [improvement.py](improvement.py): `RunImprovementService` | Search preview, execution, and progress views |
+| [improvement.py](improvement.py): `RunImprovementService` | Search preview, execution, progress and scoped experiment history/log views |
+| [improvement_results.py](improvement_results.py): `result_sections` | Project completion reports to result, comparison, usage and evidence sections |
 | [candidates.py](candidates.py): `RunCandidateService` | Candidate review, reports, and preparation |
 | [task_packs.py](task_packs.py): `RunTaskPackService` | Task material views and correction persistence |
 | [configuration.py](configuration.py): `candidate_prompt_choices` | Prompt labels using injected record and text readers |
@@ -14,6 +15,8 @@ Translate public host and Lab results into Interactive contracts. Adapters recei
 | [evaluation.py](evaluation.py): `RunEvaluationController` | Optional benchmark task catalog and confirmed Application improvement dispatch |
 
 RuntimeHandle receives these three adapters through independent fields. Task materials and candidate review remain available without enabling an improver.
+
+Method views carry declared search-guidance help and complete parameter input metadata, including descriptions, choices, nullability and numeric bounds. The adapter translates these declarations without adding method-specific frontend behavior.
 
 Candidate review displays independent confirmation evidence when supplied by the generic search host. Ordinary search still reports that independent verification was not provided. The adapter does not select failure processors, scoring policies or adoption thresholds.
 

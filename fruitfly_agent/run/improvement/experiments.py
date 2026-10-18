@@ -21,6 +21,10 @@ class RunExperiments:
         self.receipts = {}
         self.selections = {}
         self.running_improver = None
+        self._completion = None
+
+    def completion(self):
+        return self._completion
 
     def bind(self, improver, target):
         return RunExperiments(workspace=self.workspace, artifacts=self.artifacts, versions=self.versions,
@@ -105,6 +109,7 @@ class RunExperiments:
         return replace(preview, preview_token=token)
 
     async def improve(self, manifest, direction, *, preview_token):
+        self._completion = None
         if preview_token in self.selections:
             selection, executor, confirmed_direction, digest, parent, confirmed_method = self.selections.pop(preview_token)
             if method_identity(self.improver()) != confirmed_method:
@@ -141,6 +146,8 @@ class RunExperiments:
             try:
                 proposals = await self.running_improver.search_experiment(context)
             finally:
+                completion = getattr(self.running_improver, 'completion', None)
+                self._completion = completion() if callable(completion) else None
                 self.running_improver = None
             if method_identity(self.improver()) != confirmed_method:
                 raise ValueError("benchmark improvement method changed during search")

@@ -72,6 +72,9 @@ def mechanism_views(profile: HarnessProfile, catalog: LabCatalog, warnings: list
                 selection_group=catalog.get(descriptor.mechanism_id).selection_group,
                 selection_group_label=catalog.get(descriptor.mechanism_id).selection_group_label,
                 selection_group_allow_disabled=catalog.get(descriptor.mechanism_id).selection_group_allow_disabled,
+                implementation_path=definition.implementation_path,
+                documentation_path=definition.documentation_path,
+                input_parameters=definition.input_parameters,
             )
         )
     selection_groups = []

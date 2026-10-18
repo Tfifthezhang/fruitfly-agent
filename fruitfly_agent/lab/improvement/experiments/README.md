@@ -7,10 +7,10 @@ Connect immutable benchmark task references and official execution receipts to t
 ## Run a benchmark improvement job
 
 1. Start a normal session with a configured model. Search and failed-task replay with independent confirmation bind on demand; no improvement configuration switch is required. Optional YAML can retain a custom failure processor or workflow policy.
-2. Open `/improvement` and select **Start improvement → Benchmark tasks**. Choose Terminal-Bench's `starter` or a bounded CPU sample.
+2. Open `/improvement`; expand **Target**, select the base prompt and a compatible algorithm. Expand **Task** and choose Terminal-Bench's `starter` or a bounded CPU sample on the same panel.
 3. Inspect the task partitions, parent version, model allocation, trial budget, and deadline. Explicitly confirm **Start improvement**.
 4. The same Application job downloads/freeze tasks, runs the baseline, prepares learning material, iterates candidates and confirms once. **It downloads tasks/images and calls model services.** Original tasks run in fresh official environments with their original verifier.
-5. Use `/improvement → Review candidates` to inspect and explicitly adopt a confirmed result in a fresh session.
+5. Inspect the result directly, or open `/improvement → Results and history` to review and explicitly adopt a confirmed candidate in a fresh session.
 
 Selection/preview starts no task download or model calls. Configuration alone does not start improvement. A separate preliminary evaluation is not required; baseline, learning, candidate comparison and confirmation share one model/trial budget.
 

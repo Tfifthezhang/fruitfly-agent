@@ -28,6 +28,9 @@ class MethodDefinition:
     bind: Callable[[Any], Any]
     usage: MethodUsage | None = None
     prepare_targets: Callable[[Any, Any], Any] | None = None
+    budget_parameters: tuple[str, ...] = ()
+    direction_help: str = ''
+    material_parameters: tuple[str, ...] = ()
 
     def __post_init__(self):
         if self.prepare_targets is not None and not callable(self.prepare_targets):

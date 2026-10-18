@@ -41,6 +41,9 @@ class ConfigurationMechanism:
     selection_group: str | None = None
     selection_group_label: str | None = None
     selection_group_allow_disabled: bool = True
+    implementation_path: str = ''
+    documentation_path: str = ''
+    input_parameters: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

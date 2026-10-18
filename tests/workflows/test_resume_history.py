@@ -132,7 +132,10 @@ class ResumeHistoryTest(unittest.IsolatedAsyncioTestCase):
             def install(state, context, parameters):
                 return state.with_component("broken", context.own(broken))
             definition = MechanismDefinition(MechanismDescriptor("broken", "Broken", "fixture",
-                (MechanismContribution("capability", "tools"),)), install)
+                (MechanismContribution("capability", "tools"),)), install,
+                implementation_path='tests/workflows/test_resume_history.py',
+                documentation_path='tests/workflows/README.md',
+            )
             catalog = builtin_catalog().extended((definition,))
             factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=registry, catalog=catalog)
             app = AgentApplication(factory)

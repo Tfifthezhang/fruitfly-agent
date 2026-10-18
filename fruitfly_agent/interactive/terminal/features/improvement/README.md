@@ -2,45 +2,60 @@
 
 [Up: Terminal Features](../README.md)
 
-Use `/improvement [DIRECTION]` to choose an H/S/I target, improve against declared tasks, or review a proposed change. `TerminalImprovementFrontend` is the menu entry; `improvement_handler` borrows and restores the terminal's input/display scope. The menu retains navigation notices and returns outcome text; the handler publishes it through `CommandResult` after restoring chat, so the alternate screen cannot erase the reason for returning.
+Use `/improvement [DIRECTION]` to edit one experiment, run it, and inspect results. `TerminalImprovementFrontend` borrows the terminal input/display scope. Notices and final outcomes are returned through `CommandResult` after chat is restored.
 
 | File | Responsibility |
 |---|---|
-| [menu.py](menu.py) | Task source selection, one cost confirmation, progress, candidate review/activation, and role/target selection |
-| [command.py](command.py) | Dispatch through an injected view factory and menu scope |
-| [events.py](events.py) | Original-task event display |
-| [formatting.py](formatting.py) | Generic improvement activity text |
+| [panel.py](panel.py) | Experiment draft, target/task/method selection, algorithm descriptions/paths, optional search guidance and typed material/budget inputs |
+| [menu.py](menu.py) | Execution confirmation, running view, experiment history and candidate review |
+| [command.py](command.py) | Borrow and restore the terminal scope |
+| [events.py](events.py) | Original-task event and runner-log display |
+| [formatting.py](formatting.py) | Generic activity and usage text |
 
-## Navigate the menu
+## Configure one experiment
 
-Back and Esc return one level through task sources, benchmarks, task sets, saved packages, H/S/I target selections, and candidate review. Each parent retains its selected row; candidate lists retain pagination while viewing details. Cancelling a confirmation returns to its selection page. `q` exits the whole menu from any selection page; the home page also offers **Back**. Navigation and cancelled confirmations never start jobs. Every execution confirmation starts with Cancel selected, including after revisiting it.
+The panel has four configuration rows: Target, Task, Budget and Evaluation, followed by start/history/return actions. Enter expands a row on the same page. One main section is expanded at a time; switching sections retains the draft. Back/Esc first collapses the section, then returns to chat; `q` exits menu mode. Navigation and previews start no model requests or task downloads. Host previews may freeze local evidence.
 
-Unavailable configuration or task environments leave a notice on the parent/selection page instead of closing the menu. Notices also remain available in the restored chat transcript when the menu exits.
-
-## Start with a task source
-
-| Source | Behavior |
+| Field | Behavior |
 |---|---|
-| Saved task packages | Choose authored tasks or daily cases with executable acceptance criteria; inspect target, scorer, models and budget |
-| Benchmark tasks | Choose a bounded official task set; download/freeze it and run baseline, failure processing, iterative search and independent confirmation in one Application job |
-| Review candidates | Inspect evidence and changes; explicitly save or adopt in a fresh session |
+| Target | First choose an object under H/S/I, then a compatible algorithm below it; show its distinguishing description, implementation/guide paths and optional Search guidance |
+| Task | Saved packages, benchmark/task sets and declared material fields; unavailable sources explain why |
+| Budget | Typed fields declared by the method, with current values and bounds |
+| Evaluation | Read-only scoring, acceptance, requirements, implementation details and full preview; optional long-text viewer |
 
-`ImprovementClients` injects search, candidates, task materials, activation, progress, target declarations and method discovery independently. The home page selects H (Harness), S (State), I (Improver), or Jobs and history. A role opens its registered targets, then search and candidate actions. Starting a search selects among compatible installed methods before selecting tasks. One method is selected automatically. Several methods open a selector with unavailable reasons; Back restores the method selector. Preview must also match the chosen method. Temporary selection does not change configuration. Candidates are filtered by role and target; history can show all roles. Missing executable targets show an explicit reason. Previews must match the selected role and target. Optional `BenchmarkImprovementController` supplies benchmark task sources and one-use preview execution. The feature imports no Eval or Lab implementation. Hosts without Eval can use saved task packages and review candidates normally.
+Targets use object-owned readable labels. New drafts require explicit target and algorithm selection, even for a single algorithm; remembered defaults are suggestions. Hosts without method metadata retain their configured algorithm after target selection. An empty compatible-method catalog blocks preview and execution; it never falls back to a default. Methods with incompatible roles or formats are omitted; compatible methods missing runtime dependencies remain visible with reasons. A sole usable saved package is preselected. Switching targets preserves compatible choices; incompatible algorithms require reselection. Compatible budget overrides survive algorithm changes, while method-specific overrides reset with a notice. Tasks and source support are rechecked. Policy targets can project compatibility to an underlying target. Missing histories/materials/capabilities remain visible; a failed benchmark catalog does not block saved tasks.
 
-Benchmark preparation belongs to the same Application improvement lifecycle as model work. Selection/preview starts no task downloads or model calls. **Start improvement** authorizes the displayed bounded job, including downloads, containers and model calls. Cancel is selected by default. Main and auxiliary model calls share the root budget. A dedicated renderer preserves full original-task tool output and logs while the benchmark job is awaited; cooperative cancellation restores chat.
+Expanded sections scroll to the focus on small ANSI terminals. Focus follows action identity when rows change. Confirmation and optional long details use PageUp/PageDown without changing the selected action. History/candidate lists retain pagination.
 
-Benchmark improvement binds search, failed-task replay and independent confirmation on demand. If execution capabilities are unavailable, the menu displays the reason on its parent page without loading the task catalog or starting work. Empty catalogs, missing task sets, failed preflight, preview/execution errors, completion and cancellation also leave a visible message in the restored chat transcript. See [Original task experiments](../../../../lab/improvement/experiments/README.md#run-a-benchmark-improvement-job) for configuration and execution requirements.
+Field input retains the panel and selected row while displaying a labeled input area below it. Live text, cursor edits, descriptions, current values and type/range hints remain visible. Enter submits, blank keeps the value and Esc or `/cancel` cancels. `/clear` clears guidance or string fields. Invalid values preserve the previous value. During input, `q`, spaces and digits are text. Fields do not enter chat history. Internal tuning and JSON overrides are absent from the menu. The selected algorithm shows its configuration file, profile and mechanism location; YAML and programmatic previews retain parameter validation. Search guidance appears only when declared by `direction_help`; task defaults may prefill it, and unsupported guidance from another method is not sent. Evaluation and acceptance remain defined when guidance is empty.
 
-A saved daily case is usable only with declared acceptance and required data splits. Daily observation recording is separately configured through [Learning](../../../../lab/learning/README.md). This menu does not create or correct learning material. Pending observations are not scored task packages. Existing material services own validation; selecting a package does not modify its acceptance criteria.
+**Start improvement** creates a fresh preview and one execution confirmation, initially selecting Cancel. The confirmation binds the target, direction, method, normalized parameters, parent and task materials. Editing a field requires a new preview. Benchmark confirmation authorizes its displayed downloads, containers, baseline, search and independent confirmation. Real model work may incur charges. No algorithm-specific fields or branches belong to this frontend.
 
-A confirmed candidate waits for human adoption. This feature does not establish model quality, grant activation to an algorithm, or improve arbitrary code/workflow/state. See [Automatic search](../../../../lab/improvement/automatic/README.md), [Original task experiments](../../../../lab/improvement/experiments/README.md), and [Task packages](../../../../lab/improvement/tasks/README.md).
+## Inspect a running experiment
 
-The built-in terminal registers one improvement command. Programmatic search remains available through its independent interaction contract. Standalone benchmark evaluation belongs to the optional Eval CLI.
+Saved packages and benchmarks share the running/result flow. POSIX raw menu input supports bounded polling through the existing reader, so progress can update while offering **Return to chat** and **Cancel improvement**. Returning keeps Application-owned work running; use `/status`, `/cancel`, or reopen `/improvement` and select Results and history. The running view measures the current batch, not overall completion. Redirected/non-polling input waits for completion and cannot read cancellation commands during the job. Ctrl+C cancellation remains owned by Application.
+
+Original-task events retain complete tool output and runner logs. A completed, failed or cancelled job opens its result view. Empty outcomes still show a stopping reason, baseline/usage when measured and verified search logs when produced. **Edit and run again** returns to the current draft without starting work. A completed job is not itself evidence of improvement.
+
+## Review results and candidates
+
+**Results and history** lists submitted runs, including runs without candidates, under the current configuration/profile. Unfinished records after a process restart are shown as interrupted and never replayed. Existing candidates remain available through Saved candidates. History and candidate lists paginate; detail views preserve selection while paging sections.
+
+| Action | Effect |
+|---|---|
+| Review candidate | Inspect assessment, comparison, usage, changes, full texts and evidence |
+| Set as next-session default | Confirm a saved profile/configuration change; keep the current session |
+| Set default and start a new session | Confirm the default change and activate an empty session through Application |
+| Discard candidate | Reject the stored candidate |
+
+Candidates are already stored; there is no extra save/collection action. Without an activation capability, only the future-default action is offered. Review labels distinguish selection gains, ties, regressions, unknown comparisons and independent confirmation. Adoption still validates parent, scope, configuration, binding and artifact. Histories retain referenced candidates; old candidates are usable only while those checks pass.
+
+`ImprovementClients` injects search, materials, candidates, activation, metadata, history/log queries, waiting and cancellation independently. Existing hosts without history or parameter metadata keep their configured search path; unavailable capabilities do not add execution authority. The feature imports no Lab, Run or Eval implementations. Daily observation collection remains separately configured through [Learning](../../../../lab/learning/README.md); observations without acceptance are not scored task packages.
+
+See [Improvement](../../../../lab/improvement/README.md), [Original task experiments](../../../../lab/improvement/experiments/README.md) and [Task packages](../../../../lab/improvement/tasks/README.md). No new environment variables or automatic adoption.
 
 ```bash
-.venv/bin/python -m unittest tests.interactive.test_improvement tests.interactive.test_improvement_back tests.interactive.test_benchmark_events tests.interactive.test_confirm_navigation tests.workflows.test_benchmark_improvement -v
+.venv/bin/python -m unittest tests.interactive.test_improvement tests.interactive.test_improvement_back tests.interactive.test_confirm_navigation tests.workflows.test_improvement_history tests.workflows.test_benchmark_improvement
 ```
 
-Offline checks use fake Providers, controllers and original-task executors. Input and display come from [I/O](../../io/README.md) and [Rendering](../../rendering/README.md). No new environment variables.
-
-Registered I policy targets use the same search and candidate menus. DreamRSI's preview declares its trigger, material requirements, feedback, generation, acceptance and activation. Task packs describe the underlying H tasks; the method projects them to the I comparison. Missing histories or independent tasks reject the preview. Manual initiation remains separate from configuration; no background scheduler is installed.
+Offline checks use fake Providers/controllers/executors and local PTYs. They establish interaction and lifecycle behavior, not real model improvement or container integration.

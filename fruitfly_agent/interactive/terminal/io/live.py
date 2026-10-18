@@ -460,6 +460,7 @@ class IsolatedLineEditor:
         self._choices: tuple[str, ...] = ()
         self._selected_choice = 0
         self._choice_request = ""
+        self._field_input = False
 
     def set_choices(self, labels: Sequence[str] = (), request_id: str = "") -> None:
         self._choice_request = request_id
@@ -548,7 +549,10 @@ class IsolatedLineEditor:
                     self.display.set_input("", 0)
                     return None
                 if first == b"\x1b":
-                    buffer.escape(_read_escape_sequence(descriptor, first), descriptor, encoding, self._history)
+                    sequence = _read_escape_sequence(descriptor, first)
+                    if self._field_input and sequence == b'\x1b':
+                        raise InputInterrupted
+                    buffer.escape(sequence, descriptor, encoding, self._history)
                 elif first in {b"\x04", b"\x7f", b"\x08", b"\x01", b"\x05", b"\x15", b"\x17"}:
                     buffer.control(first)
                 else:
@@ -561,6 +565,30 @@ class IsolatedLineEditor:
         finally:
             if owns_terminal_state:
                 self.stop()
+
+    def read_field_line(self, label: str) -> str | None:
+        """Borrow this reader for a visible form while the chat display is suspended."""
+        if self.display.active:
+            raise RuntimeError('suspend the chat display before reading a form field')
+        previous = self.display, self._history, self._choices, self._field_input
+        owns_terminal_state = self._previous_terminal_state is None
+        display = InlineTerminalDisplay(self.display.output)
+        self.display, self._history, self._choices = display, [], ()
+        self._field_input = True
+        try:
+            display.write(safe_terminal_text(label) + '\n')
+            self.start()
+            display.activate()
+            return self.read_line()
+        finally:
+            try:
+                display.suspend()
+            finally:
+                try:
+                    if owns_terminal_state:
+                        self.stop()
+                finally:
+                    self.display, self._history, self._choices, self._field_input = previous
 
     def _read_choice(self, descriptor: int, first: bytes) -> str | None:
         """Consume a permission-selection key without changing the prompt buffer."""

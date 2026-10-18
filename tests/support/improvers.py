@@ -6,13 +6,22 @@ from fruitfly_agent.lab.improvement.api import SearchPreview, TextProposal, TEXT
 from fruitfly_agent.run.application import RunApplicationFactory
 from tests.support.materials import _write_models, _write_cases
 from tests.support.faux_provider import FauxProvider
+from tests.support.terminal import menu_choice
 
 
 class QueueEditor:
     def __init__(self):
         self.lines = Queue()
+        self.output = None
+        self.offset = 0
     def read_line(self):
-        return self.lines.get(timeout=3)
+        line = self.lines.get(timeout=3)
+        if self.output is not None:
+            rendered = self.output.getvalue()[self.offset:]
+            self.offset = len(self.output.getvalue())
+            if line.startswith('@'):
+                return menu_choice(line[1:], rendered)
+        return line
     def send(self, *lines):
         for line in lines:
             self.lines.put(line)
@@ -40,6 +49,9 @@ def custom_definition(improver_type=OfflineImprover):
         lambda state, context, params: state.with_component(TEXT_IMPROVER_COMPONENT, context.own(improver_type(params['target']))),
         implementation_id='offline-v1',
         selection_group='text-improver', selection_group_label='Text improver',
+
+        implementation_path='tests/support/improvers.py',
+        documentation_path='tests/support/README.md',
     )
 
 def offline_factory(root, algorithm='offline-search', target='base_prompt', definition=None):

@@ -80,8 +80,8 @@ class ImprovementProblem:
             raise ValueError("target format is required")
         if not self.search_id or not self.parent_manifest or not self.execution_id:
             raise ValueError("search, parent and execution identities are required")
-        if not self.direction.strip() or len(self.direction) > 500:
-            raise ValueError("direction must contain 1–500 characters")
+        if not isinstance(self.direction, str) or len(self.direction) > 500:
+            raise ValueError("direction must be a string of at most 500 characters")
         if not self.train or not self.validation:
             raise ValueError("train and selection validation are required")
         if {c.input for c in self.train} & {c.input for c in self.validation}:

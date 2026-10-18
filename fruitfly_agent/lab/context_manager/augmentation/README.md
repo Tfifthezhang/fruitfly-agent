@@ -6,8 +6,10 @@ Add bounded instructions or information to each model request without changing t
 
 | Module | Adds |
 |---|---|
-| [Skills](skills/README.md) | Names, descriptions, and file locations; the model reads full instructions when needed. |
+| [Skills](skills/README.md) | On-demand catalog instructions and an optional explicitly selected retained Skill body |
 | [Information spaces](information/README.md) | Retrieved file memory, local documents, or live HTTP results |
+
+Skill documents and learned environment memory remain Context augmentation capabilities. Their optional S targets are improved explicitly through `/improvement`; enabling augmentation itself starts no search.
 
 ## Implement a transformer
 

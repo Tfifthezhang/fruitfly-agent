@@ -35,7 +35,7 @@ class MethodBinding:
             self.resources.append(resource)
         return resource
 
-    def text_host(self, strategy, *, label):
+    def text_host(self, strategy, *, label, confirm_on_holdout=False):
         template = self.template
         role_configs = dict(template.role_configs or {})
         for name, requested in self.parameters.items():
@@ -48,9 +48,13 @@ class MethodBinding:
         host = HostedTextImprover(strategy, template.config, template.workspace, self.parameters,
             target=self.target, label=label, role_configs=role_configs,
             services_factory=template.services_factory,
-            task_source=template.task_source.with_legacy(self.parameters['cases_path']))
+            task_source=template.task_source.with_legacy(self.parameters['cases_path']),
+            trial_targets=tuple(t for key, t in self.components.items()
+                                if key.startswith('text-target:') and getattr(t, 'project_in_trials', False)),
+            confirm_on_holdout=confirm_on_holdout)
         self.own(host)
-        if template.workflow is not None and self.target.snapshot().role == 'H':
+        if (template.workflow is not None and self.target.snapshot().role == 'H'
+                and self.target.snapshot().schema == 'text-v1'):
             from ..automatic.workflow import AutomaticWorkflow
             host.configure_workflow(AutomaticWorkflow(template.workflow.processor, template.workflow.policy))
         return host
@@ -81,13 +85,17 @@ class MethodSelection:
     def options(self, role, target_id):
         target = self.targets.get(target_id)
         snapshot = target.snapshot() if target is not None else None
+        if snapshot is None or snapshot.role != role:
+            return ()
         rows = []
         for identity, definition in self.definitions.items():
             support = definition.improvement
+            if support is not None and (role not in support.roles or snapshot.schema not in support.schemas):
+                continue
+            if support is None and (identity != self.default_id or target_id != self.default_target()):
+                continue
             reason = ''
-            if snapshot is None or snapshot.role != role:
-                reason = 'The target is not registered for this role.'
-            elif role not in self.executable_roles and role not in getattr(target, 'adoption_roles', ()):
+            if role not in self.executable_roles and role not in getattr(target, 'adoption_roles', ()):
                 reason = 'No executable comparison and adoption adapter is registered for this role.'
             elif self.default is None:
                 reason = 'No search host is available in this runtime.'
@@ -97,20 +105,32 @@ class MethodSelection:
                 reason = 'Missing runtime capabilities: ' + ', '.join(sorted(definition.requires_capabilities - self.provided))
             elif definition.descriptor.conflicts & self.enabled_ids:
                 reason = 'The method conflicts with an enabled runtime mechanism.'
-            elif support is None:
-                if identity != self.default_id or target_id != self.default_target():
-                    reason = 'This host only supports its configured target.'
-            elif role not in support.roles or snapshot.schema not in support.schemas:
-                reason = 'The method does not support this target role or format.'
-            elif not isinstance(self.default, (HostedTextImprover, BindingTemplate)):
+            elif support is not None and not isinstance(self.default, (HostedTextImprover, BindingTemplate)):
                 reason = 'This runtime host does not provide per-job method binding.'
-            else:
+            elif support is not None:
                 missing = support.required_capabilities - self.default.services_factory.capabilities
                 if missing:
                     reason = 'Missing execution capabilities: ' + ', '.join(sorted(missing))
+            initial = (self.default.parameters if identity == self.default_id and isinstance(self.default, HostedTextImprover)
+                       else self.configured.get(identity, {}))
+            preferred = self.preferences.get(target_id, {})
+            if preferred.get('method') == identity:
+                initial = {**initial, **preferred['parameters']}
+            parameters = tuple({**p.to_dict(), 'value': initial.get(p.name, p.default),
+                                'group': 'budget' if support is not None and p.name in support.budget_parameters else
+                                    'materials' if support is not None and p.name in support.material_parameters else 'parameters'}
+                               for p in definition.descriptor.parameters)
+            sources = ('saved',)
+            if (not reason and role == 'H' and snapshot.binding.kind == 'prompt'
+                    and isinstance(self.default, (HostedTextImprover, BindingTemplate))
+                    and 'workflow-trials' in self.default.services_factory.capabilities):
+                sources = ('saved', 'benchmark')
             rows.append(MethodOption(identity, definition.descriptor.label, definition.descriptor.description,
                 not reason, reason, identity == self.preferences.get(target_id, {}).get('method', self.default_id),
-                tuple((c.layer, c.family) for c in definition.descriptor.contributions)))
+                tuple((c.layer, c.family) for c in definition.descriptor.contributions), parameters, sources,
+                support.usage.details if support is not None and support.usage is not None else (),
+                support.direction_help if support is not None else 'Optional guidance for the configured search host.',
+                definition.implementation_path, definition.documentation_path))
         return tuple(sorted(rows, key=lambda item: (not item.available, not item.default, item.method_id)))
 
     def default_target(self):
@@ -124,6 +144,11 @@ class MethodSelection:
         target = self.targets.get(target_id)
         if target is None:
             raise ValueError('unknown improvement target')
+        definition = self.definitions.get(identity)
+        if definition is not None and definition.improvement is not None:
+            snapshot = target.snapshot()
+            if snapshot.role not in definition.improvement.roles or snapshot.schema not in definition.improvement.schemas:
+                raise ValueError('The method does not support this target role or format.')
         option = next((item for item in self.options(target.snapshot().role, target_id)
                        if item.method_id == identity), None)
         if option is None or not option.available:

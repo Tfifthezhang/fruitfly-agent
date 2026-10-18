@@ -24,6 +24,8 @@ def definition():
             ), effects=MechanismEffects(uses_provider=True, uses_network=True, writes_files=True,
                 cost_notice="One explicit search authorizes bounded baseline, learning, candidate and confirmation trials; no automatic adoption.")),
         _install, implementation_id=AutomaticWorkflow.implementation_id,
+        implementation_path='fruitfly_agent/lab/improvement/automatic/workflow.py',
+        documentation_path='fruitfly_agent/lab/improvement/automatic/README.md',
         requires_capabilities=frozenset({"failure-processing", "text-improver"}))
 
 

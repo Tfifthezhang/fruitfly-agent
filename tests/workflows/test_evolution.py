@@ -34,7 +34,13 @@ class PersistentEvolutionTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(first_improver.calls, 1)
             self.assertEqual(factory._current_improver.calls, 0)
             self.assertEqual(host.active_manifest(), result.current_manifest)
-            self.assertEqual(len(factory.candidate_store.list()), 1)
+            # Both experiments remain reviewable through history. The inbox
+            # still presents only the latest candidate for this scope.
+            self.assertEqual(len(app.candidates()), 1)
+            runs = app.improvement_history()
+            self.assertEqual(len(runs), 2)
+            self.assertEqual({r.candidate_id for r in factory.candidate_store.list()},
+                             {identity for run in runs for identity in run.candidate_ids})
             self.assertEqual(factory.artifact_store.read_text(observed[0][2]), observed[0][1])
             await app.close()
             fresh_factory = RunApplicationFactory(cwd=Path(tmp), environment={}, catalog=factory.catalog, provider_registry=factory.provider_registry)

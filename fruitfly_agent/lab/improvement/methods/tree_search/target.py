@@ -6,6 +6,7 @@ POLICY_TARGET = 'tree-search.exploration-policy'
 
 
 class PolicyTarget:
+    label = 'Exploration policy'
     adoption_roles = frozenset({'I'})
 
     def __init__(self, text, execution_target):
@@ -15,6 +16,10 @@ class PolicyTarget:
     def snapshot(self):
         return TargetSnapshot(POLICY_TARGET, self.text, TargetBinding('artifact', POLICY_TARGET),
                               schema='exploration-policy-v1', role='I')
+
+    @property
+    def task_target_id(self):
+        return self.execution_target.snapshot().target_id
 
     def validate(self, text):
         ExplorationPolicy.parse(text)

@@ -65,6 +65,9 @@ def _definition(
             effects=MechanismEffects(tools=(mechanism_id,)),
         ),
         install or (lambda state, context, parameters: state),
+
+        implementation_path='tests/lab/test_catalog.py',
+        documentation_path='tests/lab/README.md',
     )
 
 
@@ -145,6 +148,29 @@ class DescriptorTest(unittest.TestCase):
 
 
 class CatalogTest(unittest.TestCase):
+    def test_all_registered_algorithms_declare_differentiated_descriptions_and_real_paths(self):
+        definitions = builtin_catalog().definitions()
+        descriptions = [d.descriptor.description for d in definitions]
+        self.assertEqual(len(descriptions), len(set(descriptions)))
+        root = Path(__file__).resolve().parents[2]
+        for definition in definitions:
+            with self.subTest(method=definition.descriptor.mechanism_id):
+                self.assertTrue((root / definition.implementation_path).is_file())
+                self.assertTrue((root / definition.documentation_path).is_file())
+        self.assertEqual(builtin_catalog().get('compaction').input_parameters, ())
+        self.assertEqual(builtin_catalog().get('live-http').input_parameters, ('endpoint',))
+
+    def test_registration_rejects_missing_display_metadata_and_unknown_user_fields(self):
+        definition = builtin_catalog().get('read-tool')
+        for changes in ({'implementation_path': ''}, {'documentation_path': ''},
+                        {'implementation_path': '../missing.py'}, {'implementation_path': 'bad\npath.py'},
+                        {'input_parameters': ('unknown',)}, {'input_parameters': 'unknown'},
+                        {'descriptor': replace(definition.descriptor, description='line\nbreak')}):
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                replace(definition, **changes)
+        with self.assertRaises(ValueError):
+            replace(definition, descriptor=replace(definition.descriptor, description=' '))
+
     def test_unknown_mechanisms_have_actionable_configuration_errors(self) -> None:
         catalog = builtin_catalog()
 
@@ -222,6 +248,12 @@ class CatalogTest(unittest.TestCase):
                 "opro",
                 "tree-search",
                 "dream-rsi",
+                "workflow-search",
+                "skill-edit",
+                "memory-exploration",
+                "execution-workflow",
+                "skill-document",
+                "learned-memory",
                 "failure-replay",
                 "failure-distillation",
                 "automatic-text-search",

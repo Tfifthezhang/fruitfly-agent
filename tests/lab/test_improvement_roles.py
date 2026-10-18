@@ -51,6 +51,15 @@ class ImprovementRoleTests(unittest.IsolatedAsyncioTestCase):
         adopt.assert_not_awaited()
         adapter.close.assert_awaited_once()
 
+    async def test_empty_guidance_keeps_the_fixed_comparison_policy(self):
+        flow, request, candidate, evidence, adapter, compare = self.setup_role('I')
+        request = replace(request, direction='')
+        result = await flow.run(request, generate=AsyncMock(return_value=candidate),
+                                active_version=lambda: request.parent)
+        self.assertEqual(result, (candidate, evidence))
+        self.assertEqual(compare.compare.call_args.args[0].policy_id, 'fixed-policy')
+        adapter.close.assert_awaited_once()
+
     async def test_unknown_scope_stale_parent_and_changed_conditions_reject(self):
         for mode in ('unknown', 'stale', 'conditions', 'scope'):
             with self.subTest(mode=mode):

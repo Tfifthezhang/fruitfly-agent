@@ -34,6 +34,41 @@ def probe_definition():
 
 
 class ImprovementMethodTests(unittest.IsolatedAsyncioTestCase):
+    async def test_method_without_guidance_runs_with_only_its_declared_task_scores(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            factory = offline_factory(Path(tmp), 'opro', definition=probe_definition())
+            app = AgentApplication(factory)
+            await app.start()
+            self.addAsyncCleanup(app.close)
+            methods = {m.method_id: m for m in app.improvement_methods('H', 'base_prompt')}
+            self.assertEqual(methods['probe-search'].direction_help, '')
+            self.assertTrue(methods['opro'].direction_help)
+            self.assertTrue(methods['tree-search'].direction_help)
+            targets = {t.target_id: t.label for t in app.improvement_targets()}
+            self.assertEqual(targets['base_prompt'], 'Base prompt')
+            self.assertEqual(targets['skill-catalog.guidance'], 'Skill catalog guidance')
+            self.assertEqual(targets['tree-search.exploration-policy'], 'Exploration policy')
+            materials = next(p for p in methods['opro'].parameters if p.name == 'cases_path')
+            self.assertEqual(materials.group, 'materials')
+            rounds = next(p for p in methods['opro'].parameters if p.name == 'rounds')
+            self.assertEqual((rounds.kind, rounds.minimum, rounds.maximum), ('integer', 1, 20))
+            self.assertTrue(rounds.description)
+            preview = app.improvement_preview(method_id='probe-search', target_id='base_prompt', direction='')
+            self.assertTrue(preview.preview_token)
+            provider = factory._current_runtime_config.provider
+            self.assertEqual(provider.calls, [])
+            changed = app.improvement_preview(method_id='probe-search', target_id='base_prompt', direction='')
+            with self.assertRaisesRegex(ValueError, 'request changed'):
+                await app.improve('Changed guidance', preview_token=changed.preview_token)
+            self.assertEqual(provider.calls, [])
+            provider.respond_text('wrong')
+            provider.respond_text('B')
+            records = await app.improve('', preview_token=preview.preview_token)
+            self.assertEqual(len(records), 1)
+            self.assertEqual(records[0].direction, '')
+            with self.assertRaisesRegex(ValueError, 'consumed'):
+                await app.improve('', preview_token=preview.preview_token)
+
     async def test_temporary_method_and_target_reach_review_activation_and_recovery(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -46,7 +81,7 @@ class ImprovementMethodTests(unittest.IsolatedAsyncioTestCase):
                 original_config = factory.selection.config_path.read_bytes()
                 options = app.improvement_methods('H', 'skill-catalog.guidance')
                 self.assertEqual({m.method_id for m in options if m.available}, {'opro', 'probe-search', 'tree-search'})
-                self.assertFalse(app.improvement_methods('S', 'skill-catalog.guidance')[0].available)
+                self.assertEqual(app.improvement_methods('S', 'skill-catalog.guidance'), ())
                 preview = app.improvement_preview(direction='Improve', method_id='probe-search',
                     target_id='skill-catalog.guidance', parameters={'rounds': 1})
                 self.assertEqual((preview.algorithm, preview.target), ('probe-search', 'skill-catalog.guidance'))

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import PurePosixPath
 import re
 from typing import Any, Callable, Mapping, TYPE_CHECKING
 
@@ -67,6 +68,9 @@ class MechanismDefinition:
     selection_group_allow_disabled: bool = True
     configuration_category: str | None = None
     improvement: MethodDefinition | None = None
+    implementation_path: str = ''
+    documentation_path: str = ''
+    input_parameters: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.improvement is not None:
@@ -106,6 +110,19 @@ class MechanismDefinition:
             raise TypeError("selection_group_allow_disabled must be boolean")
         if self.selection_group is None and self.selection_group_allow_disabled is not True:
             raise ValueError("a mechanism without a selection group cannot set its disabled policy")
+        if not self.descriptor.description.strip() or any(c in self.descriptor.description for c in '\r\n\x1b'):
+            raise ValueError('algorithm description must be a nonempty single line')
+        for name, suffix in (('implementation_path', '.py'), ('documentation_path', '.md')):
+            value = getattr(self, name)
+            if (not isinstance(value, str) or not value.strip() or not value.endswith(suffix)
+                    or any(ord(c) < 32 for c in value) or '..' in PurePosixPath(value).parts):
+                raise ValueError(f'algorithm {name} must name an explicit {suffix} file')
+        if isinstance(self.input_parameters, str):
+            raise ValueError('input_parameters must contain declared parameter names')
+        names = tuple(self.input_parameters)
+        if len(set(names)) != len(names) or set(names) - {p.name for p in self.descriptor.parameters}:
+            raise ValueError('input_parameters must contain distinct declared parameter names')
+        object.__setattr__(self, 'input_parameters', names)
 
 
 @dataclass(frozen=True)

@@ -26,13 +26,36 @@ class MethodSelectionTests(unittest.TestCase):
         bind = Mock()
         methods = self.setup_selection(bind)
         self.assertTrue(all(m.available for m in methods.options('H', 'base_prompt')))
-        self.assertFalse(any(m.available for m in methods.options('I', 'base_prompt')))
-        self.assertFalse(any(m.available for m in methods.options('H', 'missing')))
+        self.assertEqual(methods.options('I', 'base_prompt'), ())
+        self.assertEqual(methods.options('H', 'missing'), ())
         methods.default.services_factory.capabilities = frozenset()
         self.assertIn('Missing execution capabilities', methods.options('H', 'base_prompt')[0].reason)
         with self.assertRaisesRegex(ValueError, 'Missing execution capabilities'):
             methods.select(method_id='alternative', target_id='base_prompt')
         bind.assert_not_called()
+
+    def test_target_role_and_schema_are_filtered_before_runtime_requirements(self):
+        from fruitfly_agent.lab.algorithms.targets import TargetSnapshot, TargetBinding
+        from fruitfly_agent.lab.catalog import builtin_catalog
+        methods = self.setup_selection(Mock())
+        methods.definitions = {d.descriptor.mechanism_id: d for d in builtin_catalog().definitions()
+                               if d.improvement is not None}
+        for role, schema, expected in (
+            ('H', 'text-v1', {'opro', 'tree-search'}),
+            ('H', 'execution-workflow-v1', {'workflow-search'}),
+            ('S', 'skill-document-v1', {'skill-edit'}),
+            ('S', 'environment-memory-v1', {'memory-exploration'}),
+            ('I', 'exploration-policy-v1', {'dream-rsi'}),
+            ('S', 'unknown-v1', set()),
+        ):
+            with self.subTest(role=role, schema=schema):
+                target = SimpleNamespace(snapshot=lambda: TargetSnapshot('target', 'seed', TargetBinding('artifact', 'target'), schema, role))
+                methods.targets['target'] = target
+                options = methods.options(role, 'target')
+                self.assertEqual({m.method_id for m in options}, expected)
+                self.assertTrue(all(m.implementation_path and m.documentation_path for m in options))
+        with self.assertRaisesRegex(ValueError, 'does not support'):
+            methods.select(method_id='opro', target_id='target')
 
     def test_failed_binder_closes_owned_resources_and_keeps_default(self):
         resource = SimpleNamespace(close=Mock())

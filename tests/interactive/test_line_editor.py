@@ -320,6 +320,72 @@ class LineEditorUnitTest(unittest.TestCase):
 
 @unittest.skipUnless(os.name == "posix", "PTY regression requires a POSIX terminal")
 class TerminalInputPtyRegressionTest(unittest.TestCase):
+    def test_improvement_field_echoes_before_submission_and_restores_menu_input(self):
+        import fcntl
+        import struct
+        import termios
+        code = (
+            "import asyncio, sys, termios\n"
+            "from fruitfly_agent.interactive import TerminalFrontend\n"
+            "from fruitfly_agent.interactive.terminal.bindings import ImprovementClients\n"
+            "from tests.support.application import offline_session\n"
+            "frontend=TerminalFrontend(offline_session(), improvement_clients=ImprovementClients(search=object()))\n"
+            "with frontend.menu_scope():\n"
+            "    value=asyncio.run(frontend.improvement_frontend().read_value('Search guidance\\nCurrent: old value'))\n"
+            "    print('MENU_ACTIVE='+str(frontend.line_editor.display.active),flush=True)\n"
+            "frontend._suspend_inline_terminal()\n"
+            "print('ECHO='+str(bool(termios.tcgetattr(sys.stdin.fileno())[3] & termios.ECHO)),flush=True)\n"
+            "print('RESULT='+repr(value),flush=True)\n"
+        )
+        pid, master = pty.fork()
+        if pid == 0:
+            os.chdir(ROOT)
+            os.environ['TERM'] = 'xterm-256color'
+            os.execl(sys.executable, sys.executable, '-c', code)
+        chunks = []
+        try:
+            fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack('HHHH', 24, 80, 0, 0))
+            self._read_until(master, '❯ '.encode(), chunks)
+            os.write(master, 'Ｈello'.encode())
+            # No Enter has been sent: the draft itself must be rendered.
+            self._read_until(master, '❯ Ｈello'.encode(), chunks)
+            os.write(master, b'\x1b[D!\r')
+            self._read_until_exit(pid, master, chunks)
+            self._drain(master, chunks)
+        except BaseException:
+            self._kill_and_reap(pid)
+            raise
+        finally:
+            os.close(master)
+        output = b''.join(chunks).decode(errors='replace')
+        self.assertIn('Current: old value', output)
+        self.assertIn("RESULT='Ｈell!o'", output)
+        self.assertIn('MENU_ACTIVE=False', output)
+        self.assertIn('ECHO=True', output)
+
+    def test_suspended_form_restores_display_history_and_echo_on_every_exit(self):
+        for keys, result in ((b'value\r', "'value'"), (b'q 1\r', "'q 1'"),
+                             (b'\x04', 'None'), (b'\x03', "'cancelled'"), (b'\x1b', "'cancelled'")):
+            with self.subTest(keys=keys):
+                code = (
+                    "import sys, termios\n"
+                    "from fruitfly_agent.interactive.terminal.io.live import InlineTerminalDisplay, IsolatedLineEditor, InputInterrupted\n"
+                    "from fruitfly_agent.interactive.terminal.io.input import read_field_line\n"
+                    "display=InlineTerminalDisplay(sys.stdout); editor=IsolatedLineEditor(sys.stdin,display)\n"
+                    "editor._history=['chat entry']\n"
+                    "try:\n"
+                    "    value=read_field_line(editor,'Variable')\n"
+                    "except InputInterrupted:\n"
+                    "    value='cancelled'\n"
+                    "print('RESTORED='+str(editor.display is display and not display.active and editor._history==['chat entry']),flush=True)\n"
+                    "print('ECHO='+str(bool(termios.tcgetattr(sys.stdin.fileno())[3] & termios.ECHO)),flush=True)\n"
+                    "print('RESULT='+repr(value),flush=True)\n"
+                )
+                output = self._run_pty_code(code, keys)
+                self.assertIn('RESTORED=True', output)
+                self.assertIn('ECHO=True', output)
+                self.assertIn('RESULT=' + result, output)
+
     def test_idle_resize_rewraps_draft_without_keys_and_preserves_editing(self):
         import fcntl
         import struct

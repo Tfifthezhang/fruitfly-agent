@@ -40,9 +40,10 @@ Cancelled or failed restoration keeps the current session and does not display t
 | `model` / `prompt` | Select the model and prompt for the next session. |
 | Add model… | Collect host-provided service fields, hidden API key, and review; stage until configuration save. Opens on first startup when no models exist. |
 | Set API key… | Stage a missing credential for the selected model; the menu shows only set/missing status. |
-| `mechanisms · context-manager`, `mechanisms · tools`, `mechanisms · environment` | Enable responsibilities and choose algorithms in-place. |
-| Algorithm selector | Expand on the current row, including single-algorithm groups. |
-| Detailed parameters | Edit harness YAML; no parameter submenu. |
+| Context, Tools, Environment | One readable row per mechanism; Enter expands algorithm descriptions and paths, Space enables/disables. |
+| Context sections | Augmentation groups Skills, Memory, Knowledge and HTTP; externalization and reduction remain separate sections on the same page. |
+| Algorithm selector | Multiple implementations use inline radio choices; sole implementations expose descriptions and paths directly. |
+| User inputs | Edit declared paths, initial text and endpoints with visible input; tune internal parameters in the displayed YAML location. |
 | Prompt results | Current configuration/profile's latest task-scoped prompt candidates, plus built-ins and current selection |
 
 Expanding a prompt group does not change configuration. Choosing a prompt opens a full preview and confirmation. Active and resumed sessions retain their manifest. See [Configuration](../../../CONFIGURATION.md).
@@ -55,29 +56,29 @@ Model forms accept `/cancel` or EOF without staging. Review includes the selecte
 
 ## Improve against a task set
 
+`/improvement [DIRECTION]` opens Target, Task, Budget and Evaluation on one panel. Expand Target, choose an object, then its algorithm below it. H/S/I are section labels. Algorithms show concise descriptions and implementation/guide paths. Optional Search guidance remains editable inline; internal tuning uses the displayed configuration location. Task expands saved/benchmark sources and material fields; Budget expands limits; Evaluation exposes scoring, acceptance and preview details. New drafts require explicit target/algorithm selection. Compatible values survive changes; missing inputs remain visible. Field editing retains the panel and focus while displaying live text and validation hints.
+
 | Action | Behavior |
 |---|---|
-| Start improvement | Choose a registered method and saved task packages or benchmark tasks; no configuration switch is required. |
-| Edit parameters | On confirmation, enter a JSON object of overrides; validate, preview again and confirm. Confirmed choices are remembered per target. |
-| H / S / I | Select a registered target, compatible method and task source; unavailable bindings show their missing capability. |
-| Learning materials | Configure collection independently; no case-saving action appears in the improvement menu. |
-| Review candidates | Overview, evaluation, usage, changes, original/candidate text, scope, and evidence |
-| `n` / `p` | Change section; fallback uses `next` / `previous`. |
-| PageUp / PageDown | Page long content; fallback uses `pageup` / `pagedown`. |
-| Save for later | Set next-session default. |
-| Use for a new session | Confirm activation of a new empty session. |
+| Start improvement | Fresh preview and one confirmation, defaulting to Cancel; model work may incur charges |
+| Budget | Edit typed method-declared limits without JSON |
+| Target | Choose an object, then a compatible algorithm with description and paths; edit optional Search guidance |
+| Task / Evaluation | Choose materials and inspect scoring/acceptance |
+| Return to chat while running | Continue Application-owned work; inspect `/status`, `/cancel`, or Results and history |
+| Results and history | Inspect every submitted run, including empty, failed and cancelled experiments |
+| Review candidate | Assessment, comparison, usage, changes, original/candidate text, scope and evidence |
+| Set as next-session default | Confirm a saved configuration change without replacing the active session |
+| Set default and start a new session | Confirm the default change and open an empty session |
 
-Back or Esc returns one menu level, preserving the parent selection and list pagination. Confirmation Cancel returns to task selection or candidate details. Only Back at the Improvement home page, **Return to chat**, or `q` exits the menu; `q` works at any selection page. Confirmation defaults to cancel on every visit; review actions default to Back. Arrow keys only move selection; Enter performs it. Progress updates appear at most every 0.5 seconds while waiting for normal ANSI input and only when changed. Non-ANSI input uses `/status` or input boundaries. Progress measures the current batch, not total search completion.
+Back/Esc cancels active field input, then collapses a section, then returns to chat. Draft fields remain intact. `q` exits menu mode and is literal text during field input. Cyan focus and green enabled/selected markers remain distinct; Modified/warnings use yellow and errors use red. Section titles and indentation express hierarchy. Raw-key menus omit row numbers; line fallback retains them. `NO_COLOR` preserves symbols and text. Confirmation always starts with Cancel selected. Detail actions default to Back; `n`/`p` switch sections, PageUp/PageDown page text. Numbered fallback accepts next/previous and pageup/pagedown. Cancellation and outcomes remain visible after restoring chat. Candidates are already stored and do not guarantee improvement.
 
-See [Improvement](../../lab/improvement/README.md) for model budgets and [Task packs](../../lab/improvement/tasks/README.md) for acceptance rules. Candidates do not guarantee improvement.
+Saved tasks and benchmarks use the same running/result flow. Raw TTY input polls through the existing reader to refresh progress and offer return/cancel actions. Redirected/non-polling input waits for completion and cannot consume `/cancel` during the wait. Progress measures the current batch, not overall completion. Results expose the stop reason and measured evidence even when no candidate is published. See the [feature guide](features/improvement/README.md).
 
 ## Use benchmark tasks
 
-Select **Start improvement → Benchmark tasks**, choose a bounded CPU task set and confirm **Start improvement**. One Application job downloads/freeze tasks and performs baseline, failure processing, candidate search, original-task comparisons and independent confirmation. No separate initial evaluation is required. The terminal displays original-task activity, complete runner logs and the current improvement phase. Ctrl+C cancels active work and restores chat; redirected input cannot consume commands while awaiting a benchmark job.
+Set **Task** to a benchmark/task-set row, then choose **Start improvement** and confirm. One Application job prepares/freeze tasks and runs baseline, failure processing, candidate search, original-task comparisons and independent confirmation. No separate initial evaluation or enable switch is required. Full original-task output and logs remain observable; missing execution capabilities/preflight checks explain why a source is unavailable.
 
-Benchmark jobs bind an isolated search host with failed-task replay and independent confirmation on demand. Existing explicitly configured workflow policies remain supported. An unavailable binding returns its missing-capability reason in the chat transcript. Environment checks, errors and final outcomes remain visible after the menu screen closes.
-
-Benchmark selection is optional; saved cases remain usable without Eval. Standalone reports can be generated with the [Eval CLI](../../../eval/README.md). Containers, networks and real model calls can incur cost. Current source choices use five tasks and a 3/1/1 split, suitable for examining control flow rather than establishing general quality.
+Benchmark sources are optional. Saved packages and candidates remain available without Eval. Standalone reports use the [Eval CLI](../../../eval/README.md). Containers, downloads and model calls may incur cost. Current source choices use five tasks and a 3/1/1 split, suitable for examining control flow rather than establishing general quality.
 
 ## Register a command
 

@@ -272,6 +272,11 @@ class AgentApplication:
     def task_packs(self):
         return self._task_pack_service().task_packs()
 
+    def task_packs_for_target(self, target_id):
+        service = self._task_pack_service()
+        query = getattr(service, 'task_packs_for_target', None)
+        return query(target_id) if query is not None else service.task_packs()
+
     def task_pack_holdout(self, pack_id):
         return self._task_pack_service().task_pack_holdout(pack_id)
 
@@ -292,12 +297,21 @@ class AgentApplication:
             direction=direction, **selection)
 
     def improvement_methods(self, role, target_id):
+        """None means a legacy host; an empty tuple means no compatible method."""
         query = getattr(self._improvement_service(), 'improvement_methods', None)
-        return query(role, target_id) if query is not None else ()
+        return query(role, target_id) if query is not None else None
 
     def improvement_targets(self):
         query = getattr(self._improvement_service(), 'improvement_targets', None)
         return query() if query is not None else ()
+
+    def improvement_history(self):
+        query = getattr(self._improvement_service(), 'improvement_history', None)
+        return query() if query is not None else ()
+
+    def improvement_run_logs(self, run_id):
+        query = getattr(self._improvement_service(), 'improvement_run_logs', None)
+        return query(run_id) if query is not None else 'This host does not provide search logs.'
 
     def start_improvement(self, direction: str, *, preview_token="") -> asyncio.Task[tuple[CandidateView, ...]]:
         """Own confirmed work while allowing the frontend to continue reading input."""
@@ -305,6 +319,9 @@ class AgentApplication:
             raise RuntimeError("finish active work before starting improvement")
         service = self._improvement_service()
         manifest = self.runtime_manifest
+        submitted = getattr(service, 'improvement_submitted', None)
+        if submitted is not None:
+            preview_token = submitted(manifest, direction, preview_token=preview_token)
         self._state = ApplicationState.IMPROVING
         self._last_error = None
         async def execute(operation):
@@ -319,6 +336,12 @@ class AgentApplication:
             if self._state == ApplicationState.IMPROVING:
                 self._state = ApplicationState.IDLE
             self._last_error = error
+            completed = getattr(service, 'improvement_finished', None)
+            if completed is not None:
+                try:
+                    completed(preview_token, self._improvement_job.progress.status, str(error) if error else '')
+                except Exception as exc:
+                    self._last_error = exc
 
         return self._improvement_job.start(
             service, manifest, direction, preview_token=preview_token,
@@ -372,7 +395,9 @@ class AgentApplication:
         candidate_view = next((item for item in self.candidates()
                                if item.candidate_id == candidate_id), None)
         if candidate_view is None:
-            raise ValueError("candidate no longer exists")
+            # History may reference a retained candidate outside the latest inbox.
+            # Host preparation still validates scope, parent, binding and artifact.
+            candidate_view, _ = self.candidate_detail(candidate_id)
         previous = self._handle
         expected = self.runtime_manifest.get("digest")
         self._state = ApplicationState.REBUILDING

@@ -141,10 +141,12 @@ class TaskPackApplicationTests(unittest.IsolatedAsyncioTestCase):
             app, _, provider = await self.open_app(root, "opro")
             editor = QueueEditor()
             # The absent conventional legacy file is optional; only the managed pack is offered.
-            editor.send("/improvement improve", "1", "1", "1", "1", "1", "2", "q", "/exit")
+            editor.send('/improvement improve', '@Target ·', '@Base prompt', '@OPRO', '@Task ·',
+                '@Project regression', '@Start improvement', '@Cancel', 'q', '/exit')
             output = io.StringIO()
+            editor.output = output
             await TerminalFrontend(app, input_stream=io.StringIO(), output_stream=output, line_editor=editor).run()
-            self.assertIn("Choose task package", output.getvalue())
+            self.assertIn("Saved tasks", output.getvalue())
             self.assertIn("Project regression", output.getvalue())
             self.assertNotIn("Configured task cases", output.getvalue())
             self.assertNotIn("cases file is unavailable", output.getvalue())
@@ -229,9 +231,10 @@ class TaskPackApplicationTests(unittest.IsolatedAsyncioTestCase):
             calls = []
             app._handle.improvement.improvement_preview = lambda *args, **kwargs: calls.append(kwargs) or source.improvement_preview(*args, pack_id="project", direction=kwargs["direction"])
             editor = QueueEditor()
-            editor.send("/improvement improve", "1", "1", "1", "2", "q", "/exit")
+            editor.send('/improvement improve', '@Target ·', '@Base prompt', '@Start improvement', '@Cancel', 'q', '/exit')
             output = io.StringIO()
+            editor.output = output
             await TerminalFrontend(app, input_stream=io.StringIO(), output_stream=output, line_editor=editor).run()
-            self.assertEqual(1, len(calls))
+            self.assertEqual(2, len(calls))  # Panel preview and fresh execution confirmation.
             self.assertNotIn("Choose task package", output.getvalue())
             self.assertEqual([], provider.calls)
