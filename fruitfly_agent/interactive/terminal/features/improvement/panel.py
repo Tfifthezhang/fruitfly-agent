@@ -33,6 +33,7 @@ class ExperimentPanel:
         self.targets = self.methods = self.tasks = ()
         self.has_method_catalog = False
         self.expanded = None
+        self.details = set()
         self.focus = ('target',)
         self.changed = set()
         self.preview_attempted = False
@@ -212,15 +213,16 @@ class ExperimentPanel:
                 add(('method', method.method_id), method.label + (' · suggested' if method.default and not chosen else ''),
                     method.description + ('' if method.available else ' · Unavailable · ' + method.reason),
                     marker='●' if chosen else '○', depth=1, section='Algorithms',
-                    state='unavailable' if not method.available else 'selected' if chosen else '',
-                    references=tuple((label, path) for label, path in (
-                        ('Implementation', method.implementation_path), ('Guide', method.documentation_path)) if path))
-            if self.method is not None:
-                if self.method.configuration_path:
-                    add(('info', 'Configuration'), 'Configuration location',
-                        f'profiles.{self.method.configuration_profile}.mechanisms · id: {self.method.method_id} · parameters',
-                        depth=1, section='Algorithms',
-                        references=(('Configuration', self.method.configuration_path),))
+                    state='unavailable' if not method.available else 'selected' if chosen else '')
+                opened = method.method_id in self.details
+                references = tuple((label, path) for label, path in (
+                    ('Implementation', method.implementation_path), ('Guide', method.documentation_path),
+                    ('Configuration', method.configuration_path),
+                    ('Parameters', f'profiles.{method.configuration_profile}.mechanisms · id: {method.method_id} · parameters'
+                        if method.configuration_path else '')) if path)
+                if references:
+                    add(('references', method.method_id), 'Details · ' + method.label + (' ▴' if opened else ' ▾'),
+                        depth=2, section='Algorithms', references=references if opened else ())
             if self.direction_help():
                 add(('guidance',), 'Search guidance · ' + (self.direction or '(optional; not set)'),
                     self.direction_help(), depth=1, section='Target', changed='guidance' in self.changed)
@@ -274,6 +276,9 @@ class ExperimentPanel:
                 subtitle=safe_terminal_text(problem or self.problem or 'Ready. Review settings, then start one experiment.'),
                 selected=actions.index(self.focus) if self.focus in actions else 0)
             if choice is None:
+                if self.details and self.expanded == 'target':
+                    self.details.clear()
+                    continue
                 if self.expanded is not None:
                     self.focus, self.expanded = (self.expanded,), None
                     continue
@@ -291,6 +296,11 @@ class ExperimentPanel:
                     self.set_target(next(t for t in self.targets if (t.role, t.target_id) == action[1:]))
                 elif action[0] == 'method':
                     self.set_method(next(m for m in self.methods if m.method_id == action[1]))
+                elif action[0] == 'references':
+                    if action[1] in self.details:
+                        self.details.remove(action[1])
+                    else:
+                        self.details.add(action[1])
                 elif action[0] == 'tasks':
                     task = next(t for t in self.tasks if (t.source, t.benchmark_id, t.identity) == action[1:])
                     if not task.available or self.method is not None and task.source not in self.method.task_sources:

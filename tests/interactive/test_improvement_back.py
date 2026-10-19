@@ -184,14 +184,17 @@ class ImprovementBackTests(unittest.IsolatedAsyncioTestCase):
                 ImprovementParameterView('rounds','Search rounds','integer',2,1,20),),
             implementation_path='example/method.py', documentation_path='example/README.md',
             configuration_path='/workspace/config.yaml', configuration_profile='daily'),))
-        frames,_=await self.menu(['Target ·','Base prompt','Method',QUIT],clients=clients)
+        frames,_=await self.menu(['Target ·','Base prompt','Method','Details · Method',QUIT],clients=clients)
         self.assertFalse(any(r.label.startswith(('Search rounds', 'JSON overrides')) for f in frames for r in f['rows']))
         method=next(r for r in frames[-1]['rows'] if r.label=='Method')
         self.assertEqual(method.detail,'Generate candidates from scored history.')
-        self.assertEqual(method.references,(('Implementation','example/method.py'),('Guide','example/README.md')))
-        config=next(r for r in frames[-1]['rows'] if r.label=='Configuration location')
-        self.assertIn('profiles.daily.mechanisms',config.detail)
-        self.assertEqual(config.references,(('Configuration','/workspace/config.yaml'),))
+        self.assertEqual(method.references, ())
+        details=next(r for r in frames[-1]['rows'] if r.label.startswith('Details · Method'))
+        self.assertEqual(details.references, (('Implementation','example/method.py'),
+            ('Guide','example/README.md'), ('Configuration','/workspace/config.yaml'),
+            ('Parameters','profiles.daily.mechanisms · id: method · parameters')))
+        self.assertFalse(any(r.references for r in frames[-2]['rows']))
+        self.assertFalse(any(r.label == 'Configuration location' for r in frames[-1]['rows']))
         search.start_improvement.assert_not_awaited()
 
     async def test_method_without_guidance_shows_evaluation_and_sends_no_hidden_text(self):

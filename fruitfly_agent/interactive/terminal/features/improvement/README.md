@@ -14,11 +14,11 @@ Use `/improvement [DIRECTION]` to edit one experiment, run it, and inspect resul
 
 ## Configure one experiment
 
-The panel has four configuration rows: Target, Task, Budget and Evaluation, followed by start/history/return actions. Enter expands a row on the same page. One main section is expanded at a time; switching sections retains the draft. Back/Esc first collapses the section, then returns to chat; `q` exits menu mode. Navigation and previews start no model requests or task downloads. Host previews may freeze local evidence.
+The panel has four configuration rows: Target, Task, Budget and Evaluation, followed by start/history/return actions. Enter expands a row on the same page. One main section is expanded at a time; switching sections retains the draft. Back/Esc first collapses open algorithm details, then the section, then returns to chat; `q` exits menu mode. Navigation and previews start no model requests or task downloads. Host previews may freeze local evidence.
 
 | Field | Behavior |
 |---|---|
-| Target | First choose an object under H/S/I, then a compatible algorithm below it; show its distinguishing description, implementation/guide paths and optional Search guidance |
+| Target | First choose an object under H/S/I, then a compatible algorithm below it; show its distinguishing description and optional Search guidance; Details expands implementation/guide paths and YAML locations |
 | Task | Saved packages, benchmark/task sets and declared material fields; unavailable sources explain why |
 | Budget | Typed fields declared by the method, with current values and bounds |
 | Evaluation | Read-only scoring, acceptance, requirements, implementation details and full preview; optional long-text viewer |
@@ -27,7 +27,7 @@ Targets use object-owned readable labels. New drafts require explicit target and
 
 Expanded sections scroll to the focus on small ANSI terminals. Focus follows action identity when rows change. Confirmation and optional long details use PageUp/PageDown without changing the selected action. History/candidate lists retain pagination.
 
-Field input retains the panel and selected row while displaying a labeled input area below it. Live text, cursor edits, descriptions, current values and type/range hints remain visible. Enter submits, blank keeps the value and Esc or `/cancel` cancels. `/clear` clears guidance or string fields. Invalid values preserve the previous value. During input, `q`, spaces and digits are text. Fields do not enter chat history. Internal tuning and JSON overrides are absent from the menu. The selected algorithm shows its configuration file, profile and mechanism location; YAML and programmatic previews retain parameter validation. Search guidance appears only when declared by `direction_help`; task defaults may prefill it, and unsupported guidance from another method is not sent. Evaluation and acceptance remain defined when guidance is empty.
+Field input retains the panel and selected row while displaying a labeled input area below it. Live text, cursor edits, descriptions, current values and type/range hints remain visible. Enter submits, blank keeps the value and Esc or `/cancel` cancels. `/clear` clears guidance or string fields. Invalid values preserve the previous value. During input, `q`, spaces and digits are text. Fields do not enter chat history. Internal tuning and JSON overrides are absent from the menu. Each algorithm has a Details action for its configuration file, profile and mechanism location; YAML and programmatic previews retain parameter validation. Search guidance appears only when declared by `direction_help`; task defaults may prefill it, and unsupported guidance from another method is not sent. Evaluation and acceptance remain defined when guidance is empty.
 
 **Start improvement** creates a fresh preview and one execution confirmation, initially selecting Cancel. The confirmation binds the target, direction, method, normalized parameters, parent and task materials. Editing a field requires a new preview. Benchmark confirmation authorizes its displayed downloads, containers, baseline, search and independent confirmation. Real model work may incur charges. No algorithm-specific fields or branches belong to this frontend.
 

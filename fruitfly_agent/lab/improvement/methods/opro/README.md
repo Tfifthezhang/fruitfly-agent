@@ -22,7 +22,7 @@ The algorithm entry point is `from fruitfly_agent.lab.improvement.methods.opro i
 
 The mechanism is `opro`, with implementation identity `opro-text-v2`; it is available on demand without a configuration switch. Follow [Start a search](../../README.md#start-a-search) to select a target, task pack, model, and budget. The installer uses the [shared text assembly helpers](../../registration.py) and performs no search, file writes, or model requests.
 
-The panel exposes optional Search guidance with a visible text input. Leaving it empty keeps the task scoring objective; supplying text guides proposals without changing candidate ranking or acceptance rules. Expand Target to inspect the algorithm description and implementation/guide paths. Tune rounds, batch size and history in YAML at the displayed configuration location, or through programmatic previews. Task and Budget hold material fields and shared limits.
+The panel exposes optional Search guidance with a visible text input. Leaving it empty keeps the task scoring objective; supplying text guides proposals without changing candidate ranking or acceptance rules. Expand Target to inspect the algorithm description; open Details for implementation/guide paths and the configuration location. Tune rounds, batch size and history in YAML at the configuration location in Details, or through programmatic previews. Task and Budget hold material fields and shared limits.
 
 | Concern | Behavior |
 |---|---|

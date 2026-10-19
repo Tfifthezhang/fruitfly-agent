@@ -43,7 +43,7 @@ def create_write_tool() -> AgentTool:
     return AgentTool(
         permission=ToolPermission("write", ("path",)),
         name="write",
-        label="write",
+        label="Write file",
         description=(
             "Write content to a file. Creates the file if it doesn't exist, "
             "overwrites if it does. Automatically creates parent directories."

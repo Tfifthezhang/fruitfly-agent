@@ -7,6 +7,7 @@ Present frontend events, canonical history, Markdown, and status. Rendering obse
 | File / entry | Responsibility |
 |---|---|
 | [renderer.py](renderer.py): TerminalRenderer | Event display, stream output, history, and display cleanup |
+| [tools.py](tools.py) | Shared bounded argument/result summaries and sensitive argument-name redaction |
 | [history.py](history.py) | Static canonical conversation rendering |
 | [markdown.py](markdown.py) | Markdown formatting and streamed presentation |
 | [welcome.py](welcome.py), [branding.py](branding.py) | Welcome/status layout and project identity |
@@ -20,3 +21,18 @@ Live reasoning text, including Provider reasoning summaries, is hidden from the 
 ```bash
 .venv/bin/python -m unittest tests.interactive.test_input_emphasis tests.interactive.test_terminal_renderer tests.interactive.test_markdown tests.interactive.test_welcome tests.interactive.test_conversation -v
 ```
+
+Tool rows display the tool-owned action description with an explicit running,
+completed, failed, cancelled or unknown-outcome marker. Arguments and elapsed time
+use reduced emphasis. Tool names remain secondary metadata; rendering has no
+branches for concrete tools. Unknown legacy outcomes display Finished rather than
+Completed. Descriptions and tool text escape terminal control characters.
+
+Default live tool output shares an 800-character display allowance per run because
+the existing partial-output callback does not identify individual calls. Concurrent
+starts do not reset that allowance. Final output has a bounded summary; failed and
+cancelled results retain a bounded reason preview. `/tools` lists retained results;
+`/tools CALL_ID` shows their full retained output and bounded argument metadata via
+the [tool detail feature](../features/README.md). Truncated rows point to that command.
+These are event-window views, not durable full-output archives. Tool-side truncation
+still applies; late inspection may find that old events have been evicted.

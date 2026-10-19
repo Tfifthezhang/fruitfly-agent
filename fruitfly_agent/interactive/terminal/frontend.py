@@ -87,6 +87,7 @@ class TerminalFrontend:
             line_editor=lambda: self.line_editor, write=self.renderer.write_system,
             welcome=self.renderer.show_welcome, show_history=self.show_history,
             improvement_frontend=self.improvement_frontend if self.menu_input is not None else None,
+            trace=self.bindings.trace,
         )
         for name, handler in (command_handlers or {}).items():
             self.commands.register(name, handler)

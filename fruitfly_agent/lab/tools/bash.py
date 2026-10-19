@@ -2,13 +2,14 @@
 
 No default timeout. Bound the output body to the last 2000 lines and 51200
 UTF-8 bytes. On truncation, attempt to save the full output and report whether
-it was saved. Non-zero exits and process cancellation raise tool errors.
+it was saved. Non-zero exits and backend aborts raise tool errors; user-signal cancellation propagates.
 Throttle live stdout updates to about 100ms.
 """
 
 from __future__ import annotations
 
 import time
+import asyncio
 
 from fruitfly_agent.core.data_model import AgentToolResult, TextBlock
 from fruitfly_agent.core.env import ExecOptions
@@ -20,6 +21,7 @@ _BASH_SCHEMA: dict = {
     "type": "object",
     "properties": {
         "command": {"type": "string", "description": "Bash command to execute"},
+        "description": {"type": "string", "description": "Optional short purpose of this command for the user. Do not include secrets."},
         "timeout": {
             "type": "number",
             "description": "Timeout in seconds (optional, no default timeout)",
@@ -86,6 +88,8 @@ async def _execute(ctx: ToolCallContext) -> AgentToolResult:
             text += "\n\n[Output truncated; full output could not be saved.]"
 
     if exec_result.cancelled:
+        if ctx.signal is not None and ctx.signal.is_set():
+            raise asyncio.CancelledError
         raise RuntimeError(_append_status(text, "Command aborted"))
 
     if exec_result.exit_code not in (0, None):
@@ -105,7 +109,8 @@ def create_bash_tool() -> AgentTool:
     return AgentTool(
         permission=ToolPermission("execute", ()),
         name="bash",
-        label="bash",
+        label="Execute shell command",
+        describe_call=lambda args: args.get("description", ""),
         description=(
             "Execute a bash command in the current working directory. Returns stdout "
             f"and stderr. Output is truncated to the last {DEFAULT_MAX_LINES} lines or "

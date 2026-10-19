@@ -39,6 +39,7 @@ class TerminalBindings:
     progress: Callable
     candidate_notice: Callable | None
     acknowledge_notice: Callable | None
+    trace: Callable | None = None
 
     @classmethod
     def from_session(cls, session: Any) -> TerminalBindings:
@@ -58,6 +59,7 @@ class TerminalBindings:
             progress=lambda: getattr(session, "improvement_progress", None),
             candidate_notice=getattr(session, "candidate_notice", None),
             acknowledge_notice=getattr(session, "acknowledge_candidate_notice", None),
+            trace=getattr(session, "trace", None),
         )
 
 

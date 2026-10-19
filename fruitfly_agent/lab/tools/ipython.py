@@ -51,7 +51,7 @@ def create_ipython_tool(runtime: _IpythonExecutor) -> AgentTool:
     return AgentTool(
         permission=ToolPermission("execute", ()),
         name="ipython",
-        label="IPython",
+        label="Execute Python code",
         description=(
             "Execute code in this Session's persistent IPython workspace. "
             "Variables and imports survive later ipython calls while the Runtime "

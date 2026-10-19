@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
+import copy
+import time
 from collections.abc import Mapping
 from typing import Any
 
 from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.core.data_model import AssistantMessage, CustomMessage, ToolResultMessage, UserMessage
 from fruitfly_agent.core.extensions.hooks import (
-    AFTER_TOOL,
+    BEFORE_REQUEST,
     AFTER_RESPONSE,
     BEFORE_RUN_END,
     REQUEST_PREPARED,
@@ -168,9 +170,12 @@ class CoreEventBridge:
         self._observable_provider: _ObservableProvider | None = None
         self.context_status: dict[str, Any] = {"compaction_count": 0}
         self.last_result = None
+        self._tools: dict[str, Any] = {}
+        self._tool_calls: dict[str, tuple[str, float]] = {}
 
     def begin_run(self) -> None:
         self.last_result = None
+        self._tool_calls.clear()
         if self._observable_provider is not None:
             self._observable_provider.begin_run()
 
@@ -205,12 +210,21 @@ class CoreEventBridge:
                     self.context_status.update(run_input_tokens=usage.get("inputTokens", 0),
                                                run_output_tokens=usage.get("outputTokens", 0))
         hooks.on(BEFORE_TOOL, self._on_tool_started)
-        hooks.on(AFTER_TOOL, self._on_tool_finished)
+        self._tools = {tool.name: tool for tool in config.tools or ()}
+        hooks.on(BEFORE_REQUEST, self._on_tools_prepared)
         hooks.on(BEFORE_COMPACTION, self._on_compaction)
 
         observable = _ObservableProvider(config.provider, self._dispatcher)
         self._observable_provider = observable
         previous_partial = config.on_partial
+        previous_result = config.on_tool_result
+
+        async def on_tool_result(name: str, result: ToolResultMessage, cancelled: bool) -> None:
+            await self._on_tool_finished(name, result, cancelled)
+            if previous_result is not None:
+                observed = previous_result(name, result, cancelled)
+                if hasattr(observed, '__await__'):
+                    await observed
 
         async def on_partial(text: str) -> None:
             await self._dispatcher.emit(ToolOutput(run_id="", text=text))
@@ -224,6 +238,7 @@ class CoreEventBridge:
             provider=observable,
             hooks=hooks,
             on_partial=on_partial,
+            on_tool_result=on_tool_result,
         )
         return observed_config, context_pipeline
 
@@ -253,7 +268,24 @@ class CoreEventBridge:
         self.context_status.update(run_input_tokens=result.usage.input_tokens,
                                    run_output_tokens=result.usage.output_tokens)
 
+    def _on_tools_prepared(self, event: Any) -> None:
+        self._tools = {tool.name: tool for tool in event.tools}
+
+    def _describe_tool(self, name: str, arguments: dict[str, Any]) -> str:
+        tool = self._tools.get(name)
+        fallback = (tool.label if tool is not None else '') or name
+        if tool is not None and tool.describe_call is not None:
+            try:
+                value = tool.describe_call(copy.deepcopy(arguments))
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+            except Exception:
+                pass  # Presentation metadata cannot affect execution.
+        return fallback
+
     async def _on_tool_started(self, event: Any) -> None:
+        description = self._describe_tool(event.tool_name, event.args)
+        self._tool_calls[event.tool_call_id] = (description, time.monotonic())
         await self._dispatcher.emit(
             ToolStarted(
                 run_id="",
@@ -261,37 +293,43 @@ class CoreEventBridge:
                 tool_name=event.tool_name,
                 arguments=dict(event.args),
                 category=self._tool_categories.get(event.tool_name, "tools"),
+                description=description,
             )
         )
         await self._dispatcher.emit(
             RunActivityChanged(
                 run_id="",
                 phase="running_tool",
-                subject=event.tool_name,
+                subject=description,
                 activity_id=event.tool_call_id,
             )
         )
 
-    async def _on_tool_finished(self, event: Any) -> None:
+    async def _on_tool_finished(self, name: str, result: ToolResultMessage, cancelled: bool) -> None:
+        call = self._tool_calls.pop(result.tool_call_id, None)
+        description, started = call if call is not None else (self._describe_tool(name, {}), None)
         output = "".join(
-            getattr(block, "text", "") for block in event.result.content
+            getattr(block, "text", "") for block in result.content
         )
         await self._dispatcher.emit(
             ToolFinished(
                 run_id="",
-                tool_call_id=event.tool_call_id,
-                tool_name=event.tool_name,
+                tool_call_id=result.tool_call_id,
+                tool_name=name,
                 output=output,
-                terminate=event.result.terminate,
-                category=self._tool_categories.get(event.tool_name, "tools"),
+                terminate=result.terminate,
+                category=self._tool_categories.get(name, "tools"),
+                description=description,
+                status='cancelled' if cancelled else 'failed' if result.is_error else 'succeeded',
+                elapsed_seconds=max(0.0, time.monotonic() - started) if started is not None else None,
             )
         )
         await self._dispatcher.emit(
             RunActivityChanged(
                 run_id="",
                 phase="processing_tool_result",
-                subject=event.tool_name,
-                activity_id=event.tool_call_id,
+                subject=description,
+                activity_id=result.tool_call_id,
             )
         )
 

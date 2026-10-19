@@ -21,6 +21,7 @@ HELP_TEXT = """Commands:
   /improvement [TEXT]  choose an H/S/I target, run improvement, or review candidates
   /resume [PATH] continue saved history using current configuration
   /cancel        cooperatively stop the active run
+  /tools [CALL_ID]  inspect retained tool results in the terminal
   /permissions clear  revoke temporary approvals\n  /trace [N]     show the latest N frontend events (default: 12)
   /exit          leave the interactive session"""
 

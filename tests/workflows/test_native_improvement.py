@@ -183,7 +183,7 @@ class NativeImprovementTests(unittest.IsolatedAsyncioTestCase):
             app, factory, provider = await self.open_app(Path(tmp))
             try:
                 editor = QueueEditor()
-                editor.send('/improvement', '@Target ·', '@Skill document', '@Skill document optimization',
+                editor.send('/improvement', '@Target ·', '@Skill document', '@Skill document optimization', '@Details · Skill document optimization',
                     'q', '/exit')
                 output = io.StringIO()
                 editor.output = output
@@ -193,7 +193,8 @@ class NativeImprovementTests(unittest.IsolatedAsyncioTestCase):
                 self.assertNotIn('JSON overrides', rendered)
                 self.assertIn('bounded edits', rendered)
                 self.assertIn('Implementation:', rendered)
-                self.assertIn('Configuration location', rendered)
+                self.assertIn('Parameters:', rendered)
+                self.assertNotIn('Configuration location', rendered)
                 self.assertNotIn('Workflow search', rendered)
                 self.assertNotIn('Exploratory memory learning', rendered)
                 self.assertNotIn('DreamRSI', rendered)

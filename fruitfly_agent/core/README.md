@@ -25,6 +25,7 @@ Configure `AgentLoopConfig` with a Provider, tools, execution environment, conte
 | Case | Behavior |
 |---|---|
 | Tool failure | Lookup, argument, blocking, and ordinary execution failures become error `ToolResultMessage` entries. |
+| Tool result observation | Optional `on_tool_result` receives isolated batch-result snapshots, including failures and cancellation; see [Tool runtime](tool_runtime/README.md#observe-tool-calls). |
 | Callback failure | Use the default defined at the call site; propagate task cancellation. |
 | Environment failure | Operations return `Result`; `unwrap()` raises on a failed result. |
 | Provider failure | Adapters may retry transient errors within configured limits; Core routes overflow to recovery and other failures to a terminal result. |

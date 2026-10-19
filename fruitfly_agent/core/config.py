@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Awaitable, Callable, Sequence
 
-from .data_model.messages import AgentMessage, AgentToolResult
+from .data_model.messages import AgentMessage, AgentToolResult, ToolResultMessage
 from .data_model.runtime import AgentLoopContext, BeforeToolCallResult
 from .env.protocols import ExecutionEnv
 from .extensions.hooks import HookRegistry
@@ -88,6 +88,7 @@ class AgentLoopConfig:
 
     # --- display ---
     on_partial: Callable[[str], Awaitable[None] | None] | None = None  # tool streaming updates
+    on_tool_result: Callable[[str, ToolResultMessage, bool], Awaitable[None] | None] | None = None
 
     def __post_init__(self) -> None:
         for name, minimum in (("max_context_recovery_attempts", 1), ("max_turns", 0),

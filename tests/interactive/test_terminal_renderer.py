@@ -174,9 +174,9 @@ class TerminalRendererTests(unittest.IsolatedAsyncioTestCase):
 
         rendered = output.getvalue()
         self.assertIn("\x1b[1;32m🪰 \x1b[0manswer", rendered)
-        self.assertIn("\x1b[36m[tool read] \x1b[0m", rendered)
-        self.assertIn("\x1b[35m[memory note_lookup] \x1b[0m", rendered)
-        self.assertIn("\x1b[34m[skill skill_lookup] \x1b[0m", rendered)
+        self.assertIn("\x1b[36m◐ read\n\x1b[0m", rendered)
+        self.assertIn("\x1b[35m◐ note_lookup\n\x1b[0m", rendered)
+        self.assertIn("\x1b[34m◐ skill_lookup\n\x1b[0m", rendered)
         self.assertIn("\x1b[33m[compaction example-reducer", rendered)
 
     async def test_renderer_presents_markdown_only_on_ansi_terminal(self) -> None:
@@ -210,7 +210,7 @@ class TerminalRendererTests(unittest.IsolatedAsyncioTestCase):
             tty=True,
         )
         answer = rendered.index("Checking")
-        tool = rendered.index("[tool read]")
+        tool = rendered.index("◐ read")
         self.assertLess(answer, tool)
         self.assertNotIn("**Checking**", rendered)
         self.assertNotIn("`README.md`", rendered)

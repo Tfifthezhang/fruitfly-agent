@@ -39,6 +39,15 @@ async def execute_tool_batch(
     semaphore = asyncio.Semaphore(max(1, config.tool_execution.max_parallel))
     completed: dict[str, ToolResultMessage] = {}
     started: set[str] = set()
+    reported: set[str] = set()
+
+    async def report(name: str, result: ToolResultMessage, cancelled: bool = False) -> None:
+        if result.tool_call_id in reported:
+            return
+        reported.add(result.tool_call_id)
+        if config.on_tool_result is not None:
+            await call_extension(config.on_tool_result, name, copy.deepcopy(result), cancelled,
+                                 label="on_tool_result", default=None)
 
     async def run_one(tc) -> ToolResultMessage:
         async with semaphore:
@@ -48,6 +57,7 @@ async def execute_tool_batch(
             ctx.tool_call_count += 1
             result = await _execute_one(ctx, tc, config, hooks, signal)
             completed[tc.id] = result
+            await report(tc.name, result)
             return result
 
     tasks: list[asyncio.Task] = []
@@ -70,6 +80,7 @@ async def execute_tool_batch(
                           if call.id in started else "Tool was not executed: run cancelled.")
                 result = _error_result(call.id, detail)
             append_message(ctx, result)
+            await report(call.name, result, cancelled=call.id not in completed)
         raise
     results.extend(
         ToolResultMessage(
@@ -79,6 +90,8 @@ async def execute_tool_batch(
         )
         for call in assistant.tool_calls[max_calls:]
     )
+    for call, result in zip(assistant.tool_calls, results):
+        await report(call.name, result)
     return results, bool(results) and all(r.terminate for r in results)
 
 

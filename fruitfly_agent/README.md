@@ -21,7 +21,8 @@ Independent improvement methods declare H/S/I support in method packages within 
 
 Lab registrations own concise algorithm descriptions and implementation/guide paths.
 Configuration and improvement menus consume this shared metadata, show necessary
-user inputs and budgets, and leave internal tuning in configuration. Improvement
+user inputs and budgets, and leave internal tuning in configuration. Terminal
+details reveal implementation, guide and configuration references on demand. Improvement
 discovery excludes methods with incompatible target roles or formats before
 checking runtime availability.
 

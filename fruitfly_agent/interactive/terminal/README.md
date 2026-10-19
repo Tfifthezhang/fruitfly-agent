@@ -40,9 +40,9 @@ Cancelled or failed restoration keeps the current session and does not display t
 | `model` / `prompt` | Select the model and prompt for the next session. |
 | Add model… | Collect host-provided service fields, hidden API key, and review; stage until configuration save. Opens on first startup when no models exist. |
 | Set API key… | Stage a missing credential for the selected model; the menu shows only set/missing status. |
-| Context, Tools, Environment | One readable row per mechanism; Enter expands algorithm descriptions and paths, Space enables/disables. |
+| Context, Tools, Environment | One readable row per mechanism; Enter expands algorithm choices and descriptions, Details reveals paths/configuration locations, Space enables/disables. |
 | Context sections | Augmentation groups Skills, Memory, Knowledge and HTTP; externalization and reduction remain separate sections on the same page. |
-| Algorithm selector | Multiple implementations use inline radio choices; sole implementations expose descriptions and paths directly. |
+| Algorithm selector | Multiple implementations use inline radio choices; sole implementations expose a description with expandable Details. |
 | User inputs | Edit declared paths, initial text and endpoints with visible input; tune internal parameters in the displayed YAML location. |
 | Prompt results | Current configuration/profile's latest task-scoped prompt candidates, plus built-ins and current selection |
 
@@ -56,7 +56,7 @@ Model forms accept `/cancel` or EOF without staging. Review includes the selecte
 
 ## Improve against a task set
 
-`/improvement [DIRECTION]` opens Target, Task, Budget and Evaluation on one panel. Expand Target, choose an object, then its algorithm below it. H/S/I are section labels. Algorithms show concise descriptions and implementation/guide paths. Optional Search guidance remains editable inline; internal tuning uses the displayed configuration location. Task expands saved/benchmark sources and material fields; Budget expands limits; Evaluation exposes scoring, acceptance and preview details. New drafts require explicit target/algorithm selection. Compatible values survive changes; missing inputs remain visible. Field editing retains the panel and focus while displaying live text and validation hints.
+`/improvement [DIRECTION]` opens Target, Task, Budget and Evaluation on one panel. Expand Target, choose an object, then its algorithm below it. H/S/I are section labels. Algorithms show concise descriptions; Details reveals implementation/guide paths and YAML locations. Optional Search guidance remains editable inline; internal tuning uses the configuration location in Details. Task expands saved/benchmark sources and material fields; Budget expands limits; Evaluation exposes scoring, acceptance and preview details. New drafts require explicit target/algorithm selection. Compatible values survive changes; missing inputs remain visible. Field editing retains the panel and focus while displaying live text and validation hints.
 
 | Action | Behavior |
 |---|---|
@@ -134,3 +134,18 @@ The real interactive terminal presents the tool, operation, canonical targets, c
 The existing input reader routes approval keys; no second stdin reader is started. Ordinary non-ANSI TTY input uses numbered choices followed by Enter. Redirected input does not enable confirmations and therefore cannot silently approve local execution or external file operations. `/permissions clear` revokes remembered approvals while normal command input is available; use Esc to deny an active prompt.
 
 Local execution approval is not a sandbox. Approved Bash or Python retains current-user filesystem/network access. The terminal shows this boundary beside execution confirmation. File directory approval is separate from local execution approval.
+
+## Inspect tool execution
+
+Tool calls show a readable action and operation arguments, then an explicit result
+status and elapsed time when available. Labels and call descriptions come from the
+tool declarations; the terminal does not interpret individual tools. Errors and
+cancelled calls have distinct markers, including when no success hook ran.
+
+Use `/tools` to list completed results in the current host's retained event window,
+then `/tools CALL_ID` for the retained output and bounded argument summary. Reused
+call IDs resolve to the latest retained completion. The view does not invoke tools,
+make model requests, or start another input reader. It follows runtime replacement
+through the optional `TerminalBindings.trace` callback. Hosts without that reader
+report that inspection is unavailable. This is not a persistent execution archive;
+event eviction and tool-side truncation limit what can be inspected.

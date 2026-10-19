@@ -31,3 +31,11 @@ Configuration and improvement method views carry registration-owned implementati
 ```
 
 `BenchmarkImprovementController` and `BenchmarkImprovementRequest` in [evaluation.py](evaluation.py) provide optional bounded task-source selection and offline improvement previews. A one-use token launches task preparation and iteration through Application. The preview and candidate values reuse the independent improvement and candidate contracts. Standalone evaluation belongs to the optional Eval CLI.
+
+Tool start/finish events carry an optional plain-text `description`. Tool finish
+adds `status` (`succeeded`, `failed`, `cancelled`, or `unknown`) and optional
+`elapsed_seconds`. These fields are renderer-neutral and additive. Older payloads
+without status deserialize as `unknown`; frontends must not infer success from
+completion alone. `terminate` requests stopping the loop and is independent of
+success/failure. Existing event IDs, sequence ordering and unknown-field handling
+remain unchanged.

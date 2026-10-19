@@ -175,7 +175,7 @@ def create_edit_tool() -> AgentTool:
     return AgentTool(
         permission=ToolPermission("write", ("path",)),
         name="edit",
-        label="edit",
+        label="Edit file",
         description=(
             "Edit a single file using exact text replacement. Every edits[].oldText "
             "must match a unique, non-overlapping region of the original file. "

@@ -173,6 +173,7 @@ class TerminalMenuRenderer:
         self.numbered: bool | None = None
         self._rendered = False
         self._last_frame: dict[str, Any] = {}
+        self.reference_page = 0
 
     def begin_input(self, prompt: str, *, selected: int | None = None) -> None:
         """Keep the current menu and focused field visible while borrowing its reader."""
@@ -190,10 +191,11 @@ class TerminalMenuRenderer:
         notice: str = "",
         instructions: str = "↑↓ move · Enter select · Space toggle · Esc back · q quit",
         field: str = '',
+        reference_page: int = 0,
     ) -> None:
         if not field:
             self._last_frame = dict(title=title, subtitle=subtitle, rows=rows, selected=selected,
-                notice=notice, instructions=instructions)
+                notice=notice, instructions=instructions, reference_page=reference_page)
         try:
             size = os.get_terminal_size(self.output.fileno())
         except (AttributeError, OSError, ValueError):
@@ -221,14 +223,23 @@ class TerminalMenuRenderer:
             subtitle_lines = subtitle_lines[:1 if field else max(2, height - 12)]
         self.output.write(styled(plain(title), '1') + '\n\n')
         if subtitle_lines:
-            self.output.write('\n'.join(subtitle_lines) + '\n')
+            self.output.write(styled('\n'.join(subtitle_lines), '2') + '\n')
         self.output.write('\n')
         start, end = 0, len(rows)
+        self.reference_page = 0
         def reference_lines(row: MenuRow) -> list[str]:
             width = max(8, columns - 5 - 2 * row.depth)
-            return [part for label, path in row.references
+            lines = [part for label, path in row.references
                     for part in textwrap.wrap(plain(label) + ': ' + plain(path), width,
                                               break_on_hyphens=False)]
+            limit = max(1, height - len(subtitle_lines) - len(field_lines) - bool(field) - 13)
+            if self.ansi and not numbered and len(lines) > limit:
+                pages = (len(lines) + limit - 1) // limit
+                page = min(max(0, reference_page), pages - 1) if row is rows[selected] else 0
+                if row is rows[selected]:
+                    self.reference_page = page
+                return lines[page * limit:(page + 1) * limit] + [f'Details {page + 1}/{pages} · PageUp/PageDown']
+            return lines
         if self.ansi and not numbered and rows:
             # Titles are decorations on actionable rows, so they never consume
             # selection indices. Repeat the current section after scrolling.
@@ -263,7 +274,7 @@ class TerminalMenuRenderer:
                 label = truncate_cells(label, max(1, columns - cell_width(prefix + marker + suffix) - 2))
             if self.color:
                 fill = input_styles(self.output)[0] if index == selected else ''
-                focus = '\x1b[1;36m' if index == selected else '\x1b[1m' if row.depth == 0 else ''
+                focus = '\x1b[1;36m' if index == selected else '\x1b[1m'
                 marker_style = '32' if state in {'selected', 'enabled'} else '33' if state == 'unavailable' else '2'
                 marker_text = f'\x1b[{marker_style}m{marker}\x1b[0m{fill}{focus} ' if marker else ''
                 if state == 'unavailable' and index != selected:
@@ -291,7 +302,7 @@ class TerminalMenuRenderer:
         if field_lines:
             self.output.write('\n' + styled(field_lines[0], '1;36') + '\n')
             self.output.write('\n'.join(field_lines[1:]) + '\n')
-        self.output.write('\n' + (truncate_cells(instructions, columns - 1) if self.ansi else instructions) + '\n')
+        self.output.write('\n' + styled(truncate_cells(instructions, columns - 1) if self.ansi else instructions, '2') + '\n')
         self.output.flush()
 
 

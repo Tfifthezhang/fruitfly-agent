@@ -316,6 +316,7 @@ class TerminalImprovementFrontend:
                 return action
 
     def _select_row(self, title, rows, *, subtitle="", selected=0, instructions=None):
+        reference_page = 0
         rows = tuple(replace(row, label=safe_terminal_text(row.label), detail=safe_terminal_text(row.detail),
             section=safe_terminal_text(row.section)) for row in rows)
         subtitle = safe_terminal_text(subtitle)
@@ -333,9 +334,14 @@ class TerminalImprovementFrontend:
             if pages > 1:
                 detail += f'\nDetails page {page + 1}/{pages}'
             self.menu_renderer.render(title=title, subtitle=detail, rows=rows,
-                                      selected=selected, notice=self.notice, **options)
+                                      selected=selected, notice=self.notice, reference_page=reference_page, **options)
+            reference_page = getattr(self.menu_renderer, 'reference_page', 0)
             self.notice = ""
             event = self.menu_input.read_event()
+            if event.action in {MenuAction.PAGE_UP, MenuAction.PAGE_DOWN} and rows[selected].references:
+                reference_page = max(0, reference_page + (1 if event.action == MenuAction.PAGE_DOWN else -1))
+                continue
+            reference_page = 0
             selected, handled = navigate_menu(event, selected, len(rows))
             if handled:
                 continue

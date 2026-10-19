@@ -78,6 +78,7 @@ class ToolStarted(FrontendEvent):
     tool_name: str
     arguments: dict[str, Any]
     category: str = "tools"
+    description: str = ""
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -94,6 +95,9 @@ class ToolFinished(FrontendEvent):
     output: str
     terminate: bool
     category: str = "tools"
+    description: str = ""
+    status: str = "unknown"
+    elapsed_seconds: float | None = None
 
 
 @dataclass(frozen=True, kw_only=True)

@@ -34,7 +34,7 @@ Inject `builtin_tools()` into `AgentLoopConfig.tools`. IPython is added explicit
 | Fuzzy edit | Compare whole-line spans; reject tied best matches and empty `oldText`. |
 | Read/bash output | Default body limit: 2000 lines and 51200 UTF-8 bytes; notices are separate. |
 | Long lines | Clip on a complete UTF-8 character boundary. Read offsets cannot retrieve omitted characters from the same line. |
-| Bash failure/cancellation | Bound output; advertise the complete log only after a successful write. |
+| Bash failure/cancellation | Bound output; advertise the complete log only after a successful write. User-signal cancellation propagates as task cancellation; timeout/backend abort without that signal remains an error. |
 | Bash log persistence | Attempt to save truncated output; report save failures without advertising a complete log. |
 | Truncation API | Nonnegative integer budgets; zero gives an empty body; negative, boolean, or noninteger budgets raise `ValueError`. |
 
@@ -44,7 +44,7 @@ Reads still load entire files. Images and other tool errors lack shared size bud
 
 | Concern | Required behavior |
 |---|---|
-| Declaration | Unique name, description, supported JSON Schema, and `execute(ctx)` |
+| Declaration | Unique name, concise display `label`, model-facing description, supported JSON Schema, and `execute(ctx)` |
 | Execution | Sync or async; return `AgentToolResult`; Core turns ordinary exceptions into error results. |
 | Environment | Use `ctx.env`; define behavior when it is missing. |
 | Updates and cancellation | Use `ctx.on_update` and `ctx.signal`; propagate task cancellation and clean resources. |
@@ -61,3 +61,16 @@ Use [Core tool contracts](../../core/tool_runtime/README.md), [Environment](../e
 Built-in tools declare `ToolPermission`: read is a file read, edit/write are file writes, and Bash/IPython are local execution. The standard host authorizes final arguments and injects the [guarded environment](../environment/README.md#apply-lightweight-permissions). Custom tools must declare their operation/path arguments; declarations are trusted plugin metadata, not proof that arbitrary plugin code respects a boundary.
 
 Web tools declare `network_read`; host-owned `PermissionPolicy.allow_network` can deny them. See the [web guide](web/README.md) for credentials, HTTP limits and caches. `builtin_tools()` remains the four local file/shell factories; Catalog registers web tools separately.
+
+## Describe visible operations
+
+Built-in labels describe the action: Read file, Write file, Edit file, Execute shell
+command, Execute Python code, Search the web and Fetch web page. Parameters supply
+paths, commands and queries separately. The terminal does not maintain a tool-name
+lookup table. Custom tools inherit the same label/name fallback.
+
+Bash accepts an optional `description` string describing the current command's
+purpose, such as `Run menu tests`. Its `describe_call` callback uses that value only
+for observation; it does not change the command, timeout, authorization or outcome.
+Omission or blank text uses the tool label. Do not include credentials in descriptions.
+The model-facing `description` remains the full tool usage instructions.

@@ -1,6 +1,8 @@
 """Lab builtin tool behavior: read/write/edit/bash (offline, real files)."""
 
 import tempfile
+import asyncio
+from dataclasses import replace
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -134,6 +136,14 @@ class ToolTestCase(unittest.IsolatedAsyncioTestCase):
     async def test_bash_success(self):
         result = await self.run_tool(create_bash_tool(), {"command": "echo done"})
         self.assertIn("done", result.content[0].text)
+
+    async def test_bash_user_cancellation_propagates_instead_of_reporting_failure(self):
+        signal = asyncio.Event()
+        signal.set()
+        with patch.object(self.env, 'exec', return_value=Result.success(
+                ExecResult(stdout='partial output', stderr='', exit_code=-9, cancelled=True))):
+            with self.assertRaises(asyncio.CancelledError):
+                await create_bash_tool().execute(replace(self.ctx('bash', {'command':'unused'}), signal=signal))
 
     async def test_bash_nonzero_exit_raises(self):
         with self.assertRaises(RuntimeError) as cm:

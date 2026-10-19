@@ -101,7 +101,7 @@ def create_read_tool() -> AgentTool:
     return AgentTool(
         permission=ToolPermission("read", ("path",)),
         name="read",
-        label="read",
+        label="Read file",
         description=(
             "Read the contents of a file. Supports text files and images "
             f"(jpg, png, gif, webp, bmp). Text output is truncated to {DEFAULT_MAX_LINES} "

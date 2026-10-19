@@ -14,6 +14,40 @@ from tests.support.terminal import ScriptedLines, TtyStringIO
 
 
 class MenuInputTest(unittest.TestCase):
+    def test_labels_stand_out_from_descriptions_references_and_navigation(self):
+        with patch.dict(os.environ, {'TERM': 'xterm-256color'}, clear=True):
+            output = TtyStringIO()
+            TerminalMenuRenderer(output).render(title='Choose', subtitle='Page explanation',
+                rows=(MenuRow('Focused'), MenuRow('Algorithm', 'Algorithm explanation', depth=1,
+                    references=(('Guide', 'README.md'),))),
+                selected=0, instructions='Esc back')
+        text = output.getvalue()
+        self.assertIn('\x1b[1m    Algorithm\x1b[0m', text)
+        for value in ('Page explanation', '       Algorithm explanation',
+                      '       Guide: README.md', 'Esc back'):
+            self.assertIn(f'\x1b[2m{value}\x1b[0m', text)
+
+    def test_expanded_references_page_within_a_small_terminal(self):
+        with patch.dict(os.environ, {'TERM': 'xterm-256color', 'NO_COLOR': '1'}, clear=True), patch(
+                'os.get_terminal_size', return_value=os.terminal_size((38, 18))):
+            output = TtyStringIO()
+            renderer = TerminalMenuRenderer(output)
+            rows = (MenuRow('Parent'), MenuRow('Details', depth=1, section='Algorithms',
+                references=tuple((f'Reference {i}', f'path-{i}') for i in range(20))), MenuRow('Back'))
+            frames = []
+            for page in range(20):
+                offset = len(output.getvalue())
+                renderer.render(title='Choose', subtitle='Explanation', rows=rows, selected=1, reference_page=page)
+                frame = output.getvalue()[offset:]
+                frames.append(frame)
+                self.assertIn('❯   Details', frame)
+                self.assertLessEqual(len(frame.splitlines()), 18)
+                if renderer.reference_page < page:
+                    break
+            for i in range(20):
+                self.assertIn(f'Reference {i}: path-{i}', ''.join(frames))
+            self.assertIn('PageUp/PageDown', frames[0])
+
     def test_algorithm_references_wrap_without_truncation_or_extra_selection_indices(self):
         path = 'fruitfly_agent/lab/context_manager/augmentation/information/file_memory/learned.py'
         for color in (False, True):

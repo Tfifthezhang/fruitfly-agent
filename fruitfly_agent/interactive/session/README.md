@@ -20,3 +20,10 @@ No new environment variables or model training. Submission invokes the injected 
 ```bash
 .venv/bin/python -m unittest tests.interactive.test_session tests.interactive.test_conversation tests.interactive.test_context_status tests.interactive.test_extensions -v
 ```
+
+Tool observation reads the current request's tool declarations and uses their labels
+or isolated `describe_call` callbacks. Tool completion comes from Core's result
+callback, including errors and cancellation, rather than success-only rewrite hooks.
+The bridge correlates descriptions and monotonic elapsed time by call ID and retains
+previous result callbacks. Unknown tools and results without a start event still
+produce completion observations, with unavailable elapsed time left unset.

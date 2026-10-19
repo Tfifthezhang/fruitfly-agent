@@ -37,6 +37,7 @@ class AgentTool:
     execution_mode: str = "parallel"  # "parallel" | "sequential"
     hide_from_model: bool = False
     permission: ToolPermission | None = None
+    describe_call: Callable[[dict[str, Any]], str] | None = None
 
     def to_schema(self) -> dict[str, Any]:
         return {

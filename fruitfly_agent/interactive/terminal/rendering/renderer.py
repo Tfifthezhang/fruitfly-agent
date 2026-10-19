@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
-import re
 import sys
 import time
 from collections.abc import Callable
@@ -37,6 +35,7 @@ from fruitfly_agent.interactive.terminal.io.text import (
     truncate_cells,
 )
 from fruitfly_agent.interactive.terminal.rendering.welcome import render_welcome
+from fruitfly_agent.interactive.terminal.rendering.tools import summarize_arguments, summarize_result
 
 
 _BLUE = "\033[34m"
@@ -46,22 +45,9 @@ _GREEN_BOLD = "\033[1;32m"
 _MAGENTA = "\033[35m"
 _RED = "\033[31m"
 _YELLOW = "\033[33m"
-_TOOL_ARGUMENT_CELLS = 240
 _TOOL_UPDATE_CHARS = 800
 _ACTIVITY_INTERVAL_SECONDS = 0.12
 _SPINNER_FRAMES = ("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")
-_SENSITIVE_ARGUMENT = re.compile(
-    r"(?:api[_-]?key|authorization|cookie|password|secret|token)",
-    re.IGNORECASE,
-)
-_ARGUMENT_PRIORITY = {
-    "path": 0,
-    "command": 1,
-    "query": 2,
-    "pattern": 3,
-    "name": 4,
-    "id": 5,
-}
 
 _CATEGORY_COLORS = {
     "tools": _CYAN,
@@ -69,11 +55,8 @@ _CATEGORY_COLORS = {
     "skills": _BLUE,
     "compaction": _YELLOW,
 }
-_CATEGORY_LABELS = {
-    "tools": "tool",
-    "memory": "memory",
-    "skills": "skill",
-}
+def _tool_description(description: str, name: str, columns: int) -> str:
+    return truncate_cells(' '.join(safe_terminal_text(description or name).split()), max(8, columns - 4))
 
 
 class TerminalRenderer:
@@ -188,6 +171,8 @@ class TerminalRenderer:
             return
         if isinstance(event, RunStarted):
             self._flush_markdown()
+            self._tool_update_chars = 0
+            self._tool_update_truncated = False
             self._set_activity("Preparing")
             return
         if isinstance(event, RunActivityChanged):
@@ -223,48 +208,55 @@ class TerminalRenderer:
         if isinstance(event, ToolStarted):
             self._flush_markdown()
             self._newline()
-            self._tool_update_chars = 0
-            self._tool_update_truncated = False
-            args = _summarize_arguments(event.arguments)
-            label = _category_label(event.category)
+            args = summarize_arguments(event.arguments)
+            description = _tool_description(event.description, event.tool_name, terminal_columns(self.output))
             self._write(
-                f"[{label} {event.tool_name}] ",
+                f"◐ {description}\n",
                 _category_color(event.category),
             )
-            self._write(f"{args}\n", _DIM)
+            self._write(f"  {safe_terminal_text(event.tool_name)} · {args}\n", _DIM)
             return
         if isinstance(event, ToolOutput):
             if self._tool_update_truncated:
                 return
             self._newline()
+            text = safe_terminal_text(event.text)
             remaining = (
-                len(event.text) if self._tool_output_limit is None
+                len(text) if self._tool_output_limit is None
                 else self._tool_output_limit - self._tool_update_chars
             )
             if remaining <= 0:
-                self._write("… [live tool output truncated]\n", _DIM)
+                self._write("… [live tool output truncated; use /tools after completion]\n", _DIM)
                 self._tool_update_truncated = True
                 return
-            visible = event.text[:remaining]
+            visible = text[:remaining]
             self._tool_update_chars += len(visible)
             self._write(visible, _DIM)
             self._line_open = not visible.endswith("\n")
-            if len(event.text) > len(visible):
+            if len(text) > len(visible):
                 self._newline()
-                self._write("… [live tool output truncated]\n", _DIM)
+                self._write("… [live tool output truncated; use /tools after completion]\n", _DIM)
                 self._tool_update_truncated = True
             return
         if isinstance(event, ToolFinished):
             self._newline()
-            suffix = " (terminate)" if event.terminate else ""
-            preview = _summarize_result(event.output)
-            detail = f" {preview}" if preview else ""
-            label = _category_label(event.category)
+            suffix = " · requested stop" if event.terminate else ""
+            preview = (summarize_result(event.output) if event.status not in {'failed', 'cancelled'} else
+                       truncate_cells(' '.join(safe_terminal_text(event.output).split()), 240))
+            marker, status, color = {
+                'succeeded': ('✓', 'Completed', _GREEN_BOLD),
+                'failed': ('✗', 'Failed', _RED),
+                'cancelled': ('○', 'Cancelled', _YELLOW),
+            }.get(event.status, ('·', 'Finished', _category_color(event.category)))
+            description = _tool_description(event.description, event.tool_name,
+                terminal_columns(self.output) - len(status) - len(suffix) - 3)
             self._write(
-                f"[{label} {event.tool_name} done]{suffix}",
-                _category_color(event.category),
+                f"{marker} {description} · {status}{suffix}\n", color,
             )
-            self._write(f"{detail}\n", _DIM)
+            elapsed = f' · {event.elapsed_seconds:.1f}s' if event.elapsed_seconds is not None else ''
+            self._write(f"  {preview}{elapsed}\n", _DIM)
+            if len(event.output.strip()) > 500 or event.output.strip().count('\n') >= 3:
+                self._write(f"  Details: /tools {safe_terminal_text(event.tool_call_id)}\n", _DIM)
             return
         if isinstance(event, CompactionStarted):
             self._newline()
@@ -402,11 +394,6 @@ def _category_color(category: str) -> str:
     return _CATEGORY_COLORS.get(category.casefold(), _CYAN)
 
 
-def _category_label(category: str) -> str:
-    normalized = category.casefold()
-    return _CATEGORY_LABELS.get(normalized, normalized.replace("_", "-"))
-
-
 def _format_activity_label(event: RunActivityChanged) -> str:
     subject = event.subject.strip()
     if event.phase == "waiting_model":
@@ -442,42 +429,6 @@ def _format_activity_label(event: RunActivityChanged) -> str:
     return label
 
 
-def _summarize_arguments(arguments: dict[str, object]) -> str:
-    """Render bounded metadata without dumping source files or secrets."""
-
-    if not arguments:
-        return "{}"
-    ordered = sorted(
-        arguments.items(),
-        key=lambda item: (_ARGUMENT_PRIORITY.get(item[0].casefold(), 100), item[0]),
-    )
-    parts = [f"{key}={_summarize_value(key, value)}" for key, value in ordered]
-    return truncate_cells(" · ".join(parts), _TOOL_ARGUMENT_CELLS)
-
-
-def _summarize_value(key: str, value: object) -> str:
-    if _SENSITIVE_ARGUMENT.search(key):
-        return "<redacted>"
-    if isinstance(value, str):
-        lines = value.count("\n") + 1
-        if len(value) > 120 or lines > 1:
-            return f"<{len(value):,} chars, {lines:,} lines>"
-        return json.dumps(value, ensure_ascii=False)
-    if isinstance(value, dict):
-        return f"<{len(value):,} fields>"
-    if isinstance(value, (list, tuple)):
-        return f"<{len(value):,} items>"
-    return json.dumps(value, ensure_ascii=False, default=repr)
-
-
-def _summarize_result(output: str) -> str:
-    stripped = output.strip()
-    if not stripped:
-        return ""
-    lines = stripped.count("\n") + 1
-    if len(stripped) > 500 or lines > 3:
-        return f"<{len(stripped):,} chars, {lines:,} lines>"
-    return truncate_cells(" ".join(stripped.split()), _TOOL_ARGUMENT_CELLS)
 
 
 __all__ = ["TerminalRenderer"]

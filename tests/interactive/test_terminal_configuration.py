@@ -13,6 +13,26 @@ from tests.support.configuration import MockConfiguration, AlgorithmConfiguratio
 
 
 class TerminalConfigurationFrontendTest(unittest.TestCase):
+    def test_details_open_and_back_collapse_without_staging_configuration(self):
+        controller = AlgorithmConfiguration()
+        frontend = self.frontend(controller, '@Compaction', '@Reduction', '@Details · Variant A',
+            'back', 'back', 'back', 'back')
+        frames = []
+        render = frontend.renderer.render
+        def capture(**frame):
+            frames.append(frame)
+            render(**frame)
+        frontend.renderer.render = capture
+        self.assertFalse(frontend.run_for_active_session().start)
+        category = [f for f in frames if f['title'] == 'Compaction']
+        self.assertFalse(any(r.references for r in category[1]['rows']))
+        self.assertTrue(any(r.references for r in category[2]['rows']))
+        self.assertFalse(any(r.references for r in category[3]['rows']))
+        self.assertEqual(category[2]['rows'][category[2]['selected']].label, 'Details · Variant A ▴')
+        self.assertFalse(any(r.label == 'Configuration location' for f in frames for r in f['rows']))
+        self.assertEqual(controller.algorithm, 'variant-b')
+        self.assertFalse(controller.changed)
+
     def test_real_lab_configuration_hides_tuning_but_keeps_resource_inputs_and_values(self):
         from fruitfly_agent.lab.catalog import builtin_catalog, MechanismSelection
         from fruitfly_agent.run.configuration.profile import HarnessProfile
@@ -25,7 +45,7 @@ class TerminalConfigurationFrontendTest(unittest.TestCase):
             MechanismSelection('skill-document', parameters={'source_path':'.skills/check/SKILL.md'})))
         mechanisms,groups=mechanism_views(profile,catalog,[])
         snapshot=replace(MockConfiguration(model='offline').snapshot(), mechanisms=mechanisms,selection_groups=groups)
-        rows,actions=_category_rows(snapshot,'context-manager','reduction',{})
+        rows,actions=_category_rows(snapshot,'context-manager','reduction',{}, details={'compaction'})
         self.assertFalse(any(a.kind=='parameter' for a in actions))
         self.assertNotIn('Enabled · True',[r.label for r in rows])
         compaction=next(m for m in mechanisms if m.mechanism_id=='compaction')
@@ -114,7 +134,7 @@ class TerminalConfigurationFrontendTest(unittest.TestCase):
     def test_module_expands_readable_algorithms_and_references_without_tuning_fields(self) -> None:
         controller = AlgorithmConfiguration()
         output = self.output
-        frontend = self.frontend(controller, '@Compaction', '@Reduction', '@Variant C', 'back', 'back', 'back', '1')
+        frontend = self.frontend(controller, '@Compaction', '@Reduction', '@Variant C', '@Details · Variant C', 'back', 'back', 'back', 'back', '1')
         result = frontend.run_for_active_session()
         self.assertEqual(result, ConfigurationLaunchResult(start=True, saved=True))
         self.assertEqual(controller.algorithm, "variant-c")
@@ -142,12 +162,12 @@ class TerminalConfigurationFrontendTest(unittest.TestCase):
             ))
         controller.snapshot = snapshot
         output = self.output
-        frontend = self.frontend(controller, '@Compaction', '@Reduction',
-            'back', 'back', 'back')
+        frontend = self.frontend(controller, '@Compaction', '@Reduction', '@Details · Variant B',
+            'back', 'back', 'back', 'back')
         self.assertFalse(frontend.run_for_active_session().start)
         self.assertEqual(controller.algorithm, "variant-b")
         self.assertEqual(controller.max_tokens, 1000)
-        self.assertIn('Implementation · Variant B', output.getvalue())
+        self.assertIn('Details · Variant B', output.getvalue())
         self.assertNotIn('● Variant B', output.getvalue())
         self.assertNotIn('Maximum tokens', output.getvalue())
         self.assertIn('Implementation: tests/support/configuration.py', output.getvalue())
