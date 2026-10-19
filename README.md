@@ -98,6 +98,7 @@ For example, enable RLM-inspired externalization together with the IPython tool 
 |---|---|
 | Install, run a task, or resume a session | [Getting started](GETTING_STARTED.md) |
 | Choose models, prompts, and mechanisms | [Configuration](CONFIGURATION.md) |
+| Run file tools and Bash on an external server | [SSH environment](fruitfly_agent/lab/environment/ssh/README.md) |
 | Use terminal commands and menus | [Terminal](fruitfly_agent/interactive/terminal/README.md) |
 | Inspect externalized context through Python | [Programmatic context](fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md) |
 | Add an algorithm | [Lab](fruitfly_agent/lab/README.md) · [Offline extension example](examples/extensions/README.md) |

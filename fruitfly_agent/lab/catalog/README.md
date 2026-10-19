@@ -25,6 +25,7 @@ An improvement package exposes its own definition factory; built-ins explicitly 
 | [models.py](models.py) | Definitions, selections, and UI selection groups |
 | [catalog.py](catalog.py) | Parameter, dependency, capability, and conflict resolution |
 | [builtins.py](builtins.py) | Explicit built-in definitions and installers |
+| [SSH registration](../environment/ssh/README.md) | Optional remote execution, credentials and namespace permissions |
 | [assembly.py](assembly.py) | Assembly context, state, and installer execution |
 
 ## Assembly contract
@@ -49,6 +50,14 @@ An improvement package exposes its own definition factory; built-ins explicitly 
 `AssemblyContext` supplies workspace, Session, main model, `provider_resolver(profile, max_output_tokens)`, and optional artifact readers/bindings. Installers must not run research jobs or call models during assembly. Failed assembly prevents activation but does not roll back arbitrary file writes.
 
 ## Configuration and targets
+
+`MechanismDefinition.setup` optionally declares `MechanismSetup` from
+`catalog.models`: ordered parameter fields, required fields, hidden
+`SetupCredential` inputs bound to secret-variable parameters, and setup guidance.
+Run projects this metadata into Interactive's generic setup contract. Forms
+collect secrets separately from parameters, validate each field, review with
+hidden values, and stage selection only after confirmation. Backend-specific
+validation stays with the definition. Configuration makes no backend connection.
 
 Every `MechanismDefinition` declares a nonempty single-line descriptor description,
 an explicit `implementation_path` to a Python file, and `documentation_path` to a
@@ -94,6 +103,8 @@ hosts do not branch on concrete algorithm names.
 [permissions.py](permissions.py) exports `PermissionPolicy` and `apply_permission_policy`. The latter attaches a generic authorizer and wraps the assembled execution environment. Run imports these public host entry points rather than concrete environment implementation modules. This host policy is not a selectable research algorithm and cannot be disabled by a model-edited mechanism selection.
 
 `AssemblyContext.process_environment` supplies an explicit minimal environment to owned process backends. IPython uses it at process startup; Providers retain host-managed credentials.
+
+`AssemblyContext.secret_resolver(name)` is an optional host capability for selected network tools. It defaults to absent for existing callers. Run binds its secret environment lookup; Lab does not read ambient environment variables. Returned values must stay out of selection parameters, manifests, process environments and errors. The [web tools](../tools/web/README.md) use this capability for search credentials without making requests during construction.
 
 ## Register experiment dependencies
 

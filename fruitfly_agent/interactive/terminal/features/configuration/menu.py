@@ -21,6 +21,7 @@ from fruitfly_agent.interactive.terminal.features.configuration.model_setup impo
     configure_credential,
     run_model_setup,
 )
+from .mechanism_setup import run_mechanism_setup
 from fruitfly_agent.interactive.terminal.io.menu import (
     MenuAction,
     MenuInput,
@@ -434,6 +435,11 @@ class TerminalConfigurationFrontend:
                 except ValueError as exc:
                     self.notice = f'Invalid parameter: {exc}'
                 continue
+            if event.action == MenuAction.ACTIVATE and action.kind == 'setup':
+                service = getattr(self.configuration, 'mechanism_setup', None)
+                if service is not None and action.active is not None:
+                    run_mechanism_setup(self._model_form(), service, action.active)
+                continue
             if action.kind == 'info':
                 self.notice = rows[selected].detail
                 continue
@@ -445,6 +451,13 @@ class TerminalConfigurationFrontend:
                 option = None if active is not None else remembered.get(action.key, action.options[0])
             else:
                 option = action.active
+            service = getattr(self.configuration, 'mechanism_setup', None)
+            chosen = next((item for item in snapshot.mechanisms if item.mechanism_id == option), None)
+            if (option is not None and service is not None and chosen is not None
+                    and chosen.setup_available and not service.ready(option)):
+                run_mechanism_setup(self._model_form(), service, option)
+                focus = ('expand', action.key, '')
+                continue
             if action.declared:
                 self._call(self.configuration.select_algorithm, action.key, option)
             else:
@@ -531,6 +544,14 @@ class TerminalConfigurationFrontend:
         self,
         snapshot: ConfigurationSnapshot,
     ) -> ConfigurationLaunchResult | None:
+        service = getattr(self.configuration, 'mechanism_setup', None)
+        if service is not None:
+            for mechanism in snapshot.mechanisms:
+                if mechanism.enabled and mechanism.setup_available and not service.ready(mechanism.mechanism_id):
+                    if not run_mechanism_setup(self._model_form(), service, mechanism.mechanism_id):
+                        self.notice = 'Setup is incomplete. Complete Set up… before starting a session.'
+                        return None
+            snapshot = self.configuration.snapshot()
         if not snapshot.ready:
             self.notice = _warnings(snapshot) or "Configuration needs attention."
             return None
@@ -552,13 +573,14 @@ class TerminalConfigurationFrontend:
 
     def _call(
         self, function: Callable[..., ConfigurationActionResult], *args: object, **kwargs: object,
-    ) -> None:
+    ) -> ConfigurationActionResult | None:
         try:
             result = function(*args, **kwargs)
         except (OSError, TypeError, ValueError) as exc:
             self.notice = f"Configuration error: {exc}"
-            return
+            return None
         self.notice = result.message
+        return result
 
     def _render(
         self,
@@ -665,6 +687,9 @@ def _category_rows(
                 rows.append(MenuRow('Implementation · ' + current.label, current.description,
                     depth=1, section=heading, references=references(current)))
                 actions.append(_CategoryAction('info', key))
+            if current.setup_available:
+                rows.append(MenuRow('Set up…', current.setup_status, depth=1, section=heading))
+                actions.append(_CategoryAction('setup', key, options, current.mechanism_id))
             if active:
                 for parameter in current.parameters:
                     if parameter.name not in current.input_parameters:

@@ -150,12 +150,14 @@ def build_runtime(
             resource_sink=resource_sink,
             task_pack_sources=task_pack_sources,
             process_environment=process_environment,
+            secret_resolver=environment.get,
         ),
     )
     # Apply host policy after all installers, so an installer cannot accidentally omit it.
     secured = apply_permission_policy(assembled.config,
         replace(policy, readonly_paths=(*policy.readonly_paths, session.path.resolve())),
         confirm=approvals.confirm, audit=audit, process_environment=process_environment)
+    permission_identity = getattr(secured.tool_authorizer, 'identity', policy.identity)()
     assembled = replace(assembled, config=secured,
                         components={**assembled.components, "authorization": approvals})
     main_spec.require(tools=bool(assembled.config.tools), streaming=True)
@@ -185,7 +187,7 @@ def build_runtime(
             "mechanism: " + ", ".join(missing)
         )
     manifest_version = 5
-    manifest_payload = {
+    manifest_payload: dict[str, Any] = {
         "schema_version": manifest_version,
         "profile": profile.profile_id,
         "model_profile": selected_model_profile,
@@ -199,7 +201,7 @@ def build_runtime(
             else None
         ),
         "base_prompt": prompt_identity,
-        "permissions": policy.identity(),
+        "permissions": permission_identity,
     }
     if data_artifacts:
         manifest_payload["data_artifacts"] = [dict(item) for item in data_artifacts]
@@ -214,7 +216,7 @@ def build_runtime(
         data_artifacts=data_artifacts,
         base_prompt=prompt_identity,
         digest=digest,
-        permissions=policy.identity(),
+        permissions=permission_identity,
     )
     optional_ids = tuple(
         item.definition.descriptor.mechanism_id

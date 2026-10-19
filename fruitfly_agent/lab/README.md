@@ -11,7 +11,7 @@ Add tools, execution backends, context strategies, and improvement algorithms th
 | [Catalog](catalog/README.md) | Mechanism definitions, parameters, dependencies, and installers |
 | [Algorithms](algorithms/README.md) | Algorithm identity and text-target contracts |
 | [Context manager](context_manager/README.md) | Augmentation, externalization, and reduction |
-| [Tools](tools/README.md) | Model-callable file, shell, and IPython operations |
+| [Tools](tools/README.md) | Model-callable file, shell, IPython and public web operations |
 | [Environment](environment/README.md) | Local filesystem and process backend |
 | [Base prompt](base_prompt/README.md) | Built-in prompt text and its target adapter |
 | [Workflow](workflow/README.md) | Bounded sequential execution and its H target |
@@ -85,4 +85,4 @@ Catalog checks declared parameters, dependencies, conflicts, stage shape, and re
 
 Researchers manage formal experiments and their records externally. Learning mechanisms still define initial state, data splits, reset rules, and state sharing. A RuntimeManifest is not a source or learning-state snapshot. [Eval](../../eval/README.md) can consume public capabilities, but must not define their production interfaces.
 
-Lab has no shared environment variables and does not read API keys. [Configuration](../../CONFIGURATION.md) selects mechanisms; each child guide describes its own external effects.
+Lab has no shared environment variables and does not read ambient API keys. Hosts inject credentials required by selected tools. [Configuration](../../CONFIGURATION.md) selects mechanisms; each child guide describes its own external effects.

@@ -44,6 +44,8 @@ class ConfigurationMechanism:
     implementation_path: str = ''
     documentation_path: str = ''
     input_parameters: tuple[str, ...] = ()
+    setup_available: bool = False
+    setup_status: str = ''
 
 
 @dataclass(frozen=True)

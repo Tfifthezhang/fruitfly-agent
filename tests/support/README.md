@@ -7,6 +7,7 @@ Reusable substitutes and temporary materials. This module contains no TestCases 
 | File | Provides |
 |---|---|
 | [provider_streams.py](provider_streams.py) | Offline SDK streams, requests, and patched adapter construction |
+| [ssh.py](ssh.py) | Fake SFTP filesystem and local subprocess-backed SSH command channels |
 | [terminal_process.py](terminal_process.py) | Bounded real POSIX terminal child processes without network/model access |
 | [faux_provider.py](faux_provider.py) | Scripted responses, errors, and request capture |
 | [loop.py](loop.py) | Core configuration and counting tools |

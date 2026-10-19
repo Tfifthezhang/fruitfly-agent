@@ -10,7 +10,7 @@ Keep model specifications, secrets, and runtime selections in separate files.
 |---|---|---|
 | Model template | [models.example.yaml](examples/configuration/models.example.yaml) | DeepSeek Flash profiles for Responses and Messages APIs in one file; configure a key before use |
 | Model catalog | `.fruitfly/models.yaml` in the working directory | API protocol, model ID, endpoint, capabilities, limits, and key variable name |
-| Secrets | `.fruitfly/secrets.env` or process environment | API key values |
+| Secrets | `.fruitfly/secrets.env` or process environment | API keys and SSH account/password values |
 | Harness configuration | `.fruitfly/config.yaml` | Profiles, catalog path, model choice, prompt references, and mechanism parameters |
 | CLI overrides | Startup arguments | Workspace, configuration, profile, and session selection |
 
@@ -112,9 +112,11 @@ The capability page uses arrows and Space/Enter to toggle, then **Continue** to 
 | Reusable skill document | Disabled; Context augmentation. Set `source_path` to one workspace-relative Skill or enter `initial_text`; `max_chars=16000`. | [Skill body](fruitfly_agent/lab/context_manager/augmentation/skills/README.md#optimize-a-skill-body) |
 | Learned environment memory | Disabled; Context augmentation. Enter `initial_text`; `max_chars=16000`. Updates require explicit Improvement and adoption. | [Learned memory](fruitfly_agent/lab/context_manager/augmentation/information/file_memory/README.md#learn-environment-memory) |
 | Execution workflow | Disabled; a bounded sequence of model stages. One solve-and-answer step until an artifact is selected. | [Workflow](fruitfly_agent/lab/workflow/README.md) |
+| Web search / fetch | Disabled; enable **Search the web** and **Fetch web pages** under Tools. Search uses Brave or Tavily and a secret environment variable; fetch needs no search key. | [Web tools and YAML settings](fruitfly_agent/lab/tools/web/README.md) |
 | Failure processing | Optional YAML workflow dependency; benchmark jobs use failed-task replay on demand. | [Failure processing](fruitfly_agent/lab/improvement/failure_processing/README.md) |
 | Automatic text search | Benchmark jobs assemble confirmation on demand. Optional YAML `automatic-text-search` also supports saved packages with holdout; adoption requires human review. | [Automatic workflow and parameters](fruitfly_agent/lab/improvement/automatic/README.md) |
 | Programmatic context | Explicitly enable `ipython-tool` or `rlm-ipython`. | [Programmatic context](fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md) |
+| Remote execution | Enable **SSH server** under Environment. Complete settings and credentials are reused; missing values open the six-step form. Expand **Set up…** to edit explicitly. Disabling retains saved settings across restarts in the same workspace/profile. Mutually exclusive with local execution, local IPython/RLM and file memory. | [SSH setup and limits](fruitfly_agent/lab/environment/ssh/README.md) |
 | RSI | Host-injected capabilities and verification policy; no default CLI switch. | [RSI](fruitfly_agent/lab/rsi/README.md) |
 
 Menus show mechanism switches and algorithm choices. Edit `.fruitfly/config.yaml` for detailed parameters. Summaries, improvement, and auxiliary model queries may incur model charges.
@@ -150,6 +152,8 @@ Create custom text with `DataArtifactStore.put_text`; see the [Run example](frui
 | `FRUITFLY_EVENT_STREAM_PATH` | Optional JSONL event output in one-shot mode |
 | `NO_COLOR` | Disable terminal colors |
 | Model-specific `api_key_env` | Name of the variable containing that model's API key |
+| `FRUITFLY_SSH_USERNAME` / `FRUITFLY_SSH_PASSWORD` | Secret SSH account/password; `ssh-env.username_env` and `password_env` can select different variable names |
+| `BRAVE_SEARCH_API_KEY` / `TAVILY_API_KEY` | Secret used by the selected web search backend; optional `web-search-tool.api_key_env` overrides the variable name |
 
 [Secret template](examples/configuration/.env.example) contains public placeholders. Internal IPython subprocess variables are managed by the runtime and are not user settings.
 
@@ -172,7 +176,15 @@ Referenced results remain protected. Failed or cancelled searches do not replace
 
 The standard Run host uses a lightweight file and local-execution policy. Additional roots and sensitive paths are supplied through `RunApplicationFactory(permission_policy=...)` or `build_runtime(permission_policy=...)`, using `PermissionPolicy` from `fruitfly_agent.lab.catalog`. They are not YAML model or harness parameters. See [Run permission policy](fruitfly_agent/run/README.md#bind-host-permission-policy) and [Environment permissions](fruitfly_agent/lab/environment/README.md#apply-lightweight-permissions).
 
-Model setup owns credential persistence. Restricting model file tools does not disable Add model or Set API key. Runtime approval is temporary and never saved as a permanent grant. Approved local code still has current-user permissions; isolation is not implemented.
+Configuration forms share a credential draft saved alongside harness/model changes.
+SSH account/password input uses the same hidden-input and ignored secret-file
+storage as API keys. Only variable names enter mechanism parameters. Cancel and
+discard do not persist new credentials; ordinary save failures roll back written
+files. Restricting model file tools does not disable configuration forms.
+Runtime approval is temporary and never saved as a permanent grant. Approved
+local code still has current-user permissions; isolation is not implemented.
+
+Host-owned `PermissionPolicy.allow_network=True` allows declared network-read tools; false denies them before execution. This does not restrict Providers, live context or approved shell code. Search credentials use the same process-over-secret-file precedence as model credentials, but model setup does not edit search keys; set them in the secret file or environment. Never put key values in mechanism parameters.
 
 ### Configure original-task experiment limits
 

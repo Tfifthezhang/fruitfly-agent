@@ -18,6 +18,7 @@ from fruitfly_agent.providers.registry import ProviderRegistry
 from .profiles import RunConfigurationController
 from .configuration.resolution import HarnessSelection, resolve_harness_selection
 from .configuration.model_setup import RunModelSetup
+from .configuration.mechanism_setup import RunMechanismSetup
 from .configuration.profile import HarnessProfile
 from .storage.artifacts import DataArtifactStore
 from .storage.candidates import CandidateRecord, CandidateStore
@@ -97,6 +98,11 @@ class RunApplicationFactory:
         self._configuration.model_setup = RunModelSetup(
             config_path=self._configuration.config_path, current_profile=self._configuration.profile,
             stage_profile=self._configuration.stage_profile, workspace=self.cwd, environment=self.environment,
+        )
+        self._configuration.mechanism_setup = RunMechanismSetup(
+            catalog=self.catalog, current_profile=self._configuration.profile,
+            stage_profile=self._configuration.stage_profile, enable=self._configuration.set_mechanism,
+            credentials=self._configuration.model_setup.credentials,
         )
 
         self._preparer = RuntimePreparer(
@@ -181,6 +187,11 @@ class RunApplicationFactory:
         self._configuration.model_setup = RunModelSetup(
             config_path=self._configuration.config_path, current_profile=self._configuration.profile,
             stage_profile=self._configuration.stage_profile, workspace=self.cwd, environment=self.environment,
+        )
+        self._configuration.mechanism_setup = RunMechanismSetup(
+            catalog=self.catalog, current_profile=self._configuration.profile,
+            stage_profile=self._configuration.stage_profile, enable=self._configuration.set_mechanism,
+            credentials=self._configuration.model_setup.credentials,
         )
 
     def new_session_path(self) -> Path:

@@ -33,5 +33,6 @@ coverage.xml
 *.swo
 *.bak
 
+# API keys and SSH accounts/passwords share these ignored credential files.
 # Credential files are local even outside the default state directory.
 secrets.env

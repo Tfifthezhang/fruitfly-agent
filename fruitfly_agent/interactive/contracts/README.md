@@ -10,6 +10,7 @@ Define the data and capabilities shared by hosts, Application, Session, and fron
 | [commands.py](commands.py) | InteractiveCommand, CommandResult, CommandContext, and CommandHandler |
 | [events.py](events.py), [models.py](models.py) | Event envelopes, EventSink, status, history, and session views |
 | [configuration.py](configuration.py), [model_setup.py](model_setup.py) | Generic configuration choices, model forms, and staging services |
+| [mechanism_setup.py](mechanism_setup.py) | Optional guided mechanism forms, non-secret credential status and atomic staging |
 | [improvement.py](improvement.py) | Role/target/method/parameter views, search preview/execution, activity, progress, optional history/log queries and submission receipts |
 | [learning.py](learning.py) | Completed-task observation and optional material production service |
 | [candidates.py](candidates.py) | Candidate views with evidence assessments, review, and isolated preparation/activation contracts |

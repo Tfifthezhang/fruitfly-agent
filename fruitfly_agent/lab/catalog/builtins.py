@@ -10,6 +10,7 @@ from fruitfly_agent.lab.context_manager.reduction import (
 )
 from fruitfly_agent.core.context import ContextStage
 from fruitfly_agent.lab.environment import LocalEnv
+from fruitfly_agent.lab.environment.ssh.registration import definition as ssh_definition
 from fruitfly_agent.lab.context_manager.augmentation.information.adapter import (
     InformationRecallTransformer,
 )
@@ -33,6 +34,7 @@ from fruitfly_agent.lab.improvement.methods.workflow_search import definition as
 from fruitfly_agent.lab.improvement.methods.skill_edit import definition as skill_edit_definition
 from fruitfly_agent.lab.improvement.methods.memory_exploration import definition as memory_exploration_definition
 from fruitfly_agent.lab.workflow import definition as execution_workflow_definition
+from fruitfly_agent.lab.tools.web.registration import definitions as web_definitions
 from fruitfly_agent.lab.context_manager.augmentation.skills.document import definition as skill_document_definition
 from fruitfly_agent.lab.context_manager.augmentation.information.file_memory.learned import definition as learned_memory_definition
 from fruitfly_agent.lab.improvement.failure_processing import definitions as failure_definitions
@@ -70,6 +72,8 @@ def builtin_catalog() -> LabCatalog:
     """Return a fresh explicit catalog; callers may inject more definitions."""
 
     definitions = (
+        ssh_definition(),
+        *web_definitions(),
         _definition(
             "local-env",
             layer="capability",

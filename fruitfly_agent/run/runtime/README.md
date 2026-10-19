@@ -25,6 +25,16 @@ Manifest schema remains 5. Recovery validates each recorded manifest against its
 
 Checks use fake Providers and temporary state.
 
+Assembly supplies an optional generic secret resolver from the host environment to Lab. Selected [web tools](../../lab/tools/web/README.md) receive only the named search credential; keys are not added to manifest parameters or the minimal child-process environment. Construction makes no search or fetch requests.
+
+The optional [SSH environment](../../lab/environment/ssh/README.md) uses this
+resolver for its named account and password. Construction makes no SSH request;
+Application startup connects and retirement closes it. Catalog permits a backend
+to supply `with_permissions(policy, confirm=..., audit=...)`, returning a guarded
+environment and authorizer for its path namespace. Assembly records that
+authorizer's `identity()` when supplied, otherwise the host policy identity.
+Authentication values never enter either identity.
+
 ## Bound isolated task execution
 
 [trial_budget.py](trial_budget.py) provides `TrialInvocationBudget` and `BudgetedRegistry`: reserve before each main or auxiliary Provider call, cap output requests, share one allocation, and preserve normal resource cleanup. The generic [trial.py](../trial.py) entry composes the normal Application using frozen H/source/S and copied artifacts. It verifies resolved mechanisms and models before submitting the complete task, writes actual runtime/invocation receipts, and rejects changed source material.

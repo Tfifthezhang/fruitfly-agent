@@ -23,6 +23,7 @@ from .resolution import HarnessSelection, model_catalog_path, resolve_profile_mo
 
 if TYPE_CHECKING:
     from .model_setup import RunModelSetup
+    from .mechanism_setup import RunMechanismSetup
 
 
 class RunConfigurationController:
@@ -48,6 +49,7 @@ class RunConfigurationController:
         self._persisted = selection.persisted
         self._prompt_choices = prompt_choices_provider or (lambda profile: prompt_choices(profile))
         self.model_setup: RunModelSetup | None = None
+        self.mechanism_setup: RunMechanismSetup | None = None
 
     @property
     def config_path(self) -> Path:
@@ -101,6 +103,23 @@ class RunConfigurationController:
             ready = False
         prompt_options, prompt_labels, prompt_groups = self._prompt_choices(profile)
         mechanisms, selection_groups = mechanism_views(profile, self._catalog, warnings)
+        if self.mechanism_setup is not None:
+            projected = []
+            for mechanism in mechanisms:
+                definition = self._catalog.get(mechanism.mechanism_id)
+                if definition.setup is not None:
+                    try:
+                        missing = self.mechanism_setup.issues(mechanism.mechanism_id)
+                    except (TypeError, ValueError):
+                        missing = ('valid settings',)
+                    mechanism = replace(mechanism, setup_available=True,
+                        setup_status='Missing: ' + ', '.join(missing) if missing else 'Ready; credentials set')
+                    if mechanism.enabled and missing:
+                        warnings.append(f'{mechanism.label}: missing ' + ', '.join(missing) +
+                            '. Open Configure → ' + mechanism.category.capitalize() + ' → ' + mechanism.label + ' → Set up…')
+                        ready = False
+                projected.append(mechanism)
+            mechanisms = tuple(projected)
         return ConfigurationSnapshot(
             config_path=str(self._path),
             selected_profile=self._selected,
@@ -378,6 +397,10 @@ class RunConfigurationController:
         )
         for profile in candidate.profiles.values():
             self._catalog.resolve(profile.mechanisms)
+            if self.mechanism_setup is not None:
+                for item in profile.mechanisms:
+                    if item.enabled and self.mechanism_setup.issues(item.mechanism_id, profile):
+                        raise ValueError('Setup is incomplete. Open Configure and complete the selected mechanism’s Set up… form')
             if self.model_setup is None:
                 resolve_profile_models(profile, self._path)
             else:

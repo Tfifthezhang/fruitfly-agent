@@ -7,7 +7,8 @@ Use the interactive model wizard for first setup, or copy the single model catal
 | Template | Workspace destination | Contents |
 |---|---|---|
 | [models.example.yaml](models.example.yaml) | `.fruitfly/models.yaml` | Both DeepSeek Flash protocol profiles in one file |
-| [.env.example](.env.example) | `.fruitfly/secrets.env` | Empty `DEEPSEEK_API_KEY` variable |
+| [.env.example](.env.example) | `.fruitfly/secrets.env` | Empty model/search keys and optional SSH account/password variables |
+| [ssh.example.yaml](ssh.example.yaml) | `.fruitfly/config.yaml` | Minimal remote profile; addresses are placeholders, credentials stay in the secret file |
 
 | Profile | `provider` | `model` | `base_url` |
 |---|---|---|---|
@@ -24,7 +25,15 @@ Both examples explicitly bound first progress, later stalls, and total invocatio
 
 Copying, parsing, and offline construction do not make requests. Live tasks contact DeepSeek and may incur charges. The examples have not been validated with live requests. Keep keys out of the catalog and repository.
 
+For an external execution server, follow [SSH environment setup](../../fruitfly_agent/lab/environment/ssh/README.md).
+Startup of an SSH profile opens a verified SSH connection; file and Bash tools
+operate on the server. Copy the SSH template only when the destination is absent,
+or merge its mechanism settings into your existing profile. Keep account and
+password values alongside API keys in the ignored local secret file.
+
 See [Configuration](../../CONFIGURATION.md) for precedence and saving, and [Providers](../../fruitfly_agent/providers/README.md) for adapter behavior.
+
+Optional [web tools](../../fruitfly_agent/lab/tools/web/README.md) are disabled by default. Enable search/fetch under Tools and set the selected service's key in the secret environment. Search requests may incur service charges; public page fetching requires no search credential. Model catalog fields are unchanged.
 
 ```bash
 .venv/bin/python -m unittest tests.providers.test_providers

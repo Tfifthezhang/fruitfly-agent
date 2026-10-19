@@ -10,7 +10,10 @@ Verify configuration, model selection, assembly, manifest, CLI, candidates, rete
 |---|---|
 | `test_configuration.py / test_profiles.py` | Selection drafts, YAML, and persistence |
 | `test_model_setup.py` | First-run form, secret isolation, preservation, cancel/discard, rollback, and immediate offline assembly |
+| `test_mechanism_setup.py` | Guided SSH enable/repair, hidden account/password, per-field retries, shared model/SSH persistence and rollback |
 | `test_assembly.py / test_resources.py` | Runtime identity and failed assembly cleanup |
+| `test_web_tools.py` | Search credential injection, network-read policy, offline Application search/fetch, recovery and HTTP resource cleanup |
+| `test_ssh_environment.py` | SSH configuration selection, secret-free identity, remote file tools, recovery and failed-resource cleanup |
 | `test_cli.py` | Startup, one-shot, resume, and rebuild |
 | `test_improvement_versions.py / test_task_prompt_catalog.py / test_base_prompt_flow.py` | Candidate scope, prompt selection, and recovery |
 | `test_eval_bridge.py` | Optional benchmark catalog, one-use improvement dispatch, live subprocess logs, and removed launch APIs; no benchmark scoring |

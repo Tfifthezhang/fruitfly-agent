@@ -158,6 +158,12 @@ Run exposes an optional `configuration.model_setup` service to the terminal. Mod
 
 After Lab installation, Run applies the policy to the final config and environment. It creates a fresh Interactive authorization service, binds it to Session frontend events, and protects the active Session file from tool writes. The normalized effective policy enters `RuntimeManifest.permissions` as a record of the active environment. Recovery uses current policy even when the historical policy differs or is absent. The current Session path is an additional per-handle protection, not part of reusable policy identity.
 
+The optional [SSH environment](../lab/environment/ssh/README.md) supplies remote
+path authorization and records `ssh-permissions-v1` instead of local file roots.
+Remote execution prompts identify the server and port. Local extra roots and
+Session protections do not become remote path rules; SSH account/password values
+use the same host secret resolver as API keys and never enter runtime identity.
+
 Only host constructor parameters select additional roots and protection paths. Model-edited profile files do not expand permission scope. Algorithm configuration/state remains accessible within authorized roots. User-driven model setup continues to persist credentials through its owning host interface, and Provider construction can obtain its required key. Shell/IPython do not receive those keys automatically.
 
 Authorization audit entries contain call/tool identity, operation, outcome, and reason; they omit command/code contents, key values, and approval caches. Host policy must name additional credential files it uses. RuntimeManifest identities describe policy settings, not OS isolation or plugin source verification.

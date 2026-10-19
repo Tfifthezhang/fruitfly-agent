@@ -39,6 +39,7 @@ class AssemblyContext:
     resource_sink: list[Any] | None = None
     task_pack_sources: tuple[Any, ...] = ()
     process_environment: Mapping[str, str] | None = None
+    secret_resolver: Callable[[str], str | None] | None = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "workspace", self.workspace.resolve())

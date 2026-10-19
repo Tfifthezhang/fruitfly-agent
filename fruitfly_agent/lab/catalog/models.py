@@ -54,6 +54,21 @@ MechanismInstaller = Callable[["AssemblyState", "AssemblyContext", Mapping[str, 
 
 
 @dataclass(frozen=True)
+class SetupCredential:
+    parameter: str
+    label: str
+    description: str
+
+
+@dataclass(frozen=True)
+class MechanismSetup:
+    fields: tuple[str, ...]
+    credentials: tuple[SetupCredential, ...] = ()
+    required_fields: tuple[str, ...] = ()
+    guidance: str = ''
+
+
+@dataclass(frozen=True)
 class MechanismDefinition:
     descriptor: MechanismDescriptor
     install: MechanismInstaller
@@ -71,6 +86,7 @@ class MechanismDefinition:
     implementation_path: str = ''
     documentation_path: str = ''
     input_parameters: tuple[str, ...] = ()
+    setup: MechanismSetup | None = None
 
     def __post_init__(self) -> None:
         if self.improvement is not None:
@@ -123,6 +139,15 @@ class MechanismDefinition:
         if len(set(names)) != len(names) or set(names) - {p.name for p in self.descriptor.parameters}:
             raise ValueError('input_parameters must contain distinct declared parameter names')
         object.__setattr__(self, 'input_parameters', names)
+        if self.setup is not None:
+            parameters = {p.name: p for p in self.descriptor.parameters}
+            fields = (*self.setup.fields, *(c.parameter for c in self.setup.credentials))
+            if len(fields) != len(set(fields)) or set(fields) - parameters.keys():
+                raise ValueError('setup fields must name distinct declared parameters')
+            if set(self.setup.required_fields) - set(self.setup.fields):
+                raise ValueError('required setup fields must be visible form fields')
+            if any(parameters[c.parameter].kind != 'string' for c in self.setup.credentials):
+                raise ValueError('credential bindings must name string parameters')
 
 
 @dataclass(frozen=True)
@@ -139,4 +164,5 @@ __all__ = [
     "ActivationScope", "ParameterDescriptor", "MechanismContribution",
     "MechanismEffects", "MechanismDescriptor", "MechanismSelection",
     "MechanismInstaller", "MechanismDefinition", "ResolvedMechanism",
+    "MechanismSetup", "SetupCredential",
 ]

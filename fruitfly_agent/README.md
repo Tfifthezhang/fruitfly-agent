@@ -69,6 +69,7 @@ Recovery validates recorded contents and required artifacts, then continues with
 | Change request context | [Context manager](lab/context_manager/README.md) |
 | Add model-callable operations | [Tools](lab/tools/README.md) |
 | Replace filesystem or shell access | [Environment](lab/environment/README.md) |
+| Execute on an external SSH server | [SSH environment](lab/environment/ssh/README.md) |
 | Search text candidates | [Improvement](lab/improvement/README.md) |
 | Verify and adopt across generations | [RSI](lab/rsi/README.md) |
 | Register and assemble a mechanism | [Catalog](lab/catalog/README.md) |

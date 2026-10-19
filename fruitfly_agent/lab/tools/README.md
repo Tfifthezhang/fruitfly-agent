@@ -2,7 +2,11 @@
 
 [Up: Lab](../README.md)
 
-File, shell, and IPython operations implementing Core's `AgentTool`. Tools use the execution environment supplied by the host.
+File, shell, IPython and public web operations implementing Core's `AgentTool`. Local tools use the host's execution environment; web tools use injected HTTP clients.
+
+Read, write, edit and Bash use the selected backend, including the optional
+[SSH environment](../environment/ssh/README.md). IPython remains local and is
+incompatible with the SSH selection.
 
 ## Factories and files
 
@@ -14,6 +18,7 @@ File, shell, and IPython operations implementing Core's `AgentTool`. Tools use t
 | [edit.py](edit.py) | `create_edit_tool`: unique, non-overlapping text replacement |
 | [write.py](write.py) | `create_write_tool`: file writes |
 | [ipython.py](ipython.py) | `create_ipython_tool`: explicit Python workspace integration |
+| [Web tools](web/README.md) | `web_search` through Brave/Tavily and `web_fetch` for source text; disabled by default |
 | [truncate.py](truncate.py) | Head/tail output limits |
 | [path_utils.py](path_utils.py), [file_queue.py](file_queue.py) | Path normalization and in-process mutation ordering |
 
@@ -54,3 +59,5 @@ Use [Core tool contracts](../../core/tool_runtime/README.md), [Environment](../e
 ```
 
 Built-in tools declare `ToolPermission`: read is a file read, edit/write are file writes, and Bash/IPython are local execution. The standard host authorizes final arguments and injects the [guarded environment](../environment/README.md#apply-lightweight-permissions). Custom tools must declare their operation/path arguments; declarations are trusted plugin metadata, not proof that arbitrary plugin code respects a boundary.
+
+Web tools declare `network_read`; host-owned `PermissionPolicy.allow_network` can deny them. See the [web guide](web/README.md) for credentials, HTTP limits and caches. `builtin_tools()` remains the four local file/shell factories; Catalog registers web tools separately.

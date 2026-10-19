@@ -9,8 +9,19 @@ Use `TerminalConfigurationFrontend` as the menu entry and `configuration_handler
 | [menu.py](menu.py) | Generic configuration choices, draft review, and save confirmation |
 | [command.py](command.py) | Busy feedback, menu lending, rebuild request, and new-session display |
 | [model_setup.py](model_setup.py) | ModelFormIO, field/capability forms, review, and hidden secret input |
+| [mechanism_setup.py](mechanism_setup.py) | Registration-driven guided settings, hidden credentials, per-field retry and review |
 
 The host ConfigurationController owns choices and persistence. ModelSetupService owns validation and credential staging. Forms use explicitly supplied selection, rendering, reader, and staging operations; they do not access a menu owner's private methods. Credential values bypass readline/history and are absent from views and review text.
+
+Optional `MechanismSetupService` supplies backend-neutral forms declared in
+Catalog. Enabling a mechanism opens its guided setup only when settings or
+credentials are missing. Complete saved or staged settings are reused directly;
+disabling a mechanism retains its parameters and credentials. Expansion
+offers **Set up…** even when disabled. Staging enables the configured mechanism
+and resolves conflicts; cancellation preserves the original selection. Starting
+a new session first repairs enabled mechanisms with missing setup information.
+Hidden fields reuse the same secret reader as model keys; blank reuses an
+existing value, and invalid/missing fields retry without echoing secrets.
 
 Saving applies to a future session. The command requests rebuild through the injected operation; Application owns replacement and cleanup. Model form inspection makes no Provider requests. Configuration writes and credential effects belong to the host and are not automatically rolled back.
 

@@ -24,7 +24,7 @@ class ModelFormIO:
     output: TextIO
 
 
-def read_secret(input_stream, output_stream) -> str | None:
+def read_secret(input_stream, output_stream, *, prompt="API key (hidden; blank reuses an existing key): ") -> str | None:
     """Bypass readline/history and disable TTY echo, restoring it on every exit."""
     descriptor = input_stream.fileno() if input_stream.isatty() else None
     original = termios.tcgetattr(descriptor) if descriptor is not None else None
@@ -33,7 +33,7 @@ def read_secret(input_stream, output_stream) -> str | None:
             hidden = list(original)
             hidden[3] &= ~(termios.ECHO | termios.ECHONL)
             termios.tcsetattr(descriptor, termios.TCSANOW, hidden)
-        output_stream.write("API key (hidden; blank reuses an existing key): ")
+        output_stream.write(prompt)
         output_stream.flush()
         line = input_stream.readline()
         return None if line == "" else line.rstrip("\r\n")

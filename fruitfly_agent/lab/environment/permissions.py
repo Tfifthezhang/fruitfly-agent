@@ -23,19 +23,22 @@ class PermissionPolicy:
     write_roots: tuple[Path, ...] = ()
     sensitive_paths: tuple[Path, ...] = ()
     readonly_paths: tuple[Path, ...] = ()
+    allow_network: bool = True
 
     def __post_init__(self) -> None:
+        if not isinstance(self.allow_network, bool):
+            raise ValueError('allow_network must be a boolean')
         object.__setattr__(self, 'workspace', self.workspace.resolve())
         for name in ('read_roots', 'write_roots', 'sensitive_paths', 'readonly_paths'):
             object.__setattr__(self, name, tuple(Path(p).resolve() for p in getattr(self, name)))
 
     def identity(self) -> dict:
-        return {'implementation': 'local-permissions-v1', 'workspace': str(self.workspace),
+        return {'implementation': 'local-permissions-v2', 'workspace': str(self.workspace),
                 **{name: [str(p) for p in getattr(self, name)] for name in
                    ('read_roots', 'write_roots', 'sensitive_paths', 'readonly_paths')},
                 'outside_workspace': 'confirm', 'local_execution': 'confirm',
                 'secret_names': ['.env', '.env.* (except examples)', 'secrets.env'],
-                'environment': 'minimal-v1'}
+                'environment': 'minimal-v1', 'network_reads': 'allow' if self.allow_network else 'deny'}
 
 @dataclass
 class _Grant:
@@ -52,17 +55,34 @@ class PermissionAuthorizer:
         self.audit = audit
         self._grant: ContextVar[_Grant | None] = ContextVar('operation_authorization', default=None)
 
+    @property
+    def workspace(self) -> Path:
+        return self.policy.workspace
+
+    def file_roots(self, operation: str) -> tuple[Path, ...]:
+        return (self.workspace, *self.policy.write_roots,
+                *(self.policy.read_roots if operation == 'read' else ()))
+
+    def session_target(self, path: Path) -> Path:
+        return path if path.is_dir() else path.parent
+
+    execution_label = 'local code execution'
+    execution_denial = 'local execution requires user confirmation'
+
+    @staticmethod
+    def secret_name(path: Path) -> bool:
+        return any(p.name in {'.env', 'secrets.env'} or
+                   p.name.startswith('.env.') and p.name not in
+                   {'.env.example', '.env.sample', '.env.template'}
+                   for p in (path, *path.parents))
+
     def resolve(self, path: str) -> Path:
         value = Path(normalize_tool_path(path))
         return (value if value.is_absolute() else self.policy.workspace / value).resolve()
 
     def forbidden(self, path: Path, operation: str) -> bool:
-        candidates = (path, *path.parents)
-        for candidate in candidates:
-            name = candidate.name
-            if (name in {'.env', 'secrets.env'} or name.startswith('.env.')
-                    and name not in {'.env.example', '.env.sample', '.env.template'}):
-                return True
+        if self.secret_name(path):
+            return True
         for secret in self.policy.sensitive_paths:
             if path == secret or path.is_relative_to(secret):
                 return True
@@ -91,8 +111,7 @@ class PermissionAuthorizer:
         if self.forbidden(Path(normalize_tool_path(path)), operation) or self.forbidden(canonical, operation):
             raise PermissionError('protected credential or host-controlled file')
         if operation in {'read', 'write'}:
-            roots = (self.policy.workspace, *self.policy.write_roots,
-                     *(self.policy.read_roots if operation == 'read' else ()))
+            roots = self.file_roots(operation)
             if any(canonical == root or canonical.is_relative_to(root) for root in roots):
                 return canonical
         grant = self._grant.get()
@@ -104,7 +123,7 @@ class PermissionAuthorizer:
     def require_execution(self, command: str | None = None, cwd: str | None = None) -> None:
         grant = self._grant.get()
         if grant is None or not grant.active or not grant.execute:
-            raise PermissionError('local execution requires user confirmation')
+            raise PermissionError(self.execution_denial)
         if command is not None and grant.command != command:
             raise PermissionError('command differs from the authorized call')
         if cwd is not None and grant.cwd != self.resolve(cwd):
@@ -122,11 +141,16 @@ class PermissionAuthorizer:
         try:
             if signal is not None and signal.is_set():
                 raise asyncio.CancelledError
+            if descriptor is not None and operation == 'network_read':
+                allowed = self.policy.allow_network
+                reason = 'network reads allowed by host policy' if allowed else 'network reads disabled by host policy'
+                yield AuthorizationDecision(allowed, reason)
+                return
             if descriptor is None or operation not in {'read', 'write', 'delete', 'move', 'execute'}:
                 yield AuthorizationDecision(False, reason)
                 return
             if operation == 'execute':
-                cwd = request.arguments.get('cwd', str(self.policy.workspace))
+                cwd = request.arguments.get('cwd', str(self.workspace))
                 paths = (self.resolve(cwd),)
                 needs_confirmation = True
             else:
@@ -156,8 +180,8 @@ class PermissionAuthorizer:
                     return
                 summary = (str(request.arguments.get('command', request.arguments.get('code', 'local code execution')))
                            if operation == 'execute' else 'File operation')
-                session_targets = tuple(dict.fromkeys(str(p if p.is_dir() else p.parent) for p in paths))
-                session_label = ('Allow local code execution for this session (current user permissions)'
+                session_targets = tuple(dict.fromkeys(str(self.session_target(p)) for p in paths))
+                session_label = (f'Allow {self.execution_label} for this session (current user permissions)'
                                  if operation == 'execute' else f'Allow {operation} in these directories for this session: ' +
                                  ', '.join(session_targets))
                 prompt = AuthorizationPrompt(uuid.uuid4().hex, request.tool_name, operation,

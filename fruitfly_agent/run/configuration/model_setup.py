@@ -9,25 +9,24 @@ import yaml
 from fruitfly_agent.interactive.contracts.configuration import ConfigurationActionResult, ConfigurationParameter
 from fruitfly_agent.interactive.contracts.model_setup import ModelSetupOption
 from fruitfly_agent.providers.model_setup import CAPABILITY_OPTIONS, SERVICES, model_entry
-from fruitfly_agent.providers.config import load_env
-from fruitfly_agent.providers.workspace import WorkspacePaths
 from fruitfly_agent.providers.registry import load_model_specs
 from fruitfly_agent.providers.specs import ModelCapabilities, ModelSpec
 
 from .resolution import model_catalog_path
 from .persistence import write_bytes
+from .credentials import CredentialDraft
 
 
 class RunModelSetup:
     def __init__(self, *, config_path: Path, current_profile, stage_profile,
-                 workspace: Path, environment: dict[str, str]) -> None:
+                 workspace: Path, environment: dict[str, str], credentials: CredentialDraft | None = None) -> None:
         self.config_path = config_path
         self.current_profile = current_profile
         self.stage_profile = stage_profile
         self.workspace = workspace.resolve()
         self.environment = environment
         self.entries: dict[Path, dict[str, dict]] = {}
-        self._secrets: dict[str, str] = {}
+        self.credentials = credentials or CredentialDraft(self.workspace, environment)
 
     def options(self) -> tuple[ModelSetupOption, ...]:
         fields = (
@@ -75,7 +74,7 @@ class RunModelSetup:
         _append_models(path.read_text(encoding="utf-8") if path.is_file() else "", {name: entry})
         self.entries.setdefault(path, {})[name] = entry
         if secret:
-            self._secrets[entry["api_key_env"]] = secret
+            self.credentials.values[entry["api_key_env"]] = secret
         self.stage_profile(replace(profile, model_profile=name))
         return ConfigurationActionResult("Model and credential staged; save to use in a new session", changed=True)
 
@@ -83,51 +82,37 @@ class RunModelSetup:
         profile = self.current_profile()
         spec = self.models(profile)[model_profile]
         key = spec.provider.api_key_env
-        return "API key set" if self._secrets.get(key) or self.environment.get(key) else "API key missing"
+        return "API key set" if self.credentials.values.get(key) or self.environment.get(key) else "API key missing"
 
     def stage_credential(self, model_profile, secret) -> ConfigurationActionResult:
         profile = self.current_profile()
         key = self.models(profile)[model_profile].provider.api_key_env
         self._check_secret(key, secret)
         if secret:
-            self._secrets[key] = secret
+            self.credentials.values[key] = secret
         return ConfigurationActionResult("Credential staged; save to use in a new session", changed=True)
 
     def _check_secret(self, key, secret):
         if secret and (secret != secret.strip() or any(ord(char) < 33 for char in secret)):
             raise ValueError("API key must contain no whitespace or control characters")
-        if not secret and not (self._secrets.get(key) or self.environment.get(key)):
+        if not secret and not (self.credentials.values.get(key) or self.environment.get(key)):
             raise ValueError("API key is missing; enter a key or name an existing key variable")
-        if secret and self.environment.get(key) and self.environment[key] != secret:
-            raise ValueError("Key variable is already set; use a different variable or keep its existing value")
-        if secret and self._secrets.get(key) and self._secrets[key] != secret:
-            raise ValueError("Key variable already has another staged value")
+        self.credentials.check(key, secret)
 
     @property
     def changed(self) -> bool:
-        return bool(self.entries or self._secrets)
+        return bool(self.entries or self.credentials.values)
 
     def reset(self) -> None:
         self.entries.clear()
-        self._secrets.clear()
+        self.credentials.values.clear()
 
     def persist(self, save_harness) -> None:
         payloads = {}
         for path, entries in self.entries.items():
             text = path.read_text(encoding="utf-8") if path.is_file() else ""
             payloads[path] = _append_models(text, entries)
-        env_path = WorkspacePaths(self.workspace).secret_file()
-        if self._secrets:
-            if env_path.is_symlink():
-                raise ValueError("Refusing to write credentials through a symlink")
-            text = env_path.read_text(encoding="utf-8") if env_path.is_file() else ""
-            existing = load_env(env_path)
-            if any(existing.get(key) and existing[key] != value for key, value in self._secrets.items()):
-                raise ValueError("Credential file already has a different value; reload or choose another key variable")
-            names = self._secrets.keys()
-            lines = [line for line in text.splitlines(keepends=True) if line.strip().partition("=")[0].strip() not in names]
-            prefix = "".join(lines)
-            payloads[env_path] = prefix + ("\n" if prefix and not prefix.endswith("\n") else "") + "".join(f"{key}={value}\n" for key, value in self._secrets.items())
+        payloads.update(self.credentials.payloads())
         originals = {path: path.read_bytes() if path.is_file() else None for path in payloads}
         written = []
         try:
@@ -143,7 +128,7 @@ class RunModelSetup:
                 else:
                     write_bytes(path, original)
             raise
-        self.environment.update(self._secrets)
+        self.environment.update(self.credentials.values)
         self.reset()
 
 

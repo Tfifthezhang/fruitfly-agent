@@ -42,10 +42,20 @@ Unknown fields and unsupported schema versions raise `ValueError`. Catalog valid
 | [resolution.py](resolution.py) | Workspace/profile discovery and model catalog resolution |
 | [views.py](views.py) | Mechanism and prompt menu projections |
 | [model_setup.py](model_setup.py) | Stage models and credentials through profile callbacks |
+| [mechanism_setup.py](mechanism_setup.py) | Project registered forms, check setup readiness, stage parameters and enable selections |
+| [credentials.py](credentials.py) | Shared secret draft, variable validation and comment-preserving secret-file payloads |
 | [persistence.py](persistence.py) | Atomic byte writes for configuration operations |
 | [migration.py](migration.py) | Explicit offline configuration relocation |
 
 `profile()`, `stage_profile()`, and `changed` expose draft operations without allowing other services to access private fields. Model setup receives these callbacks and a configuration path. It writes only on save, preserves unrelated content, rolls back ordinary failures, and updates the secret environment after success. No model requests occur during configuration.
+
+Mechanism setup consumes generic Catalog metadata and profile/enable callbacks;
+it contains no backend-specific branches. It checks required settings and named
+credentials in configuration snapshots and before saving. Model and mechanism
+forms share `CredentialDraft`; the existing model/configuration save transaction
+writes all staged credentials together, rolls back ordinary failures, and updates
+the host secret environment only after success. Reset discards the complete
+shared draft. Credential values never enter snapshots, review or harness YAML.
 
 The public `RunConfigurationController` in [Run](../README.md) composes this controller with candidate-backed prompt presentation. The configuration implementation receives an artifact store and optional prompt-choice callback; it does not discover candidate paths or depend on runtime preparation. Default workspace paths and environment precedence are documented in the configuration reference below. Improvement methods have no configuration-menu category; `/improvement` owns method selection and visible per-job material/budget inputs. Algorithms show registration-owned descriptions and implementation/guide paths. Configuration exposes only declared user inputs; internal tuning stays in YAML or programmatic previews. Existing YAML entries remain optional defaults. Method-owned artifact slots registered independently of enablement remain valid adoption targets.
 
