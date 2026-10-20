@@ -10,6 +10,10 @@ from fruitfly_agent.core.errors import FatalError, OverflowError, RetryableError
 from fruitfly_agent.core.model_stream import StreamActivity, TextDelta, ThinkingDelta, ToolCallStart, ToolCallDelta
 from fruitfly_agent.providers.openai import OpenAIProvider
 from fruitfly_agent.providers.anthropic import AnthropicProvider
+from fruitfly_agent.lab.base_prompt import DEFAULT_PROMPT
+from fruitfly_agent.lab.tools.builtin import builtin_tools
+from fruitfly_agent.lab.tools.ipython import create_ipython_tool
+from fruitfly_agent.lab.tools.web import WebClient, create_web_fetch_tool, create_web_search_tool
 from tests.support.loop import make_tool
 
 
@@ -17,6 +21,31 @@ from tests.support.provider_streams import SDKStream, adapter, view
 
 
 class ProviderStreamTests(unittest.IsolatedAsyncioTestCase):
+    async def test_tool_selection_sends_independent_descriptions_without_changing_base_prompt(self):
+        client = WebClient()
+        self.addAsyncCleanup(client.close)
+        search = create_web_search_tool(client, backend='deepseek', api_key='offline-placeholder')
+        direct_fetch = create_web_fetch_tool(client)
+        deepseek_fetch = create_web_fetch_tool(client, backend='deepseek', api_key='offline-placeholder')
+        tools = (*builtin_tools(), create_ipython_tool(Mock()), search, direct_fetch, deepseek_fetch)
+        selections = [(), *((tool,) for tool in tools), (search, direct_fetch), (search, deepseek_fetch)]
+        for kind in ('openai', 'anthropic'):
+            for selected in selections:
+                with self.subTest(kind=kind, descriptions=[tool.description for tool in selected]):
+                    sdk = SDKStream([], NS(content=[], stop_reason='end_turn', usage=None))
+                    provider, request = adapter(kind, [sdk])
+                    await provider(replace(view(selected), system_prompt=DEFAULT_PROMPT.text)).result()
+                    payload = request.call_args.kwargs
+                    self.assertEqual(DEFAULT_PROMPT.text, payload['instructions' if kind == 'openai' else 'system'])
+                    wire_tools = payload.get('tools', [])
+                    self.assertEqual([tool.name for tool in selected], [tool['name'] for tool in wire_tools])
+                    self.assertEqual([tool.description for tool in selected],
+                                     [tool['description'] for tool in wire_tools])
+                    if selected == (search,):
+                        self.assertNotIn('web_fetch', wire_tools[0]['description'])
+                    if selected in ((direct_fetch,), (deepseek_fetch,)):
+                        self.assertNotIn('web_search', wire_tools[0]['description'])
+
     async def test_request_output_limit_is_capped_and_zero_uses_provider_default(self):
         for kind, parameter in (('openai', 'max_output_tokens'), ('anthropic', 'max_tokens')):
             for requested, expected in ((32, 32), (8192, 4096), (0, 4096)):

@@ -2,17 +2,25 @@
 
 [Up: Examples](../README.md)
 
-The [offline DreamRSI replay](dream_rsi/README.md) compares policies on a synthetic tree without models.
+Use the [public stage ports](../../fruitfly_agent/lab/improvement/README.md#extend-search)
+for both deterministic generators and model editors. The complete offline workflow
+example runs without keys, network or model calls:
 
-The [offline automatic workflow](automatic_text/README.md) demonstrates model-generated learning material, original-task comparison, independent confirmation and explicit human adoption with a scripted Provider.
+```bash
+.venv/bin/python -m examples.improvement.offline
+```
 
-The [offline workflow, Skill and memory example](native_methods/README.md) runs the three native methods through confirmation and exact H/S adoption with scripted Providers.
+[offline.py](offline.py) registers a rule generator, supplies task execution,
+composition and selection capabilities, and runs the unified workflow. Its
+synthetic output is a contract demonstration, not a measured quality gain.
 
-Task packs for the normal `/improvement` workflow. They are manually authored demonstrations, not formal benchmarks or measured improvement claims.
+Task packages provide optional private scoring and independent verification:
 
-| Pack | Scoring | Search / independent cases |
+| Package | Scoring | Material |
 |---|---|---|
-| [Python functions](python_functions/README.md) | Restricted function-call tests | 8 train, 4 selection, 6 holdout |
-| [Ticket triage](ticket_triage/README.md) | Exact normalized labels | 8 train, 4 selection, 6 holdout |
+| [Python functions](python_functions/README.md) | Restricted function tests | 8 train, 4 selection, 6 holdout |
+| [Ticket triage](ticket_triage/README.md) | Normalized labels | 8 train, 4 selection, 6 holdout |
 
-Install a complete pack into a new workspace task-packs directory. `baseline.txt` is an optional reference; the active target supplies the search baseline. Read [Task packs](../../fruitfly_agent/lab/improvement/tasks/README.md) before authoring your own.
+These are authored examples, not representative benchmarks. Install complete
+packages in a separate workspace. The active component snapshot is the baseline;
+`baseline.txt` is an optional reference. Follow [Task packages](../../fruitfly_agent/lab/improvement/tasks/README.md).

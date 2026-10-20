@@ -210,5 +210,10 @@ class LabCatalog:
             result.add(choices[0].descriptor.mechanism_id)
         return frozenset(result)
 
+    def required_credentials(self, selections: Sequence[MechanismSelection]) -> tuple[str, ...]:
+        """Resolve enabled declarations without constructing runtime resources."""
+        return tuple(sorted({name for item in self.resolve(selections)
+                             for name in item.definition.required_credentials(item.parameters)}))
+
 
 __all__ = ["LabCatalog"]

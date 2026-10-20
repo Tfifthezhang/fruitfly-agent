@@ -15,39 +15,45 @@ def run_mechanism_setup(form: ModelFormIO, service: MechanismSetupService, mecha
             subtitle=f'{label}\n{description}\n{hint}\n\n{setup.guidance}', rows=(), selected=0,
             notice=notice, instructions='Enter to continue · /cancel to return without changes. Nothing is saved yet.')
     try:
-        for step, field in enumerate(setup.fields, 1):
+        for step in range(1, len(setup.fields) + 1):
+            setup = service.form(mechanism_id, values)
+            total = len(setup.fields) + len(setup.credentials)
+            field = setup.fields[step - 1]
             default = str(field.value if field.value is not None else '')
             notice = ''
             while True:
-                render(step, field.label, field.description, f'Press Enter to use: {default}' if default else 'Required field.', notice)
+                render(step, field.label, field.description, (f'Press Enter to use: {default}' if default else 'Blank uses the default when available.') +
+                    (' Choices: ' + ', '.join(str(choice) for choice in field.choices) if field.choices else ''), notice)
                 line = read_field_line(form.line_editor, field.label)
                 if line is None or line.strip() == '/cancel':
                     return False
-                value = line.strip() or default
+                value = '' if line.strip() == '/clear' else line.strip() or default
                 try:
-                    service.validate_field(mechanism_id, field.name, value)
+                    service.validate_field(mechanism_id, field.name, value, values)
                 except (TypeError, ValueError) as exc:
                     notice = f'Invalid {field.label}: {exc}'
                     continue
                 values[field.name] = value
                 break
-        for step, field in enumerate(setup.credentials, len(setup.fields) + 1):
+        setup = service.form(mechanism_id, values)
+        total = len(setup.fields) + len(setup.credentials)
+        for step, credential in enumerate(setup.credentials, len(setup.fields) + 1):
             notice = ''
             while True:
-                hint = ('Already set; press Enter to reuse the existing value.' if field.available
+                hint = ('Already set; press Enter to reuse the existing value.' if credential.available
                         else 'Missing; enter a value to continue.')
-                render(step, field.label, field.description, hint, notice)
+                render(step, credential.label, credential.description, hint, notice)
                 secret = read_secret(form.input, form.output,
-                    prompt=f'{field.label} (hidden; blank reuses an existing value): ')
+                    prompt=f'{credential.label} (hidden; blank reuses an existing value): ')
                 if secret is None or secret == '/cancel':
                     return False
                 try:
-                    service.validate_credential(mechanism_id, field.parameter, secret)
+                    service.validate_credential(mechanism_id, credential.parameter, secret, values)
                 except (TypeError, ValueError):
-                    notice = f'{field.label} is missing or conflicts with an existing secret variable. '
+                    notice = f'{credential.label} is missing or conflicts with an existing secret variable. '
                     notice += 'Enter a valid value, reuse the existing value, or cancel to change the variable in configuration.'
                     continue
-                secrets[field.parameter] = secret
+                secrets[credential.parameter] = secret
                 break
         quit_requested, action = form.choose_value(
             title=f'Set up {setup.label} · Review',

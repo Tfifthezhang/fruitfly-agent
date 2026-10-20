@@ -15,7 +15,7 @@ Add tools, execution backends, context strategies, and improvement algorithms th
 | [Environment](environment/README.md) | Local filesystem and process backend |
 | [Base prompt](base_prompt/README.md) | Built-in prompt text and its target adapter |
 | [Workflow](workflow/README.md) | Bounded sequential execution and its H target |
-| [Improvement](improvement/README.md) | Candidate search, scoring, task packs, budgets, and OPRO |
+| [Improvement](improvement/README.md) | Component workflow, task evidence, experience and optional verification |
 | [Learning](learning/README.md) | Independently configured daily task-material production |
 | [RSI](rsi/README.md) | Verified adoption and continuation across generations |
 | [Known limitations](ALGORITHM_AUDIT.md) | Current budget, I/O, cancellation, and composition limits |
@@ -25,14 +25,14 @@ Add tools, execution backends, context strategies, and improvement algorithms th
 | Question | Owner | Example |
 |---|---|---|
 | What runs, and what can change? | Object module and target adapter | Base prompt or Skill catalog guidance |
-| How are improvements proposed and compared? | Improvement | OPRO searches scored text candidates. |
+| How are improvements proposed and compared? | Improvement | Replaceable generators propose evidence-based component edits. |
 | Who verifies, adopts, and continues? | Human or explicit RSI host | Review one result, or run verified text evolution. |
 
-Improvement can run independently. Human adoption of a prompt is not a complete RSI process. Persistent RSI requires an injected host and independent verifier; only confirmed activation advances the version. A registered declarative I exploration policy can be compared and activated through DreamRSI. Workflow search changes bounded H stage workflows; Skill document optimization and Exploratory memory learning change registered S documents. These methods require independent confirmation before human review. Code replacement and arbitrary learning-state evolution remain unsupported.
+Improvement runs independently of RSI. Its public stage contracts separate proposal, execution, composition, output selection, verification and reflection. Persistent RSI requires an explicit host and verification policy; only confirmed activation advances the deployed version.
 
-Independent improvement methods live under `improvement/methods/` and declare supported H/S/I targets, with shared hosting and trial services outside those packages. Methods remain Lab algorithms. Object adapters stay with the modules that define the objects; see [Improvement methods](improvement/README.md#improvement-methods).
+Generators implement `CandidateGenerator`; `WorkflowBindings` injects replaceable stages. Existing H/S text owners reuse the same execution and adoption path. I edits require an explicit improver-comparison runner.
 
-[Automatic text search](improvement/automatic/README.md) can prepare learning material with an independently selected [failure processor](improvement/failure_processing/README.md), compare text candidates on fixed original tasks, and confirm once on holdout. It stops for human adoption and does not collect weak-feedback daily tasks or modify the improver.
+Task-local work can use execution evidence without answers or scores. Persistent candidates require independent verification before human adoption. Attributed experience is retained separately at task boundaries.
 
 ## Develop an algorithm
 
@@ -53,7 +53,7 @@ It registers a context transformer, assembles it through Run, and submits a task
 | Add an operation | `AgentTool` | [Tools](tools/README.md) |
 | Replace file or shell access | `ExecutionEnv` | [Environment](environment/README.md) |
 | Collect feedback or update experience | Active hook or passive observer | [Core extensions](../core/extensions/README.md) |
-| Search candidates | `Improver` or `TextImprover` | [Improvement](improvement/README.md#extend-search) |
+| Search candidates | `CandidateGenerator` and stage ports | [Improvement](improvement/README.md#extend-search) |
 | Verify and adopt across generations | `EvolutionHost` and explicit policy | [RSI](rsi/README.md) |
 
 ## Implementation rules

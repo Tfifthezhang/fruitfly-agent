@@ -24,7 +24,7 @@ from fruitfly_agent.interactive.terminal.rendering.renderer import TerminalRende
 from fruitfly_agent.interactive.terminal.io.text import safe_terminal_text
 from fruitfly_agent.interactive.contracts.evaluation import BenchmarkImprovementController
 from .events import BenchmarkEventDisplay
-from .panel import ExperimentPanel
+from .workflow_panel import WorkflowPanel
 from fruitfly_agent.interactive.contracts.improvement import ImprovementRunView
 from fruitfly_agent.interactive.contracts.candidates import CandidateSection
 from .formatting import format_improvement_activity
@@ -63,11 +63,16 @@ class TerminalImprovementFrontend:
         if self.menu_input is None or self.menu_renderer is None:
             self.report("improvement menu unavailable\n")
             return
-        panel = ExperimentPanel(clients=self.clients, benchmark=self.benchmark,
-            choose=self.choose_row, select=self._select_row, confirm=self.confirm_choice,
-            read=self.read_value, report=self.report, execute=self.execute,
-            history=self.experiment_history, direction=" ".join(arguments).strip())
-        await panel.run()
+        configuration = self.clients.workflow.workflow_configuration() if self.clients.workflow is not None else None
+        if configuration is not None:
+            panel = WorkflowPanel(client=self.clients.workflow, configuration=configuration,
+                choose=self.choose_row, read=self.read_value, confirm=self.confirm_choice,
+                report=self.report, execute=self.execute, history=self.experiment_history,
+                benchmark=self.benchmark,
+                direction=' '.join(arguments).strip())
+            await panel.run()
+            return
+        self.report('This host does not provide component improvement.\n')
 
     async def read_value(self, prompt):
         self.menu_renderer.begin_input(safe_terminal_text(prompt), selected=self._selected_row)

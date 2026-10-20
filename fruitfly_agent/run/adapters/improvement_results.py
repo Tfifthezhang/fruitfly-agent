@@ -4,6 +4,16 @@ from fruitfly_agent.interactive.contracts.candidates import CandidateSection
 
 def result_sections(completion, records, *, error='', stop_reason=''):
     report = completion.report if completion is not None else None
+    if completion is not None and completion.summary and report is not None:
+        stop = stop_reason or report.stop_reason
+        return stop, (
+            CandidateSection('Result', completion.summary + '\nStop reason: ' + stop
+                + ('\nError: ' + error if error else ''), initial=True),
+            CandidateSection('Task output', completion.output or '(no completed output)'),
+            CandidateSection('Verification', completion.assurance + '\nBehavioral selection does not establish correctness or a quality gain.'),
+            CandidateSection('Usage', f'Model calls: {report.model_calls}/{report.model_limit}\nTask executions: {report.trial_calls}/{report.trial_limit}\nToken receipts: unavailable'),
+            CandidateSection('Evidence', '\n'.join(f'{k}: {v}' for k, v in completion.evidence)),
+        )
     if report is None and records and records[0].report is not None:
         from fruitfly_agent.lab.improvement.api import SearchReport
         report = SearchReport(**records[0].report)

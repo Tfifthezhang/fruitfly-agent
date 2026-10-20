@@ -3,8 +3,8 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
-from fruitfly_agent.lab.improvement.runtime.reporting import token_usage, build_report, restore_search_report
-from fruitfly_agent.lab.improvement.contracts.search import content_id
+from fruitfly_agent.lab.improvement.evidence.reporting import token_usage, build_report, restore_search_report
+from fruitfly_agent.lab.improvement.contracts.versions import content_hash as content_id
 
 
 class ReportingTests(unittest.TestCase):

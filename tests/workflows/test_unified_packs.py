@@ -6,6 +6,7 @@ import tempfile
 import unittest
 
 from fruitfly_agent.interactive import TerminalFrontend
+from fruitfly_agent.interactive.contracts.improvement import WorkflowRequest
 from fruitfly_agent.lab.improvement.tasks import load_pack
 from tests.support import application as fixtures
 from tests.support.improvers import QueueEditor
@@ -17,9 +18,9 @@ class UnifiedPackApplicationTests(unittest.IsolatedAsyncioTestCase):
     async def test_each_declared_file_invalidates_preview_before_model_calls(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp).resolve();path=install(root,coding_pack())
-            app,_,provider=await fixtures.open_task_app(self,root,'opro')
+            app,_,provider=await fixtures.open_task_app(self,root)
             for filename in ('pack.json','cases.json','holdout.json'):
-                preview=app.improvement_preview(pack_id='coding',direction='improve')
+                preview=app.workflow_preview(WorkflowRequest(component_ids=('base_prompt',), task_pack_id='coding', direction='improve'))
                 file=path.parent/filename
                 original=file.read_bytes()
                 # Even a valid formatting edit is a different declared material version.
@@ -29,20 +30,6 @@ class UnifiedPackApplicationTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual([],provider.calls)
                 file.write_bytes(original)
 
-    async def test_default_direction_uses_generic_view_and_cancel_makes_no_requests(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root=Path(tmp).resolve();payload=coding_pack();payload['default_direction']='Improve boundary handling'
-            install(root,payload)
-            app,_,provider=await fixtures.open_task_app(self,root,'opro')
-            view=next(p for p in app.task_packs() if p.pack_id=='coding')
-            self.assertEqual(payload['default_direction'],view.default_direction)
-            editor=QueueEditor();editor.send('/improvement','@Target ·','@Base prompt','@OPRO','@Start improvement','@Cancel','q','/exit')
-            output=io.StringIO()
-            editor.output=output
-            await TerminalFrontend(app,input_stream=io.StringIO(),output_stream=output,line_editor=editor).run()
-            self.assertIn('Search guidance · Improve boundary handling',output.getvalue())
-            self.assertIn('Confirm improvement',output.getvalue())
-            self.assertEqual([],provider.calls)
 
     async def test_coding_correction_saves_checks_without_request_or_reference_code(self):
         for confirm in ('1','2'):

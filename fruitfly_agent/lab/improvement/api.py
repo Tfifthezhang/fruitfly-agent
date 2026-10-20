@@ -1,75 +1,50 @@
-"""Text search values: algorithms do not own persistence or adoption."""
+"""Public component-improvement ports consumed by hosts and external extensions."""
 from dataclasses import dataclass
-from typing import Protocol, runtime_checkable
-import math
-import re
-from fruitfly_agent.lab.algorithms.targets import validate_text
-from fruitfly_agent.lab.improvement.runtime.reporting import SearchReport, TokenUsage, restore_search_report
-from fruitfly_agent.lab.improvement.experiments.contracts import BenchmarkContext, ExperimentImprover
-from fruitfly_agent.lab.improvement.experiments.models import TaskReference, TaskRunEvidence, EvidenceArtifact, ExperimentTasks
+from typing import Any, Callable, Protocol, runtime_checkable
 
-TEXT_IMPROVER_COMPONENT = 'text-improver'
-TEXT_IMPROVEMENT_TARGET_COMPONENT = 'improvement-target-id'
-
-
-@dataclass(frozen=True)
-class SearchPreview:
-    algorithm: str
-    label: str
-    cost_notice: str
-    details: tuple[tuple[str, str], ...] = ()
-    target_id: str = "base_prompt"
-    preview_token: str = ""
-    role: str = "H"
-
-    def __post_init__(self):
-        if self.role not in {'H', 'S', 'I'}:
-            raise ValueError('preview role must be H, S or I')
-        if not all(isinstance(v, str) and v.strip() for v in (self.algorithm, self.label, self.cost_notice, self.target_id)):
-            raise ValueError("preview must declare algorithm, label, cost notice and target")
-        if any(len(pair) != 2 or not all(isinstance(v, str) for v in pair) for pair in self.details):
-            raise ValueError("preview details must be text label/value pairs")
-        object.__setattr__(self, 'details', tuple(tuple(pair) for pair in self.details))
+from .contracts.pipeline import (
+    TaskMaterial, Resource, ComponentDocument, ComponentFile, HarnessSnapshot,
+    CandidateBundle, EditReason, ExecutionRecord, Measurement, RunPlan,
+    ProposalRequest, ProposalResult, CompositionRequest, SelectionDecision,
+    ExperienceEntry, ImprovementOutcome, ArtifactAccess, ComponentAdapter,
+    CandidateGenerator, GeneratorDefinition, GenerationServices, Composer, TaskRunner, Selector,
+    Reflector, MeasurementSource, ExperienceRepository, VerificationPolicy,
+    EditorSession, EvidenceInspector, EditorWorkspace, JobServices, JobResource, WorkflowController, TaskSource,
+)
+from .components import (ComponentRegistry, TextComponentAdapter, FileComponentAdapter,
+    component_registry, bundle_target, bundle_text)
+from .workflow import (ImprovementWorkflow as ComponentWorkflow, WorkflowServices,
+    GeneratorRegistry, AgentGenerator, AgentComposer, AllocationExhausted)
+from .workflow.execution import FileTaskRunner
+from .editor import AgentEditor, AgentSelector, AgentReflector, model_completion
+from .editor.instructions import EditorInstructions, EditorInstructionTarget
+from .registration import SETTINGS, EDITOR_CONFIG, EDITOR_INSTRUCTIONS
+from .materials import WorkspaceTaskSource
+from .experience import entry_to_dict, entry_from_dict, experience_id
+from .verification import CaseMeasurements, HoldoutVerification
+from .evidence.receipts import TaskReference, TaskRunEvidence, EvidenceArtifact
+from .evidence.reporting import SearchReport, TokenUsage, restore_search_report
 
 
 @dataclass(frozen=True)
-class TextProposal:
-    text: str
-    algorithm: str
-    cases_digest: str = ''
-    seed_score: float | None = None
-    validation_score: float | None = None
-    metric_calls: int = 0
-    evidence: tuple[tuple[str, str], ...] = ()
-    report: SearchReport | None = None
-
-    def __post_init__(self):
-        validate_text(self.text)
-        if self.report is not None and not isinstance(self.report, SearchReport):
-            raise ValueError('proposal report must be a SearchReport')
-        if not isinstance(self.algorithm, str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*', self.algorithm):
-            raise ValueError('invalid proposal algorithm identity')
-        if isinstance(self.metric_calls, bool) or not isinstance(self.metric_calls, int) or self.metric_calls < 0:
-            raise ValueError('metric calls must be non-negative')
-        for value in (self.seed_score, self.validation_score):
-            if value is not None and (isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value)):
-                raise ValueError('optional search scores must be finite numbers')
-        if any(len(pair) != 2 or not all(isinstance(v, str) for v in pair) for pair in self.evidence):
-            raise ValueError('proposal evidence must be text label/value pairs')
-        object.__setattr__(self, 'evidence', tuple(tuple(pair) for pair in self.evidence))
-
-
-@runtime_checkable
-class TextImprover(Protocol):
-    """Deliver complete proposals in preferred order; the host publishes the first."""
-    def preview(self, *, task=None) -> SearchPreview: ...
-    async def search(self, prompt: str, direction: str, *, parent_manifest: str, task=None) -> tuple[TextProposal, ...]: ...
-    def cancel(self) -> bool: ...
+class WorkflowBindings:
+    """Replace stage implementations with factories owning one job's state."""
+    generators: GeneratorRegistry | None = None
+    runner: Callable[..., TaskRunner] | None = None
+    composer: Callable[..., Composer] | None = None
+    selector: Callable[..., Selector] | None = None
+    reflector: Callable[..., Reflector] | None = None
+    verifier: VerificationPolicy | None = None
+    measurements: MeasurementSource | None = None
+    workflow_factory: Callable[..., WorkflowController] | None = None
+    editor: Callable[..., EditorSession] | None = None
+    inspector: Callable[..., EvidenceInspector] | None = None
+    components: Callable[..., ComponentRegistry] | None = None
 
 
 @dataclass(frozen=True)
 class SearchActivity:
-    """Presentation snapshot; counters are usage, never whole-search completion."""
+    """Progress counters; no invented percentage or token estimates."""
     phase: str
     completed: int = 0
     total: int = 0
@@ -83,41 +58,19 @@ class SearchActivity:
 
 @runtime_checkable
 class SearchActivitySource(Protocol):
-    """Optional read-only progress capability, independent of search strategies."""
     def progress(self) -> SearchActivity | None: ...
 
 
 @dataclass(frozen=True)
-class MethodOption:
-    method_id: str
-    label: str
-    description: str
-    available: bool = True
-    reason: str = ''
-    default: bool = False
-    contributions: tuple[tuple[str, str], ...] = ()
-    parameters: tuple[dict, ...] = ()
-    task_sources: tuple[str, ...] = ('saved',)
-    requirements: tuple[tuple[str, str], ...] = ()
-    direction_help: str = ''
-    implementation_path: str = ''
-    documentation_path: str = ''
-
-
-@dataclass(frozen=True)
 class SearchCompletion:
-    """Final measurements and evidence even when search publishes no proposal."""
+    """Final results including unscored work; existing report records stay readable."""
     report: SearchReport
     evidence: tuple[tuple[str, str], ...] = ()
+    summary: str = ''
+    output: str = ''
+    assurance: str = ''
 
 
 @runtime_checkable
 class SearchCompletionSource(Protocol):
     def completion(self) -> SearchCompletion | None: ...
-
-
-def method_identity(improver):
-    """Serialize a host's declared execution identity without preview side effects."""
-    import json
-    identity = getattr(improver, 'improvement_identity', None)
-    return json.dumps(identity(), sort_keys=True, allow_nan=False) if callable(identity) else None

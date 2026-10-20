@@ -13,47 +13,12 @@ from fruitfly_agent.run.configuration.profile import HarnessProfile
 from fruitfly_agent.run.configuration.model_setup import RunModelSetup
 from fruitfly_agent.run.improvement.candidates import RunCandidates
 from fruitfly_agent.run.improvement.evolution import RunEvolutionHost
-from fruitfly_agent.run.improvement.search_jobs import RunSearchJobs
 from fruitfly_agent.run.storage.artifacts import DataArtifactStore
 from fruitfly_agent.run.storage.candidates import CandidateStore
 from tests.support.materials import _write_cases
-from tests.support.improvers import OfflineImprover
 
 
 class HostServiceTests(unittest.IsolatedAsyncioTestCase):
-    async def test_search_owns_preview_receipts_and_runs_with_injected_capabilities(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp).resolve()
-            _write_cases(root)
-            artifacts = DataArtifactStore(root / '.fruitfly/artifacts')
-            candidates = CandidateStore(root / '.fruitfly/improvement/candidates', artifacts)
-            target = BasePromptTarget('seed')
-            improver = OfflineImprover('base_prompt')
-            packs = TaskPackCatalog(root, legacy_path='.fruitfly/improvement/cases.json')
-            manifest = SimpleNamespace(digest='parent', to_dict=lambda: {'digest': 'parent'})
-            compactions = []
-            jobs = RunSearchJobs(
-                workspace=root, artifacts=artifacts, candidates=candidates,
-                snapshots=TaskSnapshotStore(root), active_manifest=lambda: manifest,
-                improver=lambda _manifest: improver,
-                target=lambda _manifest, **_kwargs: target,
-                task_catalog=lambda: packs, selected_target=lambda: 'base_prompt',
-                scope=lambda: (str(root / 'config.yaml'), 'default'),
-                compact=lambda: compactions.append(True),
-            )
-            preview = jobs.improvement_preview({'digest': 'parent'}, direction='improve')
-            self.assertEqual(jobs.last_target('parent'), 'base_prompt')
-            self.assertIsNone(jobs.last_target('another-parent'))
-            records = await jobs.improve({'digest': 'parent'}, 'improve', preview_token=preview.preview_token)
-            self.assertEqual(len(records), 1)
-            self.assertEqual(artifacts.read_text(records[0].artifact_id), 'seed\nUse exact answers.')
-            self.assertEqual(improver.calls, 1)
-            self.assertEqual(compactions, [True])
-            with self.assertRaisesRegex(ValueError, 'consumed'):
-                await jobs.improve({'digest': 'parent'}, 'improve', preview_token=preview.preview_token)
-            self.assertEqual(improver.calls, 1)
-            jobs.clear()
-            self.assertIsNone(jobs.last_target())
 
     async def test_candidate_activation_rechecks_settings_without_factory_or_application(self):
         with tempfile.TemporaryDirectory() as tmp:

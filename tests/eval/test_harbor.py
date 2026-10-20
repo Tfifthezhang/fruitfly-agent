@@ -25,6 +25,7 @@ from eval.benchmarks.harbor import (
 from eval.benchmarks.swe_bench import SWEBenchAdapter
 from eval.benchmarks.base import PreflightResult
 from eval.installation import resolve_installation, validate_installation
+from fruitfly_agent.lab.catalog import MechanismDefinition, MechanismDescriptor, MechanismContribution, builtin_catalog
 from tests.support.evaluation import request_payload
 from tests.support.harbor import InstalledAgentDouble, load_harbor_agent
 
@@ -609,6 +610,50 @@ profiles:
             self.assertEqual(enabled, {"compaction": True})
             self.assertEqual(copied_models.read_text(), models_path.read_text())
             self.assertEqual(secret_names, ("TEST_API_KEY",))
+
+    def test_runtime_forwards_independent_web_secrets_with_defaults_and_overrides(self) -> None:
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        (root / "models.yaml").write_text(yaml.safe_dump({"models": {
+            "test": {"api_key_env": "MODEL_KEY"}}}))
+        for backend, search_key, fetch_key, expected in (
+            ("deepseek", "", "", {"DEEPSEEK_SEARCH_API_KEY", "DEEPSEEK_FETCH_API_KEY"}),
+            ("deepseek", "SEARCH_ONLY", "FETCH_ONLY", {"SEARCH_ONLY", "FETCH_ONLY"}),
+            ("deepseek", "MODEL_KEY", "MODEL_KEY", set()),
+            ("brave", "", "", {"BRAVE_SEARCH_API_KEY"}),
+            ("deepseek", "DISABLED_KEY", "", {"DEEPSEEK_FETCH_API_KEY"}),
+        ):
+            with self.subTest(backend=backend, search_key=search_key):
+                mechanisms = [
+                    {"id": "web-search-tool", "enabled": search_key != "DISABLED_KEY", "parameters": {"backend": backend, "api_key_env": search_key}},
+                    {"id": "web-fetch-tool", "parameters": {"backend": "deepseek" if backend == "deepseek" else "direct", "api_key_env": fetch_key}},
+                ]
+                config = root / "config.yaml"
+                config.write_text(yaml.safe_dump({"profiles": {"default": {
+                    "model": {"catalog": "models.yaml"}, "mechanisms": mechanisms}}}))
+                output = root / "runtime"
+                output.mkdir(exist_ok=True)
+                generated, _, names = _runtime_files(
+                    runtime={"config_path": str(config), "profile": "default"}, output_dir=output)
+                self.assertEqual(expected | {"MODEL_KEY"}, set(names))
+                self.assertNotIn("DISABLED_KEY", names)
+                self.assertEqual(mechanisms, yaml.safe_load(generated.read_text())["profiles"]["default"]["mechanisms"])
+
+    def test_runtime_collects_non_web_component_credentials_through_catalog(self) -> None:
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        (root / "models.yaml").write_text("models: {test: {api_key_env: MODEL_KEY}}")
+        (root / "config.yaml").write_text(yaml.safe_dump({"profiles": {"default": {
+            "model": {"catalog": "models.yaml"}, "mechanisms": [{"id": "fixture-resource"}]}}}))
+        definition = MechanismDefinition(
+            MechanismDescriptor("fixture-resource", "Fixture resource", "Fixture credential consumer.",
+                                contributions=(MechanismContribution("capability", "tools"),)),
+            lambda *args: self.fail("credential discovery ran an installer"),
+            credential_variables=lambda parameters: ("RESOURCE_KEY",),
+            implementation_path="tests/eval/test_harbor.py", documentation_path="tests/eval/README.md")
+        (root / "runtime").mkdir()
+        with patch("eval.benchmarks.harbor.builtin_catalog", return_value=builtin_catalog().extended((definition,))):
+            _, _, names = _runtime_files(runtime={"config_path": str(root / "config.yaml"), "profile": "default"},
+                                         output_dir=root / "runtime")
+        self.assertEqual(("MODEL_KEY", "RESOURCE_KEY"), names)
 
     def test_installed_agent_exports_native_manifest_and_usage(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

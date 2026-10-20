@@ -40,6 +40,7 @@ Cancelled or failed restoration keeps the current session and does not display t
 | `model` / `prompt` | Select the model and prompt for the next session. |
 | Add model… | Collect host-provided service fields, hidden API key, and review; stage until configuration save. Opens on first startup when no models exist. |
 | Set API key… | Stage a missing credential for the selected model; the menu shows only set/missing status. |
+| Tools → Set up… | Select a web service and optional key variable, enter a hidden API key, and stage until configuration save. Direct fetch skips key input. |
 | Context, Tools, Environment | One readable row per mechanism; Enter expands algorithm choices and descriptions, Details reveals paths/configuration locations, Space enables/disables. |
 | Context sections | Augmentation groups Skills, Memory, Knowledge and HTTP; externalization and reduction remain separate sections on the same page. |
 | Algorithm selector | Multiple implementations use inline radio choices; sole implementations expose a description with expandable Details. |
@@ -53,6 +54,12 @@ Selecting a service replaces the choice menu with one field per screen. Each fie
 The `capabilities` page renders host-provided booleans as checkboxes with defaults. Space or Enter toggles the selected capability; Continue confirms. Choices limited to one value remain fixed and explain the requirement. Checked values are staged as `true`, unchecked values as `false`; cancel discards the page. The host remains responsible for capability validation.
 
 Model forms accept `/cancel` or EOF without staging. Review includes the selected service and defaults to Cancel. API key input disables TTY echo and bypasses readline/history; redirected input is read directly without writing its value to output. The host validates and saves settings; the terminal performs no Provider requests or filesystem configuration writes.
+
+Mechanism forms refresh credential requirements from pending non-secret field
+values before hidden input. Switching a service or key variable changes the
+binding within that form. `/clear` clears an ordinary field; required-field
+validation still applies. Hidden input and review reuse the model form's echo,
+history, cancellation and staging behavior. The host owns secret-file writes.
 
 ## Improve against a task set
 

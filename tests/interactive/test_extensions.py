@@ -5,6 +5,7 @@ from dataclasses import replace
 import io
 from types import SimpleNamespace
 import unittest
+from unittest.mock import Mock
 
 from fruitfly_agent.interactive import AgentApplication, ApplicationState
 from fruitfly_agent.interactive.contracts.candidates import CandidateView
@@ -62,7 +63,7 @@ class ExtensionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(app.runtime_manifest["digest"], saved[0][3]["source"]["parent_manifest"])
         self.assertEqual((), app.candidates())
         with self.assertRaisesRegex(RuntimeError, "no improvement service"):
-            app.improvement_preview()
+            app.workflow_preview(None)
 
     async def test_candidate_review_works_without_improvement(self):
         view = CandidateView("candidate", "proposed", "custom", "text", "artifact", "improve", "parent")
@@ -205,27 +206,20 @@ class ExtensionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([], provider.calls)
 
     async def test_menu_accepts_distinct_feature_clients(self):
-        from fruitfly_agent.interactive.contracts.improvement import ImprovementTargetView
-        targets = lambda: (ImprovementTargetView('H', 'base_prompt', 'Base prompt'),)
-        async def start(direction, **options):
-            self.fail('Navigation must not start improvement')
-        for clients in (
-            ImprovementClients(search=SimpleNamespace(improvement_preview=lambda **options:
-                ImprovementPreview('custom', 'Custom', 'offline', target='base_prompt'), start_improvement=start), targets=targets),
-            ImprovementClients(candidates=SimpleNamespace(candidates=lambda: ()), targets=targets),
-            ImprovementClients(materials=SimpleNamespace(task_packs_available=True)),
-        ):
-            provider = FauxProvider()
-            output = io.StringIO()
-            frontend = TerminalFrontend(offline_session(provider=provider), improvement_clients=clients,
-                input_stream=io.StringIO(), output_stream=output,
-                line_editor=ScriptedLines('/improvement', 'q', '/exit'))
-            await frontend.run()
-            self.assertIn('Improvement · Experiment', output.getvalue())
-            for field in ('Target ·', 'Task ·', 'Evaluation ·', 'Budget ·', 'Results and history'):
-                self.assertIn(field, output.getvalue())
-            self.assertNotIn('Save a failed task', output.getvalue())
-            self.assertEqual([], provider.calls)
+        from tests.support.improvement_ui import configuration
+        workflow = SimpleNamespace(workflow_configuration=configuration, workflow_preview=Mock())
+        clients = ImprovementClients(workflow=workflow, candidates=SimpleNamespace(candidates=lambda: ()))
+        provider = FauxProvider()
+        output = io.StringIO()
+        frontend = TerminalFrontend(offline_session(provider=provider), improvement_clients=clients,
+            input_stream=io.StringIO(), output_stream=output,
+            line_editor=ScriptedLines('/improvement', 'q', '/exit'))
+        await frontend.run()
+        self.assertIn('Component improvement', output.getvalue())
+        self.assertIn('Editable components', output.getvalue())
+        self.assertIn('Candidate generator', output.getvalue())
+        workflow.workflow_preview.assert_not_called()
+        self.assertEqual(provider.calls, [])
 
     async def test_previous_job_completion_cannot_reset_new_job_state(self):
         second_started, release = asyncio.Event(), asyncio.Event()

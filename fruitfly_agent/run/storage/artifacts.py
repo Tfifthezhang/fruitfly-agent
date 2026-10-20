@@ -54,7 +54,12 @@ class DataArtifactStore:
     def put_text(self, content: str) -> DataArtifactRef:
         if not isinstance(content, str):
             raise TypeError("artifact content must be text")
-        encoded = content.encode("utf-8")
+        return self.put_bytes(content.encode('utf-8'), media_type='text/plain; charset=utf-8')
+
+    def put_bytes(self, encoded: bytes, *, media_type='application/octet-stream') -> DataArtifactRef:
+        """Store an original input or evidence artifact without lossy text decoding."""
+        if not isinstance(encoded, bytes):
+            raise TypeError('artifact content must be bytes')
         artifact_id = "sha256:" + hashlib.sha256(encoded).hexdigest()
         path = self._path(artifact_id)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -78,9 +83,16 @@ class DataArtifactStore:
                     )
         finally:
             temporary.unlink(missing_ok=True)
-        return DataArtifactRef(artifact_id, "text/plain; charset=utf-8", len(encoded))
+        return DataArtifactRef(artifact_id, media_type, len(encoded))
 
     def read_text(self, artifact_id: str) -> str:
+        encoded = self.read_bytes(artifact_id)
+        try:
+            return encoded.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValueError(f'data artifact is not valid UTF-8 text: {artifact_id}') from exc
+
+    def read_bytes(self, artifact_id: str) -> bytes:
         path = self._path(artifact_id)
         if path.is_symlink():
             raise ValueError(f"data artifact must not be a symlink: {artifact_id}")
@@ -91,12 +103,7 @@ class DataArtifactStore:
         actual_id = "sha256:" + hashlib.sha256(encoded).hexdigest()
         if actual_id != artifact_id:
             raise ValueError(f"data artifact failed its content hash check: {artifact_id}")
-        try:
-            return encoded.decode("utf-8")
-        except UnicodeDecodeError as exc:
-            raise ValueError(
-                f"data artifact is not valid UTF-8 text: {artifact_id}"
-            ) from exc
+        return encoded
 
     def list_text_ids(self, *, limit: int = 100) -> tuple[str, ...]:
         """List local, verified UTF-8 candidates without following arbitrary paths."""

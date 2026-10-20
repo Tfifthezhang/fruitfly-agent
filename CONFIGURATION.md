@@ -108,13 +108,11 @@ The capability page uses arrows and Space/Enter to toggle, then **Continue** to 
 | Base prompt | `assistant-default`; choose another prompt in **Configure → prompt**. | [Base prompt](fruitfly_agent/lab/base_prompt/README.md) |
 | Skill catalog | Read `.skills/`; enable in **Context → Context augmentation → Skill catalog** (Space toggles; the phase is a section heading). | [Skills](fruitfly_agent/lab/context_manager/augmentation/skills/README.md) |
 | Reduction | Summarizing; expand Reduction to edit typed parameters, or use YAML. | [Reduction](fruitfly_agent/lab/context_manager/reduction/README.md) |
-| Improvement methods | Select compatible methods directly in `/improvement`; no algorithm enable switch. Workflow search, Skill document optimization and Exploratory memory learning require their object mechanisms. | [Improvement](fruitfly_agent/lab/improvement/README.md) |
+| Improvement | Choose materials, components, generator, exploration, allocations and scope in `/improvement`; no per-algorithm switch. | [Improvement](fruitfly_agent/lab/improvement/README.md) |
 | Reusable skill document | Disabled; Context augmentation. Set `source_path` to one workspace-relative Skill or enter `initial_text`; `max_chars=16000`. | [Skill body](fruitfly_agent/lab/context_manager/augmentation/skills/README.md#optimize-a-skill-body) |
 | Learned environment memory | Disabled; Context augmentation. Enter `initial_text`; `max_chars=16000`. Updates require explicit Improvement and adoption. | [Learned memory](fruitfly_agent/lab/context_manager/augmentation/information/file_memory/README.md#learn-environment-memory) |
 | Execution workflow | Disabled; a bounded sequence of model stages. One solve-and-answer step until an artifact is selected. | [Workflow](fruitfly_agent/lab/workflow/README.md) |
-| Web search / fetch | Disabled; enable **Search the web** and **Fetch web pages** under Tools. Search uses Brave or Tavily and a secret environment variable; fetch needs no search key. | [Web tools and YAML settings](fruitfly_agent/lab/tools/web/README.md) |
-| Failure processing | Optional YAML workflow dependency; benchmark jobs use failed-task replay on demand. | [Failure processing](fruitfly_agent/lab/improvement/failure_processing/README.md) |
-| Automatic text search | Benchmark jobs assemble confirmation on demand. Optional YAML `automatic-text-search` also supports saved packages with holdout; adoption requires human review. | [Automatic workflow and parameters](fruitfly_agent/lab/improvement/automatic/README.md) |
+| Web search / fetch | Disabled; enable **Search the web** and **Fetch web pages** under Tools. Search uses Brave, Tavily or DeepSeek. Fetch uses `direct` (no key) or `deepseek`. Expand either tool and choose **Set up…** to select the service and enter a hidden API key. Save writes the secret file. DeepSeek search/fetch use separate default variables; `api_key_env` can select a shared key. | [Web tools and YAML settings](fruitfly_agent/lab/tools/web/README.md) |
 | Programmatic context | Explicitly enable `ipython-tool` or `rlm-ipython`. | [Programmatic context](fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md) |
 | Remote execution | Enable **SSH server** under Environment. Complete settings and credentials are reused; missing values open the six-step form. Expand **Set up…** to edit explicitly. Disabling retains saved settings across restarts in the same workspace/profile. Mutually exclusive with local execution, local IPython/RLM and file memory. | [SSH setup and limits](fruitfly_agent/lab/environment/ssh/README.md) |
 | RSI | Host-injected capabilities and verification policy; no default CLI switch. | [RSI](fruitfly_agent/lab/rsi/README.md) |
@@ -137,12 +135,14 @@ Source paths resolve within the workspace. All three sources require `informatio
 | Field | Meaning |
 |---|---|
 | `prompt` | Built-in prompt ID or `sha256:…` text artifact; omission selects `assistant-default`. |
-| `artifact_bindings` | Named slots such as `skill-catalog.guidance`, `execution-workflow`, `skill-document` and `learned-memory`, mapped to text artifact IDs. |
+| `artifact_bindings` | Named slots such as `skill-catalog.guidance`, `tool-guidance.<name>`, `execution-workflow`, `skill-document` and `learned-memory`, mapped to text artifact IDs. |
 | `RuntimeManifest` | Actual model, normalized mechanisms, implementation identities, prompt hash, and consumed artifacts. |
 
 Create custom text with `DataArtifactStore.put_text`; see the [Run example](fruitfly_agent/run/README.md#text-artifacts). Artifacts are plaintext model instructions. Unknown or unused bindings are rejected; recovery verifies the original contents and manifest. Keep secrets out of artifacts, configuration, sessions, and reports.
 
-`execution-workflow` validates JSON stage instructions. `skill-document` and `learned-memory` are S documents and enter persistent-state identity rather than H identity. Adopted artifacts take precedence over configured initial text. Each slot must be consumed by its enabled object mechanism. The three methods require task packs with independent holdout; they confirm one selected candidate before publication. See the [offline three-method example](examples/improvement/native_methods/README.md).
+`tool-guidance.<name>` replaces an enabled tool description with its owner-validated text. `/improvement` selects one or more editable components. A joint candidate expands into ordinary prompt/artifact bindings; tool schemas, execution and permissions retain their existing contracts. Preview is offline; execution may incur model and external-runner costs.
+
+`execution-workflow` validates bounded stage instructions. `skill-document` and `learned-memory` are retained S documents; adopted artifacts override initial text. `improvement-editor` is an I stage-instruction artifact, requiring an explicit improver-comparison runner. Persistent publication requires independent verification and explicit adoption.
 
 ## Environment variables
 
@@ -154,6 +154,8 @@ Create custom text with `DataArtifactStore.put_text`; see the [Run example](frui
 | Model-specific `api_key_env` | Name of the variable containing that model's API key |
 | `FRUITFLY_SSH_USERNAME` / `FRUITFLY_SSH_PASSWORD` | Secret SSH account/password; `ssh-env.username_env` and `password_env` can select different variable names |
 | `BRAVE_SEARCH_API_KEY` / `TAVILY_API_KEY` | Secret used by the selected web search backend; optional `web-search-tool.api_key_env` overrides the variable name |
+| `DEEPSEEK_API_KEY` | Model credential used by the DeepSeek model examples |
+| `DEEPSEEK_SEARCH_API_KEY` / `DEEPSEEK_FETCH_API_KEY` | Separate default secrets for DeepSeek search and fetch. Each tool's `api_key_env` can select another variable, including the model key when explicit reuse is wanted. |
 
 [Secret template](examples/configuration/.env.example) contains public placeholders. Internal IPython subprocess variables are managed by the runtime and are not user settings.
 
@@ -167,7 +169,8 @@ With no initial choice, a sole catalog entry is selected automatically. Multiple
 | Experiment history | `.fruitfly/improvement/runs/`; scoped run summaries, including empty, failed and cancelled jobs |
 | Candidates | `.fruitfly/improvement/candidates/`; latest complete result per configuration, profile, target, and task pack |
 | Text contents | `.fruitfly/artifacts/`; immutable content-addressed artifacts |
-| Readable task results | `.fruitfly/improvement/task-results/<pack-id>/<config-profile-scope>/<target>/`; `latest.txt` and `latest.json` |
+| Workflow records | `.fruitfly/improvement/jobs/<job-id>/`; frozen plan, journal and result |
+| Experience | `.fruitfly/improvement/experience.json`; attributed library included in S identity |
 | Explicit evolution jobs | `.fruitfly/evolution/`; host-owned phases, policy, and activation evidence |
 
 Referenced results remain protected. Failed or cancelled searches do not replace a complete candidate. Editing a readable export does not change the runtime. See [Improvement](fruitfly_agent/lab/improvement/README.md#results-and-retention) for retention and [Run](fruitfly_agent/run/README.md#recovery) for compatibility rules.
@@ -184,11 +187,14 @@ files. Restricting model file tools does not disable configuration forms.
 Runtime approval is temporary and never saved as a permanent grant. Approved
 local code still has current-user permissions; isolation is not implemented.
 
-Host-owned `PermissionPolicy.allow_network=True` allows declared network-read tools; false denies them before execution. This does not restrict Providers, live context or approved shell code. Search credentials use the same process-over-secret-file precedence as model credentials, but model setup does not edit search keys; set them in the secret file or environment. Never put key values in mechanism parameters.
+Host-owned `PermissionPolicy.allow_network=True` allows declared network-read tools; false denies them before execution. This does not restrict Providers, live context or approved shell code. Search/fetch credentials use the same process-over-secret-file precedence as model credentials. Their **Set up…** forms accept hidden keys and share the model credential draft and save transaction. Keys are written only when configuration is saved; manual secret-file/environment setup remains supported. Never put key values in mechanism parameters.
 
-### Configure original-task experiment limits
+### Bound external task execution
 
-`automatic-text-search` also accepts `external_trial_model_calls` (24), `external_trial_timeout_seconds` (1800), and `external_timeout_seconds` (14400), all positive integers. They bound each original-task model allocation, individual task deadline and whole benchmark improvement deadline. Original tasks, derived exercises, material preparation and candidate search share the improver root budget. Configuring these values starts no model work. See [Original task experiments](fruitfly_agent/lab/improvement/experiments/README.md).
+External streams share the confirmed model-call and execution allocation across
+tasks. A trial leases up to 24 remaining model calls and has a 1800-second executor
+deadline; the workflow operation timeout may impose a smaller deadline. Unknown
+usage retains its reservation. There is no implicit whole-job monetary budget.
 
 ## Configure daily learning material
 
@@ -222,10 +228,26 @@ Custom legacy targets require explicit role classification before migration.
 Run one migration coordinator while the Agent is stopped; there is no
 cross-process transaction. Repeating a completed migration makes no changes.
 
-## Choose a method for one improvement job
+## Choose a candidate generator
 
-The configuration menu has no improvement category. `/improvement` discovers registered compatible methods, binds the selected method on demand and previews its requirements and budget. The experiment panel offers Target, Task, Budget and Evaluation. Expand Target to select the object and then its algorithm; algorithms show concise descriptions and implementation/guide paths under Target. Internal tuning stays in YAML at the displayed file/profile/mechanism location, or in programmatic previews. Task holds source/material choices and Budget holds limits. Field input preserves the page and focus while showing live text, current values and rules. The terminal offers no internal tuning list or JSON override editor. Search guidance appears only when declared by the method and may be empty; scoring and acceptance remain separate. Confirmed choices persist separately under `.fruitfly/improvement/preferences/`, scoped to configuration/profile/target; they do not change YAML or the parent optimizer version. Existing YAML method entries remain optional parameter defaults; disabled entries do not prevent command selection. Legacy enabled hosts remain supported. The preview shows the selected implementation and normalized parameters. New auxiliary model profiles still require configuration and a new session. See [Method selection](fruitfly_agent/lab/improvement/README.md#select-methods-without-changing-defaults).
+`/improvement` selects task materials, components, generator, exploration, feedback
+and effect scope. `GeneratorRegistry` declares factories and capabilities;
+`WorkflowRequest` freezes each job. Discovery and previews make no model requests.
+Retired algorithm selections are rejected, including disabled YAML entries. Remove
+them explicitly; there is no automatic equivalence to the new generator contract.
+Legacy namespace migration preserves historical data and does not translate those
+retired algorithms into the new workflow.
 
-## Configure DreamRSI
+## Configure the component editor
 
-Tree search registers its I exploration-policy target independently of method enablement. Optional disabled YAML method entries can store replay/confirmation parameter defaults. Registration performs no search. Collect H discovery histories, then explicitly choose DreamRSI for the I policy target. [DreamRSI](fruitfly_agent/lab/improvement/methods/dream_rsi/README.md#configure-method-entries) describes task packs, feedback, history paths and paired confirmation budgets. Generated policy JSON is stored as an I artifact; it is not executed as Python.
+The hidden default `component-improvement` registration has `editor_profile`
+(empty reuses the active model), `max_model_calls=64`, `max_executions=32` and
+`operation_timeout=120`. Model profiles use the existing catalog and secret
+configuration. Registration and previews make no model requests. Per-job component,
+generator, exploration, feedback and scope choices belong to `/improvement`.
+
+Python embeddings inject `WorkflowBindings` into `RunApplicationFactory` to replace
+stages. Changing an execution backend requires a compatible `TaskRunner`; the
+native improvement file workspace does not inherit the active SSH/Bash environment.
+No dedicated search-tool API key is needed for component editing; web search/fetch
+credentials remain independent tool settings.

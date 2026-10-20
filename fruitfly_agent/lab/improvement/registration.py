@@ -1,106 +1,54 @@
-"""Shared parameter declarations and assembly for native text improvers."""
-
-from __future__ import annotations
-
+"""One generic workflow configuration; stage implementations are injected ports."""
 from dataclasses import replace
-from typing import Any, Mapping, TYPE_CHECKING
 
-from fruitfly_agent.core.mechanisms import ParameterDescriptor
+from fruitfly_agent.core.mechanisms import MechanismDescriptor, MechanismContribution, MechanismEffects, ParameterDescriptor as P
 from fruitfly_agent.lab.algorithms.targets import TEXT_TARGET_PREFIX
-from fruitfly_agent.lab.improvement.runtime.host import HostedTextImprover
-from fruitfly_agent.lab.improvement.tasks import TASK_PACK_COMPONENT
-from fruitfly_agent.lab.improvement.api import TEXT_IMPROVER_COMPONENT, TEXT_IMPROVEMENT_TARGET_COMPONENT
-from fruitfly_agent.lab.improvement.runtime.services import NativeSearchServices
-from .trials import TRIAL_SERVICES_COMPONENT
-
-if TYPE_CHECKING:
-    from fruitfly_agent.lab.catalog.assembly import AssemblyContext, AssemblyState
-    from fruitfly_agent.lab.improvement.contracts.search import Improver
+from .editor.instructions import EditorInstructions, EditorInstructionTarget
 
 
-def text_target_parameters() -> tuple[ParameterDescriptor, ...]:
-    return (
-        ParameterDescriptor("target", "string", "Text target", "Enabled named target.", "base_prompt"),
-        ParameterDescriptor(
-            "cases_path", "path", "Default task pack or legacy cases JSON",
-            "Workspace-relative default source; selecting a saved task pack takes precedence. Escaping the workspace is rejected.",
-            ".fruitfly/improvement/cases.json",
-        ),
-    )
+SETTINGS = 'component-improvement-settings'
+EDITOR_CONFIG = 'component-improvement-editor-config'
+EDITOR_INSTRUCTIONS = 'component-improvement-editor-instructions'
 
 
-def text_budget_parameters() -> tuple[ParameterDescriptor, ...]:
-    return (
-        ParameterDescriptor("max_metric_calls", "integer", "Trial budget", "Root trial call limit.", 32, minimum=1, maximum=200),
-        ParameterDescriptor("max_model_calls", "integer", "Model budget", "Root Provider attempt limit for all roles and trials.", 64, minimum=1, maximum=300),
-        ParameterDescriptor("output_max_tokens", "integer", "Output limit", "Per request output token cap.", 1024, minimum=128, maximum=4096),
-        ParameterDescriptor("call_timeout_seconds", "integer", "Call timeout", "Maximum seconds per operation.", 30, minimum=1, maximum=180),
-    )
-
-
-def install_text_improver(
-    state: AssemblyState,
-    context: AssemblyContext,
-    parameters: Mapping[str, Any],
-    *,
-    strategy: Improver,
-    label: str,
-    roles: tuple[str, ...],
-    confirm_on_holdout=False,
-) -> AssemblyState:
-    """Bind an injected strategy without starting a search or calling a model."""
-    source = state.components[TASK_PACK_COMPONENT].with_legacy(parameters["cases_path"])
-    role_configs = {}
-    for role in roles:
-        profile = parameters.get(role + "_profile")
-        if profile:
-            binding = context.provider_resolver(profile, parameters["output_max_tokens"])
-            role_configs[role] = replace(
-                state.config, provider=binding.provider, model=binding.model,
-                context_window=binding.context_window or state.config.context_window,
-                max_tokens=binding.max_output_tokens or state.config.max_tokens,
-            )
-    improver = HostedTextImprover(
-        strategy, state.config, context.workspace, parameters,
-        target=state.components.get(TEXT_TARGET_PREFIX + parameters["target"]),
-        label=label, role_configs=role_configs, task_source=source,
-        services_factory=state.components.get(TRIAL_SERVICES_COMPONENT, NativeSearchServices),
-        trial_targets=tuple(t for key, t in state.components.items()
-                            if key.startswith(TEXT_TARGET_PREFIX) and getattr(t, 'project_in_trials', False)),
-        confirm_on_holdout=confirm_on_holdout,
-    )
-    context.own(improver)
-    return (
-        state.with_component(TEXT_IMPROVER_COMPONENT, improver)
-        .with_component(TASK_PACK_COMPONENT, source)
-        .with_component(TEXT_IMPROVEMENT_TARGET_COMPONENT, parameters["target"])
-    )
-
-
-def native_method_definition(strategy_type, *, label, description, implementation_path, documentation_path,
-                             family, target, parameters, direction_help=''):
-    """Declare a native method with the shared on-demand text-artifact host."""
-    from fruitfly_agent.core.mechanisms import MechanismDescriptor, MechanismContribution, MechanismEffects
+def definition():
     from fruitfly_agent.lab.catalog.models import MechanismDefinition
-    from fruitfly_agent.lab.improvement.methods import MethodDefinition
-    target_fields = tuple(replace(p, default=target) if p.name == 'target' else p
-                          for p in text_target_parameters())
-    def install(state, context, values):
-        return install_text_improver(state, context, values, strategy=strategy_type(), label=label,
-                                     roles=('improver', 'curriculum'), confirm_on_holdout=True)
-    return MechanismDefinition(MechanismDescriptor(strategy_type.spec.algorithm_id, label,
-        description,
-        contributions=(MechanismContribution('improvement', 'context'),
-                       *((MechanismContribution('improvement', family),) if family != 'context' else ())),
-        parameters=(*target_fields, *text_budget_parameters(), *parameters),
-        exclusive_group='text-improver', install_order=76,
-        effects=MechanismEffects(uses_provider=True, uses_network=True, writes_files=True,
-            cost_notice='Explicit search runs scored trials and model requests and stores evidence; calls may incur charges.')),
-        install, implementation_id=strategy_type.spec.implementation_id,
-        implementation_path=implementation_path, documentation_path=documentation_path,
-        provides=frozenset({'text-improver'}), selection_group='text-improver', selection_group_label='Text improver',
-        improvement=MethodDefinition(strategy_type.supported_roles, strategy_type.supported_schemas,
-            strategy_type.required_capabilities | frozenset({'workflow-trials'}),
-            lambda binding: binding.text_host(strategy_type(), label=label, confirm_on_holdout=True),
-            usage=strategy_type.usage, budget_parameters=tuple(p.name for p in text_budget_parameters()),
-            direction_help=direction_help, material_parameters=('cases_path',)))
+    return MechanismDefinition(MechanismDescriptor('component-improvement', 'Component improvement',
+        'Configure shared editing and execution allocations without starting improvement.',
+        contributions=(MechanismContribution('improvement', 'context'),),
+        default_enabled=True,
+        parameters=(P('editor_profile', 'string', 'Editor model', 'Model catalog profile; empty reuses the active model.', ''),
+            P('max_model_calls', 'integer', 'Model calls', 'Root allocation across stages.', 64, minimum=1, maximum=10000),
+            P('max_executions', 'integer', 'Task executions', 'Root execution allocation.', 32, minimum=1, maximum=1000),
+            P('operation_timeout', 'number', 'Operation timeout', 'Seconds per stage.', 120, minimum=1, maximum=14400)),
+        install_order=76, effects=MechanismEffects(uses_provider=True, uses_network=True, writes_files=True,
+            cost_notice="Explicit improvement runs call models and execute tasks; registration makes no requests.")),
+        _install, visible=False, implementation_id='component-workflow-v1',
+        artifact_slots=frozenset({'improvement-editor'}), prepare_targets=_prepare_targets,
+        implementation_path='fruitfly_agent/lab/improvement/registration.py',
+        documentation_path='fruitfly_agent/lab/improvement/README.md')
+
+
+def _install(state, context, parameters):
+    config = state.config
+    if parameters['editor_profile']:
+        binding = context.provider_resolver(parameters['editor_profile'], None)
+        config = replace(config, provider=binding.provider, model=binding.model,
+            context_window=binding.context_window or config.context_window,
+            max_tokens=binding.max_output_tokens or config.max_tokens)
+    return state.with_component(SETTINGS, dict(parameters)).with_component(EDITOR_CONFIG, config)
+
+
+def _prepare_targets(state, context):
+    instructions = EditorInstructions()
+    reference = context.artifact_bindings.get('improvement-editor')
+    if reference is not None:
+        if context.artifact_reader is None:
+            raise ValueError('editor instructions require an artifact reader')
+        text = context.artifact_reader(reference)
+        instructions = EditorInstructions.parse(text)
+        if not any(a['key'] == 'improvement-editor' for a in state.data_artifacts):
+            state = state.with_data_artifact({'key': 'improvement-editor', 'id': reference, 'role': 'I',
+                'media_type': 'application/json', 'size_bytes': len(text.encode('utf-8'))})
+    return (state.with_component(EDITOR_INSTRUCTIONS, instructions)
+        .with_component(TEXT_TARGET_PREFIX + 'improvement-editor', EditorInstructionTarget(instructions)))

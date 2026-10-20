@@ -27,7 +27,7 @@ class EvalBridgeTests(unittest.IsolatedAsyncioTestCase):
             request = BenchmarkImprovementRequest('terminal-bench', 'starter')
             preview = controller.benchmark_preview(request, 'Improve task success')
             selection, executor, direction = factory.benchmark_task_preview.call_args.args
-            self.assertEqual(selection, {'benchmark_id': 'terminal-bench', 'variant': 'starter', 'task_limit': 5})
+            self.assertEqual(selection, __import__('dataclasses').asdict(request))
             self.assertIsInstance(executor, BenchmarkTrialClient)
             application.improve.assert_not_awaited()
             events = AsyncMock()
@@ -42,11 +42,11 @@ class EvalBridgeTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as directory:
             controller, application, factory = self.controller(Path(directory))
             controller.benchmark_preview(BenchmarkImprovementRequest('terminal-bench', 'starter',
-                method_id='alternative', target_id='base_prompt', parameters={'rounds': 1}))
+                generator_id='alternative', component_ids=('base_prompt',), width=2))
             selection = factory.benchmark_task_preview.call_args.args[0]
-            self.assertEqual(selection['method_id'], 'alternative')
-            self.assertEqual(selection['target_id'], 'base_prompt')
-            self.assertEqual(selection['parameters'], {'rounds': 1})
+            self.assertEqual(selection['generator_id'], 'alternative')
+            self.assertEqual(selection['component_ids'], ('base_prompt',))
+            self.assertEqual(selection['width'], 2)
             application.improve.assert_not_awaited()
 
     async def test_failed_execution_still_consumes_preview(self):

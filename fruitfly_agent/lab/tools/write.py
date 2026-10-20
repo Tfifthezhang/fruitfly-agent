@@ -45,7 +45,9 @@ def create_write_tool() -> AgentTool:
         name="write",
         label="Write file",
         description=(
-            "Write content to a file. Creates the file if it doesn't exist, "
+            "Write a complete text file in the selected execution environment (local or SSH). "
+            "Use for creating files or replacing their entire contents. "
+            "Creates the file if it doesn't exist, "
             "overwrites if it does. Automatically creates parent directories."
         ),
         parameters=_WRITE_SCHEMA,

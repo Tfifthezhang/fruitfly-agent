@@ -15,7 +15,7 @@ No live experiment is recorded here. Enter actual observations; do not substitut
 | Repeats / seed / budgets | |
 | Calls / failures / timeouts / missing usage | |
 
-| Holdout case | Baseline passed / total | OPRO passed / total | Raw output / failure |
+| Holdout case | Baseline passed / total | candidate workflow passed / total | Raw output / failure |
 |---|---|---|---|
 | holdout-001 run_lengths | | | |
 | holdout-002 transpose | | | |

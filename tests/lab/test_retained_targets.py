@@ -10,8 +10,6 @@ from fruitfly_agent.core.data_model import AssistantMessage, UserMessage
 from fruitfly_agent.core.loop import run_agent_loop
 from fruitfly_agent.lab.algorithms.retained import RetainedText
 from fruitfly_agent.lab.algorithms.targets import state_artifact_path
-from fruitfly_agent.lab.improvement.contracts.search import ImprovementProblem, TaskCase
-from fruitfly_agent.lab.improvement.runtime.services import NativeSearchServices, SearchBudget, SearchJournal, BudgetExhausted
 from fruitfly_agent.lab.workflow import WorkflowTarget, apply_workflow, parse_workflow
 from tests.support.faux_provider import FauxProvider
 
@@ -30,28 +28,35 @@ class RetainedTargetTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(ValueError):
                 target.validate(text)
 
+    async def trial(self, config, targets, changed, text, calls=10):
+        from fruitfly_agent.lab.improvement.api import (component_registry, RunPlan,
+            TaskMaterial, FileTaskRunner, WorkflowServices, HarnessSnapshot, ComponentFile)
+        from fruitfly_agent.lab.algorithms.targets import SystemVersion, content_hash
+        from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
+        registry = component_registry(targets)
+        harness = HarnessSnapshot(tuple(replace(c, files=(ComponentFile('instructions.txt', text),))
+            if c.component_id == changed else c for c in registry.snapshot().components))
+        plan = RunPlan('test', SystemVersion(*(content_hash(v) for v in ('H', 'I', 'S'))), (changed,), max_model_calls=calls)
+        services = WorkflowServices(plan)
+        record = await FileTaskRunner(config, registry, MemoryArtifacts(), services).execute(
+            plan, TaskMaterial('task', 'select'), harness)
+        return record, services
+
     async def test_workflow_production_and_trials_use_same_steps_and_final_output(self):
         text = json.dumps({'steps': ['Solve carefully.', 'Critique and return final answer only.']})
         provider = FauxProvider()
         provider.respond_text('draft')
         provider.respond_text('B')
         config = AgentLoopConfig(provider=provider, system_prompt='base')
-        production = apply_workflow(config, text)
-        result = await run_agent_loop(production, [UserMessage(content='select')])
+        result = await run_agent_loop(apply_workflow(config, text), [UserMessage(content='select')])
         self.assertEqual([m.text for m in result.messages if isinstance(m, AssistantMessage)], ['draft', 'B'])
-        self.assertIn('Solve carefully.', provider.calls[0]['system_prompt'])
         production_calls = provider.calls.copy()
         provider.calls.clear()
         provider.respond_text('draft')
         provider.respond_text('B')
-        target = WorkflowTarget(text)
-        problem = ImprovementProblem('job', 'parent', target.snapshot(), '', (TaskCase('train', 'A'),),
-            (TaskCase('select', 'B'),), 'cases', 'execution')
-        services = NativeSearchServices(problem, production, target, budget=SearchBudget(10, 5), journal=SearchJournal(problem))
-        evaluation = await services.evaluate(text, 'validation')
-        self.assertEqual(evaluation.score, 1)
-        self.assertEqual(evaluation.observations[0].output, 'B')
-        self.assertEqual(services.budget.used, {'model': 2, 'trial': 1})
+        record, services = await self.trial(config, (WorkflowTarget(text),), 'execution-workflow', text)
+        self.assertEqual((record.status, record.output), ('completed', 'B'))
+        self.assertEqual(services.used['model'], 2)
         self.assertEqual(provider.calls[0]['system_prompt'], production_calls[0]['system_prompt'])
         self.assertEqual(provider.calls[1]['messages'][-1].content, 'Critique and return final answer only.')
 
@@ -59,14 +64,11 @@ class RetainedTargetTests(unittest.IsolatedAsyncioTestCase):
         provider = FauxProvider()
         provider.respond_text('draft')
         provider.respond_text('B')
-        target = RetainedText('skill-document', 'old skill', 'Skill', 'skill-document-v1')
+        skill = RetainedText('skill-document', 'old skill', 'Skill', 'skill-document-v1')
         memory = RetainedText('learned-memory', 'fixed memory', 'Memory', 'environment-memory-v1')
         workflow = WorkflowTarget('{"steps":["reason","return final"]}')
-        p = ImprovementProblem('job', 'parent', target.snapshot(), '', (TaskCase('train', 'A'),),
-            (TaskCase('select', 'B'),), 'cases', 'execution')
-        s = NativeSearchServices(p, AgentLoopConfig(provider=provider), target, budget=SearchBudget(10, 5),
-            journal=SearchJournal(p), trial_targets=(target, memory, workflow))
-        self.assertEqual((await s.evaluate('new skill', 'validation')).score, 1)
+        record, _ = await self.trial(AgentLoopConfig(provider=provider), (skill, memory, workflow), 'skill-document', 'new skill')
+        self.assertEqual(record.output, 'B')
         self.assertIn('fixed memory', provider.calls[0]['system_prompt'])
         self.assertIn('new skill', provider.calls[0]['system_prompt'])
         self.assertNotIn('old skill', provider.calls[0]['system_prompt'])
@@ -76,33 +78,10 @@ class RetainedTargetTests(unittest.IsolatedAsyncioTestCase):
         provider = FauxProvider()
         provider.respond_text('draft')
         target = WorkflowTarget('{"steps":["reason","finish"]}')
-        p = ImprovementProblem('job', 'parent', target.snapshot(), '', (TaskCase('train', 'A'),),
-            (TaskCase('select', 'B'),), 'cases', 'execution')
-        s = NativeSearchServices(p, AgentLoopConfig(provider=provider), target,
-            budget=SearchBudget(1, 5), journal=SearchJournal(p))
-        with self.assertRaises(BudgetExhausted):
-            await s.evaluate(target.text, 'validation')
+        record, services = await self.trial(AgentLoopConfig(provider=provider), (target,), 'execution-workflow', target.text, calls=1)
+        self.assertEqual(record.status, 'error')
+        self.assertEqual(services.used['model'], 1)
         self.assertEqual(len(provider.calls), 1)
-
-    async def test_production_context_order_matches_trials_with_multiple_documents(self):
-        from fruitfly_agent.core.context import ContextFrame
-        provider = FauxProvider()
-        skill = RetainedText('skill-document', 'old skill', 'Skill', 'skill-document-v1')
-        memory = RetainedText('learned-memory', 'fixed memory', 'Memory', 'environment-memory-v1')
-        workflow = WorkflowTarget('{"steps":["reason","return final"]}')
-        original = apply_workflow(AgentLoopConfig(provider=provider, system_prompt='base'), workflow.text)
-        p = ImprovementProblem('job', 'parent', skill.snapshot(), '', (TaskCase('train', 'A'),),
-            (TaskCase('select', 'B'),), 'cases', 'execution')
-        s = NativeSearchServices(p, original, skill, budget=SearchBudget(10, 5), journal=SearchJournal(p),
-            trial_targets=(skill, memory, workflow))
-        provider.respond_text('draft')
-        provider.respond_text('B')
-        await s.evaluate('new skill', 'validation')
-        selected = replace(skill, text='new skill')
-        frame = ContextFrame(original.system_prompt, (), (), '', 1024)
-        frame = selected.transform(frame).frame
-        frame = memory.transform(frame).frame
-        self.assertEqual(provider.calls[0]['system_prompt'], frame.system_prompt)
 
     def test_workflow_rejects_code_unknown_fields_and_unbounded_steps(self):
         for value in ('print(1)', '{}', '{"steps":[]}', '{"steps":[1]}',

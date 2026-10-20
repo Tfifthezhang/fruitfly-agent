@@ -17,6 +17,7 @@ import yaml
 
 from fruitfly_agent.providers.config import load_env
 from fruitfly_agent.providers.workspace import WorkspacePaths
+from fruitfly_agent.lab.catalog import MechanismSelection, builtin_catalog
 from eval.installation import resolve_installation
 from eval.contracts import EvaluationRequest, SCHEMA_VERSION
 from dataclasses import asdict
@@ -525,7 +526,11 @@ def _runtime_files(
         encoding="utf-8",
     )
     shutil.copyfile(source_catalog, model_path)
-    return config_path, model_path, _secret_names(model_path)
+    secret_names = set(_secret_names(model_path))
+    selections = tuple(MechanismSelection(item["id"], enabled=item.get("enabled", True),
+                                          parameters=item.get("parameters") or {}) for item in mechanisms)
+    secret_names.update(builtin_catalog().required_credentials(selections))
+    return config_path, model_path, tuple(sorted(secret_names))
 
 
 def _secret_names(model_catalog: Path) -> tuple[str, ...]:

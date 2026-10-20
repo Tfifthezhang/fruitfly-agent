@@ -48,7 +48,7 @@ class RunEvaluationController:
         selection = {key: value for key, value in asdict(request).items() if value is not None}
         preview = self.preview_benchmark(selection, executor, direction)
         self.improvement_previews[preview.preview_token] = (
-            executor, direction.strip() or "Improve completion of the frozen original benchmark tasks.")
+            executor, direction)
         return preview
 
     async def improve(self, preview_token, on_event=None):

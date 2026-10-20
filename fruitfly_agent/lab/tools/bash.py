@@ -112,7 +112,10 @@ def create_bash_tool() -> AgentTool:
         label="Execute shell command",
         describe_call=lambda args: args.get("description", ""),
         description=(
-            "Execute a bash command in the current working directory. Returns stdout "
+            "Execute a bash command in the selected execution environment (local or SSH), "
+            "starting in its current working directory. Use for inspecting the environment, "
+            "running programs, installing dependencies, building and testing, downloading files, "
+            "and processing structured API responses. Returns stdout "
             f"and stderr. Output is truncated to the last {DEFAULT_MAX_LINES} lines or "
             f"{DEFAULT_MAX_BYTES // 1024}KB (whichever is hit first). If truncated, the "
             "tool attempts to save the full output to a temp file and reports save failures. "

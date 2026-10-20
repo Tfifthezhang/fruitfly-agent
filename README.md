@@ -47,9 +47,7 @@ Our ambition is **recursive self-improvement (RSI)**: agents that improve their 
 | [Improvement](fruitfly_agent/lab/improvement/README.md) | Search and compare candidates for a fixed target under a defined objective. It can run independently. |
 | [RSI](fruitfly_agent/lab/rsi/README.md) | Verify and adopt changes to the system or its improver, then continue with the adopted implementation across generations. |
 
-The built-in `/improvement` menu selects H/S/I targets. H supports prompt/guidance search and bounded Workflow search. S supports Skill document optimization and Exploratory memory learning. These three workflow/document methods confirm one selection winner on independent tasks before human review. [DreamRSI](fruitfly_agent/lab/improvement/methods/dream_rsi/README.md) improves a registered I exploration-policy artifact. Arbitrary source replacement remains unsupported. Daily [learning material recording](fruitfly_agent/lab/learning/README.md) is separately configured and produces pending observations without inferred scores. Broader harness experiments use the public mechanism contracts and researcher-supplied evaluators, version bindings, and adoption hosts. The generic RSI driver accepts host-bound implementation references; the built-in durable Run host handles text artifacts. See [Lab](fruitfly_agent/lab/README.md#improvement-and-rsi) for these implementation boundaries. Runtime manifests record declared identities; reproducible research also needs source and learning-state records.
-
-Optional [automatic text search](fruitfly_agent/lab/improvement/automatic/README.md) prepares learning exercises from explicitly scored failures, compares candidates on fixed original tasks and confirms one candidate on holdout before human adoption. Its [offline demonstration](examples/improvement/automatic_text/README.md) uses scripted responses; real quality gains remain unmeasured.
+The `/improvement` menu selects task materials, editable components, a candidate generator, exploration and budgets. Public protocols separate proposal, execution, composition, output selection, verification and reflection. Current-task outputs do not change profile defaults; persistent candidates require verification and human adoption. H/S/I retain separate identities. See [Improvement](fruitfly_agent/lab/improvement/README.md) for execution limits and [Learning](fruitfly_agent/lab/learning/README.md) for independent daily observations.
 
 | At a glance | Details |
 |---|---|
@@ -140,10 +138,7 @@ FruitFlyAgent is released under the [MIT License](LICENSE). See [Third-party not
 | Source | Contribution |
 |---|---|
 | [Pi](https://github.com/earendil-works/pi) | Runtime design and adapted Agent loop, Session, and tool infrastructure; code attribution and the upstream license are recorded in [Third-party notices](THIRD_PARTY_NOTICES.md). |
-| [Dream-RSI](https://arxiv.org/abs/2609.14858) | Research basis for prefix-only replay and exploration-policy refinement; [implemented scope](fruitfly_agent/lab/improvement/methods/dream_rsi/README.md). |
-| [Automated Design of Agentic Systems](https://arxiv.org/abs/2408.08435) | Archive-conditioned design, reflection and comparison in [Workflow search](fruitfly_agent/lab/improvement/methods/workflow_search/README.md). |
-| [SkillOpt](https://arxiv.org/abs/2605.23904) | Feedback minibatches, bounded edits and validation gates in [Skill document optimization](fruitfly_agent/lab/improvement/methods/skill_edit/README.md). |
-| [RSIAgent](https://arxiv.org/abs/2609.15364) | Broad/deep practice, grounded consolidation and frozen reuse in [Exploratory memory learning](fruitfly_agent/lab/improvement/methods/memory_exploration/README.md). |
+| [Harness²](https://arxiv.org/abs/2610.14224) | Evidence-driven component editing, Propose–Probe–Compose and cross-task experience; [implemented scope](fruitfly_agent/lab/improvement/README.md). |
 | [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) | Inspiration for externalizing context into a programmable Python environment; see [Programmatic context](fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md). |
 
 Research sources and the scope of each adaptation are documented in the corresponding algorithm modules.

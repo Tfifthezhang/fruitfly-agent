@@ -21,4 +21,4 @@ Change chunking or ranking through [Information source contracts](../README.md#e
 .venv/bin/python -m unittest tests.lab.test_information_sources.InformationSourcesTest.test_knowledge_reindexes_current_files_and_cites_lines -v
 ```
 
-Catalog registers a bounded workspace text snapshot source for [original-task experiments](../../../../improvement/experiments/README.md). Each trial receives copied Markdown/text files and an explicit root identity, so production knowledge is not shared for writes. External services and arbitrary plugin state are not frozen.
+Catalog registers a bounded workspace text snapshot source for [original-task experiments](../../../../improvement/README.md). Each trial receives copied Markdown/text files and an explicit root identity, so production knowledge is not shared for writes. External services and arbitrary plugin state are not frozen.

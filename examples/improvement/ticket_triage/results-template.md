@@ -2,7 +2,7 @@
 
 [Up: Ticket Triage Improvement](README.md)
 
-No live experiment is recorded here. Compare baseline and OPRO with the same model and independent inputs.
+No live experiment is recorded here. Compare baseline and candidate workflow with the same model and independent inputs.
 
 | Condition | Value |
 |---|---|
@@ -14,7 +14,7 @@ No live experiment is recorded here. Compare baseline and OPRO with the same mod
 | Repeats / seed / budgets | |
 | Raw Session / search journal paths | |
 
-| Holdout | Expected | Baseline output | OPRO output |
+| Holdout | Expected | Baseline output | candidate workflow output |
 |---|---|---|---|
 | 1 | P0\|SECURITY | | |
 | 2 | P1\|OUTAGE | | |

@@ -2,7 +2,7 @@
 
 [Up: Lab](../README.md)
 
-Execute bounded sequences of model stages through Core's existing follow-up callback. Workflow definitions are H artifacts; searching them belongs to [Workflow search](../improvement/methods/workflow_search/README.md).
+Execute bounded sequences of model stages through Core's existing follow-up callback. Workflow definitions are H artifacts; searching them belongs to the [component workflow](../improvement/README.md).
 
 ## Enable a workflow
 

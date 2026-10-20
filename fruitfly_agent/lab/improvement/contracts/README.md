@@ -2,23 +2,27 @@
 
 [Up: Improvement](../README.md)
 
-Represent modification scope, immutable parent versions and comparison evidence without benchmark-specific dependencies.
+[Pipeline](pipeline.py) defines immutable task materials, component file sets,
+candidate bundles, execution records, optional measurements, plans, stage requests,
+selection decisions and attributed experience. Stage protocols are exported through
+[the public API](../api.py). There are no model requests or filesystem operations.
 
-| Entry | Responsibility |
+| Contract | Invariant |
 |---|---|
-| [__init__.py](__init__.py): `ImprovementRequest` | One H/S/I role, target and fixed comparison conditions |
-| `ImprovementAdapter`, `ImprovementComparison` | Explicit preparation/cleanup and evidence-producing comparison |
-| `ComparisonEvidence` | Bind the decision to candidate, policy and conditions |
-| [search.py](search.py) | Text search problems, strategy/services protocols, observations and results |
-| [versions.py](versions.py) | Immutable H/I/S identity and registered persistent-state snapshots |
-| [candidates.py](candidates.py) | Declared target changes, candidate identity and target registry |
+| `TaskMaterial` / `Resource` | Owned relative paths and immutable byte references; no answers |
+| `HarnessSnapshot` / `ComponentDocument` | Distinct stable IDs, declared kind, axis and schema |
+| `CandidateBundle` | Frozen parent, complete component set and per-edit evidence |
+| `ExecutionRecord` | Task, material, harness, initial state and conditions identities |
+| `SelectionDecision` | Existing run ID; output selection differs from verification |
+| `JobServices` / `JobResource` | Shared budgets, cancellation, operations and optional asynchronous cleanup |
+| `RunPlan` | Exact component scope, generator, modes and shared allocations |
+| `ExperienceEntry` | Task attribution, lesson, limitations, evidence and reusable snapshot |
 
-Target meaning and execution remain owned by the object module. A declared role or content hash does not provide an executable adapter. Model allocation, budgets and acceptance conditions remain external to the modifiable H/I/S triple. Original-task context belongs to [Experiments](../experiments/README.md).
-
-Natural-language `direction` is optional bounded guidance, with an empty string allowed. It is separate from the required scoring/comparison policy. A method may derive its objective entirely from task feedback and its own fixed comparison rules.
-
-No configuration, filesystem operations or model requests occur here. [Runtime](../runtime/README.md) validates and consumes these values; Run persists and activates candidates.
+[Versions](versions.py) bind H/I/S separately. [Candidates](candidates.py) declare
+actual target changes; scope checks reject undeclared axes. Concrete adapters
+belong to the object owner. Role metadata does not supply execution or activation.
+Run uses the same version contracts for persistent publication and recovery.
 
 ```bash
-.venv/bin/python -m unittest tests.lab.test_improvement_roles tests.lab.test_experiment_contracts
+.venv/bin/python -m unittest tests.lab.test_improvement_pipeline tests.lab.test_experiment_contracts tests.contracts.test_signatures
 ```

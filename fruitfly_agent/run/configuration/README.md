@@ -57,7 +57,16 @@ writes all staged credentials together, rolls back ordinary failures, and update
 the host secret environment only after success. Reset discards the complete
 shared draft. Credential values never enter snapshots, review or harness YAML.
 
-The public `RunConfigurationController` in [Run](../README.md) composes this controller with candidate-backed prompt presentation. The configuration implementation receives an artifact store and optional prompt-choice callback; it does not discover candidate paths or depend on runtime preparation. Default workspace paths and environment precedence are documented in the configuration reference below. Improvement methods have no configuration-menu category; `/improvement` owns method selection and visible per-job material/budget inputs. Algorithms show registration-owned descriptions; Details reveals implementation/guide paths and configuration locations. Configuration exposes only declared user inputs; internal tuning stays in YAML or programmatic previews. Existing YAML entries remain optional defaults. Method-owned artifact slots registered independently of enablement remain valid adoption targets.
+Mechanisms with a Catalog credential declaration show each required variable's
+set/missing status in their effects. Enabled missing credentials also appear in
+snapshot warnings. This is an offline projection; values stay in `CredentialDraft`.
+Web tools expose **Set up…** forms for hidden API keys. `form`, `validate_field`
+and `validate_credential` accept optional pending non-secret values; credential
+requirements use the service and variable selected in that form. Direct fetch
+requires no key. Staging and saving reuse the shared credential transaction, with
+no backend-specific host branches. Runtime assembly requires declared credentials.
+
+The public `RunConfigurationController` in [Run](../README.md) composes this controller with candidate-backed prompt presentation. The configuration implementation receives an artifact store and optional prompt-choice callback; it does not discover candidate paths or depend on runtime preparation. Default workspace paths and environment precedence are documented in the configuration reference below. Improvement uses separate typed per-job contracts for components, generators, materials and allocations. The hidden `component-improvement` registration supplies shared editor defaults. Object mechanisms own their artifact slots and validation.
 
 | Reference | Purpose |
 |---|---|

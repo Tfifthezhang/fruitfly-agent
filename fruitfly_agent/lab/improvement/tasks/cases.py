@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import hashlib
 import json
-from fruitfly_agent.lab.improvement.contracts.search import TaskCase
+from fruitfly_agent.lab.improvement.tasks.models import TaskCase
 
 @dataclass(frozen=True)
 class TaskSuite:

@@ -106,13 +106,13 @@ Canonical data and record semantics belong to [Session](../core/session/README.m
 
 ## Candidate jobs
 
-[improvement/search_jobs.py](improvement/search_jobs.py) owns preview receipts and uses injected improver, target, task, storage, and active-version queries. The Factory retains active bindings and exposes the public host methods.
+[improvement/pipeline.py](improvement/pipeline.py) owns preview receipts and uses public stage factories, components, task, storage and active-version queries. The Factory retains active bindings and exposes the public host methods.
 
 | Step | Run's responsibility |
 |---|---|
 | Preview | Bind one-use token to target, direction, task material, and parent manifest. |
 | Start | Recheck source identity before model work, then freeze the job. |
-| Search | Call generic `TextImprover.search(text, direction, parent_manifest=..., task=...)`. |
+| Execute | Run the injected `WorkflowController` through public stage contracts. |
 | Save | Persist the preferred complete proposal, artifacts, task identity, and evidence. |
 | Review | Map results to Interactive sections without parsing strategy-specific logs. |
 | Activate | Prepare a separate handle; commit host references only after successful startup. |
@@ -120,7 +120,7 @@ Canonical data and record semantics belong to [Session](../core/session/README.m
 
 The terminal edits one experiment panel and exposes scoped run history through the improvement service. Submitted jobs receive summaries even when cancelled before execution or completed without a candidate; native reports retain measured usage, stopping reasons and verified journal references. History protects referenced candidates without relaxing activation checks.
 
-Target views use optional object-owned readable labels, with stable-ID fallback for existing targets. Method metadata places budget/material inputs under Budget/Task and concise algorithm descriptions with implementation/guide paths under Target. Internal tuning remains in YAML or programmatic previews. Discovery omits incompatible roles/formats and retains unavailable matching methods with reasons. These presentation choices do not alter H/I/S identity or execution contracts.
+Component and generator views declare capability availability. Typed workflow requests select materials, component scope, exploration, allocations and optional feedback. Adding an implementation does not add algorithm branches to Run or the terminal.
 
 Task selection does not change runtime configuration. Lab owns pack parsing and training edits. Readable `latest.txt` exports are not runtime inputs. Failed replacement retains the active runtime; external writes and effects do not automatically roll back. See [Improvement results](../lab/improvement/README.md#results-and-retention).
 
@@ -170,4 +170,4 @@ Authorization audit entries contain call/tool identity, operation, outcome, and 
 
 ## Start an original-task improvement experiment
 
-Use `/improvement` to select a saved task package or a bounded benchmark task set. One explicitly confirmed benchmark job prepares original material and freezes source, H/I/S, profile, model catalog, registered text state and original task bytes; its own baseline and official verification determine improvement. It does not silently start when configuration is enabled. A confirmed candidate uses the existing human review and fresh-session adoption path. See [Original task experiments](../lab/improvement/experiments/README.md) for budgets, splits, artifacts and unsupported targets. The public [trial.py](trial.py) composition entry runs one injected isolated task through the normal Application; Eval remains optional.
+Use `/improvement` to select a saved task package or a bounded benchmark task set. One explicitly confirmed benchmark job prepares original material and freezes source, H/I/S, profile, model catalog, registered text state and original task bytes; its own baseline and official verification determine improvement. It does not silently start when configuration is enabled. A confirmed candidate uses the existing human review and fresh-session adoption path. See [Original task experiments](../lab/improvement/README.md) for budgets, splits, artifacts and unsupported targets. The public [trial.py](trial.py) composition entry runs one injected isolated task through the normal Application; Eval remains optional.

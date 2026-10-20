@@ -55,7 +55,8 @@ def compact_candidates(workspace, store, config_path):
                 if path.is_symlink():
                     return ()
                 walk(yaml.safe_load(path.read_text()), config=True)
-        for directory, evolution in (('sessions', False), ('evolution', True), ('improvement/runs', True)):
+        for directory, evolution in (('sessions', False), ('evolution', True), ('improvement/runs', True),
+                                     ('improvement/jobs', False), ('improvement/external', False)):
             for path in (workspace / '.fruitfly' / directory).rglob('*'):
                 if path.is_symlink():
                     return ()
@@ -66,6 +67,11 @@ def compact_candidates(workspace, store, config_path):
                                 walk(json.loads(line), evolution=evolution)
                     else:
                         walk(json.loads(path.read_text()), evolution=evolution)
+        experience = workspace / '.fruitfly/improvement/experience.json'
+        if experience.is_symlink():
+            return ()
+        if experience.exists():
+            walk(json.loads(experience.read_text()))
         for path in (workspace / '.fruitfly/improvement/experiments').rglob('experiment.json'):
             if path.is_symlink():
                 return ()
@@ -104,7 +110,10 @@ def compact_candidates(workspace, store, config_path):
             path = store.artifacts.root / reference.removeprefix('sha256:')
             if not path.exists() and not path.is_symlink():
                 continue  # Task/trace hashes are identities, not stored artifacts.
-            body = store.artifacts.read_text(reference)
+            try:
+                body = store.artifacts.read_bytes(reference).decode('utf-8')
+            except UnicodeDecodeError:
+                continue
             try:
                 value = json.loads(body)
             except ValueError:

@@ -63,7 +63,7 @@ class CandidateRecord:
             raise ValueError("invalid Improvement candidate id")
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", self.algorithm) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", self.target):
             raise ValueError("unsupported improvement candidate")
-        if self.binding_kind not in {"prompt", "artifact"} or (self.binding_kind == "artifact" and not self.binding_key):
+        if self.binding_kind not in {"prompt", "artifact", "components"} or (self.binding_kind == "artifact" and not self.binding_key):
             raise ValueError("invalid candidate binding")
         if not isinstance(self.metric_calls, int) or isinstance(self.metric_calls, bool) or self.metric_calls < 0:
             raise ValueError("invalid candidate metric call count")
@@ -103,7 +103,11 @@ class CandidateStore:
         report=None,
         task_pack_id="", task_pack_name="", task_pack_hash="",
     ) -> CandidateRecord:
-        validate_candidate_text(text)
+        if snapshot.binding.kind == 'components':
+            if not isinstance(text, str) or not text.strip() or len(text.encode('utf-8')) > 2_000_000:
+                raise ValueError('component candidate exceeds its allocation')
+        else:
+            validate_candidate_text(text)
         parent_artifact = self.artifacts.put_text(snapshot.text)
         artifact = self.artifacts.put_text(text)
         record = CandidateRecord(

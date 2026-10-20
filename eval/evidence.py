@@ -8,7 +8,7 @@ import shutil
 import tomllib
 from typing import Any
 
-from fruitfly_agent.lab.improvement.experiments import TaskReference, TaskRunEvidence, EvidenceArtifact
+from fruitfly_agent.lab.improvement.api import TaskReference, TaskRunEvidence, EvidenceArtifact
 from fruitfly_agent.lab.improvement.contracts.versions import canonical_json, content_hash, SystemVersion
 
 

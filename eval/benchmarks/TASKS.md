@@ -57,6 +57,6 @@ Install the benchmark extra and start Docker Engine using the [environment guide
 
 Standalone Eval results live in `.fruitfly/eval/<evaluation-id>/`: `report.md`, `report.json`, parsed `trials/`, and Harbor artifacts with task sessions, events and setup/verifier logs. A completed report does not imply all tasks passed. Inspect infrastructure errors separately from failed tasks. See [artifact paths](../DEVELOPER_GUIDE.md#follow-execution-and-reports).
 
-This selected exercise set is not a representative benchmark score or an improvement training/holdout split. Reports are not automatically ingested by the [automatic text workflow](../../fruitfly_agent/lab/improvement/automatic/README.md). Preserve original environment and verifier identities when deriving future learning material.
+This selected exercise set is not a representative benchmark score or an improvement training/holdout split. [Improvement](../../fruitfly_agent/lab/improvement/README.md) consumes explicit task sources and attributable executions; grader answers are not implicit learning data.
 
-Direct improvement task material lives in `.fruitfly/improvement/task-sources/`; experiments, source snapshots, search journals and reviewed candidates use the [original-task improvement layout](../../fruitfly_agent/lab/improvement/experiments/README.md#read-artifacts-and-extend-execution).
+Direct improvement task material lives in `.fruitfly/improvement/task-sources/`; experiments, source snapshots, search journals and reviewed candidates use the [original-task improvement layout](../../fruitfly_agent/lab/improvement/README.md#results-and-retention).

@@ -10,7 +10,7 @@ from fruitfly_agent.lab.algorithms.evolution import VerificationEvidence
 from fruitfly_agent.lab.rsi.persistent import PersistentEvolutionDriver
 from fruitfly_agent.run.evolution import RunEvolutionHost
 from fruitfly_agent.run.application import RunApplicationFactory
-from tests.support.improvers import offline_factory
+from tests.support.improvers import offline_factory, improve
 
 
 class PersistentEvolutionTests(unittest.IsolatedAsyncioTestCase):
@@ -23,16 +23,12 @@ class PersistentEvolutionTests(unittest.IsolatedAsyncioTestCase):
             async def verify(record, text):
                 observed.append((record.parent_manifest_digest, text, record.artifact_id))
                 return VerificationEvidence(record.candidate_id, record.artifact_id, record.parent_manifest_digest, 'explicit-policy', True)
-            host = RunEvolutionHost(app, factory, policy_id='explicit-policy', verify=verify)
-            first_improver = factory._current_improver
+            host = RunEvolutionHost(app, factory, policy_id='explicit-policy', verify=verify, request=factory.test_request)
             result = await PersistentEvolutionDriver().evolve(host, job_id='job', policy_id='explicit-policy', direction='improve', max_steps=2)
             self.assertEqual(result.phase, 'complete')
             self.assertEqual(result.steps, 2)
             self.assertEqual(len(observed), 2)
             self.assertNotEqual(observed[0][0], observed[1][0])
-            self.assertIsNot(first_improver, factory._current_improver)
-            self.assertEqual(first_improver.calls, 1)
-            self.assertEqual(factory._current_improver.calls, 0)
             self.assertEqual(host.active_manifest(), result.current_manifest)
             # Both experiments remain reviewable through history. The inbox
             # still presents only the latest candidate for this scope.
@@ -46,7 +42,7 @@ class PersistentEvolutionTests(unittest.IsolatedAsyncioTestCase):
             fresh_factory = RunApplicationFactory(cwd=Path(tmp), environment={}, catalog=factory.catalog, provider_registry=factory.provider_registry)
             restored = AgentApplication(fresh_factory)
             await restored.start()
-            new_host = RunEvolutionHost(restored, fresh_factory, policy_id='explicit-policy', verify=verify)
+            new_host = RunEvolutionHost(restored, fresh_factory, policy_id='explicit-policy', verify=verify, request=factory.test_request)
             resumed = await PersistentEvolutionDriver().evolve(new_host, job_id='job', policy_id='explicit-policy', direction='improve', max_steps=2)
             self.assertEqual(resumed, result)
             self.assertEqual(len(observed), 2)
@@ -57,10 +53,10 @@ class PersistentEvolutionTests(unittest.IsolatedAsyncioTestCase):
             factory = offline_factory(Path(tmp))
             app = AgentApplication(factory)
             await app.start()
-            records = await app.improve('improve')
+            records = await improve(app, factory)
             before = app.runtime_manifest
             app.candidate_action(records[0].candidate_id, 'adopt')
-            host = RunEvolutionHost(app, factory, policy_id='policy', verify=lambda *args: None)
+            host = RunEvolutionHost(app, factory, policy_id='policy', verify=lambda *args: None, request=factory.test_request)
             self.assertFalse(host.is_active(records[0].candidate_id))
             self.assertEqual(app.runtime_manifest, before)
             await app.close()
@@ -72,7 +68,7 @@ class PersistentEvolutionTests(unittest.IsolatedAsyncioTestCase):
             await app.start()
             async def verify(record, text):
                 return VerificationEvidence(record.candidate_id, record.artifact_id, record.parent_manifest_digest, 'policy', True)
-            host = RunEvolutionHost(app, factory, policy_id='policy', verify=verify)
+            host = RunEvolutionHost(app, factory, policy_id='policy', verify=verify, request=factory.test_request)
             original = host.save_job
             def crash(job):
                 if job.phase == 'ready' and job.steps == 1:
@@ -95,7 +91,7 @@ class PersistentEvolutionTests(unittest.IsolatedAsyncioTestCase):
             await app.start()
             async def wrong(record, text):
                 return VerificationEvidence(record.candidate_id, 'sha256:wrong', record.parent_manifest_digest, 'policy', True)
-            host = RunEvolutionHost(app, factory, policy_id='policy', verify=wrong)
+            host = RunEvolutionHost(app, factory, policy_id='policy', verify=wrong, request=factory.test_request)
             before = app.runtime_manifest
             with self.assertRaisesRegex(ValueError, 'exact candidate'):
                 await PersistentEvolutionDriver().evolve(host, job_id='wrong', policy_id='policy', direction='improve')
@@ -107,18 +103,17 @@ class PersistentEvolutionTests(unittest.IsolatedAsyncioTestCase):
             factory = offline_factory(Path(tmp))
             app = AgentApplication(factory)
             await app.start()
-            host = RunEvolutionHost(app, factory, policy_id='policy', verify=lambda *_: None)
+            host = RunEvolutionHost(app, factory, policy_id='policy', verify=lambda *_: None, request=factory.test_request)
             async def fail(direction):
                 raise RuntimeError('proposal interrupted')
             host.propose = fail
             driver = PersistentEvolutionDriver()
             with self.assertRaisesRegex(RuntimeError, 'proposal interrupted'):
                 await driver.evolve(host, job_id='interrupted', policy_id='policy', direction='improve')
-            fresh_host = RunEvolutionHost(app, factory, policy_id='policy', verify=lambda *_: None)
+            fresh_host = RunEvolutionHost(app, factory, policy_id='policy', verify=lambda *_: None, request=factory.test_request)
             result = await driver.evolve(fresh_host, job_id='interrupted', policy_id='policy', direction='improve')
             self.assertEqual(result.phase, 'interrupted')
             self.assertEqual(result.steps, 1)
-            self.assertEqual(factory._current_improver.calls, 0)
             await app.close()
 
     async def test_configuration_change_after_prepare_is_not_overwritten_by_activation(self):
@@ -128,7 +123,7 @@ class PersistentEvolutionTests(unittest.IsolatedAsyncioTestCase):
             await app.start()
             self.addAsyncCleanup(app.close)
             before = app.runtime_manifest
-            record = (await app.improve('improve'))[0]
+            record = (await improve(app, factory))[0]
             candidate = await factory.prepare_candidate(before, record.candidate_id)
             factory.configuration.set_mechanism('knowledge-files', enabled=True)
             factory.configuration.save()

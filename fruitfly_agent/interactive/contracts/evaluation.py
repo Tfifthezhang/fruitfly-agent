@@ -39,13 +39,17 @@ class BenchmarkImprovementRequest:
     benchmark_id: str
     variant: str
     task_limit: int = 5
-    method_id: str | None = None
-    target_id: str | None = None
-    parameters: Mapping[str, Any] | None = None
+    generator_id: str = 'agent-editor-v1'
+    component_ids: tuple[str, ...] = ()
+    mode: str = 'parallel'
+    width: int = 1
+    depth: int = 1
+    max_model_calls: int = 128
+    max_executions: int = 64
 
     def __post_init__(self):
-        if type(self.task_limit) is not int or not 3 <= self.task_limit <= 12:
-            raise ValueError("improvement task limit must be 3–12")
+        if type(self.task_limit) is not int or not 1 <= self.task_limit <= 12:
+            raise ValueError("improvement task limit must be 1–12")
 
 
 @runtime_checkable

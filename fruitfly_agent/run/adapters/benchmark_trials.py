@@ -40,7 +40,7 @@ class BenchmarkTrialClient:
         for path, expected in self.runtime_hashes.items():
             if "sha256:" + hashlib.sha256(self.owned_path(path).read_bytes()).hexdigest() != expected:
                 raise ValueError("frozen runtime configuration or model catalog changed")
-        root = self.owned_path(self.workspace / ".fruitfly/improvement/experiments/trials" / uuid4().hex)
+        root = self.owned_path(self.workspace / ".fruitfly/improvement/external/trials" / uuid4().hex)
         root.parent.mkdir(parents=True, exist_ok=True)
         request_path = root.with_suffix(".request.json")
         request = {"schema_version": 1, "runtime": self.runtime, "benchmark_id": self.benchmark_id,

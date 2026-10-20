@@ -52,7 +52,7 @@ For each of the 6 holdout cases, send only its input in a new empty session with
 .venv/bin/python -m fruitfly_agent.lab.improvement.tasks.verification score examples/improvement/python_functions/pack.json --case holdout-001 --answer-file /tmp/function-answer.py
 ```
 
-Compare baseline and candidate under the same model, materials, and policy. Selection scores are not independent holdout evidence. The optional [automatic workflow](../../../fruitfly_agent/lab/improvement/automatic/README.md) runs holdout confirmation before publishing a candidate; ordinary search uses the manual procedure above. Adoption remains a separate human decision.
+Compare baseline and candidate under the same model, materials and policy. Selection scores are not independent holdout evidence. The [verification policy](../../../fruitfly_agent/lab/improvement/verification/README.md) runs independent comparison before persistent publication. Adoption remains an explicit human decision.
 
 | Boundary | Scope |
 |---|---|

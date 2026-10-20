@@ -6,8 +6,7 @@ import tempfile
 import unittest
 
 from fruitfly_agent.lab.algorithms.targets import SystemVersion, StateSnapshot, SnapshotFile, TargetChange, VersionCandidate, TargetRegistry, content_hash
-from fruitfly_agent.lab.improvement.experiments import TaskReference, TaskRunEvidence, EvidenceArtifact, ExperimentTasks
-from fruitfly_agent.lab.improvement.failure_processing.projection import EvidenceProjection
+from fruitfly_agent.lab.improvement.api import TaskReference, TaskRunEvidence, EvidenceArtifact
 from fruitfly_agent.run.storage.artifacts import DataArtifactStore
 from fruitfly_agent.run.storage.snapshots import SnapshotStore
 
@@ -63,25 +62,3 @@ class ExperimentContractTests(unittest.TestCase):
             TaskRunEvidence('run', self.task, 'error', 0)
         with self.assertRaises(ValueError):
             TaskRunEvidence('run', self.task, 'scored', True)
-        with self.assertRaises(ValueError):
-            ExperimentTasks((self.task,), (self.task,), (self.task,))
-        other = replace(self.task, task_id='other')
-        with self.assertRaises(ValueError):
-            ExperimentTasks((self.task,), (other,), (replace(other, task_id='third'),))
-
-    def test_projection_uses_only_authorized_training_and_canonical_messages(self):
-        evidence = TaskRunEvidence('run', self.task, 'scored', 0, artifacts=(
-            EvidenceArtifact('trajectory', 'session.jsonl', content_hash('trajectory')),))
-        text = '\n'.join(json.dumps(row) for row in [
-            {'type': 'meta', 'secrets': 'excluded'},
-            *({'type': 'message', 'message': {'role': 'assistant', 'content': str(i)}} for i in range(9))])
-        projection = EvidenceProjection()
-        result = json.loads(projection.project(evidence, authorized={self.task.reference_id}, load_artifact=lambda _: text))
-        self.assertEqual(result['trajectory_total_messages'], 9)
-        self.assertEqual(len(result['trajectory_excerpt']), 6)
-        self.assertNotIn('excluded', repr(result))
-        self.assertEqual(result['source_task']['instruction'], self.task.instruction)
-        with self.assertRaises(ValueError):
-            projection.project(evidence, authorized=set(), load_artifact=lambda _: self.fail('must not read holdout'))
-        with self.assertRaises(ValueError):
-            projection.project(replace(evidence, status='unscored', score=None), authorized={self.task.reference_id}, load_artifact=lambda _: '')

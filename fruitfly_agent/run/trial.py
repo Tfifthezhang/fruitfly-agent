@@ -12,7 +12,7 @@ from pathlib import Path
 
 from fruitfly_agent.core.data_model import AssistantMessage
 from fruitfly_agent.interactive import AgentApplication
-from fruitfly_agent.lab.algorithms.targets import SystemVersion, StateSnapshot, content_hash, canonical_json
+from fruitfly_agent.lab.algorithms.targets import SystemVersion, StateSnapshot, TargetSnapshot, target_edits, content_hash, canonical_json
 from fruitfly_agent.providers.registry import default_registry
 from fruitfly_agent.run.application import RunApplicationFactory
 from fruitfly_agent.run.configuration.profile import HarnessConfig, save_harness_config
@@ -38,14 +38,23 @@ async def execute_trial(packet: dict, *, workspace: Path, config_path: Path, pro
             or harness["source"] != capture_source_tree(source_root).snapshot_id):
         raise ValueError("trial source, H or S material does not match its frozen version")
     target = packet["target"]
-    if target.get("role") != "H" or target.get("schema") != "text-v1" or target.get("kind") not in {"prompt", "artifact"}:
-        raise ValueError("this runtime trial host supports registered H text targets only")
+    if target.get("role") not in {'H', 'S'} or target.get("kind") not in {"prompt", "artifact", "components"}:
+        raise ValueError("this runtime trial host supports registered execution and state components")
     from fruitfly_agent.lab.algorithms.targets import validate_text
-    validate_text(packet["text"])
+    if target.get('kind') != 'components':
+        validate_text(packet["text"])
+    snapshot = TargetSnapshot.from_dict(target['snapshot']) if 'snapshot' in target else None
+    if snapshot is not None and (snapshot.role != target['role'] or snapshot.schema != target['schema']
+                                 or snapshot.binding.kind != target['kind'] or snapshot.binding.key != target['key']):
+        raise ValueError('trial target metadata differs from its snapshot')
+    if target['kind'] == 'components' and snapshot is None:
+        raise ValueError('component trials require their frozen target snapshot')
     if target["kind"] == "prompt" and harness["base_prompt"]["content_hash"] != content_hash(packet["text"]):
         raise ValueError("trial prompt differs from its H version")
-    if target["kind"] == "artifact" and harness.get("target_overrides", {}).get(target["key"]) != content_hash(packet["text"]):
-        raise ValueError("trial guidance differs from its H version")
+    if target['kind'] == 'artifact' and (snapshot is None or packet['text'] != snapshot.text):
+        reference = next((a['id'] for a in harness.get('data_artifacts', ()) if a['key'] == target['key']), None)
+        if reference != content_hash(packet['text']):
+            raise ValueError('trial guidance differs from its H version')
     workspace = workspace.resolve()
     expected_paths = {entry.path for entry in state.files}
     for root in state.roots:
@@ -72,12 +81,18 @@ async def execute_trial(packet: dict, *, workspace: Path, config_path: Path, pro
             raise ValueError("trial artifact content differs from its declared identity")
     factory = RunApplicationFactory(cwd=workspace, config_path=str(config_path), profile_id=profile,
                                     environment=environment, provider_registry=registry)
-    binding = factory.artifact_store.put_text(packet["text"]).artifact_id
     selected = factory.selection.profile
-    if target["kind"] == "prompt":
-        selected = replace(selected, prompt=binding)
+    if snapshot is not None:
+        for part, value in target_edits(snapshot, packet['text']):
+            if part.role not in {'H', 'S'} or part.binding.kind not in {'prompt', 'artifact'}:
+                raise ValueError('trial component needs an execution/state binding')
+            binding = factory.artifact_store.put_text(value).artifact_id
+            selected = (replace(selected, prompt=binding) if part.binding.kind == 'prompt' else
+                        replace(selected, artifact_bindings={**selected.artifact_bindings, part.binding.key: binding}))
     else:
-        selected = replace(selected, artifact_bindings={**selected.artifact_bindings, target["key"]: binding})
+        binding = factory.artifact_store.put_text(packet["text"]).artifact_id
+        selected = (replace(selected, prompt=binding) if target['kind'] == 'prompt' else
+                    replace(selected, artifact_bindings={**selected.artifact_bindings, target['key']: binding}))
     # Preserve absolute catalog resolution before writing an isolated profile.
     catalog = Path(selected.model_catalog)
     if not catalog.is_absolute():
@@ -107,7 +122,7 @@ async def execute_trial(packet: dict, *, workspace: Path, config_path: Path, pro
     try:
         await app.start(session_path=output_directory / "session.jsonl")
         receipt["runtime"] = app.runtime_manifest
-        if target["kind"] != "prompt" or content_hash(canonical_json(
+        if content_hash(canonical_json(
                 execution_version_payload(app.runtime_manifest, harness["source"]))) != version.harness:
             raise ValueError("trial assembled different execution mechanisms or artifacts")
         actual_models = {key: {k: v for k, v in value.items() if k != "transport"}

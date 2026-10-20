@@ -10,11 +10,10 @@ from unittest.mock import Mock, patch
 
 from fruitfly_agent.interactive import AgentApplication, TerminalFrontend
 from fruitfly_agent.lab.catalog import builtin_catalog, MechanismDefinition, MechanismDescriptor, MechanismContribution, ParameterDescriptor, MechanismSelection
-from fruitfly_agent.lab.improvement.api import SearchPreview, TextProposal, TEXT_IMPROVER_COMPONENT
 from fruitfly_agent.run.application import RunApplicationFactory
 from tests.support.materials import _write_models, _write_cases
 from tests.support.faux_provider import FauxProvider
-from tests.support.improvers import QueueEditor, OfflineImprover, custom_definition, offline_factory
+from tests.support.improvers import offline_factory, improve
 
 
 
@@ -26,68 +25,14 @@ from tests.support.improvers import QueueEditor, OfflineImprover, custom_definit
 class DecouplingTests(unittest.IsolatedAsyncioTestCase):
     factory = staticmethod(offline_factory)
 
-    async def test_two_algorithms_two_targets_use_same_terminal_and_recover(self):
-        for algorithm in ('offline-search', 'opro',):
-            for target in ('base_prompt', 'skill-catalog.guidance'):
-                with self.subTest(algorithm=algorithm, target=target), tempfile.TemporaryDirectory() as tmp:
-                    root = Path(tmp)
-                    factory = self.factory(root, algorithm, target)
-                    choices = next(group for group in factory.configuration.snapshot().selection_groups
-                                   if group.group_id == 'text-improver')
-                    self.assertEqual(set(choices.option_ids), {'opro', 'offline-search', 'tree-search',
-                        'workflow-search', 'skill-edit', 'memory-exploration'})
-                    self.assertEqual(choices.selected_id, algorithm)
-                    app = AgentApplication(factory)
-                    await app.start()
-                    if algorithm in ('opro',):
-                        provider = factory._current_runtime_config.provider
-                        for text in ('wrong', 'wrong', '["Improved target"]', 'A', 'B', '["Improved target"]'):
-                            provider.respond_text(text)
-                    editor = QueueEditor()
-                    output = io.StringIO()
-                    editor.output = output
-                    frontend = TerminalFrontend(app, input_stream=io.StringIO(), output_stream=output, line_editor=editor)
-                    target_label = next(view.label for view in app.improvement_targets() if view.target_id == target)
-                    method_label = next(view.label for view in app.improvement_methods('H', target) if view.method_id == algorithm)
-                    editor.send('/improvement improve', '@Target ·', '@' + target_label, '@' + method_label,
-                        '@Start improvement', '@Start improvement', '@Review candidate',
-                        '@Set default and start a new session', '@Start a fresh session', 'q', '/exit')
-                    self.assertEqual(await asyncio.wait_for(frontend.run(), 5), 0)
-                    candidate = app.candidates()[0]
-                    self.assertEqual(factory.candidate_store.read(candidate.candidate_id).status, 'adopted')
-                    snapshot = factory._current_targets[target].snapshot()
-                    self.assertEqual(snapshot.content_hash, candidate.artifact_id)
-                    provider = factory._current_runtime_config.provider
-                    provider.respond_text('done')
-                    await app.submit('continue')
-                    self.assertIn(snapshot.text, provider.calls[0]['system_prompt'])
-                    path = Path(app.status.session_path)
-                    await app.close()
-                    restored = AgentApplication(factory)
-                    await restored.start(resume=True, session_path=path)
-                    self.assertEqual(factory._current_targets[target].snapshot().content_hash, candidate.artifact_id)
-                    await restored.close()
 
-    async def test_rejecting_confirmation_never_invokes_custom_search(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            factory = self.factory(Path(tmp))
-            app = AgentApplication(factory)
-            await app.start()
-            editor = QueueEditor()
-            editor.send('/improvement improve', '@Target ·', '@Base prompt', '@Offline search', '@Start improvement', '', 'q', '/exit')
-            output = io.StringIO()
-            editor.output = output
-            await TerminalFrontend(app, input_stream=io.StringIO(), output_stream=output, line_editor=editor).run()
-            self.assertEqual(factory._current_improver.calls, 0)
-            self.assertEqual(app.candidates(), ())
-            await app.close()
 
     async def test_failed_candidate_start_keeps_active_runtime_and_closes_candidate(self):
         with tempfile.TemporaryDirectory() as tmp:
             factory = self.factory(Path(tmp))
             app = AgentApplication(factory)
             await app.start()
-            candidate_record = (await app.improve('improve'))[0]
+            candidate_record = (await improve(app, factory))[0]
             previous = app._handle
             old_manifest = app.runtime_manifest
             closed = []
@@ -120,7 +65,7 @@ class DecouplingTests(unittest.IsolatedAsyncioTestCase):
             factory = self.factory(root)
             app = AgentApplication(factory)
             await app.start()
-            candidate = (await app.improve('improve'))[0]
+            candidate = (await improve(app, factory))[0]
             original_update = factory.candidate_store.update
 
             def fail_final_commit(candidate_id, **changes):
@@ -145,44 +90,11 @@ class DecouplingTests(unittest.IsolatedAsyncioTestCase):
                 record = factory.candidate_store.read(candidate.candidate_id)
                 self.assertEqual(record.status, 'adopted')
                 self.assertEqual(record.activated_manifest_digest, restarted.runtime_manifest['digest'])
-                self.assertEqual(factory._current_targets['base_prompt'].snapshot().content_hash,
+                self.assertEqual(factory._current_targets['component-bundle'].snapshot().content_hash,
                                  candidate.artifact_id)
             finally:
                 await restarted.close()
 
-    async def test_terminal_cancel_status_and_exit_during_improvement(self):
-        started = asyncio.Event()
-        cleaned = asyncio.Event()
-        class Slow(OfflineImprover):
-            async def search(self, text, direction, *, parent_manifest, task=None):
-                started.set()
-                try:
-                    await asyncio.Event().wait()
-                finally:
-                    cleaned.set()
-        with tempfile.TemporaryDirectory() as tmp:
-            factory = self.factory(Path(tmp), definition=custom_definition(Slow))
-            app = AgentApplication(factory)
-            await app.start()
-            editor = QueueEditor()
-            output = io.StringIO()
-            editor.output = output
-            frontend = TerminalFrontend(app, input_stream=io.StringIO(), output_stream=output, line_editor=editor)
-            from types import SimpleNamespace
-            from fruitfly_agent.interactive.terminal.io.menu import LineMenuInput, MenuEvent, MenuAction
-            frontend.menu_input = SimpleNamespace(read_event=LineMenuInput(editor).read_event,
-                poll_event=lambda timeout: MenuEvent(MenuAction.BACK))
-            editor.send('/improvement improve', '@Target ·', '@Base prompt', '@Offline search', '@Start improvement', '@Start improvement')
-            task = asyncio.create_task(frontend.run())
-            await asyncio.wait_for(started.wait(), 3)
-            editor.send('/status', 'ordinary message', '/cancel', '/exit')
-            await task
-            await app.close()
-            self.assertTrue(cleaned.is_set())
-            self.assertEqual(app.candidates() if app.state.value != 'closed' else factory.candidates(), ())
-            self.assertIn('state: improving', output.getvalue())
-            self.assertIn('cannot submit', output.getvalue())
-            self.assertIn('cancellation requested', output.getvalue())
 
     async def test_rebuild_start_failure_preserves_active_handle_and_factory(self):
         with tempfile.TemporaryDirectory() as tmp:

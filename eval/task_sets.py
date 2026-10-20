@@ -8,7 +8,7 @@ import tomllib
 
 from eval.catalog import builtin_catalog
 from eval.evidence import material_hash
-from fruitfly_agent.lab.improvement.experiments import TaskReference
+from fruitfly_agent.lab.improvement.api import TaskReference
 from fruitfly_agent.lab.improvement.contracts.versions import canonical_json, content_hash
 
 
@@ -35,13 +35,13 @@ async def resolve_materials(dataset, task_names, limit, cache):
 
 
 async def prepare_task_set(benchmark_id, variant, task_limit, *, output_root, resolver=resolve_materials, progress=None):
-    if type(task_limit) is not int or not 3 <= task_limit <= 12:
-        raise ValueError('improvement task sets require 3–12 tasks')
+    if type(task_limit) is not int or not 1 <= task_limit <= 12:
+        raise ValueError('improvement task sets require 1–12 tasks')
     adapter = builtin_catalog().get(benchmark_id)
     descriptor = adapter.descriptor
     options = {v.variant_id: v for v in descriptor.variants}
     if variant not in options or variant not in {'starter', 'no_gpu'}:
-        raise ValueError('this task preparation path supports CPU batches with at least three tasks')
+        raise ValueError('this task preparation path supports CPU task streams')
     names = options[variant].task_names
     if names and len(names) != task_limit:
         raise ValueError('fixed task batch size differs from the requested limit')
@@ -88,5 +88,5 @@ def improvement_catalog(catalog):
         for variant in benchmark['variants']:
             if not variant.get('task_names'):
                 variant['label'] = 'CPU sample · 5 tasks'
-                variant['description'] = 'Freeze the first five tasks by exact registry name; split 3 training / 1 selection / 1 confirmation.'
+                variant['description'] = 'Freeze tasks by exact registry name and refine each independently; no grading data is supplied to editors.'
     return payload

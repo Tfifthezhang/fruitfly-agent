@@ -103,7 +103,9 @@ def create_read_tool() -> AgentTool:
         name="read",
         label="Read file",
         description=(
-            "Read the contents of a file. Supports text files and images "
+            "Read a file in the selected execution environment (local or SSH). "
+            "Use for inspecting source code, configuration, logs and saved artifacts. "
+            "Supports text files and images "
             f"(jpg, png, gif, webp, bmp). Text output is truncated to {DEFAULT_MAX_LINES} "
             f"lines or {DEFAULT_MAX_BYTES // 1024}KB (whichever is hit first). "
             "Use offset/limit for large files."

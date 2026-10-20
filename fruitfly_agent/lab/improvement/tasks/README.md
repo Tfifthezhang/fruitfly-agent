@@ -120,7 +120,7 @@ Use `task_schema=python-function-v1` and `policy_id=python-function-tests-v1`:
 | Size | Source 20000 characters; AST 3000 nodes; serialized result 10000 characters; feedback 1000 characters; verification 16000 characters |
 | Isolation | Fresh globals per check; kill and reap on cancellation or timeout |
 
-This restricted subset is not a general code sandbox or deployment backend. Task policy owns parsing and scoring; OPRO only consumes scores and permitted feedback. Execution identity binds worker/scorer content hashes, interpreter version, and platform.
+This restricted subset is not a general code sandbox or deployment backend. Task policy owns parsing and scoring; optional measured feedback exposes only permitted results to generation. Execution identity binds worker/scorer content hashes, interpreter version, and platform.
 
 ## Check and score offline
 
@@ -190,7 +190,7 @@ supply trusted answers and are not executable task packs.
 | Search feedback | May contain policy-authorized acceptance facts; not all acceptance material is secret from feedback. |
 | Holdout | Send only each input in a new empty session with the same model, save all responses, then score offline. |
 
-The optional [automatic workflow](../automatic/README.md) requires nonempty holdout and privately freezes its contents. It uses generated or replayed learning material without rewriting the pack, keeps original selection cases fixed, and confirms one selected candidate before human review. Ordinary search retains manual independent testing. Derived exercises have their own policy and source identities; their scores do not replace original-task performance.
+Persistent [Improvement](../README.md) requires nonempty independent holdout. Verification privately freezes its cases and compares baseline/candidate after editing. Scorer answers and holdout instructions never enter generation. Task-local selection requires no scoring policy.
 
 Host services exclude holdout contents from generation and material review; this is not a filesystem sandbox for arbitrary Python plugins. Confirmation is once per automatic job, not a guarantee of independence across repeated jobs. No automatic adoption is performed.
 

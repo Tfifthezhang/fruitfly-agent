@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import AsyncMock, Mock
 
 from fruitfly_agent.interactive import TerminalFrontend
+from tests.support.improvement_ui import configuration
 from fruitfly_agent.interactive.contracts.improvement import ImprovementPreview, ImprovementTargetView
 from fruitfly_agent.interactive.terminal.io.menu import LineMenuInput, MenuRow, MenuEvent, MenuAction, RawTerminalMenuInput, TerminalMenuRenderer
 
@@ -14,7 +15,7 @@ class ConfirmationNavigationTests(unittest.IsolatedAsyncioTestCase):
     def frontend(self, events):
         output = io.StringIO()
         preview = ImprovementPreview('opro', 'OPRO', 'Model calls may incur cost.', target='base_prompt', preview_token='confirmed-token')
-        session = SimpleNamespace(set_event_sink=Mock(), improvement_preview=Mock(return_value=preview), start_improvement=Mock(),
+        session = SimpleNamespace(set_event_sink=Mock(), workflow_preview=Mock(return_value=preview), workflow_configuration=configuration, start_improvement=Mock(),
                                   improvement_targets=lambda: (ImprovementTargetView('H','base_prompt','Base prompt'),), candidates=Mock(return_value=()), candidate_notice=Mock(return_value=()),
                                   acknowledge_candidate_notice=Mock(), candidate_detail=Mock(), candidate_action=Mock())
         frontend = TerminalFrontend(session, input_stream=io.StringIO(), output_stream=output)
@@ -45,7 +46,7 @@ class ConfirmationNavigationTests(unittest.IsolatedAsyncioTestCase):
         for events, expected, start in scenarios:
             with self.subTest(events=events):
                 frontend, session, output = self.frontend(events)
-                pending = iter(('Target ·', 'Base prompt', 'Start improvement', *events, b'q'))
+                pending = iter(('Next page', 'Start improvement', *events, b'q'))
                 def read():
                     value = next(pending)
                     if isinstance(value, str):
@@ -55,10 +56,10 @@ class ConfirmationNavigationTests(unittest.IsolatedAsyncioTestCase):
                 frontend.menu_input = SimpleNamespace(read_event=read)
                 view = frontend.improvement_frontend()
                 await view.run(('improve',))
-                frames = [f for f in output.getvalue().split('\x1b[2J\x1b[H') if f.startswith('Confirm improvement')]
-                selections = [0 if '❯ Start improvement' in f else 1 for f in frames]
+                frames = [f for f in output.getvalue().split('\x1b[2J\x1b[H') if f.startswith('Confirm component improvement')]
+                selections = [0 if '❯ Start the frozen workflow' in f else 1 for f in frames]
                 self.assertEqual(expected, selections)
-                self.assertTrue(all('❯ Start improvement' in f or '❯ Cancel' in f for f in frames))
+                self.assertTrue(all('❯ Start the frozen workflow' in f or '❯ Cancel' in f for f in frames))
                 if start:
                     session.start_improvement.assert_called_once_with('improve', preview_token='confirmed-token')
                 else:

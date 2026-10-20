@@ -148,6 +148,56 @@ class DescriptorTest(unittest.TestCase):
 
 
 class CatalogTest(unittest.TestCase):
+    def test_dynamic_setup_credentials_validate_declarations(self):
+        from fruitfly_agent.lab.catalog.models import SetupCredential
+        definition = builtin_catalog().get('web-search-tool')
+        for fields in ([SetupCredential('api_key_env', 'Key', 'Hidden')],
+                       (SetupCredential('unknown', 'Key', 'Hidden'),),
+                       (SetupCredential('backend', 'Key', 'Hidden'),),
+                       (SetupCredential('api_key_env', 'Key', 'Hidden', variable='invalid variable'),),
+                       (SetupCredential('api_key_env', 'Key', 'Hidden'),) * 2):
+            with self.subTest(fields=fields), self.assertRaisesRegex(ValueError, 'setup credentials'):
+                invalid = replace(definition, setup=replace(definition.setup, credential_resolver=lambda parameters: fields))
+                invalid.setup_credentials({'backend': 'deepseek', 'api_key_env': ''})
+        with self.assertRaisesRegex(TypeError, 'credential_resolver'):
+            replace(definition, setup=replace(definition.setup, credential_resolver='invalid'))
+
+    def test_credential_declarations_are_offline_normalized_and_enabled_only(self):
+        calls = []
+        def credentials(parameters):
+            calls.append(parameters["limit"])
+            return ("SHARED_KEY", "CUSTOM_KEY", "SHARED_KEY")
+        definition = replace(_definition("custom"), credential_variables=credentials,
+                             install=lambda *args: self.fail("discovery constructed a runtime"))
+        catalog = LabCatalog((definition,))
+        self.assertEqual(("CUSTOM_KEY", "SHARED_KEY"), catalog.required_credentials((MechanismSelection("custom"),)))
+        self.assertEqual([2], calls)
+        self.assertEqual((), catalog.required_credentials((MechanismSelection("custom", enabled=False),)))
+        self.assertEqual([2], calls)
+        for result in ("CUSTOM_KEY", ("a key value",), (123,)):
+            invalid = replace(definition, credential_variables=lambda parameters: result)
+            with self.subTest(result=result), self.assertRaisesRegex(ValueError, "environment variable"):
+                invalid.required_credentials({})
+
+    def test_assembly_checks_declared_credentials_before_install_and_injects_snapshot(self):
+        lookups = []
+        def resolve(name):
+            lookups.append(name)
+            return "fixture-value"
+        def install(state, context, parameters):
+            self.assertEqual("fixture-value", context.secret_resolver("CUSTOM_KEY"))
+            self.assertIsNone(context.secret_resolver("UNDECLARED_KEY"))
+            return state
+        definition = replace(_definition("custom"), credential_variables=lambda parameters: ("CUSTOM_KEY",), install=install)
+        catalog = LabCatalog((definition,))
+        context = AssemblyContext(Path.cwd(), object(), "offline", lambda *args: None, secret_resolver=resolve)
+        assemble_lab(AgentLoopConfig(provider=FauxProvider()), catalog=catalog,
+                     selections=(MechanismSelection("custom"),), context=context)
+        self.assertEqual(["CUSTOM_KEY"], lookups)
+        with self.assertRaisesRegex(ValueError, "CUSTOM_KEY"):
+            assemble_lab(AgentLoopConfig(provider=FauxProvider()), catalog=catalog,
+                         selections=(MechanismSelection("custom"),), context=replace(context, secret_resolver=None))
+
     def test_all_registered_algorithms_declare_differentiated_descriptions_and_real_paths(self):
         definitions = builtin_catalog().definitions()
         descriptions = [d.descriptor.description for d in definitions]
@@ -233,6 +283,7 @@ class CatalogTest(unittest.TestCase):
             {item.mechanism_id for item in builtin_catalog().descriptors()},
             {
                 "local-env",
+                "instruction-components",
                 "ssh-env",
                 "read-tool",
                 "bash-tool",
@@ -248,19 +299,11 @@ class CatalogTest(unittest.TestCase):
                 "live-http",
                 "compaction",
                 "rlm-ipython",
-                "opro",
-                "tree-search",
-                "dream-rsi",
-                "workflow-search",
-                "skill-edit",
-                "memory-exploration",
                 "execution-workflow",
                 "skill-document",
                 "learned-memory",
-                "failure-replay",
-                "failure-distillation",
-                "automatic-text-search",
                 "task-material-recording",
+                "component-improvement",
             },
         )
 
@@ -272,66 +315,7 @@ class CatalogTest(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, "unknown mechanism.*Remove this selection"):
                         catalog.resolve((MechanismSelection(mechanism, enabled=enabled),))
 
-    def test_native_improvers_use_algorithm_neutral_task_path(self) -> None:
-        catalog = builtin_catalog()
-        for mechanism in ("opro",):
-            with self.subTest(mechanism=mechanism):
-                definition = catalog.get(mechanism)
-                self.assertFalse(definition.descriptor.default_enabled)
-                parameters = {item.name: item.default for item in definition.descriptor.parameters}
-                self.assertEqual(parameters["cases_path"], ".fruitfly/improvement/cases.json")
-                self.assertFalse(any("reflection" in name for name in parameters))
 
-    def test_opro_package_definition_assembles_without_running_search(self) -> None:
-        from fruitfly_agent.lab.algorithms.targets import TEXT_TARGET_PREFIX
-        from fruitfly_agent.lab.base_prompt.target import BasePromptTarget
-        from fruitfly_agent.lab.improvement.methods.opro import OproImprover, definition
-        from fruitfly_agent.lab.improvement.tasks import TaskPackCatalog, TASK_PACK_COMPONENT
-        from fruitfly_agent.lab.improvement.api import (
-            TEXT_IMPROVER_COMPONENT, TEXT_IMPROVEMENT_TARGET_COMPONENT,
-        )
-
-        for profile in ("", "auxiliary"):
-            with self.subTest(profile=profile), tempfile.TemporaryDirectory() as tmp:
-                root = Path(tmp)
-                main, auxiliary = FauxProvider(), FauxProvider()
-                resolutions, owned = [], []
-
-                def resolve(name, limit):
-                    resolutions.append((name, limit))
-                    return ProviderBinding(auxiliary, "improver-model", name,
-                                           context_window=4000, max_output_tokens=256)
-
-                catalog = LabCatalog((definition(),), bootstrap=lambda state, context: (
-                    state.with_component(TEXT_TARGET_PREFIX + "base_prompt", BasePromptTarget("seed"))
-                    .with_component(TASK_PACK_COMPONENT, TaskPackCatalog(context.workspace))
-                ))
-                result = assemble_lab(
-                    AgentLoopConfig(provider=main, model="main-model", system_prompt="seed"),
-                    catalog=catalog,
-                    selections=(MechanismSelection("opro", parameters={"improver_profile": profile}),),
-                    context=AssemblyContext(root, object(), "main-model", resolve, resource_sink=owned),
-                )
-                improver = result.components[TEXT_IMPROVER_COMPONENT]
-                try:
-                    self.assertIsInstance(improver.strategy, OproImprover)
-                    self.assertIn(improver, owned)
-                    self.assertEqual(result.components[TEXT_IMPROVEMENT_TARGET_COMPONENT], "base_prompt")
-                    self.assertEqual(improver.spec.implementation_id, "opro-text-v2")
-                    self.assertIs(improver.config.provider, main)
-                    if profile:
-                        self.assertEqual(resolutions, [("auxiliary", 1024)])
-                        self.assertIs(improver.role_configs["improver"].provider, auxiliary)
-                        self.assertEqual(improver.role_configs["improver"].max_tokens, 256)
-                        self.assertEqual(improver.role_configs["improver"].context_window, 4000)
-                    else:
-                        self.assertEqual(resolutions, [])
-                        self.assertEqual(improver.role_configs, {})
-                    self.assertEqual(main.calls, [])
-                    self.assertEqual(auxiliary.calls, [])
-                    self.assertEqual(list(root.iterdir()), [])
-                finally:
-                    improver.close()
 
     def test_ipython_and_rlm_descriptors_have_separate_effects(self) -> None:
         catalog = builtin_catalog()

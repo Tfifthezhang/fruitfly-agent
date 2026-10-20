@@ -1,7 +1,7 @@
 """Freeze actual execution, improvement and registered persistent-state material."""
 from pathlib import Path
 from fruitfly_agent.lab.algorithms.targets import (
-    SystemVersion, SnapshotFile, StateSnapshot, canonical_json, TargetChange, VersionCandidate, state_artifact_path,
+    SystemVersion, SnapshotFile, StateSnapshot, canonical_json, TargetChange, VersionCandidate, state_artifact_path, target_edits,
 )
 from fruitfly_agent.run.storage.snapshots import SnapshotStore, capture_source_tree
 from fruitfly_agent.run.storage.versions import VersionStore
@@ -25,7 +25,7 @@ class RunVersions:
         snapshots = tuple(source.freeze_text(self.artifacts.read_text(bindings[source.artifact_key]))
                           if getattr(source, 'artifact_key', None) in bindings else source.freeze()
                           for source in sources)
-        files = {}
+        files: dict[str, SnapshotFile] = {}
         for snapshot in snapshots:
             for entry in snapshot.files:
                 if entry.path in files and files[entry.path] != entry:
@@ -50,6 +50,18 @@ class RunVersions:
         return version
 
     def text_candidate(self, parent, snapshot, text):
+        if snapshot.binding.kind == 'components':
+            edits = target_edits(snapshot, text)
+            if not edits:
+                raise ValueError('a component candidate must change at least one component')
+            current, changes = parent, []
+            for part, value in edits:
+                candidate = self.text_candidate(current, part, value)
+                current = candidate.version
+                changes.extend(candidate.changes)
+            candidate = VersionCandidate(parent, current, tuple(changes))
+            self.versions.put_candidate(candidate)
+            return candidate
         if snapshot.role not in {'H', 'S', 'I'} or (snapshot.role in {'S', 'I'} and snapshot.binding.kind != 'artifact'):
             raise ValueError('no version adapter for this role and binding')
         before = self.artifacts.put_text(snapshot.text).artifact_id

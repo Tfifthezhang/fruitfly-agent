@@ -28,6 +28,7 @@ from fruitfly_agent.interactive.contracts.improvement import (
     ImprovementService,
     ImprovementPreview,
     ImprovementProgress,
+    ComponentImprovementClient,
 )
 from fruitfly_agent.interactive.contracts.candidates import CandidateView, CandidateService
 from fruitfly_agent.interactive.contracts.task_packs import TaskPackService
@@ -288,22 +289,21 @@ class AgentApplication:
             raise RuntimeError("finish active work before saving a task")
         return self._materials.save(task_id, pack_id, input, expected, **options)
 
-    def improvement_preview(self, *, pack_id=None, direction="", method_id=None, target_id=None, parameters=None) -> ImprovementPreview:
-        if self._state != ApplicationState.IDLE or self._pending:
-            raise RuntimeError("finish active work before starting improvement")
-        selection = {} if method_id is None and target_id is None and parameters is None else {
-            'method_id': method_id, 'target_id': target_id, 'parameters': parameters}
-        return self._improvement_service().improvement_preview(self.runtime_manifest, pack_id=pack_id,
-            direction=direction, **selection)
+    def workflow_configuration(self):
+        service = self._improvement_service()
+        return service.workflow_configuration() if isinstance(service, ComponentImprovementClient) else None
 
-    def improvement_methods(self, role, target_id):
-        """None means a legacy host; an empty tuple means no compatible method."""
-        query = getattr(self._improvement_service(), 'improvement_methods', None)
-        return query(role, target_id) if query is not None else None
+    def workflow_preview(self, request):
+        if self._state != ApplicationState.IDLE or self._pending:
+            raise RuntimeError('finish active work before preparing improvement')
+        service = self._improvement_service()
+        if not isinstance(service, ComponentImprovementClient):
+            raise RuntimeError('component improvement is unavailable')
+        return service.workflow_preview(request)
 
     def improvement_targets(self):
-        query = getattr(self._improvement_service(), 'improvement_targets', None)
-        return query() if query is not None else ()
+        configuration = self.workflow_configuration()
+        return configuration.components if configuration is not None else ()
 
     def improvement_history(self):
         query = getattr(self._improvement_service(), 'improvement_history', None)

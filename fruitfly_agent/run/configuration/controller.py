@@ -107,6 +107,17 @@ class RunConfigurationController:
             projected = []
             for mechanism in mechanisms:
                 definition = self._catalog.get(mechanism.mechanism_id)
+                if definition.credential_variables is not None:
+                    try:
+                        status = self.mechanism_setup.credential_status(mechanism.mechanism_id)
+                    except (TypeError, ValueError):
+                        status = ()  # Existing parameter validation reports the error.
+                    mechanism = replace(mechanism, effects=(*mechanism.effects,
+                        *(name + (': set' if available else ': missing') for name, available in status)))
+                    missing_names = [name for name, available in status if not available]
+                    if mechanism.enabled and missing_names:
+                        warnings.append(mechanism.label + ': missing credentials: ' + ', '.join(missing_names))
+                        ready = False
                 if definition.setup is not None:
                     try:
                         missing = self.mechanism_setup.issues(mechanism.mechanism_id)
@@ -174,9 +185,6 @@ class RunConfigurationController:
             raise ValueError("unsupported target binding kind")
         profile = self._draft.select(self._selected)
         slots = {slot for item in self._catalog.resolve(profile.mechanisms) for slot in item.definition.artifact_slots}
-        slots.update(slot for definition in self._catalog.definitions()
-                     if definition.improvement is not None and definition.improvement.prepare_targets is not None
-                     for slot in definition.artifact_slots)
         if key not in slots:
             raise ValueError("target slot is not enabled")
         self._artifact_store.read_text(reference)

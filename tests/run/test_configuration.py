@@ -56,17 +56,7 @@ class HarnessSelectionTest(unittest.TestCase):
         self.assertEqual(reduction.option_ids, ("compaction",))
         self.assertEqual(reduction.selected_id, "compaction")
         self.assertEqual(reduction.label, "Reduction")
-        group = next(item for item in controller.snapshot().selection_groups
-                     if item.group_id == "text-improver")
-        self.assertEqual(group.option_ids, ("memory-exploration", "opro", "skill-edit", "tree-search", "workflow-search"))
-        controller.select_algorithm("text-improver", "opro")
-        selected_group = next(item for item in controller.snapshot().selection_groups
-                              if item.group_id == "text-improver")
-        self.assertEqual(selected_group.selected_id, "opro")
-        controller.select_algorithm("text-improver", None)
-        disabled_group = next(item for item in controller.snapshot().selection_groups
-                              if item.group_id == "text-improver")
-        self.assertIsNone(disabled_group.selected_id)
+        self.assertNotIn('text-improver', {g.group_id for g in controller.snapshot().selection_groups})
 
     def test_reduction_group_accepts_another_algorithm_without_frontend_changes(self) -> None:
         root = self.root
@@ -151,6 +141,7 @@ class HarnessSelectionTest(unittest.TestCase):
                 "information-context",
                 "memory-files",
                 "compaction",
+                "component-improvement",
             },
         )
 
@@ -369,7 +360,7 @@ class HarnessSelectionTest(unittest.TestCase):
         from tests.support.terminal import ScriptedLines
         _write_catalog(self.root / 'models.yaml', {'only': 'model-a'})
         controller = RunConfigurationController(self.selection(), builtin_catalog())
-        controller.set_parameter('opro', 'rounds', '3')
+        controller.set_parameter('component-improvement', 'max_model_calls', '3')
         controller.save()
         output = io.StringIO()
         frontend = TerminalConfigurationFrontend(controller, output_stream=output,
@@ -379,4 +370,4 @@ class HarnessSelectionTest(unittest.TestCase):
         self.assertIn('. Context', output.getvalue())
         self.assertTrue(all(not m.visible for m in controller.snapshot().mechanisms
                             if m.category == 'improvement'))
-        self.assertEqual(next(s for s in controller.profile().mechanisms if s.mechanism_id == 'opro').parameters['rounds'], 3)
+        self.assertEqual(next(s for s in controller.profile().mechanisms if s.mechanism_id == 'component-improvement').parameters['max_model_calls'], 3)

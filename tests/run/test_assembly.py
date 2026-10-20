@@ -278,7 +278,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
         )
         self.assertEqual(
             runtime.mechanism_ids,
-            ("skill-catalog", "information-context", "compaction"),
+            ("skill-catalog", "information-context", "compaction", "component-improvement"),
         )
         self.assertEqual(runtime.manifest.schema_version, 5)
         self.assertEqual(runtime.manifest.data_artifacts, ())

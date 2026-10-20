@@ -6,7 +6,7 @@ from typing import Any, Awaitable, Callable, Protocol
 
 from fruitfly_agent.interactive.contracts.events import EventSink
 from fruitfly_agent.interactive.contracts.models import InteractiveStatus
-from fruitfly_agent.interactive.contracts.improvement import ImprovementClient, ImprovementProgress
+from fruitfly_agent.interactive.contracts.improvement import ImprovementClient, ImprovementProgress, ComponentImprovementClient
 from fruitfly_agent.interactive.contracts.candidates import CandidateClient, CandidateActivationClient
 from fruitfly_agent.interactive.contracts.task_packs import TaskPackClient
 
@@ -71,13 +71,11 @@ class ImprovementClients:
     materials: TaskPackClient | None = None
     activation: CandidateActivationClient | None = None
     progress: Callable[[], ImprovementProgress | None] = lambda: None
-    targets: Callable = lambda: ()
-    methods: Callable | None = None
     history: Callable = lambda: ()
     cancel: Callable[[], bool] = lambda: False
-    packs_for_target: Callable | None = None
     history_logs: Callable | None = None
     wait: Callable | None = None
+    workflow: ComponentImprovementClient | None = None
 
     @classmethod
     def from_session(cls, session: Any) -> ImprovementClients:
@@ -87,15 +85,13 @@ class ImprovementClients:
             materials=session if isinstance(session, TaskPackClient) else None,
             activation=session if isinstance(session, CandidateActivationClient) else None,
             progress=lambda: getattr(session, "improvement_progress", None),
-            targets=getattr(session, 'improvement_targets', lambda: ()),
-            methods=getattr(session, 'improvement_methods', None),
             history=getattr(session, 'improvement_history', lambda: ()),
             cancel=getattr(session, 'cancel', lambda: False),
-            packs_for_target=getattr(session, 'task_packs_for_target', None),
             history_logs=getattr(session, 'improvement_run_logs', None),
             wait=getattr(session, 'wait_for_improvement', None),
+            workflow=session if isinstance(session, ComponentImprovementClient) else None,
         )
 
     @property
     def available(self) -> bool:
-        return any(client is not None for client in (self.search, self.candidates, self.materials))
+        return any(client is not None for client in (self.workflow, self.search, self.candidates, self.materials))

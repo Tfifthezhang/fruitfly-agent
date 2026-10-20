@@ -22,7 +22,7 @@ from fruitfly_agent.lab.base_prompt.target import BasePromptTarget
 from fruitfly_agent.lab.context_manager.augmentation.skills.target import SkillGuidanceTarget
 from tests.support.faux_provider import FauxProvider
 from tests.support.materials import _write_models, _write_cases
-from fruitfly_agent.lab.improvement.api import TextProposal, SearchReport, TokenUsage
+from fruitfly_agent.lab.improvement.api import SearchReport, TokenUsage
 
 
 class RetentionTests(unittest.TestCase):
@@ -120,40 +120,6 @@ class StartupVersionsTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual([],provider.calls)
             finally: await app.close()
 
-    async def test_failed_cancelled_and_empty_search_keep_latest_then_success_replaces_it(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root=Path(tmp)
-            app,factory,provider=await self.setup_app(root)
-            try:
-                _write_cases(root)
-                factory.configuration.set_mechanism('opro',enabled=True)
-                factory.configuration.save(); await app.rebuild()
-                old=self.candidate(app,factory,'previous pending')
-                old=replace(old, task_pack_id='configured-cases', task_pack_name='Configured task cases')
-                factory.candidate_store._write(old, create=False)
-                from fruitfly_agent.run.storage.results import save_task_result
-                output = save_task_result(root, old, 'previous pending')
-                for error in (RuntimeError('failed'),asyncio.CancelledError()):
-                    with patch.object(factory._current_improver,'search',new=AsyncMock(side_effect=error)):
-                        with self.assertRaises(type(error)):
-                            await app.improve('improve')
-                    await asyncio.sleep(0)
-                    self.assertEqual((old.candidate_id,),tuple(r.candidate_id for r in app.candidates()))
-                    self.assertEqual('previous pending', (output / 'latest.txt').read_text())
-                with patch.object(factory._current_improver,'search',new=AsyncMock(return_value=())):
-                    self.assertEqual((),await app.improve('improve'))
-                self.assertEqual(old.candidate_id,app.candidates()[0].candidate_id)
-                proposals=(TextProposal('first ranked','custom',validation_score=0.9),
-                           TextProposal('second ranked','custom',validation_score=0.1))
-                with patch.object(factory._current_improver,'search',new=AsyncMock(return_value=proposals)):
-                    latest=await app.improve('improve')
-                self.assertEqual(1,len(latest))
-                self.assertEqual('first ranked',factory.artifact_store.read_text(latest[0].artifact_id))
-                self.assertEqual('first ranked', (output / 'latest.txt').read_text())
-                self.assertEqual((latest[0].candidate_id,),tuple(r.candidate_id for r in app.candidates()))
-                with self.assertRaises(ValueError): factory.candidate_store.read(old.candidate_id)
-                self.assertEqual([],provider.calls)
-            finally: await app.close()
 
     async def test_same_runtime_in_another_profile_cannot_adopt_this_profiles_candidate(self):
         with tempfile.TemporaryDirectory() as tmp:

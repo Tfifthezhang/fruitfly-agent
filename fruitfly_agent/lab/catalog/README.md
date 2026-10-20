@@ -2,7 +2,7 @@
 
 [Up: Lab](../README.md)
 
-Register mechanisms, validate selections, and assemble a runtime deterministically. Run supplies workspace, Session, and Provider bindings; Catalog owns registration and assembly contracts. Independent improvement method packages own their definitions and installers.
+Register mechanisms, validate selections, and assemble a runtime deterministically. Run supplies workspace, Session, and Provider bindings; Catalog owns registration and assembly contracts. Object modules own target adapters; Improvement owns per-job stage contracts.
 
 ## Register a mechanism
 
@@ -16,7 +16,7 @@ Register mechanisms, validate selections, and assemble a runtime deterministical
 
 The [offline example](../../../examples/extensions/README.md) completes this path. The CLI does not scan Python packages for plugins.
 
-An improvement package exposes its own definition factory; built-ins explicitly collect [OPRO's definition](../improvement/methods/opro/README.md). External methods can supply definitions through `builtin_catalog().extended(definitions)`. Shared text improver assembly belongs to [Improvement](../improvement/README.md#extend-search), so Catalog does not implement search strategies or declare their method-specific parameters.
+Improvement registers one shared workflow configuration. Per-job generator factories and stage bindings use the [public Improvement API](../improvement/README.md#extend-search), independently of selectable runtime mechanisms.
 
 ## Files
 
@@ -51,6 +51,13 @@ An improvement package exposes its own definition factory; built-ins explicitly 
 
 ## Configuration and targets
 
+`MechanismDefinition.prepare_targets(state, context)` optionally exposes object-owned
+adapters independently of mechanism or search enablement. It runs after assembly and must be idempotent. It may
+consume declared artifacts and register targets; it must not start Providers,
+research or external execution. Disabled capabilities must not consume bindings
+for tools that are absent. Returned resources follow normal construction ownership.
+
+
 `MechanismDefinition.setup` optionally declares `MechanismSetup` from
 `catalog.models`: ordered parameter fields, required fields, hidden
 `SetupCredential` inputs bound to secret-variable parameters, and setup guidance.
@@ -58,6 +65,21 @@ Run projects this metadata into Interactive's generic setup contract. Forms
 collect secrets separately from parameters, validate each field, review with
 hidden values, and stage selection only after confirmation. Backend-specific
 validation stays with the definition. Configuration makes no backend connection.
+
+`MechanismSetup.credential_resolver(parameters)` optionally computes hidden fields
+from the current form values. It returns `SetupCredential` declarations, never key
+values. `definition.setup_credentials(parameters)` validates the resolved fields.
+A credential's `variable` can declare the resolved secret name; blank retains the
+existing binding to the named string parameter. `allow_whitespace=False` is suitable
+for API keys; its default preserves credentials such as SSH passwords. Ordinary
+form fields and hidden values use separate mappings, so a visible variable-name
+field may also name its corresponding hidden credential binding. Declarations
+within each mapping must remain distinct.
+
+Run and Interactive pass pending non-secret values to form projection and
+validation. The terminal refreshes credentials after ordinary fields, so changing
+service or variable in the same form changes the credential binding without
+staging partial configuration. Static SSH setup declarations remain supported.
 
 Every `MechanismDefinition` declares a nonempty single-line descriptor description,
 an explicit `implementation_path` to a Python file, and `documentation_path` to a
@@ -80,7 +102,7 @@ implementation IDs continue to do so.
 | `provides/requires_capabilities` | Require a unique enabled provider of a capability. |
 | `artifact_slots` | Declare consumed named text bindings. |
 | `text-target:ID` component | Register an object's snapshot, validation, and trial adapter. |
-| `text-improver` component | Provide `preview`, `search`, and `cancel` through the shared host contract. |
+| `GeneratorRegistry` | Declare per-job candidate generators through the Improvement API. |
 
 Selection groups share display placement and exclusivity. Display metadata does not enter runtime identity; effective parameters and implementation IDs do. See [Algorithms](../algorithms/README.md), [Improvement](../improvement/README.md), and [Harness configuration](../../run/configuration/README.md).
 
@@ -106,10 +128,30 @@ hosts do not branch on concrete algorithm names.
 
 `AssemblyContext.secret_resolver(name)` is an optional host capability for selected network tools. It defaults to absent for existing callers. Run binds its secret environment lookup; Lab does not read ambient environment variables. Returned values must stay out of selection parameters, manifests, process environments and errors. The [web tools](../tools/web/README.md) use this capability for search credentials without making requests during construction.
 
+## Declare credential requirements
+
+`MechanismDefinition.credential_variables(parameters)` optionally returns a tuple
+of secret environment variable names. The callback is pure and offline: it must
+not read values, construct resources or make requests. It receives normalized
+parameters so conditional backend requirements and overrides have one owner.
+`definition.required_credentials(parameters)` validates, deduplicates and sorts
+these names. `catalog.required_credentials(selections)` also validates selections
+and collects requirements from enabled mechanisms only. Unknown/duplicate
+selections and invalid variable names fail explicitly.
+
+Assembly resolves declared names through the host's `secret_resolver` before each
+installer. Missing values fail before that installer constructs resources. The
+installer receives a snapshot resolver limited to those declared names. Mechanisms
+without this declaration retain the existing assembly context behavior. Secret
+values never enter metadata, parameters or manifests. Configuration consumes the
+same declaration to show set/missing status; Eval uses it to forward credentials
+to task containers without tool-specific branches. Setup form credentials remain
+independently declared through `MechanismSetup`; existing forms are unchanged.
+
 ## Register experiment dependencies
 
-Built-in file memory, workspace skill files and local knowledge register initial text snapshot sources through `persistent-state-snapshots`. Live HTTP context registers an `experiment-blockers` reason because responses cannot be frozen. Installers register capabilities without taking snapshots or starting model work. Custom mechanisms must register each persistent dependency they read; arbitrary plugin heap state and external services remain unsupported. See [Algorithm versions](../algorithms/README.md) and [Original task experiments](../improvement/experiments/README.md).
+Built-in file memory, workspace skill files and local knowledge register initial text snapshot sources through `persistent-state-snapshots`. Live HTTP context registers an `experiment-blockers` reason because responses cannot be frozen. Installers register capabilities without taking snapshots or starting model work. Custom mechanisms must register each persistent dependency they read; arbitrary plugin heap state and external services remain unsupported. See [Algorithm versions](../algorithms/README.md) and [Original task experiments](../improvement/README.md).
 
 ## Declare per-job improvement support
 
-`MechanismDefinition.improvement` optionally supplies a `MethodDefinition` with supported H/S/I roles, target schemas, required execution capabilities and an offline binder. Existing `layer × family` contributions still describe system position. No new Core classification is introduced. [Method selection](../improvement/methods/README.md) checks declarations against the active target and host. Definition and method discovery must not make model requests. Registered methods are available on demand. Configuration menus omit the improvement category. Optional `prepare_targets(state, context)` registers lightweight method-owned targets and consumes declared artifacts without enabling the search algorithm or creating Providers. Per-job binders borrow runtime services and own their search state. Existing enabled hosts and YAML parameter defaults remain supported.
+Per-job candidate generators register through `GeneratorRegistry`; stage factories are injected with `WorkflowBindings`. Catalog owns mechanism construction and object adapters, without a parallel algorithm selector or method binder.

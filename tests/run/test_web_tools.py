@@ -28,6 +28,25 @@ async def public_destination(url):
 
 
 class WebAssemblyTests(unittest.IsolatedAsyncioTestCase):
+    async def test_configuration_projects_service_credential_names_and_status_without_values(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            _write_catalog(root / "models.yaml", {"offline": "offline-model"})
+            factory = RunApplicationFactory(cwd=root, environment={})
+            configuration = factory.configuration
+            configuration.set_mechanism("web-search-tool", enabled=True)
+            configuration.set_parameter("web-search-tool", "backend", "deepseek")
+            snapshot = configuration.snapshot()
+            view = next(m for m in snapshot.mechanisms if m.mechanism_id == "web-search-tool")
+            self.assertIn("DEEPSEEK_SEARCH_API_KEY: missing", view.effects)
+            self.assertIn("DEEPSEEK_SEARCH_API_KEY", " ".join(snapshot.warnings))
+            factory.environment["DEEPSEEK_SEARCH_API_KEY"] = "fixture-private-key"
+            snapshot = configuration.snapshot()
+            view = next(m for m in snapshot.mechanisms if m.mechanism_id == "web-search-tool")
+            self.assertIn("DEEPSEEK_SEARCH_API_KEY: set", view.effects)
+            self.assertNotIn("fixture-private-key", repr(snapshot))
+            self.assertNotIn("DEEPSEEK_SEARCH_API_KEY", " ".join(snapshot.warnings))
+
     async def test_optional_registration_and_missing_credential_are_offline(self):
         catalog = builtin_catalog()
         self.assertFalse(any(s.mechanism_id.startswith("web-") for s in catalog.default_selections()))
@@ -45,7 +64,8 @@ class WebAssemblyTests(unittest.IsolatedAsyncioTestCase):
                 assemble_lab(AgentLoopConfig(provider=provider, model="offline"), catalog=catalog,
                              selections=(MechanismSelection("web-search-tool"),), context=context)
             self.assertEqual([], provider.calls)
-            for backend, variable in (("brave", "BRAVE_SEARCH_API_KEY"), ("tavily", "TAVILY_API_KEY")):
+            for backend, variable in (("brave", "BRAVE_SEARCH_API_KEY"), ("tavily", "TAVILY_API_KEY"),
+                                      ("deepseek", "DEEPSEEK_SEARCH_API_KEY")):
                 lookups = []
                 def resolve(name):
                     lookups.append(name)
@@ -63,6 +83,28 @@ class WebAssemblyTests(unittest.IsolatedAsyncioTestCase):
             result = assemble_lab(AgentLoopConfig(provider=provider, model="offline"), catalog=catalog,
                 selections=(MechanismSelection("web-search-tool", enabled=False),), context=context)
             self.assertFalse(any(key.startswith("web-") for key in result.components))
+
+    async def test_deepseek_tools_require_separate_default_keys_offline(self):
+        catalog = builtin_catalog()
+        with tempfile.TemporaryDirectory() as directory:
+            context = AssemblyContext(Path(directory), object(), "offline", Mock())
+            for mechanism in ("web-search-tool", "web-fetch-tool"):
+                with self.assertRaisesRegex(ValueError, "DEEPSEEK_SEARCH_API_KEY" if mechanism == "web-search-tool" else "DEEPSEEK_FETCH_API_KEY"):
+                    assemble_lab(AgentLoopConfig(provider=FauxProvider(), model="offline"), catalog=catalog,
+                        selections=(MechanismSelection(mechanism, parameters={"backend": "deepseek"}),), context=context)
+            lookups, owned = [], []
+            def resolve(name):
+                lookups.append(name)
+                return "offline-token"
+            result = assemble_lab(AgentLoopConfig(provider=FauxProvider(), model="offline"), catalog=catalog,
+                selections=tuple(MechanismSelection(name, parameters={"backend": "deepseek"})
+                                 for name in ("web-search-tool", "web-fetch-tool")),
+                context=replace(context, secret_resolver=resolve, resource_sink=owned))
+            self.assertEqual(["DEEPSEEK_SEARCH_API_KEY", "DEEPSEEK_FETCH_API_KEY"], lookups)
+            self.assertEqual(["web_search", "web_fetch"], [t.name for t in result.config.tools])
+            for client in owned:
+                if isinstance(client, WebClient):
+                    await client.close()
 
     async def test_bad_parameters_are_rejected_even_when_disabled(self):
         catalog = builtin_catalog()
@@ -105,8 +147,8 @@ class WebAssemblyTests(unittest.IsolatedAsyncioTestCase):
                 resources = []
                 with Session(root / (token + ".jsonl")) as session:
                     runtime = build_runtime(HarnessProfile("default", str(model_path), "offline", (
-                        MechanismSelection("web-search-tool", parameters={"api_key_env": "CUSTOM_SEARCH_KEY"}),
-                        MechanismSelection("web-fetch-tool"))), config_path=root / "config.yaml", catalog=builtin_catalog(),
+                        MechanismSelection("web-search-tool", parameters={"backend": "deepseek", "api_key_env": "CUSTOM_SEARCH_KEY"}),
+                        MechanismSelection("web-fetch-tool", parameters={"backend": "deepseek", "api_key_env": "CUSTOM_SEARCH_KEY"}))), config_path=root / "config.yaml", catalog=builtin_catalog(),
                         environment={"CUSTOM_SEARCH_KEY": token}, cwd=root, session=session,
                         provider_registry=registry, resource_sink=resources)
                     manifest = json.dumps(runtime.manifest.to_dict())
@@ -198,7 +240,7 @@ class WebAssemblyTests(unittest.IsolatedAsyncioTestCase):
                 factory.reload_configuration()
                 app = AgentApplication(factory)
                 self.addAsyncCleanup(app.close)
-                def fail_tool(client):
+                def fail_tool(*, service):
                     raise ValueError("fixture assembly failure")
                 with patch("fruitfly_agent.lab.tools.web.registration.WebClient", side_effect=create_client):
                     if failure == "assembly":

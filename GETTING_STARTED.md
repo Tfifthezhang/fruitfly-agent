@@ -94,7 +94,7 @@ cp -R examples/improvement/python_functions .fruitfly/improvement/task-packs/pyt
 .venv/bin/python -m fruitfly_agent.lab.improvement.tasks.cases.verification self-check .fruitfly/improvement/task-packs/python-functions/pack.json
 ```
 
-The checks are offline. In **Configure → mechanisms · improvement**, enable **text-improver**, select **opro**, save, and start a new session. Use `/improvement` to select the pack and review the model, budget, and execution policy before confirming a paid search. The active target supplies the baseline; `baseline.txt` is an optional reference.
+The checks are offline. Start a normal session and use `/improvement` to select the package, editable components, candidate generator and budget. Persistent publication requires independent verification; review the frozen preview before confirming paid model work. The active component snapshot supplies the baseline; `baseline.txt` is an optional reference.
 
 | Next step | Guide |
 |---|---|

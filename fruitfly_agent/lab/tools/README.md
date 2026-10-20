@@ -18,7 +18,8 @@ incompatible with the SSH selection.
 | [edit.py](edit.py) | `create_edit_tool`: unique, non-overlapping text replacement |
 | [write.py](write.py) | `create_write_tool`: file writes |
 | [ipython.py](ipython.py) | `create_ipython_tool`: explicit Python workspace integration |
-| [Web tools](web/README.md) | `web_search` through Brave/Tavily and `web_fetch` for source text; disabled by default |
+| [guidance.py](guidance.py) | `ToolGuidanceTarget`: validate, trial and bind instruction text independently of tool implementations |
+| [Web tools](web/README.md) | `web_search` through Brave/Tavily/DeepSeek; `web_fetch` directly or through DeepSeek; disabled by default |
 | [truncate.py](truncate.py) | Head/tail output limits |
 | [path_utils.py](path_utils.py), [file_queue.py](file_queue.py) | Path normalization and in-process mutation ordering |
 
@@ -74,3 +75,36 @@ purpose, such as `Run menu tests`. Its `describe_call` callback uses that value 
 for observation; it does not change the command, timeout, authorization or outcome.
 Omission or blank text uses the tool label. Do not include credentials in descriptions.
 The model-facing `description` remains the full tool usage instructions.
+
+Each tool owns its use cases, scope and limits in that description. Descriptions
+must stand alone when only that tool is enabled; do not name another tool as a
+required next step. Providers serialize the enabled tools' descriptions into API
+tool definitions. The base prompt does not enumerate tools or prescribe their
+selection. These descriptions guide model choice; they do not enforce routing.
+
+| Tool | Use cases declared to the model |
+|---|---|
+| Read | Inspect source, configuration, logs and saved artifacts in the selected local or SSH environment. |
+| Write | Create or replace a complete text file in that environment. |
+| Edit | Make targeted replacements while preserving surrounding content in that environment. |
+| Bash | Inspect the environment, run programs, install, build, test, download files and process API responses there. |
+| IPython | Calculate, analyze data and reuse Python state in a local workspace. |
+| Search | Discover external information, check current facts and locate authoritative sources. |
+| Fetch | Read a known URL and verify details or quotations, within the selected service's capabilities. |
+
+## Bind an instruction candidate
+
+The built-in Catalog exposes one H target `tool-guidance.<name>` per enabled tool,
+plus the combined [execution instruction target](../algorithms/README.md#improve-multiple-instruction-components).
+An adopted guidance artifact replaces only `AgentTool.description`; it keeps the
+name, parameters, execution function and permission declaration. Each complete
+description must be nonempty and at most 6000 characters. Artifacts are consumed
+at runtime construction and recorded in H identity. Disabling a tool with a bound
+artifact requires clearing that binding; unused bindings fail construction.
+
+Custom tool definitions can declare the slot returned by `guidance_key(name)` in
+`artifact_slots`. `prepare_guidance` consumes enabled tools' bindings and registers
+their object-owned targets. The built-in composition root supplies those slots
+from its declared tool effects. Installing a description does not invoke the tool
+or make a model request. Component experiments require isolated full-runtime
+execution; ordinary tool-free text trials are not a measurement of tool use.

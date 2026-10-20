@@ -6,12 +6,11 @@ Verify algorithms and components through Core contracts and Catalog assembly.
 
 | Files | Protects |
 |---|---|
-| `test_dream_rsi.py` | Prefix-only replay, objective, I policy confirmation, activation and recovery |
 | `test_builtin_tools.py` | Character counts, file contents, output truncation, and shell failure reporting |
 | `test_ssh_env.py` | Remote paths, secret injection boundaries, SSH lifecycle, permissions and supervised cancellation without network |
 | `test_web_tools.py` | Offline search/fetch adapters, extraction, pagination, HTTP deadlines, retries, cache and cancellation |
+| `test_web_services.py` | Service injection, registry extension, credential metadata and known/unknown final URLs |
 | `test_catalog.py / test_base_prompt.py` | Registered identities, actionable rejection errors, and validation of disabled selections |
-| `test_search.py` | Frozen problems, evaluator, OPRO, journal, budgets, and optional private tool Agent |
 | `test_failure_processing.py / test_automatic_improvement.py` | Derived exercises, provenance, original-task gates, independent confirmation, and isolated task execution |
 | `test_skill_catalog.py / test_algorithm_contracts.py` | Bounded guidance, transformer forms, signals, and cancellation |
 | `test_reduction_safety.py / test_summarizing_compaction.py` | Valid summaries, tool associations, overflow, external references, and commits |
@@ -26,3 +25,4 @@ Use temporary materials, fake Providers, and injected HTTP callbacks. RLM tests 
 ```
 
 Environment tests include protected credentials, ordinary algorithm state, external approvals, symlink retargeting, and explicit child environments. No real credentials or network requests are used.
+| `test_improvement_pipeline.py` | Public stage protocols, task evidence, shared budgets and component execution |

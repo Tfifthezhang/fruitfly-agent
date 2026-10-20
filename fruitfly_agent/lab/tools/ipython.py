@@ -53,7 +53,8 @@ def create_ipython_tool(runtime: _IpythonExecutor) -> AgentTool:
         name="ipython",
         label="Execute Python code",
         description=(
-            "Execute code in this Session's persistent IPython workspace. "
+            "Execute Python code in this Session's persistent local IPython workspace. "
+            "Use for calculations, data analysis and experiments that reuse variables. "
             "Variables and imports survive later ipython calls while the Runtime "
             "is open. Top-level await is supported. Use the preloaded `context` "
             "object for external artifacts and `await llm_query(...)` for bounded "

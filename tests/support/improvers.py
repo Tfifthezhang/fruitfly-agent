@@ -1,10 +1,15 @@
-"""Offline improver substitution and terminal fixtures."""
+"""Explicit offline component ports; synthetic verification makes no quality claim."""
+from dataclasses import replace
 from queue import Queue
+from uuid import uuid4
 from unittest.mock import Mock
-from fruitfly_agent.lab.catalog import builtin_catalog, MechanismDefinition, MechanismDescriptor, MechanismContribution, ParameterDescriptor
-from fruitfly_agent.lab.improvement.api import SearchPreview, TextProposal, TEXT_IMPROVER_COMPONENT
+
+from fruitfly_agent.lab.improvement.api import (WorkflowBindings, GeneratorRegistry,
+    CandidateBundle, ComponentFile, HarnessSnapshot, EditReason, ProposalResult,
+    ExecutionRecord, SelectionDecision)
+from fruitfly_agent.interactive.contracts.improvement import WorkflowRequest
 from fruitfly_agent.run.application import RunApplicationFactory
-from tests.support.materials import _write_models, _write_cases
+from tests.support.materials import _write_models
 from tests.support.faux_provider import FauxProvider
 from tests.support.terminal import menu_choice
 
@@ -14,6 +19,7 @@ class QueueEditor:
         self.lines = Queue()
         self.output = None
         self.offset = 0
+
     def read_line(self):
         line = self.lines.get(timeout=3)
         if self.output is not None:
@@ -22,47 +28,72 @@ class QueueEditor:
             if line.startswith('@'):
                 return menu_choice(line[1:], rendered)
         return line
+
     def send(self, *lines):
         for line in lines:
             self.lines.put(line)
 
 
-class OfflineImprover:
-    def __init__(self, target):
-        self.target = target
-        self.calls = 0
-    def preview(self, *, task=None):
-        return SearchPreview('offline-search', 'Offline search', 'No network or model calls', target_id=self.target)
-    async def search(self, text, direction, *, parent_manifest, task=None):
-        self.calls += 1
-        return (TextProposal(text + '\nUse exact answers.', 'offline-search', evidence=(('Rule', 'deterministic append'),)),)
-    def cancel(self):
-        return False
+class OfflineGenerator:
+    generator_id = 'offline-rule'
+    required_capabilities = frozenset()
+
+    async def propose(self, request, services):
+        documents = tuple(replace(c, files=(ComponentFile('instructions.txt',
+            c.files[0].text + '\nUse exact answers.'),)) if c.component_id in request.plan.component_ids else c
+            for c in request.baseline.components)
+        return ProposalResult((CandidateBundle(request.plan.parent, request.baseline,
+            HarnessSnapshot(documents), self.generator_id,
+            tuple(EditReason(name, 'Synthetic offline contrast', (request.records[0].run_id,))
+                  for name in request.plan.component_ids)),))
 
 
-def custom_definition(improver_type=OfflineImprover):
-    return MechanismDefinition(
-        MechanismDescriptor('offline-search', 'Offline search', 'Alternative text algorithm',
-            contributions=(MechanismContribution('improvement', 'context'),),
-            exclusive_group='text-improver',
-            parameters=(ParameterDescriptor('target', 'string', 'Target', 'Named text target', 'base_prompt'),)),
-        lambda state, context, params: state.with_component(TEXT_IMPROVER_COMPONENT, context.own(improver_type(params['target']))),
-        implementation_id='offline-v1',
-        selection_group='text-improver', selection_group_label='Text improver',
+class FirstComposer:
+    async def compose(self, request, services):
+        return request.candidates[-1]
 
-        implementation_path='tests/support/improvers.py',
-        documentation_path='tests/support/README.md',
-    )
 
-def offline_factory(root, algorithm='offline-search', target='base_prompt', definition=None):
+class FirstSelector:
+    async def select(self, task, records):
+        return SelectionDecision(records[0].run_id, 'Synthetic offline choice')
+
+
+class NoReflection:
+    async def reflect(self, outcome):
+        return ()
+
+
+class SyntheticVerification:
+    async def verify(self, outcome):
+        return SelectionDecision(outcome.selected.run_id, 'Synthetic test verification only', 'verified')
+
+
+class OfflineRunner:
+    capabilities = frozenset({'file-workspace', 'tool:read', 'tool:write', 'tool:edit'})
+
+    async def execute(self, plan, task, harness):
+        return ExecutionRecord('run-' + uuid4().hex, task.task_id, task.material_id,
+            harness.snapshot_id, plan.parent.state, plan.conditions_id, 'completed', 'offline result', model_calls=0)
+
+
+def offline_factory(root, target='base_prompt'):
     _write_models(root)
-    _write_cases(root)
-    registry = Mock()
-    registry.create.side_effect = lambda *_: FauxProvider()
-    catalog = builtin_catalog().extended((definition or custom_definition(),))
-    factory = RunApplicationFactory(cwd=root, environment={}, catalog=catalog, provider_registry=registry)
-    factory.configuration.set_mechanism(algorithm, enabled=True)
-    factory.configuration.set_parameter(algorithm, 'target', target)
+    providers = Mock()
+    providers.create.side_effect = lambda *_: FauxProvider()
+    generators = GeneratorRegistry()
+    generators.register('offline-rule', OfflineGenerator)
+    factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=providers,
+        improvement_bindings=WorkflowBindings(generators=generators,
+            runner=lambda *args: OfflineRunner(), composer=lambda *args: FirstComposer(),
+            selector=lambda *args: FirstSelector(), reflector=lambda *args: NoReflection(),
+            verifier=SyntheticVerification()))
+    factory.test_request = WorkflowRequest('Complete the synthetic task.', component_ids=(target,),
+        generator_id='offline-rule', scope='persistent')
     factory.configuration.save()
     factory.reload_configuration()
     return factory
+
+
+async def improve(app, factory, direction='improve'):
+    preview = app.workflow_preview(replace(factory.test_request, direction=direction))
+    return await app.improve(direction, preview_token=preview.preview_token)

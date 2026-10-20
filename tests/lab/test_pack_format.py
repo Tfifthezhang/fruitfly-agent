@@ -138,7 +138,7 @@ class UnifiedPackTests(unittest.IsolatedAsyncioTestCase):
     def test_new_policy_projects_same_envelope_without_catalog_type_branches(self):
         from dataclasses import replace
         from fruitfly_agent.lab.improvement.tasks.scoring import ScoreResult, task_policy
-        from fruitfly_agent.lab.improvement.contracts.search import TaskCase
+        from fruitfly_agent.lab.improvement.tasks.models import TaskCase
         policy=replace(task_policy('normalized-exact-v1'),policy_id='contains-v1',task_schema='contains-task-v1',
             required_fields=frozenset({'input','contains'}),
             project=lambda row:TaskCase(row['input'],row['contains']),

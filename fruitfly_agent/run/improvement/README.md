@@ -2,57 +2,47 @@
 
 [Up: Run](../README.md)
 
-Host improvement jobs and candidate operations through injected capabilities. Algorithms and the RSI state machine remain in Lab; Application owns runtime lifecycle.
+Bind the public Lab workflow to durable storage and Application lifecycle. Leaf
+services receive explicit callbacks and stores, never the composition Factory.
 
-| File / entry | Responsibility |
+| Entry | Responsibility |
 |---|---|
-| [search_jobs.py](search_jobs.py): `RunSearchJobs` | Own preview receipts, freeze inputs, invoke generic improvers, persist proposals |
-| [candidates.py](candidates.py): `RunCandidates` | Scope, review, validate, prepare, and reconcile candidate adoption |
-| [evolution.py](evolution.py): `RunEvolutionHost` | Durable jobs, independent verification, adoption, active-version checks |
-| [startup_versions.py](startup_versions.py): `RunStartupVersions` | Opaque startup choices and temporary or remembered selections |
+| [pipeline.py](pipeline.py): `RunComponentJobs` | Freeze previews; assemble injected stage ports; persist outcomes and journals |
+| [external.py](external.py): `RunExternalJobs` | Prepare external task streams and reuse the same workflow |
+| `RuntimeTrialRunner` | Bind normal Application trials and validate official receipts |
+| [versions.py](versions.py): `RunVersions` | Source-backed H, declared I and registered S identity |
+| [candidates.py](candidates.py): `RunCandidates` | Review, scope validation, adoption and recovery |
+| [evolution.py](evolution.py): `RunEvolutionHost` | Durable RSI phases with independent verification |
+| [startup_versions.py](startup_versions.py) | Explicit temporary or remembered version choices |
 
-Services receive explicit storage interfaces, queries, configuration operations, and preparation callbacks. They do not receive a Factory or access another module's private fields. Search and startup services own their receipts. The Factory owns active bindings and invalidates search receipts on activation.
+Preview freezes the instruction, byte resources, components, parent H/I/S,
+experience and comparison materials. Its one-use token binds exact guidance and
+allocations. Changed conditions reject execution. Construction, timeout,
+cancellation and ordinary failure close journal resources; submitted intent remains
+in history even without a candidate.
 
-Saving a future default differs from switching the active runtime. Candidate and startup adoption use [activation hooks](../runtime/README.md) around isolated handles. Configuration is rechecked before commit. Partial saved intent is reconciled on later successful startup.
+Native file tasks use detached in-memory inputs. External execution downloads only
+after submission, freezes source/configuration and validates task, lease, model-call,
+runtime and environment receipts. Scores remain outside behavior editing. The
+stream shares a total allocation, starts each task with the common configured
+harness, and carries committed experience separately. External streams currently
+return task-local outputs rather than persistent candidates.
 
-The optional [automatic workflow](../../lab/improvement/automatic/README.md) uses the existing job and candidate contracts. Lab owns failure processing and independent confirmation; Run stores the returned evidence and keeps adoption separate.
+Persistent publication requires `verified` assurance from the injected verifier.
+Changed text bindings form one version candidate, including mixed H/S changes.
+Review and activation use existing host guards. Model, permissions and source
+conditions are rechecked before adoption. Registration alone cannot activate code.
 
-Evolution persists in `.fruitfly/evolution/` and requires an injected independent verifier. Unknown proposing/verifying work is not replayed. Interrupted activation is reconciled. One coordinator owns a job; no cross-process transaction. Real search and verification may incur model cost.
+The public Run evolution wrapper requires an explicit workflow `request` and an
+independent verifier. It previews each persistent proposal before invoking the
+normal Application job. Unknown proposing/verifying work is not replayed; partial
+activation is reconciled. One coordinator owns a job; no cross-process transaction
+is provided.
 
-See [Lab Improvement](../../lab/improvement/README.md), [Lab RSI](../../lab/rsi/README.md), and [Storage](../storage/README.md). No module-specific environment variables.
+See [Lab Improvement](../../lab/improvement/README.md),
+[RSI](../../lab/rsi/README.md), [Storage](../storage/README.md) and
+[Application adapters](../adapters/README.md). There are no new secret variables.
 
 ```bash
-.venv/bin/python -m unittest tests.run.test_host_services tests.workflows.test_improvement tests.workflows.test_evolution tests.workflows.test_decoupling -v
+.venv/bin/python -m unittest tests.run.test_host_services tests.workflows.test_improvement_pipeline tests.workflows.test_improvement_history tests.workflows.test_evolution
 ```
-
-Standalone checks use fake capabilities without a Factory; workflow checks exercise real composition offline.
-
-## Host original-task experiments
-
-[experiments.py](experiments.py) hosts explicitly requested benchmark jobs through the optional executor capability. It freezes complete task references, separates training/selection/confirmation, reruns the baseline, invokes the Lab workflow and stores one confirmed proposal. [versions.py](versions.py) binds source-backed H, declared I and registered S snapshots. Candidate adoption rejects stale H/I/S and mismatched prepared execution versions. Source identities do not capture live Python heaps.
-
-The Factory exposes `system_version()`, `benchmark_improvement_available`, `benchmark_task_preview(selection, executor, direction="")`. Direct task selection needs no prior evaluation. Pass the returned one-use token to the normal `Application.improve` path. The direction is `Improve completion of the frozen original benchmark tasks.` Preview is offline; the selected task download and execution run under one Application job. Execution through Eval uses models, networks and containers. See [Original task experiments](../../lab/improvement/experiments/README.md) for requirements, limits and data locations.
-
-## Bind ordinary searches to H/S/I
-
-The standard Factory supplies source-backed parent freezing to `RunSearchJobs`.
-A confirmed preview captures H, I and registered initial S before model work.
-The host rechecks the triple before and after search, stores a version candidate,
-and checks it again before saving or activating. Candidate role, target and
-artifact must match the declared modification. Prepared runtime identity must
-match the verified candidate. Standalone hosts may inject their own freezing
-capabilities; a manifest digest alone does not capture mutable learning state.
-
-## Select a method for one job
-
-The runtime owns an offline method selector built from Catalog declarations. With no enabled improver it exposes a lazy default and borrows active model/task services. Command selection does not require an enable switch. Confirmed per-target parameters persist as workspace preferences; candidate parent identity excludes these presentation defaults. Target views reflect actual executable method bindings. Previews can bind a compatible method and target without changing the active improver, profile or parent I identity. Receipts bind the exact host and normalized method identity; execution rejects changed identity before model work. Search activity and cancellation follow the running host, including temporary methods and original-task experiments.
-
-Normal job completion and failure keep the active default. Candidate activation changes only the declared target. Completed or failed ordinary jobs close their temporary hosts. Runtime closure closes remaining preview/binding resources. Submitted experiments are recorded independently of candidates through the [storage run store](../storage/improvement_runs.py). Results include method-owned completion reports even when no proposal is published. History protects referenced candidates, and all parent/configuration checks still apply when selecting an older result.
-
-The standard production path supports H instructions/workflows, S retained Skill/memory documents and registered I artifacts; role support declarations cannot bypass missing comparison or adoption adapters.
-
-Natural-language guidance may be empty. Previews still freeze the selected/default task material and issue one-use receipts binding the exact guidance, policy, method and parent. Changing empty guidance to nonempty text requires a new preview, just as changing any other confirmed input does.
-
-I artifact bindings are classified separately from H execution artifacts in version identity. Candidate construction, prepared-runtime checks, review, activation and recovery preserve H/S when only the policy changes. Candidate reports distinguish the method objective from task-selection scores. Source replacement and arbitrary state mutation remain unsupported.
-
-S document bindings are excluded from H identity and projected into registered immutable state snapshots. `RunVersions.text_candidate` replaces exactly one matching virtual document in S. Prepared-runtime checks resolve the new artifact against the registered snapshot source before activation. Skill source files and reference directories remain separate frozen dependencies; adopting a Skill body does not overwrite them. Identical overlaps in registered file sources are deduplicated; conflicting contents fail.

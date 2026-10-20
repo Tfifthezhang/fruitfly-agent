@@ -47,7 +47,7 @@ _EDIT_SCHEMA: dict = {
 _BOM = "﻿"
 
 
-def _apply_edits(content: str, edits: list[dict], path: str) -> tuple[str, str]:
+def apply_text_edits(content: str, edits: list[dict], path: str) -> tuple[str, str]:
     """Apply edits to LF-normalized content. Returns (base, new)."""
     spans: list[tuple[int, int, str]] = []
     for edit in edits:
@@ -155,7 +155,7 @@ async def _execute(ctx: ToolCallContext) -> AgentToolResult:
         original_ending = "\r\n" if "\r\n" in body else "\n"
         normalized = body.replace("\r\n", "\n")
 
-        base, new = _apply_edits(normalized, edits, path)
+        base, new = apply_text_edits(normalized, edits, path)
         final_content = bom + (new.replace("\n", original_ending) if original_ending == "\r\n" else new)
 
         write_result = ctx.env.write_file(absolute, final_content)
@@ -177,7 +177,9 @@ def create_edit_tool() -> AgentTool:
         name="edit",
         label="Edit file",
         description=(
-            "Edit a single file using exact text replacement. Every edits[].oldText "
+            "Edit a single file in the selected execution environment (local or SSH). "
+            "Use for targeted changes to existing text while preserving surrounding content. "
+            "Uses exact text replacement. Every edits[].oldText "
             "must match a unique, non-overlapping region of the original file. "
             "Merge nearby changes into one edit."
         ),

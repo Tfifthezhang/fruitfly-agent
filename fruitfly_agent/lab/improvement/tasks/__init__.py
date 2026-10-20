@@ -15,7 +15,7 @@ from uuid import uuid4
 from typing import Iterator, NotRequired, Protocol, Sequence, TypedDict, cast
 
 from fruitfly_agent.lab.improvement.tasks.cases import TaskSuite, load_task_cases
-from fruitfly_agent.lab.improvement.contracts.search import TaskCase
+from fruitfly_agent.lab.improvement.tasks.models import TaskCase
 from fruitfly_agent.lab.improvement.tasks.scoring import TaskPolicy, builtin_task_policies, task_policy
 
 TASK_PACK_COMPONENT = "improvement-task-packs"
@@ -336,6 +336,7 @@ class FrozenTaskSuite:
     evaluation_policy: object = None
     material_files: tuple[tuple[str, str], ...] = ()
     case_ids: tuple[tuple[str, str], ...] = ()
+    direction: str = 'max'
 
 
 class TaskSource(Protocol):
@@ -487,7 +488,8 @@ class TaskPackCatalog:
             tuple(TaskCase(**c) for c in projection["validation"]), digest(encoded(projection)),
             pack_id, payload["name"], identity, target_id, payload["objective"]["policy_id"],
             tuple((c["id"], encoded(c.get("source", {})).decode("utf-8")) for p in ("train", "validation") for c in _partition(payload, p)), policy.execution_id, policy, loaded.file_hashes,
-            tuple((policy.project(c).case_id, c["id"]) for p in ("train", "validation") for c in _partition(payload, p)))
+            tuple((policy.project(c).case_id, c["id"]) for p in ("train", "validation") for c in _partition(payload, p)),
+            payload['objective']['direction'])
 
     def holdout(self, pack_id: str) -> tuple[TaskCase, ...]:
         if pack_id == LEGACY_PACK_ID:

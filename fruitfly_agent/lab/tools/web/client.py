@@ -188,7 +188,7 @@ class WebClient:
                         url = target
                         continue
                     if status >= 400:
-                        code = {401: "authentication", 403: "forbidden", 404: "not_found", 429: "rate_limit",
+                        code = {401: "authentication", 402: "quota_exceeded", 403: "forbidden", 404: "not_found", 429: "rate_limit",
                                 432: "quota_exceeded", 433: "quota_exceeded"}.get(status, "http_error")
                         # Never include upstream bodies, request headers or credentials in errors.
                         raise WebError(code, f"The service returned HTTP {status}.",

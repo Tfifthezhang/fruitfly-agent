@@ -10,7 +10,6 @@ from typing import Any, Callable, Mapping, TYPE_CHECKING
 if TYPE_CHECKING:
     from .assembly import AssemblyContext, AssemblyState
 
-from fruitfly_agent.lab.improvement.methods import MethodDefinition
 
 from fruitfly_agent.core.mechanisms import (
     ActivationScope,
@@ -58,6 +57,8 @@ class SetupCredential:
     parameter: str
     label: str
     description: str
+    variable: str = ''
+    allow_whitespace: bool = True
 
 
 @dataclass(frozen=True)
@@ -66,6 +67,7 @@ class MechanismSetup:
     credentials: tuple[SetupCredential, ...] = ()
     required_fields: tuple[str, ...] = ()
     guidance: str = ''
+    credential_resolver: Callable[[Mapping[str, Any]], tuple[SetupCredential, ...]] | None = None
 
 
 @dataclass(frozen=True)
@@ -82,18 +84,16 @@ class MechanismDefinition:
     selection_group_label: str | None = None
     selection_group_allow_disabled: bool = True
     configuration_category: str | None = None
-    improvement: MethodDefinition | None = None
     implementation_path: str = ''
     documentation_path: str = ''
     input_parameters: tuple[str, ...] = ()
     setup: MechanismSetup | None = None
+    credential_variables: Callable[[Mapping[str, Any]], tuple[str, ...]] | None = None
+    prepare_targets: Callable[[Any, Any], Any] | None = None
 
     def __post_init__(self) -> None:
-        if self.improvement is not None:
-            if not isinstance(self.improvement, MethodDefinition):
-                raise TypeError('improvement must be a MethodDefinition')
-            if not any(c.layer == 'improvement' for c in self.descriptor.contributions):
-                raise ValueError('an improvement method must declare its improvement contribution')
+        if self.prepare_targets is not None and not callable(self.prepare_targets):
+            raise TypeError('object target preparation must be callable')
         if self.configuration_category is not None and not _ID.fullmatch(self.configuration_category):
             raise ValueError('configuration category must be a stable identifier')
         if self.implementation_id is not None and (
@@ -112,6 +112,8 @@ class MechanismDefinition:
             object.__setattr__(self, name, frozenset(values))
         if self.validate_parameters is not None and not callable(self.validate_parameters):
             raise TypeError("parameter validator must be callable")
+        if self.credential_variables is not None and not callable(self.credential_variables):
+            raise TypeError("credential_variables must be callable")
         if not callable(self.install):
             raise TypeError("mechanism installer must be callable")
         if self.selection_group is not None and not _ID.fullmatch(self.selection_group):
@@ -142,12 +144,45 @@ class MechanismDefinition:
         if self.setup is not None:
             parameters = {p.name: p for p in self.descriptor.parameters}
             fields = (*self.setup.fields, *(c.parameter for c in self.setup.credentials))
-            if len(fields) != len(set(fields)) or set(fields) - parameters.keys():
+            if (len(self.setup.fields) != len(set(self.setup.fields))
+                    or len(self.setup.credentials) != len({c.parameter for c in self.setup.credentials})
+                    or set(fields) - parameters.keys()):
                 raise ValueError('setup fields must name distinct declared parameters')
             if set(self.setup.required_fields) - set(self.setup.fields):
                 raise ValueError('required setup fields must be visible form fields')
             if any(parameters[c.parameter].kind != 'string' for c in self.setup.credentials):
                 raise ValueError('credential bindings must name string parameters')
+            if self.setup.credential_resolver is not None and not callable(self.setup.credential_resolver):
+                raise TypeError('setup credential_resolver must be callable')
+
+    def setup_credentials(self, parameters: Mapping[str, Any]) -> tuple[SetupCredential, ...]:
+        """Resolve hidden form fields from the current form's non-secret values."""
+        if self.setup is None:
+            return ()
+        fields = (self.setup.credential_resolver(parameters) if self.setup.credential_resolver is not None
+                  else self.setup.credentials)
+        declared = {p.name: p for p in self.descriptor.parameters}
+        if (not isinstance(fields, tuple) or any(not isinstance(c, SetupCredential)
+                or c.parameter not in declared or declared[c.parameter].kind != 'string'
+                or not isinstance(c.variable, str)
+                or c.variable and not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', c.variable)
+                or not isinstance(c.allow_whitespace, bool) for c in fields)
+                or len(fields) != len({c.parameter for c in fields})):
+            raise ValueError('setup credentials must bind distinct string parameters and valid secret variable names')
+        return fields
+
+    def required_credentials(self, parameters: Mapping[str, Any]) -> tuple[str, ...]:
+        """Return declared secret names offline; never read or return their values."""
+        if self.credential_variables is None:
+            return ()
+        if self.validate_parameters is not None:
+            self.validate_parameters(parameters)
+        normalized = self.descriptor.normalize_parameters(parameters)
+        names = self.credential_variables(normalized)
+        if (not isinstance(names, tuple) or any(not isinstance(name, str)
+                or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) for name in names)):
+            raise ValueError("credential_variables must return a tuple of environment variable names")
+        return tuple(sorted(set(names)))
 
 
 @dataclass(frozen=True)

@@ -27,6 +27,87 @@ class WebToolTests(unittest.IsolatedAsyncioTestCase):
         self.addAsyncCleanup(client.close)
         return client
 
+    async def test_deepseek_search_maps_summary_filters_and_caches(self):
+        requests = []
+        def respond(request):
+            requests.append(request)
+            return httpx.Response(200, json={"results": [
+                {"url": "https://docs.example.org/a#part", "title": "<b>Source</b>", "summary": "Detailed evidence", "snippet": "Short"},
+                {"url": "https://docs.example.org/a", "title": "Duplicate"},
+                {"url": "https://other.org/a", "title": "Excluded"},
+            ]})
+        tool = create_web_search_tool(self.client(respond), backend="deepseek", api_key="offline-token")
+        args = {"query": "GPU", "count": 2, "domains": ["example.org"], "freshness": "week"}
+        first = (await tool.execute(context(tool.name, args))).details
+        second = (await tool.execute(context(tool.name, args))).details
+        self.assertEqual(1, len(requests))
+        request = requests[0]
+        self.assertEqual("https://api.deepseek.com/v1/tools/search", str(request.url))
+        self.assertEqual("POST", request.method)
+        self.assertEqual("Bearer offline-token", request.headers["authorization"])
+        payload = json.loads(request.content)
+        self.assertIn("site:example.org", payload["query"])
+        self.assertRegex(payload["query"], r" after:\d{4}-\d{2}-\d{2}$")
+        self.assertEqual(2, payload["count"])
+        self.assertFalse(payload["need_content"])
+        self.assertEqual(1, len(first["results"]))
+        self.assertEqual("Detailed evidence", first["results"][0]["snippet"])
+        self.assertTrue(second["cached"])
+
+    async def test_deepseek_combined_query_limit_rejects_before_http(self):
+        tool = create_web_search_tool(self.client(lambda r: self.fail("unexpected HTTP")),
+                                      backend="deepseek", api_key="offline-token")
+        for args in ({"query": "x" * 129}, {"query": "x" * 120, "domains": ["example.org"]},
+                     {"query": "x" * 120, "freshness": "day"}):
+            with self.subTest(args=args), self.assertRaises(WebError) as failure:
+                await tool.execute(context(tool.name, args))
+            self.assertEqual("invalid_arguments", failure.exception.code)
+
+    async def test_deepseek_fetch_preserves_markdown_paginates_and_reports_source_url(self):
+        requests = []
+        def respond(request):
+            requests.append(request)
+            return httpx.Response(200, json={"title": "Docs", "content": "# Heading\n\n  code\n[Guide](https://example.org/guide)"})
+        tool = create_web_fetch_tool(self.client(respond), backend="deepseek", api_key="offline-token")
+        args = {"url": "https://example.org/start", "limit": 2}
+        first = (await tool.execute(context(tool.name, args))).details
+        second = (await tool.execute(context(tool.name, {**args, "offset": first["next_offset"]}))).details
+        self.assertEqual(1, len(requests))
+        self.assertEqual("https://api.deepseek.com/v1/tools/fetch", str(requests[0].url))
+        self.assertEqual({"url": args["url"]}, json.loads(requests[0].content))
+        self.assertEqual("Bearer offline-token", requests[0].headers["authorization"])
+        self.assertEqual("Docs", first["title"])
+        self.assertEqual(args["url"], first["url"])
+        self.assertIn("L3:   code", second["text"])
+        self.assertIn("[Guide](https://example.org/guide)", second["text"])
+        self.assertEqual(first["content_id"], second["content_id"])
+        self.assertTrue(second["cached"])
+        self.assertIsNone(second["next_offset"])
+
+    async def test_deepseek_fetch_rejects_bad_payloads_without_caching_or_leaking_keys(self):
+        for body, code in (({}, "invalid_response"), ({"content": 1}, "invalid_response"),
+                           ({"content": ""}, "empty_content"), ({"content": "  \n"}, "empty_content"),
+                           ({"content": "text", "title": None}, "invalid_response"),
+                           ({"error": "offline-token", "content": "text"}, "invalid_response")):
+            calls = []
+            def respond(request):
+                calls.append(request)
+                return httpx.Response(200, json=body)
+            tool = create_web_fetch_tool(self.client(respond), backend="deepseek", api_key="offline-token")
+            for _ in range(2):
+                with self.subTest(body=body), self.assertRaises(WebError) as failure:
+                    await tool.execute(context(tool.name, {"url": "https://example.org/"}))
+                self.assertEqual(code, failure.exception.code)
+                self.assertNotIn("offline-token", str(failure.exception))
+            self.assertEqual(2, len(calls))
+
+    async def test_deepseek_fetch_rejects_private_source_urls_before_http(self):
+        tool = create_web_fetch_tool(self.client(lambda r: self.fail("unexpected HTTP")),
+                                     backend="deepseek", api_key="offline-token")
+        for url in ("file:///etc/passwd", "http://127.0.0.1/", "https://user:password@example.org/"):
+            with self.subTest(url=url), self.assertRaises(WebError):
+                await tool.execute(context(tool.name, {"url": url}))
+
     async def test_brave_filters_deduplicates_bounds_and_caches_sources(self):
         requests = []
         def respond(request):
@@ -78,6 +159,9 @@ class WebToolTests(unittest.IsolatedAsyncioTestCase):
         for backend, body, succeeds in (
             ("brave", {"query": {"original": "unmatched"}}, True),
             ("tavily", {"results": []}, True),
+            ("deepseek", {"results": []}, True),
+            ("deepseek", {"results": [{"url": "https://example.org/", "snippet": "Fallback"}]}, True),
+            ("deepseek", {"error": "offline-token"}, False),
             ("brave", {}, False), ("brave", {"web": {"results": {}}}, False),
             ("tavily", {"results": [{"title": "no url"}]}, False),
             ("tavily", {"error": "offline-token"}, False),
@@ -89,7 +173,10 @@ class WebToolTests(unittest.IsolatedAsyncioTestCase):
                     return httpx.Response(200, json=body)
                 tool = create_web_search_tool(self.client(respond), backend=backend, api_key="offline-token")
                 if succeeds:
-                    self.assertEqual([], (await tool.execute(context(tool.name, {"query": "unmatched"}))).details["results"])
+                    results = (await tool.execute(context(tool.name, {"query": "unmatched"}))).details["results"]
+                    self.assertEqual(len(body.get("results", [])), len(results))
+                    if results:
+                        self.assertEqual("Fallback", results[0]["snippet"])
                 else:
                     for _ in range(2):
                         with self.assertRaises(WebError) as failure:
@@ -186,7 +273,7 @@ class HttpBoundaryTests(unittest.IsolatedAsyncioTestCase):
     async def test_transient_retry_is_bounded_but_permanent_errors_never_retry(self):
         for status, expected_attempts, expected in ((503, 2, "http_error"), (429, 2, "rate_limit"),
                                                    (401, 1, "authentication"), (403, 1, "forbidden"),
-                                                   (404, 1, "not_found"), (432, 1, "quota_exceeded")):
+                                                   (404, 1, "not_found"), (402, 1, "quota_exceeded"), (432, 1, "quota_exceeded")):
             with self.subTest(status=status):
                 calls = []
                 def respond(request):

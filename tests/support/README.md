@@ -15,7 +15,7 @@ Reusable substitutes and temporary materials. This module contains no TestCases 
 | [task_packs.py](task_packs.py) | Text/Python pack fixtures |
 | [application.py](application.py) | Offline Sessions, RuntimeFactory substitutes, and Applications |
 | [terminal.py](terminal.py), [configuration.py](configuration.py) | Finite input, TTY streams, fixed completion events, and configuration controller substitutes |
-| [improvers.py](improvers.py), [search.py](search.py) | Replaceable improvers, problems, services, and input queues |
+| [improvers.py](improvers.py), [improvement_ui.py](improvement_ui.py) | Replaceable workflow stages, neutral menu metadata and finite input queues |
 | [evaluation.py](evaluation.py), [harbor.py](harbor.py) | Offline requests and isolated Harbor protocol |
 
 Keep local helpers local unless multiple tests need them. Do not compute reviewed expected values from implementation helpers. Production code must not import support. Its consumers verify behavior; it has no separate execution command or key requirements.

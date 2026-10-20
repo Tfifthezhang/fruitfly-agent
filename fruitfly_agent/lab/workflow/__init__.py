@@ -53,6 +53,7 @@ def apply_workflow(config, text):
 
 class WorkflowTarget:
     label = 'Execution workflow'
+    component_kind = 'execution-workflow'
     project_in_trials = True
 
     def __init__(self, text=DEFAULT_WORKFLOW):

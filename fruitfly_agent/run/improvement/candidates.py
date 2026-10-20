@@ -11,6 +11,7 @@ from fruitfly_agent.run.storage.candidates import CandidateRecord
 from fruitfly_agent.run.storage.retention import compact_candidates
 from fruitfly_agent.run.runtime.activation import bind_activation
 from fruitfly_agent.run.configuration.operations import BindingEditor
+from fruitfly_agent.lab.algorithms.targets import expand_target
 
 
 class RunCandidates:
@@ -128,10 +129,10 @@ class RunCandidates:
         if snapshot.binding.kind != record.binding_kind or snapshot.binding.key != record.binding_key:
             raise ValueError("candidate target binding changed")
         target.validate(self.artifacts.read_text(record.artifact_id))
-        if record.binding_kind == "artifact" and record.binding_key in self.pinned_bindings and self.pinned_bindings[record.binding_key] != record.artifact_id:
-            raise ValueError("target is pinned by constructor bindings; update those bindings before adoption")
+        bindings = self.candidate_bindings(record)
         try:
-            self.configuration().bind_target(record.binding_kind, record.binding_key, record.artifact_id)
+            for kind, key, reference in bindings:
+                self.configuration().bind_target(kind, key, reference)
             self.configuration().save()
         except BaseException:
             self.configuration().reset()
@@ -144,10 +145,40 @@ class RunCandidates:
             raise ValueError('candidate belongs to another configuration/profile')
 
     def _saved_candidate_profile(self, record):
-        profile = self.profile()
-        if record.binding_kind == 'prompt':
-            return replace(profile, prompt=record.artifact_id)
-        return replace(profile, artifact_bindings={**profile.artifact_bindings, record.binding_key: record.artifact_id})
+        return self.apply_candidate(self.profile(), record)
+
+    def candidate_bindings(self, record):
+        """Expand object-owned component content into existing profile bindings."""
+        target = self.target(record.target)
+        if target is None:
+            raise ValueError('candidate target is unavailable')
+        text = self.artifacts.read_text(record.artifact_id)
+        target.validate(text)
+        snapshot = target.snapshot()
+        if snapshot.binding.kind == 'components':
+            original = dict((part.target_id, value) for part, value in expand_target(
+                snapshot, self.artifacts.read_text(record.parent_target_reference)))
+            parts = tuple((part, value) for part, value in expand_target(snapshot, text)
+                          if value != original[part.target_id])
+        else:
+            parts = expand_target(snapshot, text)
+        if not parts:
+            raise ValueError('candidate does not change any component')
+        result = []
+        for part, value in parts:
+            reference = self.artifacts.put_text(value).artifact_id
+            binding = part.binding
+            if (binding.kind == 'artifact' and binding.key in self.pinned_bindings
+                    and self.pinned_bindings[binding.key] != reference):
+                raise ValueError('target is pinned by constructor bindings; update those bindings before adoption')
+            result.append((binding.kind, binding.key, reference))
+        return tuple(result)
+
+    def apply_candidate(self, profile, record):
+        for kind, key, reference in self.candidate_bindings(record):
+            profile = (replace(profile, prompt=reference) if kind == 'prompt' else
+                       replace(profile, artifact_bindings={**profile.artifact_bindings, key: reference}))
+        return profile
 
     def candidate_profile(self, active_manifest, candidate_id):
         """Validate one candidate against the exact active parent and binding."""
@@ -165,15 +196,7 @@ class RunCandidates:
         if (record.binding_kind, record.binding_key) != (snapshot.binding.kind, snapshot.binding.key):
             raise ValueError("candidate binding differs from target")
         target.validate(self.artifacts.read_text(record.artifact_id))
-        if record.binding_kind == "artifact" and record.binding_key in self.pinned_bindings and self.pinned_bindings[record.binding_key] != record.artifact_id:
-            raise ValueError("target is pinned by constructor bindings; update those bindings before adoption")
-        profile = self.active_profile() or self.profile()
-        if record.binding_kind == "prompt":
-            profile = replace(profile, prompt=record.artifact_id)
-        elif record.binding_kind == "artifact":
-            profile = replace(profile, artifact_bindings={**profile.artifact_bindings, record.binding_key: record.artifact_id})
-        else:
-            raise ValueError("unsupported target binding")
+        profile = self.apply_candidate(self.active_profile() or self.profile(), record)
         resolved_profile = self.resolved_profile()
         unchanged = resolved_profile == self.profile() and not self.configuration().changed
         saved_candidate = record.status == "selected_for_next_session" and resolved_profile == self._saved_candidate_profile(record)
@@ -200,7 +223,8 @@ class RunCandidates:
                 # after profile save, the next successful startup reconciles it
                 # against the actual target hash and manifest.
                 self.store.update(candidate_id, status="selected_for_next_session")
-                self.configuration().bind_target(record.binding_kind, record.binding_key, record.artifact_id)
+                for kind, key, reference in self.candidate_bindings(record):
+                    self.configuration().bind_target(kind, key, reference)
                 try:
                     self.configuration().save()
                 except BaseException:

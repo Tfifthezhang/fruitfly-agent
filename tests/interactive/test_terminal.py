@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fruitfly_agent.interactive.contracts.improvement import ImprovementPreview, ImprovementTargetView
+from tests.support.improvement_ui import configuration
 
 import asyncio
 from dataclasses import replace
@@ -89,13 +90,12 @@ class TerminalFrontendTest(unittest.IsolatedAsyncioTestCase):
         )
 
         class ImprovementSession(_TerminalSessionStub):
-            def improvement_targets(self):
-                return (ImprovementTargetView('H', 'base_prompt', 'Base prompt'),)
+            def workflow_configuration(self):
+                return configuration()
 
-
-
-            def improvement_preview(self, *, pack_id=None, direction=""):
-                return ImprovementPreview("opro", "OPRO", "Model requests may incur cost", (("Maximum metric calls", "8"),), target="base_prompt")
+            def workflow_preview(self, request):
+                return ImprovementPreview('rule', 'Rule', 'Model requests may incur cost',
+                    (('Maximum model calls', '8'),), target='base_prompt', preview_token='token')
 
             def start_improvement(self, direction, *, preview_token=""):
                 return asyncio.create_task(self.improve(direction))
@@ -130,14 +130,14 @@ class TerminalFrontendTest(unittest.IsolatedAsyncioTestCase):
             input_stream=io.StringIO(),
             output_stream=output,
             line_editor=MenuScriptedLines(output,
-                '/improvement be concise', '@Target ·', '@Base prompt', '@Start improvement', '@Start improvement',
+                '/improvement be concise', '@Next page', '@Start improvement', '@Start the frozen workflow',
                 '@Review candidate', '@Set as next-session default', '@Set as next-session default', 'q', '/exit',
             ),
         )
         self.assertEqual(await frontend.run(), 0)
         self.assertEqual(session.direction, "be concise")
-        self.assertIn("Maximum metric calls: 8", output.getvalue())
-        self.assertIn("candidate(s) ready; not active", output.getvalue())
+        self.assertIn("Maximum model calls: 8", output.getvalue())
+        self.assertIn("candidate(s)", output.getvalue())
         self.assertIn("Candidate saved for the next session", output.getvalue())
 
     async def test_inline_terminal_accepts_input_while_run_is_active(self) -> None:

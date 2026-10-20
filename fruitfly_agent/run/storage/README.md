@@ -6,11 +6,11 @@ Persist immutable text, candidate records, and readable outputs. Storage validat
 
 | File / entry | Responsibility |
 |---|---|
-| [artifacts.py](artifacts.py): `DataArtifactStore` | Store and verify UTF-8 text under SHA-256 identities |
+| [artifacts.py](artifacts.py): `DataArtifactStore` | Store and verify immutable text and binary bytes under SHA-256 identities |
 | [prompts.py](prompts.py): `resolve_base_prompt` | Resolve built-in or stored prompt contents without assembly |
 | [candidates.py](candidates.py): `CandidateRecord`, `CandidateStore` | Create, read, update, replace, and delete records |
 | [improvement_runs.py](improvement_runs.py): `ImprovementRunStore` | Atomic experiment summaries and verified journal reads, scoped to configuration/profile |
-| [improvement_preferences.py](improvement_preferences.py): `ImprovementPreferences` | Atomically retain confirmed per-target method and parameter choices, separately from runtime identity |
+| [experience.py](experience.py): `ExperienceStore` | Optimistic attributed-library commit and exact S snapshots |
 | [results.py](results.py): `save_task_result` | Export latest complete task/configuration/profile/target results |
 | [retention.py](retention.py): `compact_candidates` | Protect references before deleting obsolete owned records and contents |
 
@@ -21,7 +21,6 @@ Persist immutable text, candidate records, and readable outputs. Storage validat
 | Immutable text | `.fruitfly/artifacts/` |
 | Candidates | `.fruitfly/improvement/candidates/` |
 | Experiment summaries | `.fruitfly/improvement/runs/`; all submitted outcomes, including no candidate |
-| Job preferences | `.fruitfly/improvement/preferences/`; scoped to configuration/profile, no quality evidence |
 | Readable results | `.fruitfly/improvement/task-results/` |
 
 Experiment records use their independent schema version 1. History retains candidate and journal references; referenced candidates remain protected during compaction. Run history is not automatically pruned. A running record left by an interrupted process is not permission to replay work. Exports are not runtime inputs. Malformed or suspicious references stop cleanup; arbitrary unowned artifacts are not swept. Keep secrets out of stored text and reports. No model calls or module-specific environment variables.

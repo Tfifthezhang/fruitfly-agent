@@ -71,7 +71,7 @@ The next command executes the paid/network/container path:
 | Exit codes | completed 0, failed 1, input/file error 2, blocked 3 |
 | Request validation | Requires schema 2; unknown fields and experiment inputs are rejected |
 
-The runner copies the selected profile and catalog before starting Harbor. Per-task records include available actual runtime manifests. Source code, live Python heaps, and external services are not snapshotted. Ordinary evaluation does not freeze runtime source or learning state. The separately authorized [original-task improvement host](../fruitfly_agent/lab/improvement/experiments/README.md) does so before controlled trials.
+The runner copies the selected profile and catalog before starting Harbor. Per-task records include available actual runtime manifests. Source code, live Python heaps, and external services are not snapshotted. Ordinary evaluation does not freeze runtime source or learning state. The separately authorized [original-task improvement host](../fruitfly_agent/lab/improvement/README.md) does so before controlled trials.
 
 ## Follow execution and reports
 

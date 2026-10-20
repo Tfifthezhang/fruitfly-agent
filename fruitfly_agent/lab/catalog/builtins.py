@@ -27,18 +27,11 @@ from fruitfly_agent.lab.context_manager.externalization.adapter import (
     install_rlm_ipython,
 )
 from fruitfly_agent.lab.improvement.tasks import TaskPackCatalog, TASK_PACK_COMPONENT
-from fruitfly_agent.lab.improvement.methods.opro import definition as opro_definition
-from fruitfly_agent.lab.improvement.methods.tree_search import definition as tree_definition
-from fruitfly_agent.lab.improvement.methods.dream_rsi import definition as dream_definition
-from fruitfly_agent.lab.improvement.methods.workflow_search import definition as workflow_search_definition
-from fruitfly_agent.lab.improvement.methods.skill_edit import definition as skill_edit_definition
-from fruitfly_agent.lab.improvement.methods.memory_exploration import definition as memory_exploration_definition
+from fruitfly_agent.lab.improvement.registration import definition as improvement_definition
 from fruitfly_agent.lab.workflow import definition as execution_workflow_definition
 from fruitfly_agent.lab.tools.web.registration import definitions as web_definitions
 from fruitfly_agent.lab.context_manager.augmentation.skills.document import definition as skill_document_definition
 from fruitfly_agent.lab.context_manager.augmentation.information.file_memory.learned import definition as learned_memory_definition
-from fruitfly_agent.lab.improvement.failure_processing import definitions as failure_definitions
-from fruitfly_agent.lab.improvement.automatic import definition as automatic_definition
 from fruitfly_agent.lab.context_manager.augmentation.skills import (
     SkillCatalogTransformer, load_skills, render_skills_xml,
 )
@@ -49,6 +42,7 @@ from fruitfly_agent.lab.context_manager.augmentation.information.file_memory.sna
 from fruitfly_agent.lab.algorithms.snapshots import WorkspaceTextSnapshots
 from fruitfly_agent.lab.improvement.contracts.versions import EXPERIMENT_BLOCKERS_COMPONENT
 from fruitfly_agent.lab.base_prompt.target import BasePromptTarget
+from fruitfly_agent.lab.tools.guidance import prepare_guidance, guidance_key
 from fruitfly_agent.lab.tools import (
     create_bash_tool,
     create_edit_tool,
@@ -72,6 +66,14 @@ def builtin_catalog() -> LabCatalog:
     """Return a fresh explicit catalog; callers may inject more definitions."""
 
     definitions = (
+        MechanismDefinition(
+            MechanismDescriptor('instruction-components', 'Execution instructions',
+                'Expose execution instructions as independently bound improvement components.',
+                contributions=(MechanismContribution('capability', 'tools'),)),
+            lambda state, context, parameters: state, visible=False,
+            prepare_targets=_prepare_instruction_components,
+            implementation_path='fruitfly_agent/lab/algorithms/components.py',
+            documentation_path='fruitfly_agent/lab/algorithms/README.md'),
         ssh_definition(),
         *web_definitions(),
         _definition(
@@ -304,23 +306,23 @@ def builtin_catalog() -> LabCatalog:
                 writes_files=True,
             ),
         ),
-        opro_definition(),
-        tree_definition(),
-        dream_definition(),
-        workflow_search_definition(),
-        skill_edit_definition(),
-        memory_exploration_definition(),
         execution_workflow_definition(),
+        improvement_definition(),
         skill_document_definition(),
         learned_memory_definition(),
         learning_definition(),
-        *failure_definitions(),
-        automatic_definition(),
     )
+    definitions = tuple(replace(d, artifact_slots=d.artifact_slots | frozenset(
+        guidance_key(name) for name in d.descriptor.effects.tools)) for d in definitions)
     return LabCatalog(definitions, bootstrap=lambda state, context: (
         state.with_component(TEXT_TARGET_PREFIX + "base_prompt", BasePromptTarget(state.config.system_prompt))
         .with_component(TASK_PACK_COMPONENT, TaskPackCatalog(context.workspace, context.task_pack_sources))
     ))
+
+
+def _prepare_instruction_components(state, context):
+    state = prepare_guidance(state, context)
+    return state
 
 
 def _definition(

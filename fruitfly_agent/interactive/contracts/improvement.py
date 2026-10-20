@@ -6,6 +6,60 @@ from fruitfly_agent.interactive.contracts.candidates import CandidateView, Candi
 
 
 @dataclass(frozen=True)
+class WorkflowChoice:
+    choice_id: str
+    label: str
+    available: bool = True
+    reason: str = ''
+    detail: str = ''
+
+
+@dataclass(frozen=True)
+class WorkflowComponentView:
+    component_id: str
+    label: str
+    kind: str
+    role: str
+    available: bool = True
+    reason: str = ''
+
+
+@dataclass(frozen=True)
+class WorkflowConfiguration:
+    components: tuple[WorkflowComponentView, ...]
+    generators: tuple[WorkflowChoice, ...]
+    modes: tuple[WorkflowChoice, ...]
+    verification: tuple[WorkflowChoice, ...]
+    scopes: tuple[WorkflowChoice, ...]
+    parameters: tuple['ImprovementParameterView', ...] = ()
+    materials: tuple[WorkflowChoice, ...] = ()
+
+
+@dataclass(frozen=True)
+class WorkflowRequest:
+    instruction: str = ''
+    input_paths: tuple[str, ...] = ()
+    component_ids: tuple[str, ...] = ()
+    generator_id: str = 'agent-editor-v1'
+    mode: str = 'parallel'
+    verification: str = 'behavior'
+    scope: str = 'task'
+    width: int = 1
+    depth: int = 1
+    max_model_calls: int = 64
+    max_executions: int = 32
+    operation_timeout: float = 120
+    direction: str = ''
+    task_pack_id: str = ''
+
+
+@runtime_checkable
+class ComponentImprovementClient(Protocol):
+    def workflow_configuration(self) -> WorkflowConfiguration | None: ...
+    def workflow_preview(self, request: WorkflowRequest) -> 'ImprovementPreview': ...
+
+
+@dataclass(frozen=True)
 class ImprovementPreview:
     algorithm: str
     label: str
@@ -26,7 +80,8 @@ class ImprovementTargetView:
 
 
 class ImprovementService(Protocol):
-    def improvement_preview(self, manifest: Mapping[str, object], *, pack_id=None, direction="", method_id=None, target_id=None, parameters=None) -> ImprovementPreview: ...
+    def workflow_configuration(self) -> WorkflowConfiguration: ...
+    def workflow_preview(self, request: WorkflowRequest) -> ImprovementPreview: ...
     async def improve(self, manifest: Mapping[str, object], direction: str, *, preview_token="") -> tuple[CandidateView, ...]: ...
     def cancel_improvement(self) -> bool: ...
 
@@ -64,30 +119,11 @@ class ImprovementProgress:
 
 
 @runtime_checkable
-class ImprovementClient(Protocol):
+class ImprovementClient(ComponentImprovementClient, Protocol):
     """Frontend operations implemented by an Application with an injected service."""
-    def improvement_preview(self, *, pack_id=None, direction="", method_id=None, target_id=None, parameters=None) -> ImprovementPreview: ...
     def start_improvement(self, direction: str, *, preview_token=""): ...
 
 
-
-
-@dataclass(frozen=True)
-class ImprovementMethodView:
-    method_id: str
-    label: str
-    description: str
-    available: bool = True
-    reason: str = ''
-    default: bool = False
-    parameters: tuple[ImprovementParameterView, ...] = ()
-    task_sources: tuple[str, ...] = ('saved',)
-    requirements: tuple[tuple[str, str], ...] = ()
-    direction_help: str = ''
-    implementation_path: str = ''
-    documentation_path: str = ''
-    configuration_path: str = ''
-    configuration_profile: str = ''
 
 
 @dataclass(frozen=True)

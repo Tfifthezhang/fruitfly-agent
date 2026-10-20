@@ -123,9 +123,17 @@ def assemble_lab(
     reduction_stage_id: str | None = None
     for item in resolved:
         descriptor = item.definition.descriptor
+        item_context = context
+        names = item.definition.required_credentials(item.parameters)
+        if names:
+            secrets = {name: context.secret_resolver(name) if context.secret_resolver is not None else None for name in names}
+            missing = [name for name, value in secrets.items() if not value]
+            if missing:
+                raise ValueError("missing required credentials: " + ", ".join(missing))
+            item_context = replace(context, secret_resolver=secrets.get)
         previous_stages = state.context_stages
         previous_reducer = state.reducer
-        candidate = item.definition.install(state, context, item.parameters)
+        candidate = item.definition.install(state, item_context, item.parameters)
         if not isinstance(candidate, AssemblyState):
             raise TypeError(
                 f"mechanism {descriptor.mechanism_id!r} returned "
@@ -196,13 +204,9 @@ def assemble_lab(
             candidate,
             mechanism_ids=(*candidate.mechanism_ids, descriptor.mechanism_id),
         )
-    # Register lightweight method-owned targets independently of algorithm enablement.
-    # These callbacks may read declared artifacts, but must not create Providers or search.
-    for definition in catalog.definitions():
-        support = definition.improvement
-        if support is not None and support.prepare_targets is not None:
-            state = support.prepare_targets(state, context)
-            _own_state(state, context)
+    # Object adapters see the complete tool set, independently of search enablement.
+    # They may consume declared artifacts but cannot start model work.
+    state = _prepare_object_targets(state, context, catalog)
     stages = state.context_stages
     if state.reducer is not None:
         if reduction_stage_id is None:
@@ -234,6 +238,16 @@ def _own_state(state: AssemblyState, context: AssemblyContext) -> None:
         context.own(component)
     if state.config.env is not None:
         context.own(state.config.env)
+
+
+def _prepare_object_targets(state, context, catalog):
+    for definition in catalog.definitions():
+        if definition.prepare_targets is not None:
+            state = definition.prepare_targets(state, context)
+            if not isinstance(state, AssemblyState):
+                raise TypeError('object target preparation must return AssemblyState')
+            _own_state(state, context)
+    return state
 
 
 def require_workspace_path(workspace: Path, value: str, *, name: str) -> Path:

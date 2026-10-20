@@ -9,13 +9,11 @@ from fruitfly_agent.core.extensions.protocols import RecoveryValidator
 from fruitfly_agent.interactive import InteractiveSession
 from fruitfly_agent.interactive.application import RuntimeHandle
 from fruitfly_agent.lab.algorithms.targets import TEXT_TARGET_PREFIX, TextTarget
-from fruitfly_agent.lab.improvement.api import TEXT_IMPROVER_COMPONENT, TextImprover
 from fruitfly_agent.run.configuration.resolution import resolve_profile_models
 from fruitfly_agent.run.configuration.profile import HarnessProfile
 from .assembly import RuntimeAssembly
-from fruitfly_agent.lab.catalog import LEARNING_POLICY_COMPONENT, LEARNING_PROCESSOR_COMPONENT, build_method_selection
+from fruitfly_agent.lab.catalog import LEARNING_POLICY_COMPONENT, LEARNING_PROCESSOR_COMPONENT
 from fruitfly_agent.run.learning.service import RunLearningService
-from fruitfly_agent.run.storage.improvement_preferences import ImprovementPreferences
 from .recovery import (new_session_path, check_session_manifest, record_session_manifest,
                        session_manifests)
 
@@ -24,7 +22,6 @@ from .recovery import (new_session_path, check_session_manifest, record_session_
 class PreparedRuntime:
     runtime: RuntimeAssembly
     profile: HarnessProfile
-    improver: TextImprover | None
     targets: dict[str, TextTarget]
     resumed: bool
 
@@ -124,27 +121,14 @@ class RuntimePreparer:
                 learning=learning,
                 authorization=approvals,
             )
-            improver = runtime.components.get(TEXT_IMPROVER_COMPONENT)
-            if improver is not None and not isinstance(improver, TextImprover):
-                raise TypeError("text-improver component must implement TextImprover")
             targets = {key[len(TEXT_TARGET_PREFIX):]: value for key, value in runtime.components.items()
                        if key.startswith(TEXT_TARGET_PREFIX)}
             if any(not isinstance(value, TextTarget) for value in targets.values()):
                 raise TypeError("named text targets must implement TextTarget")
 
-            preferences = ImprovementPreferences(self.cwd, str(selection.config_path.resolve()) + ':' + profile.profile_id)
-            methods = build_method_selection(self.catalog, profile.mechanisms, improver, targets,
-                components=runtime.components, config=runtime.config, workspace=self.cwd,
-                preferences=preferences.load(), save_preferences=preferences.save)
-            if improver is None and methods.default_id:
-                improver = methods.lazy_default()
-            resources.append(methods)
-            runtime = replace(runtime, components={**runtime.components, 'improvement-methods': methods})
-            handle.components = {**handle.components, 'improvement-methods': methods}
-
             def activate():
                 record_session_manifest(session, runtime, messages=messages if reset_projection else None)
-                activated(PreparedRuntime(runtime, profile, improver, targets, resume))
+                activated(PreparedRuntime(runtime, profile, targets, resume))
             handle.activate_callback = activate
             return handle
         except BaseException:

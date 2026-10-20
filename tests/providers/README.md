@@ -7,7 +7,7 @@ Verify model specifications, registry, codecs, errors, and public streams with S
 | Files | Protects |
 |---|---|
 | `test_deadlines.py` | Quiet headers/chunks, keepalive, thinking progress, total/backoff deadlines, partial failure, signal cancellation, retry hints, and bounded cleanup |
-| `test_streams.py` | Text/thinking/tool deltas, final results, usage, request limits, retries, cancellation, and stream cleanup |
+| `test_streams.py` | Text/thinking/tool deltas, enabled tool descriptions with an unchanged base prompt, final results, usage, request limits, retries, cancellation, and stream cleanup |
 | `test_*.py` | Catalog configuration and message/error mapping |
 
 No real API calls. Use the explicit Integration entry for network smoke.

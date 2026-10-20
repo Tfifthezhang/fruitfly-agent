@@ -14,7 +14,7 @@ def candidate_view(record):
         evidence.append(('Cases identity', record.cases_digest))
     if record.metric_calls:
         evidence.append(('Metric calls', str(record.metric_calls)))
-    comparison = record.report.get('conclusion') if record.report is not None else None
+    comparison = str(record.report.get('conclusion', 'unavailable')) if record.report is not None else 'unavailable'
     assessment = {'improved': 'Measured gain on selection; independent confirmation not provided',
                   'tied': 'Tied with baseline; no measured improvement',
                   'worse': 'Worse than baseline', 'unavailable': 'Comparison unavailable'}.get(comparison, 'Comparison unavailable')

@@ -47,6 +47,14 @@ Harbor installs the validated source checkout when available. Wheel installation
 
 Source installation stages package files, build inputs, README, and license notices. It excludes secrets, caches, and sessions. The selected profile and model catalog are copied into runner artifacts; secret values stay in the process environment. Workspace `.fruitfly/secrets.env` is used, with root `.env` fallback only when absent; process values take precedence. See [Configuration](../CONFIGURATION.md#files-and-precedence).
 
+Enabled mechanisms declare credential requirements through Lab Catalog. Eval
+forwards those named credentials to task containers without identifying tools or
+services. Web tools resolve service defaults and `api_key_env` overrides in their
+own declarations.
+Model, search and fetch keys may be separate. Disabled tools and direct fetch
+add no credentials. Only variable names enter runner arguments and copied YAML;
+values remain in the secret environment. See [Web tools](../fruitfly_agent/lab/tools/web/README.md).
+
 ## Modules
 
 | File / module | Responsibility |
@@ -70,6 +78,6 @@ Removing Eval leaves normal interaction and Lab development intact.
 
 [trial.py](trial.py) executes one frozen original task through Harbor with an injected versioned runtime packet. The bridge installs the frozen source and invokes the generic Run Application trial host; Harbor owns the original environment and verifier. This path requires source material, Harbor, Docker and authorized model/network calls. It rejects changed task material, unsupported datasets and incomplete receipts. `python -m eval trial --request REQUEST --output-root NEW_DIRECTORY --events jsonl` consumes a Run-generated request; it is not a schema-2 evaluation request.
 
-`/improvement` can directly prepare a benchmark task set and start one explicitly confirmed improvement job, without preliminary Agent evaluation. See [Original task experiments](../fruitfly_agent/lab/improvement/experiments/README.md) for the task split, fixed versions, shared budgets, human adoption and limits.
+`/improvement` can directly prepare a benchmark task set and start one explicitly confirmed improvement job, without preliminary Agent evaluation. See [Original task experiments](../fruitfly_agent/lab/improvement/README.md) for the task split, fixed versions, shared budgets, human adoption and limits.
 
 [task_sets.py](task_sets.py) supplies `prepare_task_set` and the improvement-specific bounded CPU catalog. `python -m eval prepare --benchmark terminal-bench --variant starter --task-limit 5 --output-root NEW_DIRECTORY --events jsonl` downloads and freezes official tasks without constructing an Agent or inventing feedback. This operation requires Harbor, registry/network access, and a ready task environment; runtime improvement still owns model budgets and adoption.

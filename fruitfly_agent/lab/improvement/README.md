@@ -2,188 +2,171 @@
 
 [Up: Lab](../README.md)
 
-Search and compare improvements to a fixed target. Improvement proposes candidates; Run stores them; Application activates a reviewed candidate in a new session. [RSI](../rsi/README.md) can coordinate independent verification and adoption across generations.
+Refine registered Agent components using task execution evidence. The public
+[API](api.py) separates candidate generation, execution, composition, selection,
+verification, reflection and activation. Run persists jobs; Application owns
+execution and adoption. Eval remains an optional external task consumer.
+
+## Follow a task
+
+```text
+Freeze plan, task, H/I/S and experience
+  → reference executions
+  → propose invariant and domain edits
+  → validate component ownership and evidence
+  → probe candidates
+  → compose and execute
+  → select an existing output
+  → optionally verify a persistent change
+  → reflect and commit attributed experience at the task boundary
+```
+
+| Stage | Public contract | Default |
+|---|---|---|
+| Materials | `TaskSource`, `TaskMaterial`, `ArtifactAccess` | Freeze explicitly selected workspace inputs as immutable bytes |
+| Components | `ComponentAdapter`, `HarnessSnapshot`, `CandidateBundle` | Object-owned text adapters; complete named file sets |
+| Propose | `CandidateGenerator`, `ProposalRequest`, `ProposalResult` | Tool-using editor with invariant/domain missions |
+| Probe | `TaskRunner`, `ExecutionRecord` | Detached read/write/edit file workspace |
+| Compose | `Composer`, `CompositionRequest` | Editor compares executions and resolves component changes |
+| Select | `Selector`, `SelectionDecision` | Read-only comparison of anonymous executed outputs |
+| Verify | `VerificationPolicy`, optional `MeasurementSource` | Independent task-package comparison when provided |
+| Reflect | `Reflector`, `ExperienceEntry` | Evidence-grounded lesson or no entry |
+| Retain | `ExperienceRepository` | Host commits after a completed task; no activation authority |
+| Orchestrate | `WorkflowController` | Bounded parallel or sequential exploration |
+
+Parallel width `k` uses `k` references, `2k` proposals, and `k` compositions when
+each proposal returns one candidate. All proposals in one round receive the same
+reference evidence and prior history. They cannot inspect their peers. Probes
+start after the proposal pool is complete. Sequential mode performs invariant and
+domain proposals and one composition per depth, carrying prior edits and execution
+evidence forward. Every composition is executed, including an unchanged one.
+Generators may return no candidates or request an early stop.
 
 ## Choose H, S or I
 
-| Role | Object | Comparison |
+| Axis | Meaning | Required execution |
 |---|---|---|
-| H: Harness | Execution instructions and mechanisms | Fix I and initial S; compare task outcomes |
-| S: State | Retained skills, memory and knowledge | Fix H and I; declare initial state and update/reset rules |
-| I: Improver | Candidate generation, processing and search mechanisms | Use the same initial system and budget; compare the resulting improvements |
+| H | Execution instructions and mechanisms | Compare task behavior with fixed initial S and I |
+| S | Retained knowledge, skills and experience | Declare initial state, updates and reset behavior |
+| I | Candidate generation and improvement instructions | Explicit improver-comparison runner; ordinary task trials reject I edits |
 
-Classification follows use, not file format. Base prompts and Skill catalog
-guidance are H; retained Skill bodies are S. The final task/scoring policy,
-model allocation and budgets are external comparison conditions.
+Component kind and H/S/I axis are independent. Existing owners expose the base
+prompt, enabled tool guidance, Skill catalog guidance, bounded execution workflow,
+retained Skill/memory documents and I editor instructions. A candidate can change
+multiple H/S components when its runner supports them. IDs, owners and schemas
+cannot change within a job. Subagents are not a component category.
 
-[Methods](methods/README.md) contain OPRO, Tree search, DreamRSI, Workflow search, Skill document optimization and Exploratory memory learning. S supports registered retained Skill and memory documents; DreamRSI supports the registered I exploration-policy artifact. Shared [contracts](contracts/__init__.py), [versions](contracts/versions.py),
-[candidates](contracts/candidates.py) and [workflow](runtime/workflow.py) support explicit embedding
-capabilities for all three roles. One job modifies one role and one target.
-`ImprovementWorkflow` rejects absent comparison capabilities, stale parents,
-scope changes and mismatched evidence; prepared trials close on rejection or
-cancellation. An optional host adopter must activate the exact verified version.
-Concrete targets remain owned by their original modules.
+`FileComponentAdapter` supports explicitly registered multi-file documents, such
+as guardrails, scripts or hooks, with an injected validator. Registration alone
+does not make code runnable or publishable. These require a runner and owner
+binding implementation. The built-in persistent host publishes registered text
+bindings; arbitrary Python/plugin replacement and whole Skill repositories are
+unsupported. No empty placeholder implementations are installed.
 
-The standard host supports H instructions and bounded workflows, registered S documents, and registered I policy artifacts. The generic role workflow is an embedding
-entry, not an arbitrary state or source-replacement implementation. Daily
-[learning material production](../learning/README.md) is separately configured;
-in-job failure processing continues to operate on scored training failures.
+## Prepare task materials
 
-[Automatic text search](automatic/README.md) optionally connects original-task baselines, independent [failure processing](failure_processing/README.md), learning exercises, original-task comparison and one holdout confirmation. A confirmed candidate waits for human adoption. Daily tasks without declared acceptance are not collected by this workflow. [Original task experiments](experiments/README.md) connect official benchmark evidence and isolated full-Application trials to the same workflow.
+`TaskMaterial` contains an instruction, resource references, environment identity
+and origin. An `ExecutionRecord` contains status, output, trajectory/deliverable
+references and available invocation counts. Neither requires a score. Original
+binary inputs are preserved. Text evidence is paginated; PNG/JPEG can be read
+visually. Other binary formats need an explicit reader.
 
-## Start a search
+[Task packages](tasks/README.md) provide optional private scoring and independent
+holdout. The first training task supplies diagnosis; all training regression cases, selection and holdout run
+only after generation. Answers, checks and holdout inputs are absent from editor
+workspaces. Explicit scored feedback is an injected capability and never implied
+by benchmark availability. [External receipts](evidence/README.md) retain official
+grading outside the behavior-based editing path.
 
-| Step | Action |
-|---|---|
-| 1 | Prepare a [task pack](tasks/README.md) and run its offline checks. |
-| 2 | Start a normal session with a configured model. No improvement switch is required. |
-| 3 | Use `/improvement [DIRECTION]`; expand Target, select an object and then its algorithm inline. Set Task and Budget; inspect Evaluation. Inspect the algorithm description and open Details for paths; edit optional Search guidance under Target. |
-| 4 | Choose **Start improvement** and confirm; inspect the running view or return to chat and use `/status` or `/cancel`. |
-| 5 | Inspect the result and stop reason, including empty outcomes. Review any candidate before setting the future default or activating a new session. |
+## Start improvement
 
-**Search calls the configured Provider and may incur charges. Python task scoring also executes restricted local functions.** Only explicit confirmation starts a search; registering methods does not run them.
+1. Start a normal session and open `/improvement [DIRECTION]`.
+2. Choose a current instruction and input files, a saved task package, or an
+   available benchmark task stream. Select editable components and a generator.
+3. Choose parallel/sequential exploration, allocations, feedback and effect scope.
+4. Review the frozen preview and explicitly confirm. Calls may incur model cost;
+   external streams also download task material and execute containers.
+5. Inspect outputs, assurance, history and logs. Persistent candidates require
+   independent verification and remain pending until explicit adoption.
 
-## Improvement methods
+Current-task output selection does not prove improvement or change profile
+defaults. Pending reflection is committed to a separate experience library after
+that task completes. Persistent jobs defer library updates. The library belongs
+to S identity and is frozen for each task. Later tasks start from the common
+configured harness and the latest committed library, rather than inheriting all
+previous task-local edits.
 
-Each independent method has its own package under `methods/`. Shared contracts, evaluation, budgets, evidence, task packs, and hosting remain at the Improvement level. Target adapters belong to the modules that own the objects being changed. A method package may expose an adapter for its own strategy when that capability is implemented.
-
-| Method package | Public entry point | Scope |
-|---|---|---|
-| [OPRO](methods/opro/README.md) | `opro.OproImprover`, `opro.definition()` | History-driven H text search; available on demand |
-| [Tree search](methods/tree_search/README.md) | `TreeSearchImprover`, `definition()` | H discovery histories and an I exploration-policy target |
-| [DreamRSI](methods/dream_rsi/README.md) | `DreamRsiImprover`, `definition()` | Replay-based I policy refinement with real confirmation |
-| [Workflow search](methods/workflow_search/README.md) | `WorkflowSearchImprover`, `definition()` | H stage workflows with reflection, repair and design archives |
-| [Skill document optimization](methods/skill_edit/README.md) | `SkillEditImprover`, `definition()` | S Skill body updates under a bounded edit allowance |
-| [Exploratory memory learning](methods/memory_exploration/README.md) | `MemoryExplorationImprover`, `definition()` | S knowledge from authorized broad/focused practice |
-
-Method guides document their research basis, implemented behavior, and limits. Improvement remains part of Lab and can run independently of RSI and Eval.
-
-## Select methods without changing defaults
-
-Catalog contributions retain the existing `layer × family` classification. H/S/I identifies the object changed by a job. Internal analysis, practice selection and patch operations do not create additional classification axes. [Method declarations](methods/README.md) describe support; [runtime selection](runtime/README.md) checks executable bindings.
-
-`/improvement` selects role, target, method and task source. Select a target first, then explicitly select an algorithm below it, including when only one is available. Remembered defaults are suggestions; compatible prior selections can remain when changing targets. Methods incompatible with the target role or schema are omitted. Compatible methods explain missing runtime capabilities; an empty catalog blocks startup. Per-job choices do not change YAML or the parent I version. Target shows concise algorithm descriptions; Details reveals implementation/guide paths and configuration locations. The panel expands typed Budget fields and declared material fields under Task; internal tuning uses the configuration location in Details. Input retains the panel and focused field while showing descriptions, current values, types and bounds. The terminal exposes no internal tuning fields or JSON override editor. YAML defaults and programmatic parameter overrides remain available; unknown fields and invalid values are rejected before search. Confirmed method/parameter choices are remembered per configuration/profile/target in workspace preferences. Saved preferences are editable defaults, not evidence or activation. Confirmation binds implementation, normalized parameters, tasks and parent H/S/I. Programmatic previews accept `method_id`, `target_id` and optional `parameters`; changing auxiliary model profiles requires configuration and a new session.
-
-Scoring and acceptance differ from natural-language search guidance. The task policy and method determine comparisons; empty guidance does not remove those rules. Methods declare `direction_help` to expose optional guidance input. OPRO and Tree search use it for candidate proposals. DreamRSI uses its replay objective and confirmation rules; its fixed inner-search direction is a separate method parameter and must match the discovery histories. The shared search contract permits empty guidance. Preview receipts bind it exactly, including an empty string.
-
-The public [api.py](api.py) facade supplies host views, reports and optional experiment types. Run consumes it and the task-material API; it does not import concrete method implementations.
-
-## Inspect requirements and feedback
-
-Built-in methods supply `MethodUsage` fields in their previews: trigger, required materials, feedback, candidate generator, acceptance and activation. Task execution scores, replay objectives and independent confirmation are distinct evidence. Configuration does not trigger optimization. Use `/improvement` explicitly; timer/event scheduling is not installed.
-
-DreamRSI needs the registered tree-search policy target, matching completed histories and a schema-2 task pack with holdout. Follow [DreamRSI preparation](methods/dream_rsi/README.md#prepare-inputs) before starting I improvement. Missing or changed materials fail before model requests.
-
-Enable the object mechanism before selecting Workflow search (`execution-workflow`), Skill document optimization (`skill-document`) or Exploratory memory learning (`learned-memory`). Skill and memory are Context augmentation mechanisms; workflow is an execution mechanism. These methods require disjoint train/selection/holdout. The host confirms only the selection winner once, allows an independent tie, and rejects aggregate or per-case regression. Confirmation evidence is not supplied to generation. [Offline example](../../../examples/improvement/native_methods/README.md).
-
-## Ownership and contracts
-
-| Concern | Owner / API |
-|---|---|
-| Target meaning and legal changes | Object's `TextTarget` adapter |
-| Frozen problem | `ImprovementProblem`: parent manifest, role-bearing target snapshot, tasks, objective policy, execution identity; the standard host also freezes H/S/I |
-| Search loop | `Improver.search(problem, services) -> SearchResult` |
-| Evaluation | `SearchServices.evaluate` returns per-case observations and aggregates. |
-| Model/tool capabilities | Injected services with a shared root budget |
-| Search evidence | Append-only journal; strategy selects its own bounded history view. |
-| Text host | `HostedTextImprover` projects a search result to `TextProposal`. |
-| Production candidate | Run saves the preferred complete proposal and its evidence. |
-| Adoption | Human review or explicitly injected independent RSI policy |
-| Learning material | Independently selected [failure processor](failure_processing/README.md); derived exercises retain source, review and scoring identity |
-| Automatic confirmation | Optional [workflow](automatic/README.md); fixed original tasks determine whether a learned candidate is publishable |
-
-The shared contract does not require a particular generate/reflect/select sequence. Problems retain fixed task, policy, target, execution, and parent identities. Missing or infrastructure-failed observations have no valid score; task failures may receive zero or partial credit according to policy.
-
-## Parameters
-
-| Parameter | Default | Meaning |
-|---|---|---|
-| `target` | `base_prompt` | May select enabled `skill-catalog.guidance`. |
-| `cases_path` | `.fruitfly/improvement/cases.json` | Optional read-only train/validation source or `pack.json`; job selection can use other registered packs. |
-| `rounds` | 2 | Maximum search rounds |
-| `batch_size` | 2 | OPRO proposals per round |
-| `history_limit` | 5 | History entries shown to the improver |
-| `max_metric_calls` | 32 | Per-case trials, including baseline and each partition |
-| `max_model_calls` | 64 | Harness-level Provider calls across all roles |
-| `output_max_tokens` | 1024 | Per-request output limit |
-| `call_timeout_seconds` | 30 | Model/evaluation timeout |
-| `improver_profile` | Empty | Reuse the active Provider, or resolve an explicit model profile. |
-
-Parameters can be overridden on the experiment panel or supplied programmatically. Existing YAML method entries remain optional defaults; `enabled: false` does not hide a registered method. Legacy enabled hosts remain supported. Improvement has no configuration-menu category. Default model trials use independent, no-Session, no-tool Core loops with the target adapter's projection. Registered retained documents and bounded execution workflows remain fixed when another target changes. A workflow runs its declared stages; other native trials are single-turn. These trials do not measure the full interactive harness or retrieve arbitrary file context. Validation is repeatedly used for selection. The three workflow/document methods require host-owned holdout confirmation; OPRO/Tree search use manual independent testing or the optional automatic workflow. Injected [trial executors](automatic/README.md#inspect-evidence-and-extend-execution) can run fresh task-owned tool harnesses.
-
-## Budgets, progress, and failure
-
-| Concern | Behavior |
-|---|---|
-| Call accounting | Reserve before harness Provider calls and each case; adapter-internal retries are not separate budget calls. |
-| Output limit | Built-in Providers use the smaller of the trial limit and constructor limit. |
-| Token reporting | Actual available receipts; missing usage stays unknown. Cache counters are separate. |
-| Cost | Call limits are not cumulative token or monetary limits. |
-| Progress | Phase, current batch completed/total, call/trial usage, and infrastructure failures |
-| Percentage | Batch progress only; no overall completion percentage or time estimate. |
-| Observer failure | Does not stop the authorized search. |
-| Exhausted budget | Return only already complete candidates; mandatory confirmation cannot be skipped; normal conversation remains available. |
-| Cancellation | No candidate returned. |
-| Interrupted paid work | Record intent and response separately; do not replay unknown calls automatically. |
-
-With 8 training and 4 selection cases, one full evaluation consumes 12 trials. A budget of 32 permits baseline, one complete candidate, and 8 additional training trials.
-
-## Results and retention
-
-| Data / action | Behavior |
-|---|---|
-| Experiment history | `.fruitfly/improvement/runs/`; submitted jobs, including empty/failed/cancelled outcomes, scoped to configuration/profile |
-| Candidate inbox | `.fruitfly/improvement/candidates/`; one preferred complete result per configuration/profile/target/task pack |
-| Text artifact | `.fruitfly/artifacts/`; immutable contents used by runtime and recovery |
-| Search journal | `.fruitfly/improvement/searches/<search_id>.jsonl` |
-| Readable result | `.fruitfly/improvement/task-results/<pack-id>/<config-profile-scope>/<target>/latest.txt` and `latest.json` |
-| Set as next-session default | Confirm a saved configuration change without replacing the active session. |
-| Set default and start a new session | Confirm, validate parent/artifact/configuration, then activate a new empty session. |
-| Retention | Protect configuration, Session, candidate-parent, and RSI references; stop cleanup on suspicious or damaged references. |
-
-Experiment summaries retain stop reasons, available measurements and journal references independently of candidate publication. Referenced candidates and evidence remain protected; history is not automatically pruned. Interrupted records are not replayed.
-
-Latest does not mean better. Failed, cancelled, or empty searches do not replace prior complete results. Cleanup does not sweep arbitrary artifacts or failed searches with no candidate. Export research evidence explicitly. Editing `latest.txt` does not change the runtime. Activation does not roll back external effects, reload source, or create a cross-process transaction.
-
-## Files
-
-| File | Responsibility |
-|---|---|
-| [Contracts](contracts/README.md) | Parent versions, declared changes, target scope and comparison evidence |
-| [search.py](contracts/search.py) | Problems, strategies, observations, policies, and candidates |
-| [Runtime](runtime/README.md), [services.py](runtime/services.py) | Evaluation, budgets, model/tool services, and journal |
-| [host.py](runtime/host.py), [api.py](api.py) | Shared text host and Run-facing preview/search/cancel contract |
-| [registration.py](registration.py) | Shared target/budget parameters and text improver assembly |
-| [OPRO](methods/opro/README.md) | Independent history-driven text improvement method |
-| [scoring.py](tasks/scoring.py), [python_worker.py](tasks/python_worker.py) | Task policies and restricted function scoring |
-| [reporting.py](runtime/reporting.py) | Search reports, usage, and evidence validation |
-| [Task materials](tasks/README.md), [cases.py](tasks/cases.py) | Pack catalog, freezing, editing, and read-only case loading |
-| [verification.py](tasks/verification.py) | Offline material validation, reference checks, scoring, and format conversion |
-| [Task packs](tasks/README.md) | Pack format and task-authoring workflow |
-| [Failure processing](failure_processing/README.md) | Independent replay, model-generated exercises and material review |
-| [Automatic search](automatic/README.md) | Original-task gates, early stopping and independent confirmation |
-| [Trials](trials/README.md), [execution.py](trials/execution.py) | Batch receipts and isolated task-harness executor contracts |
+The native runner provides fresh in-memory read/write/edit files, no Bash,
+network tools, live Session or production filesystem. Full runtime/SSH/container
+execution requires a declared runner. External benchmark streams reuse normal
+Application trials and produce task-local outputs; they do not claim independent
+persistent verification. Tool descriptions, schemas and permissions retain their
+normal owner contracts.
 
 ## Extend search
 
-Create one package per independent method under `improvement/methods/`, with a public entry point in `__init__.py` and an English README. Keep method-specific prompts and state beside its implementation when needed. The README must describe the research source, supported targets, injected capabilities, parameters, state/reset/recovery, budgets, failure/cancellation, limits, and offline checks. Do not create placeholder files for unsupported capabilities.
+Register a factory with `GeneratorRegistry.register(id, factory,
+implementation_id=..., label=..., required_capabilities=...)`. Discovery reads
+metadata without constructing generators or requesting models. Each job receives
+a fresh generator instance. Implement `propose(request, services)`; a deterministic
+or numerical algorithm can return the same `ProposalResult` without calling an
+editor. Model-based algorithms can use the budgeted `services.complete(system, prompt)`
+port without the tool-Agent editor. Every edit needs a supplied execution ID and a registered component.
 
-Own the method's Catalog definition, per-job binding declaration and installer in that package, as [OPRO](methods/opro/README.md) does. For a native text method, reuse `text_target_parameters`, `text_budget_parameters`, and `install_text_improver` from [registration.py](registration.py). Declare method-specific parameters and model roles explicitly; assembly resolves only those roles. Definition construction and installation must not start research or make model requests.
+Inject `WorkflowBindings` into `RunApplicationFactory(improvement_bindings=...)`
+to replace any stage, component registry or workflow factory. Generators receive
+editing and journaling services; execution, verification and activation remain
+separate capabilities. Trusted Python extensions are not an OS sandbox.
 
-Implement `Improver.search` with declared schemas/capabilities and register it through [Catalog](../catalog/README.md). Use `HostedTextImprover` for shared evaluation and evidence, or implement the narrower `TextImprover` contract directly. A deterministic evaluator can run without a model; declare a truthful policy and execution identity. Synchronous evaluators must be fast and bounded.
+## Budgets and failures
 
-Reuse shared services for trials, budgets, journals, and results. Run and frontends consume the common host contract; adding a method must not add algorithm-specific branches there. Registration is explicit through Catalog definitions, not automatic package discovery. Algorithm tests belong in the project's `tests/` tree.
+One root allocation covers editor requests and task executions, including
+verification. Reserve before external work. Provider-internal retries are not
+separate harness calls. Missing token/cost usage remains unknown. Each operation
+has a timeout and shares cancellation. Incomplete, malformed or mismatched
+receipts cannot grant verification. Cancellation propagates and does not adopt a
+candidate. Model requests with unknown outcomes are not automatically replayed.
+Reflection failure is recorded without losing an already selected deliverable.
 
-The optional tool-Agent service uses a private text workspace, no Bash or user files, and at most 8 tool calls by default. It does not have production adoption authority.
+## Results and retention
 
-| Supported | Not supported |
+| Data | Location |
 |---|---|
-| H prompts/guidance, bounded workflows, S retained Skill/memory documents and I declarative exploration policies | Multi-file code, whole Skill repositories, arbitrary stateful targets |
-| Exact-text and restricted Python scoring | General project-command verification |
-| Human review, optional automatic confirmation, or explicit RSI host | Default background search, autonomous adoption, weak-feedback daily-task learning |
+| Plan, frozen task/snapshot, event journal, outcome | `.fruitfly/improvement/jobs/<job-id>/` |
+| Submitted-job history, including failure/cancellation | `.fruitfly/improvement/runs/` |
+| Pending persistent candidates | `.fruitfly/improvement/candidates/` |
+| Committed experience | `.fruitfly/improvement/experience.json` |
+| Immutable text/binary resources and versions | `.fruitfly/artifacts/` |
 
-No module-specific environment variables; dependencies and model roles are injected. Examples: [Python functions](../../../examples/improvement/python_functions/README.md), [ticket triage](../../../examples/improvement/ticket_triage/README.md), and [offline automatic search](../../../examples/improvement/automatic_text/README.md).
+History verifies journal hashes before reading. Retention follows job, experience,
+Session, configuration and candidate references. Old candidate/report data remains
+readable. Unknown retired mechanism selections are rejected, including disabled
+entries; remove them explicitly and configure `component-improvement` as needed.
+There is no parallel method selector or legacy search engine.
+
+## Modules and offline checks
+
+| Module | Responsibility |
+|---|---|
+| [Contracts](contracts/README.md) | Immutable values and public stage protocols |
+| [Workflow](workflow/README.md) | Orchestration, accounting and native file execution |
+| [Editor](editor/README.md) | Tool workspace editing, output selection and reflection |
+| [Materials](materials/README.md) | Explicit workspace input freezing |
+| [Evidence](evidence/README.md) | Detached workspace, official receipts and historical reports |
+| [Verification](verification/README.md) | Optional private measurements and holdout policy |
+| [Experience](experience/README.md) | Attributed lesson serialization and snapshot identity |
+| [Task packages](tasks/README.md) | Authoring, validation and independent scoring |
+
+The workflow adapts Propose–Probe–Compose, role-separated editing, output selection
+and cross-task experience from [Harness²: Recursive Agent Harnessing for an Open
+World](https://arxiv.org/abs/2610.14224). This implementation adds explicit H/S/I
+ownership and host verification/adoption. It does not reproduce published scores,
+train model weights or autonomously rewrite the improver.
 
 ```bash
-.venv/bin/python -m unittest tests.lab.test_search tests.workflows.test_decoupling tests.workflows.test_improvement -v
+.venv/bin/python -m unittest tests.lab.test_improvement_pipeline tests.workflows.test_improvement_pipeline tests.workflows.test_benchmark_improvement
 ```
+
+Offline fake Providers and synthetic rewards establish control flow and isolation,
+not model quality, real API compatibility or benchmark gains. The
+[offline example](../../../examples/improvement/README.md) uses replaceable ports.

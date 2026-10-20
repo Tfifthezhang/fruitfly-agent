@@ -90,6 +90,16 @@ class ImprovementRunStore:
         if row is None:
             raise ValueError('experiment does not belong to this configuration/profile')
         evidence = dict(row.evidence)
+        if evidence.get('Workflow journal'):
+            path = self.workspace / evidence['Workflow journal']
+            owned = self.workspace / '.fruitfly/improvement/jobs'
+            if (path.name != 'events.jsonl' or path.parent.parent != owned
+                    or any(p.is_symlink() for p in (path, *path.parents) if p.is_relative_to(self.workspace))):
+                raise ValueError('workflow journal must remain in its owned directory')
+            data = path.read_bytes()
+            if 'sha256:' + hashlib.sha256(data).hexdigest() != evidence.get('Workflow journal hash'):
+                raise ValueError('workflow journal hash mismatch')
+            return data.decode('utf-8')
         if not evidence.get('Search history'):
             return 'No search journal was produced. Inspect the result for setup or execution errors.'
         path = self.workspace / evidence['Search history']

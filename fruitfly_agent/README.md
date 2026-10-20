@@ -17,18 +17,15 @@ FruitFlyAgent separates the Agent loop, model adapters, Application lifecycle, a
 
 Eval consumes public runtime capabilities. Removing it must leave normal Agent use and algorithm development intact.
 
-Independent improvement methods declare H/S/I support in method packages within Lab's [Improvement](lab/improvement/README.md#improvement-methods) module. They use shared search services and object-owned target adapters; Run assembles them without implementing algorithm-specific search logic.
+The [Improvement workflow](lab/improvement/README.md) separates candidate generation, execution, composition, selection, verification and reflection through public ports. Object-owned component adapters expose legal changes; Run and Application retain persistence and activation.
 
-Lab registrations own concise algorithm descriptions and implementation/guide paths.
-Configuration and improvement menus consume this shared metadata, show necessary
-user inputs and budgets, and leave internal tuning in configuration. Terminal
-details reveal implementation, guide and configuration references on demand. Improvement
-discovery excludes methods with incompatible target roles or formats before
-checking runtime availability.
+[Instruction components](lab/algorithms/README.md#improve-multiple-instruction-components) retain separate H/S/I ownership. A candidate can modify multiple executable components; unregistered bindings and missing runner capabilities fail explicitly.
 
-[Execution workflows](lab/workflow/README.md) own bounded H stage execution. Skill and memory adapters own retained S documents. Workflow search, Skill document optimization and Exploratory memory learning use these adapters, fixed comparison tasks, host-owned independent confirmation and the normal human adoption lifecycle. S artifacts enter state identity separately from H and I.
+Lab registrations own mechanism metadata. Improvement menus use generator, component, source and allocation contracts. Adding a generator does not add algorithm-specific branches to Run or the terminal.
 
-Optional [automatic text search](lab/improvement/automatic/README.md) separates original tasks, derived learning material and confirmation. [Failure processing](lab/improvement/failure_processing/README.md) is independently replaceable. A confirmed candidate enters human review; Application still owns activation. [Original task experiments](lab/improvement/experiments/README.md) freeze H/I/S, consume official task evidence and reuse this human adoption path.
+[Execution workflows](lab/workflow/README.md) own bounded H execution. Retained Skill and memory documents belong to S. I editor instructions require an improver-comparison runner.
+
+Task materials and executions need no score. Persistent publication requires an injected verification policy; current-task selection retains its weaker assurance. The experience library is a separate attributed S update at task boundaries.
 
 Run separates [configuration](run/configuration/README.md), [runtime preparation](run/runtime/README.md), [storage](run/storage/README.md), [improvement hosting](run/improvement/README.md), and [adapters](run/adapters/README.md). Its Factory composes these services; leaf services receive explicit capabilities and own their local state.
 
@@ -48,7 +45,12 @@ Interactive separates Contracts, Application, Session, Interaction, and Terminal
 
 The Session keeps canonical conversation facts. The model projection is the context sent to the Provider; it may contain additional information, external references, or summaries.
 
-[DreamRSI](lab/improvement/methods/dream_rsi/README.md) refines a bounded I exploration policy from discovery histories and real holdout confirmation. Policy artifacts enter I identity separately from H execution artifacts. Daily [learning material production](lab/learning/README.md) is configured independently of search. Application triggers processing, Run persists attributed records, and the default method produces pending observations without inferred scores. Core receives no improvement-role or scoring responsibilities.
+Daily [learning material production](lab/learning/README.md) is configured independently of improvement. Application triggers processing and Run persists attributed observations. Core has no scoring or adoption responsibility.
+
+[Web tools](lab/tools/web/README.md#extend-and-verify-offline) consume separate
+search and fetch service contracts. Lab owns vendor adapters and service factories;
+Catalog declares credential dependencies. Configuration and Eval consume those
+declarations without vendor-specific branches. Model Providers remain independent.
 
 ## State and recovery
 
