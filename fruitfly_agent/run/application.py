@@ -30,11 +30,7 @@ from .improvement.candidates import RunCandidates
 from .improvement.startup_versions import RunStartupVersions
 from .improvement.versions import RunVersions
 from .improvement.pipeline import RunComponentJobs
-from .improvement.external import RunExternalJobs
 from .storage.experience import ExperienceStore
-from .configuration.profile import HarnessConfig, save_harness_config
-from .configuration.resolution import model_catalog_path
-from fruitfly_agent.providers.registry import load_model_specs
 from .adapters.improvement import RunImprovementService
 from .adapters.candidates import RunCandidateService
 from .adapters.task_packs import RunTaskPackService
@@ -94,16 +90,12 @@ class RunApplicationFactory:
             self._selection,
             self.catalog,
             self.artifact_store,
+            read_only=self.read_only_configuration,
+            secret_resolver=self.environment.get if self.read_only_configuration else None,
+            default_config_path=self.cwd / ".fruitfly/default-config.yaml",
         )
-        self._configuration.model_setup = RunModelSetup(
-            config_path=self._configuration.config_path, current_profile=self._configuration.profile,
-            stage_profile=self._configuration.stage_profile, workspace=self.cwd, environment=self.environment,
-        )
-        self._configuration.mechanism_setup = RunMechanismSetup(
-            catalog=self.catalog, current_profile=self._configuration.profile,
-            stage_profile=self._configuration.stage_profile, enable=self._configuration.set_mechanism,
-            credentials=self._configuration.model_setup.credentials,
-        )
+        if not self.read_only_configuration:
+            self._configure_setup()
 
         self._preparer = RuntimePreparer(
             workspace=self.cwd, catalog=self.catalog, environment=self.environment,
@@ -114,6 +106,24 @@ class RunApplicationFactory:
             build=lambda *args, **kwargs: build_runtime(
                 *args, **{**kwargs, "provider_registry": self.provider_registry}),
         )
+        self._compose_improvement()
+
+    @property
+    def read_only_configuration(self) -> bool:
+        return self._selection.config_path.resolve() == (self.cwd / ".fruitfly/default-config.yaml").resolve()
+
+    def _configure_setup(self):
+        self._configuration.model_setup = RunModelSetup(
+            config_path=self._configuration.config_path, current_profile=self._configuration.profile,
+            stage_profile=self._configuration.stage_profile, workspace=self.cwd, environment=self.environment,
+        )
+        self._configuration.mechanism_setup = RunMechanismSetup(
+            catalog=self.catalog, current_profile=self._configuration.profile,
+            stage_profile=self._configuration.stage_profile, enable=self._configuration.set_mechanism,
+            credentials=self._configuration.model_setup.credentials,
+        )
+
+    def _compose_improvement(self):
         self._experience_store = ExperienceStore(self.cwd / '.fruitfly/improvement/experience.json')
         self._versions = RunVersions(
             workspace=self.cwd, artifacts=self.artifact_store, manifest=self.system_manifest,
@@ -150,11 +160,6 @@ class RunApplicationFactory:
             jobs=self._component_jobs, activity=self.improvement_activity, cancel=self.cancel_improvement,
             runs=ImprovementRunStore(self.cwd), scope=self.candidate_scope,
         )
-        self._external_jobs = RunExternalJobs(jobs=self._component_jobs, versions=self._versions,
-            manifest=self.system_manifest, targets=lambda: self._current_targets, workspace=self.cwd,
-            freeze_runtime=self.freeze_experiment_runtime, config=lambda: self._current_runtime_config,
-            artifacts=self.artifact_store, experience=self._experience_store,
-            bindings=pipeline_bindings, publish=self.publish_component_candidate)
         self._candidate_adapter = RunCandidateService(
             workspace=self.cwd, candidates=self._candidate_service,
             artifacts=self.artifact_store, scope=self.candidate_scope,
@@ -183,16 +188,12 @@ class RunApplicationFactory:
             self._selection,
             self.catalog,
             self.artifact_store,
+            read_only=self.read_only_configuration,
+            secret_resolver=self.environment.get if self.read_only_configuration else None,
+            default_config_path=self.cwd / ".fruitfly/default-config.yaml",
         )
-        self._configuration.model_setup = RunModelSetup(
-            config_path=self._configuration.config_path, current_profile=self._configuration.profile,
-            stage_profile=self._configuration.stage_profile, workspace=self.cwd, environment=self.environment,
-        )
-        self._configuration.mechanism_setup = RunMechanismSetup(
-            catalog=self.catalog, current_profile=self._configuration.profile,
-            stage_profile=self._configuration.stage_profile, enable=self._configuration.set_mechanism,
-            credentials=self._configuration.model_setup.credentials,
-        )
+        if not self.read_only_configuration:
+            self._configure_setup()
 
     def new_session_path(self) -> Path:
         return new_session_path(self.cwd)
@@ -207,7 +208,9 @@ class RunApplicationFactory:
             profile_id=self._requested_profile_id,
             environment=self.environment,
             catalog=self.catalog,
-            allow_incomplete=self._allow_incomplete,
+            allow_incomplete=self._allow_incomplete and not (
+                self._requested_config_path is not None and
+                (self.cwd / self._requested_config_path).resolve() == (self.cwd / ".fruitfly/default-config.yaml").resolve()),
         )
 
     def improvement_activity(self):
@@ -331,13 +334,6 @@ class RunApplicationFactory:
         if candidate != expected:
             raise ValueError("candidate artifact differs from its declared version change")
 
-    @property
-    def benchmark_improvement_available(self):
-        return self._current_runtime_config is not None
-
-    def benchmark_task_preview(self, selection, executor, direction=""):
-        return self._improvement_service.register_benchmark(self._external_jobs, selection, executor, direction)
-
     def check_candidate_runtime(self, record, manifest):
         reference = dict(record.evidence).get("Version candidate")
         if reference and dict(record.evidence).get('Experiment'):
@@ -353,21 +349,6 @@ class RunApplicationFactory:
             candidate = self._versions.versions.read_candidate(reference)
             if self._versions.freeze(manifest=manifest) != candidate.version:
                 raise ValueError("prepared runtime differs from the verified candidate H/I/S")
-
-    def freeze_experiment_runtime(self, root):
-        from dataclasses import replace
-        profile = self._active_profile or self.selection.profile
-        catalog = model_catalog_path(profile, self.selection.config_path)
-        load_model_specs(catalog)
-        runtime = root / "runtime"
-        runtime.mkdir()
-        models = runtime / "models.yaml"
-        models.write_bytes(catalog.read_bytes())
-        profile = replace(profile, model_catalog=str(models),
-            artifact_bindings={**profile.artifact_bindings, **self.data_artifact_bindings})
-        config = runtime / "config.yaml"
-        save_harness_config(config, HarnessConfig(profile.profile_id, {profile.profile_id: profile}))
-        return {"config_path": str(config), "profile": profile.profile_id, "working_directory": str(self.cwd)}
 
     def startup_versions(self):
         return RunStartupVersions(

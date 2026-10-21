@@ -68,6 +68,9 @@ class TerminalConfigurationFrontend:
         """Edit future-session choices without ever exiting the Agent client."""
         self._inside_active_session = True
         try:
+            if getattr(self.configuration, "read_only", False):
+                self._review_loop(self.configuration.snapshot())
+                return ConfigurationLaunchResult(start=False)
             while True:
                 self._configure_loop(back_detail="Review changes before returning")
                 snapshot = self.configuration.snapshot()
@@ -162,6 +165,9 @@ class TerminalConfigurationFrontend:
         *,
         back_detail: str = "Return to startup",
     ) -> bool:
+        if getattr(self.configuration, "read_only", False):
+            self._review_loop(self.configuration.snapshot())
+            return False
         selected = 0
         while True:
             snapshot = self.configuration.snapshot()
@@ -177,7 +183,11 @@ class TerminalConfigurationFrontend:
                 )
                 for category, mechanisms in categories
             )
+            restore = getattr(self.configuration, "restore_defaults", None)
+            if restore is not None:
+                rows.append(MenuRow("Restore default configuration", "Stage default harness settings; keep model and credentials"))
             rows.append(MenuRow("Back", back_detail))
+            selected = min(selected, len(rows) - 1)
             self._render(
                 title="Configuration",
                 subtitle=(
@@ -207,6 +217,8 @@ class TerminalConfigurationFrontend:
                 category = categories[selected - 2][0]
                 if self._category_loop(category):
                     return True
+            elif restore is not None:
+                self._call(restore)
 
     def _confirm_new_session_loop(
         self,

@@ -3,7 +3,7 @@
 import importlib.util
 from pathlib import Path
 import sys
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 from unittest.mock import patch
 
 
@@ -18,6 +18,7 @@ class InstalledAgentDouble:
 def load_harbor_agent():
     """Keep bridge tests independent of the optional SDK and its constructors."""
     attributes = {
+        "harbor.agents.capabilities": {"AgentCapabilities": SimpleNamespace},
         "harbor.agents.installed.base": {
             "BaseInstalledAgent": InstalledAgentDouble,
             "with_prompt_template": lambda function: function,

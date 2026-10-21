@@ -2,11 +2,14 @@
 
 [Up: FruitFlyAgent](../README.md)
 
-Run a benchmark with one selected harness configuration and generate task results and reports. Harbor owns task containers and official verifiers. Eval remains an optional external consumer of the normal Agent.
+Evaluate the native FruitFlyAgent in benchmark task containers. Harbor owns the
+environments, task deadlines and official verifiers. Eval installs the Agent,
+passes one saved configuration and collects outcomes, trajectories and reports.
+Interactive improvement remains independent of Eval.
 
 ## Install and inspect
 
-Harbor requires Python 3.12+, Docker Engine, and Compose v2. Real evaluations download tasks/images and call models, potentially incurring charges.
+Use Python 3.12+, Docker Engine and Compose v2:
 
 ```bash
 .venv/bin/python -m pip install -e '.[benchmarks]'
@@ -17,67 +20,107 @@ docker compose version
 
 | Item | Support |
 |---|---|
-| Benchmarks | Terminal-Bench 2.0, SWE-bench Verified |
-| Backend | Local Docker through Harbor |
-| Variants | Fixed single-task `smoke`, Terminal-Bench five-task `starter`, full `no_gpu`, full `gpu` |
-| Formats | Request, runner result, trial, and report schema 2 |
+| Datasets | Terminal-Bench 2.1 (`terminal-bench/terminal-bench-2-1`), SWE-bench Verified |
+| Backend | Docker through Harbor `0.23.0` |
+| Selection | Single-task `smoke`, Terminal-Bench five-task `starter`, full `no_gpu` or `gpu` |
+| Formats | Evaluation request, runner result, trial and report schema 2; catalog schema 1 |
 | Output | `.fruitfly/eval/<evaluation-id>/` |
 
-Preflight checks executable/Engine/Compose availability. It does not prove image availability, free disk space, architecture compatibility, or model connectivity.
+Preflight checks Harbor/Docker availability and Engine/Compose access. It does
+not prove dataset access, cached image tags, architecture compatibility, disk
+space or model connectivity. A `gpu` selection adds an NVIDIA executable check;
+`no_gpu` does not filter GPU tasks from a dataset. Task resources remain official.
 
-## Run and read reports
+## Run an evaluation
 
-Use the Eval CLI to run a selected saved configuration and create independent task sessions. Use `/improvement → Start improvement → Benchmark tasks` for iterative improvement against a bounded original task set. See the [developer guide](DEVELOPER_GUIDE.md) for request examples, logs, and adapter development.
+Unless `runtime.config_path` is supplied, Eval selects the workspace's
+`.fruitfly/default-config.yaml` and its default profile. The runtime object and
+profile may be omitted; `working_directory` defaults to the process workspace.
+Relative configuration paths resolve from that workspace. Explicit configurations
+remain supported. Missing/invalid defaults fail without daily fallback. Prepare
+the independent [default files](../CONFIGURATION.md#restore-default-configuration)
+before execution.
 
-| Command | Purpose |
-|---|---|
-| `python -m eval catalog --json` | Inspect benchmarks, variants, and availability |
-| `python -m eval run --request request.json` | Execute one explicitly authorized benchmark request |
-| `python -m eval report EVALUATION_ID --json` | Read a stored report |
+Create a request using the [evaluation guide](DEVELOPER_GUIDE.md), then run:
 
-Reports include the selected configuration, execution settings, scores, available usage/cost/latency, errors, and artifact paths. Task records include actual runtime manifests when Harbor supplies them. Missing measurements remain unknown. `completed` means report generation finished; inspect task outcomes. A smoke run does not establish general capability.
+```bash
+# Downloads/containers/model requests; may incur charges.
+.venv/bin/python -m eval run --request .fruitfly/eval-request.json --events jsonl
+.venv/bin/python -m eval report '<EVALUATION_ID>' --json
+```
 
-For a small standalone evaluation, set the Terminal-Bench request variant to `starter`. The improvement menu also offers **Terminal-Bench → Starter batch · 5 CPU tasks**. See [public task formats and selected tasks](benchmarks/TASKS.md). The interactive starter uses one attempt and concurrency one, with a four-hour whole-job deadline.
-
-Requests reject unsupported experiment fields. Stored JSON and Markdown reports are read directly without regeneration. Run and Lab own controlled improvement experiments; Eval supplies an optional official-task executor and evidence export.
+`catalog`, `run` and `report` are the complete Eval CLI. Each attempt starts a
+separate native Agent session. `completed` means reports were assembled; inspect
+trial failures and infrastructure errors. A smoke or starter result is not a
+representative full-dataset score. See [task selection](benchmarks/TASKS.md).
 
 ## Select installation material
 
-Harbor installs the validated source checkout when available. Wheel installations must set `FRUITFLY_EVAL_PACKAGE` to an absolute path to complete FruitFlyAgent source or a built wheel. An explicit value overrides checkout discovery. Material must identify `fruitfly-agent` version `0.1`; invalid material fails before task startup.
+A complete source checkout is discovered automatically. Set `FRUITFLY_EVAL_PACKAGE`
+to an absolute source directory or built wheel to override it. Material must
+identify `fruitfly-agent` version `0.1`. Source staging includes package Python,
+build inputs, README and license notices, excluding local secrets and sessions.
+Each trial records SHA-256 installation inputs in `agent/installation.json`.
 
-Source installation stages package files, build inputs, README, and license notices. It excludes secrets, caches, and sessions. The selected profile and model catalog are copied into runner artifacts; secret values stay in the process environment. Workspace `.fruitfly/secrets.env` is used, with root `.env` fallback only when absent; process values take precedence. See [Configuration](../CONFIGURATION.md#files-and-precedence).
+The selected profile is normalized and its referenced main/auxiliary models are
+staged before Harbor starts. Enabled mechanism dependencies are resolved through
+Catalog without Provider construction. Missing required credentials and remote
+execution environments are rejected before launching tasks. Unselected models
+and unrelated credential variables are excluded. Explicit
+content-addressed prompt and component bindings are hash-checked and copied into
+each task's artifact store. Mutable host memory, Skill directories, arbitrary
+workspace files and external services are not copied. Use inline initial text,
+explicit immutable bindings or inputs already provided by the task. State created
+inside an attempt is discarded with its environment; Eval does not carry learning
+between tasks or optimize the Agent.
 
-Enabled mechanisms declare credential requirements through Lab Catalog. Eval
-forwards those named credentials to task containers without identifying tools or
-services. Web tools resolve service defaults and `api_key_env` overrides in their
-own declarations.
-Model, search and fetch keys may be separate. Disabled tools and direct fetch
-add no credentials. Only variable names enter runner arguments and copied YAML;
-values remain in the secret environment. See [Web tools](../fruitfly_agent/lab/tools/web/README.md).
+Secrets come from the workspace `.fruitfly/secrets.env` (root `.env` fallback)
+and process environment; process values win. Model keys and enabled mechanisms'
+Catalog-declared credentials reach the Agent through environment variables.
+Values are absent from request JSON and runner arguments. See
+[Configuration](../CONFIGURATION.md#files-and-precedence).
 
-## Modules
+The container invokes the normal CLI with explicit `--unrestricted`. The chosen
+host strategy leaves the task backend unwrapped, allows tools without approval
+and preserves the task environment. Application directory, credential-file and
+Session-file restrictions do not apply. Harbor/Docker supply isolation; timeout,
+cancellation, cleanup and logging remain active. No permission settings file is
+staged or loaded. Agent configuration contains no permission preference. Task
+images can still need network access to install Python/Agent dependencies.
 
-| File / module | Responsibility |
+## Inspect results
+
+| Artifact | Meaning |
 |---|---|
-| [Benchmarks](benchmarks/README.md) | Preflight, runner commands, official results, and logs |
-| [contracts.py](contracts.py) | Single-configuration requests and task results |
-| [execution.py](execution.py), [storage.py](storage.py) | Execution, reports, and artifacts |
-| [report.py](report.py) | JSON and Markdown reports |
-| [harbor_agent.py](harbor_agent.py) | Install/run the normal Agent inside task containers |
-| [installation.py](installation.py) | Validate source or wheel build inputs |
+| `report.json`, `report.md`, `trials/` | Official outcomes and available measurements |
+| `artifacts/harbor/config.yaml`, `models.yaml` | Selected configuration |
+| `artifacts/harbor/runtime.json` | Source selection, configuration/model hashes and unrestricted execution mode; no key values |
+| Harbor trial `agent/session.jsonl` | Authoritative canonical Session |
+| Harbor trial `agent/trajectory.json` | ATIF-v1.7 projection with tools and observations |
+| Harbor trial `agent/installation.json` | Exact source/wheel input hashes |
+| Harbor trial `agent/runtime.json` | Shared frozen configuration/model/policy receipt |
+| Harbor job/trial logs | Setup, Agent execution, verifier output and exceptions |
 
-Removing Eval leaves normal interaction and Lab development intact.
+ATIF does not reconstruct request-specific context projections or auxiliary model
+calls. Missing usage/cost remains unknown. The native Session retains original
+records. Invalid conversion is reported in Agent metadata rather than fabricating
+a complete trajectory.
+
+## Modules and offline checks
+
+| Module | Responsibility |
+|---|---|
+| [Benchmarks](benchmarks/README.md) | Dataset declarations and shared Harbor adapter |
+| [catalog.py](catalog.py), [contracts.py](contracts.py) | Discovery and single-configuration requests |
+| [execution.py](execution.py), [storage.py](storage.py), [report.py](report.py) | Evaluation lifecycle, artifacts and reports |
+| [runtime.py](runtime.py) | Profile, immutable artifacts and credential staging |
+| [installation.py](installation.py), [harbor_agent.py](harbor_agent.py) | Validate, install and launch the native Agent |
+| [runner.py](runner.py), [results.py](results.py) | Process/log handling and official result parsing |
+| [trajectory.py](trajectory.py) | Canonical Session to ATIF projection |
 
 ```bash
 .venv/bin/python -m unittest discover -s tests/eval -t . -v
 ```
 
-## Export tasks for improvement
-
-[evidence.py](evidence.py) exports complete original task snapshots, canonical trajectories, official results and verifier logs under `artifacts/harbor/evidence/`. Missing task material is recorded as an export error without changing ordinary evaluation scores. Original schema-2 requests and reports remain unchanged. Evidence uses a separate schema-1 format.
-
-[trial.py](trial.py) executes one frozen original task through Harbor with an injected versioned runtime packet. The bridge installs the frozen source and invokes the generic Run Application trial host; Harbor owns the original environment and verifier. This path requires source material, Harbor, Docker and authorized model/network calls. It rejects changed task material, unsupported datasets and incomplete receipts. `python -m eval trial --request REQUEST --output-root NEW_DIRECTORY --events jsonl` consumes a Run-generated request; it is not a schema-2 evaluation request.
-
-`/improvement` can directly prepare a benchmark task set and start one explicitly confirmed improvement job, without preliminary Agent evaluation. See [Original task experiments](../fruitfly_agent/lab/improvement/README.md) for the task split, fixed versions, shared budgets, human adoption and limits.
-
-[task_sets.py](task_sets.py) supplies `prepare_task_set` and the improvement-specific bounded CPU catalog. `python -m eval prepare --benchmark terminal-bench --variant starter --task-limit 5 --output-root NEW_DIRECTORY --events jsonl` downloads and freezes official tasks without constructing an Agent or inventing feedback. This operation requires Harbor, registry/network access, and a ready task environment; runtime improvement still owns model budgets and adoption.
+Offline tests use fake Providers and local processes. Real container, registry and
+model compatibility require a separately authorized smoke run.

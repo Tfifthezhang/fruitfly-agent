@@ -33,6 +33,7 @@ class CliSurfaceTest(unittest.TestCase):
         self.assertEqual(args.task, "do work")
         self.assertEqual(args.profile, "research")
         self.assertFalse(args.resume)
+        self.assertFalse(args.approve_tools)
         self.assertFalse(
             any(
                 hasattr(args, name)
@@ -87,6 +88,49 @@ class CliSurfaceTest(unittest.TestCase):
 
 
 class CliRunTest(unittest.IsolatedAsyncioTestCase):
+    async def test_headless_commands_require_explicit_tool_approval(self):
+        for approved in (False, True):
+            with self.subTest(approved=approved), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                _write_catalog(root / "models.yaml", {"offline": "offline-model"})
+                provider = FauxProvider()
+                provider.respond_tool_call("bash", {"command": "printf verified > output.txt"})
+                provider.respond_text("done")
+                registry = Mock()
+                registry.create.return_value = provider
+                with patch("fruitfly_agent.run.runtime.assembly.default_registry", return_value=registry), \
+                        contextlib.redirect_stdout(io.StringIO()):
+                    result = await cli.run_cli(_args(task="write output", cwd=tmp, approve_tools=approved))
+                self.assertEqual(result, 0)
+                self.assertEqual((root / "output.txt").exists(), approved)
+                tool = next(m for m in provider.calls[-1]["messages"] if m.role == "toolResult")
+                self.assertEqual(tool.is_error, not approved)
+                if approved:
+                    self.assertEqual((root / "output.txt").read_text(), "verified")
+
+    async def test_automatic_approval_keeps_protected_file_checks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_catalog(root / "models.yaml", {"offline": "offline-model"})
+            (root / ".env").write_text("FIXTURE_ONLY=placeholder\n")
+            provider = FauxProvider()
+            provider.respond_tool_call("read", {"path": ".env"})
+            provider.respond_text("done")
+            registry = Mock()
+            registry.create.return_value = provider
+            with patch("fruitfly_agent.run.runtime.assembly.default_registry", return_value=registry), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                await cli.run_cli(_args(task="read file", cwd=tmp, approve_tools=True))
+            tool = next(m for m in provider.calls[-1]["messages"] if m.role == "toolResult")
+            self.assertTrue(tool.is_error)
+            self.assertNotIn("placeholder", tool.text)
+
+    async def test_tool_approval_flag_rejects_interactive_and_resumed_work(self):
+        for args in (_args(approve_tools=True), _args(task="resume", resume=True, approve_tools=True)):
+            with contextlib.redirect_stderr(io.StringIO()), patch.object(cli, "RunApplicationFactory") as factory:
+                self.assertEqual(await cli.run_cli(args), 2)
+                factory.assert_not_called()
+
     async def test_cwd_selects_env_file_and_process_values_take_precedence(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -289,12 +333,12 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual("first", first.calls[-1]["messages"][0].content)
 
     async def test_interactive_resume_injects_next_session_controller(self) -> None:
-        captured: list[tuple[int, object, object]] = []
+        captured: list[tuple[int, object]] = []
 
         class FakeFrontend:
-            def __init__(self, app, *, evaluation=None) -> None:
+            def __init__(self, app) -> None:
                 captured.append(
-                    (app.status.message_count, app.configuration, evaluation)
+                    (app.status.message_count, app.configuration)
                 )
 
             async def run(self) -> int:
@@ -334,15 +378,13 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
         startup.run.assert_called_once_with(editable=False)
         self.assertEqual(captured[0][0], 2)
         self.assertIsInstance(captured[0][1], RunConfigurationController)
-        self.assertIsNotNone(captured[0][2])
 
     async def test_confirmed_runtime_configuration_rebuilds_a_fresh_session(self) -> None:
         captured_paths: list[str] = []
 
         class FakeFrontend:
-            def __init__(self, app, *, evaluation=None) -> None:
+            def __init__(self, app) -> None:
                 self.app = app
-                self.evaluation = evaluation
                 captured_paths.append(app.status.session_path)
 
             async def run(self) -> int:

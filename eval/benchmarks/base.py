@@ -17,6 +17,7 @@ class BenchmarkVariant:
     label: str
     description: str
     task_names: tuple[str, ...] = ()
+    requires_gpu: bool = False
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "task_names", tuple(self.task_names))
@@ -30,6 +31,7 @@ class BenchmarkVariant:
             "id": self.variant_id,
             "label": self.label,
             "description": self.description,
+            "requires_gpu": self.requires_gpu,
         }
         if self.task_names:
             result["task_names"] = list(self.task_names)

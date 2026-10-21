@@ -2,33 +2,41 @@
 
 [Up: Eval](../README.md)
 
-Describe datasets, resources, preflight, Harbor jobs, and official results. Adapters do not own Agent runtime behavior or task verifiers.
+Declare task sets and consume official benchmark results. Agent execution remains
+native; Harbor owns task environments and verification.
 
 | File | Responsibility |
 |---|---|
-| [base.py](base.py) | Descriptor and adapter protocol |
-| [harbor.py](harbor.py) | Shared runner, progress, logs, and result parsing |
-| [terminal_bench.py](terminal_bench.py) | Terminal-Bench 2.0 identity, fixed smoke and five-task starter |
-| [swe_bench.py](swe_bench.py) | SWE-bench Verified identity and smoke task |
-| [Public tasks](TASKS.md) | Task formats, selected exercises, resources, and interactive execution |
+| [base.py](base.py) | Runner protocol, descriptors, exact task subsets and GPU preflight metadata |
+| [harbor.py](harbor.py) | Shared preflight, commands, result coverage and Harbor job dispatch |
+| [terminal_bench.py](terminal_bench.py) | Terminal-Bench 2.1 dataset and smoke/starter tasks |
+| [swe_bench.py](swe_bench.py) | SWE-bench Verified dataset and smoke task |
+| [TASKS.md](TASKS.md) | Official task format and selection |
 
-The installed-agent bridge reports project version `0.1`, matching package metadata.
+## Add a Harbor dataset
 
-`BenchmarkVariant.task_names` optionally declares a fixed subset of distinct exact registry names. Empty keeps ordinary smoke/full behavior. Selected subsets use exact Harbor filters and a task cap; returned task and attempt counts must match. The catalog includes declared names for inspection. Request/report schema versions remain 2; the new selector is an additional variant, not an experiment format.
+Subclass `HarborBenchmarkAdapter` and set `descriptor = harbor_descriptor(...)`.
+Supply benchmark ID, label, description, version, dataset and exact smoke task.
+Optional `BenchmarkVariant` subsets supply distinct exact task names. The common
+declaration supplies measurement names, network surfaces, isolation and full-run
+variants. A variant's `requires_gpu` controls resource preflight without matching
+its name. New datasets require no changes to installation, native CLI startup,
+credentials, trajectories, subprocess handling or result parsing.
 
-Harbor result parsing separates official reward selection, trial status, and aggregate metric formatting. Runner exceptions determine error status; available actual runtime manifests are retained in task records. Error trials contribute no reward, while available usage, cost, and latency remain reportable. Missing measurements remain unknown; a single numeric reward with another name is accepted when no numeric `reward` field is available.
+Task filters are exact and capped to their declared count. Returned names and
+attempt counts must match, including smoke; missing, unexpected or duplicated
+attempts fail validation. Full variants retain the dataset's original task set.
+The official numerical `reward` is preferred; one other numerical reward can be
+used when unambiguous. Errors remain separate from scored task failures.
 
-| Contract | Requirement |
-|---|---|
-| Identity | Unique benchmark ID, dataset/version, adapter version, and exact smoke task |
-| Resources | Explicit variants, network surfaces, timeout, and backend constraints |
-| Results | Official rewards, missing data, errors, and actual runtime metadata |
-| Progress | Job/Agent/trial events; no precise image preparation percentage |
-| Installation | Existing Python/venv preferred; bounded fallback setup with preserved logs |
-| Retries | Connection-only, before job creation; bounded attempts with all logs retained |
-
-Register in [Catalog](../catalog.py). Full setup, diagnostics, and extension procedures belong to [Evaluation guide](../DEVELOPER_GUIDE.md). `FRUITFLY_EVAL_PACKAGE` selects explicit source or wheel installation material; see [Eval](../README.md#select-installation-material). Offline tests need no Docker; real jobs need the optional Harbor installation, Docker/Compose, registries, and model access.
+For a different runner, implement `BenchmarkAdapter.preflight` and `run` and
+register it in [Catalog](../catalog.py). The [evaluation guide](../DEVELOPER_GUIDE.md#add-a-benchmark)
+describes the request/result boundary. [Runner](../runner.py),
+[runtime staging](../runtime.py) and [results](../results.py) own shared behavior.
 
 ```bash
-.venv/bin/python -m unittest tests.eval.test_catalog tests.eval.test_harbor -v
+.venv/bin/python -m unittest tests.eval.test_catalog tests.eval.test_harbor tests.eval.test_task_batches -v
 ```
+
+These checks are offline. Real execution requires Harbor, task access, Docker,
+Agent installation dependencies and model connectivity.

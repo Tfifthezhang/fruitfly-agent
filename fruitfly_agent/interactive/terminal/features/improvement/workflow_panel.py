@@ -3,16 +3,14 @@ from dataclasses import replace
 import shlex
 
 from fruitfly_agent.interactive.contracts.improvement import WorkflowRequest
-from fruitfly_agent.interactive.contracts.evaluation import BenchmarkImprovementRequest
 from fruitfly_agent.interactive.terminal.io.menu import MenuRow
 
 
 class WorkflowPanel:
-    def __init__(self, *, client, configuration, choose, read, confirm, report, execute, history, direction='', benchmark=None):
+    def __init__(self, *, client, configuration, choose, read, confirm, report, execute, history, direction=''):
         self.client, self.configuration = client, configuration
         self.choose, self.read, self.confirm, self.report = choose, read, confirm, report
         self.execute, self.history = execute, history
-        self.benchmark, self.external = benchmark, None
         components = tuple(c.component_id for c in configuration.components if c.available)
         generators = tuple(c.choice_id for c in configuration.generators if c.available)
         self.request = WorkflowRequest(component_ids=components[:1],
@@ -24,7 +22,7 @@ class WorkflowPanel:
         while True:
             value = self.request
             rows = (
-                MenuRow('Task', (' / '.join(self.external[:2]) if self.external else (value.task_pack_id or value.instruction)) or 'Choose task material'),
+                MenuRow('Task', (value.task_pack_id or value.instruction) or 'Choose task material'),
                 MenuRow('Input files', ', '.join(value.input_paths) or 'No files selected'),
                 MenuRow('Editable components', ', '.join(value.component_ids) or 'Select components'),
                 MenuRow('Candidate generator', value.generator_id or 'No available generator'),
@@ -68,19 +66,11 @@ class WorkflowPanel:
                     if text is not None:
                         self.request = replace(value, direction=text)
                 elif selected == 9:
-                    if self.external:
-                        if value.scope != 'task' or value.verification != 'behavior' or value.input_paths:
-                            raise ValueError('External task streams use their own inputs, execution evidence and current-task scope.')
-                        benchmark_id, variant, count = self.external
-                        preview = self.benchmark.benchmark_preview(BenchmarkImprovementRequest(
-                            benchmark_id, variant, count, value.generator_id, value.component_ids,
-                            value.mode, value.width, value.depth, value.max_model_calls, value.max_executions), value.direction)
-                    else:
-                        preview = self.client.workflow_preview(value)
+                    preview = self.client.workflow_preview(value)
                     subtitle = '\n'.join(f'{k}: {v}' for k, v in preview.details) + '\n\n' + preview.cost_notice
                     if self.confirm(title='Confirm component improvement', subtitle=subtitle,
                             rows=(MenuRow('Start the frozen workflow'), MenuRow('Cancel'))):
-                        if await self.execute(preview, value.direction, 'benchmark' if self.external else 'workflow'):
+                        if await self.execute(preview, value.direction):
                             return
                 elif selected == 10:
                     await self.history()
@@ -89,43 +79,16 @@ class WorkflowPanel:
 
     async def task_material(self):
         materials = self.configuration.materials
-        rows = [MenuRow(c.label, c.reason or c.detail) for c in materials]
-        if self.benchmark is not None:
-            rows.append(MenuRow('Benchmark task stream', 'Download and refine original tasks after confirmation'))
-        index = self.choose('Task material', tuple(rows), key='workflow-material')
+        rows = tuple(MenuRow(c.label, c.reason or c.detail) for c in materials)
+        index = self.choose('Task material', rows, key='workflow-material')
         if index is None:
             return False
-        if index < len(materials):
-            choice = materials[index]
-            if not choice.available:
-                self.report(choice.reason + '\n')
-                return False
-            self.external = None
-            self.request = replace(self.request, task_pack_id=choice.choice_id)
-            return not choice.choice_id
-        if not self.benchmark.improvement_available:
-            raise ValueError('No external task execution capability is registered.')
-        benchmarks = self.benchmark.improvement_snapshot().benchmarks
-        index = self.choose('Benchmark', tuple(MenuRow(b.label, b.description) for b in benchmarks))
-        if index is None:
+        choice = materials[index]
+        if not choice.available:
+            self.report(choice.reason + '\n')
             return False
-        benchmark = benchmarks[index]
-        index = self.choose('Task environment', tuple(MenuRow(v.label,
-            '; '.join(v.preflight) if not v.available else v.description) for v in benchmark.variants))
-        if index is None:
-            return False
-        variant = benchmark.variants[index]
-        if not variant.available:
-            raise ValueError('; '.join(variant.preflight) or 'Task environment is unavailable.')
-        text = await self.read('Task count (1–12; fixed task batches require their declared size)')
-        if text is None:
-            return False
-        count = int(text)
-        if not 1 <= count <= 12:
-            raise ValueError('Task count must be 1–12.')
-        self.external = (benchmark.benchmark_id, variant.variant_id, count)
-        self.request = replace(self.request, task_pack_id='', input_paths=(), scope='task', verification='behavior')
-        return False
+        self.request = replace(self.request, task_pack_id=choice.choice_id)
+        return not choice.choice_id
 
     def components(self):
         while True:

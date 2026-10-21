@@ -11,7 +11,7 @@ from eval.catalog import builtin_catalog
 from tests.support.evaluation import request_payload
 
 
-TASKS = ("fix-git", "log-summary-date-ranges", "regex-log", "cancel-async-tasks", "fix-code-vulnerability")
+TASKS = tuple("terminal-bench/" + name for name in ("fix-git", "log-summary-date-ranges", "regex-log", "cancel-async-tasks", "fix-code-vulnerability"))
 
 
 class TaskBatchTests(unittest.TestCase):
@@ -67,9 +67,9 @@ class TaskBatchTests(unittest.TestCase):
                 adapter = TerminalBenchAdapter()
                 with patch.object(adapter, "preflight", return_value=PreflightResult(True, (), ("offline-harbor",))), patch(
                     "eval.benchmarks.harbor.resolve_installation", return_value=root
-                ), patch("eval.benchmarks.harbor._runtime_files", return_value=(root / "config", root / "models", ())), patch(
+                ), patch("eval.benchmarks.harbor.prepare_runtime", return_value=(root / "config", root / "models", ())), patch(
                     "eval.benchmarks.harbor.load_env", return_value={}
-                ), patch("eval.benchmarks.harbor._run_harbor_job", return_value=(0, "")):
+                ), patch("eval.benchmarks.harbor.run_harbor_job", return_value=(0, "")):
                     if passes:
                         adapter.run(request_path=request_path, result_path=result_path, variant="starter")
                         result = json.loads(result_path.read_text())

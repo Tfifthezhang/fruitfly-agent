@@ -9,6 +9,8 @@ Verify configuration, model selection, assembly, manifest, CLI, candidates, rete
 | Files | Protects |
 |---|---|
 | `test_configuration.py / test_profiles.py` | Selection drafts, YAML, and persistence |
+| `test_execution_policy.py` | Guarded/unrestricted native file and shell behavior, environment inheritance, cancellation and launch validation |
+| `test_defaults.py` | Default restoration drafts, model/key preservation, save/discard and read-only default files |
 | `test_model_setup.py` | First-run form, secret isolation, preservation, cancel/discard, rollback, and immediate offline assembly |
 | `test_mechanism_setup.py` | Guided SSH enable/repair, hidden account/password, per-field retries, shared model/SSH persistence and rollback |
 | `test_web_setup.py` | Hidden web keys, pending service/variable bindings, direct fetch, cancel/discard, rollback and same-process startup |
@@ -17,7 +19,6 @@ Verify configuration, model selection, assembly, manifest, CLI, candidates, rete
 | `test_ssh_environment.py` | SSH configuration selection, secret-free identity, remote file tools, recovery and failed-resource cleanup |
 | `test_cli.py` | Startup, one-shot, resume, and rebuild |
 | `test_improvement_versions.py / test_task_prompt_catalog.py / test_base_prompt_flow.py` | Candidate scope, prompt selection, and recovery |
-| `test_eval_bridge.py` | Optional benchmark catalog, one-use improvement dispatch, live subprocess logs, and removed launch APIs; no benchmark scoring |
 
 Fake Providers and temporary files. No model fees or benchmark containers.
 

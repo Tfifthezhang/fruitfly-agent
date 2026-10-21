@@ -26,6 +26,7 @@ def _args(**values):
     defaults = dict(
         task="",
         resume=False,
+        approve_tools=False,
         cwd=None,
         session=None,
         config=None,

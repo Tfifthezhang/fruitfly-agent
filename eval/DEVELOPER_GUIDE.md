@@ -21,19 +21,14 @@ docker compose version
 .venv/bin/python -m eval catalog --json
 ```
 
-Preflight locates Harbor/Docker, checks Engine/Compose within five seconds, and locates `nvidia-smi` for the GPU variant. It does not check images, free disk, all registries, or paid model connectivity. Inspect task images and architecture separately. Host and Docker network/proxy settings are separate paths.
+Preflight locates Harbor/Docker, checks Engine/Compose within five seconds, and locates `nvidia-smi` for the GPU variant. It does not check images, free disk, all registries, or paid model connectivity. Inspect task images and architecture separately. Host and Docker network/proxy settings are separate paths. Terminal-Bench 2.1 uses the Hub dataset `terminal-bench/terminal-bench-2-1`; configure Harbor login/access if required. Pre-downloaded images must match the resolved task definitions.
 
 Use `FRUITFLY_EVAL_PACKAGE` to select complete source or wheel material when needed; see [installation material](README.md#select-installation-material).
 
-## Use benchmark tasks in improvement
-
-Open `/improvement` while idle. Select **Start improvement → Benchmark tasks**, choose a bounded CPU task set, inspect budget/acceptance/version details, then confirm **Start improvement**. Cancel is selected by default. The same Application job prepares task material and performs baseline, learning, candidate comparisons and confirmation; no preliminary evaluation is required. Original tasks and verifiers remain owned by Eval. A confirmed candidate still requires explicit human adoption.
-
-For standalone benchmark scores and reports, use the CLI request below. Terminal-Bench's `starter` runs its fixed five-task batch; `smoke` runs one task. See [task formats](benchmarks/TASKS.md).
-
 ## Create a CLI request
 
-This example creates a request offline. Replace `default` with the selected saved profile if needed:
+This example creates a request offline using the independent default configuration.
+Prepare `.fruitfly/default-config.yaml` and its model catalog before running it:
 
 ```bash
 .venv/bin/python - <<'PY'
@@ -44,8 +39,7 @@ from eval.contracts import EvaluationRequest
 cwd = Path.cwd()
 request = EvaluationRequest.from_dict({
     'schema_version': 2,
-    'runtime': {'config_path': str(cwd / '.fruitfly/config.yaml'),
-                'profile': 'default', 'working_directory': str(cwd)},
+    'runtime': {'working_directory': str(cwd)},
     'benchmark': {'id': 'terminal-bench', 'variant': 'smoke'},
     'execution': {'attempts': 1, 'concurrency': 1, 'timeout_seconds': 3600},
 })
@@ -65,13 +59,31 @@ The next command executes the paid/network/container path:
 
 | Option / result | Meaning |
 |---|---|
-| Runtime | Configuration path, profile, and working directory |
+| Runtime | Optional configuration path/profile; defaults to `.fruitfly/default-config.yaml` and its default profile. Working directory defaults to the process workspace. |
 | Execution | Positive integer attempts, concurrency, and total job timeout |
 | `--output-root` | Override output location; use the same root to read reports |
 | Exit codes | completed 0, failed 1, input/file error 2, blocked 3 |
 | Request validation | Requires schema 2; unknown fields and experiment inputs are rejected |
 
-The runner copies the selected profile and catalog before starting Harbor. Per-task records include available actual runtime manifests. Source code, live Python heaps, and external services are not snapshotted. Ordinary evaluation does not freeze runtime source or learning state. The separately authorized [original-task improvement host](../fruitfly_agent/lab/improvement/README.md) does so before controlled trials.
+For an experimental configuration, explicitly supply `runtime.config_path` and
+optionally `runtime.profile`. Relative paths resolve from `working_directory`.
+Explicit empty strings and unknown fields fail; defaults never fall back to daily
+configuration. Existing fully specified schema-2 requests remain supported.
+
+The runner normalizes the selected profile, stages referenced main/auxiliary
+models, validates required credentials and rejects remote execution environments
+before starting Harbor. `runtime.json` records source, selected profile and
+configuration/model hashes and unrestricted execution mode. Each attempt consumes the same staged files;
+subsequent edits to source configuration do not change the job. Eval explicitly
+passes `--unrestricted` inside each task container. Its host strategy omits
+application permission wrapping and approval while retaining the task environment.
+Harbor/Docker supply isolation; runtime deadlines, cancellation and cleanup remain.
+No permission configuration file is staged.
+
+Per-task records include available actual runtime manifests. Live Python heaps
+and external services are not snapshotted. Installation input hashes identify the
+source/wheel actually staged for each task. Eval does not freeze or optimize
+learning state.
 
 ## Follow execution and reports
 
@@ -81,12 +93,14 @@ The runner copies the selected profile and catalog before starting Harbor. Per-t
 | `report.md`, `report.json` | Scores, errors, available measurements, and artifact paths |
 | `trials/` | Parsed task results and actual runtime metadata when supplied |
 | `artifacts/runner-result.json` | Adapter result |
-| `artifacts/harbor/config.yaml`, `models.yaml` | Copied runtime files; secret values are excluded by configuration convention |
+| Harbor trial `agent/installation.json`, `trajectory.json` | Installation hashes and ATIF projection |
+| `artifacts/harbor/config.yaml`, `models.yaml` | Normalized selected runtime files; credentials remain environment references |
+| `artifacts/harbor/runtime.json` | Source/content identity and unrestricted execution mode |
 | `artifacts/harbor/harbor.log` | Final runner attempt |
 | `artifacts/harbor/harbor-attempt-*.log` | Earlier registry connection attempts |
 | Harbor job/trial directories | Setup/session/events, verifier logs, exceptions, and official results |
 
-Setup prefers an existing Python 3.11+ with venv, otherwise uses system/uv fallback. Setup commands are limited to 300 seconds; Harbor's default overall setup is 360 seconds. Interactive job limits are one hour for smoke, four hours for starter, and seven days for full datasets; individual task/verifier limits remain task-defined.
+Setup prefers an existing Python 3.11+ with venv, otherwise uses system/uv fallback. Setup commands are limited to 300 seconds; Harbor's default overall setup is 360 seconds. The request sets the whole-job deadline; individual task/verifier limits remain task-defined.
 
 Agent events are read around every 0.2 seconds and archived on completion. Job progress is emitted every five seconds. Setup, runner, verifier, exceptions, stderr, and non-JSON stdout are forwarded without log-body truncation. No observed Agent event can mean setup is still running.
 
@@ -108,20 +122,11 @@ Registry connection failures retry at most three times, within the same timeout,
 
 | Step | Action |
 |---|---|
-| 1 | Declare dataset/version, smoke task, resources, network surfaces, and reward fields. |
-| 2 | Implement a [Benchmark adapter](benchmarks/README.md); reuse HarborBenchmarkAdapter when appropriate. |
+| 1 | Declare dataset/version, an exact smoke task and optional exact subsets. |
+| 2 | For Harbor tasks, subclass `HarborBenchmarkAdapter` and call `harbor_descriptor`; default resolution, runtime snapshots, credentials, permissions, installation, commands, logs, trajectories and parsing are shared. Other backends implement `BenchmarkAdapter`. |
 | 3 | Export/register its unique ID in [catalog.py](catalog.py). |
 | 4 | Test request validation, commands, preflight, failures, rewards, and reports offline. |
-| 5 | Inspect catalog/menu output; authorize real smoke separately. |
+| 5 | Inspect catalog output; authorize real smoke separately. |
 
-`BenchmarkAdapter.run(request_path=..., result_path=..., variant=..., progress=...)` consumes the single-configuration request and writes schema-2 results containing status, metrics, errors, artifacts, and trials. A custom Harbor task needs instructions, task.toml, an environment, and an independent verifier. The terminal does not accept arbitrary image/path fields. Other runners implement the same request/result interface; runtime ownership stays outside Eval.
+`BenchmarkAdapter.run(request_path=..., result_path=..., variant=..., progress=...)` consumes the single-configuration request and writes schema-2 results containing status, metrics, errors, artifacts, and trials. A custom Harbor task needs instructions, task.toml, an environment, and an independent verifier. Dataset identity and exact task subsets belong to the adapter declaration. Other runners implement the same request/result interface; runtime ownership stays outside Eval.
 
-## Consume official execution evidence
-
-The [evidence exporter](evidence.py) resolves the trial task through Harbor `TaskConfig.get_local_path()`, preserves complete task files and verifies the copied material hash. See the [upstream task configuration](https://github.com/laude-institute/harbor/blob/main/src/harbor/models/trial/config.py). This project pins Harbor 0.23.0. Export errors stay explicit. Boolean/missing rewards and runner exceptions do not become scored learning failures. Whole task snapshots include hidden verifier material for official reruns, but Lab's training projection does not send those files to the model.
-
-The single-task [trial executor](trial.py) validates task/source identity before starting Harbor. It consumes a separately versioned Run-generated request, installs the frozen source and profile, and retrieves the actual Application invocation receipt. New runners can implement the injected original-task executor without changing Lab algorithms or ordinary evaluation requests. Default tests must use fake executors and Providers.
-
-## Prepare a task set without Agent calls
-
-[task_sets.py](task_sets.py) resolves the selected dataset with Harbor 0.23.0 `DatasetConfig.get_task_configs()` and downloads selected original bytes using `TaskClient.download_tasks()`. These APIs are used by [upstream task construction](https://github.com/laude-institute/harbor/blob/v0.23.0/src/harbor/trial/trial.py). Select exact fixed names or the first bounded CPU sample sorted by registry name. Freeze source revision, full material, instruction and verifier identities before any baseline runs. Unsupported multi-step/GPU tasks and changed copies fail explicitly. Preparation emits a task set, not an evaluation report or fabricated scores.

@@ -34,6 +34,14 @@ Unknown fields and unsupported schema versions raise `ValueError`. Catalog valid
 
 ## Files and ownership
 
+**Restore default configuration** stages default harness settings in the current
+daily profile while retaining its model selection and pending credentials. Save
+applies the draft to a new session; reset discards it. Defaults are loaded from an
+injected workspace path, validated before staging and never edited by this operation.
+Missing or invalid defaults leave the draft unchanged. Explicitly selected default
+files retain a read-only controller. See the
+[configuration reference](../../../CONFIGURATION.md#restore-default-configuration).
+
 | File | Responsibility |
 |---|---|
 | [profile.py](profile.py) | Schema 1 values, YAML validation and persistence |

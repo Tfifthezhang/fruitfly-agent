@@ -34,11 +34,24 @@ class ProviderRegistry:
 
 
 def load_model_specs(path: str | Path) -> dict[str, ModelSpec]:
-    raw = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+    try:
+        raw = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as exc:
+        raise ValueError(f"invalid model catalog YAML: {path}") from exc
+    if not isinstance(raw, dict):
+        raise ValueError("model catalog must be a mapping")
     models = raw.get("models")
     if not isinstance(models, dict):
         raise ValueError("model catalog must contain a 'models' mapping")
-    return {str(name): ModelSpec.from_dict(str(name), value) for name, value in models.items()}
+    result = {}
+    for name, value in models.items():
+        try:
+            if not isinstance(value, dict) or not isinstance(value.get("provider"), str):
+                raise ValueError("provider must name an API protocol")
+            result[str(name)] = ModelSpec.from_dict(str(name), value)
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(f"invalid model specification {name!r}; verify protocol, model, capabilities and token limits") from exc
+    return result
 
 
 def default_registry() -> ProviderRegistry:

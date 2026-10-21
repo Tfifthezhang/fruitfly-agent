@@ -17,7 +17,6 @@ from fruitfly_agent.interactive.terminal.features.assembly import bind_commands
 from fruitfly_agent.interactive.terminal.notifications import ImprovementNotifications
 
 from fruitfly_agent.interactive.contracts.configuration import ConfigurationController
-from fruitfly_agent.interactive.contracts.evaluation import BenchmarkImprovementController
 from fruitfly_agent.interactive.interaction.commands import CommandRouter, parse_command
 from fruitfly_agent.interactive.terminal.io.input import LineEditor, create_line_editor, PollingLineEditor
 from fruitfly_agent.interactive.terminal.io.live import (
@@ -43,7 +42,6 @@ class TerminalFrontend:
         line_editor: LineEditor | None = None,
         command_router: CommandRouter | None = None,
         configuration: ConfigurationController | None = None,
-        evaluation: BenchmarkImprovementController | None = None,
         command_handlers: Mapping[str, TerminalCommandHandler] | None = None,
         bindings: TerminalBindings | None = None,
         improvement_clients: ImprovementClients | None = None,
@@ -71,11 +69,10 @@ class TerminalFrontend:
         self._improvement_clients = improvement_clients
         self.menu_input = None
         self.menu_renderer = None
-        if (improvement_clients or ImprovementClients.from_session(session)).available or evaluation is not None:
+        if (improvement_clients or ImprovementClients.from_session(session)).available:
             from fruitfly_agent.interactive.terminal.io.menu import create_menu_input, TerminalMenuRenderer
             self.menu_input = create_menu_input(self.input, self.output, self.line_editor)
             self.menu_renderer = TerminalMenuRenderer(self.output)
-        self.evaluation = evaluation
         self.command_router = command_router or CommandRouter()
         self._reading_authorization = False
         self.session.set_event_sink(self._render_event)
@@ -334,7 +331,7 @@ class TerminalFrontend:
     def improvement_frontend(self) -> TerminalImprovementFrontend:
         return TerminalImprovementFrontend(
             self.session, self.renderer, self.line_editor, self.menu_input, self.menu_renderer,
-            clients=self._improvement_clients, benchmark=self.evaluation,
+            clients=self._improvement_clients,
         )
 
     async def show_history(self) -> None:

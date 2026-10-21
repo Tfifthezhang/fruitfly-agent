@@ -58,6 +58,7 @@ files = [
     "fruitfly_agent/core/tool_runtime/authorization.py",
     "fruitfly_agent/interactive/interaction/authorization.py",
     "fruitfly_agent/lab/environment/permissions.py",
+    "fruitfly_agent/lab/environment/execution.py",
     "fruitfly_agent/lab/environment/guarded.py",
     "fruitfly_agent/lab/catalog/permissions.py",
     "fruitfly_agent/run/runtime/permissions.py",
@@ -88,8 +89,6 @@ files = [
     "fruitfly_agent/run/configuration/controller.py",
     "fruitfly_agent/run/runtime/recovery.py",
     "fruitfly_agent/run/improvement/versions.py",
-    "fruitfly_agent/run/trial.py",
-    "fruitfly_agent/run/runtime/trial_budget.py",
     "fruitfly_agent/lab/improvement/contracts/versions.py",
     "fruitfly_agent/lab/improvement/contracts/candidates.py",
     "fruitfly_agent/lab/algorithms/snapshots.py",
@@ -101,7 +100,6 @@ files = [
     "fruitfly_agent/lab/improvement/workflow",
     "fruitfly_agent/lab/improvement/editor",
     "fruitfly_agent/run/improvement/pipeline.py",
-    "fruitfly_agent/run/improvement/external.py",
     "fruitfly_agent/lab/improvement/migration.py",
     "fruitfly_agent/lab/learning",
     "fruitfly_agent/run/learning",
@@ -122,9 +120,10 @@ files = [
     "eval/report.py",
     "eval/storage.py",
     "eval/installation.py",
-    "eval/evidence.py",
-    "eval/trial.py",
-    "eval/task_sets.py",
+    "eval/runtime.py",
+    "eval/runner.py",
+    "eval/results.py",
+    "eval/trajectory.py",
 ]
 
 [[tool.mypy.overrides]]

@@ -15,6 +15,12 @@ Assemble the default runtime from configuration, Providers, Lab, and Interactive
 
 Real tasks call the configured model service and may incur charges. See [Getting started](../../GETTING_STARTED.md) for installation and [Terminal](../interactive/terminal/README.md) for interaction.
 
+The home menu retains Start new session, Configure and Exit. Configure ends with
+**Restore default configuration**, which stages default harness settings while
+preserving the daily model and credentials. Save applies the draft to a new
+session. Default files are edited manually; Eval uses their complete profile.
+See [restoration](../../CONFIGURATION.md#restore-default-configuration).
+
 | Resume entry | Behavior |
 |---|---|
 | `--resume` | Resume the latest non-empty session at startup, subject to full runtime validation. |
@@ -33,7 +39,7 @@ Interactive recovery displays original saved conversation through the same histo
 | [Storage](storage/README.md) | Text artifacts, candidate records, result exports, retention | No quality decisions or activation |
 | [Improvement host](improvement/README.md) | Search jobs, candidate rules, evolution capabilities, startup choices | Lab owns algorithms and the RSI state machine |
 | [Learning host](learning/README.md) | Configured task observation and material persistence | No search or adoption authority |
-| [Adapters](adapters/README.md) | Interactive views and optional Eval bridge | No algorithm-specific decisions |
+| [Adapters](adapters/README.md) | Interactive views and capability adapters | No algorithm-specific decisions |
 
 [application.py](application.py) is the composition root. `RunApplicationFactory` constructs services, owns active runtime bindings, and delegates operations. Search services own preview receipts, startup services own choice receipts, and configuration owns its draft. Services use injected queries and operations instead of receiving the Factory or inspecting private fields.
 
@@ -47,7 +53,6 @@ Interactive recovery displays original saved conversation through the same histo
 | [assembly.py](assembly.py) | Public assembly/manifest/prompt-resolution exports |
 | [profiles.py](profiles.py) | Configuration controller composed with candidate-backed prompt views |
 | [evolution.py](evolution.py) | Bind Application and storage operations to the evolution host |
-| [evaluation.py](evaluation.py) | Bind host queries to the optional Eval adapter |
 | [startup_versions.py](startup_versions.py) | Public startup-selection composition entry |
 | [migrate_improvement.py](migrate_improvement.py) | Explicit offline data/configuration migration; see [configuration](../../CONFIGURATION.md#relocate-improvement-data) |
 | [migrate_configuration.py](migrate_configuration.py) | Explicit migration function and CLI; see [commands and limits](../../CONFIGURATION.md#relocate-workspace-configuration) |
@@ -164,10 +169,31 @@ Remote execution prompts identify the server and port. Local extra roots and
 Session protections do not become remote path rules; SSH account/password values
 use the same host secret resolver as API keys and never enter runtime identity.
 
-Only host constructor parameters select additional roots and protection paths. Model-edited profile files do not expand permission scope. Algorithm configuration/state remains accessible within authorized roots. User-driven model setup continues to persist credentials through its owning host interface, and Provider construction can obtain its required key. Shell/IPython do not receive those keys automatically.
+Host constructor parameters select additional roots and protection paths; there
+is no user permission-settings file or menu. Model-edited profiles cannot expand
+scope. The standard strategy supplies a minimal child-process environment.
+
+`PermissionPolicy.unrestricted(workspace)` constructs the alternative strategy.
+Assembly calls `prepare_environment` and `bind` on the injected policy. This
+strategy keeps the backend unwrapped, explicitly allows tool authorization and
+preserves the task environment. It does not apply application credential/Session
+protections or invoke backend permission adapters. Its identity is recorded in
+`RuntimeManifest.permissions`; the ordinary guarded strategy remains the default.
+Selection occurs once at launch, with no benchmark branches in tools or Core.
+See [host execution](../../CONFIGURATION.md#host-execution-policies).
 
 Authorization audit entries contain call/tool identity, operation, outcome, and reason; they omit command/code contents, key values, and approval caches. Host policy must name additional credential files it uses. RuntimeManifest identities describe policy settings, not OS isolation or plugin source verification.
 
-## Start an original-task improvement experiment
+## Start component improvement
 
-Use `/improvement` to select a saved task package or a bounded benchmark task set. One explicitly confirmed benchmark job prepares original material and freezes source, H/I/S, profile, model catalog, registered text state and original task bytes; its own baseline and official verification determine improvement. It does not silently start when configuration is enabled. A confirmed candidate uses the existing human review and fresh-session adoption path. See [Original task experiments](../lab/improvement/README.md) for budgets, splits, artifacts and unsupported targets. The public [trial.py](trial.py) composition entry runs one injected isolated task through the normal Application; Eval remains optional.
+Use `/improvement` to select current instructions and explicit input files or a
+saved task package. Preview components, generator, budgets, verification and scope
+before submitting the Application-owned job. Candidates retain explicit human
+review and fresh-session adoption. See [Improvement](../lab/improvement/README.md).
+Container benchmark execution uses the separate [Eval CLI](../../eval/README.md).
+
+`--approve-tools` answers ordinary confirmations for a fresh headless task while
+keeping protected checks. `--unrestricted` selects the unrestricted strategy for
+a fresh headless task in an externally isolated environment. Both reject
+interactive/resumed launches and cannot be combined. Eval uses `--unrestricted`
+inside Harbor containers. Neither flag is an Agent configuration field.

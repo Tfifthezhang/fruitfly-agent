@@ -5,9 +5,9 @@ import asyncio
 import uuid
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import AsyncIterator, Awaitable, Callable
+from typing import AsyncIterator, Awaitable, Callable, Mapping
 
 from fruitfly_agent.core.tool_runtime.authorization import (
     AuthorizationRequest, AuthorizationDecision, AuthorizationPrompt,
@@ -39,6 +39,30 @@ class PermissionPolicy:
                 'outside_workspace': 'confirm', 'local_execution': 'confirm',
                 'secret_names': ['.env', '.env.* (except examples)', 'secrets.env'],
                 'environment': 'minimal-v1', 'network_reads': 'allow' if self.allow_network else 'deny'}
+
+    @staticmethod
+    def unrestricted(workspace: Path) -> PermissionPolicy:
+        """Construct the explicit strategy for an externally isolated runtime."""
+        from .execution import UnrestrictedExecutionPolicy
+        return UnrestrictedExecutionPolicy(workspace)
+
+    @staticmethod
+    def prepare_environment(environment: Mapping[str, str]) -> dict[str, str]:
+        names = ('LANG', 'LC_ALL', 'LC_CTYPE', 'TZ', 'TERM')
+        return {'PATH': '/usr/bin:/bin:/usr/sbin:/sbin', **{k: environment[k] for k in names if k in environment}}
+
+    def bind(self, config, *, confirm, audit=None, process_environment=None):
+        """Bind the ordinary guarded strategy after all environment installers."""
+        from .guarded import GuardedEnv
+
+        authorizer = PermissionAuthorizer(self, confirm=confirm, audit=audit)
+        env = config.env
+        adapter = getattr(env, 'with_permissions', None)
+        if adapter is not None:
+            env, authorizer = adapter(self, confirm=confirm, audit=audit)
+        elif env is not None:
+            env = GuardedEnv(env, authorizer, process_environment=process_environment)
+        return replace(config, env=env, tool_authorizer=authorizer)
 
 @dataclass
 class _Grant:

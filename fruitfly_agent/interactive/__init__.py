@@ -45,12 +45,7 @@ from fruitfly_agent.interactive.contracts.events import (
     ToolStarted,
     event_from_dict,
 )
-from fruitfly_agent.interactive.contracts.evaluation import (
-    EvaluationBenchmarkOption,
-    EvaluationEventSink,
-    EvaluationSnapshot,
-    EvaluationVariantOption,
-)
+
 from fruitfly_agent.interactive.contracts.events import EventSink
 from fruitfly_agent.interactive.contracts.models import (
     ConversationBlock,
@@ -97,10 +92,6 @@ __all__ = [
     "ConfigurationActionResult",
     "ConfigurationLaunchResult",
     "ConfigurationController",
-    "EvaluationBenchmarkOption",
-    "EvaluationEventSink",
-    "EvaluationSnapshot",
-    "EvaluationVariantOption",
     "FrontendEvent",
     "InteractiveEvent",
     "event_from_dict",

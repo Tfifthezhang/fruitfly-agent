@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fruitfly_agent.lab.catalog import PermissionPolicy, apply_permission_policy
 from fruitfly_agent.interactive.interaction.authorization import AuthorizationService
-from fruitfly_agent.run.runtime.permissions import default_permission_policy, execution_environment
+from fruitfly_agent.run.runtime.permissions import default_permission_policy
 
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
@@ -69,7 +69,7 @@ def build_runtime(
     approvals = AuthorizationService()
     def audit(data):
         session.append("meta", {"kind": "authorization", **data})
-    process_environment = execution_environment(environment)
+    process_environment = policy.prepare_environment(environment)
     main_spec.require(streaming=True)
     registry = provider_registry or default_registry()
     resolved_model_specs: dict[str, dict[str, Any]] = {}

@@ -24,6 +24,8 @@ and remote process supervision. Local sessions and model calls stay local.
 | File | Responsibility |
 |---|---|
 | [local.py](local.py) | `LocalEnv` implementation |
+| [permissions.py](permissions.py), [guarded.py](guarded.py) | Guarded host strategy, authorizer and environment wrapper |
+| [execution.py](execution.py) | Explicit unrestricted strategy and allow authorizer |
 | [ssh](ssh/README.md) | `SshConfig`, `SshEnv`, remote permissions and Catalog registration |
 | [__init__.py](__init__.py) | Public exports |
 | [Core protocols](../../core/env/protocols.py) | Required filesystem and shell operations |
@@ -59,3 +61,19 @@ The wrapper checks canonical targets at actual file access, including both move 
 Children receive a minimal environment: a system `PATH` and selected locale/timezone/terminal variables. IPython additionally receives its package and artifact transport settings. Provider key variables and ambient `HOME`, `PYTHONPATH`, and startup configuration are not inherited automatically. Explicit host-supplied execution options can add environment values and are trusted.
 
 These controls protect model tool entry points. They are not OS isolation: approved local code can access host files/network with current user permissions, and arbitrary trusted plugin code can use Python APIs directly. Canonical path checks do not eliminate all concurrent filesystem races. No containers, automatic command parsing, permanent approvals, or shell command blacklists are supplied.
+
+## Select an execution strategy
+
+`PermissionPolicy` implements the guarded strategy through `prepare_environment`
+and `bind`. `PermissionPolicy.unrestricted(workspace)` returns
+`UnrestrictedExecutionPolicy`: environment preparation preserves task variables,
+binding retains the backend and supplies an explicit allow authorizer. It does
+not invoke `with_permissions` adapters or enforce directory/credential/Session
+checks. Core still validates tool calls; timeout, cancellation and cleanup retain
+their owning implementations. Authorization audits omit arguments and key values.
+
+Run selects the strategy once at startup. Eval explicitly selects unrestricted
+execution inside Harbor/Docker; it is independent of Agent YAML and never inferred
+from Docker detection. The manifest records `unrestricted-execution-v1` and the
+inherited environment. External isolation must bound its effects. See
+[host execution](../../../CONFIGURATION.md#host-execution-policies).

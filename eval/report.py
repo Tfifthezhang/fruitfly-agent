@@ -44,12 +44,14 @@ class EvaluationReport:
         return {"schema_version": SCHEMA_VERSION, **asdict(self)}
 
     def render_markdown(self) -> str:
+        resolved = self.runtime.get("resolved", self.runtime)
         lines = [f"# Evaluation {self.evaluation_id}", "", "## Summary", "",
                  f"- Status: `{self.status}`",
                  f"- Benchmark: `{self.benchmark.get('benchmark')}` / `{self.benchmark.get('variant')}`",
                  f"- Started: `{self.started_at}`", f"- Completed: `{self.completed_at}`",
                  "", "## Configuration", "",
-                 f"- Config: `{self.runtime.get('config_path')}`", f"- Profile: `{self.runtime.get('profile')}`",
+                 f"- Config: `{resolved.get('config_path')}`", f"- Profile: `{resolved.get('profile')}`",
+                 f"- Execution policy: `{resolved.get('execution_policy', 'see task runtime manifests')}`",
                  "- Actual per-task runtime manifests, when available: `trials/`",
                  "- Selected runtime files and logs: `artifacts/`", "", "## Results", ""]
         if self.metrics:
@@ -98,8 +100,11 @@ def report_from_runner_result(
     status = str(result.get("status", "completed"))
     if status not in {"completed", "blocked", "failed"}:
         raise ValueError("unsupported evaluation status")
+    runtime = asdict(request.runtime)
+    if isinstance(result.get("runtime_snapshot"), Mapping):
+        runtime["resolved"] = dict(result["runtime_snapshot"])
     return EvaluationReport(evaluation_id, status, started_at, completed_at, benchmark,
-        asdict(request.runtime), asdict(request.execution), tuple(MetricRecord.from_dict(item) for item in metrics),
+        runtime, asdict(request.execution), tuple(MetricRecord.from_dict(item) for item in metrics),
         reported_errors, tuple(dict(item) for item in artifacts if isinstance(item, Mapping)))
 
 

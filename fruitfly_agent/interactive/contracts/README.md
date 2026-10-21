@@ -9,13 +9,12 @@ Define the data and capabilities shared by hosts, Application, Session, and fron
 | [runtime.py](runtime.py) | RuntimeFactory, RuntimeSession, RuntimeAuthorization, and the RuntimeHandle protocol |
 | [commands.py](commands.py) | InteractiveCommand, CommandResult, CommandContext, and CommandHandler |
 | [events.py](events.py), [models.py](models.py) | Event envelopes, EventSink, status, history, and session views |
-| [configuration.py](configuration.py), [model_setup.py](model_setup.py) | Generic configuration choices, model forms, and staging services |
+| [configuration.py](configuration.py), [model_setup.py](model_setup.py) | Configuration choices, optional default-restoration capability, model forms and staging |
 | [mechanism_setup.py](mechanism_setup.py) | Optional guided mechanism forms, non-secret credential status and atomic staging |
 | [improvement.py](improvement.py) | Role/target/method/parameter views, search preview/execution, activity, progress, optional history/log queries and submission receipts |
 | [learning.py](learning.py) | Completed-task observation and optional material production service |
 | [candidates.py](candidates.py) | Candidate views with evidence assessments, review, and isolated preparation/activation contracts |
 | [task_packs.py](task_packs.py) | Task material and correction views/services |
-| [evaluation.py](evaluation.py) | Optional benchmark task selection, improvement previews, and event contracts |
 
 Implement only the capabilities a host supplies. Optional `ImprovementSubmissionService` records authorized intent before the Application task is scheduled, including immediate cancellation; it grants no execution or activation authority. `ComponentImprovementClient` supplies typed workflow configuration and preview. Stage protocols replace algorithm-specific search signatures. Improvement, candidates, and task materials are independently injected. Candidate preparation returns a handle satisfying this package's RuntimeHandle protocol. The concrete constructor belongs to [Application](../application/README.md) and is exported as `fruitfly_agent.interactive.RuntimeHandle`.
 
@@ -29,8 +28,6 @@ Configuration and improvement method views carry registration-owned implementati
 .venv/bin/python -m unittest tests.architecture.test_boundaries tests.contracts.test_public_api tests.contracts.test_signatures -v
 .venv/bin/python -m mypy
 ```
-
-`BenchmarkImprovementController` and `BenchmarkImprovementRequest` in [evaluation.py](evaluation.py) provide optional bounded task-source selection and offline improvement previews. A one-use token launches task preparation and iteration through Application. The preview and candidate values reuse the independent improvement and candidate contracts. Standalone evaluation belongs to the optional Eval CLI.
 
 Tool start/finish events carry an optional plain-text `description`. Tool finish
 adds `status` (`succeeded`, `failed`, `cancelled`, or `unknown`) and optional

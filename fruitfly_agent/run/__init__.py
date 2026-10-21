@@ -4,7 +4,6 @@ from .runtime.assembly import RuntimeAssembly, build_runtime
 from .runtime.manifest import RuntimeManifest
 from .application import RunApplicationFactory
 from .storage.artifacts import DataArtifactRef, DataArtifactStore
-from .evaluation import RunEvaluationController
 from .cli import create_parser, main, resolve_session_path, run_cli
 from .profiles import (
     HarnessSelection, RunConfigurationController, default_model_catalog_path,
@@ -18,7 +17,6 @@ __all__ = [
     "RunApplicationFactory",
     "DataArtifactRef",
     "DataArtifactStore",
-    "RunEvaluationController",
     "build_runtime",
     "HarnessSelection",
     "RunConfigurationController",

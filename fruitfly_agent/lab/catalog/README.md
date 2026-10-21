@@ -122,7 +122,7 @@ hosts do not branch on concrete algorithm names.
 
 ## Assemble host permissions
 
-[permissions.py](permissions.py) exports `PermissionPolicy` and `apply_permission_policy`. The latter attaches a generic authorizer and wraps the assembled execution environment. Run imports these public host entry points rather than concrete environment implementation modules. This host policy is not a selectable research algorithm and cannot be disabled by a model-edited mechanism selection.
+[permissions.py](permissions.py) exports `PermissionPolicy` and `apply_permission_policy`. The latter delegates to the selected policy’s `bind` method. The standard strategy attaches an authorizer and wraps the execution environment; `PermissionPolicy.unrestricted(workspace)` keeps the backend and allows tools explicitly. `prepare_environment` supplies the selected strategy’s process environment before installers run. Run imports these public host entry points rather than concrete environment implementation modules. This host policy is not a selectable research algorithm and cannot be disabled by a model-edited mechanism selection.
 
 `AssemblyContext.process_environment` supplies an explicit minimal environment to owned process backends. IPython uses it at process startup; Providers retain host-managed credentials.
 
@@ -147,6 +147,16 @@ values never enter metadata, parameters or manifests. Configuration consumes the
 same declaration to show set/missing status; Eval uses it to forward credentials
 to task containers without tool-specific branches. Setup form credentials remain
 independently declared through `MechanismSetup`; existing forms are unchanged.
+
+## Declare auxiliary model dependencies
+
+`MechanismDefinition.model_profiles(parameters)` optionally returns a tuple of
+non-empty model catalog labels. It receives normalized enabled parameters and
+must remain pure and offline. `catalog.required_model_profiles(selections)`
+validates and combines those declarations. An empty tuple means reuse the active
+model. Component improvement declares its optional editor model this way; Eval
+stages only the main and declared auxiliary models and their named credentials.
+Custom mechanisms requesting additional models must declare them.
 
 ## Register experiment dependencies
 

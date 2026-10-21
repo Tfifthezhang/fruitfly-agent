@@ -22,7 +22,7 @@ from unittest.mock import Mock, AsyncMock
 from fruitfly_agent.interactive.contracts.improvement import ImprovementPreview
 from fruitfly_agent.interactive.terminal.features.improvement.workflow_panel import WorkflowPanel
 
-def panel(choices, *, text=(), confirmed=False, benchmark=None):
+def panel(choices, *, text=(), confirmed=False):
     selection, values = iter(choices), iter(text)
     frames, notices = [], []
     def choose(title, rows, **options):
@@ -32,6 +32,6 @@ def panel(choices, *, text=(), confirmed=False, benchmark=None):
         return next(values)
     client = SimpleNamespace(workflow_preview=Mock(return_value=ImprovementPreview('rule', 'Rule', 'Costs', preview_token='token')))
     panel = WorkflowPanel(client=client, configuration=configuration(), choose=choose, read=read,
-        confirm=Mock(return_value=confirmed), report=notices.append, execute=AsyncMock(return_value=False), history=AsyncMock(), benchmark=benchmark)
+        confirm=Mock(return_value=confirmed), report=notices.append, execute=AsyncMock(return_value=False), history=AsyncMock())
     return panel, client, frames, notices
 

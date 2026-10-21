@@ -68,6 +68,13 @@ python3 -m venv .venv
 
 If no models are configured, the terminal opens **Add model**. Choose the service, enter its model ID and documented limits, and enter the API key with hidden input. Review and stage the model, then choose **Start new session** to save. For existing configuration, use **Configure → model → Add model…** or **Set API key…**. Setup checks are offline; live model requests use the network and may incur charges. Local tools run with your user permissions; use a dedicated workspace when trying unfamiliar tasks.
 
+The home menu keeps Start new session, Configure and Exit. **Configure → Restore
+default configuration** stages default harness settings while preserving the
+selected model and credentials. Save applies them to a new session. Eval uses an
+independent default profile and unrestricted tool execution inside task containers.
+See [restoration](CONFIGURATION.md#restore-default-configuration) and the
+[templates](examples/configuration/README.md).
+
 To explore the extension lifecycle without keys or network access:
 
 ```bash
@@ -102,7 +109,7 @@ For example, enable RLM-inspired externalization together with the IPython tool 
 | Add an algorithm | [Lab](fruitfly_agent/lab/README.md) · [Offline extension example](examples/extensions/README.md) |
 | Investigate and improve harness mechanisms | [Lab](fruitfly_agent/lab/README.md#improvement-and-rsi) · [Improvement](fruitfly_agent/lab/improvement/README.md) |
 | Verify, adopt, and continue across harness or improver versions | [RSI](fruitfly_agent/lab/rsi/README.md) |
-| Run external benchmarks | [Eval](eval/README.md) |
+| Evaluate the native Agent in Terminal-Bench 2.1 or SWE-bench containers | [Eval](eval/README.md) |
 | Develop and test | [Contributing](CONTRIBUTING.md) · [Tests](tests/README.md) |
 
 ## Project layout

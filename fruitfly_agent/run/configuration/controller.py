@@ -15,6 +15,7 @@ from .profile import (
     HarnessConfig,
     HarnessProfile,
     save_harness_config,
+    load_harness_config,
 )
 from fruitfly_agent.providers.registry import load_model_specs
 from fruitfly_agent.run.storage.artifacts import DataArtifactStore
@@ -36,8 +37,14 @@ class RunConfigurationController:
         artifact_store: DataArtifactStore | None = None,
         *,
         prompt_choices_provider=None,
+        read_only: bool = False,
+        secret_resolver=None,
+        default_config_path: Path | None = None,
     ) -> None:
         self._original = selection.config
+        self.read_only = read_only
+        self._secret_resolver = secret_resolver
+        self.default_config_path = default_config_path or selection.config_path.parent / "default-config.yaml"
         self._draft = selection.config
         self._selected = selection.profile.profile_id
         self._original_selected = selection.profile.profile_id
@@ -59,7 +66,28 @@ class RunConfigurationController:
         return self._draft.select(profile_id or self._selected)
 
     def stage_profile(self, profile: HarnessProfile) -> None:
+        self._assert_editable()
         self._replace_profile(profile)
+
+    def restore_defaults(self) -> ConfigurationActionResult:
+        """Stage default harness settings while preserving daily model/credential drafts."""
+        self._assert_editable()
+        if not self.default_config_path.is_file():
+            raise ValueError(f"default configuration not found: {self.default_config_path}")
+        baseline = load_harness_config(self.default_config_path).select()
+        self._catalog.resolve(baseline.mechanisms)
+        from fruitfly_agent.run.storage.prompts import resolve_base_prompt
+        resolve_base_prompt(baseline.prompt, self._artifact_store)
+        for reference in baseline.artifact_bindings.values():
+            self._artifact_store.read_text(reference)
+        current = self.profile()
+        models = self._models(current)
+        missing = set(self._catalog.required_model_profiles(baseline.mechanisms)) - models.keys()
+        if missing:
+            raise ValueError("default mechanisms require model profiles in the daily catalog: " + ", ".join(sorted(missing)))
+        self._replace_profile(replace(current, prompt=baseline.prompt, mechanisms=baseline.mechanisms,
+                                      artifact_bindings=baseline.artifact_bindings))
+        return _changed("restored default harness settings in the draft; model settings and credentials retained; save for a new session")
 
     @property
     def changed(self) -> bool:
@@ -89,6 +117,27 @@ class RunConfigurationController:
             selected_model = profile.model_profile
             warnings.append(str(exc))
             ready = False
+        if self._secret_resolver is not None and selected_model in models:
+            name = models[selected_model].provider.api_key_env
+            if not self._secret_resolver(name):
+                warnings.append(f"missing model credential: {name}")
+                ready = False
+        if self.read_only:
+            try:
+                credential_missing = [name for name in self._catalog.required_credentials(profile.mechanisms)
+                           if self._secret_resolver is not None and not self._secret_resolver(name)]
+                for name in self._catalog.required_model_profiles(profile.mechanisms):
+                    if name not in models:
+                        warnings.append(f"unknown auxiliary model profile {name!r}")
+                        ready = False
+                    elif self._secret_resolver is not None and not self._secret_resolver(models[name].provider.api_key_env):
+                        credential_missing.append(models[name].provider.api_key_env)
+                if credential_missing:
+                    warnings.append("missing credentials: " + ", ".join(credential_missing))
+                    ready = False
+            except (TypeError, ValueError) as exc:
+                warnings.append(str(exc))
+                ready = False
         try:
             self._catalog.resolve(profile.mechanisms)
         except (TypeError, ValueError) as exc:
@@ -151,6 +200,7 @@ class RunConfigurationController:
         )
 
     def select_profile(self, profile_id: str) -> ConfigurationActionResult:
+        self._assert_editable()
         self._draft.select(profile_id)
         self._selected = profile_id
         return _changed(
@@ -398,6 +448,7 @@ class RunConfigurationController:
         )
 
     def save(self) -> ConfigurationActionResult:
+        self._assert_editable()
         from fruitfly_agent.run.storage.prompts import resolve_base_prompt
         candidate = HarnessConfig(
             default_profile=self._selected,
@@ -442,12 +493,17 @@ class RunConfigurationController:
         )
 
     def _replace_profile(self, profile: HarnessProfile) -> None:
+        self._assert_editable()
         profiles = dict(self._draft.profiles)
         profiles[profile.profile_id] = profile
         self._draft = HarnessConfig(
             default_profile=self._draft.default_profile,
             profiles=profiles,
         )
+
+    def _assert_editable(self) -> None:
+        if self.read_only:
+            raise ValueError(f"default configuration is read-only in interaction; edit {self._path} manually")
 
     def _is_changed(self) -> bool:
         return (

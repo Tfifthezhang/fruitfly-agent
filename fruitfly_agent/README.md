@@ -15,7 +15,7 @@ FruitFlyAgent separates the Agent loop, model adapters, Application lifecycle, a
 | [Run](run/README.md) | Configuration, Provider construction, assembly, and CLI | All runtime layers |
 | [Eval](../eval/README.md) | Optional single-configuration benchmark execution and reports | Core, Providers, Lab, and Eval |
 
-Eval consumes public runtime capabilities. Removing it must leave normal Agent use and algorithm development intact.
+Eval installs and launches the native Agent CLI inside Harbor task environments, then collects official verifier results. Benchmark declarations remain in Eval. Removing it must leave normal Agent use and generic improvement intact.
 
 The [Improvement workflow](lab/improvement/README.md) separates candidate generation, execution, composition, selection, verification and reflection through public ports. Object-owned component adapters expose legal changes; Run and Application retain persistence and activation.
 
@@ -81,3 +81,9 @@ Recovery validates recorded contents and required artifacts, then continues with
 The [offline extension example](../examples/extensions/README.md) demonstrates registration, assembly, and interaction without model access. [Tests](../tests/README.md) enforce boundaries and covered behavior; [Lab limitations](lab/ALGORITHM_AUDIT.md) describe remaining constraints.
 
 Runtime authorization has a Core contract, a Lab file/execution policy, Interactive confirmation, and Run assembly. Standard Run protects known credential paths and asks for external file access and local code execution. See [Environment permissions](lab/environment/README.md#apply-lightweight-permissions). It does not provide OS isolation or sandbox arbitrary trusted Python plugins.
+
+Run's configuration menu restores default harness settings through its ordinary
+save/discard flow while preserving daily model selections. Eval consumes the
+independent default profile, freezes runtime inputs and explicitly selects an
+unrestricted host strategy inside task containers. Benchmark adapters do not
+define runtime configuration fields; tools and Core share one execution path.

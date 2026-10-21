@@ -35,8 +35,17 @@ environment and authorizer for its path namespace. Assembly records that
 authorizer's `identity()` when supplied, otherwise the host policy identity.
 Authentication values never enter either identity.
 
-## Bound isolated task execution
+## Run non-interactive tasks
 
-[trial_budget.py](trial_budget.py) provides `TrialInvocationBudget` and `BudgetedRegistry`: reserve before each main or auxiliary Provider call, cap output requests, share one allocation, and preserve normal resource cleanup. The generic [trial.py](../trial.py) entry composes the normal Application using frozen H/source/S and copied artifacts. It verifies resolved mechanisms and models before submitting the complete task, writes actual runtime/invocation receipts, and rejects changed source material.
+The public [CLI](../cli.py) selects `PermissionPolicy.unrestricted(workspace)`
+with `--unrestricted` for a fresh task in an externally isolated environment.
+Assembly uses the selected policy's `prepare_environment` and `bind` methods.
+The standard policy filters process variables and binds guarded authorization;
+the unrestricted policy retains the backend and installs an explicit allow
+handler. No tool or Core benchmark branch is required. Runtime manifests record
+the effective strategy. Timeout, cancellation and cleanup remain unchanged.
 
-The external executor owns environment isolation. A trial packet explicitly authorizes ordinary local operations in its isolated workspace; standard protected credential paths remain denied. This does not change normal interactive authorization. Frozen state copies may change within a trial and are discarded as production learning state. Cancellation writes the available receipt and closes owned resources. Pre-construction errors may have no invocation receipt; unknown work is not assumed free or replayed. See [Original task experiments](../../lab/improvement/README.md).
+`--approve-tools` retains ordinary single-call approvals and protected checks.
+Both flags reject interactive/resumed launches and conflict with each other.
+Eval invokes `--unrestricted` inside Harbor task environments. Agent configuration
+contains no permission preference.

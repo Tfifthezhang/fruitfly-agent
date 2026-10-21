@@ -46,7 +46,7 @@ Frontends consume Application and Interactive events. They do not construct Prov
 | `task_packs`: [TaskPackService](contracts/task_packs.py) | Read task materials and save corrections. Does not require improvement or candidate services. |
 | `authorization`: [AuthorizationService](interaction/authorization.py) | Serialize permission requests and retain grants for this runtime only. |
 
-Configuration and model setup come from the injected RuntimeFactory/controller. Benchmark task selection is an optional frontend capability; confirmed work uses Application improvement jobs. Run binds concrete implementations; Interactive imports neither Run, Lab, Providers, nor Eval.
+Configuration and model setup come from the injected RuntimeFactory/controller. Confirmed generic improvement uses Application jobs. Run binds concrete implementations; Interactive imports neither Run, Lab, Providers, nor Eval.
 
 Each runtime capability is optional and independently injected. Use explicit `candidates=` and `task_packs=` fields even when one object implements several contracts. Missing query capabilities return empty candidate lists or unavailable material status; operations requiring a missing service raise an explicit error. Protocol and view definitions belong to `contracts/`. The package-level `fruitfly_agent.interactive` API exports the usual Application, concrete RuntimeHandle, Session, views, and terminal entries. Internal consumers import their owning modules directly.
 
@@ -56,7 +56,7 @@ To add a frontend, consume Application's public operations and the capability pr
 
 Replacement paths share preparation and retirement: start resources, bind events, invoke activation, then switch the active handle. Failed replacement keeps the active handle; failure to retire the previous handle is exposed through `last_error` after a successful switch. Configuration writes and external side effects do not automatically roll back. No source hot reload or cross-process activation transaction. Improvement progress covers the current batch, not overall search completion.
 
-Resume continues canonical history in the original file with the selected current configuration. Discovery exposes availability/reasons rather than filtering by the active manifest digest. Run records changed environments after successful startup; history display never triggers model/tool replay. `/improvement` selects saved task packages or benchmark tasks for a bounded iterative improvement job. One experiment panel edits target, tasks, goal, method and budget; H/S/I are target labels. Results and history include empty/failed/cancelled experiments, and candidates remain subject to human adoption. Daily material recording is independently configured under learning. Benchmark preparation, baseline and iteration share the Application job lifecycle; standalone evaluation remains in the optional Eval CLI.
+Resume continues canonical history in the original file with the selected current configuration. Discovery exposes availability/reasons rather than filtering by the active manifest digest. Run records changed environments after successful startup; history display never triggers model/tool replay. `/improvement` selects current instructions, explicit input files or saved task packages for a bounded component workflow. One experiment panel edits target, tasks, goal, method and budget; H/S/I are target labels. Results and history include empty/failed/cancelled experiments, and candidates remain subject to human adoption. Daily material recording is independently configured under learning. Container benchmark evaluation belongs to the optional external Eval CLI.
 
 ## Modules
 
@@ -91,6 +91,12 @@ Async cancellation cannot preempt synchronous file I/O, abandoned thread work, o
 
 [authorization.py](interaction/authorization.py) provides `AuthorizationService`, owned by `RuntimeHandle.authorization`. Requests are serialized and use `AuthorizationRequested` / `AuthorizationResolved` events. A frontend replies with `respond(request_id, "once" | "session" | "deny")`; stale replies are rejected. Prompt bodies are not retained in the interactive trace.
 
-Application hosts can enable interactive replies with `enable_authorization()` or inject an asynchronous decision handler with `set_authorization_handler(handler)`. Without either, requests are denied. Confirmation expires after 300 seconds by default. Cancellation interrupts pending waits. `clear_authorizations()` revokes remembered grants and denies a pending request. It does not undo completed effects or preempt an already authorized operation.
+Application hosts enable interactive replies with `enable_authorization()` or
+inject an asynchronous handler with `set_authorization_handler(handler)`. Without
+either, requests are denied. Confirmation expires after 300 seconds by default.
+Cancellation interrupts waits. `clear_authorizations()` revokes remembered grants
+and denies pending requests without undoing completed effects or preempting
+already authorized work. Hosts selecting unrestricted execution do not invoke
+this confirmation service.
 
 Single approval belongs to one call. Session file approvals cover the displayed directories and operation; a read grant does not authorize writes. Local-execution session approval explicitly grants current-user code execution. Grants exist only in the runtime service, are absent from Session records, and are cleared on close; replacement/restoration constructs a fresh service. Embedded hosts can observe configured roots and grant/pending state through `Application.status` without authorizing anything; the terminal `/status` omits these details.

@@ -22,15 +22,16 @@ def _fields(data: Mapping[str, Any], allowed: set[str], name: str) -> None:
 
 @dataclass(frozen=True)
 class RuntimeReference:
-    config_path: str
-    profile: str
-    working_directory: str
+    config_path: str | None = None
+    profile: str | None = None
+    working_directory: str = "."
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> RuntimeReference:
         _fields(data, {"config_path", "profile", "working_directory"}, "runtime")
-        return cls(*(_text(data.get(key), "runtime." + key)
-                     for key in ("config_path", "profile", "working_directory")))
+        return cls(config_path=_text(data["config_path"], "runtime.config_path") if data.get("config_path") is not None else None,
+                   profile=_text(data["profile"], "runtime.profile") if data.get("profile") is not None else None,
+                   working_directory=_text(data.get("working_directory", "."), "runtime.working_directory"))
 
 
 @dataclass(frozen=True)
@@ -78,7 +79,7 @@ class EvaluationRequest:
         _fields(data, {"schema_version", "runtime", "benchmark", "execution"}, "request")
         values = {}
         for key in ("runtime", "benchmark", "execution"):
-            value = data.get(key, {} if key == "execution" else None)
+            value = data.get(key, {} if key in {"execution", "runtime"} else None)
             if not isinstance(value, Mapping):
                 raise ValueError(f"{key} must be an object")
             values[key] = value

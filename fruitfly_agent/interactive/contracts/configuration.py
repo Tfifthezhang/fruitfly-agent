@@ -99,6 +99,11 @@ class ConfigurationLaunchResult:
     remember_tokens: tuple[str, ...] = ()
 
 
+class DefaultConfiguration(Protocol):
+    """Optional host operation staging default harness settings for a new session."""
+    def restore_defaults(self) -> ConfigurationActionResult: ...
+
+
 @dataclass(frozen=True)
 class StartupVersion:
     token: str
@@ -152,6 +157,7 @@ __all__ = [
     "ConfigurationActionResult",
     "ConfigurationLaunchResult",
     "ConfigurationController",
+    "DefaultConfiguration",
     "StartupVersion",
     "StartupVersions",
 ]

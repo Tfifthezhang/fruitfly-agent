@@ -215,5 +215,17 @@ class LabCatalog:
         return tuple(sorted({name for item in self.resolve(selections)
                              for name in item.definition.required_credentials(item.parameters)}))
 
+    def required_model_profiles(self, selections: Sequence[MechanismSelection]) -> tuple[str, ...]:
+        """Discover auxiliary model dependencies without constructing Providers."""
+        names = set()
+        for item in self.resolve(selections):
+            if item.definition.model_profiles is None:
+                continue
+            references = item.definition.model_profiles(item.parameters)
+            if not isinstance(references, tuple) or any(not isinstance(n, str) or not n.strip() for n in references):
+                raise ValueError("model_profiles must return a tuple of non-empty model labels")
+            names.update(references)
+        return tuple(sorted(names))
+
 
 __all__ = ["LabCatalog"]

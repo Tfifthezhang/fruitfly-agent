@@ -89,6 +89,7 @@ class MechanismDefinition:
     input_parameters: tuple[str, ...] = ()
     setup: MechanismSetup | None = None
     credential_variables: Callable[[Mapping[str, Any]], tuple[str, ...]] | None = None
+    model_profiles: Callable[[Mapping[str, Any]], tuple[str, ...]] | None = None
     prepare_targets: Callable[[Any, Any], Any] | None = None
 
     def __post_init__(self) -> None:
@@ -114,6 +115,8 @@ class MechanismDefinition:
             raise TypeError("parameter validator must be callable")
         if self.credential_variables is not None and not callable(self.credential_variables):
             raise TypeError("credential_variables must be callable")
+        if self.model_profiles is not None and not callable(self.model_profiles):
+            raise TypeError("model_profiles must be callable")
         if not callable(self.install):
             raise TypeError("mechanism installer must be callable")
         if self.selection_group is not None and not _ID.fullmatch(self.selection_group):

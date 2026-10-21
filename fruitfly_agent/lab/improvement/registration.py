@@ -24,6 +24,7 @@ def definition():
         install_order=76, effects=MechanismEffects(uses_provider=True, uses_network=True, writes_files=True,
             cost_notice="Explicit improvement runs call models and execute tasks; registration makes no requests.")),
         _install, visible=False, implementation_id='component-workflow-v1',
+        model_profiles=lambda parameters: (parameters['editor_profile'],) if parameters['editor_profile'] else (),
         artifact_slots=frozenset({'improvement-editor'}), prepare_targets=_prepare_targets,
         implementation_path='fruitfly_agent/lab/improvement/registration.py',
         documentation_path='fruitfly_agent/lab/improvement/README.md')

@@ -12,13 +12,43 @@ Keep model specifications, secrets, and runtime selections in separate files.
 | Model catalog | `.fruitfly/models.yaml` in the working directory | API protocol, model ID, endpoint, capabilities, limits, and key variable name |
 | Secrets | `.fruitfly/secrets.env` or process environment | API keys and SSH account/password values |
 | Harness configuration | `.fruitfly/config.yaml` | Profiles, catalog path, model choice, prompt references, and mechanism parameters |
+| Default configuration | `.fruitfly/default-config.yaml` | Independent baseline; editable manually, read-only in terminal configuration |
+| Default model catalog | `.fruitfly/default-models.yaml` | Baseline model settings; may reference the same key variable as daily models |
 | CLI overrides | Startup arguments | Workspace, configuration, profile, and session selection |
 
-`--cwd`, `--config`, and `--profile` select the process's workspace and configuration. A relative `model.catalog` path resolves from the harness configuration file. The configuration menu saves choices for the next session; an active or resumed session keeps its validated runtime identity.
+`--cwd`, `--config`, and `--profile` select the process's workspace and configuration. `--approve-tools` explicitly answers tool confirmation requests for a fresh non-interactive task in a trusted isolated environment; protected paths remain denied. A relative `model.catalog` path resolves from the harness configuration file. The configuration menu saves choices for the next session; an active or resumed session keeps its validated runtime identity.
 
 The Agent CLI reads `.fruitfly/secrets.env` from the selected workspace, including when using `--cwd`. Process environment values take precedence over that file, including explicit empty values. It does not fall back to another workspace's secret file.
 
 Model discovery prefers `.fruitfly/models.yaml` and accepts root `models.yaml` when the new catalog is absent. A saved or explicitly selected catalog path always takes precedence. Secrets use `.fruitfly/secrets.env`, falling back to root `.env` only when the new file is absent. Files are never merged. The CLI reports when both old and new files exist. Existing workspace-local catalogs and credential files keep their selected locations when edited through the wizard.
+
+## Restore default configuration
+
+The home menu has **Start new session**, **Configure**, and **Exit**. In Configure
+or `/config`, **Restore default configuration** is the final action before Back.
+It reads `.fruitfly/default-config.yaml` and stages its prompt, mechanisms,
+parameters and artifact bindings in the selected daily profile. Existing model
+selection, catalog, credentials and other profiles remain unchanged. Experiment
+bindings absent from the defaults are removed from the draft.
+
+Review or adjust the draft, then save for a new session. Discard restores the
+previous saved choices. The active session is unchanged. Missing/invalid defaults
+leave the draft unchanged; declared auxiliary models must exist in the daily
+catalog. Each restoration reloads the file so manual edits are available immediately.
+
+Copy [default-config.example.yaml](examples/configuration/default-config.example.yaml) and
+[default-models.example.yaml](examples/configuration/default-models.example.yaml) to their
+default paths only when absent. The template enables local execution, basic
+read/Bash/edit/write tools and explicitly parameterized compaction. Default files
+are edited manually. Explicit `--config .fruitfly/default-config.yaml` selections
+have a read-only terminal controller.
+
+[Eval](eval/README.md) uses the complete default profile, including its independent
+model catalog, unless the request explicitly selects another configuration. The
+two catalogs may reference the same key variable, such as `DEEPSEEK_API_KEY`.
+Use distinct `api_key_env` names only for different credentials; updating a shared
+key affects subsequent use of both catalogs. Keep values in the secret environment.
+Agent configuration does not select an execution-permission policy.
 
 ## Relocate workspace configuration
 
@@ -33,7 +63,7 @@ Use `--config path/to/custom.yaml` to update a custom harness file. The operatio
 
 ## Configure a model
 
-Run the interactive CLI. If no models are available, **Add model** opens automatically. Otherwise use **Configure → model → Add model…**. Choose a supported service, enter the model ID and documented token limits, and enter the key with hidden input. Custom services need a base URL. Review and stage the settings; **Start new session** or **Save and start new session** persists them.
+Run the interactive CLI. **Add model** opens when no models are available; otherwise use **Configure → model → Add model…**. Choose a supported service, enter the model ID and documented token limits, and enter the key with hidden input. Custom services need a base URL. Review and stage the settings; **Start new session** or **Save and start new session** persists them.
 
 | Service option | Use when |
 |---|---|
@@ -105,7 +135,7 @@ The capability page uses arrows and Space/Enter to toggle, then **Continue** to 
 
 | Selection | Default / behavior | Reference |
 |---|---|---|
-| Base prompt | `assistant-default`; choose another prompt in **Configure → prompt**. | [Base prompt](fruitfly_agent/lab/base_prompt/README.md) |
+| Base prompt | `assistant-default`; choose another prompt in **Configure → prompt** or `/config`. | [Base prompt](fruitfly_agent/lab/base_prompt/README.md) |
 | Skill catalog | Read `.skills/`; enable in **Context → Context augmentation → Skill catalog** (Space toggles; the phase is a section heading). | [Skills](fruitfly_agent/lab/context_manager/augmentation/skills/README.md) |
 | Reduction | Summarizing; expand Reduction to edit typed parameters, or use YAML. | [Reduction](fruitfly_agent/lab/context_manager/reduction/README.md) |
 | Improvement | Choose materials, components, generator, exploration, allocations and scope in `/improvement`; no per-algorithm switch. | [Improvement](fruitfly_agent/lab/improvement/README.md) |
@@ -175,9 +205,33 @@ With no initial choice, a sole catalog entry is selected automatically. Multiple
 
 Referenced results remain protected. Failed or cancelled searches do not replace a complete candidate. Editing a readable export does not change the runtime. See [Improvement](fruitfly_agent/lab/improvement/README.md#results-and-retention) for retention and [Run](fruitfly_agent/run/README.md#recovery) for compatibility rules.
 
-## Configure host permissions
+## Host execution policies
 
-The standard Run host uses a lightweight file and local-execution policy. Additional roots and sensitive paths are supplied through `RunApplicationFactory(permission_policy=...)` or `build_runtime(permission_policy=...)`, using `PermissionPolicy` from `fruitfly_agent.lab.catalog`. They are not YAML model or harness parameters. See [Run permission policy](fruitfly_agent/run/README.md#bind-host-permission-policy) and [Environment permissions](fruitfly_agent/lab/environment/README.md#apply-lightweight-permissions).
+The standard interactive host uses its built-in guarded strategy: ordinary
+workspace files are accessible, credential paths are protected, and external
+file access or code execution requests confirmation. There is no permission
+configuration file or menu. Embedded hosts can inject `PermissionPolicy` through
+`RunApplicationFactory(permission_policy=...)` or `build_runtime(permission_policy=...)`.
+Model/harness YAML cannot select or expand host permissions.
+
+| Launch | Tool execution |
+|---|---|
+| Normal interactive/headless | Guarded; unavailable confirmation means deny |
+| Fresh headless `--approve-tools` | Approve ordinary confirmation requests once; protected checks remain |
+| Fresh headless `--unrestricted` | Skip application permission checks, preserve the backend and its task environment |
+
+`--unrestricted` requires a new non-interactive task, rejects resume and conflicts
+with `--approve-tools`. It does not detect Docker or create isolation. Eval passes
+it explicitly inside Harbor task containers; Harbor/Docker bound filesystem,
+process and network access. Timeout, cancellation, cleanup and logging still run.
+The unrestricted strategy permits access to files normally protected by the
+application, including credential and Session paths. Reports identify this mode.
+
+Host code can construct the same strategy with `PermissionPolicy.unrestricted(workspace)`.
+Assembly calls `prepare_environment` and `bind` on the chosen strategy; tools and
+Agent algorithms share the same execution path. No benchmark conditions enter
+Core. See [Run](fruitfly_agent/run/README.md#bind-host-permission-policy) and
+[Environment](fruitfly_agent/lab/environment/README.md#select-an-execution-strategy).
 
 Configuration forms share a credential draft saved alongside harness/model changes.
 SSH account/password input uses the same hidden-input and ignored secret-file

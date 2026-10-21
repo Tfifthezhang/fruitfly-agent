@@ -10,7 +10,7 @@ Use FruitFlyAgent through stdin/stdout, menus, and live events. Application owns
 |---|---|
 | Start | Run `python -m fruitfly_agent`; choose **Start new session**. |
 | Configure | `/config`; save choices for a new session. |
-| Select a prompt | **Configure → prompt**; preview and confirm. |
+| Select a prompt | **Configure → prompt** or `/config`; preview and confirm. |
 | Inspect activity | `/status`: model, prompt, workspace, session, message count, state, queue, pending candidates, context usage percentage, and session compaction count. |
 | Cancel active work | `/cancel` or the first Ctrl+C; clear pending Application input. |
 | Exit | `/exit`, `/quit`, or a second Ctrl+C within three seconds; drain cancelled work before resource cleanup. |
@@ -34,6 +34,12 @@ Tool calls show names without arguments. Tool results show at most 800 character
 Cancelled or failed restoration keeps the current session and does not display the target history. Embedding hosts can optionally expose `conversation()` using the [Interactive views](../README.md#state-and-events); existing terminal hosts without it continue to work. A single-task CLI run with `--resume` continues saved context without printing the historical conversation.
 
 ## Configure
+
+The home menu retains Start new session, Configure and Exit. **Restore default
+configuration** appears immediately before Back in Configure and `/config`. It
+stages the default prompt, mechanisms and bindings while preserving the current
+model and credentials. Review and save for a new session or discard the changes.
+Default files are edited manually. No permission configuration page is supplied.
 
 | Menu | Behavior |
 |---|---|
@@ -63,7 +69,10 @@ history, cancellation and staging behavior. The host owns secret-file writes.
 
 ## Improve against a task set
 
-`/improvement [DIRECTION]` opens Target, Task, Budget and Evaluation on one panel. Expand Target, choose an object, then its algorithm below it. H/S/I are section labels. Algorithms show concise descriptions; Details reveals implementation/guide paths and YAML locations. Optional Search guidance remains editable inline; internal tuning uses the configuration location in Details. Task expands saved/benchmark sources and material fields; Budget expands limits; Evaluation exposes scoring, acceptance and preview details. New drafts require explicit target/algorithm selection. Compatible values survive changes; missing inputs remain visible. Field editing retains the panel and focus while displaying live text and validation hints.
+`/improvement [DIRECTION]` opens a component workflow panel. Choose current
+instructions and input files or a saved package, editable components, a generator,
+exploration, budget, verification and effect scope. H/S/I identify component
+ownership. Review the frozen preview before one explicit submission.
 
 | Action | Behavior |
 |---|---|
@@ -79,13 +88,7 @@ history, cancellation and staging behavior. The host owns secret-file writes.
 
 Back/Esc cancels active field input, then collapses a section, then returns to chat. Draft fields remain intact. `q` exits menu mode and is literal text during field input. Cyan focus and green enabled/selected markers remain distinct; Modified/warnings use yellow and errors use red. Section titles and indentation express hierarchy. Raw-key menus omit row numbers; line fallback retains them. `NO_COLOR` preserves symbols and text. Confirmation always starts with Cancel selected. Detail actions default to Back; `n`/`p` switch sections, PageUp/PageDown page text. Numbered fallback accepts next/previous and pageup/pagedown. Cancellation and outcomes remain visible after restoring chat. Candidates are already stored and do not guarantee improvement.
 
-Saved tasks and benchmarks use the same running/result flow. Raw TTY input polls through the existing reader to refresh progress and offer return/cancel actions. Redirected/non-polling input waits for completion and cannot consume `/cancel` during the wait. Progress measures the current batch, not overall completion. Results expose the stop reason and measured evidence even when no candidate is published. See the [feature guide](features/improvement/README.md).
-
-## Use benchmark tasks
-
-Set **Task** to a benchmark/task-set row, then choose **Start improvement** and confirm. One Application job prepares/freeze tasks and runs baseline, failure processing, candidate search, original-task comparisons and independent confirmation. No separate initial evaluation or enable switch is required. Full original-task output and logs remain observable; missing execution capabilities/preflight checks explain why a source is unavailable.
-
-Benchmark sources are optional. Saved packages and candidates remain available without Eval. Standalone reports use the [Eval CLI](../../../eval/README.md). Containers, downloads and model calls may incur cost. Current source choices use five tasks and a 3/1/1 split, suitable for examining control flow rather than establishing general quality.
+Current tasks and saved packages use the same running/result flow. Raw TTY input polls through the existing reader to refresh progress and offer return/cancel actions. Redirected/non-polling input waits for completion and cannot consume `/cancel` during the wait. Progress measures the current batch, not overall completion. Results expose the stop reason and measured evidence even when no candidate is published. See the [feature guide](features/improvement/README.md).
 
 ## Register a command
 

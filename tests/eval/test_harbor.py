@@ -12,15 +12,11 @@ from unittest.mock import AsyncMock, patch
 
 import yaml
 
-from eval.benchmarks.harbor import (
-    _runtime_files,
-    _harbor_executable,
-    _load_harbor_job_result,
-    _forward_agent_events,
-    _forward_logs,
-    _forward_trial_results,
-    _run_harbor_job,
-    parse_harbor_job_result,
+from eval.benchmarks.harbor import _harbor_executable
+from eval.runtime import prepare_runtime
+from eval.results import load_harbor_job_result, parse_harbor_job_result
+from eval.runner import (
+    _forward_agent_events, _forward_logs, _forward_trial_results, run_harbor_job,
 )
 from eval.benchmarks.swe_bench import SWEBenchAdapter
 from eval.benchmarks.base import PreflightResult
@@ -45,8 +41,8 @@ class HarborAdapterTests(unittest.TestCase):
         adapter = SWEBenchAdapter()
         with patch.dict("os.environ", {"TEST_API_KEY": "process-placeholder"}, clear=True), patch.object(
             adapter, "preflight", return_value=PreflightResult(True, (), ("offline-harbor",))
-        ), patch("eval.benchmarks.harbor._runtime_files", return_value=(root / "config", root / "models", ("TEST_API_KEY",))), patch(
-            "eval.benchmarks.harbor._run_harbor_job", return_value=(1, "offline stop")
+        ), patch("eval.benchmarks.harbor.prepare_runtime", return_value=(root / "config", root / "models", ("TEST_API_KEY",))), patch(
+            "eval.benchmarks.harbor.run_harbor_job", return_value=(1, "offline stop")
         ) as job, patch("eval.benchmarks.harbor.resolve_installation", return_value=root), patch("sys.stderr"):
             with self.assertRaisesRegex(RuntimeError, "offline stop"):
                 adapter.run(request_path=request, result_path=root / "result.json", variant="smoke")
@@ -68,7 +64,7 @@ class HarborAdapterTests(unittest.TestCase):
                 "time.sleep(0.5)"
             )
             updates = []
-            code, detail = _run_harbor_job(
+            code, detail = run_harbor_job(
                 [sys.executable, "-c", script], environment={}, timeout=5,
                 job_root=root, progress=updates.append,
                 job_id="current",
@@ -93,7 +89,7 @@ class HarborAdapterTests(unittest.TestCase):
                 updates.append(event)
                 released.touch()  # The child cannot finish until progress arrives.
 
-            code, detail = _run_harbor_job(
+            code, detail = run_harbor_job(
                 [sys.executable, "-c", script], environment={}, timeout=5,
                 job_root=root, progress=observe, job_id="current",
             )
@@ -122,7 +118,7 @@ class HarborAdapterTests(unittest.TestCase):
                 if event["type"] == "log" and "early output" in event["text"]:
                     released.touch()
 
-            code, _ = _run_harbor_job(
+            code, _ = run_harbor_job(
                 [sys.executable, "-u", "-c", script], environment={}, timeout=5,
                 job_root=root, progress=observe, job_id="current",
             )
@@ -277,16 +273,17 @@ class HarborAdapterTests(unittest.TestCase):
     def test_transient_registry_failure_retries_before_job_and_keeps_logs(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            (root / "artifacts").mkdir()  # Staged Agent inputs are not a started Harbor job.
             count = root / "count"
             script = (
                 "from pathlib import Path; import sys; "
                 f"p=Path({str(count)!r}); "
                 "n=int(p.read_text())+1 if p.exists() else 1; p.write_text(str(n)); "
-                "print('ConnectError: Error getting dataset terminal-bench@2.0' if n==1 else 'registry ready',flush=True); "
+                "print('ConnectError: Error getting dataset terminal-bench/terminal-bench-2-1' if n==1 else 'registry ready',flush=True); "
                 "sys.exit(1 if n==1 else 0)"
             )
             updates = []
-            code, _ = _run_harbor_job([sys.executable, "-u", "-c", script], environment={}, timeout=5, job_root=root, progress=updates.append, job_id="current")
+            code, _ = run_harbor_job([sys.executable, "-u", "-c", script], environment={}, timeout=5, job_root=root, progress=updates.append, job_id="current")
             self.assertEqual(code, 0)
             self.assertEqual(count.read_text(), "2")
             self.assertIn("ConnectError", (root / "harbor-attempt-1.log").read_text())
@@ -299,8 +296,8 @@ class HarborAdapterTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "job").mkdir()
-            script = "print('ConnectError: Error getting dataset terminal-bench@2.0'); raise SystemExit(1)"
-            code, _ = _run_harbor_job([sys.executable, "-c", script], environment={}, timeout=5, job_root=root, progress=None, job_id="current")
+            script = "print('ConnectError: Error getting dataset terminal-bench/terminal-bench-2-1'); raise SystemExit(1)"
+            code, _ = run_harbor_job([sys.executable, "-c", script], environment={}, timeout=5, job_root=root, progress=None, job_id="current")
             self.assertEqual(code, 1)
             self.assertFalse((root / "harbor-attempt-1.log").exists())
 
@@ -509,7 +506,7 @@ class HarborAdapterTests(unittest.TestCase):
             )
 
             trials, metrics = parse_harbor_job_result(
-                _load_harbor_job_result(job / "result.json"),
+                load_harbor_job_result(job / "result.json"),
                 job_id="current",
             )
 
@@ -523,7 +520,7 @@ class HarborAdapterTests(unittest.TestCase):
             path = Path(directory) / "result.json"
             path.write_text('{"n_total_trials": 1}', encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "0 of 1 trial result files"):
-                _load_harbor_job_result(path)
+                load_harbor_job_result(path)
 
     def test_actual_runtime_is_reported_without_comparing_it_to_a_frozen_identity(self):
         actual = {"digest": "sha256:actual", "models": {"main": {"model": "actual-model"}}}
@@ -585,9 +582,8 @@ profiles:
             models_path.write_text(
                 """models:
   test:
-    provider:
-      type: openai
-      api_key_env: TEST_API_KEY
+    provider: openai
+    api_key_env: TEST_API_KEY
     model: test-model
     context_window: 8192
     max_output_tokens: 1024
@@ -596,7 +592,7 @@ profiles:
             )
             output = root / "runtime"
             output.mkdir()
-            generated, copied_models, secret_names = _runtime_files(
+            generated, copied_models, secret_names = prepare_runtime(
                 runtime={"config_path": str(config_path), "profile": "default"},
                 output_dir=output,
             )
@@ -608,13 +604,16 @@ profiles:
                 "/installed-agent/fruitfly/runtime/models.yaml",
             )
             self.assertEqual(enabled, {"compaction": True})
-            self.assertEqual(copied_models.read_text(), models_path.read_text())
+            copied = yaml.safe_load(copied_models.read_text())["models"]["test"]
+            self.assertEqual(copied["model"], "test-model")
+            self.assertEqual(copied["api_key_env"], "TEST_API_KEY")
+            self.assertEqual(copied["max_output_tokens"], 1024)
             self.assertEqual(secret_names, ("TEST_API_KEY",))
 
     def test_runtime_forwards_independent_web_secrets_with_defaults_and_overrides(self) -> None:
         root = Path(self.enterContext(tempfile.TemporaryDirectory()))
         (root / "models.yaml").write_text(yaml.safe_dump({"models": {
-            "test": {"api_key_env": "MODEL_KEY"}}}))
+            "test": {"provider": "openai", "model": "fake", "context_window": 8192, "api_key_env": "MODEL_KEY"}}}))
         for backend, search_key, fetch_key, expected in (
             ("deepseek", "", "", {"DEEPSEEK_SEARCH_API_KEY", "DEEPSEEK_FETCH_API_KEY"}),
             ("deepseek", "SEARCH_ONLY", "FETCH_ONLY", {"SEARCH_ONLY", "FETCH_ONLY"}),
@@ -628,20 +627,25 @@ profiles:
                     {"id": "web-fetch-tool", "parameters": {"backend": "deepseek" if backend == "deepseek" else "direct", "api_key_env": fetch_key}},
                 ]
                 config = root / "config.yaml"
-                config.write_text(yaml.safe_dump({"profiles": {"default": {
+                config.write_text(yaml.safe_dump({"schema_version": 1, "default_profile": "default", "profiles": {"default": {
                     "model": {"catalog": "models.yaml"}, "mechanisms": mechanisms}}}))
                 output = root / "runtime"
                 output.mkdir(exist_ok=True)
-                generated, _, names = _runtime_files(
+                generated, _, names = prepare_runtime(
                     runtime={"config_path": str(config), "profile": "default"}, output_dir=output)
                 self.assertEqual(expected | {"MODEL_KEY"}, set(names))
                 self.assertNotIn("DISABLED_KEY", names)
-                self.assertEqual(mechanisms, yaml.safe_load(generated.read_text())["profiles"]["default"]["mechanisms"])
+                staged = yaml.safe_load(generated.read_text())["profiles"]["default"]["mechanisms"]
+                self.assertEqual([m["id"] for m in mechanisms], [m["id"] for m in staged])
+                for original, copied in zip(mechanisms, staged):
+                    self.assertEqual(copied["enabled"], original.get("enabled", True))
+                    for key, value in original.get("parameters", {}).items():
+                        self.assertEqual(copied["parameters"][key], value)
 
     def test_runtime_collects_non_web_component_credentials_through_catalog(self) -> None:
         root = Path(self.enterContext(tempfile.TemporaryDirectory()))
-        (root / "models.yaml").write_text("models: {test: {api_key_env: MODEL_KEY}}")
-        (root / "config.yaml").write_text(yaml.safe_dump({"profiles": {"default": {
+        (root / "models.yaml").write_text("models: {test: {provider: openai, model: fake, context_window: 8192, api_key_env: MODEL_KEY}}")
+        (root / "config.yaml").write_text(yaml.safe_dump({"schema_version": 1, "default_profile": "default", "profiles": {"default": {
             "model": {"catalog": "models.yaml"}, "mechanisms": [{"id": "fixture-resource"}]}}}))
         definition = MechanismDefinition(
             MechanismDescriptor("fixture-resource", "Fixture resource", "Fixture credential consumer.",
@@ -650,8 +654,8 @@ profiles:
             credential_variables=lambda parameters: ("RESOURCE_KEY",),
             implementation_path="tests/eval/test_harbor.py", documentation_path="tests/eval/README.md")
         (root / "runtime").mkdir()
-        with patch("eval.benchmarks.harbor.builtin_catalog", return_value=builtin_catalog().extended((definition,))):
-            _, _, names = _runtime_files(runtime={"config_path": str(root / "config.yaml"), "profile": "default"},
+        with patch("eval.runtime.builtin_catalog", return_value=builtin_catalog().extended((definition,))):
+            _, _, names = prepare_runtime(runtime={"config_path": str(root / "config.yaml"), "profile": "default"},
                                          output_dir=root / "runtime")
         self.assertEqual(("MODEL_KEY", "RESOURCE_KEY"), names)
 
@@ -709,6 +713,12 @@ profiles:
 
         self.assertIsNone(context.metadata)
         agent.exec_as_agent.assert_awaited_once()
+        command = agent.exec_as_agent.call_args.kwargs["command"]
+        self.assertIn("--unrestricted", command)
+        self.assertNotIn("--approve-tools", command)
+        self.assertNotIn("--permissions", command)
+        self.assertIn("/logs/agent/session.jsonl -- task", command)
+        self.assertTrue(agent.capabilities.atif)
 
 
 if __name__ == "__main__":

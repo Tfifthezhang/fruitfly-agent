@@ -47,6 +47,12 @@ The standard host allows ordinary workspace file operations, protects known cred
 
 ## Run and resume
 
+Use **Configure → Restore default configuration** to stage the default tools,
+environment, algorithms and prompt. The action retains your model and credentials;
+review and save for a new session or discard the draft. Prepare the
+[default templates](examples/configuration/README.md) before restoring. Default
+files are edited manually. Eval uses their complete profile inside task containers.
+
 After initial configuration:
 
 ```bash

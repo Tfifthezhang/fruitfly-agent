@@ -13,6 +13,12 @@ from tests.support.evaluation import request_payload
 
 
 class EvalCliTests(unittest.TestCase):
+    def test_improvement_only_commands_and_catalog_option_are_rejected(self) -> None:
+        for command in (["prepare"], ["trial"], ["catalog", "--improvement"]):
+            with self.subTest(command=command), redirect_stderr(StringIO()), self.assertRaises(SystemExit) as raised:
+                main(command)
+            self.assertEqual(raised.exception.code, 2)
+
     def test_removed_plan_command_is_rejected(self) -> None:
         errors = StringIO()
         with redirect_stderr(errors), self.assertRaises(SystemExit) as raised:

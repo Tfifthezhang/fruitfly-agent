@@ -30,3 +30,5 @@ Experiment records use their independent schema version 1. History retains candi
 ```
 
 [snapshots.py](snapshots.py) stores verified text trees and materializes fresh directories. [versions.py](versions.py) stores H/I/S and modification manifests with verified referenced contents. Source snapshots include package Python files and declared build inputs, excluding local sessions, secrets and caches. Candidate compaction follows structured artifact references and protects experiment manifests before collecting obsolete prompt text. Hashes describing task/trace identities need not identify stored artifacts.
+
+Content-addressed artifact files use the bare lowercase SHA-256 digest as the filename under `.fruitfly/artifacts/`. External consumers can copy explicitly referenced immutable files after checking their content hash; they must not copy the whole workspace store or infer mutable learning state from it.

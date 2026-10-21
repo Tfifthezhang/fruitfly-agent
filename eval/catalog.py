@@ -41,6 +41,7 @@ class BenchmarkCatalog:
                     "label": descriptor.label,
                     "description": descriptor.description,
                     "version": descriptor.version,
+                    "dataset": descriptor.dataset,
                     "adapter_version": descriptor.adapter_version,
                     "metrics": list(descriptor.metric_names),
                     "network": dict(descriptor.network),

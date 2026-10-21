@@ -5,7 +5,7 @@
 Refine registered Agent components using task execution evidence. The public
 [API](api.py) separates candidate generation, execution, composition, selection,
 verification, reflection and activation. Run persists jobs; Application owns
-execution and adoption. Eval remains an optional external task consumer.
+execution and adoption. Container benchmark evaluation belongs to the separate Eval consumer.
 
 ## Follow a task
 
@@ -81,11 +81,10 @@ grading outside the behavior-based editing path.
 ## Start improvement
 
 1. Start a normal session and open `/improvement [DIRECTION]`.
-2. Choose a current instruction and input files, a saved task package, or an
-   available benchmark task stream. Select editable components and a generator.
+2. Choose a current instruction and input files or a saved task package.
+   Select editable components and a generator.
 3. Choose parallel/sequential exploration, allocations, feedback and effect scope.
-4. Review the frozen preview and explicitly confirm. Calls may incur model cost;
-   external streams also download task material and execute containers.
+4. Review the frozen preview and explicitly confirm. Calls may incur model cost.
 5. Inspect outputs, assurance, history and logs. Persistent candidates require
    independent verification and remain pending until explicit adoption.
 
@@ -98,9 +97,7 @@ previous task-local edits.
 
 The native runner provides fresh in-memory read/write/edit files, no Bash,
 network tools, live Session or production filesystem. Full runtime/SSH/container
-execution requires a declared runner. External benchmark streams reuse normal
-Application trials and produce task-local outputs; they do not claim independent
-persistent verification. Tool descriptions, schemas and permissions retain their
+execution requires a declared runner. Tool descriptions, schemas and permissions retain their
 normal owner contracts.
 
 ## Extend search
@@ -164,7 +161,7 @@ ownership and host verification/adoption. It does not reproduce published scores
 train model weights or autonomously rewrite the improver.
 
 ```bash
-.venv/bin/python -m unittest tests.lab.test_improvement_pipeline tests.workflows.test_improvement_pipeline tests.workflows.test_benchmark_improvement
+.venv/bin/python -m unittest tests.lab.test_improvement_pipeline tests.workflows.test_improvement_pipeline
 ```
 
 Offline fake Providers and synthetic rewards establish control flow and isolation,

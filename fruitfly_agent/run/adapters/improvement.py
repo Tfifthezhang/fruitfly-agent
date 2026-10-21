@@ -16,7 +16,6 @@ class RunImprovementService:
         self.jobs = jobs
         self.activity = activity
         self.cancel = cancel
-        self.experiment_routes = {}
         self.running_host = None
         self.runs, self.scope = runs, scope
         self.previews = {}
@@ -29,7 +28,6 @@ class RunImprovementService:
 
     def workflow_preview(self, request):
         value = self.jobs.preview(request)
-        self.experiment_routes[value.preview_token] = self.jobs
         return self._remember_preview(value)
 
     def _remember_preview(self, preview):
@@ -80,13 +78,6 @@ class RunImprovementService:
                 f'Stop reason: {stop}\nNo search work was started.\n{error}', initial=True), setup)), scope)
         self.current_run_id = None
 
-    def register_benchmark(self, host, selection, executor, direction=""):
-        value = host.preview_selection(selection, executor, direction=direction)
-        if len(self.experiment_routes) >= 16:
-            self.experiment_routes.pop(next(iter(self.experiment_routes)))
-        self.experiment_routes[value.preview_token] = host
-        return self._remember_preview(value)
-
     @property
     def running_improver(self):
         return self.running_host.running_improver if self.running_host is not None else None
@@ -96,7 +87,7 @@ class RunImprovementService:
             preview_token = self.improvement_submitted(manifest, direction, preview_token=preview_token)
         view, scope, setup = self.submissions.pop(preview_token)
         self.previews.pop(preview_token, None)
-        host = self.experiment_routes.pop(preview_token, self.jobs)
+        host = self.jobs
         self.running_host = host
         now = lambda: datetime.now(timezone.utc).isoformat()
         self.current_run_id = view.run_id

@@ -14,7 +14,7 @@ Verify Application state/lifecycle, resource cleanup, events, menus, commands, a
 | `test_conversation.py` | Immutable original history after reduction, safe content projection, and static display bounds |
 | `test_terminal_configuration.py / test_menu.py` | Context phase headings, inline algorithms/fields, focus versus enabled/modified colors, NO_COLOR/light-dark fallback, small-terminal viewport, configuration drafts and confirmation |
 | `test_terminal_renderer.py / test_markdown.py / test_welcome.py` | Event presentation, output bounds, ANSI handling, and layouts |
-| `test_improvement.py / test_improvement_back.py / test_benchmark_events.py` | Inline target-before-algorithm selection, field focus/current values, compatible budget retention, task revalidation, optional guidance, unified sources, cost confirmation, cancellation and complete original-task diagnostics |
+| `test_improvement.py / test_improvement_back.py` | Inline target-before-algorithm selection, field focus/current values, compatible budget retention, task revalidation, optional guidance, generic task sources, cost confirmation and cancellation |
 | `test_input_emphasis.py` | Dark/light/unknown terminal palettes, NO_COLOR, editor-only fill, and readable submitted/restored input |
 | `test_line_editor.py` | PTY resize without keystrokes, visible pre-submission form drafts, cursor/history preservation, form exit/echo restoration, explicit TERM, redirected fallback, and model-key echo suppression/restoration |
 

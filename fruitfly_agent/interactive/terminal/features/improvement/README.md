@@ -11,20 +11,16 @@ Run or Eval implementation.
 | [workflow_panel.py](workflow_panel.py) | Task/input selection, component toggles, generator, exploration, budgets, feedback and scope |
 | [menu.py](menu.py) | Confirmation, progress, history, results and candidate review |
 | [command.py](command.py) | Borrow and restore terminal input/display scope |
-| [events.py](events.py) | External task events and complete runner output |
 | [formatting.py](formatting.py) | Generic activity and usage |
 
-Task sources include explicit current instructions and input files, saved packages,
-and an optional benchmark task stream. Benchmark catalog/preflight failures retain
-the draft and do not block saved tasks. Invalid or cancelled field input preserves
-the prior value. Components and generators show capability availability. The panel
-has no algorithm-specific tuning or legacy method selector.
+Task sources include explicit current instructions and input files or saved
+packages. Invalid or cancelled field input preserves the prior value. Components
+and generators show capability availability. The panel has no benchmark-specific
+source, runner or configuration.
 
 Start creates a fresh frozen preview and one confirmation with Cancel selected by
-default. Navigation and previews start no downloads or model calls. Confirmation
-binds materials, component scope, generator, guidance and allocations. External
-streams use their own inputs, execution evidence and current-task effect scope.
-They do not offer persistent verification implicitly.
+default. Confirmation binds materials, component scope, generator, guidance and
+allocations. Navigation and previews start no model work.
 
 Application owns the running job. Polling terminal input offers Return to chat and
 Cancel improvement; returning leaves the job running. Non-polling input waits for

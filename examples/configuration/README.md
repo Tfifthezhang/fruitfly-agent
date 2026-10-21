@@ -9,6 +9,16 @@ Use the interactive model wizard for first setup, or copy the single model catal
 | [models.example.yaml](models.example.yaml) | `.fruitfly/models.yaml` | Both DeepSeek Flash protocol profiles in one file |
 | [.env.example](.env.example) | `.fruitfly/secrets.env` | Empty model/search keys and optional SSH account/password variables |
 | [ssh.example.yaml](ssh.example.yaml) | `.fruitfly/config.yaml` | Minimal remote profile; addresses are placeholders, credentials stay in the secret file |
+| [default-config.example.yaml](default-config.example.yaml) | `.fruitfly/default-config.yaml` | Local baseline with basic tools and explicit compaction parameters; manual editing only |
+| [default-models.example.yaml](default-models.example.yaml) | `.fruitfly/default-models.yaml` | Independent default model settings referencing a shared or separate key variable |
+
+Copy the default configuration and model templates together only when their
+destinations are absent. **Configure → Restore default configuration** stages the
+default harness settings while retaining the daily model and credentials. Save
+for a new session or discard the draft. Eval uses the complete default profile
+unless explicitly overridden, including the independent default model catalog.
+It passes `--unrestricted` inside task containers; no permission configuration
+belongs in either Agent file.
 
 | Profile | `provider` | `model` | `base_url` |
 |---|---|---|---|

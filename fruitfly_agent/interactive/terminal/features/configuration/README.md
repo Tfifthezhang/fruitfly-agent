@@ -11,6 +11,12 @@ Use `TerminalConfigurationFrontend` as the menu entry and `configuration_handler
 | [model_setup.py](model_setup.py) | ModelFormIO, field/capability forms, review, and hidden secret input |
 | [mechanism_setup.py](mechanism_setup.py) | Registration-driven guided settings, hidden credentials, per-field retry and review |
 
+The home menu retains Start new session, Configure and Exit. An optional
+`DefaultConfiguration.restore_defaults()` capability adds **Restore default
+configuration** immediately before Back in Configure. It stages a draft through
+the host; the existing save/discard/new-session flow applies. Read-only default
+controllers expose review only. No permission settings page is supplied.
+
 The host ConfigurationController owns choices and persistence. ModelSetupService owns validation and credential staging. Forms use explicitly supplied selection, rendering, reader, and staging operations; they do not access a menu owner's private methods. Credential values bypass readline/history and are absent from views and review text.
 
 Optional `MechanismSetupService` supplies backend-neutral forms declared in

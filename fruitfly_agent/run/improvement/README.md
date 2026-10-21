@@ -8,8 +8,6 @@ services receive explicit callbacks and stores, never the composition Factory.
 | Entry | Responsibility |
 |---|---|
 | [pipeline.py](pipeline.py): `RunComponentJobs` | Freeze previews; assemble injected stage ports; persist outcomes and journals |
-| [external.py](external.py): `RunExternalJobs` | Prepare external task streams and reuse the same workflow |
-| `RuntimeTrialRunner` | Bind normal Application trials and validate official receipts |
 | [versions.py](versions.py): `RunVersions` | Source-backed H, declared I and registered S identity |
 | [candidates.py](candidates.py): `RunCandidates` | Review, scope validation, adoption and recovery |
 | [evolution.py](evolution.py): `RunEvolutionHost` | Durable RSI phases with independent verification |
@@ -21,12 +19,9 @@ allocations. Changed conditions reject execution. Construction, timeout,
 cancellation and ordinary failure close journal resources; submitted intent remains
 in history even without a candidate.
 
-Native file tasks use detached in-memory inputs. External execution downloads only
-after submission, freezes source/configuration and validates task, lease, model-call,
-runtime and environment receipts. Scores remain outside behavior editing. The
-stream shares a total allocation, starts each task with the common configured
-harness, and carries committed experience separately. External streams currently
-return task-local outputs rather than persistent candidates.
+Native file tasks use detached in-memory inputs. Full runtime, SSH or container
+execution requires an explicitly injected runner through the public stage ports.
+The interactive host does not discover benchmark tasks or launch Eval processes.
 
 Persistent publication requires `verified` assurance from the injected verifier.
 Changed text bindings form one version candidate, including mixed H/S changes.

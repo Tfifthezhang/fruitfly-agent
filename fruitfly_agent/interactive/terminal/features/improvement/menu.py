@@ -22,8 +22,6 @@ from fruitfly_agent.interactive.terminal.io.menu import (
 )
 from fruitfly_agent.interactive.terminal.rendering.renderer import TerminalRenderer
 from fruitfly_agent.interactive.terminal.io.text import safe_terminal_text
-from fruitfly_agent.interactive.contracts.evaluation import BenchmarkImprovementController
-from .events import BenchmarkEventDisplay
 from .workflow_panel import WorkflowPanel
 from fruitfly_agent.interactive.contracts.improvement import ImprovementRunView
 from fruitfly_agent.interactive.contracts.candidates import CandidateSection
@@ -35,7 +33,7 @@ class TerminalImprovementFrontend:
 
     def __init__(self, session, renderer: TerminalRenderer, line_editor: LineEditor,
                  menu_input: MenuInput | None, menu_renderer: TerminalMenuRenderer | None,
-                 *, clients: ImprovementClients | None = None, benchmark=None) -> None:
+                 *, clients: ImprovementClients | None = None) -> None:
         self.clients = clients or ImprovementClients.from_session(session)
         self.renderer = renderer
         self.line_editor = line_editor
@@ -43,7 +41,6 @@ class TerminalImprovementFrontend:
         self.menu_renderer = menu_renderer
         if menu_renderer is not None and isinstance(menu_input, LineMenuInput):
             menu_renderer.numbered = True
-        self.benchmark = benchmark if isinstance(benchmark, BenchmarkImprovementController) else None
         self._quit = False
         self._selections = {}
         self.role = "H"
@@ -68,7 +65,6 @@ class TerminalImprovementFrontend:
             panel = WorkflowPanel(client=self.clients.workflow, configuration=configuration,
                 choose=self.choose_row, read=self.read_value, confirm=self.confirm_choice,
                 report=self.report, execute=self.execute, history=self.experiment_history,
-                benchmark=self.benchmark,
                 direction=' '.join(arguments).strip())
             await panel.run()
             return
@@ -81,21 +77,11 @@ class TerminalImprovementFrontend:
         except (InputInterrupted, KeyboardInterrupt):
             return None
 
-    async def execute(self, preview, direction, source):
+    async def execute(self, preview, direction):
         before = {r.run_id for r in self.clients.history()}
-        display = BenchmarkEventDisplay()
-        event_renderer = TerminalRenderer(self.renderer.output, tool_output_limit=None)
-
         async def run():
-            try:
-                if source == 'benchmark':
-                    return await self.benchmark.improve(preview.preview_token,
-                        on_event=lambda event: display.show_event(event_renderer, event))
-                value = self.clients.search.start_improvement(direction, preview_token=preview.preview_token)
-                return await value if inspect.isawaitable(value) else ()
-            finally:
-                await event_renderer.close()
-                event_renderer.finish_line()
+            value = self.clients.search.start_improvement(direction, preview_token=preview.preview_token)
+            return await value if inspect.isawaitable(value) else ()
 
         task = asyncio.create_task(run())
         if await self.watch(task):

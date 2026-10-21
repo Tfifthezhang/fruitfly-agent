@@ -16,29 +16,30 @@ from fruitfly_agent.providers.config import load_env
 from fruitfly_agent.providers.workspace import WorkspacePaths
 
 from fruitfly_agent.run.application import RunApplicationFactory, resolve_session_path as _resolve_path
-from .evaluation import RunEvaluationController
+from fruitfly_agent.lab.catalog import PermissionPolicy
 
 
 async def run_cli(args: argparse.Namespace) -> int:
     cwd = Path(args.cwd).resolve() if args.cwd else Path.cwd().resolve()
     application: AgentApplication | None = None
     try:
+        if args.approve_tools and (not args.task or args.resume):
+            raise ValueError("--approve-tools requires a new non-interactive task")
+        unrestricted = getattr(args, "unrestricted", False)
+        if unrestricted and (not args.task or args.resume or args.approve_tools):
+            raise ValueError("--unrestricted requires a fresh non-interactive task and conflicts with --approve-tools")
         paths = WorkspacePaths(cwd)
         for notice in paths.notices():
             print(f"notice: {notice}", file=sys.stderr)
         environment = {**load_env(paths.secret_file()), **os.environ}
         factory = RunApplicationFactory(
-            cwd=cwd,
-            environment=environment,
-            config_path=args.config,
-            profile_id=args.profile,
-            allow_incomplete=not bool(args.task),
+            cwd=cwd, environment=environment, config_path=args.config,
+            profile_id=args.profile, allow_incomplete=not bool(args.task),
+            permission_policy=PermissionPolicy.unrestricted(cwd) if unrestricted else None,
         )
         if not args.task:
             with transient_screen(sys.stdin, sys.stdout):
-                launch = TerminalConfigurationFrontend(factory.configuration).run(
-                    editable=not args.resume
-                )
+                launch = TerminalConfigurationFrontend(factory.configuration).run(editable=not args.resume)
             if not launch.start:
                 return 0
             if launch.saved:
@@ -46,6 +47,10 @@ async def run_cli(args: argparse.Namespace) -> int:
 
         session_path = resolve_session_path(args, cwd)
         application = AgentApplication(factory)
+        if args.approve_tools:
+            async def approve_tool(prompt):
+                return "once"
+            application.set_authorization_handler(approve_tool)
         await application.start(
             resume=bool(args.resume),
             session_path=session_path,
@@ -82,10 +87,7 @@ async def run_cli(args: argparse.Namespace) -> int:
                 if event_stream is not None:
                     event_stream.close()
 
-        return await TerminalFrontend(
-            application,
-            evaluation=RunEvaluationController(application, factory),
-        ).run()
+        return await TerminalFrontend(application).run()
     except (ValueError, OSError, RuntimeError, SessionCorruptError, TypeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -123,6 +125,10 @@ def create_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="resume the latest non-empty session, or select a path with --session",
     )
+    parser.add_argument("--approve-tools", action="store_true",
+                        help="approve tool confirmation requests for a new task in a trusted isolated environment")
+    parser.add_argument("--unrestricted", action="store_true",
+                        help="disable application tool permission checks for a fresh task in an externally isolated environment")
     parser.add_argument("--cwd", default=None, help="working directory")
     parser.add_argument(
         "--session",

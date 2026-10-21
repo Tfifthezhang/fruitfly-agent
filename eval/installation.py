@@ -1,6 +1,8 @@
 """Validate the explicit package material used by Harbor task installation."""
 
 from email.parser import Parser
+import hashlib
+import json
 from pathlib import Path
 import tomllib
 import zipfile
@@ -8,6 +10,20 @@ import zipfile
 
 SOURCE_FILES = ("pyproject.toml", "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md")
 SOURCE_PACKAGES = ("fruitfly_agent", "eval")
+
+
+def installation_identity(path: Path) -> dict:
+    """Identify the exact install inputs without reading workspace state."""
+    path = validate_installation(path)
+    files = ([path] if path.is_file() else
+             [*(path / name for name in SOURCE_FILES),
+              *(p for name in SOURCE_PACKAGES for p in (path / name).rglob("*.py")
+                if "__pycache__" not in p.parts and not p.is_symlink())])
+    rows = sorted((p.name if path.is_file() else p.relative_to(path).as_posix(),
+                   hashlib.sha256(p.read_bytes()).hexdigest()) for p in files)
+    digest = hashlib.sha256(json.dumps(rows, separators=(",", ":")).encode()).hexdigest()
+    return {"schema_version": 1, "project": "fruitfly-agent", "version": "0.1",
+            "kind": "wheel" if path.is_file() else "source", "sha256": digest, "files": rows}
 
 
 def validate_installation(path: Path) -> Path:

@@ -1,0 +1,41 @@
+# Copy to .fruitfly/default-config.yaml. Edit this file manually, outside the terminal menu.
+schema_version: 1
+default_profile: baseline
+profiles:
+  baseline:
+    model:
+      catalog: default-models.yaml
+      profile: deepseek-flash-openai
+    prompt: assistant-default
+    mechanisms:
+    - id: local-env
+      enabled: true
+      parameters: {}
+    - id: read-tool
+      enabled: true
+      parameters: {}
+    - id: bash-tool
+      enabled: true
+      parameters: {}
+    - id: edit-tool
+      enabled: true
+      parameters: {}
+    - id: write-tool
+      enabled: true
+      parameters: {}
+    - id: compaction
+      enabled: true
+      parameters:
+        enabled: true
+        reserve_tokens: 1024
+        keep_recent_tokens: 20000
+        reactive_keep_recent_tokens: 10000
+        max_shrink_steps: 5
+        summary_word_limit: 400
+        summary_max_tokens: 2048
+        history_char_limit: 120000
+        per_message_char_limit: 2000
+        summary_attempts: 2
+        summary_timeout_seconds: 60.0
+        token_estimator: heuristic_cjk
+        prompt_version: continuity

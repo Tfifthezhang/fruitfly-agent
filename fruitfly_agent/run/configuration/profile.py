@@ -119,7 +119,10 @@ class HarnessConfig:
 
 def load_harness_config(path: str | Path) -> HarnessConfig:
     target = Path(path)
-    raw = yaml.safe_load(target.read_text(encoding="utf-8")) or {}
+    try:
+        raw = yaml.safe_load(target.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as exc:
+        raise ValueError(f"invalid harness YAML: {target}") from exc
     if not isinstance(raw, Mapping):
         raise ValueError("harness config must be a mapping")
     _reject_unknown(
