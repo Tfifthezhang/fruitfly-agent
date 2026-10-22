@@ -10,7 +10,8 @@ Persist immutable text, candidate records, and readable outputs. Storage validat
 | [prompts.py](prompts.py): `resolve_base_prompt` | Resolve built-in or stored prompt contents without assembly |
 | [candidates.py](candidates.py): `CandidateRecord`, `CandidateStore` | Create, read, update, replace, and delete records |
 | [improvement_runs.py](improvement_runs.py): `ImprovementRunStore` | Atomic experiment summaries and verified journal reads, scoped to configuration/profile |
-| [experience.py](experience.py): `ExperienceStore` | Optimistic attributed-library commit and exact S snapshots |
+| [experience.py](experience.py): `ExperienceStore` | Pending lesson review, optimistic library commit and exact S snapshots |
+| [verification.py](verification.py): `VerificationUseStore` | Atomic private-suite claims; unknown work remains consumed |
 | [results.py](results.py): `save_task_result` | Export latest complete task/configuration/profile/target results |
 | [retention.py](retention.py): `compact_candidates` | Protect references before deleting obsolete owned records and contents |
 
@@ -32,3 +33,10 @@ Experiment records use their independent schema version 1. History retains candi
 [snapshots.py](snapshots.py) stores verified text trees and materializes fresh directories. [versions.py](versions.py) stores H/I/S and modification manifests with verified referenced contents. Source snapshots include package Python files and declared build inputs, excluding local sessions, secrets and caches. Candidate compaction follows structured artifact references and protects experiment manifests before collecting obsolete prompt text. Hashes describing task/trace identities need not identify stored artifacts.
 
 Content-addressed artifact files use the bare lowercase SHA-256 digest as the filename under `.fruitfly/artifacts/`. External consumers can copy explicitly referenced immutable files after checking their content hash; they must not copy the whole workspace store or infer mutable learning state from it.
+
+Job plans use schema 2 for execution metadata and normalized requests. Submitted-run
+summaries keep their independent schema 1; old histories remain readable. Pending
+lessons retain their own schema 1, including initial library identity and review
+status. Only explicit commit changes the S snapshot. Verification claims use a
+locked atomic ledger; completed-proof reuse does not claim a new use. These stores
+do not validate model quality or grant activation authority.

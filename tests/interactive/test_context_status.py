@@ -7,11 +7,11 @@ import unittest
 
 from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.core.context import ContextFrame, ContextPipeline, ContextStage
-from fruitfly_agent.core.data_model import AssistantMessage, ContextDecision, TextBlock, Usage, UserMessage
-from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone, StreamActivity
+from fruitfly_agent.core.data_model import AgentToolResult, AssistantMessage, ContextDecision, TextBlock, Usage, UserMessage
+from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone, StreamActivity, TextDelta
 from fruitfly_agent.core.session import Session
 from fruitfly_agent.core.tool_runtime import AgentTool
-from fruitfly_agent.interactive import InteractiveSession, RunActivityChanged
+from fruitfly_agent.interactive import InteractiveSession, RunActivityChanged, RunStarted
 from fruitfly_agent.interactive.interaction.commands import CommandRouter
 from fruitfly_agent.interactive.contracts.commands import InteractiveCommand
 from tests.support.faux_provider import FauxProvider
@@ -30,6 +30,118 @@ class ContextStatusTests(unittest.IsolatedAsyncioTestCase):
             yield StreamDone(AssistantMessage(content=[TextBlock('answer')], stop_reason='stop',
                                              usage=None if tokens is None else Usage(tokens, 2)))
         provider.script.append(lambda view, signal=None: AssistantMessageEventStream(final()))
+
+    async def test_message_count_uses_canonical_records_after_reduction_and_restore(self):
+        class Reduce:
+            def estimate(self, snapshot):
+                return 25
+            async def check_budget(self, snapshot):
+                return ContextDecision(messages=(UserMessage('summary'),), mechanism_id='fixture')
+            async def react_to_overflow(self, snapshot, error):
+                return None
+
+        provider = FauxProvider()
+        provider.respond_text('first answer')
+        provider.respond_text('second answer')
+        pipeline = ContextPipeline((ContextStage('reduce', 'reduction', Reduce()),))
+        events = []
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'session.jsonl'
+            with Session(path) as durable:
+                for message in (UserMessage('original question'), AssistantMessage([TextBlock('original answer')])):
+                    durable.append('message', {'message': message.to_dict()})
+                durable.append('meta', {'kind': 'fixture'})
+                config = AgentLoopConfig(provider=provider, model='offline', session=durable)
+                session = InteractiveSession(config, messages=durable.messages(), context_pipeline=pipeline,
+                                             event_sink=events.append)
+                await session.submit('first task')
+                self.assertEqual(2, len(session.messages))
+                self.assertEqual(4, session.status.message_count)
+                await session.submit('second task')
+                self.assertEqual(2, len(session.messages))
+                self.assertEqual(6, session.status.message_count)
+                self.assertEqual([3, 5], [event.message_count for event in events if isinstance(event, RunStarted)])
+                self.assertEqual(2, session.status.compaction_count)
+                before = path.read_bytes()
+                text = CommandRouter().execute(InteractiveCommand('status'), session).text
+                self.assertIn('messages: 6\n', text)
+                self.assertEqual(before, path.read_bytes())
+                self.assertEqual(2, len(provider.calls))
+            with Session(path) as durable:
+                restored = InteractiveSession(replace(config, session=durable), messages=durable.messages())
+                self.assertEqual(2, len(restored.messages))
+                self.assertEqual(6, restored.status.message_count)
+                self.assertEqual(2, restored.status.compaction_count)
+
+    async def test_message_count_updates_during_tools_and_counts_only_committed_messages(self):
+        provider = FauxProvider()
+        provider.respond_tool_call('pause', {})
+        entered_tool = asyncio.Event()
+        release_tool = asyncio.Event()
+        entered_response = asyncio.Event()
+        finish_response = asyncio.Event()
+
+        async def execute(ctx):
+            entered_tool.set()
+            await release_tool.wait()
+            return AgentToolResult(content=[TextBlock('tool result')])
+
+        async def final_response():
+            yield TextDelta('partial ')
+            yield TextDelta('answer')
+            entered_response.set()
+            await finish_response.wait()
+            yield StreamDone(AssistantMessage(content=[TextBlock('partial answer')], stop_reason='stop'))
+
+        provider.script.append(lambda view, signal=None: AssistantMessageEventStream(final_response()))
+        tool = AgentTool('pause', 'pause', 'offline barrier', {'type': 'object'}, execute)
+        with tempfile.TemporaryDirectory() as directory, Session(Path(directory) / 'session.jsonl') as durable:
+            session = InteractiveSession(AgentLoopConfig(provider=provider, model='offline', session=durable, tools=(tool,)))
+            task = asyncio.create_task(session.submit('use the tool'))
+            try:
+                await asyncio.wait_for(entered_tool.wait(), timeout=2)
+                self.assertTrue(session.running)
+                self.assertEqual(1, len(session.messages))
+                self.assertEqual(2, session.status.message_count)
+                self.assertTrue(session.steer('follow-up guidance'))
+                self.assertEqual(2, session.status.message_count)
+                release_tool.set()
+                await asyncio.wait_for(entered_response.wait(), timeout=2)
+                self.assertTrue(session.running)
+                self.assertEqual(4, session.status.message_count)
+                before = durable.read_all()
+                text = CommandRouter().execute(InteractiveCommand('status'), session).text
+                self.assertIn('messages: 4\n', text)
+                self.assertEqual(before, durable.read_all())
+                self.assertEqual(2, len(provider.calls))
+            finally:
+                release_tool.set()
+                finish_response.set()
+                await task
+            self.assertEqual(5, session.status.message_count)
+
+    async def test_message_count_keeps_committed_results_after_cancellation(self):
+        provider = FauxProvider()
+        provider.respond_tool_call('pause', {})
+        entered_tool = asyncio.Event()
+
+        async def execute(ctx):
+            entered_tool.set()
+            await asyncio.Event().wait()
+
+        tool = AgentTool('pause', 'pause', 'offline cancellation barrier', {'type': 'object'}, execute)
+        with tempfile.TemporaryDirectory() as directory, Session(Path(directory) / 'session.jsonl') as durable:
+            session = InteractiveSession(AgentLoopConfig(provider=provider, model='offline', session=durable, tools=(tool,)))
+            task = asyncio.create_task(session.submit('cancel the tool'))
+            try:
+                await asyncio.wait_for(entered_tool.wait(), timeout=2)
+                self.assertEqual(2, session.status.message_count)
+            finally:
+                session.cancel()
+                result = await task
+            self.assertEqual('aborted', result.stop_reason)
+            self.assertEqual(3, session.status.message_count)
+            self.assertEqual(['user', 'assistant', 'toolResult'], [message.role for message in durable.canonical_messages()])
 
     async def test_last_receipt_is_separate_from_cumulative_and_restores_without_requests(self):
         provider = FauxProvider()
@@ -54,8 +166,8 @@ class ContextStatusTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIsNone(status.estimated_input_tokens)
                 before = path.read_bytes()
                 text = CommandRouter().execute(InteractiveCommand('status'), session).text
-                self.assertIn('context usage: 1.2% (reported; last request)', text)
-                self.assertEqual(['context usage: 1.2% (reported; last request)', 'compactions: 0'],
+                self.assertIn('context usage: [--------------------] 1.2% (reported; last request)', text)
+                self.assertEqual(['context usage: [--------------------] 1.2% (reported; last request)', 'compactions: 0'],
                                  text.split('pending candidates: 0\n')[1].splitlines())
                 self.assertNotIn('2.2%', text)
                 self.assertEqual(before, path.read_bytes())
@@ -109,7 +221,7 @@ class ContextStatusTests(unittest.IsolatedAsyncioTestCase):
         before = len(observations)
         for _ in range(3):
             text = CommandRouter().execute(InteractiveCommand('status'), session).text
-        self.assertIn('context usage: 2.5% (estimated; last request)', text)
+        self.assertIn('context usage: [--------------------] 2.5% (estimated; last request)', text)
         self.assertIn('compactions: 1', text)
         self.assertEqual(before, len(observations))
         self.assertEqual(1, reducer.calls)
@@ -178,9 +290,43 @@ class ContextStatusTests(unittest.IsolatedAsyncioTestCase):
                                    estimated_input_tokens=1200, estimate_model='current')
         def render(value):
             return CommandRouter().execute(InteractiveCommand('status'), SimpleNamespace(status=value)).text
-        self.assertIn('context usage: 120.0%', render(status))
+        self.assertIn('context usage: [####################] 120.0%', render(status))
         self.assertIn('context usage: unknown', render(replace(status, estimate_model='other')))
         self.assertIn('context usage: unknown', render(replace(status, context_window=0)))
+
+    def test_context_bar_shows_occupancy_without_ansi_or_hiding_overflow(self):
+        from types import SimpleNamespace
+        from fruitfly_agent.interactive.contracts.models import InteractiveStatus
+
+        status = InteractiveStatus(model='current', working_directory='', session_path='',
+                                   message_count=0, tool_names=(), mechanisms=(), context_window=1000,
+                                   estimate_model='current')
+        for tokens, expected in (
+            (0, '[--------------------] 0.0%'),
+            (102, '[##------------------] 10.2%'),
+            (500, '[##########----------] 50.0%'),
+            (1000, '[####################] 100.0%'),
+            (1200, '[####################] 120.0%'),
+        ):
+            with self.subTest(tokens=tokens):
+                context = SimpleNamespace(status=replace(status, estimated_input_tokens=tokens))
+                text = CommandRouter().execute(InteractiveCommand('status'), context).text
+                self.assertIn(f'context usage: {expected} (estimated; last request)\n', text)
+                self.assertNotIn('\x1b', text)
+
+    def test_unknown_context_has_no_empty_bar_and_uses_matching_receipt(self):
+        from types import SimpleNamespace
+        from fruitfly_agent.interactive.contracts.models import InteractiveStatus
+
+        status = InteractiveStatus(model='current', working_directory='', session_path='',
+                                   message_count=0, tool_names=(), mechanisms=(), context_window=1000,
+                                   estimated_input_tokens=900, estimate_model='other')
+        unknown = CommandRouter().execute(InteractiveCommand('status'), SimpleNamespace(status=status)).text
+        self.assertIn('context usage: unknown\n', unknown)
+        self.assertNotIn('[', unknown)
+        receipt = replace(status, last_input_tokens=500, receipt_model='current')
+        reported = CommandRouter().execute(InteractiveCommand('status'), SimpleNamespace(status=receipt)).text
+        self.assertIn('context usage: [##########----------] 50.0% (reported; last request)\n', reported)
 
     async def test_no_reduction_does_not_report_zero_as_estimate(self):
         provider = FauxProvider()

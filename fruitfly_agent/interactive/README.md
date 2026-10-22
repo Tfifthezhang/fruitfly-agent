@@ -33,6 +33,13 @@ The [offline example](../../examples/extensions/README.md) demonstrates `start â
 
 Frontends consume Application and Interactive events. They do not construct Providers, read algorithm files, or decide candidate quality.
 
+`/lab` consumes the status snapshot's visible active component descriptions,
+installed tool names and injected improvement availability. Run supplies component
+metadata independently of the experimental-mechanism ID collection. The command
+returns a read-only structured panel and plain-text fallback; terminal rendering
+owns section colors, alignment and width adaptation. Inspection makes no service
+queries, model calls or configuration changes. See [active harness inspection](terminal/README.md#inspect-the-active-harness).
+
 `conversation()` projects canonical messages into `ConversationMessage` and `ConversationBlock` views. Text remains complete; image blocks contain only their media type, thinking blocks contain an omission marker, and tool calls contain only their name. Internal context summaries are excluded. Reading history emits no events and changes neither persisted messages nor model context.
 
 ## Inject independent capabilities
@@ -83,7 +90,9 @@ Model setup fields use `kind="constant"` for service-selected values and `kind="
 
 `InteractiveStatus` keeps separate last prepared-input estimates, last request receipts, and last-run reported cumulative usage. Snapshots include their source/model/time and can be restored from concise Session records. Reading status does not run context mechanisms, model calls, or tools. Missing estimates/receipts are unknown. These snapshots describe previous requests, not a live recomputation of the next request.
 
-After the model/workspace/session state and pending candidates, `/status` displays only context usage as a percentage of the configured window and the session's compaction count. Usage prefers the prepared-input estimate, then falls back to a same-model Provider receipt; the line labels the source and last-request scope. Missing capacity or matching measurements yields `unknown`. `compaction_count` counts committed reductions, excludes cancelled or invalid proposals, accumulates across turns, and restores from persisted compaction entries.
+`/status` reports `messages` as the number of committed canonical Session messages, including user inputs, assistant responses and individual tool results. It is not a conversation-turn count or the length of the model projection. The count includes messages committed during an active run, survives context reduction and restores from original message records. Metadata, compaction records, streamed text fragments and queued inputs that have not become messages do not increase it. Reading status inspects the current Session records without preparing a request, invoking a model or changing storage. Embedded sessions without a Session store fall back to the retained in-memory message count.
+
+After the model/workspace/session state and pending candidates, `/status` displays context usage as a 20-cell ASCII bar and percentage of the configured window, followed by the session's compaction count. Usage prefers the prepared-input estimate, then falls back to a same-model Provider receipt; the line labels the source and last-request scope. The bar fills to at most 100%, while the percentage preserves values above capacity. Missing capacity or matching measurements yields `unknown` without a bar. `compaction_count` counts committed reductions, excludes cancelled or invalid proposals, accumulates across turns, and restores from persisted compaction entries.
 
 Async cancellation cannot preempt synchronous file I/O, abandoned thread work, or arbitrary noncooperating code. Cleanup does not undo completed external effects. If quiescence exceeds its deadline, closing remains incomplete rather than closing resources still in use.
 

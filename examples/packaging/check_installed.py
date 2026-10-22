@@ -3,6 +3,7 @@
 import argparse
 import asyncio
 import io
+import json
 from pathlib import Path
 import runpy
 import tempfile
@@ -13,6 +14,7 @@ import fruitfly_agent
 import eval
 from eval.harbor_agent import FruitFlyHarborAgent
 from eval.installation import resolve_installation
+from eval.harbor.material import source_snapshot
 from fruitfly_agent.lab.context_manager.externalization.programmatic_context import (
     IpythonRuntime, SessionArtifactStore,
 )
@@ -65,22 +67,27 @@ async def check(wheel: Path) -> None:
         assert not (root / "models.yaml").exists()
         assert not (root / ".env").exists()
         agent = FruitFlyHarborAgent.__new__(FruitFlyHarborAgent)
-        agent.source_root = resolve_installation(str(wheel), checkout=root)
+        package = resolve_installation(str(wheel), checkout=root)
+        identity = source_snapshot(package, root / "source")
+        assert (root / "source/eval/harbor/supervisor.py").is_file()
         agent.config_path = root / "config.yaml"
         agent.model_catalog_path = root / "models.yaml"
         agent.config_path.write_text("offline configuration", encoding="utf-8")
         agent.model_catalog_path.write_text("offline catalog", encoding="utf-8")
         agent.exec_as_root = AsyncMock()
+        agent.exec_as_agent = AsyncMock()
+        (root / "preparation.json").write_text(json.dumps({"runtime": {
+            "python": "/opt/runtime/bin/python", "environment": {}, "installation": identity,
+        }}), encoding="utf-8")
         environment = SimpleNamespace(
             exec=AsyncMock(return_value=SimpleNamespace(return_code=0)),
             upload_dir=AsyncMock(), upload_file=AsyncMock(),
         )
         await agent.install(environment)
-        environment.upload_file.assert_any_await(
-            wheel.resolve(), "/installed-agent/fruitfly/source/" + wheel.name,
-        )
-        assert wheel.name in agent.exec_as_root.call_args.kwargs["command"]
-    print("Installed model wizard, extension, function worker, IPython, and Eval installation checks passed.")
+        environment.upload_file.assert_any_await(root / "config.yaml", "/installed-agent/fruitfly/runtime/config.yaml")
+        environment.upload_dir.assert_not_called()
+        assert "pip" not in agent.exec_as_root.call_args.kwargs["command"]
+    print("Installed model wizard, extension, function worker, IPython, and prepared Eval checks passed.")
 
 
 if __name__ == "__main__":

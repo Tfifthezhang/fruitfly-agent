@@ -106,20 +106,21 @@ class TrialRecord:
     metrics: tuple[Mapping[str, Any], ...] = ()
     error: Mapping[str, Any] | None = None
     runtime: Mapping[str, Any] | None = None
+    execution: Mapping[str, Any] | None = None
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> TrialRecord:
         metrics = data.get("metrics", [])
         if not isinstance(metrics, list) or not all(isinstance(item, Mapping) for item in metrics):
             raise ValueError("trial.metrics must be a list of objects")
-        for key in ("error", "runtime"):
+        for key in ("error", "runtime", "execution"):
             if data.get(key) is not None and not isinstance(data[key], Mapping):
                 raise ValueError(f"trial.{key} must be an object or null")
         status = _text(data.get("status"), "trial.status")
         if status not in {"passed", "failed", "error"}:
             raise ValueError("invalid trial.status")
         return cls(_text(data.get("trial_id"), "trial.trial_id"), _text(data.get("task_id"), "trial.task_id"),
-                   status, tuple(dict(item) for item in metrics), data.get("error"), data.get("runtime"))
+                   status, tuple(dict(item) for item in metrics), data.get("error"), data.get("runtime"), data.get("execution"))
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

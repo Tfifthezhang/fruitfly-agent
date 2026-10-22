@@ -11,7 +11,8 @@ Use FruitFlyAgent through stdin/stdout, menus, and live events. Application owns
 | Start | Run `python -m fruitfly_agent`; choose **Start new session**. |
 | Configure | `/config`; save choices for a new session. |
 | Select a prompt | **Configure → prompt** or `/config`; preview and confirm. |
-| Inspect activity | `/status`: model, prompt, workspace, session, message count, state, queue, pending candidates, context usage percentage, and session compaction count. |
+| Inspect activity | `/status`: model, prompt, workspace, session, committed conversation message count, state, queue, pending candidates, context usage bar/percentage, and session compaction count. |
+| Inspect the active harness | `/lab`: active context mechanisms, execution environment, installed tools and supplied capabilities. |
 | Cancel active work | `/cancel` or the first Ctrl+C; clear pending Application input. |
 | Exit | `/exit`, `/quit`, or a second Ctrl+C within three seconds; drain cancelled work before resource cleanup. |
 | Clear a draft | First Ctrl+C while idle; normal submitted input resets the double-press interval. |
@@ -90,9 +91,45 @@ Back/Esc cancels active field input, then collapses a section, then returns to c
 
 Current tasks and saved packages use the same running/result flow. Raw TTY input polls through the existing reader to refresh progress and offer return/cancel actions. Redirected/non-polling input waits for completion and cannot consume `/cancel` during the wait. Progress measures the current batch, not overall completion. Results expose the stop reason and measured evidence even when no candidate is published. See the [feature guide](features/improvement/README.md).
 
+## Inspect the active harness
+
+`/lab` inspects the current runtime, including tools and execution capabilities.
+It reads a supplied status snapshot, so saved configuration drafts do not appear
+as active. Unselected algorithms remain available through `/config`. Hidden
+internal aggregation components stay hidden. Improvement appears as Available
+only when the host supplies the component-workflow capability; inspection starts
+no work.
+
+Section titles have compact color blocks. Bodies remain unfilled and use aligned
+rows, with explicit Not enabled text for empty context phases. Example content
+for a runtime with an SSH backend:
+
+```text
+Lab · Active session
+
+Context Manager
+  Augmentation     Skill catalog
+  Externalization  Not enabled
+  Reduction        Summarizing
+
+Environment
+  Remote environment  Enabled
+
+Tools
+  read   Read files
+  bash   Run shell commands
+
+Improvement
+  Component workflow  Available · /improvement
+```
+
+Actual rows follow host-provided runtime metadata. Unknown categories and missing
+phase metadata remain visible. Narrow windows stack and wrap rows; `NO_COLOR`,
+dumb terminals and redirected output retain the same sections without color.
+
 ## Register a command
 
-`TerminalFrontend(command_handlers={...})` accepts synchronous or asynchronous handlers. Each receives an `InteractiveCommand` and returns a `CommandResult`. The frontend writes its result and handles exit; handlers capture only the service operations they need. Registered terminal commands run before the frontend-neutral CommandRouter fallback.
+`TerminalFrontend(command_handlers={...})` accepts synchronous or asynchronous handlers. Each receives an `InteractiveCommand` and returns a `CommandResult`. The frontend forwards results to the renderer and handles exit; handlers capture only the service operations they need. Registered terminal commands run before the frontend-neutral CommandRouter fallback. Results may provide a read-only `CommandPanel` alongside their plain-text fallback; the renderer chooses the layout without adding command-specific input-loop branches.
 
 ```python
 from fruitfly_agent.interactive.interaction.commands import CommandResult
@@ -135,7 +172,7 @@ I/O does not import rendering or feature modules. Rendering consumes I/O primiti
 .venv/bin/python -m unittest discover -s tests/interactive -t . -v
 ```
 
-Waiting/retry/timeout activity includes request and adapter attempt identities. Timeout text describes an exceeded waiting deadline; it does not assert server overload. `/status` prefers the latest prepared-input estimate for context usage, with a same-model Provider receipt as fallback. The line labels the source and last-request scope. Reported input receipts can exclude cached input according to the Provider convention. Estimates do not guarantee tokenizer accuracy and can be stale after new input. Missing measurements or configured capacity display `unknown`. Compactions count committed reductions across the session, including restored records; budget checks and cancelled proposals do not increment the count.
+Waiting/retry/timeout activity includes request and adapter attempt identities. Timeout text describes an exceeded waiting deadline; it does not assert server overload. `/status` prefers the latest prepared-input estimate for context usage, with a same-model Provider receipt as fallback. A 20-cell ASCII occupancy bar accompanies the percentage, source and last-request scope; it works without ANSI or color. The bar stops at full, while percentages above 100% remain visible. Reported input receipts can exclude cached input according to the Provider convention. Estimates do not guarantee tokenizer accuracy and can be stale after new input. Missing measurements or configured capacity display `unknown` without a bar. Compactions count committed reductions across the session, including restored records; budget checks and cancelled proposals do not increment the count. The `messages` field counts original committed Session messages, including user, assistant and tool results, even while work is running. Context reduction does not reduce this conversation total; metadata and streamed fragments are excluded. See [Interactive status semantics](../README.md#state-and-events) for the in-memory embedding fallback.
 
 ## Respond to permission requests
 
@@ -152,10 +189,5 @@ status and elapsed time when available. Labels and call descriptions come from t
 tool declarations; the terminal does not interpret individual tools. Errors and
 cancelled calls have distinct markers, including when no success hook ran.
 
-Use `/tools` to list completed results in the current host's retained event window,
-then `/tools CALL_ID` for the retained output and bounded argument summary. Reused
-call IDs resolve to the latest retained completion. The view does not invoke tools,
-make model requests, or start another input reader. It follows runtime replacement
-through the optional `TerminalBindings.trace` callback. Hosts without that reader
-report that inspection is unavailable. This is not a persistent execution archive;
-event eviction and tool-side truncation limit what can be inspected.
+Live tool output and final summaries have display bounds. Omitted live output has
+an explicit marker. These bounds do not alter stored messages or model context.

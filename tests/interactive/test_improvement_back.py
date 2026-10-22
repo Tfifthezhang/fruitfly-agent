@@ -2,13 +2,31 @@
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, AsyncMock
-from fruitfly_agent.interactive.contracts.improvement import ImprovementPreview
+from fruitfly_agent.interactive.contracts.improvement import (ImprovementPreview,
+    WorkflowExecutionView, WorkflowChoice, ImprovementParameterView)
 from fruitfly_agent.interactive.terminal.features.improvement.workflow_panel import WorkflowPanel
 from tests.support.improvement_ui import configuration, panel
 
 
 class WorkflowPanelTests(unittest.IsolatedAsyncioTestCase):
     panel = staticmethod(panel)
+
+    async def test_registered_execution_changes_components_materials_and_typed_parameters(self):
+        view = WorkflowExecutionView('custom-experiment', 'Custom experiment', ('editor',),
+            (WorkflowChoice('study', 'Independent study'),),
+            (ImprovementParameterView('repeats', 'Repeated trials', 'integer', 2, 2, 10),),
+            'Explicit model work', defaults=(('verification', 'scored'), ('scope', 'persistent')))
+        panel, client, _, _ = self.panel((11, 0, 0, 0, 12, 0, None, None), text=('3',))
+        panel.executions = (view,)
+        await panel.run()
+        self.assertEqual(panel.request.execution_id, 'custom-experiment')
+        self.assertEqual(panel.request.component_ids, ('editor',))
+        self.assertEqual(panel.request.task_pack_id, 'study')
+        self.assertEqual(panel.request.execution_parameters, (('repeats', 3),))
+        self.assertEqual((panel.request.verification, panel.request.scope), ('scored', 'persistent'))
+        self.assertTrue(next(c for c in panel.configuration.components if c.component_id == 'editor').available)
+        client.workflow_preview.assert_not_called()
+        panel.execute.assert_not_awaited()
 
     async def test_back_keeps_component_selection_and_guidance(self):
         panel, client, frames, _ = self.panel((2, 1, None, 8, None), text=('Keep citations',))

@@ -177,6 +177,9 @@ class TerminalImprovementFrontend:
                 actions.append(('page', page + 1))
             rows.append(MenuRow('Saved candidates', 'Includes candidates created before experiment history was available'))
             actions.append(('candidates', None))
+            if self.clients.experience is not None:
+                rows.append(MenuRow('Pending experience', 'Review lessons before they affect later tasks'))
+                actions.append(('experience', None))
             choice = self.choose_row('Results and history', tuple(rows),
                 subtitle='Every submitted experiment is recorded, including empty, failed and cancelled runs.', key=('history', page))
             if choice is None:
@@ -186,10 +189,32 @@ class TerminalImprovementFrontend:
                 page = value
             elif action == 'candidates':
                 await self.review_candidates(all_roles=True)
+            elif action == 'experience':
+                await self.review_experience()
             else:
                 if await self.run_result(value, historical=True):
                     self._quit = True
                     return
+
+    async def review_experience(self):
+        client = self.clients.experience
+        if client is None:
+            return
+        try:
+            entries = client.pending_experience()
+            index = self.choose_row('Pending experience', tuple(MenuRow(e.job_id, '\n'.join(e.lessons)) for e in entries),
+                subtitle='Lessons are attributed observations, not automatically verified improvements.')
+            if index is None:
+                return
+            entry = entries[index]
+            action = self.choose_row('Review experience', (MenuRow('Commit to experience library'), MenuRow('Reject lesson')),
+                subtitle='\n'.join(entry.lessons) + '\n' + '\n'.join(f'{k}: {v}' for k, v in entry.details)
+                    + '\nInitial S snapshot: ' + entry.initial_snapshot)
+            if action is not None and self.confirm_choice(title='Confirm experience update', subtitle='This is a separate retained-state change.',
+                    rows=(MenuRow('Apply the selected action'), MenuRow('Cancel'))):
+                self.report(client.experience_action(entry.job_id, 'commit' if action == 0 else 'reject') + '\n')
+        except (OSError, RuntimeError, TypeError, ValueError) as exc:
+            self.report('Experience review failed: ' + str(exc) + '\n')
 
     async def run_result(self, result, *, historical=False):
         sections = list(result.sections or (CandidateSection('Result', result.stop_reason or result.status),))

@@ -8,7 +8,7 @@ composition, execution, selection, optional verification and reflection use
 public ports. No stage activates a candidate.
 
 Parallel proposals share frozen references and prior history. Sequential rounds
-carry the previous composition and executed edits. Scope, ownership, evidence
+carry the selected incumbent and accumulated execution evidence. Scope, ownership, evidence
 citations and task/state/condition receipts are checked before reuse. Generator
 factories create job-local state; discovery uses registration metadata only.
 
@@ -33,3 +33,24 @@ success, failure or cancellation. Cleanup waits at most ten seconds per resource
 measurement ports remain caller-owned. Embeddings use `async with WorkflowServices`
 or close their services explicitly after execution; generator factories must clean
 up partially failed construction.
+
+## Retain results and stop explicitly
+
+Every successful reference, probe and composition remains selectable. The original
+reference is retained before exploration. Sequential search updates its editing
+baseline only after comparison. Measured ties or missing measurements keep the
+incumbent; unscored output choice has no independent assurance.
+
+[stopping.py](stopping.py) supplies pure `SearchState`, `StopPolicy` and
+`BoundedStopPolicy`. Round limits, no candidate, repeated candidates and generator
+stop are recorded separately from quality assurance. These rules are bounded
+search decisions, not a convergence proof. The host can inject another stop
+policy through `WorkflowBindings`.
+
+[budget.py](budget.py) supplies `BudgetScope`. Child quota is held rather than
+spent; leaf reservations charge every ancestor once. Closing returns only unused
+quota. Deadline and cancellation inherit through nested operations. Final
+selection holds up to eight model requests when available; independent verification
+has its own protected allocation. Exhaustion retains an already completed result
+without granting verification. Composite runners set `execution_charge=0` and
+charge their leaf executions; trial count is independently bounded.

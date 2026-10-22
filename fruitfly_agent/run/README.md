@@ -137,10 +137,11 @@ For a started Application with an available improver, an embedding host can inje
 from fruitfly_agent.lab.rsi import PersistentEvolutionDriver
 from fruitfly_agent.run.evolution import RunEvolutionHost
 
-# application, factory, and verify_candidate are supplied by the host.
+# application, factory, request, and verify_candidate are supplied by the host.
+# request is an explicit WorkflowRequest selecting materials, scope and budgets.
 host = RunEvolutionHost(
     application, factory,
-    policy_id="my-fixed-policy-v1", verify=verify_candidate,
+    policy_id="my-fixed-policy-v1", verify=verify_candidate, request=request,
 )
 # In the host's event loop, after explicitly authorizing model work:
 # result = await PersistentEvolutionDriver().evolve(
@@ -149,7 +150,7 @@ host = RunEvolutionHost(
 # )
 ```
 
-The verifier returns `VerificationEvidence` bound to candidate/artifact/parent/policy identities, not merely a search score. Jobs live in `.fruitfly/evolution/`. Only confirmed activation advances the version. Unknown paid phases stop; activation interruptions reconcile the actual manifest. One coordinator owns the job; no cross-process commit transaction. See [RSI](../lab/rsi/README.md).
+The verifier returns `VerificationEvidence` bound to candidate/artifact/parent/policy identities, not merely a search score. For built-in completed proofs, omit `verify` and select `task-holdout-v1` or `improver-paired-v1` as appropriate. The host rechecks exact content, parent, material and execution identity without repeating paid verification. See [proof reuse](improvement/README.md#reuse-a-completed-independent-proof). Jobs live in `.fruitfly/evolution/`. Only confirmed activation advances the version. Unknown paid phases stop; activation interruptions reconcile the actual manifest. One coordinator owns the job; no cross-process commit transaction. See [RSI](../lab/rsi/README.md).
 
 Run exposes an optional `configuration.model_setup` service to the terminal. Model additions and hidden credentials stay in memory until configuration save; reset discards them. The factory's secret environment is updated after successful save, so the next session can use the model without restarting. Existing configuration-controller consumers can omit this service. Use [Configuration](../../CONFIGURATION.md) and [Providers](../providers/README.md) for supported APIs, generated key-variable names, and persistence limits.
 

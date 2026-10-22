@@ -14,9 +14,26 @@ class InteractiveCommand:
 
 
 @dataclass(frozen=True)
+class CommandSection:
+    """Read-only labelled rows; category is a presentation hint."""
+    category: str
+    title: str
+    rows: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True)
+class CommandPanel:
+    """Optional structured presentation alongside a command's text fallback."""
+    title: str
+    sections: tuple[CommandSection, ...]
+    footer: str = ""
+
+
+@dataclass(frozen=True)
 class CommandResult:
     text: str = ""
     should_exit: bool = False
+    panel: CommandPanel | None = None
 
 
 class CommandContext(Protocol):

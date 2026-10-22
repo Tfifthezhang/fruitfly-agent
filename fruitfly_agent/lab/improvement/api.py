@@ -22,6 +22,11 @@ from .registration import SETTINGS, EDITOR_CONFIG, EDITOR_INSTRUCTIONS
 from .materials import WorkspaceTaskSource
 from .experience import entry_to_dict, entry_from_dict, experience_id
 from .verification import CaseMeasurements, HoldoutVerification
+from .contracts.experiments import (ExperimentSpec, EpisodeRequest, EpisodeResult, EpisodeExecutor,
+    TrialReport, ExecutionRequest, ExecutionParameter, MaterialOption, PreparedExecution, ExecutionPorts, ExecutionDefinition)
+from .execution import ExecutionContext, ExecutionRegistry, builtin_executions
+from .workflow.budget import BudgetScope
+from .workflow.stopping import StopPolicy, SearchState, BoundedStopPolicy
 from .evidence.receipts import TaskReference, TaskRunEvidence, EvidenceArtifact
 from .evidence.reporting import SearchReport, TokenUsage, restore_search_report
 
@@ -40,6 +45,8 @@ class WorkflowBindings:
     editor: Callable[..., EditorSession] | None = None
     inspector: Callable[..., EvidenceInspector] | None = None
     components: Callable[..., ComponentRegistry] | None = None
+    executions: ExecutionRegistry | None = None
+    stop_policy: StopPolicy | None = None
 
 
 @dataclass(frozen=True)

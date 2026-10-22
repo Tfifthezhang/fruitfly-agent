@@ -5,6 +5,35 @@ from pathlib import Path
 import sys
 from types import ModuleType, SimpleNamespace
 from unittest.mock import patch
+import json
+
+from eval.harbor.host import HostConfig, Mount
+
+
+def prepared_harbor(root, names=("task",)):
+    """Minimal explicit prepared input for adapter command/secret tests."""
+    host = HostConfig(root / "host.yaml", root / "cache", "/opt/runtime/bin/python",
+                      (Mount(root / "runtime", "/opt/runtime"),))
+    receipt = {"runtime": {"python": host.python, "environment": host.runtime_env(),
+                            "host": host.identity(), "mounts": [m.to_dict() for m in host.mounts],
+                            "source": str(root / "source"), "installation": {"version": "0.1"}},
+               "tasks": [{"id": name, "name": name.rsplit("/", 1)[-1],
+                          "path": str(root / "tasks" / name.rsplit("/", 1)[-1])} for name in names]}
+    return host, receipt
+
+
+def installed_agent_inputs(agent, root):
+    """Stage the files that the bridge receives after job preparation."""
+    host, receipt = prepared_harbor(root)
+    agent.config_path = root / "config.yaml"
+    agent.model_catalog_path = root / "models.yaml"
+    agent.config_path.write_text("offline configuration")
+    agent.model_catalog_path.write_text("offline catalog")
+    (root / "preparation.json").write_text(json.dumps(receipt))
+    agent.runtime_python = host.python
+    agent.runtime_environment = host.runtime_env()
+    agent.preparation = receipt
+    return receipt
 
 
 class InstalledAgentDouble:

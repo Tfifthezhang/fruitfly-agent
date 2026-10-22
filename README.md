@@ -47,7 +47,7 @@ Our ambition is **recursive self-improvement (RSI)**: agents that improve their 
 | [Improvement](fruitfly_agent/lab/improvement/README.md) | Search and compare candidates for a fixed target under a defined objective. It can run independently. |
 | [RSI](fruitfly_agent/lab/rsi/README.md) | Verify and adopt changes to the system or its improver, then continue with the adopted implementation across generations. |
 
-The `/improvement` menu selects task materials, editable components, a candidate generator, exploration and budgets. Public protocols separate proposal, execution, composition, output selection, verification and reflection. Current-task outputs do not change profile defaults; persistent candidates require verification and human adoption. H/S/I retain separate identities. See [Improvement](fruitfly_agent/lab/improvement/README.md) for execution limits and [Learning](fruitfly_agent/lab/learning/README.md) for independent daily observations.
+The `/improvement` menu selects task materials, editable components, a candidate generator, exploration and budgets. Public protocols separate proposal, execution, composition, output selection, verification and reflection. Current-task outputs do not change profile defaults; persistent candidates require verification and human adoption. H/S/I retain separate identities. Registered [editor experiments](fruitfly_agent/lab/improvement/improver/README.md) compare downstream gains under fixed initial H/S and shared budgets. Lessons require explicit review before entering retained state. See [Improvement](fruitfly_agent/lab/improvement/README.md) for execution limits and [Learning](fruitfly_agent/lab/learning/README.md) for independent daily observations.
 
 | At a glance | Details |
 |---|---|
@@ -85,7 +85,7 @@ Expected output: `Offline response: example-guidance is active.` The example reg
 
 ## Choose your mechanisms
 
-Use the terminal configuration menu to assemble the harness for your task or experiment. Select a model and base prompt, enable or disable mechanisms, and choose their registered algorithms. Context, tools and environment are configured through the configuration menu. `/improvement` provides a separate experiment panel for target, algorithm, tasks, budgets and evaluation.
+Use the terminal configuration menu to assemble the harness for your task or experiment. Select a model and base prompt, enable or disable mechanisms, and choose their registered algorithms. Context, tools and environment are configured through the configuration menu. `/lab` shows the active harness in labelled sections, including its context mechanisms, execution environment and installed tools. `/improvement` provides a separate experiment panel for target, algorithm, tasks, budgets and evaluation.
 
 ![Compose a FruitFlyAgent harness: choose a model and base prompt, configure context, environment, tools, and improvement, then assemble a new Agent session](assets/mechanism-selection.svg)
 

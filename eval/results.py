@@ -4,11 +4,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any, Mapping
+from .harbor.diagnostics import attach_evidence, trial_diagnostics
 
 
-def load_harbor_job_result(path: Path) -> Mapping[str, Any]:
+def load_harbor_job_result(path: Path, *, allow_partial: bool = False) -> Mapping[str, Any]:
     """Load Harbor's job summary and its separately stored trial results."""
-    result = dict(_load_object(path))
+    result = dict(_load_object(path)) if path.is_file() or not allow_partial else {}
     embedded = result.get("trial_results")
     if embedded:
         return result
@@ -19,10 +20,15 @@ def load_harbor_job_result(path: Path) -> Mapping[str, Any]:
         and not isinstance(expected, bool)
         and expected > len(trial_paths)
     ):
-        raise ValueError(
-            f"Harbor job has {len(trial_paths)} of {expected} trial result files"
-        )
-    result["trial_results"] = [_load_object(trial_path) for trial_path in trial_paths]
+        if not allow_partial:
+            raise ValueError(f"Harbor job has {len(trial_paths)} of {expected} trial result files")
+        result["incomplete"] = {"reported": expected, "available": len(trial_paths)}
+    loaded = []
+    for trial_path in trial_paths:
+        trial = dict(_load_object(trial_path))
+        attach_evidence(trial, trial_path.parent)
+        loaded.append(trial)
+    result["trial_results"] = loaded
     return result
 
 
@@ -52,6 +58,11 @@ def parse_harbor_job_result(
         reward = _official_reward(trial)
         agent_result = trial.get("agent_result")
         status, error, timed_out = _trial_status(exception, reward)
+        diagnostics = trial_diagnostics(trial, reward=reward)
+        if diagnostics["state"] == "error" and error is None:
+            status = "error"
+            error = {"type": str(diagnostics["exceptions"][0]["type"]),
+                     "message": str(diagnostics["exceptions"][0]["message"])}
         errors += int(error is not None)
         timeouts += int(timed_out)
         if error is None and reward is not None:
@@ -84,6 +95,7 @@ def parse_harbor_job_result(
                 "metrics": metrics,
                 "error": error,
                 "runtime": _runtime_metadata(agent_result),
+                "execution": diagnostics,
             }
         )
     count = len(raw_trials)

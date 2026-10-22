@@ -62,7 +62,7 @@ class ApplicationPipelineTests(unittest.IsolatedAsyncioTestCase):
             try:
                 parent = factory.system_version()
                 request = WorkflowRequest(component_ids=('base_prompt',), generator_id='local-rule',
-                    task_pack_id='project', scope='persistent')
+                    task_pack_id='project', scope='persistent', verification='scored')
                 preview = app.workflow_preview(request)
                 records = await app.improve('', preview_token=preview.preview_token)
                 self.assertEqual(len(records), 1)
@@ -92,6 +92,7 @@ class ApplicationPipelineTests(unittest.IsolatedAsyncioTestCase):
             for text in ('reference output', 'candidate output', 'candidate output', 'composed output'):
                 provider.respond_tool_call('read', {'path': 'input.txt'})
                 provider.respond_text(text)
+            provider.respond_text('{"choice":"4","reason":"Selected the complete source-based output"}')
             providers = Mock()
             providers.create.return_value = provider
             generators = GeneratorRegistry()
@@ -120,8 +121,8 @@ class ApplicationPipelineTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual((root / 'input.txt').read_text(), 'Original task source')
                 result = app.improvement_history()[0]
                 self.assertIn('composed output', next(s.text for s in result.sections if s.title == 'Task output'))
-                self.assertEqual(len(provider.calls), 8)
-                for call in provider.calls[1::2]:
+                self.assertEqual(len(provider.calls), 9)
+                for call in provider.calls[1:8:2]:
                     self.assertIn('Original task source', repr(call['messages']))
                 with self.assertRaisesRegex(ValueError, 'unknown|consumed'):
                     await app.improve('', preview_token=preview.preview_token)
@@ -150,7 +151,7 @@ class ApplicationPipelineTests(unittest.IsolatedAsyncioTestCase):
             finally:
                 await app.close()
 
-    async def test_experience_commits_at_task_boundary_and_next_task_gets_common_baseline(self):
+    async def test_experience_requires_review_and_next_task_gets_common_baseline(self):
         from fruitfly_agent.lab.improvement.api import ExperienceEntry, experience_id
         class Remember:
             async def reflect(self, outcome):
@@ -178,16 +179,23 @@ class ApplicationPipelineTests(unittest.IsolatedAsyncioTestCase):
             try:
                 initial = factory.system_version()
                 original = factory._current_runtime_config.system_prompt
-                for _ in range(2):
+                for index in range(2):
                     for text in ('reference', 'probe', 'probe', 'final'):
                         provider.respond_text(text)
+                    provider.respond_text('{"choice":"4","reason":"Complete revised result"}')
                     preview = app.workflow_preview(WorkflowRequest('Complete a file task.',
                         component_ids=('base_prompt',), generator_id='local-rule'))
                     await app.improve('', preview_token=preview.preview_token)
+                    if index == 0:
+                        self.assertEqual(factory.system_version(), initial)
+                        pending = app.pending_experience()
+                        self.assertEqual(len(pending), 1)
+                        self.assertEqual(app.experience_action(pending[0].job_id, 'commit'), 'committed')
                 current = factory.system_version()
                 self.assertEqual((initial.harness, initial.improver), (current.harness, current.improver))
                 self.assertNotEqual(initial.state, current.state)
-                self.assertEqual(len(factory._experience_store.snapshot()), 2)
+                self.assertEqual(len(factory._experience_store.snapshot()), 1)
+                self.assertEqual(len(app.pending_experience()), 1)
                 self.assertEqual(len(requests[0].experience), 0)
                 self.assertEqual(len(requests[2].experience), 1)
                 self.assertEqual(requests[2].baseline.component('base_prompt').files[0].text, original)

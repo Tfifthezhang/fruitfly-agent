@@ -14,6 +14,7 @@ Keep model specifications, secrets, and runtime selections in separate files.
 | Harness configuration | `.fruitfly/config.yaml` | Profiles, catalog path, model choice, prompt references, and mechanism parameters |
 | Default configuration | `.fruitfly/default-config.yaml` | Independent baseline; editable manually, read-only in terminal configuration |
 | Default model catalog | `.fruitfly/default-models.yaml` | Baseline model settings; may reference the same key variable as daily models |
+| Eval host settings | `.fruitfly/eval-host.yaml` | Machine-local runtime mounts, task source and dependency/cache preparation; see [Harbor settings](eval/harbor/README.md) |
 | CLI overrides | Startup arguments | Workspace, configuration, profile, and session selection |
 
 `--cwd`, `--config`, and `--profile` select the process's workspace and configuration. `--approve-tools` explicitly answers tool confirmation requests for a fresh non-interactive task in a trusted isolated environment; protected paths remain denied. A relative `model.catalog` path resolves from the harness configuration file. The configuration menu saves choices for the next session; an active or resumed session keeps its validated runtime identity.
@@ -144,7 +145,7 @@ The capability page uses arrows and Space/Enter to toggle, then **Continue** to 
 | Execution workflow | Disabled; a bounded sequence of model stages. One solve-and-answer step until an artifact is selected. | [Workflow](fruitfly_agent/lab/workflow/README.md) |
 | Web search / fetch | Disabled; enable **Search the web** and **Fetch web pages** under Tools. Search uses Brave, Tavily or DeepSeek. Fetch uses `direct` (no key) or `deepseek`. Expand either tool and choose **Set up…** to select the service and enter a hidden API key. Save writes the secret file. DeepSeek search/fetch use separate default variables; `api_key_env` can select a shared key. | [Web tools and YAML settings](fruitfly_agent/lab/tools/web/README.md) |
 | Programmatic context | Explicitly enable `ipython-tool` or `rlm-ipython`. | [Programmatic context](fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md) |
-| Remote execution | Enable **SSH server** under Environment. Complete settings and credentials are reused; missing values open the six-step form. Expand **Set up…** to edit explicitly. Disabling retains saved settings across restarts in the same workspace/profile. Mutually exclusive with local execution, local IPython/RLM and file memory. | [SSH setup and limits](fruitfly_agent/lab/environment/ssh/README.md) |
+| Remote execution | Enable **Remote environment** under Environment to run file and Bash tools through SSH. Complete settings and credentials are reused; missing values open the six-step form. Expand **Set up…** to edit explicitly. Disabling retains saved settings across restarts in the same workspace/profile. Mutually exclusive with local execution, local IPython/RLM and file memory. | [SSH setup and limits](fruitfly_agent/lab/environment/ssh/README.md) |
 | RSI | Host-injected capabilities and verification policy; no default CLI switch. | [RSI](fruitfly_agent/lab/rsi/README.md) |
 
 Menus show mechanism switches and algorithm choices. Edit `.fruitfly/config.yaml` for detailed parameters. Summaries, improvement, and auxiliary model queries may incur model charges.
@@ -172,7 +173,7 @@ Create custom text with `DataArtifactStore.put_text`; see the [Run example](frui
 
 `tool-guidance.<name>` replaces an enabled tool description with its owner-validated text. `/improvement` selects one or more editable components. A joint candidate expands into ordinary prompt/artifact bindings; tool schemas, execution and permissions retain their existing contracts. Preview is offline; execution may incur model and external-runner costs.
 
-`execution-workflow` validates bounded stage instructions. `skill-document` and `learned-memory` are retained S documents; adopted artifacts override initial text. `improvement-editor` is an I stage-instruction artifact, requiring an explicit improver-comparison runner. Persistent publication requires independent verification and explicit adoption.
+`execution-workflow` validates bounded stage instructions. `skill-document` and `learned-memory` are retained S documents; adopted artifacts override initial text. `improvement-editor` is a six-field I instruction artifact. The registered editor-comparison execution can modify `invariant`, `domain` and `compose`; `system`, `select` and `reflect` stay fixed during an experiment. Persistent publication requires independent verification and explicit adoption.
 
 ## Environment variables
 
@@ -200,7 +201,10 @@ With no initial choice, a sole catalog entry is selected automatically. Multiple
 | Candidates | `.fruitfly/improvement/candidates/`; latest complete result per configuration, profile, target, and task pack |
 | Text contents | `.fruitfly/artifacts/`; immutable content-addressed artifacts |
 | Workflow records | `.fruitfly/improvement/jobs/<job-id>/`; frozen plan, journal and result |
-| Experience | `.fruitfly/improvement/experience.json`; attributed library included in S identity |
+| Experience | `.fruitfly/improvement/experience.json`; explicitly committed library included in S identity |
+| Pending lessons | `.fruitfly/improvement/experience-pending/`; review before commit/reject |
+| Editor experiments | `.fruitfly/improvement/experiments/<id>/experiment.json`; references disjoint task packages |
+| Private-suite claims | `.fruitfly/improvement/verification-uses.json`; completed or uncertain verification consumes a declared use |
 | Explicit evolution jobs | `.fruitfly/evolution/`; host-owned phases, policy, and activation evidence |
 
 Referenced results remain protected. Failed or cancelled searches do not replace a complete candidate. Editing a readable export does not change the runtime. See [Improvement](fruitfly_agent/lab/improvement/README.md#results-and-retention) for retention and [Run](fruitfly_agent/run/README.md#recovery) for compatibility rules.
@@ -243,12 +247,15 @@ local code still has current-user permissions; isolation is not implemented.
 
 Host-owned `PermissionPolicy.allow_network=True` allows declared network-read tools; false denies them before execution. This does not restrict Providers, live context or approved shell code. Search/fetch credentials use the same process-over-secret-file precedence as model credentials. Their **Set up…** forms accept hidden keys and share the model credential draft and save transaction. Keys are written only when configuration is saved; manual secret-file/environment setup remains supported. Never put key values in mechanism parameters.
 
-### Bound external task execution
+### Bound registered improvement execution
 
-External streams share the confirmed model-call and execution allocation across
-tasks. A trial leases up to 24 remaining model calls and has a 1800-second executor
-deadline; the workflow operation timeout may impose a smaller deadline. Unknown
-usage retains its reservation. There is no implicit whole-job monetary budget.
+All editor requests and leaf task executions, including nested experiments and
+verification, share one root allowance. Child budgets hold quota and charge leaf
+work once. Final selection and independent verification retain protected quota;
+unspent search allowance can supplement final verification. Missing token/cost
+usage remains unknown. Task and parent-operation timeouts bound child operations.
+External execution needs an explicitly registered compatible runner; the native
+file workspace does not inherit Bash, network tools, containers or live Session.
 
 ## Configure daily learning material
 
@@ -305,3 +312,26 @@ stages. Changing an execution backend requires a compatible `TaskRunner`; the
 native improvement file workspace does not inherit the active SSH/Bash environment.
 No dedicated search-tool API key is needed for component editing; web search/fetch
 credentials remain independent tool settings.
+
+## Configure an editor comparison
+
+In `/improvement`, choose **Execution strategy → Editor self-improvement** and an
+installed experiment under **Task**. **Execution parameters** declares inner H/S
+components, repetitions, inner allocations, development trial limit and fixed
+acceptance thresholds. These are per-job settings, not new model credentials or
+harness YAML fields. The strategy recommends 512 root model calls and 256 leaf
+executions; preview rejects a budget below its calculated minimum. Longer model
+latency or larger suites may require a higher operation timeout and allocations.
+Actual calls incur cost only after explicit confirmation.
+
+Prepare independent development and verification packages, each with train,
+selection and holdout. The exact manifest, parameters, data separation, proof and
+limits are documented in [Editor self-improvement](fruitfly_agent/lab/improvement/improver/README.md).
+Selecting I alone does not grant execution support; ordinary file trials reject I
+and mixed outer H/S/I comparison is unsupported.
+
+Every task execution uses fixed components. Search stopping is recorded separately
+from `selected` or `verified` assurance. A task-local result changes no default.
+Lessons remain pending until **Results and history → Pending experience** explicitly
+commits or rejects them. A library change invalidates a stale pending commit.
+Persistent I experiments cannot write production experience.

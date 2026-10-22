@@ -11,11 +11,11 @@ from fruitfly_agent.core.data_model import AgentToolResult, AssistantMessage, Te
 from fruitfly_agent.core.tool_runtime import AgentTool
 from fruitfly_agent.core.tool_runtime.authorization import AuthorizationDecision
 from fruitfly_agent.interactive import InteractiveSession, TerminalFrontend, TerminalRenderer
-from fruitfly_agent.interactive.contracts.commands import InteractiveCommand
 from fruitfly_agent.interactive.contracts.events import ToolStarted, ToolFinished, ToolOutput, event_from_dict
+from fruitfly_agent.interactive.interaction.commands import HELP_TEXT
 from fruitfly_agent.lab.tools.bash import create_bash_tool
 from tests.support.faux_provider import FauxProvider
-from tests.support.terminal import ScriptedLines, run_finished
+from tests.support.terminal import ScriptedLines
 
 
 class ToolPresentationTests(unittest.IsolatedAsyncioTestCase):
@@ -141,6 +141,7 @@ class ToolPresentationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(output.getvalue().count('x'), 600)
         self.assertEqual(output.getvalue().count('y'), 200)
         self.assertIn('live tool output truncated', output.getvalue())
+        self.assertNotIn('/tools', output.getvalue())
 
     async def test_escaped_live_output_is_bounded_and_result_status_is_explicit(self):
         output = io.StringIO()
@@ -150,21 +151,25 @@ class ToolPresentationTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('live tool output truncated', output.getvalue())
         for status, label in (('succeeded', 'Completed'), ('failed', 'Failed'), ('cancelled', 'Cancelled')):
             await renderer.render(ToolFinished(run_id='r', tool_call_id=status, tool_name='custom',
-                description='Inspect resource', status=status, output='observed result', terminate=False))
+                description='Inspect resource', status=status, output='observed result\n' * 100, terminate=False))
             self.assertIn('Inspect resource · ' + label, output.getvalue())
         await renderer.close()
+        self.assertNotIn('/tools', output.getvalue())
 
-    async def test_details_command_uses_retained_results_without_extra_model_calls(self):
+    async def test_removed_tools_command_is_rejected_without_replaying_results(self):
         body = 'retained output\n' * 100
         session, events, _ = await self.submit(self.tool(execute=lambda ctx: AgentToolResult(content=[TextBlock(body)])))
+        history = session.conversation()
+        retained = session.trace(200)
         output = io.StringIO()
         frontend = TerminalFrontend(session, output_stream=output, input_stream=io.StringIO(),
             line_editor=ScriptedLines('/tools', '/tools call_1', '/tools missing', '/exit'))
         await frontend.run()
-        self.assertIn('call_1 · Inspect resource · succeeded', output.getvalue())
-        self.assertIn(body, output.getvalue())
-        self.assertIn('unavailable in the retained event window', output.getvalue())
-        self.assertEqual(len([e for e in session.trace(200) if isinstance(e, ToolFinished)]), 1)
+        self.assertNotIn('/tools', HELP_TEXT)
+        self.assertEqual(output.getvalue().count('unknown command: /tools; use /help'), 3)
+        self.assertNotIn(body, output.getvalue())
+        self.assertEqual(session.conversation(), history)
+        self.assertEqual(session.trace(200), retained)
 
 
 if __name__ == '__main__':

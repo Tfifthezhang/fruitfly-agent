@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from collections import Counter
 import os
 from pathlib import Path
 import shutil
@@ -14,7 +13,6 @@ from typing import Any, Mapping
 
 from fruitfly_agent.providers.config import load_env
 from fruitfly_agent.providers.workspace import WorkspacePaths
-from eval.installation import resolve_installation
 from eval.contracts import EvaluationRequest, SCHEMA_VERSION
 from dataclasses import asdict
 
@@ -22,6 +20,11 @@ from .base import BenchmarkDescriptor, BenchmarkVariant, PreflightResult, Progre
 from eval.runner import run_harbor_job
 from eval.runtime import prepare_runtime
 from eval.results import load_harbor_job_result, parse_harbor_job_result
+from eval.harbor.host import HostConfig
+from eval.harbor.preparation import inspect as inspect_preparation, job_environment, load_preparation
+from eval.harbor.dependencies import dependency_environment
+from eval.harbor.material import write_json
+from eval.harbor.tasks import validate_coverage
 
 
 HARBOR_AGENT_IMPORT = "eval.harbor_agent:FruitFlyHarborAgent"
@@ -33,7 +36,7 @@ def harbor_descriptor(*, benchmark_id: str, label: str, description: str,
     """Declare a dataset using the shared container execution and reward contract."""
     return BenchmarkDescriptor(
         benchmark_id=benchmark_id, label=label, description=description,
-        version=version, dataset=dataset, adapter_version="5",
+        version=version, dataset=dataset, adapter_version="6",
         variants=(
             BenchmarkVariant("smoke", "Single-task smoke", "Validate one complete evaluation path",
                              task_names=(smoke_task,)),
@@ -44,7 +47,7 @@ def harbor_descriptor(*, benchmark_id: str, label: str, description: str,
         ),
         metric_names=("success_rate", "official_reward", "error_rate", "timeout_rate",
                       "input_tokens", "output_tokens", "cost_usd", "latency_ms"),
-        network={"provider": True, "control_plane": True, "task_environment": True, "verifier": False},
+        network={"provider": True, "control_plane": True, "task_environment": True, "verifier": True},
         isolation="harbor_task_container", smoke_task=smoke_task,
     )
 
@@ -91,6 +94,10 @@ class HarborBenchmarkAdapter:
         self._harbor_command = harbor_command
         self._docker_command = docker_command
         self._gpu_command = gpu_command
+        self.host_config_path: str | None = None
+
+    def configure_host(self, path: str) -> None:
+        self.host_config_path = path
 
     def preflight(self, variant: str) -> PreflightResult:
         variants = {item.variant_id for item in self.descriptor.variants}
@@ -178,14 +185,19 @@ class HarborBenchmarkAdapter:
         request = EvaluationRequest.read(request_path)
         if request.benchmark.benchmark_id != self.descriptor.benchmark_id or request.benchmark.variant != variant:
             raise ValueError("runner benchmark selection differs from request")
-        source_root = resolve_installation(os.environ.get("FRUITFLY_EVAL_PACKAGE"),
-                                           checkout=Path(__file__).resolve().parents[2])
         preflight = self.preflight(variant)
         if not preflight.available:
             raise RuntimeError(str(next(item for item in preflight.checks if not item["ok"])["detail"]))
+        host = HostConfig.read(Path(request.runtime.working_directory), self.host_config_path)
+        preparation = load_preparation(host, self.descriptor, variant)
+        readiness = inspect_preparation(request, self.descriptor, host, docker=self._docker_command or "docker", receipt=preparation)
+        if not readiness["available"]:
+            raise ValueError("Harbor preparation check failed: " + json.dumps(readiness["checks"]))
         runtime, execution = asdict(request.runtime), asdict(request.execution)
         job_root = result_path.parent / "harbor"
         job_root.mkdir(parents=True, exist_ok=True)
+        write_json(job_root / "preparation.json", preparation)
+        write_json(job_root / "readiness.json", readiness)
         paths = WorkspacePaths(Path(request.runtime.working_directory))
         for notice in paths.notices():
             print(f"notice: {notice}", file=sys.stderr)
@@ -200,32 +212,42 @@ class HarborBenchmarkAdapter:
         job_name = self.descriptor.benchmark_id
         command = self._command(executable=preflight.command[0], dataset=self.descriptor.dataset,
             variant=variant, execution=execution, jobs_dir=job_root, job_name=job_name,
-            source_root=source_root, config_path=config_path, model_catalog=model_catalog,
-            profile=selected_profile, secret_names=secret_names)
+            config_path=config_path, model_catalog=model_catalog,
+            profile=selected_profile, secret_names=secret_names, host=host, preparation=preparation)
         if progress is not None:
             progress({"type": "job_started", "job_id": job_name, "artifacts_path": str(job_root)})
-        code, detail = run_harbor_job(command, environment=environment,
-            timeout=request.execution.timeout_seconds, job_root=job_root, progress=progress, job_id=job_name)
-        if code:
-            raise RuntimeError(f"Harbor exited with {code}: {detail[-2000:]}\nFull runner log: {job_root / 'harbor.log'}")
+        runner_error = None
+        try:
+            code, detail = run_harbor_job(command, environment=environment,
+                timeout=request.execution.timeout_seconds, job_root=job_root, progress=progress, job_id=job_name,
+                docker=self._docker_command or "docker")
+            if code:
+                runner_error = f"Harbor exited with {code}: {detail[-2000:]}"
+        except (RuntimeError, KeyboardInterrupt) as exc:
+            runner_error = str(exc) or "evaluation interrupted"
         job_result_path = job_root / job_name / "result.json"
-        if not job_result_path.is_file():
+        if not job_result_path.parent.is_dir():
             candidates = tuple(job_root.glob("*/result.json"))
             if len(candidates) != 1:
-                raise RuntimeError("Harbor did not create a unique job result")
+                raise RuntimeError((runner_error or "Harbor did not create a unique job result")
+                                   + f"\nFull runner log: {job_root / 'harbor.log'}")
             job_result_path = candidates[0]
-        trials, metrics = parse_harbor_job_result(load_harbor_job_result(job_result_path), job_id=job_name)
-        selected_names = next(item.task_names for item in self.descriptor.variants if item.variant_id == variant)
-        if selected_names:
-            expected = Counter({name: request.execution.attempts for name in selected_names})
-            if Counter(trial["task_id"] for trial in trials) != expected:
-                raise ValueError("Harbor results do not match the selected task batch and attempt count")
-        payload: dict[str, Any] = {"schema_version": SCHEMA_VERSION, "status": "completed", "metrics": metrics,
-            "errors": {}, "trials": trials,
+        data = load_harbor_job_result(job_result_path, allow_partial=True)
+        trials, metrics = parse_harbor_job_result(data, job_id=job_name)
+        errors = {"runner": runner_error} if runner_error else {}
+        try:
+            validate_coverage(preparation["tasks"], trials, request.execution.attempts)
+        except ValueError as exc:
+            errors["coverage"] = str(exc)
+            metrics = []  # Partial samples cannot establish a full selection score.
+        payload: dict[str, Any] = {"schema_version": SCHEMA_VERSION, "status": "failed" if errors else "completed", "metrics": metrics,
+            "errors": errors, "trials": trials,
             "artifacts": [{"kind": "harbor_job", "path": str(job_result_path.parent)},
                           {"kind": "harbor_log", "path": str(job_root / "harbor.log")},
                           {"kind": "runtime_config", "path": str(config_path)},
-                          {"kind": "model_catalog", "path": str(model_catalog)}]}
+                          {"kind": "model_catalog", "path": str(model_catalog)},
+                          {"kind": "preparation", "path": str(job_root / "preparation.json")},
+                          {"kind": "readiness", "path": str(job_root / "readiness.json")}]}
         if receipt.is_file():
             payload["artifacts"].append({"kind": "runtime_snapshot", "path": str(receipt)})
             payload["runtime_snapshot"] = json.loads(receipt.read_text(encoding="utf-8"))
@@ -242,56 +264,35 @@ class HarborBenchmarkAdapter:
         execution: Mapping[str, Any],
         jobs_dir: Path,
         job_name: str,
-        source_root: Path,
         config_path: Path,
         model_catalog: Path,
         profile: str,
         secret_names: tuple[str, ...],
+        host: HostConfig,
+        preparation: dict[str, Any],
     ) -> list[str]:
-        command = [
-            executable,
-            "run",
-            "--dataset",
-            dataset,
-            "--agent",
-            HARBOR_AGENT_IMPORT,
-            "--env",
-            "docker",
-            "--n-attempts",
-            str(execution.get("attempts", 1)),
-            "--n-concurrent",
-            str(execution.get("concurrency", 1)),
-            "--jobs-dir",
-            str(jobs_dir),
-            "--job-name",
-            job_name,
-            "--yes",
-            "--agent-kwarg",
-            f"source_root={source_root}",
-            "--agent-kwarg",
-            f"config_path={config_path}",
-            "--agent-kwarg",
-            f"model_catalog_path={model_catalog}",
-            "--agent-kwarg",
-            f"profile={profile}",
-            "--agent-kwarg",
-            f"secret_names={','.join(secret_names)}",
-        ]
         selected = next((item for item in self.descriptor.variants if item.variant_id == variant), None)
         if selected is None:
             raise ValueError(f"unknown execution profile {variant!r}")
-        task_names = selected.task_names
-        if variant == "smoke" and not task_names:
-            if not self.descriptor.smoke_task:
-                raise ValueError(
-                    f"{self.descriptor.benchmark_id} does not declare a smoke task"
-                )
-            task_names = (self.descriptor.smoke_task,)
-        if task_names:
-            for name in task_names:
-                command.extend(("--include-task-name", name))
-            command.extend(("--n-tasks", str(len(task_names))))
-        return command
+        if not preparation["tasks"]:
+            raise ValueError("prepared task selection is empty")
+        payload = {
+            "job_name": job_name, "jobs_dir": str(jobs_dir),
+            "n_attempts": int(execution.get("attempts", 1)),
+            "n_concurrent_trials": int(execution.get("concurrency", 1)),
+            "retry": {"max_retries": 0},
+            "environment": job_environment(host, preparation),
+            "verifier": {"env": {**dependency_environment(host), **host.verifier_env}},
+            "tasks": [{"path": task["path"], "source": dataset} for task in preparation["tasks"]],
+            "agents": [{"import_path": HARBOR_AGENT_IMPORT, "kwargs": {
+                "config_path": str(config_path),
+                "model_catalog_path": str(model_catalog), "profile": profile,
+                "secret_names": ",".join(secret_names),
+            }}],
+        }
+        config = jobs_dir / "harbor-job.json"
+        write_json(config, payload)
+        return [executable, "run", "--config", str(config), "--yes"]
 
 
 __all__ = ["HARBOR_AGENT_IMPORT", "HarborBenchmarkAdapter", "harbor_descriptor"]

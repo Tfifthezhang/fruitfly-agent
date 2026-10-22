@@ -72,10 +72,11 @@ class CommandRouterTest(unittest.TestCase):
         )
 
         self.assertIn("model: offline-model", status.text)
-        self.assertIn("Lab mechanisms", lab.text)
-        self.assertIn("  Context Manager", lab.text)
-        self.assertIn("    Reduction\n      - Compaction", lab.text)
-        self.assertIn("    Augmentation\n      - File memory", lab.text)
+        self.assertIn("Lab · Active session", lab.text)
+        self.assertIn("Context Manager", lab.text)
+        self.assertIn("Reduction: Compaction", lab.text)
+        self.assertIn("Augmentation: File memory", lab.text)
+        self.assertIn("Tools\n  read: Enabled\n  bash: Enabled", lab.text)
         self.assertNotIn("Model-facing tools", lab.text)
         self.assertNotIn("  - read", lab.text)
         self.assertEqual(trace.text, "  1 run_started run=abcdefgh\n")
@@ -116,14 +117,14 @@ class CommandRouterTest(unittest.TestCase):
             InteractiveCommand(name="lab"), ContextManagerContext()
         )
 
-        self.assertIn("  Context Manager", result.text)
-        self.assertIn("    Augmentation\n      - Information context", result.text)
+        self.assertIn("Context Manager", result.text)
+        self.assertIn("Augmentation: Information context", result.text)
         self.assertNotIn("Selection", result.text)
         self.assertIn(
-            "    Externalization\n      - Programmatic Context (RLM)",
+            "Externalization: Programmatic Context (RLM)",
             result.text,
         )
-        self.assertIn("    Reduction\n      - none", result.text)
+        self.assertIn("Reduction: Not enabled", result.text)
 
     def test_invalid_and_unknown_commands_keep_existing_messages(self) -> None:
         invalid = self.router.execute(

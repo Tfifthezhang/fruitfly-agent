@@ -294,9 +294,10 @@ class RunApplicationFactory:
             direction=outcome.plan.direction, seed_score=None, validation_score=None, metric_calls=len(outcome.records),
             evidence=(('Independent confirmation', 'passed'), ('Version candidate', candidate.candidate_id),
                       ('Changed axes', ', '.join(sorted({c.role for c in candidate.changes}))),
-                      ('Component job', '.fruitfly/improvement/jobs/' + outcome.plan.job_id)),
+                      ('Component job', '.fruitfly/improvement/jobs/' + outcome.plan.job_id),
+                      *((('Verification receipt', outcome.verification),) if outcome.verification else ())),
             snapshot=target.snapshot(), config_path=self.candidate_scope()[0], profile_id=self.candidate_scope()[1],
-            task_pack_id=outcome.task.origin.removeprefix('task-pack:') if outcome.task.origin.startswith('task-pack:') else '',
+            task_pack_id=outcome.task.origin.partition(':')[2],
             task_pack_name=outcome.task.origin, task_pack_hash=outcome.task.material_id)
         from .storage.results import save_task_result
         save_task_result(self.cwd, record, text)
@@ -403,6 +404,11 @@ class RunApplicationFactory:
 
     async def prepare_candidate(self, active_manifest, candidate_id):
         return await self._candidate_service.prepare_candidate(active_manifest, candidate_id)
+
+    def verified_candidate(self, record, policy_id):
+        self._candidate_service.check_scope(record)
+        self.check_candidate_version(record)
+        return self._component_jobs.verified_candidate(record, policy_id)
 
 
 __all__ = ["RunApplicationFactory", "check_session_manifest", "discover_resumable_sessions"]

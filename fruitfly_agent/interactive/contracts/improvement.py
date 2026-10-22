@@ -33,6 +33,18 @@ class WorkflowConfiguration:
     scopes: tuple[WorkflowChoice, ...]
     parameters: tuple['ImprovementParameterView', ...] = ()
     materials: tuple[WorkflowChoice, ...] = ()
+    executions: tuple['WorkflowExecutionView', ...] = ()
+
+
+@dataclass(frozen=True)
+class WorkflowExecutionView:
+    execution_id: str
+    label: str
+    component_ids: tuple[str, ...]
+    materials: tuple[WorkflowChoice, ...]
+    parameters: tuple['ImprovementParameterView', ...]
+    notice: str
+    defaults: tuple[tuple[str, object], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -51,6 +63,8 @@ class WorkflowRequest:
     operation_timeout: float = 120
     direction: str = ''
     task_pack_id: str = ''
+    execution_id: str = 'file-task'
+    execution_parameters: tuple[tuple[str, object], ...] = ()
 
 
 @runtime_checkable

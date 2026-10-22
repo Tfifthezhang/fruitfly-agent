@@ -30,9 +30,10 @@ Add tools, execution backends, context strategies, and improvement algorithms th
 
 Improvement runs independently of RSI. Its public stage contracts separate proposal, execution, composition, output selection, verification and reflection. Persistent RSI requires an explicit host and verification policy; only confirmed activation advances the deployed version.
 
-Generators implement `CandidateGenerator`; `WorkflowBindings` injects replaceable stages. Existing H/S text owners reuse the same execution and adoption path. I edits require an explicit improver-comparison runner.
+Generators implement `CandidateGenerator`; `WorkflowBindings` injects replaceable stages. Existing H/S text owners reuse the same execution and adoption path. I edits use the registered fixed-depth editor-comparison runner and independent paired verification.
+See [editor experiments](improvement/improver/README.md).
 
-Task-local work can use execution evidence without answers or scores. Persistent candidates require independent verification before human adoption. Attributed experience is retained separately at task boundaries.
+Task-local work can use execution evidence without answers or scores. Persistent candidates require independent verification before human adoption. Attributed experience is staged separately at task boundaries and enters the library only after explicit review.
 
 ## Develop an algorithm
 

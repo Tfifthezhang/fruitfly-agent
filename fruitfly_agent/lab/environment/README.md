@@ -4,8 +4,9 @@
 
 `LocalEnv` accesses the host filesystem and runs local shell commands through Core's execution contracts.
 
-Select the optional [SSH server backend](ssh/README.md) to run file and Bash
-tools on an external server. It supports configurable host/port, remote paths,
+Choose **Local environment** to execute on the machine or container running the
+Agent. Select [Remote environment](ssh/README.md) to run file and Bash
+tools on an external server through SSH. It supports configurable host/port, remote paths,
 password authentication through the host secret environment, verified host keys,
 and remote process supervision. Local sessions and model calls stay local.
 

@@ -19,6 +19,7 @@ from fruitfly_agent.lab.catalog import (
 )
 from fruitfly_agent.run.configuration import HarnessProfile
 from fruitfly_agent.run import DataArtifactStore, build_runtime
+from fruitfly_agent.run.adapters.runtime import describe_runtime
 
 
 from fruitfly_agent.run.application import discover_resumable_sessions
@@ -312,6 +313,40 @@ class RuntimeAssemblyTest(unittest.TestCase):
 
         self.assertEqual(first.manifest.digest, second.manifest.digest)
         self.assertEqual(set(first.manifest.models), {"main", "auxiliary-1"})
+
+    def test_runtime_overview_includes_capabilities_and_preserves_experimental_ids(self) -> None:
+        catalog = builtin_catalog()
+        profile = HarnessProfile('default', str(self.model_path), 'offline', catalog.default_selections())
+        with Session(self.root / 'overview.jsonl') as session:
+            runtime = self.assemble(profile, session, catalog=catalog)
+        experiment_ids, details, tool_categories = describe_runtime(runtime, catalog)
+        views = {item.mechanism_id: item for item in details}
+        self.assertNotIn('local-env', experiment_ids)
+        self.assertNotIn('read-tool', experiment_ids)
+        self.assertEqual('environment', views['local-env'].category)
+        self.assertEqual('tools', views['read-tool'].category)
+        self.assertEqual(('read',), views['read-tool'].tool_names)
+        self.assertEqual('reduction', views['compaction'].display_section)
+        self.assertNotIn('information-context', views)
+        self.assertNotIn('web-search-tool', views)
+        self.assertEqual('tools', tool_categories['read'])
+        self.assertEqual([], runtime.config.provider.calls)
+
+    def test_runtime_overview_respects_registration_category_metadata(self) -> None:
+        from fruitfly_agent.lab.catalog import LabCatalog
+
+        catalog = builtin_catalog()
+        catalog = LabCatalog(tuple(
+            replace(definition, configuration_category='learning')
+            if definition.descriptor.mechanism_id == 'skill-catalog' else definition
+            for definition in catalog.definitions()
+        ))
+        profile = HarnessProfile('default', str(self.model_path), 'offline', catalog.default_selections())
+        with Session(self.root / 'overview-category.jsonl') as session:
+            runtime = self.assemble(profile, session, catalog=catalog)
+        _, details, _ = describe_runtime(runtime, catalog)
+        view = next(item for item in details if item.mechanism_id == 'skill-catalog')
+        self.assertEqual('learning', view.category)
 
     def test_builtin_tools_are_individually_selectable(self) -> None:
         root = self.root

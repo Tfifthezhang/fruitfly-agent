@@ -24,3 +24,10 @@ Task packages provide optional private scoring and independent verification:
 These are authored examples, not representative benchmarks. Install complete
 packages in a separate workspace. The active component snapshot is the baseline;
 `baseline.txt` is an optional reference. Follow [Task packages](../../fruitfly_agent/lab/improvement/tasks/README.md).
+
+For fixed-depth editor experiments, prepare separate development and verification
+task packages and follow [Improve editor instructions](../../fruitfly_agent/lab/improvement/improver/README.md).
+That guide provides the exact experiment manifest and a `WorkflowRequest`. Preview
+is offline; submitting its model-based experiment may incur charges. The
+[editor evolution tests](../../tests/workflows/test_editor_evolution.py) demonstrate
+actual binding and multi-generation activation with synthetic offline Providers.

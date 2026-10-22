@@ -5,8 +5,12 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import socket
 import time
+import uuid
 from typing import Any, Callable, Mapping
+from .harbor.lifecycle import retire_containers, terminate_process
+from .harbor.material import write_json
 
 ProgressSink = Callable[[dict[str, Any]], None]
 
@@ -14,6 +18,7 @@ ProgressSink = Callable[[dict[str, Any]], None]
 def run_harbor_job(
     command: list[str], *, environment: Mapping[str, str], timeout: int,
     job_root: Path, progress: ProgressSink | None, job_id: str,
+    docker: str | None = None,
 ) -> tuple[int, str]:
     """Retry transient registry errors only before Harbor creates a job."""
 
@@ -26,7 +31,7 @@ def run_harbor_job(
         code, detail = _run_harbor_job_once(
             command, environment=environment, timeout=remaining,
             job_root=job_root, progress=progress,
-            job_id=job_id, log_offsets=log_offsets,
+            job_id=job_id, log_offsets=log_offsets, docker=docker,
         )
         path = job_root / "harbor.log"
         text = path.read_text(encoding="utf-8", errors="replace")
@@ -56,6 +61,7 @@ def _run_harbor_job_once(
     command: list[str], *, environment: Mapping[str, str], timeout: float,
     job_root: Path, progress: ProgressSink | None, job_id: str,
     log_offsets: dict[Path, int],
+    docker: str | None = None,
 ) -> tuple[int, str]:
     """Stream ephemeral display events; the normal session remains the record."""
 
@@ -81,13 +87,23 @@ def _run_harbor_job_once(
     with output_path.open("w+b") as output:
         process = subprocess.Popen(
             command, stdout=output, stderr=subprocess.STDOUT,
-            env=dict(environment),
+            env=dict(environment), start_new_session=True,
         )
+        control = {"schema_version": 1, "token": uuid.uuid4().hex,
+                   "state": "running", "hostname": socket.gethostname(),
+                   "owner_pid": os.getpid(), "child_pid": process.pid,
+                   "docker": docker, "job_id": job_id}
         started_at = time.monotonic()
         deadline = started_at + timeout
         next_update = started_at
         try:
+            write_json(job_root / "control.json", control)
             while process.poll() is None:
+                stop_path = job_root / "stop-request.json"
+                if stop_path.is_file():
+                    stop = json.loads(stop_path.read_text())
+                    if stop.get("token") == control["token"]:
+                        raise RuntimeError("Harbor evaluation stopped by request")
                 if progress is not None:
                     _forward_agent_events(
                         job_root, job_id, offsets, fragments, observe
@@ -107,8 +123,6 @@ def _run_harbor_job_once(
                         })
                         next_update = now + 5
                 if time.monotonic() >= deadline:
-                    process.kill()
-                    process.wait()
                     raise RuntimeError(f"Harbor job timed out after {timeout} seconds")
                 time.sleep(0.2)
             if progress is not None:
@@ -119,9 +133,17 @@ def _run_harbor_job_once(
                     job_root, job_id, finished_trials, observe
                 )
         finally:
-            if process.poll() is None:
-                process.kill()
-                process.wait()
+            cleanup: dict[str, Any] = {"state": "finished", "containers_removed": []}
+            try:
+                terminate_process(process)
+                if docker is not None:
+                    cleanup["containers_removed"] = retire_containers(job_root, docker, dict(environment))
+            except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
+                cleanup.update(state="cleanup_failed", error=str(exc))
+                raise RuntimeError("Harbor cleanup is unconfirmed; inspect cleanup.json") from exc
+            finally:
+                write_json(job_root / "cleanup.json", cleanup)
+                write_json(job_root / "control.json", {**control, "state": cleanup["state"]})
             if progress is not None:
                 _forward_logs(
                     job_root, job_id, log_offsets, log_fragments,

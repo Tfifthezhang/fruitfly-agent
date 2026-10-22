@@ -3,13 +3,11 @@ from fruitfly_agent.interactive.contracts.commands import CommandResult
 from fruitfly_agent.interactive.terminal.features.configuration.command import configuration_handler
 from fruitfly_agent.interactive.terminal.features.improvement.command import improvement_handler
 from fruitfly_agent.interactive.terminal.features.resume.command import resume_handler
-from fruitfly_agent.interactive.terminal.features.tool_details import tool_details_handler
 
 
 def bind_commands(registry, *, bindings, configuration, status, cancel,
                   menu_scope, input_stream, output_stream, line_editor, write,
-                  welcome, show_history, improvement_frontend, trace):
-    registry.register('tools', tool_details_handler(trace=trace))
+                  welcome, show_history, improvement_frontend):
     def cancel_command(command):
         if command.arguments:
             return CommandResult(text="usage: /cancel\n")

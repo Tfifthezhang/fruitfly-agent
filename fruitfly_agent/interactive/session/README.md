@@ -13,6 +13,14 @@ Integrate the public Core loop with multi-turn conversation state and frontend o
 
 InteractiveSession implements [RuntimeSession](../contracts/runtime.py). Canonical facts remain distinct from model context projections. History reads do not emit events or run tools/models. TaskMaterials selects completed text tasks and records original-output hashes, message identity, session path, and parent manifest. It does not decide when saving is allowed; Application checks that boundary.
 
+With a Session store, `status.message_count` and `RunStarted.message_count` count
+committed `message` records, including user, assistant and tool-result messages.
+Reads include records appended by the active loop and preserve the original total
+after compaction or restoration. They exclude metadata, compaction records,
+stream fragments and inputs waiting to become messages. Counting reads Session
+records without decoding message bodies or mutating storage. Hosts without a
+Session store retain the in-memory message-list fallback.
+
 Durable message storage belongs to [Core Session](../../core/session/README.md). Persisted configuration/artifact recovery belongs to Run. Cancellation uses a cooperative signal and a short interrupt grace; it cannot preempt arbitrary synchronous or noncooperating code. Event observer isolation belongs to [Interaction](../interaction/README.md).
 
 No new environment variables or model training. Submission invokes the injected Core loop/Provider and can have model/tool effects; offline checks use substitutes.

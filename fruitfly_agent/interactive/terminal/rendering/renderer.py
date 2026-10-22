@@ -23,6 +23,7 @@ from fruitfly_agent.interactive.contracts.events import (
     ToolStarted,
 )
 from fruitfly_agent.interactive.contracts.models import ConversationMessage, InteractiveStatus
+from fruitfly_agent.interactive.contracts.commands import CommandResult
 from fruitfly_agent.interactive.terminal.rendering.history import render_history_message
 from fruitfly_agent.interactive.terminal.rendering.branding import FRUIT_FLY_ICON
 from fruitfly_agent.interactive.terminal.rendering.markdown import MarkdownStreamPresenter, MarkdownUpdate
@@ -36,6 +37,7 @@ from fruitfly_agent.interactive.terminal.io.text import (
 )
 from fruitfly_agent.interactive.terminal.rendering.welcome import render_welcome
 from fruitfly_agent.interactive.terminal.rendering.tools import summarize_arguments, summarize_result
+from fruitfly_agent.interactive.terminal.rendering.panels import render_command_panel
 
 
 _BLUE = "\033[34m"
@@ -114,6 +116,14 @@ class TerminalRenderer:
         self.finish_line()
         self.output.write(text)
         self.output.flush()
+
+    def write_command_result(self, result: CommandResult) -> None:
+        if result.panel is not None:
+            self.write_system(render_command_panel(
+                result.panel, columns=terminal_columns(self.output), color=self._color,
+            ))
+        elif result.text:
+            self.write_system(result.text)
 
     async def show_history(self, messages: tuple[ConversationMessage, ...]) -> None:
         """Append saved conversation once, without emitting live run events."""
@@ -226,7 +236,7 @@ class TerminalRenderer:
                 else self._tool_output_limit - self._tool_update_chars
             )
             if remaining <= 0:
-                self._write("… [live tool output truncated; use /tools after completion]\n", _DIM)
+                self._write("… [live tool output truncated]\n", _DIM)
                 self._tool_update_truncated = True
                 return
             visible = text[:remaining]
@@ -235,7 +245,7 @@ class TerminalRenderer:
             self._line_open = not visible.endswith("\n")
             if len(text) > len(visible):
                 self._newline()
-                self._write("… [live tool output truncated; use /tools after completion]\n", _DIM)
+                self._write("… [live tool output truncated]\n", _DIM)
                 self._tool_update_truncated = True
             return
         if isinstance(event, ToolFinished):
@@ -255,8 +265,6 @@ class TerminalRenderer:
             )
             elapsed = f' · {event.elapsed_seconds:.1f}s' if event.elapsed_seconds is not None else ''
             self._write(f"  {preview}{elapsed}\n", _DIM)
-            if len(event.output.strip()) > 500 or event.output.strip().count('\n') >= 3:
-                self._write(f"  Details: /tools {safe_terminal_text(event.tool_call_id)}\n", _DIM)
             return
         if isinstance(event, CompactionStarted):
             self._newline()

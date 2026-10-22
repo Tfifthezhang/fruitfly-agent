@@ -46,3 +46,21 @@ See [Improvement](../../../../lab/improvement/README.md) and
 
 These checks are offline and establish interaction/lifecycle behavior, not model
 quality or real container integration. Model execution may incur charges.
+
+## Choose registered execution and review lessons
+
+**Execution strategy** changes compatible component availability and material
+choices from host metadata. **Execution parameters** edits declared string/integer/
+number fields. Switching strategies clears incompatible material/component choices
+and applies its declared defaults. The terminal contains no concrete execution or
+scoring implementation. Start always creates a fresh preview after edits.
+
+For **Editor self-improvement**, follow the [experiment guide](../../../../lab/improvement/improver/README.md).
+Progress counts all nested model calls and leaf executions. Results retain stopping
+reason separately from assurance. Original references remain candidates for output
+selection; no task execution mutates its active components.
+
+Results and history includes **Pending experience** when an independent review
+client exists. Inspect lessons and the initial S snapshot, then explicitly confirm
+Commit or Reject. Application must be idle; stale commits fail. No lesson is
+silently committed when returning to chat or selecting a candidate.

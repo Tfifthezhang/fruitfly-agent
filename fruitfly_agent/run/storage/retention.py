@@ -56,7 +56,8 @@ def compact_candidates(workspace, store, config_path):
                     return ()
                 walk(yaml.safe_load(path.read_text()), config=True)
         for directory, evolution in (('sessions', False), ('evolution', True), ('improvement/runs', True),
-                                     ('improvement/jobs', False), ('improvement/external', False)):
+                                     ('improvement/jobs', False), ('improvement/external', False),
+                                     ('improvement/experience-pending', False)):
             for path in (workspace / '.fruitfly' / directory).rglob('*'):
                 if path.is_symlink():
                     return ()

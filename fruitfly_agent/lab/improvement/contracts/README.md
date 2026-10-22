@@ -26,3 +26,27 @@ Run uses the same version contracts for persistent publication and recovery.
 ```bash
 .venv/bin/python -m unittest tests.lab.test_improvement_pipeline tests.lab.test_experiment_contracts tests.contracts.test_signatures
 ```
+
+## Freeze experiments and execution capabilities
+
+[experiments.py](experiments.py) defines `ExperimentSpec`, `EpisodeRequest`,
+`EpisodeResult`, `EpisodeExecutor` and `TrialReport`. Experiment identity binds
+source, initial harness/state and conditions. Reports retain per-case gains,
+failures, exact episode/evidence identities and actual usage. Private scorer data
+is not part of `ProposalRequest` or `CompositionRequest`.
+
+`ExecutionDefinition`, `ExecutionRequest`, `PreparedExecution` and `ExecutionPorts`
+separate discovery, validation and construction. Typed parameter declarations
+reject unknown or duplicate fields. Run converts these public values to frontend
+views rather than exposing Lab implementations to Interactive.
+
+`CompositionRequest.feedback` supplies explicitly permitted development
+measurements. `ImprovementOutcome.verification` optionally references a completed
+independent proof envelope; old outcomes without that field remain ordinary
+historical data and do not acquire fabricated proof. Existing generator/composer/
+runner call signatures remain unchanged. Job plan schema 2 records execution
+identity and normalized request; schema 1 journals and historical reports remain
+readable. A preview is never restored as authorization to rerun unknown work.
+
+See [execution](../execution/README.md), [editor experiments](../improver/README.md)
+and [budget/stop behavior](../workflow/README.md).

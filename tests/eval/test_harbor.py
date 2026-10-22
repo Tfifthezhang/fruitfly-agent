@@ -23,7 +23,7 @@ from eval.benchmarks.base import PreflightResult
 from eval.installation import resolve_installation, validate_installation
 from fruitfly_agent.lab.catalog import MechanismDefinition, MechanismDescriptor, MechanismContribution, builtin_catalog
 from tests.support.evaluation import request_payload
-from tests.support.harbor import InstalledAgentDouble, load_harbor_agent
+from tests.support.harbor import InstalledAgentDouble, load_harbor_agent, prepared_harbor, installed_agent_inputs
 
 FruitFlyHarborAgent = load_harbor_agent()
 
@@ -39,11 +39,15 @@ class HarborAdapterTests(unittest.TestCase):
         payload["runtime"]["working_directory"] = str(root)
         request.write_text(json.dumps(payload))
         adapter = SWEBenchAdapter()
+        host, preparation = prepared_harbor(root)
         with patch.dict("os.environ", {"TEST_API_KEY": "process-placeholder"}, clear=True), patch.object(
             adapter, "preflight", return_value=PreflightResult(True, (), ("offline-harbor",))
         ), patch("eval.benchmarks.harbor.prepare_runtime", return_value=(root / "config", root / "models", ("TEST_API_KEY",))), patch(
             "eval.benchmarks.harbor.run_harbor_job", return_value=(1, "offline stop")
-        ) as job, patch("eval.benchmarks.harbor.resolve_installation", return_value=root), patch("sys.stderr"):
+        ) as job, patch("sys.stderr"), patch(
+            "eval.benchmarks.harbor.HostConfig.read", return_value=host
+        ), patch("eval.benchmarks.harbor.load_preparation", return_value=preparation), patch(
+            "eval.benchmarks.harbor.inspect_preparation", return_value={"available": True}):
             with self.assertRaisesRegex(RuntimeError, "offline stop"):
                 adapter.run(request_path=request, result_path=root / "result.json", variant="smoke")
         env = job.call_args.kwargs["environment"]
@@ -144,85 +148,63 @@ class HarborAdapterTests(unittest.TestCase):
             _forward_logs(root, "current", offsets, fragments, updates.append, final=True)
             self.assertEqual([e["text"] for e in updates], ["ＯＫ\n", "partial completed\n", "timeout traceback"])
 
-    def test_existing_python_install_skips_apt_and_uv(self) -> None:
+    def test_prepared_install_does_not_install_python_or_agent_dependencies(self) -> None:
         agent = FruitFlyHarborAgent.__new__(FruitFlyHarborAgent)
-        agent.source_root = Path(__file__).resolve().parents[2]
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        installed_agent_inputs(agent, root)
+        agent.exec_as_agent = AsyncMock()
+        agent.exec_as_root = AsyncMock()
+        environment = SimpleNamespace(upload_dir=AsyncMock(), upload_file=AsyncMock())
+        asyncio.run(agent.install(environment))
+        commands = [call.kwargs["command"] for mock in (agent.exec_as_agent, agent.exec_as_root)
+                    for call in mock.await_args_list]
+        self.assertTrue(any("/opt/runtime/bin/python" in command for command in commands))
+        self.assertFalse(any(word in command for command in commands for word in ("pip install", "venv", "apt", "curl")))
+        environment.upload_dir.assert_not_called()
+        self.assertTrue(all("/source/" not in call.args[1] for call in environment.upload_file.await_args_list))
+
+    def test_missing_preparation_fails_before_container_access(self) -> None:
+        agent = FruitFlyHarborAgent.__new__(FruitFlyHarborAgent)
         root = Path(self.enterContext(tempfile.TemporaryDirectory()))
         agent.config_path = root / "config.yaml"
-        agent.model_catalog_path = root / "models.yaml"
-        agent.config_path.write_text("offline configuration")
-        agent.model_catalog_path.write_text("offline catalog")
-        agent.ensure_system_dependencies = AsyncMock()
-        agent.exec_as_root = AsyncMock()
-        environment = SimpleNamespace(
-            exec=AsyncMock(return_value=SimpleNamespace(return_code=0)),
-            upload_dir=AsyncMock(), upload_file=AsyncMock(),
-        )
-        asyncio.run(agent.install(environment))
-        agent.ensure_system_dependencies.assert_not_called()
-        command = agent.exec_as_root.call_args.kwargs["command"]
-        self.assertIn("python3 -m venv", command)
-        self.assertIn("-m pip install", command)
-        self.assertNotIn("uv", command)
-        self.assertNotIn("apt", command)
-        environment.upload_dir.assert_awaited_once()
+        agent.exec_as_agent = AsyncMock()
+        with self.assertRaisesRegex(ValueError, "run eval prepare"):
+            asyncio.run(agent.install(object()))
+        agent.exec_as_agent.assert_not_called()
 
     def test_invalid_installation_material_fails_before_environment_access(self) -> None:
+        from eval.contracts import EvaluationRequest
+        from eval.harbor.preparation import prepare
         root = Path(self.enterContext(tempfile.TemporaryDirectory()))
-        adapter = SWEBenchAdapter()
-        (root / "request.json").write_text(json.dumps(request_payload()))
-        with patch.dict("os.environ", {"FRUITFLY_EVAL_PACKAGE": str(root)}), patch.object(adapter, "preflight") as preflight:
+        host, _ = prepared_harbor(root)
+        (root / "runtime").mkdir()
+        with patch("eval.harbor.preparation.probe_environment") as probe:
             with self.assertRaisesRegex(ValueError, "incomplete FruitFlyAgent source"):
-                adapter.run(request_path=root / "request.json", result_path=root / "result.json", variant="smoke")
-        preflight.assert_not_called()
+                prepare(EvaluationRequest.from_dict(request_payload()), SWEBenchAdapter().descriptor, host, package=root)
+        probe.assert_not_called()
         with self.assertRaisesRegex(ValueError, "FRUITFLY_EVAL_PACKAGE"):
             resolve_installation(None, checkout=root)
 
-    def test_wheel_installation_uses_uploaded_artifact(self) -> None:
+    def test_wheel_preparation_freezes_source_without_installation(self) -> None:
+        from eval.harbor.material import source_snapshot
         root = Path(self.enterContext(tempfile.TemporaryDirectory()))
         wheel = root / "fruitfly_agent-0.1-py3-none-any.whl"
         with zipfile.ZipFile(wheel, "w") as archive:
             archive.writestr("fruitfly_agent/__init__.py", "")
             archive.writestr("eval/__init__.py", "")
             archive.writestr("fruitfly_agent-0.1.dist-info/METADATA", "Name: fruitfly-agent\nVersion: 0.1\n")
+            archive.writestr("fruitfly_agent-0.1.dist-info/licenses/LICENSE", "Fixture license")
         self.assertEqual(validate_installation(wheel), wheel.resolve())
-        agent = FruitFlyHarborAgent.__new__(FruitFlyHarborAgent)
-        agent.source_root = wheel
-        agent.config_path = root / "config.yaml"
-        agent.model_catalog_path = root / "models.yaml"
-        agent.config_path.write_text("offline configuration")
-        agent.model_catalog_path.write_text("offline catalog")
-        agent.exec_as_root = AsyncMock()
-        environment = SimpleNamespace(
-            exec=AsyncMock(return_value=SimpleNamespace(return_code=0)),
-            upload_dir=AsyncMock(), upload_file=AsyncMock(),
-        )
-        asyncio.run(agent.install(environment))
-        environment.upload_dir.assert_not_called()
-        self.assertEqual(environment.upload_file.await_args_list[0].args, (
-            wheel.resolve(), "/installed-agent/fruitfly/source/" + wheel.name,
-        ))
-        self.assertIn(wheel.name, agent.exec_as_root.call_args.kwargs["command"])
+        source_snapshot(wheel, root / "snapshot")
+        self.assertTrue((root / "snapshot/fruitfly_agent/__init__.py").is_file())
+        self.assertTrue((root / "snapshot/eval/__init__.py").is_file())
+        self.assertEqual((root / "snapshot/licenses/LICENSE").read_text(), "Fixture license")
 
-    def test_source_installation_stages_build_inputs_without_local_state(self) -> None:
-        agent = FruitFlyHarborAgent.__new__(FruitFlyHarborAgent)
-        agent.source_root = Path(__file__).resolve().parents[2]
+    def test_source_preparation_stages_build_inputs_without_local_state(self) -> None:
+        from eval.harbor.material import source_snapshot
         root = Path(self.enterContext(tempfile.TemporaryDirectory()))
-        agent.config_path = root / "config.yaml"
-        agent.model_catalog_path = root / "models.yaml"
-        agent.config_path.write_text("offline configuration")
-        agent.model_catalog_path.write_text("offline catalog")
-        agent.exec_as_root = AsyncMock()
-        staged_names = []
-
-        async def inspect_upload(source, destination):
-            staged_names.extend(str(path.relative_to(source)) for path in source.rglob("*") if path.is_file())
-
-        environment = SimpleNamespace(
-            exec=AsyncMock(return_value=SimpleNamespace(return_code=0)),
-            upload_dir=AsyncMock(side_effect=inspect_upload), upload_file=AsyncMock(),
-        )
-        asyncio.run(agent.install(environment))
+        source_snapshot(Path(__file__).resolve().parents[2], root / "source")
+        staged_names = [str(path.relative_to(root / "source")) for path in (root / "source").rglob("*") if path.is_file()]
         for name in ("README.md", "LICENSE", "THIRD_PARTY_NOTICES.md", "pyproject.toml",
                      "fruitfly_agent/__init__.py", "eval/__init__.py"):
             self.assertIn(name, staged_names)
@@ -384,25 +366,25 @@ class HarborAdapterTests(unittest.TestCase):
 
     def test_smoke_command_limits_tasks_without_replacing_the_agent(self) -> None:
         adapter = SWEBenchAdapter()
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        host, preparation = prepared_harbor(root, ("swe-bench/psf__requests-1142",))
         command = adapter._command(
             executable="harbor",
             dataset=adapter.descriptor.dataset,
             variant="smoke",
             execution={"attempts": 2, "concurrency": 1},
-            jobs_dir=Path("/tmp/jobs"),
+            jobs_dir=root,
             job_name="job",
-            source_root=Path("/tmp/source"),
             config_path=Path("/tmp/config.yaml"),
             model_catalog=Path("/tmp/models.yaml"),
             profile="default",
-            secret_names=("TEST_API_KEY",),
+            secret_names=("TEST_API_KEY",), host=host, preparation=preparation,
         )
-        self.assertIn("eval.harbor_agent:FruitFlyHarborAgent", command)
-        self.assertEqual(
-            command[command.index("--include-task-name") + 1],
-            "swe-bench/psf__requests-1142",
-        )
-        self.assertEqual(command[command.index("--n-tasks") + 1], "1")
+        job = json.loads((root / "harbor-job.json").read_text())
+        self.assertEqual(job["agents"][0]["import_path"], "eval.harbor_agent:FruitFlyHarborAgent")
+        self.assertEqual(job["tasks"], [{"path": preparation["tasks"][0]["path"], "source": adapter.descriptor.dataset}])
+        self.assertEqual(job["n_attempts"], 2)
+        self.assertEqual(job["retry"]["max_retries"], 0)
         self.assertNotIn("TEST_API_KEY=secret", command)
 
     def test_official_rewards_become_trials_and_aggregate_metrics(self) -> None:
@@ -445,11 +427,11 @@ class HarborAdapterTests(unittest.TestCase):
 
     def test_reward_shapes_preserve_unknown_values_and_single_metric_fallback(self) -> None:
         for name, verifier, reward, status in (
-            ("missing", None, None, "failed"),
-            ("non-mapping rewards", {"rewards": []}, None, "failed"),
-            ("null rewards", {"rewards": None}, None, "failed"),
+            ("missing", None, None, "error"),
+            ("non-mapping rewards", {"rewards": []}, None, "error"),
+            ("null rewards", {"rewards": None}, None, "error"),
             ("single official metric", {"rewards": {"score": 1}}, 1.0, "passed"),
-            ("ambiguous metrics", {"rewards": {"a": 1, "b": 0}}, None, "failed"),
+            ("ambiguous metrics", {"rewards": {"a": 1, "b": 0}}, None, "error"),
             ("explicit reward", {"rewards": {"reward": 0, "other": 1}}, 0.0, "failed"),
         ):
             with self.subTest(shape=name):
@@ -704,6 +686,8 @@ profiles:
 
     def test_installed_agent_leaves_context_empty_until_logs_are_downloaded(self) -> None:
         agent = FruitFlyHarborAgent.__new__(FruitFlyHarborAgent)
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        installed_agent_inputs(agent, root)
         agent.profile = "default"
         agent.render_instruction = lambda instruction: instruction
         agent.exec_as_agent = AsyncMock()

@@ -41,13 +41,13 @@ class MechanismSetupTests(unittest.TestCase):
                 self.assertNotIn(value, path.read_text())
 
     def test_enabling_remote_opens_wizard_and_saves_hidden_credentials_with_configuration(self):
-        frontend = self.frontend('@Configure', '@Environment', '@SSH server', 'space',
+        frontend = self.frontend('@Configure', '@Environment', '@Remote environment', 'space',
             'server.example', '2222', '/srv/project', '', '@Stage settings', 'back', 'back', 'back', '@Start new session')
         result = frontend.run()
         self.assertTrue(result.start)
         self.assertTrue(result.saved)
         text = self.output.getvalue()
-        self.assertIn('Set up SSH server · Step 1 of 6', text)
+        self.assertIn('Set up Remote environment · Step 1 of 6', text)
         self.assertIn('Step 6 of 6', text)
         self.assertIn('fingerprint', text)
         self.assertIn('Account: entered (value hidden)', text)
@@ -84,12 +84,12 @@ class MechanismSetupTests(unittest.TestCase):
 
     def test_cancel_at_field_secret_review_or_discard_keeps_original_environment(self):
         scenarios = (
-            (('@Configure', '@Environment', '@SSH server', 'space', '/cancel', 'back', 'back', 'back', '@Exit'), ''),
-            (('@Configure', '@Environment', '@SSH server', 'space', 'server.example', '', '', '',
+            (('@Configure', '@Environment', '@Remote environment', 'space', '/cancel', 'back', 'back', 'back', '@Exit'), ''),
+            (('@Configure', '@Environment', '@Remote environment', 'space', 'server.example', '', '', '',
               'back', 'back', 'back', '@Exit'), '/cancel\n'),
-            (('@Configure', '@Environment', '@SSH server', 'space', 'server.example', '', '', '',
+            (('@Configure', '@Environment', '@Remote environment', 'space', 'server.example', '', '', '',
               '@Cancel', 'back', 'back', 'back', '@Exit'), 'fixture-private-account\nfixture-private-password\n'),
-            (('@Configure', '@Environment', '@SSH server', 'space', 'server.example', '', '', '',
+            (('@Configure', '@Environment', '@Remote environment', 'space', 'server.example', '', '', '',
               '@Stage settings', 'back', 'back', 'back', '@Exit'), 'fixture-private-account\nfixture-private-password\n'),
         )
         for lines, secrets in scenarios:
@@ -119,7 +119,7 @@ class MechanismSetupTests(unittest.TestCase):
         self.configuration.save()
         original = (self.root / '.fruitfly/secrets.env').read_bytes()
         self.output = io.StringIO()
-        frontend = self.frontend('@Configure', '@Environment', '@SSH server', '@Set up…',
+        frontend = self.frontend('@Configure', '@Environment', '@Remote environment', '@Set up…',
             '', '', '', '', '@Stage settings', 'back', 'back', 'back', '@Start new session', secrets='\n\n')
         self.assertTrue(frontend.run().start)
         self.assertEqual(original, (self.root / '.fruitfly/secrets.env').read_bytes())
@@ -129,7 +129,7 @@ class MechanismSetupTests(unittest.TestCase):
     def test_rechecking_complete_staged_settings_skips_wizard(self):
         self.stage()
         parameters = next(m.parameters for m in self.configuration.profile().mechanisms if m.mechanism_id == 'ssh-env')
-        frontend = self.frontend('@Configure', '@Environment', '@SSH server', 'space', 'space',
+        frontend = self.frontend('@Configure', '@Environment', '@Remote environment', 'space', 'space',
             'back', 'back', 'back', '@Start new session', secrets='')
         with patch('fruitfly_agent.interactive.terminal.features.configuration.menu.run_mechanism_setup',
                    side_effect=AssertionError('complete settings reopened setup')):
@@ -152,7 +152,7 @@ class MechanismSetupTests(unittest.TestCase):
         self.configuration = self.factory.configuration
         self.service = self.configuration.mechanism_setup
         self.output = io.StringIO()
-        frontend = self.frontend('@Configure', '@Environment', '@SSH server', 'space',
+        frontend = self.frontend('@Configure', '@Environment', '@Remote environment', 'space',
             'back', 'back', 'back', '@Start new session', secrets='')
         with patch('fruitfly_agent.interactive.terminal.features.configuration.menu.run_mechanism_setup',
                    side_effect=AssertionError('saved settings reopened setup')):
@@ -163,7 +163,7 @@ class MechanismSetupTests(unittest.TestCase):
         self.assertEqual(2222, remote.parameters['port'])
         self.assertEqual('/srv/project', remote.parameters['cwd'])
         self.assertEqual(saved_secrets, secret_path.read_bytes())
-        self.assertNotIn('Set up SSH server · Step', self.output.getvalue())
+        self.assertNotIn('Set up Remote environment · Step', self.output.getvalue())
         self.assert_hidden()
 
     def test_rechecking_with_a_missing_credential_still_opens_setup(self):
@@ -171,11 +171,11 @@ class MechanismSetupTests(unittest.TestCase):
         self.configuration.save()
         self.configuration.set_mechanism('local-env', enabled=True)
         self.factory.environment.pop('FRUITFLY_SSH_PASSWORD')
-        frontend = self.frontend('@Configure', '@Environment', '@SSH server', 'space',
+        frontend = self.frontend('@Configure', '@Environment', '@Remote environment', 'space',
             '', '', '', '', '@Stage settings', 'back', 'back', 'back', '@Start new session',
             secrets='\nfixture-private-password\n')
         self.assertTrue(frontend.run().saved)
-        self.assertIn('Set up SSH server · Step', self.output.getvalue())
+        self.assertIn('Set up Remote environment · Step', self.output.getvalue())
         self.assert_hidden()
 
     def test_shared_model_and_remote_credentials_are_saved_together_with_unrelated_content(self):

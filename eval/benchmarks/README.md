@@ -23,9 +23,11 @@ variants. A variant's `requires_gpu` controls resource preflight without matchin
 its name. New datasets require no changes to installation, native CLI startup,
 credentials, trajectories, subprocess handling or result parsing.
 
-Task filters are exact and capped to their declared count. Returned names and
-attempt counts must match, including smoke; missing, unexpected or duplicated
-attempts fail validation. Full variants retain the dataset's original task set.
+Preparation freezes exact task paths before Harbor starts. Returned names and
+attempt counts must match the frozen set for every variant, including full runs;
+missing, unexpected or duplicated attempts fail validation. Full variants freeze
+the dataset's complete resolved task set. Host links, runtime/cache preparation
+and environment probes belong to the [shared Harbor package](../harbor/README.md).
 The official numerical `reward` is preferred; one other numerical reward can be
 used when unambiguous. Errors remain separate from scored task failures.
 

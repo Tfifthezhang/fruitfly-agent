@@ -21,7 +21,14 @@ docker compose version
 .venv/bin/python -m eval catalog --json
 ```
 
-Preflight locates Harbor/Docker, checks Engine/Compose within five seconds, and locates `nvidia-smi` for the GPU variant. It does not check images, free disk, all registries, or paid model connectivity. Inspect task images and architecture separately. Host and Docker network/proxy settings are separate paths. Terminal-Bench 2.1 uses the Hub dataset `terminal-bench/terminal-bench-2-1`; configure Harbor login/access if required. Pre-downloaded images must match the resolved task definitions.
+Catalog preflight locates Harbor/Docker, checks Engine/Compose within five seconds,
+and locates `nvidia-smi` for GPU variants. Detailed [Harbor preparation](harbor/README.md)
+freezes tasks, probes the mounted Linux runtime and records image identities.
+Host and Docker network/proxy settings are separate paths. Terminal-Bench 2.1
+uses `terminal-bench/terminal-bench-2-1`; other Harbor datasets use the same flow.
+Pre-downloaded images must match the resolved task definitions. Prepare a
+dedicated complete Linux Python/Agent environment once, then declare its
+read-only mounts in `.fruitfly/eval-host.yaml`. Agent defaults and key files stay separate.
 
 Use `FRUITFLY_EVAL_PACKAGE` to select complete source or wheel material when needed; see [installation material](README.md#select-installation-material).
 
@@ -50,7 +57,16 @@ print(path)
 PY
 ```
 
-The next command executes the paid/network/container path:
+After configuring the [machine file](harbor/README.md#configure-a-machine), prepare
+the selection and check it. Preparation can download dependencies and build/start
+containers; it makes no model requests. `check` only validates prepared local identities:
+
+```bash
+.venv/bin/python -m eval prepare --request .fruitfly/eval-request.json
+.venv/bin/python -m eval check --request .fruitfly/eval-request.json
+```
+
+The next command executes the model/container path and can incur charges:
 
 ```bash
 .venv/bin/python -m eval run --request .fruitfly/eval-request.json --events jsonl
@@ -62,8 +78,13 @@ The next command executes the paid/network/container path:
 | Runtime | Optional configuration path/profile; defaults to `.fruitfly/default-config.yaml` and its default profile. Working directory defaults to the process workspace. |
 | Execution | Positive integer attempts, concurrency, and total job timeout |
 | `--output-root` | Override output location; use the same root to read reports |
+| `--host-config` | Machine YAML override for prepare/check/run; defaults to workspace `.fruitfly/eval-host.yaml` |
 | Exit codes | completed 0, failed 1, input/file error 2, blocked 3 |
 | Request validation | Requires schema 2; unknown fields and experiment inputs are rejected |
+
+`check` exits 0 for matching preparation, 3 when unavailable and 2 for input errors.
+Verifier completeness/model connectivity remain explicitly unverified without
+a real smoke trial. `prepare` creates no evaluation score or report.
 
 For an experimental configuration, explicitly supply `runtime.config_path` and
 optionally `runtime.profile`. Relative paths resolve from `working_directory`.
@@ -99,12 +120,33 @@ learning state.
 | `artifacts/harbor/harbor.log` | Final runner attempt |
 | `artifacts/harbor/harbor-attempt-*.log` | Earlier registry connection attempts |
 | Harbor job/trial directories | Setup/session/events, verifier logs, exceptions, and official results |
+| `artifacts/harbor/preparation.json`, `readiness.json` | Exact prepared task list, runtime/image identities and readiness evidence |
+| `artifacts/harbor/control.json`, `cleanup.json` | Scoped stop token and cleanup state |
 
-Setup prefers an existing Python 3.11+ with venv, otherwise uses system/uv fallback. Setup commands are limited to 300 seconds; Harbor's default overall setup is 360 seconds. The request sets the whole-job deadline; individual task/verifier limits remain task-defined.
+Trial setup probes the mounted Python and stages selected configuration. It never
+installs the Agent, Python or pip packages. Agent runtime compatibility is checked
+during preparation. Verifier dependencies use the separately prepared assets and
+caches. The request sets the whole-job deadline; individual task/verifier limits
+remain task-defined. No automatic timeout extension or failed-trial replay occurs.
 
 Agent events are read around every 0.2 seconds and archived on completion. Job progress is emitted every five seconds. Setup, runner, verifier, exceptions, stderr, and non-JSON stdout are forwarded without log-body truncation. No observed Agent event can mean setup is still running.
 
 `completed` means the report was assembled, `blocked` means preflight failed, and `failed` means runner/result validation failed. Missing usage/cost is unknown. Smoke validates one execution path.
+
+Inspect report readiness and trial execution evidence separately from score.
+Missing rewards are errors; a real zero remains a scored failure. Additional
+qualified traceback exceptions and original log paths are retained even if Harbor
+stores only its first exception. Timestamp states describe observations, not
+proof that a phase succeeded.
+
+```bash
+.venv/bin/python -m eval stop '<EVALUATION_ID>' --output-root .fruitfly/eval
+```
+
+`stop` returns success only after cleanup is confirmed, or for an already finished
+job. A pending request or cleanup failure returns nonzero. Ctrl+C/SIGTERM and job
+timeout use the same process/container retirement. Normal Agent completion keeps
+task background services alive for the verifier. See [ownership limits](harbor/README.md#stop-and-inspect-ownership).
 
 ## Diagnose failures
 
@@ -112,20 +154,25 @@ Agent events are read around every 0.2 seconds and archived on completion. Job p
 |---|---|
 | Registry connection error | Host proxy/VPN and underlying exception in harbor.log |
 | Image failure | Engine network, registry auth, tag/architecture, and disk space |
-| Setup timeout | Last setup.log download/install and Python/venv availability |
+| Setup timeout | Preparation/readiness identities, setup.log and runtime probe; no per-task Agent downloads are expected |
 | No Agent events | Setup and trial logs |
 | Missing reward | Verifier logs and adapter reward mapping |
 
-Registry connection failures retry at most three times, within the same timeout, only before a Harbor job exists. Existing jobs and model/setup/verifier failures are not automatically replayed. Keep TLS verification; preserve logs and keep secrets out of reports.
+The run consumes explicit frozen local tasks rather than resolving a registry
+again. A legacy registry connection failure retries at most three times, within
+the same timeout, only before a Harbor job exists. Existing jobs and
+model/setup/verifier failures are not automatically replayed. Keep TLS
+verification; preserve logs and keep secrets out of reports. Never overwrite
+Harbor's private content-addressed cache to repair a verifier setup script.
 
 ## Add a benchmark
 
 | Step | Action |
 |---|---|
 | 1 | Declare dataset/version, an exact smoke task and optional exact subsets. |
-| 2 | For Harbor tasks, subclass `HarborBenchmarkAdapter` and call `harbor_descriptor`; default resolution, runtime snapshots, credentials, permissions, installation, commands, logs, trajectories and parsing are shared. Other backends implement `BenchmarkAdapter`. |
+| 2 | Subclass `HarborBenchmarkAdapter` and call `harbor_descriptor`. Preparation, runtime mounts, credentials, commands, lifecycle, logs, trajectories and parsing are shared by [the Harbor package](harbor/README.md). Other backends implement `BenchmarkAdapter`. |
 | 3 | Export/register its unique ID in [catalog.py](catalog.py). |
-| 4 | Test request validation, commands, preflight, failures, rewards, and reports offline. |
+| 4 | Declare machine/cache requirements through the host file, and explicit verifier dependency recipes or exact setup patches where needed. Test preparation, frozen task coverage, failures, rewards and reports offline. |
 | 5 | Inspect catalog output; authorize real smoke separately. |
 
 `BenchmarkAdapter.run(request_path=..., result_path=..., variant=..., progress=...)` consumes the single-configuration request and writes schema-2 results containing status, metrics, errors, artifacts, and trials. A custom Harbor task needs instructions, task.toml, an environment, and an independent verifier. Dataset identity and exact task subsets belong to the adapter declaration. Other runners implement the same request/result interface; runtime ownership stays outside Eval.

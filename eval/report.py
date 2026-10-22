@@ -39,6 +39,7 @@ class EvaluationReport:
     metrics: tuple[MetricRecord, ...] = ()
     errors: Mapping[str, Any] = field(default_factory=dict)
     artifacts: tuple[Mapping[str, Any], ...] = ()
+    readiness: Mapping[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {"schema_version": SCHEMA_VERSION, **asdict(self)}
@@ -61,7 +62,12 @@ class EvaluationReport:
                 lines.append(f"| {metric.name} | {value} | {metric.unit} | {metric.sample_count} |")
         else:
             lines.append("No benchmark metrics were produced.")
-        lines += ["", "## Task Results", "", "See `trials/` for task outcomes and reported runtime metadata.", "", "## Failures", ""]
+        lines += ["", "## Execution Readiness", "",
+                  f"- Trials with execution evidence: {self.readiness.get('observed', 0)}",
+                  f"- Completed execution paths: {self.readiness.get('completed', 0)}",
+                  f"- Execution errors: {self.readiness.get('errors', 0)}",
+                  "- A zero reward can have a completed execution path.",
+                  "", "## Task Results", "", "See `trials/` for task outcomes, phase evidence and runtime metadata.", "", "## Failures", ""]
         if self.errors:
             for key, value in self.errors.items():
                 if key == "trials" and isinstance(value, list):
@@ -103,9 +109,13 @@ def report_from_runner_result(
     runtime = asdict(request.runtime)
     if isinstance(result.get("runtime_snapshot"), Mapping):
         runtime["resolved"] = dict(result["runtime_snapshot"])
+    execution_records = [t["execution"] for t in trials if isinstance(t, Mapping) and isinstance(t.get("execution"), Mapping)]
+    readiness = {"observed": len(execution_records),
+                 "completed": sum(r.get("state") == "completed" for r in execution_records),
+                 "errors": sum(r.get("state") == "error" for r in execution_records)}
     return EvaluationReport(evaluation_id, status, started_at, completed_at, benchmark,
         runtime, asdict(request.execution), tuple(MetricRecord.from_dict(item) for item in metrics),
-        reported_errors, tuple(dict(item) for item in artifacts if isinstance(item, Mapping)))
+        reported_errors, tuple(dict(item) for item in artifacts if isinstance(item, Mapping)), readiness)
 
 
 __all__ = ["EvaluationReport", "MetricRecord", "report_from_runner_result"]

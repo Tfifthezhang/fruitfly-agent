@@ -1,0 +1,23 @@
+# Machine-local paths; set these variables in the host process environment.
+# The Python installation and venv must be Linux-compatible and complete.
+# Match the host paths inside the container to preserve absolute Python links.
+schema_version: 1
+cache: eval-cache
+agent:
+  python: ${FRUITFLY_EVAL_VENV}/bin/python
+  mounts:
+    - source: ${FRUITFLY_EVAL_PYTHON_ROOT}
+    - source: ${FRUITFLY_EVAL_VENV}
+  library_paths: []
+environment:
+  setup: {}
+  agent: {}
+  verifier: {}
+dependencies:
+  assets: []
+  prepare: []
+  offline: false
+# Optional: an exported Harbor task directory instead of registry resolution.
+# task_directory: /absolute/path/to/tasks
+# Optional: exact, reviewed setup replacements in private frozen task copies.
+task_patches: []

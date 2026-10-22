@@ -6,15 +6,16 @@ Harbor remains the owner of task containers and official verification.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from pathlib import Path
 import shlex
-import shutil
 import tempfile
+import uuid
 from typing import Any
 
-from eval.installation import SOURCE_FILES, SOURCE_PACKAGES, installation_identity, validate_installation
+from eval.harbor.material import probe_command
 from eval.trajectory import session_trajectory
 
 
@@ -34,13 +35,12 @@ except ImportError:  # pragma: no cover - exercised by catalog preflight instead
 
 
 class FruitFlyHarborAgent(BaseInstalledAgent):  # type: ignore[misc]
-    """Install validated source or a wheel, then run its normal one-shot CLI."""
+    """Validate a prepared, mounted runtime and run the native CLI inside Harbor."""
 
     if AgentCapabilities is not None:
         capabilities = AgentCapabilities(atif=True)
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self.source_root = Path(_required(kwargs.pop("source_root", None), "source_root"))
         self.config_path = Path(_required(kwargs.pop("config_path", None), "config_path"))
         self.model_catalog_path = Path(
             _required(kwargs.pop("model_catalog_path", None), "model_catalog_path")
@@ -62,53 +62,21 @@ class FruitFlyHarborAgent(BaseInstalledAgent):  # type: ignore[misc]
         return "0.1"
 
     async def install(self, environment: BaseEnvironment) -> None:
-        package = validate_installation(self.source_root)
+        preparation = self.config_path.parent / "preparation.json"
+        if not preparation.is_file():
+            raise ValueError("prepared runtime receipt is missing; run eval prepare before evaluation")
+        self.preparation = json.loads(preparation.read_text(encoding="utf-8"))
+        runtime = self.preparation["runtime"]
+        self.runtime_python = runtime["python"]
+        self.runtime_environment = runtime["environment"]
         for path in (self.config_path, self.model_catalog_path):
             if not path.is_file():
                 raise ValueError(f"installation runtime file is missing: {path}")
-        identity = installation_identity(package)
-        # Official task images may already provide a suitable Python. Avoid an
-        # unnecessary apt update and a second Python/uv download in that case.
-        probe = await environment.exec(
-            command="python3 -c 'import sys, venv; assert sys.version_info >= (3, 11)'",
-            user="root", timeout_sec=15,
-        )
-        use_existing_python = probe.return_code == 0
-        if not use_existing_python:
-            await self.ensure_system_dependencies(
-                environment, ("curl", "ca_certificates", "bash", "git")
-            )
-        await self.exec_as_root(
-            environment,
-            command="mkdir -p /installed-agent/fruitfly/source /installed-agent/fruitfly/runtime",
-        )
-        install_target = "/installed-agent/fruitfly/source"
-        if package.is_file():
-            install_target += "/" + package.name
-            await environment.upload_file(package, install_target)
-        else:
-            # Stage only package code and declared build inputs, never local state.
-            with tempfile.TemporaryDirectory(prefix="fruitfly-install-") as directory:
-                staged = Path(directory)
-                for name in SOURCE_PACKAGES:
-                    for source in (package / name).rglob("*.py"):
-                        if "__pycache__" in source.parts or source.is_symlink():
-                            continue
-                        target = staged / source.relative_to(package)
-                        target.parent.mkdir(parents=True, exist_ok=True)
-                        shutil.copyfile(source, target)
-                for name in SOURCE_FILES:
-                    shutil.copyfile(package / name, staged / name)
-                identity = installation_identity(staged)
-                await environment.upload_dir(staged, install_target)
-        await environment.upload_file(
-            self.config_path,
-            "/installed-agent/fruitfly/runtime/config.yaml",
-        )
-        await environment.upload_file(
-            self.model_catalog_path,
-            "/installed-agent/fruitfly/runtime/models.yaml",
-        )
+        await self.exec_as_agent(environment, command=shlex.join(probe_command(self.runtime_python)),
+                                 env=self.runtime_environment, timeout_sec=60)
+        await self.exec_as_root(environment, command="mkdir -p /installed-agent/fruitfly/runtime")
+        for source, target in ((self.config_path, "config.yaml"), (self.model_catalog_path, "models.yaml")):
+            await environment.upload_file(source, "/installed-agent/fruitfly/runtime/" + target)
         receipt = self.config_path.parent / "runtime.json"
         if receipt.is_file():
             await environment.upload_file(receipt, "/installed-agent/fruitfly/runtime/runtime.json")
@@ -117,30 +85,10 @@ class FruitFlyHarborAgent(BaseInstalledAgent):  # type: ignore[misc]
         if artifacts.is_dir():
             await environment.upload_dir(artifacts, "/installed-agent/fruitfly/runtime/artifacts")
         with tempfile.TemporaryDirectory(prefix="fruitfly-identity-") as directory:
-            receipt = Path(directory) / "installation.json"
-            receipt.write_text(json.dumps(identity, indent=2) + "\n", encoding="utf-8")
-            await environment.upload_file(receipt, "/logs/agent/installation.json")
-        if use_existing_python:
-            command = (
-                "python3 -m venv /installed-agent/fruitfly/venv && "
-                "/installed-agent/fruitfly/venv/bin/python -m pip install "
-                "--disable-pip-version-check --timeout 15 --retries 1 "
-                + shlex.quote(install_target)
-            )
-        else:
-            command = (
-                "curl --connect-timeout 15 --max-time 60 -LsSf "
-                "https://astral.sh/uv/0.8.22/install.sh "
-                "-o /installed-agent/fruitfly/install-uv.sh && "
-                "env UV_INSTALL_DIR=/installed-agent/fruitfly/bin "
-                "sh /installed-agent/fruitfly/install-uv.sh && "
-                "/installed-agent/fruitfly/bin/uv venv --python 3.12 "
-                "/installed-agent/fruitfly/venv && "
-                "/installed-agent/fruitfly/bin/uv pip install --python "
-                "/installed-agent/fruitfly/venv/bin/python "
-                + shlex.quote(install_target)
-            )
-        await self.exec_as_root(environment, command=command, timeout_sec=300)
+            identity = Path(directory) / "installation.json"
+            identity.write_text(json.dumps(runtime["installation"], indent=2) + "\n", encoding="utf-8")
+            await environment.upload_file(identity, "/logs/agent/installation.json")
+        await environment.upload_file(preparation, "/logs/agent/preparation.json")
 
     async def _exec(
         self, environment: BaseEnvironment, command: str,
@@ -168,10 +116,12 @@ class FruitFlyHarborAgent(BaseInstalledAgent):  # type: ignore[misc]
         environment: BaseEnvironment,
         context: AgentContext,
     ) -> None:
-        command = " ".join(
-            (
-                "FRUITFLY_EVENT_STREAM_PATH=/logs/agent/live-events.jsonl",
-                "/installed-agent/fruitfly/venv/bin/python",
+        token = uuid.uuid4().hex
+        command = shlex.join(
+            [
+                self.runtime_python,
+                "-m", "eval.harbor.supervisor", "--record", "/logs/agent/process.json", "--token", token, "--",
+                self.runtime_python,
                 "-m",
                 "fruitfly_agent",
                 "--unrestricted",
@@ -180,12 +130,12 @@ class FruitFlyHarborAgent(BaseInstalledAgent):  # type: ignore[misc]
                 "--config",
                 "/installed-agent/fruitfly/runtime/config.yaml",
                 "--profile",
-                shlex.quote(self.profile),
+                self.profile,
                 "--session",
                 "/logs/agent/session.jsonl",
                 "--",
-                shlex.quote(instruction),
-            )
+                instruction,
+            ]
         )
         command = (
             "if [ -d /installed-agent/fruitfly/runtime/artifacts ]; then "
@@ -193,7 +143,26 @@ class FruitFlyHarborAgent(BaseInstalledAgent):  # type: ignore[misc]
             "cp -n /installed-agent/fruitfly/runtime/artifacts/* .fruitfly/artifacts/; "
             "fi && " + command
         )
-        await self.exec_as_agent(environment, command=command)
+        # Supervise the real CLI rather than just the docker-exec client. An
+        # expired Harbor await must not leave an Agent making requests behind.
+        env = {**self.runtime_environment, **self.preparation["runtime"]["host"].get("agent", {}),
+               "FRUITFLY_EVENT_STREAM_PATH": "/logs/agent/live-events.jsonl"}
+        try:
+            await self.exec_as_agent(environment, command=command, env=env)
+        except BaseException:
+            cleanup = asyncio.create_task(self.exec_as_agent(environment, command=shlex.join([
+                self.runtime_python, "-m", "eval.harbor.supervisor", "--record", "/logs/agent/process.json", "--token", token, "--stop",
+            ]), env=self.runtime_environment, timeout_sec=12))
+            try:
+                await asyncio.wait_for(asyncio.shield(cleanup), timeout=15)
+            except BaseException:
+                cleanup.cancel()
+                await asyncio.gather(cleanup, return_exceptions=True)
+                # Failed control cleanup forbids verification against an Agent
+                # that is still changing files. Harbor retains the trial logs.
+                await asyncio.wait_for(environment.stop(delete=False), timeout=15)
+                raise RuntimeError("Agent cancellation cleanup failed; environment stopped")
+            raise
 
     def populate_context_post_run(self, context: AgentContext) -> None:
         session_path = self.logs_dir / "session.jsonl"

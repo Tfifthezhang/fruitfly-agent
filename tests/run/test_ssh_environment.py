@@ -10,6 +10,7 @@ from fruitfly_agent.interactive import AgentApplication
 from fruitfly_agent.lab.catalog import builtin_catalog, MechanismSelection
 from fruitfly_agent.lab.environment.ssh import SshEnv
 from fruitfly_agent.run import build_runtime
+from fruitfly_agent.run.adapters.runtime import describe_runtime
 from fruitfly_agent.run.application import RunApplicationFactory, record_session_manifest
 from fruitfly_agent.run.configuration import HarnessProfile, load_harness_config
 from tests.support.faux_provider import FauxProvider
@@ -42,6 +43,10 @@ class SshRunTests(unittest.IsolatedAsyncioTestCase):
         factory = self.factory()
         snapshot = factory.configuration.snapshot()
         self.assertTrue(snapshot.ready, snapshot.warnings)
+        views = {item.mechanism_id: item for item in snapshot.mechanisms}
+        self.assertEqual('Local environment', views['local-env'].label)
+        self.assertEqual('Remote environment', views['ssh-env'].label)
+        self.assertIn('SSH', views['ssh-env'].description)
         profile = factory.configuration.profile()
         enabled = {m.mechanism_id for m in profile.mechanisms if m.enabled}
         self.assertIn('ssh-env', enabled)
@@ -76,6 +81,10 @@ class SshRunTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual('ssh-permissions-v1', runtime.manifest.permissions['implementation'])
                     self.assertEqual(2222, runtime.manifest.permissions['port'])
                     self.assertEqual('/srv/workspace', runtime.config.env.cwd)
+                    _, details, _ = describe_runtime(runtime, builtin_catalog())
+                    remote = next(item for item in details if item.mechanism_id == 'ssh-env')
+                    self.assertEqual('Remote environment', remote.label)
+                    self.assertEqual('environment', remote.category)
                     record_session_manifest(session, runtime)
                     text = json.dumps(runtime.manifest.to_dict()) + session.path.read_text()
                     for secret in environment.values():

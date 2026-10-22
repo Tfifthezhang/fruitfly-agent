@@ -9,10 +9,15 @@ from uuid import uuid4
 
 from fruitfly_agent.lab.improvement.api import (RunPlan, ComponentWorkflow, WorkflowServices,
     GeneratorRegistry, AgentGenerator, AgentComposer, AgentEditor, AgentSelector, AgentReflector,
-    FileTaskRunner, WorkspaceTaskSource, component_registry, experience_id,
-    SearchActivity, SearchReport, SearchCompletion, TaskMaterial, CaseMeasurements, HoldoutVerification, model_completion, EvidenceInspector)
+    component_registry, experience_id, SearchActivity, SearchReport, SearchCompletion,
+    model_completion, EvidenceInspector, ExecutionContext, ExecutionRequest, builtin_executions,
+    HarnessSnapshot, bundle_target, bundle_text)
+from fruitfly_agent.lab.algorithms.targets import SystemVersion, content_hash
+from fruitfly_agent.lab.algorithms.evolution import VerificationEvidence
 from fruitfly_agent.interactive.contracts.improvement import (WorkflowConfiguration,
-    WorkflowChoice, WorkflowComponentView, ImprovementParameterView, ImprovementPreview)
+    WorkflowChoice, WorkflowComponentView, ImprovementParameterView, ImprovementPreview, WorkflowExecutionView)
+from fruitfly_agent.run.storage.verification import VerificationUseStore
+from fruitfly_agent.interactive.contracts.experience import PendingExperienceView
 
 
 class ArtifactPort:
@@ -31,7 +36,7 @@ class RunComponentJobs:
     def __init__(self, *, workspace, artifacts, experience, manifest, version, config,
                  targets, generators=None, runner=None, composer=None, selector=None,
                  reflector=None, verifier=None, measurements=None, workflow_factory=None,
-                 tasks=None, publish=None, editor=None, inspector=None, components=None):
+                 tasks=None, publish=None, editor=None, inspector=None, components=None, executions=None, stop_policy=None):
         self.workspace, self.artifacts = Path(workspace), ArtifactPort(artifacts)
         self.experience, self.manifest, self.version = experience, manifest, version
         self.config, self.targets = config, targets
@@ -48,6 +53,9 @@ class RunComponentJobs:
         self.editor_configuration = config
         self.defaults: Callable[[], dict] = lambda: {}
         self.tasks, self.publish = tasks, publish
+        self.executions = executions or builtin_executions()
+        self.stop_policy = stop_policy
+        self.verification_uses = VerificationUseStore(self.workspace / '.fruitfly/improvement/verification-uses.json')
         self.previews = {}
         self.services = None
         self.outcome = None
@@ -62,7 +70,8 @@ class RunComponentJobs:
             return getattr(value, 'implementation_id',
                 getattr(value, '__module__', type(value).__module__) + '.' +
                 getattr(value, '__qualname__', type(value).__qualname__)) if value is not None else default
-        return {'workflow': 'propose-probe-compose-v1',
+        return {'workflow': 'propose-probe-compose-v2',
+                'executions': [(d.execution_id, d.implementation_id) for d in self.executions.definitions()],
                 'generators': tuple(asdict(d) | {'required_capabilities': sorted(d.required_capabilities)} for d in self.generators.definitions()),
                 'stages': {name: identity(value, default) for name, value, default in (
                     ('editor', self.editor_factory, 'workspace-editor-v1'),
@@ -70,125 +79,117 @@ class RunComponentJobs:
                     ('compose', self.composer_factory, 'agent-composer-v1'),
                     ('select', self.selector_factory, 'agent-selector-v1'),
                     ('reflect', self.reflector_factory, 'agent-reflector-v1'),
+                    ('stop', self.stop_policy, 'bounded-stop-v1'),
                     ('workflow', self.controller_factory, 'propose-probe-compose-v1'))}}
 
+    def context(self, plan=None, services=None, experience=()):
+        return ExecutionContext(self.workspace, self.artifacts, self.registry(),
+            self.tasks() if self.tasks is not None else None, self.config(), self.editor_configuration(),
+            experience=experience, plan=plan, services=services, runner_factory=self.runner_factory,
+            measurements=self.measurements, verifier=self.verifier, claim_verification=self.verification_uses.claim,
+            remaining_verification=self.verification_uses.remaining)
+
     def workflow_configuration(self):
-        registry = self.registry()
-        packages = tuple(self.tasks().summaries()) if self.tasks is not None else ()
-        measured = self.measurements is not None or any(not p.error for p in packages)
-        runner_caps = getattr(self.runner_factory, 'capabilities', FileTaskRunner.capabilities)
-        components = []
-        for document in registry.snapshot().components:
-            adapter = registry.adapters[document.component_id]
-            missing: frozenset[str] = getattr(adapter, 'required_capabilities', frozenset()) - runner_caps
-            reason = 'Missing execution capabilities: ' + ', '.join(sorted(missing)) if missing else ''
-            if document.role == 'I' and 'improver-comparison' not in runner_caps:
-                reason = 'This runner does not compare improver behavior.'
-            components.append(WorkflowComponentView(document.component_id,
-                getattr(getattr(adapter, 'target', adapter), 'label', document.component_id), document.kind, document.role, not reason, reason))
-        generators = []
-        for definition in self.generators.definitions():
-            missing = definition.required_capabilities - ({'editor', 'model'} | ({'measurements'} if measured else set()))
-            generators.append(WorkflowChoice(definition.generator_id, definition.label, not missing,
-                                              'Missing capabilities: ' + ', '.join(sorted(missing)) if missing else ''))
-        return WorkflowConfiguration(tuple(components), tuple(generators),
+        context = self.context()
+        views = []
+        documents = context.components.snapshot().components
+        for definition in self.executions.definitions():
+            capabilities = (getattr(self.runner_factory, 'capabilities', definition.capabilities)
+                if definition.accepts_runner_override and self.runner_factory else definition.capabilities)
+            ids = tuple(d.component_id for d in documents if d.role in definition.roles and not (
+                getattr(context.components.adapters[d.component_id], 'required_capabilities', frozenset()) - capabilities))
+            sources = definition.materials(context)
+            views.append(WorkflowExecutionView(definition.execution_id, definition.label, ids,
+                tuple(WorkflowChoice(v.material_id, v.label, not v.error, v.error, v.detail) for v in sources),
+                tuple(ImprovementParameterView(p.name, p.label, p.kind, p.default, p.minimum, p.maximum,
+                    'execution', p.description) for p in definition.parameters), definition.notice, definition.defaults))
+        primary = views[0]
+        components = tuple(WorkflowComponentView(d.component_id,
+            getattr(getattr(context.components.adapters[d.component_id], 'target', None), 'label', d.component_id),
+            d.kind, d.role, d.component_id in primary.component_ids,
+            '' if d.component_id in primary.component_ids else 'Choose an execution strategy supporting this component.') for d in documents)
+        measured = self.measurements is not None or any(c.choice_id and c.available for v in views for c in v.materials)
+        generators = tuple(WorkflowChoice(d.generator_id, d.label,
+            not (d.required_capabilities - ({'editor', 'model'} | ({'measurements'} if measured else set()))),
+            'Required capabilities are not available.' if d.required_capabilities - ({'editor', 'model'} | ({'measurements'} if measured else set())) else '')
+            for d in self.generators.definitions())
+        return WorkflowConfiguration(components, generators,
             (WorkflowChoice('parallel', 'Parallel exploration'), WorkflowChoice('sequential', 'Sequential refinement')),
-            (WorkflowChoice('behavior', 'Execution evidence', detail='Selection is not a proof of correctness.'),
-             WorkflowChoice('scored', 'Measured feedback', measured,
-                            '' if measured else 'No measurement source is registered.')),
-            (WorkflowChoice('task', 'Current task only'),
-             WorkflowChoice('persistent', 'Publish a persistent candidate', self.publish is not None,
-                            '' if self.publish else 'No candidate publication capability is registered.')),
-            tuple(ImprovementParameterView(name, label, kind, self.defaults().get(name, default), minimum, maximum, 'budget', description)
-                for name, label, kind, default, minimum, maximum, description in (
-                    ('width', 'Exploration width', 'integer', 1, 1, 10, 'Candidates per diagnostic scope in parallel mode.'),
-                    ('depth', 'Refinement depth', 'integer', 1, 1, 10, 'Successive rounds in sequential mode.'),
-                    ('max_model_calls', 'Model calls', 'integer', 64, 1, 10000, 'One shared allocation for editor and task executions.'),
-                    ('max_executions', 'Task executions', 'integer', 32, 1, 1000, 'Includes reference, probes and composed executions.'),
-                    ('operation_timeout', 'Operation timeout', 'number', 120, 1, 14400, 'Seconds per stage operation.'))),
-            (WorkflowChoice('', 'Current task and input files'), *(WorkflowChoice(s.pack_id, s.name,
-                not s.error, s.error, f'{s.train_count} training · {s.validation_count} selection · {s.holdout_count} holdout')
-                for s in packages)))
+            (WorkflowChoice('behavior', 'Execution evidence', detail='Selection is not proof of quality.'),
+             WorkflowChoice('scored', 'Measured feedback', measured, '' if measured else 'No measurement source is registered.')),
+            (WorkflowChoice('task', 'Current task only'), WorkflowChoice('persistent', 'Publish a persistent candidate',
+             self.publish is not None, '' if self.publish else 'Publication is unavailable.')),
+            tuple(ImprovementParameterView(name, label, kind, self.defaults().get(name, default), low, high, 'budget', description)
+                for name, label, kind, default, low, high, description in (
+                    ('width', 'Exploration width', 'integer', 1, 1, 10, 'Independent proposals per diagnostic scope.'),
+                    ('depth', 'Refinement depth', 'integer', 1, 1, 10, 'Successive rounds; only selected incumbents advance.'),
+                    ('max_model_calls', 'Model calls', 'integer', 64, 1, 10000, 'Root allowance includes all nested calls and verification.'),
+                    ('max_executions', 'Task executions', 'integer', 32, 1, 1000, 'Root allowance counts leaf task executions once.'),
+                    ('operation_timeout', 'Operation timeout', 'number', 120, 1, 14400, 'Seconds per operation, bounded by parent deadline.'))),
+            primary.materials, tuple(views))
 
     def preview(self, request, *, material=None):
+        if material is not None:
+            raise ValueError('external materials require a registered execution source')
         options = self.workflow_configuration()
-        if not request.instruction.strip() and not request.task_pack_id and material is None:
-            raise ValueError('provide the current task instruction')
-        if request.verification == 'scored' and not request.task_pack_id and self.measurements is None:
-            raise ValueError('measured feedback requires a task package or registered measurement source')
-        available = {c.component_id for c in options.components if c.available}
-        if not request.component_ids or set(request.component_ids) - available:
-            raise ValueError('select available editable components')
+        definition = self.executions.get(request.execution_id)
+        view = next(v for v in options.executions if v.execution_id == request.execution_id)
+        if not request.component_ids or set(request.component_ids) - set(view.component_ids):
+            raise ValueError('select available editable components for this execution strategy')
         for selected, choices in ((request.generator_id, options.generators), (request.mode, options.modes),
                                   (request.verification, options.verification), (request.scope, options.scopes)):
             if not any(c.choice_id == selected and c.available for c in choices):
                 raise ValueError('selected workflow capability is unavailable')
-        parent = self.version()
-        plan = RunPlan('job-' + uuid4().hex, parent, request.component_ids, request.generator_id,
+        parameters = tuple(sorted(definition.normalize(request.execution_parameters).items()))
+        plan = RunPlan('job-' + uuid4().hex, self.version(), request.component_ids, request.generator_id,
             request.mode, request.width, request.depth, request.scope, request.verification,
             request.max_model_calls, request.max_executions, request.operation_timeout, request.direction)
-        comparison = None
-        if material is not None:
-            task = material
-        elif request.task_pack_id:
-            if self.tasks is None:
-                raise ValueError('task packages are unavailable')
-            suite = self.tasks().freeze(request.task_pack_id, request.component_ids[0])
-            holdout = self.tasks().holdout(request.task_pack_id)
-            if request.scope == 'persistent' and not holdout:
-                raise ValueError('persistent improvement requires independent holdout tasks')
-            task = TaskMaterial('training-task', suite.train[0].input, origin='task-pack:' + request.task_pack_id,
-                                environment_id='file-workspace-v1')
-            selection = tuple(TaskMaterial(f'selection-{i}', c.input, origin=task.origin,
-                environment_id=task.environment_id) for i, c in enumerate(suite.validation))
-            confirmation = tuple(TaskMaterial(f'holdout-{i}', c.input, origin=task.origin,
-                environment_id=task.environment_id) for i, c in enumerate(holdout))
-            regression = tuple(TaskMaterial(f'regression-{i}', c.input, origin=task.origin,
-                environment_id=task.environment_id) for i, c in enumerate(suite.train))
-            comparison = (suite, selection, confirmation, tuple(holdout), regression)
-        else:
-            task = WorkspaceTaskSource(self.workspace, self.artifacts).freeze('task-' + uuid4().hex,
-                request.instruction, paths=request.input_paths, environment_id='file-workspace-v1')
-            if request.scope == 'persistent' and self.verifier is None:
-                raise ValueError('select a task package with independent verification material')
-        registry = self.registry()
-        baseline = registry.snapshot()
         experience = self.experience.snapshot()
+        context = self.context(plan, experience=experience)
+        execution_request = ExecutionRequest(request.instruction, request.input_paths,
+            request.component_ids, request.task_pack_id, request.scope, request.verification, parameters)
+        prepared = definition.prepare(context, execution_request)
+        for kind, limit in (('model', plan.max_model_calls), ('execution', plan.max_executions)):
+            if prepared.minimum_budget.get(kind, 0) > limit:
+                raise ValueError(f'root {kind} budget is too small; need at least {prepared.minimum_budget[kind]}')
         token = uuid4().hex
         if len(self.previews) >= 16:
             self.previews.pop(next(iter(self.previews)))
-        self.previews[token] = (plan, task, baseline, registry, experience, self.manifest()['digest'], comparison)
-        return ImprovementPreview(plan.generator_id, 'Component improvement',
-            'Runs model requests and repeated task executions in a detached file workspace. Calls may incur charges. '
-            'Current-task selection does not change profile defaults or prove a quality gain.',
-            (('Task', task.instruction), ('Input files', ', '.join(r.path for r in task.inputs) or '(none)'),
+        self.previews[token] = (plan, prepared, context.components.snapshot(), context.components, experience,
+                               self.manifest()['digest'], definition, execution_request)
+        return ImprovementPreview(plan.generator_id, 'Component improvement', definition.notice,
+            (('Task', prepared.task.instruction), ('Input files', ', '.join(r.path for r in prepared.task.inputs) or '(none)'),
              ('Components', ', '.join(plan.component_ids)), ('Candidate generator', plan.generator_id),
+             ('Execution strategy', definition.label), ('Material identity', prepared.source_id),
+             ('Execution parameters', json.dumps(dict(parameters), ensure_ascii=False)),
              ('Exploration', f'{plan.mode}; width={plan.width}; depth={plan.depth}'),
-             ('Verification', plan.feedback), ('Effect scope', plan.purpose),
+             ('Feedback', plan.feedback), ('Effect scope', plan.purpose),
              ('Model calls', str(plan.max_model_calls)), ('Task executions', str(plan.max_executions)),
-             ('Execution environment', task.environment_id), ('Experience snapshot', experience_id(experience))),
-            target='component-bundle', preview_token=token)
+             ('Experience snapshot', experience_id(experience)),
+             ('Feedback assurance', 'Development signals do not grant independent verification.'),
+             *prepared.details), target='component-bundle', preview_token=token,
+             role=context.components.snapshot().component(plan.component_ids[0]).role)
 
     async def improve(self, manifest, direction, *, preview_token):
         self._completion, self.outcome = None, None
         if preview_token not in self.previews:
             raise ValueError('unknown or consumed component preview')
-        plan, task, baseline, registry, experience, digest, comparison = self.previews.pop(preview_token)
+        plan, prepared, baseline, registry, experience, digest, definition, execution_request = self.previews.pop(preview_token)
+        task = prepared.task
         if (manifest['digest'] != digest or self.manifest()['digest'] != digest or self.version() != plan.parent
                 or direction != plan.direction or self.registry().snapshot() != baseline
-                or experience_id(self.experience.snapshot()) != experience_id(experience)):
+                or experience_id(self.experience.snapshot()) != experience_id(experience)
+                or prepared.current_source() != prepared.source_id):
             raise ValueError('task improvement conditions changed; preview again')
         root = self.workspace / '.fruitfly/improvement/jobs' / plan.job_id
         if not root.resolve().is_relative_to(self.workspace.resolve()):
             raise ValueError('job records must remain inside the workspace')
         root.mkdir(parents=True, exist_ok=False)
-        (root / 'plan.json').write_text(json.dumps({'schema_version': 1, 'plan': asdict(plan),
+        (root / 'plan.json').write_text(json.dumps({'schema_version': 2, 'plan': asdict(plan),
             'task': asdict(task), 'baseline': baseline.to_dict(), 'experience': experience_id(experience),
-            'verification': {'source_hash': comparison[0].source_hash,
-                'policy_id': comparison[0].evaluation_policy.policy_id,
-                'selection': [t.material_id for t in comparison[1]],
-                'holdout': [t.material_id for t in comparison[2]],
-                'regression': [t.material_id for t in comparison[4]]} if comparison else None}, ensure_ascii=False), encoding='utf-8')
+            'execution': {'id': definition.execution_id, 'implementation': definition.implementation_id,
+                          'source_id': prepared.source_id, 'details': prepared.details,
+                          'request': asdict(execution_request)}}, ensure_ascii=False), encoding='utf-8')
         stream = (root / 'events.jsonl').open('x', encoding='utf-8')
         def record(event, **fields):
             stream.write(json.dumps({'event': event, **fields}, ensure_ascii=False) + '\n')
@@ -211,55 +212,44 @@ class RunComponentJobs:
                 else AgentEditor(self.editor_configuration(), self.artifacts, registry,
                                  instructions=self.editor_instructions()))
             services.own(inspector)
-            runner = (self.runner_factory(plan, registry, self.artifacts, services) if self.runner_factory else
-                      FileTaskRunner(self.config(), registry, self.artifacts, services))
-            services.own(runner)
+            context = self.context(plan, services, experience)
+            context.components = registry
+            ports = definition.build(context, prepared)
+            runner = services.own(ports.runner)
+            if plan.purpose == 'persistent' and any(ports.verification_reserve.values()):
+                services.protect_verification(ports.verification_reserve)
             composer = self.composer_factory(plan, services) if self.composer_factory else AgentComposer()
             services.own(composer)
-            selector = self.selector_factory(plan, services) if self.selector_factory else AgentSelector(inspector, services)
+            selector = self.selector_factory(plan, services) if self.selector_factory else ports.selector or AgentSelector(inspector, services)
             services.own(selector)
             reflector = self.reflector_factory(plan, services) if self.reflector_factory else AgentReflector(inspector, services)
             services.own(reflector)
-            measurements, verifier = self.measurements, self.verifier
-            if comparison is not None:
-                suite, selection, confirmation, holdout, regression = comparison
-                if self.tasks().source_hash(suite.pack_id) != suite.source_hash:
-                    raise ValueError('verification task package changed after preview')
-                cases = {task.task_id: suite.train[0],
-                    **{t.task_id: c for t, c in zip(regression, suite.train)},
-                    **{t.task_id: c for t, c in zip(selection, suite.validation)},
-                    **{t.task_id: c for t, c in zip(confirmation, holdout)}}
-                measurements = CaseMeasurements(suite.evaluation_policy, cases)
-                async def execute_verification(material, harness):
-                    services.reserve('execution')
-                    receipt = await services.operation(runner.execute(plan, material, harness))
-                    if (receipt.material_id != material.material_id or receipt.harness_id != harness.snapshot_id
-                            or receipt.conditions_id != plan.conditions_id or receipt.initial_state_id != plan.parent.state):
-                        raise ValueError('verification execution differs from frozen comparison')
-                    record('verification-execution', receipt=asdict(receipt))
-                    return receipt
-                verifier = HoldoutVerification(baseline=baseline, selection=selection, holdout=confirmation,
-                    execute=execute_verification, measurements=measurements,
-                    direction=suite.direction, regression=regression) if confirmation else None
+            measurements, verifier = ports.measurements, ports.verifier
             workflow = self.controller_factory(generators=self.generators, components=registry,
                 runner=runner, composer=composer, selector=selector, reflector=reflector,
-                measurements=measurements, verifier=verifier)
+                measurements=measurements, verifier=verifier, **({"stop_policy": self.stop_policy} if self.stop_policy is not None else {}))
             services.own(workflow)
             outcome = await workflow.run(plan, task, baseline, services, experience=experience)
             services.check()
             if self.version() != plan.parent:
                 raise ValueError('production H/I/S changed during task improvement')
+            proof = getattr(verifier, 'receipt', None)
+            if outcome.decision is not None and outcome.decision.assurance == 'verified' and proof:
+                reference = self.artifacts.put(json.dumps({'schema_version': 1,
+                    'policy_id': verifier.policy_id, 'execution_id': definition.execution_id,
+                    'implementation_id': definition.implementation_id, 'source_id': prepared.source_id,
+                    'request': asdict(execution_request), 'plan': asdict(plan),
+                    'harness': outcome.harness.to_dict(), 'evidence': proof}, sort_keys=True).encode())
+                outcome = replace(outcome, verification=reference)
             self.outcome = outcome
             stop = outcome.stop_reason
             services.record('workflow-completed', stop_reason=stop,
                 selected=outcome.selected.run_id if outcome.selected else None,
                 assurance=outcome.decision.assurance if outcome.decision else 'unavailable')
             (root / 'result.json').write_text(json.dumps(asdict(outcome), ensure_ascii=False), encoding='utf-8')
-            # Experience is a separately recorded S update, committed only at
-            # this completed task boundary. Persistent jobs defer it to adoption.
-            if outcome.experience and plan.purpose == 'task':
-                snapshot = self.experience.commit(outcome.experience, expected_snapshot=experience_id(experience))
-                record('experience-committed', before=experience_id(experience), after=snapshot)
+            if outcome.experience and plan.purpose == 'task' and ports.retain_experience:
+                self.experience.stage(plan.job_id, outcome.experience, expected_snapshot=experience_id(experience))
+                record('experience-pending', job_id=plan.job_id, initial_snapshot=experience_id(experience))
             if (plan.purpose == 'persistent' and outcome.decision is not None
                     and outcome.decision.assurance == 'verified'):
                 return self.publish(outcome, baseline, tuple(registry.adapters.values()))
@@ -285,6 +275,47 @@ class RunComponentJobs:
 
     def completion(self):
         return self._completion
+
+    def pending_experience(self):
+        return tuple(PendingExperienceView(v['job_id'], v['initial_snapshot'],
+            tuple(e['lesson'] for e in v['entries']),
+            tuple((e['task_id'], 'Cue: ' + e['cue'] + '\nEvidence: ' + ', '.join(e['evidence_ids']) +
+                   '\nLimits: ' + e['limitations']) for e in v['entries'])) for v in self.experience.pending())
+
+    def experience_action(self, job_id, action):
+        return self.experience.review(job_id, action)
+
+    def verified_candidate(self, record, policy_id):
+        reference = dict(record.evidence).get('Verification receipt')
+        if not reference:
+            raise ValueError('candidate has no reusable independent verification receipt')
+        value = json.loads(self.artifacts.read(reference))
+        if value.get('schema_version') != 1 or value.get('policy_id') != policy_id:
+            raise ValueError('verification policy or receipt schema mismatch')
+        plan_value = dict(value['plan'])
+        plan_value['parent'] = SystemVersion(**plan_value['parent'])
+        plan = RunPlan(**plan_value)
+        if plan.parent != self.version() or record.parent_manifest_digest != self.manifest()['digest']:
+            raise ValueError('verification parent or conditions changed')
+        definition = self.executions.get(value['execution_id'])
+        if definition.implementation_id != value['implementation_id']:
+            raise ValueError('verification implementation changed')
+        request_value = dict(value['request'])
+        for name in ('input_paths', 'component_ids', 'parameters'):
+            request_value[name] = tuple(tuple(v) if isinstance(v, list) else v for v in request_value[name])
+        context = self.context(plan, experience=self.experience.snapshot())
+        # A completed proof consumes no new private-suite use or model work.
+        context.remaining_verification = None
+        prepared = definition.prepare(context, ExecutionRequest(**request_value))
+        if prepared.source_id != value['source_id']:
+            raise ValueError('verification material changed')
+        target = bundle_target(tuple(self.targets()))
+        text = bundle_text(target, HarnessSnapshot.from_dict(value['harness']))
+        if content_hash(text) != record.artifact_id:
+            raise ValueError('verification candidate content mismatch')
+        self.artifacts.read(value['evidence'])
+        return VerificationEvidence(record.candidate_id, record.artifact_id, record.parent_manifest_digest,
+                                    policy_id, True, 'Reused exact completed independent verification: ' + reference)
 
     def progress(self):
         if self.services is None:

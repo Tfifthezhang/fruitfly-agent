@@ -61,3 +61,22 @@ There is no default autonomous CLI or Catalog mechanism. Real injected capabilit
 ```
 
 Offline tests verify binding, continuation, rejection, cancellation, budgets, and reconciliation. They do not prove real improvement or safe arbitrary code deployment. No module-specific environment variables.
+
+## Evolve the editor across generations
+
+Use [editor-comparison material and requests](../improvement/improver/README.md).
+The outer job changes I only; each inner trial fixes I and changes declared H/S.
+Only the verified I artifact is activated. Runtime construction rebinds its exact
+instruction bytes, and the next generation uses that active editor.
+
+`RunEvolutionHost(application, factory, policy_id="improver-paired-v1", request=request)`
+reuses an exact completed proof when `verify` is omitted. This requires a built-in
+independent receipt; development scores, selected outputs and legacy candidates
+without proof are rejected. It does not spend an additional private-suite use.
+The suite must have a declared remaining use for each new generation. Explicit
+custom verifier callbacks remain supported.
+
+[Offline editor evolution tests](../../../tests/workflows/test_editor_evolution.py)
+exercise actual inner editor calls, independent measurement, two I activations,
+proof reuse and restart behavior without keys or network access. Their synthetic
+response model is not evidence of real recursive capability gains.

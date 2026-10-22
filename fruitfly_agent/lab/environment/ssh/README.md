@@ -1,9 +1,9 @@
-# Execute on an SSH server
+# Use a remote environment through SSH
 
 [Up: Execution Environments](../README.md)
 
 `SshEnv` implements Core's `ExecutionEnv` using SSH command channels and SFTP.
-In **Configure → Environment**, use Space to enable **SSH server**, or expand it
+In **Configure → Environment**, use Space to enable **Remote environment**, or expand it
 and choose **Set up…**. The guided form asks for the server address, port, remote
 directory, local host-key file, hidden account and hidden password, then shows
 a review. Choose **Stage settings**, return to startup and save/start a new session.
@@ -12,8 +12,8 @@ after staging. Cancelling the form preserves the previous environment.
 Configuration and construction are offline; Application startup opens the
 connection. Authentication failure prevents activation.
 
-After saving once, selecting SSH again reuses the server settings and stored
-credentials without reopening the form. Unchecking SSH or selecting the local
+After saving once, selecting Remote environment again reuses the server settings and stored
+credentials without reopening the form. Unchecking it or selecting the local
 environment retains them, including across restarts in the same workspace and
 profile. Missing settings or credentials reopen setup; choose **Set up…** explicitly
 to edit complete settings. Staged settings are also reused within the current

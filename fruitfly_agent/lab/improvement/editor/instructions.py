@@ -16,7 +16,8 @@ class EditorInstructions:
     domain: str = 'Diagnose domain reasoning, source fidelity, constraints and workspace facts. Verify facts against this task.'
     compose: str = 'Compare baseline and candidate executions. Adopt, revise or reject edits using behavioral contrasts. Resolve conflicts and include required dependencies.'
     select: str = ('Choose one existing anonymous deliverable using task requirements and source material. '
-        'Do not edit or synthesize an answer. Return JSON {"choice":"id","reason":"concrete reason"}.')
+        'Do not edit or synthesize an answer. Return NO_CLEAR_CHOICE if evidence cannot distinguish the outputs; '
+        'otherwise return JSON {"choice":"id","reason":"concrete reason"}.')
     reflect: str = ('Inspect all edits and execution contrasts. Adoption alone proves no improvement. '
         'Mark confounded effects and unsupported attribution. Return NO_ENTRY if evidence is insufficient, '
         'otherwise JSON {"cue":"situation shape","lesson":"component operation",'
@@ -32,7 +33,14 @@ class EditorInstructions:
 
     @classmethod
     def parse(cls, text):
-        value = json.loads(text)
+        def unique(pairs):
+            result = {}
+            for name, value in pairs:
+                if name in result:
+                    raise ValueError('duplicate editor instruction field')
+                result[name] = value
+            return result
+        value = json.loads(text, object_pairs_hook=unique)
         if not isinstance(value, dict) or set(value) != set(cls.__dataclass_fields__):
             raise ValueError('editor instructions require exactly the registered stage fields')
         return cls(**value)
@@ -44,15 +52,21 @@ class EditorInstructionTarget:
     required_capabilities = frozenset({'improver-comparison'})
     adoption_roles = frozenset({'I'})
 
-    def __init__(self, instructions=None):
+    def __init__(self, instructions=None, *, text=None):
         self.instructions = instructions or EditorInstructions()
+        self.text = self.instructions.serialize() if text is None else text
+        if EditorInstructions.parse(self.text) != self.instructions:
+            raise ValueError('editor source text differs from the installed instructions')
 
     def snapshot(self):
-        return TargetSnapshot('improvement-editor', self.instructions.serialize(),
+        return TargetSnapshot('improvement-editor', self.text,
             TargetBinding('artifact', 'improvement-editor'), 'editor-instructions-v1', 'I')
 
     def validate(self, text):
-        EditorInstructions.parse(text)
+        candidate = EditorInstructions.parse(text)
+        for name in ('system', 'select', 'reflect'):
+            if getattr(candidate, name) != getattr(self.instructions, name):
+                raise ValueError('editor field is frozen during self-improvement: ' + name)
 
     def prepare_trial(self, config, text):
         raise ValueError('editor instruction changes require an improver comparison runner')

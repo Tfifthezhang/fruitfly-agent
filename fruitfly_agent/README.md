@@ -15,7 +15,10 @@ FruitFlyAgent separates the Agent loop, model adapters, Application lifecycle, a
 | [Run](run/README.md) | Configuration, Provider construction, assembly, and CLI | All runtime layers |
 | [Eval](../eval/README.md) | Optional single-configuration benchmark execution and reports | Core, Providers, Lab, and Eval |
 
-Eval installs and launches the native Agent CLI inside Harbor task environments, then collects official verifier results. Benchmark declarations remain in Eval. Removing it must leave normal Agent use and generic improvement intact.
+Eval prepares and mounts a Linux Agent runtime, launches the native CLI inside
+Harbor task environments, then collects official verifier results. Shared
+preparation and lifecycle stay in Eval; benchmark declarations do not configure
+runtime interfaces. Removing Eval leaves normal Agent use and generic improvement intact.
 
 The [Improvement workflow](lab/improvement/README.md) separates candidate generation, execution, composition, selection, verification and reflection through public ports. Object-owned component adapters expose legal changes; Run and Application retain persistence and activation.
 
@@ -23,9 +26,12 @@ The [Improvement workflow](lab/improvement/README.md) separates candidate genera
 
 Lab registrations own mechanism metadata. Improvement menus use generator, component, source and allocation contracts. Adding a generator does not add algorithm-specific branches to Run or the terminal.
 
-[Execution workflows](lab/workflow/README.md) own bounded H execution. Retained Skill and memory documents belong to S. I editor instructions require an improver-comparison runner.
+[Execution workflows](lab/workflow/README.md) own bounded H execution. Retained Skill and memory documents belong to S. I editor instructions use a registered [fixed-depth comparison](lab/improvement/improver/README.md)
+that measures the downstream H/S changes produced by each editor.
 
-Task materials and executions need no score. Persistent publication requires an injected verification policy; current-task selection retains its weaker assurance. The experience library is a separate attributed S update at task boundaries.
+Task materials and executions need no score. Persistent publication requires an injected verification policy; current-task selection retains its weaker assurance. The experience library is a separate attributed S update after explicit pending-lesson review.
+Search preserves reference results, separates stopping from assurance, and charges nested
+work to one root budget. No component changes during a task execution.
 
 Run separates [configuration](run/configuration/README.md), [runtime preparation](run/runtime/README.md), [storage](run/storage/README.md), [improvement hosting](run/improvement/README.md), and [adapters](run/adapters/README.md). Its Factory composes these services; leaf services receive explicit capabilities and own their local state.
 

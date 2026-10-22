@@ -141,6 +141,7 @@ class ExecutionTests(unittest.TestCase):
                     "metrics",
                     "errors",
                     "artifacts",
+                    "readiness",
                 },
             )
             for relative in (
@@ -155,6 +156,7 @@ class ExecutionTests(unittest.TestCase):
                 "## Summary",
                 "## Configuration",
                 "## Results",
+                "## Execution Readiness",
                 "## Task Results",
                 "## Failures",
                 "## Artifacts",

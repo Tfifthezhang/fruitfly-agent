@@ -159,8 +159,14 @@ class AgentSelector:
         response = await self.editor.session(
             self.editor.instructions.select,
             workspace, self.services, writable=False)
-        value = json.loads(response)
-        return SelectionDecision(mapping[value['choice']], value['reason'])
+        try:
+            if response.strip() == 'NO_CLEAR_CHOICE':
+                return SelectionDecision(records[0].run_id, 'Insufficient distinction; baseline retained')
+            value = json.loads(response)
+            return SelectionDecision(mapping[value['choice']], value['reason'])
+        except (ValueError, TypeError, KeyError):
+            self.services.record('selection-invalid', reason='Malformed choice; baseline retained')
+            return SelectionDecision(records[0].run_id, 'Invalid selection; baseline retained')
 
 
 class AgentReflector:

@@ -42,6 +42,7 @@ def _install(state, context, parameters):
 
 def _prepare_targets(state, context):
     instructions = EditorInstructions()
+    text = None
     reference = context.artifact_bindings.get('improvement-editor')
     if reference is not None:
         if context.artifact_reader is None:
@@ -52,4 +53,4 @@ def _prepare_targets(state, context):
             state = state.with_data_artifact({'key': 'improvement-editor', 'id': reference, 'role': 'I',
                 'media_type': 'application/json', 'size_bytes': len(text.encode('utf-8'))})
     return (state.with_component(EDITOR_INSTRUCTIONS, instructions)
-        .with_component(TEXT_TARGET_PREFIX + 'improvement-editor', EditorInstructionTarget(instructions)))
+        .with_component(TEXT_TARGET_PREFIX + 'improvement-editor', EditorInstructionTarget(instructions, text=text)))

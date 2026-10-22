@@ -312,6 +312,7 @@ class CompositionRequest:
     records: tuple[ExecutionRecord, ...]
     index: int
     experience: tuple[ExperienceEntry, ...] = ()
+    feedback: tuple[Measurement, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -338,6 +339,7 @@ class ImprovementOutcome:
     decision: SelectionDecision | None
     experience: tuple[ExperienceEntry, ...] = ()
     stop_reason: str = 'completed'
+    verification: str = ''
 
 
 class ArtifactAccess(Protocol):

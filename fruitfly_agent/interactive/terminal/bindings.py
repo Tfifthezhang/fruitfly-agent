@@ -9,6 +9,7 @@ from fruitfly_agent.interactive.contracts.models import InteractiveStatus
 from fruitfly_agent.interactive.contracts.improvement import ImprovementClient, ImprovementProgress, ComponentImprovementClient
 from fruitfly_agent.interactive.contracts.candidates import CandidateClient, CandidateActivationClient
 from fruitfly_agent.interactive.contracts.task_packs import TaskPackClient
+from fruitfly_agent.interactive.contracts.experience import ExperienceReviewClient
 
 
 class TerminalSession(Protocol):
@@ -39,7 +40,6 @@ class TerminalBindings:
     progress: Callable
     candidate_notice: Callable | None
     acknowledge_notice: Callable | None
-    trace: Callable | None = None
 
     @classmethod
     def from_session(cls, session: Any) -> TerminalBindings:
@@ -59,7 +59,6 @@ class TerminalBindings:
             progress=lambda: getattr(session, "improvement_progress", None),
             candidate_notice=getattr(session, "candidate_notice", None),
             acknowledge_notice=getattr(session, "acknowledge_candidate_notice", None),
-            trace=getattr(session, "trace", None),
         )
 
 
@@ -76,6 +75,7 @@ class ImprovementClients:
     history_logs: Callable | None = None
     wait: Callable | None = None
     workflow: ComponentImprovementClient | None = None
+    experience: ExperienceReviewClient | None = None
 
     @classmethod
     def from_session(cls, session: Any) -> ImprovementClients:
@@ -90,6 +90,7 @@ class ImprovementClients:
             history_logs=getattr(session, 'improvement_run_logs', None),
             wait=getattr(session, 'wait_for_improvement', None),
             workflow=session if isinstance(session, ComponentImprovementClient) else None,
+            experience=session if isinstance(session, ExperienceReviewClient) else None,
         )
 
     @property

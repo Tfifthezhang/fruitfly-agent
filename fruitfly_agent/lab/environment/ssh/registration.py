@@ -11,8 +11,8 @@ from .environment import SshEnv
 
 def definition():
     return MechanismDefinition(
-        MechanismDescriptor('ssh-env', 'SSH server',
-            'Read and write server files and run Bash commands over verified SSH.',
+        MechanismDescriptor('ssh-env', 'Remote environment',
+            'Read and write remote files and run Bash commands through verified SSH.',
             contributions=(MechanismContribution('capability', 'environment'),),
             parameters=(
                 ParameterDescriptor('host', 'string', 'Server address', 'Hostname or IP address; no account or port.', ''),
@@ -61,7 +61,7 @@ def install(state, context, parameters):
     username = secrets(config.username_env) if secrets is not None else None
     password = secrets(config.password_env) if secrets is not None else None
     if not username or not password:
-        raise ValueError('SSH account or password is missing from the host secret environment. Open Configure → Environment → SSH server → Set up… '
+        raise ValueError('SSH account or password is missing from the host secret environment. Open Configure → Environment → Remote environment → Set up… '
                          'or set the configured secret variables in .fruitfly/secrets.env')
     # Resolve only the local host-key path here; remote paths never use resolve().
     known_hosts = Path(config.known_hosts).expanduser()

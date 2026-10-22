@@ -15,8 +15,8 @@ checks resulting files or environment state and writes a reward.
 ## Run the Terminal-Bench starter
 
 Set `benchmark.id` to `terminal-bench` and `benchmark.variant` to `starter` in the
-[CLI request](../DEVELOPER_GUIDE.md#create-a-cli-request). Actual execution downloads
-tasks/images and calls models; charges can apply.
+[CLI request](../DEVELOPER_GUIDE.md#create-a-cli-request). Preparation resolves
+tasks and checks images; execution calls models and charges can apply.
 
 | Exact task name | Goal |
 |---|---|
@@ -26,7 +26,8 @@ tasks/images and calls models; charges can apply.
 | `terminal-bench/cancel-async-tasks` | Implement bounded asynchronous execution and cancellation |
 | `terminal-bench/fix-code-vulnerability` | Repair vulnerable code and describe the issue |
 
-The runner passes five exact filters and a five-task cap. Results must contain
+Preparation resolves the five exact names and freezes their local task paths.
+Results must contain
 each selected task exactly once per requested attempt. Smoke applies the same
 coverage rule to its single task. These samples establish execution-path behavior,
 not a representative benchmark score.
@@ -39,6 +40,9 @@ image tags, CPU architecture, disk, task resources, host/container connectivity
 and model access. `no_gpu` performs no GPU preflight; it does not remove tasks
 from the dataset. Harbor preserves individual resource and timeout declarations.
 
-The Hub resolves a dataset to its available revision; Eval records the dataset
-name and preserves Harbor's resolved job configuration and logs. Keep those
-artifacts when comparing runs. See [Eval results](../README.md#inspect-results).
+The Hub resolves a dataset to its available revision during preparation. Eval
+freezes every selected task's content and records original/prepared hashes,
+explicit setup diffs and image identities. Run consumes those local paths and
+checks coverage for full datasets too. `task_directory` can use exported local
+tasks without registry access. Keep preparation and Harbor job artifacts when
+comparing runs. See [Eval results](../README.md#inspect-results).

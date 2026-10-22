@@ -9,6 +9,22 @@ from fruitfly_agent.run.storage.artifacts import DataArtifactStore
 
 
 class ExperienceStoreTests(unittest.TestCase):
+    def test_pending_lessons_require_review_and_stale_commits_are_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = ExperienceStore(Path(directory).resolve() / 'experience.json')
+            initial = experience_id(store.snapshot())
+            entry = self.entry()
+            store.stage('first', (entry,), expected_snapshot=initial)
+            store.stage('second', (replace(entry, entry_id='other'),), expected_snapshot=initial)
+            self.assertEqual(store.snapshot(), ())
+            self.assertEqual(len(store.pending()), 2)
+            self.assertEqual(store.review('first', 'commit'), 'committed')
+            with self.assertRaisesRegex(ValueError, 'changed'):
+                store.review('second', 'commit')
+            self.assertEqual(store.review('second', 'reject'), 'rejected')
+            self.assertEqual(store.pending(), ())
+            self.assertEqual(store.snapshot(), (entry,))
+
     def entry(self):
         harness = HarnessSnapshot((ComponentDocument('prompt', 'system-prompt', 'H', 'text-v1',
             (ComponentFile('instructions.txt', 'Check the result'),)),))

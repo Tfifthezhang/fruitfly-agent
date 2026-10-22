@@ -12,12 +12,20 @@ explicit queries and operations, not Factory internals or algorithm implementati
 | [candidates.py](candidates.py) | Candidate review and isolated preparation |
 | [task_packs.py](task_packs.py) | Task material views and corrections |
 | [configuration.py](configuration.py) | Prompt labels using injected readers |
-| [runtime.py](runtime.py) | Mechanism and tool descriptions |
+| [runtime.py](runtime.py) | Visible active component descriptions, registration-owned categories and tool names; separate experimental-mechanism IDs |
 
 RuntimeHandle receives improvement, candidate and task-material services through
 independent fields. Task materials and candidate review remain available without
 an improver. Method views carry registered descriptions, parameter metadata and
 configuration locations. Adapters do not choose algorithms or acceptance policies.
+
+Runtime descriptions cover visible assembled components, including capability-only
+tools and execution environments. They honor each registration's configuration
+category and exclude hidden internal components. The experimental ID collection
+keeps its original scope. These read-only descriptions drive
+[`/lab`](../../interactive/terminal/README.md#inspect-the-active-harness) without
+giving the command access to Catalog or a configuration draft. No parameters,
+credentials or algorithm objects enter this overview.
 
 Confirmed workflow submissions use Application's existing lifecycle. History
 retains completed, failed, empty and cancelled work. Independent verification

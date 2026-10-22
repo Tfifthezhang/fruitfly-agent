@@ -32,6 +32,7 @@ from fruitfly_agent.interactive.contracts.improvement import (
 )
 from fruitfly_agent.interactive.contracts.candidates import CandidateView, CandidateService
 from fruitfly_agent.interactive.contracts.task_packs import TaskPackService
+from fruitfly_agent.interactive.contracts.experience import ExperienceReviewClient
 from fruitfly_agent.interactive.application.jobs import ImprovementJob
 from fruitfly_agent.interactive.session.materials import TaskMaterials
 
@@ -99,6 +100,7 @@ class AgentApplication:
             self._require_handle().session.status,
             application_state=self._state.value,
             pending_count=len(self._pending),
+            improvement_available=isinstance(self._require_handle().improvement, ComponentImprovementClient),
             prompt_label=str(prompt.get("label", "")),
             prompt_hash=str(prompt.get("content_hash", "")),
             permission_grants=self.authorization.status()['grants'] if self.authorization is not None else 0,
@@ -312,6 +314,18 @@ class AgentApplication:
     def improvement_run_logs(self, run_id):
         query = getattr(self._improvement_service(), 'improvement_run_logs', None)
         return query(run_id) if query is not None else 'This host does not provide search logs.'
+
+    def pending_experience(self):
+        service = self._improvement_service()
+        return service.pending_experience() if isinstance(service, ExperienceReviewClient) else ()
+
+    def experience_action(self, job_id, action):
+        if self._state != ApplicationState.IDLE or self._pending:
+            raise RuntimeError('finish active work before reviewing experience')
+        service = self._improvement_service()
+        if not isinstance(service, ExperienceReviewClient):
+            raise RuntimeError('experience review is unavailable')
+        return service.experience_action(job_id, action)
 
     def start_improvement(self, direction: str, *, preview_token="") -> asyncio.Task[tuple[CandidateView, ...]]:
         """Own confirmed work while allowing the frontend to continue reading input."""

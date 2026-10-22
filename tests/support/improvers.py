@@ -55,7 +55,7 @@ class FirstComposer:
 
 class FirstSelector:
     async def select(self, task, records):
-        return SelectionDecision(records[0].run_id, 'Synthetic offline choice')
+        return SelectionDecision(records[-1].run_id, 'Synthetic offline choice of the executed revision')
 
 
 class NoReflection:

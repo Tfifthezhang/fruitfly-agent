@@ -30,6 +30,12 @@ class RunImprovementService:
         value = self.jobs.preview(request)
         return self._remember_preview(value)
 
+    def pending_experience(self):
+        return self.jobs.pending_experience()
+
+    def experience_action(self, job_id, action):
+        return self.jobs.experience_action(job_id, action)
+
     def _remember_preview(self, preview):
         if preview.preview_token:
             if len(self.previews) >= 16:

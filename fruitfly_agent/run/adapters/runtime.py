@@ -16,14 +16,16 @@ def describe_runtime(
     details = tuple(
         InteractiveMechanism(
             mechanism_id,
-            display_group(catalog.get(mechanism_id).descriptor),
+            catalog.get(mechanism_id).configuration_category or display_group(catalog.get(mechanism_id).descriptor),
             catalog.get(mechanism_id).descriptor.label,
             catalog.get(mechanism_id).descriptor.primary.layer,
             catalog.get(mechanism_id).descriptor.primary.family,
             catalog.get(mechanism_id).descriptor.primary.context_phase,
             display_section(catalog.get(mechanism_id).descriptor),
+            tuple(catalog.get(mechanism_id).descriptor.effects.tools),
         )
-        for mechanism_id in visible_mechanism_ids
+        for mechanism_id in runtime.component_ids
+        if catalog.get(mechanism_id).visible
     )
     tool_categories: dict[str, str] = {}
     for mechanism_id in runtime.component_ids:

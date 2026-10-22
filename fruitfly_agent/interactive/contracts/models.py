@@ -35,6 +35,7 @@ class InteractiveMechanism:
     family: str = "context"
     context_phase: str | None = None
     display_section: str | None = None
+    tool_names: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -82,6 +83,7 @@ class InteractiveStatus:
     permission_read_roots: tuple[str, ...] = ()
     permission_write_roots: tuple[str, ...] = ()
     compaction_count: int = 0
+    improvement_available: bool = False
 
 
 __all__ = ["ConversationBlock", "ConversationMessage", "InteractiveMechanism", "InteractiveStatus", "ResumableSession"]

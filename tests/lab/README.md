@@ -16,6 +16,7 @@ Verify algorithms and components through Core contracts and Catalog assembly.
 | `test_reduction_safety.py / test_summarizing_compaction.py` | Valid summaries, tool associations, overflow, external references, and commits |
 | `test_task_packs.py / test_pack_format.py / test_coding_tasks.py` | Task material, catalog discovery and dangling-link rejection, policy, and restricted scoring |
 | `test_rsi.py / test_rlm.py` | Host-driven evolution and local IPython/artifact behavior |
+| `test_improvement_pipeline.py / test_improver.py` | Stage contracts, result retention, stopping, hierarchical budgets and frozen editor fields |
 | `test_algorithm_audit.py` | Edit spans, rendered budgets, and environment regressions |
 
 Use temporary materials, fake Providers, and injected HTTP callbacks. RLM tests start local IPython processes; none prove real model gains.
@@ -25,4 +26,3 @@ Use temporary materials, fake Providers, and injected HTTP callbacks. RLM tests 
 ```
 
 Environment tests include protected credentials, ordinary algorithm state, external approvals, symlink retargeting, and explicit child environments. No real credentials or network requests are used.
-| `test_improvement_pipeline.py` | Public stage protocols, task evidence, shared budgets and component execution |

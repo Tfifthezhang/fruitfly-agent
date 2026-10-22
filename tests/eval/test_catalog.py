@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import unittest
+import json
+import tempfile
 from unittest.mock import patch
 
 from eval.catalog import builtin_catalog
@@ -18,6 +20,7 @@ class BenchmarkCatalogTests(unittest.TestCase):
         from pathlib import Path
         from eval.benchmarks.base import BenchmarkVariant
         from eval.benchmarks.harbor import HarborBenchmarkAdapter, harbor_descriptor
+        from tests.support.harbor import prepared_harbor
         adapter = HarborBenchmarkAdapter(harbor_command="harbor", docker_command="docker")
         adapter.descriptor = harbor_descriptor(benchmark_id="other", label="Other", description="Fixture",
             version="1", dataset="example/tasks", smoke_task="example/task")
@@ -26,12 +29,15 @@ class BenchmarkCatalogTests(unittest.TestCase):
         with patch("eval.benchmarks.harbor._docker_check", return_value={"ok": True, "detail": "ready"}), \
                 patch("eval.benchmarks.harbor.shutil.which", return_value=None):
             self.assertFalse(adapter.preflight("accelerator").available)
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        host, preparation = prepared_harbor(root, ("example/task",))
         command = adapter._command(executable="harbor", dataset=adapter.descriptor.dataset,
-            variant="accelerator", execution={"attempts": 1, "concurrency": 1}, jobs_dir=Path("jobs"),
-            job_name="fixture", source_root=Path("source"), config_path=Path("config"),
-            model_catalog=Path("models"), profile="default", secret_names=())
-        self.assertEqual(command[command.index("--dataset") + 1], "example/tasks")
-        self.assertIn("eval.harbor_agent:FruitFlyHarborAgent", command)
+            variant="accelerator", execution={"attempts": 1, "concurrency": 1}, jobs_dir=root,
+            job_name="fixture", config_path=Path("config"),
+            model_catalog=Path("models"), profile="default", secret_names=(), host=host, preparation=preparation)
+        config = json.loads(Path(command[3]).read_text())
+        self.assertEqual(config["tasks"][0]["source"], "example/tasks")
+        self.assertEqual(config["agents"][0]["import_path"], "eval.harbor_agent:FruitFlyHarborAgent")
 
     def test_standardized_benchmarks_and_modes_are_registered(self) -> None:
         with patch("eval.benchmarks.harbor._harbor_executable", return_value=None):

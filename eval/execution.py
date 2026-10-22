@@ -15,10 +15,16 @@ from .storage import EvaluationStore
 def execute_request(
     request: EvaluationRequest, *, output_root: Path, catalog: BenchmarkCatalog | None = None,
     progress: ProgressSink | None = None,
+    host_config_path: str | None = None,
 ) -> tuple[EvaluationReport, EvaluationStore]:
     # Validate constructed requests as well as JSON requests before external effects.
     request = EvaluationRequest.from_dict(request.to_dict())
     adapter = (catalog or builtin_catalog()).get(request.benchmark.benchmark_id)
+    if host_config_path is not None:
+        from .benchmarks.harbor import HarborBenchmarkAdapter
+        if not isinstance(adapter, HarborBenchmarkAdapter):
+            raise ValueError("--host-config is supported only by Harbor adapters")
+        adapter.configure_host(host_config_path)
     descriptor = adapter.descriptor
     variant = request.benchmark.variant
     if variant not in {item.variant_id for item in descriptor.variants}:
@@ -50,8 +56,11 @@ def execute_request(
                     raise ValueError("runner trial must be an object")
                 store.write_json(f"trials/{index:06d}.json", TrialRecord.from_dict(trial).to_dict())
             result = loaded
-    except (OSError, RuntimeError, TypeError, ValueError) as exc:
+    except (OSError, RuntimeError, TypeError, ValueError, KeyboardInterrupt) as exc:
         result = {"status": "failed", "errors": {"runner": str(exc)}}
+        harbor = store.artifacts / "harbor"
+        if harbor.is_dir():
+            result["artifacts"] = [{"kind": "harbor_diagnostics", "path": str(harbor)}]
     benchmark = {"benchmark": descriptor.benchmark_id, "version": descriptor.version,
                  "variant": variant, "adapter_version": descriptor.adapter_version, "dataset": descriptor.dataset}
     try:

@@ -7,6 +7,8 @@ from collections.abc import Callable, Mapping
 from fruitfly_agent.interactive.contracts.commands import (
     InteractiveCommand,
     CommandResult,
+    CommandPanel,
+    CommandSection,
     CommandContext,
     CommandHandler,
 )
@@ -16,12 +18,11 @@ from fruitfly_agent.interactive.contracts.models import InteractiveMechanism, In
 HELP_TEXT = """Commands:
   /help          show this help
   /status        show model, workspace, session, and context state
-  /lab           show active experimental mechanisms by category
+  /lab           inspect active context, tools, environment, and capabilities
   /config        open the model and mechanism selection menu
   /improvement [TEXT]  choose an H/S/I target, run improvement, or review candidates
   /resume [PATH] continue saved history using current configuration
   /cancel        cooperatively stop the active run
-  /tools [CALL_ID]  inspect retained tool results in the terminal
   /permissions clear  revoke temporary approvals\n  /trace [N]     show the latest N frontend events (default: 12)
   /exit          leave the interactive session"""
 
@@ -129,7 +130,11 @@ def _context_status(status: InteractiveStatus) -> str:
         source = "reported; last request"
     percentage = "unknown"
     if tokens is not None and status.context_window and status.context_window > 0:
-        percentage = f"{100 * tokens / status.context_window:.1f}% ({source})"
+        ratio = tokens / status.context_window
+        width = 20
+        filled = max(0, min(width, int(ratio * width)))
+        bar = "#" * filled + "-" * (width - filled)
+        percentage = f"[{bar}] {100 * ratio:.1f}% ({source})"
     return (
         f"context usage: {percentage}\n"
         f"compactions: {status.compaction_count:,}\n"
@@ -140,6 +145,8 @@ def _lab(
     command: InteractiveCommand,
     context: CommandContext,
 ) -> CommandResult:
+    if command.arguments:
+        return CommandResult(text="usage: /lab\n")
     status = context.status
     grouped: dict[str, list[InteractiveMechanism]] = {}
     for mechanism in status.mechanism_details:
@@ -157,31 +164,50 @@ def _lab(
             InteractiveMechanism(item, "other", item) for item in uncategorized
         )
 
-    rows = ["Lab mechanisms\n"]
-    if grouped:
-        for category in sorted(grouped):
-            rows.append(f"  {_category_label(category)}\n")
-            mechanisms = grouped[category]
-            if category == "context-manager":
-                for phase in (
-                    "augmentation",
-                    "externalization",
-                    "reduction",
-                ):
-                    labels = [
-                        item.label
-                        for item in mechanisms
-                        if item.display_section == phase
-                    ]
-                    rows.append(f"    {_category_label(phase)}\n")
-                    rows.extend(f"      - {label}\n" for label in labels)
-                    if not labels:
-                        rows.append("      - none\n")
-            else:
-                rows.extend(f"    - {item.label}\n" for item in mechanisms)
-    else:
-        rows.append("  none\n")
-    return CommandResult(text="".join(rows))
+    if status.tool_names:
+        grouped.setdefault("tools", [])
+    if status.improvement_available:
+        grouped.setdefault("improvement", [])
+    order = {name: index for index, name in enumerate((
+        "context-manager", "environment", "tools", "learning", "workflow", "improvement",
+    ))}
+    sections = []
+    for category in sorted(grouped, key=lambda name: (order.get(name, len(order)), name)):
+        mechanisms = grouped[category]
+        if category == "context-manager":
+            phases: dict[str, list[str]] = {}
+            for item in mechanisms:
+                phase = item.display_section or item.context_phase or "other"
+                phases.setdefault(phase, []).append(item.label)
+            phase_order = ("augmentation", "externalization", "reduction")
+            rows = [(_category_label(phase), " · ".join(phases.get(phase, ())) or "Not enabled")
+                    for phase in (*phase_order, *sorted(set(phases) - set(phase_order)))]
+        elif category == "tools":
+            rows = []
+            described: set[str] = set()
+            for item in mechanisms:
+                names = [name for name in item.tool_names if name in status.tool_names and name not in described]
+                rows.extend((name, item.label) for name in names)
+                described.update(names)
+                if not item.tool_names:
+                    rows.append((item.label, "Enabled"))
+            rows.extend((name, "Enabled") for name in dict.fromkeys(status.tool_names) if name not in described)
+        else:
+            rows = [(item.label, "Enabled") for item in mechanisms]
+        if category == "improvement" and status.improvement_available:
+            rows.append(("Component workflow", "Available · /improvement"))
+        if rows:
+            sections.append(CommandSection(category, _category_label(category), tuple(rows)))
+    if not sections:
+        sections.append(CommandSection("overview", "Overview", (("Mechanisms", "None enabled"),)))
+    panel = CommandPanel("Lab · Active session", tuple(sections), "Next-session settings: /config")
+    text = [panel.title, ""]
+    for section in panel.sections:
+        text.append(section.title)
+        text.extend(f"  {label}: {value}" for label, value in section.rows)
+        text.append("")
+    text.append(panel.footer)
+    return CommandResult(text="\n".join(text) + "\n", panel=panel)
 
 
 def _category_label(category: str) -> str:

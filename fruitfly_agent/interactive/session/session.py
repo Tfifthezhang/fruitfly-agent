@@ -96,7 +96,7 @@ class InteractiveSession:
             model=self._config.model,
             working_directory=self._working_directory,
             session_path=self._session_path,
-            message_count=len(self._messages),
+            message_count=self._message_count(),
             tool_names=tuple(tool.name for tool in self._config.tools or ()),
             mechanisms=self._mechanisms,
             mechanism_details=self._mechanism_details,
@@ -162,7 +162,7 @@ class InteractiveSession:
                         run_id="",
                         prompt=prompt,
                         model=self._config.model,
-                        message_count=len(self._messages),
+                        message_count=self._message_count(),
                     )
                 )
                 self._active_task = asyncio.create_task(self._run_loop(
@@ -260,6 +260,12 @@ class InteractiveSession:
         session: SessionLike | None = self._config.session
         if session is not None:
             session.append("message", {"message": message.to_dict()})
+
+    def _message_count(self) -> int:
+        """Count committed conversation records independently of model context."""
+        if self._config.session is not None:
+            return sum(entry.type == "message" for entry in self._config.session.read_all())
+        return len(self._messages)
 
 
 __all__ = ["EventSink", "InteractiveSession", "InteractiveStatus"]
