@@ -38,7 +38,7 @@ class LabCommandTests(unittest.TestCase):
                 InteractiveMechanism('context-fixture', 'context-manager', 'Fixture context', context_phase='augmentation'),
                 InteractiveMechanism('remote-fixture', 'environment', 'Fixture execution backend'),
                 InteractiveMechanism('tool-fixture', 'tools', 'Inspect a file', tool_names=('inspect_file', 'not_installed')),
-                InteractiveMechanism('learning-fixture', 'learning', 'Record observations'),
+                InteractiveMechanism('workflow-fixture', 'workflow', 'Execute stages'),
             ),
             improvement_available=True,
         )
@@ -56,14 +56,14 @@ class LabCommandTests(unittest.TestCase):
         result = CommandRouter().execute(InteractiveCommand('lab'), host)
         self.assertEqual(1, host.reads)
         self.assertIsNotNone(result.panel)
-        self.assertEqual(['context-manager', 'environment', 'tools', 'learning', 'improvement'],
+        self.assertEqual(['context-manager', 'environment', 'tools', 'workflow', 'improvement'],
                          [section.category for section in result.panel.sections])
         self.assertIn('Augmentation: Fixture context', result.text)
         self.assertIn('Externalization: Not enabled', result.text)
         self.assertIn('Fixture execution backend: Enabled', result.text)
         self.assertIn('inspect_file: Inspect a file', result.text)
         self.assertIn('extra_tool: Enabled', result.text)
-        self.assertIn('Record observations: Enabled', result.text)
+        self.assertIn('Execute stages: Enabled', result.text)
         self.assertIn('Available · /improvement', result.text)
         self.assertNotIn('not_installed', result.text)
         self.assertNotIn('\x1b', result.text)

@@ -96,8 +96,8 @@ Install the [Python task pack](examples/improvement/python_functions/README.md) 
 ```bash
 mkdir -p .fruitfly/improvement/task-packs
 cp -R examples/improvement/python_functions .fruitfly/improvement/task-packs/python-functions
-.venv/bin/python -m fruitfly_agent.lab.improvement.tasks.cases.verification check .fruitfly/improvement/task-packs/python-functions/pack.json
-.venv/bin/python -m fruitfly_agent.lab.improvement.tasks.cases.verification self-check .fruitfly/improvement/task-packs/python-functions/pack.json
+.venv/bin/python -m fruitfly_agent.lab.improvement.tasks.verification check .fruitfly/improvement/task-packs/python-functions/pack.json
+.venv/bin/python -m fruitfly_agent.lab.improvement.tasks.verification self-check .fruitfly/improvement/task-packs/python-functions/pack.json
 ```
 
 The checks are offline. Start a normal session and use `/improvement` to select the package, editable components, candidate generator and budget. Persistent publication requires independent verification; review the frozen preview before confirming paid model work. The active component snapshot supplies the baseline; `baseline.txt` is an optional reference.

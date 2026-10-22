@@ -16,7 +16,6 @@ Add tools, execution backends, context strategies, and improvement algorithms th
 | [Base prompt](base_prompt/README.md) | Built-in prompt text and its target adapter |
 | [Workflow](workflow/README.md) | Bounded sequential execution and its H target |
 | [Improvement](improvement/README.md) | Component workflow, task evidence, experience and optional verification |
-| [Learning](learning/README.md) | Independently configured daily task-material production |
 | [RSI](rsi/README.md) | Verified adoption and continuation across generations |
 | [Known limitations](ALGORITHM_AUDIT.md) | Current budget, I/O, cancellation, and composition limits |
 

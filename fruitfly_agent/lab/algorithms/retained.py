@@ -16,7 +16,6 @@ class RetainedText:
     reference_directory: str = ''
 
     adoption_roles = frozenset({'S'})
-    project_in_trials = True
 
     def __post_init__(self):
         state_artifact_path(self.key)

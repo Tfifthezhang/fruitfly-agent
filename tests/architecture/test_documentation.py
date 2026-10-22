@@ -72,6 +72,22 @@ class DocumentationTest(unittest.TestCase):
                         missing.append(f'{path.relative_to(ROOT)}: {target.relative_to(ROOT)}#{fragment}')
         self.assertEqual([], missing)
 
+    def test_documented_project_commands_and_test_modules_exist(self):
+        missing = []
+        for path in documents():
+            content = path.read_text(encoding='utf-8')
+            commands = re.findall(
+                r'python\s+-m\s+((?:fruitfly_agent|eval|examples)(?:\.\w+)*)', content)
+            for module in commands:
+                target = ROOT.joinpath(*module.split('.'))
+                if not (target.with_suffix('.py').is_file() or (target / '__main__.py').is_file()):
+                    missing.append(f'{path.relative_to(ROOT)}: python -m {module}')
+            # Class and method suffixes are allowed after the test module name.
+            for module in re.findall(r'\btests\.[a-z_]+\.test_[a-z_0-9]+', content):
+                if not ROOT.joinpath(*module.split('.')).with_suffix('.py').is_file():
+                    missing.append(f'{path.relative_to(ROOT)}: {module}')
+        self.assertEqual([], missing)
+
     def test_every_guide_is_reachable_from_root(self):
         guides = set(documents())
         reached = set()

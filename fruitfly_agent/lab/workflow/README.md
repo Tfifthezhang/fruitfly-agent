@@ -6,7 +6,7 @@ Execute bounded sequences of model stages through Core's existing follow-up call
 
 ## Enable a workflow
 
-Enable **Execution workflow** in configuration and start a new session. Its default is one solve-and-answer step. Select **Execution workflow → Workflow search** under `/improvement` to search alternatives. Construction and method discovery make no model calls.
+Enable **Execution workflow** in configuration and start a new session. Its default is one solve-and-answer step. Select **Execution workflow** under **Editable components** in `/improvement` to search alternatives. Construction and discovery make no model calls.
 
 ```json
 {"steps":["Solve the user task.","Check the reasoning and return only the final answer."]}
@@ -18,7 +18,7 @@ Enable **Execution workflow** in configuration and start a new session. Its defa
 | `apply_workflow(config, text)` | First instruction in an owned system block; remaining instructions as follow-up messages |
 | `WorkflowTarget` | `execution-workflow`, H, schema `execution-workflow-v1` |
 | Production execution | Fresh stage count for each user run; normal tools, permissions and cancellation remain active |
-| Native trials | Fresh tool-free Core loop; every stage uses the root budgeted Provider; only the final answer is scored |
+| Native trials | Fresh Core loop with isolated read/write/edit files; every stage uses the root budgeted Provider; only the final answer is scored |
 | Adoption | Exact immutable artifact loaded into a new session; H changes, I and S remain fixed |
 
 An existing follow-up controller is a construction conflict. The configured turn limit must cover every step. Definitions contain instructions, not executable Python, conditions, parallel branches or model allocations. Model execution is stochastic; stage labels do not prove independent verification. Recovery reloads the artifact and normal conversation; interrupted model work is not automatically replayed. Calls may incur charges.
@@ -26,5 +26,5 @@ An existing follow-up controller is a construction conflict. The configured turn
 The module's [public entry](./__init__.py) owns validation, execution, target and registration. No module-specific environment variables.
 
 ```bash
-.venv/bin/python -m unittest tests.lab.test_retained_targets tests.workflows.test_native_improvement
+.venv/bin/python -m unittest tests.lab.test_retained_targets tests.workflows.test_improvement_pipeline
 ```

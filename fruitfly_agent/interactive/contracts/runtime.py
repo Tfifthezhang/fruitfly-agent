@@ -14,7 +14,6 @@ from fruitfly_agent.interactive.contracts.models import (
 from fruitfly_agent.interactive.contracts.improvement import ImprovementService
 from fruitfly_agent.interactive.contracts.candidates import CandidateActivationService, CandidateService
 from fruitfly_agent.interactive.contracts.task_packs import TaskPackService
-from fruitfly_agent.interactive.contracts.learning import LearningService
 
 
 class RuntimeSession(Protocol):
@@ -55,8 +54,6 @@ class RuntimeHandle(Protocol):
     def candidates(self) -> CandidateService | None: ...
     @property
     def task_packs(self) -> TaskPackService | None: ...
-    @property
-    def learning(self) -> LearningService | None: ...
     @property
     def candidate_activation(self) -> CandidateActivationService | None: ...
     @property

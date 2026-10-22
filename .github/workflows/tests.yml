@@ -33,6 +33,11 @@ jobs:
         run: python -m pip install -e '.[dev]'
       - name: Runtime and interface type checks
         run: python -m mypy
+      - name: Type checks with the optional benchmark SDK
+        if: matrix.os == 'ubuntu-latest' && matrix.python == '3.13'
+        run: |
+          python -m pip install -e '.[benchmarks]'
+          python -m mypy
       - name: Architecture and contract guards
         run: |
           python -m unittest discover -s tests/architecture -t .

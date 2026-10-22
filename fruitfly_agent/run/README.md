@@ -38,7 +38,6 @@ Interactive recovery displays original saved conversation through the same histo
 | [Runtime](runtime/README.md) | Assembly, manifest, preparation, recovery, and permission bindings | Application owns lifecycle and switching |
 | [Storage](storage/README.md) | Text artifacts, candidate records, result exports, retention | No quality decisions or activation |
 | [Improvement host](improvement/README.md) | Search jobs, candidate rules, evolution capabilities, startup choices | Lab owns algorithms and the RSI state machine |
-| [Learning host](learning/README.md) | Configured task observation and material persistence | No search or adoption authority |
 | [Adapters](adapters/README.md) | Interactive views and capability adapters | No algorithm-specific decisions |
 
 [application.py](application.py) is the composition root. `RunApplicationFactory` constructs services, owns active runtime bindings, and delegates operations. Search services own preview receipts, startup services own choice receipts, and configuration owns its draft. Services use injected queries and operations instead of receiving the Factory or inspecting private fields.

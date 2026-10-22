@@ -51,7 +51,6 @@ from fruitfly_agent.lab.tools import (
 )
 
 from .assembly import AssemblyContext, AssemblyState, require_workspace_path
-from fruitfly_agent.lab.learning.registration import definition as learning_definition
 from .catalog import LabCatalog
 from .models import (
     MechanismDefinition,
@@ -310,7 +309,6 @@ def builtin_catalog() -> LabCatalog:
         improvement_definition(),
         skill_document_definition(),
         learned_memory_definition(),
-        learning_definition(),
     )
     definitions = tuple(replace(d, artifact_slots=d.artifact_slots | frozenset(
         guidance_key(name) for name in d.descriptor.effects.tools)) for d in definitions)
@@ -407,7 +405,7 @@ def _integer_parameters(
             f"Positive integer for {label.casefold()}.",
             getattr(source, name),
             minimum=1,
-            advanced=name not in {"consolidate_threshold", "memory_max_items"},
+            advanced=True,
         )
         for name, label in fields
     )

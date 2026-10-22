@@ -79,8 +79,12 @@ ownership. Review the frozen preview before one explicit submission.
 |---|---|
 | Start improvement | Fresh preview and one confirmation, defaulting to Cancel; model work may incur charges |
 | Budget | Edit typed method-declared limits without JSON |
-| Target | Choose an object, then a compatible algorithm with description and paths; edit optional Search guidance |
-| Task / Evaluation | Choose materials and inspect scoring/acceptance |
+| Editable components / Candidate generator | Choose the registered changes and how proposals are generated |
+| Task / Input files | Select explicit task materials |
+| Exploration / Improvement guidance | Set parallel width or sequential depth and optional search hints |
+| Verification / Effect scope | Select feedback and task-local or persistent effect; persistent publication needs independent verification |
+| Execution strategy / Execution parameters | Choose native H/S trials or registered I experiments and their typed inputs |
+| Pending experience | Review and explicitly commit or reject lessons while idle |
 | Return to chat while running | Continue Application-owned work; inspect `/status`, `/cancel`, or Results and history |
 | Results and history | Inspect every submitted run, including empty, failed and cancelled experiments |
 | Review candidate | Assessment, comparison, usage, changes, original/candidate text, scope and evidence |
@@ -151,7 +155,7 @@ Names are lowercase, path-free tokens. Duplicate registration raises an error. `
 
 [TerminalBindings](bindings.py) names queueing, waiting, recovery, configuration readers, history, authorization, and notification operations. `from_session()` provides the default adapter for existing embedding hosts; `TerminalFrontend(bindings=...)` permits explicit binding. Compatibility discovery is confined to this adapter. Live readers follow runtime replacement.
 
-`ImprovementClients` independently injects search, candidate review, task materials, and activation clients. Pass it as `improvement_clients=` when these capabilities come from different objects. The improvement menu offers only the supplied capabilities. Material-only hosts can save corrections without offering search afterward. `improvement_frontend()` returns the current menu view; `show_history()` and `show_notifications()` expose observation without granting execution.
+`ImprovementClients` independently injects search, candidate review, task materials, and activation clients. Pass it as `improvement_clients=` when these capabilities come from different objects. The improvement menu offers the supplied workflow and review capabilities. Corrections are available through the host task-material API, not a terminal form. `improvement_frontend()` returns the current menu view; `show_history()` and `show_notifications()` expose observation without granting execution.
 
 `ModelFormIO` in [model_setup.py](features/configuration/model_setup.py) supplies menu selection, input, rendering, and staging callbacks. Forms do not receive a configuration frontend or use its private methods. The host model service still owns validation and persistence. No new environment variables or independent lifecycle state.
 

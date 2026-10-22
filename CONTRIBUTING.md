@@ -58,39 +58,16 @@ The ignore rule for local `models.yaml` does not remove an already tracked file.
 
 ## Push source changes to GitHub
 
-For an existing Git checkout, inspect the current branch, remote, and pending changes:
+Use an existing authorized checkout. Before committing, inspect the complete
+change, run the checks above, and verify that staged files contain no secrets,
+local configuration, sessions, caches or build products. Ignore rules do not
+remove already tracked files. Publish source, public examples, tests, guides and
+licenses; keep workspace state private.
 
-```bash
-git status --short
-git branch --show-current
-git remote -v
-git ls-files --cached --ignored --exclude-standard
-git add --dry-run --all
-```
-
-Run these commands locally; do not paste secret-bearing diffs or credential-bearing remote URLs into public reports. The branch command must show a named branch. The ignored-file check should produce no output; investigate any listed files before staging. Ignore rules do not remove already tracked files. Use `git rm --cached -- PATH` for a tracked local file, or `git rm -r --cached -- DIRECTORY` for local state, after confirming the path. These commands preserve working copies. Removing a file from the current commit does not erase it from earlier history; revoke any exposed credentials before publication.
-
-If `origin` is absent, create an empty GitHub repository and add its URL. Replace `OWNER` and `REPOSITORY` below with your actual names; use a URL without embedded credentials. An SSH remote requires an SSH key configured for GitHub.
-
-```bash
-git remote add origin git@github.com:OWNER/REPOSITORY.git
-```
-
-Run the checks in [Verify changes](#verify-changes), then stage and review the source changes before committing:
-
-```bash
-git add --all
-git diff --cached --stat
-git diff --cached --name-status
-git diff --cached --check
-git diff --cached
-git commit -m "Improve model setup and restored conversation display"
-git push -u origin HEAD
-```
-
-Choose a commit message that describes your actual changes. Push the named current branch; open a Pull Request when it is a development branch. If the remote has newer commits and rejects the push, fetch and review that history before integrating it; do not force-push over it. After pushing, check the repository's Actions page for the offline tests and package job.
-
-Publish source, public examples, tests, guides, licenses, and workflows. Keep local `.fruitfly/`, model catalogs, secrets, virtual environments, caches, assistant settings, and `dist/` outside Git. Source publication does not require uploading a wheel or publishing to a package registry.
+Use a commit message describing the actual change and push the intended branch.
+Review remote changes before integrating them; avoid force-pushing shared work.
+Publication and package release are separate operations. Workspace VCS rules
+remain in [AGENTS.md](AGENTS.md).
 
 ## Build and publish
 

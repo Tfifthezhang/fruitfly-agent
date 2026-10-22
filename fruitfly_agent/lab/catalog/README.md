@@ -109,10 +109,7 @@ Selection groups share display placement and exclusivity. Display metadata does 
 No Catalog-specific environment variables. Catalog itself makes no model requests; selected mechanisms declare their own effects.
 
 `MechanismDefinition.configuration_category` optionally declares menu placement
-without adding a Core mechanism layer. [Learning](../learning/README.md) uses the
-`learning` category. Catalog exposes `build_learning` and the policy/processor
-component keys as explicit assembly entries. The Run host supplies persistence;
-the Lab method supplies material processing. Offline legacy configuration and
+without adding a Core mechanism layer. Offline legacy configuration and
 candidate classifiers are also exposed for the Run migration entry; runtime
 hosts do not branch on concrete algorithm names.
 

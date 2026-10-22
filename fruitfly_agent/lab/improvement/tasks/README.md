@@ -19,11 +19,13 @@ my-task-pack/
 | Material | Purpose | Search access |
 |---|---|---|
 | `pack.json` | Declare and validate the pack | Frozen metadata |
-| `cases.json`: `train` | Generation feedback | Yes |
-| `cases.json`: `validation` | Repeated candidate selection | Yes; not independent validation |
-| `holdout.json` | Manual testing or one automatic confirmation after generation stops | No content access through the improver or failure processor |
+| `cases.json`: `train` | First input supplies diagnosis; all cases check regressions after generation | First input; answers/checks stay private unless an explicit feedback policy exposes them |
+| `cases.json`: `validation` | Fixed baseline/candidate comparison after generation | No inputs or answers in editor workspaces |
+| `holdout.json` | Manual testing or one automatic confirmation after generation stops | No content access through the editor |
 
-`default_direction` describes desired changes; it does not change scoring. To measure brevity or reliability, the policy must define those metrics.
+`default_direction` is optional package metadata; the current panel uses its explicit
+**Improvement guidance** field and does not automatically load that metadata.
+Guidance does not change scoring. To measure brevity or reliability, the policy must define those metrics.
 
 ## Text example
 
@@ -68,7 +70,7 @@ Omit the holdout file and declaration when none is available. These cases illust
 | `schema_version` | 2 |
 | `id` | Stable unique ID; letters, numbers, dots, hyphens, and underscores |
 | `name` / `description` | Required; at most 120 / 500 characters |
-| `default_direction` | Optional; at most 500 characters; prefill only |
+| `default_direction` | Optional descriptive guidance; at most 500 characters |
 | Schemas / targets | Registered task policy; `text-v1` target schema; nonempty compatible target list |
 | `objective` | Registered `policy_id` and `direction=max`; no imports, commands, or scorer source |
 | `files` | Required cases and optional holdout; distinct single-level JSON names inside the pack; no symlinks, escaping paths, `pack.json`, or `references.json` |
@@ -154,9 +156,9 @@ cp -R examples/improvement/python_functions .fruitfly/improvement/task-packs/pyt
 | Step | Action |
 |---|---|
 | 1 | Start a normal session; no improvement enable switch is required. |
-| 2 | Open `/improvement`; expand **Target**, choose the object and its algorithm, then expand **Task** on the same panel. |
-| 3 | Review evaluation and acceptance. If the method exposes **Search guidance**, keep the task default, edit it in the visible input field, or clear it. |
-| 4 | Review target, cases, policy, model, budgets, and execution notice. |
+| 2 | Open `/improvement`; choose **Task**, **Editable components**, and **Candidate generator**. Native packages use **Agent task execution**. |
+| 3 | Review the package policy. **Verification** selects behavior or measured feedback; **Improvement guidance** supplies optional search hints. |
+| 4 | Set **Effect scope** to persistent for independent verification and a publishable candidate; review the frozen preview and budgets. |
 | 5 | Choose **Start improvement** and confirm the paid search; Cancel is selected initially. |
 | 6 | Inspect the result and evidence before setting the next-session default or starting a new session. |
 
@@ -175,9 +177,8 @@ They retain source attribution, reject cross-partition overlap, require explicit
 replacement for conflicting acceptance, and validate the whole-pack hash.
 New train-only packs require independent selection cases before search.
 
-The improvement menu has no correction form. Configure daily observation
-recording through [Learning](../../learning/README.md). Pending recordings do not
-supply trusted answers and are not executable task packs.
+The improvement menu has no correction form. Author packs directly or use the
+explicit host API above. Ordinary chat does not create task packs or inferred answers.
 
 ## Frozen evidence and independent testing
 
@@ -186,7 +187,7 @@ supply trusted answers and are not executable task packs.
 | Pack identity | Hash manifest and every declared material file, including holdout. |
 | Preview | One-use token binds target, parent manifest, direction, policy, and material identity. |
 | Material changes | Invalidate the preview before any Provider request. |
-| Search snapshot | Frozen train/selection and execution evidence; no holdout contents. |
+| Editor workspace | First training task and supplied execution evidence; no selection/holdout inputs or private checks. |
 | Search feedback | May contain policy-authorized acceptance facts; not all acceptance material is secret from feedback. |
 | Holdout | Send only each input in a new empty session with the same model, save all responses, then score offline. |
 

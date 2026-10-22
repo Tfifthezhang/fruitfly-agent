@@ -51,7 +51,7 @@ Interactive separates Contracts, Application, Session, Interaction, and Terminal
 
 The Session keeps canonical conversation facts. The model projection is the context sent to the Provider; it may contain additional information, external references, or summaries.
 
-Daily [learning material production](lab/learning/README.md) is configured independently of improvement. Application triggers processing and Run persists attributed observations. Core has no scoring or adoption responsibility.
+Task packages are explicit inputs. Hosts can save human corrections through the [task-material API](lab/improvement/tasks/README.md#maintain-training-acceptance). Ordinary conversations do not create training material. Improvement lessons enter S only after explicit review; Core owns neither scoring nor adoption.
 
 [Web tools](lab/tools/web/README.md#extend-and-verify-offline) consume separate
 search and fetch service contracts. Lab owns vendor adapters and service factories;

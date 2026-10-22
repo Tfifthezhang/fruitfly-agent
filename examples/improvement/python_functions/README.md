@@ -36,8 +36,8 @@ These checks make no model requests. See [Task packs](../../../fruitfly_agent/la
 |---|---|
 | 1 | Start the terminal with a configured model; no improvement switch is required. |
 | 2 | Record the active prompt hash from `/status`. |
-| 3 | Open `/improvement`; expand **Target**, select the object and algorithm, then set **Task** to the installed Python pack. |
-| 4 | Accept or edit direction; verify 8 train / 4 selection, model, budgets, and restricted execution policy. |
+| 3 | Open `/improvement`; choose **Editable components** and **Candidate generator**, then set **Task** to the installed Python pack. |
+| 4 | Set optional guidance and persistent effect scope; review model, budgets and the 8 train / 4 selection / 6 holdout package. |
 | 5 | Explicitly confirm search. **Model requests may incur charges.** |
 | 6 | Review evaluation, usage, differences, text, and scope. |
 | 7 | Confirm **Set as next-session default** or **Set default and start a new session**. |
@@ -58,7 +58,7 @@ Compare baseline and candidate under the same model, materials and policy. Selec
 |---|---|
 | Function runner | POSIX restricted Python subset; no imports, files/network/processes, classes, or third-party dependencies |
 | Limits | Per-case time/CPU limits; Linux memory limit; kill/reap on cancellation |
-| Correction | The public task-material API can update training acceptance without a model request. Daily recording is configured separately. |
+| Correction | The public task-material API can update training acceptance without a model request. |
 | Evidence | Export explicitly; [retention](../../../fruitfly_agent/lab/improvement/README.md#results-and-retention) protects referenced contents but is not permanent research storage. |
 
 Do not save holdout cases into train. A restricted function runner is not a general code sandbox. Full contracts belong to [Task packs](../../../fruitfly_agent/lab/improvement/tasks/README.md).

@@ -16,8 +16,8 @@ explicit queries and operations, not Factory internals or algorithm implementati
 
 RuntimeHandle receives improvement, candidate and task-material services through
 independent fields. Task materials and candidate review remain available without
-an improver. Method views carry registered descriptions, parameter metadata and
-configuration locations. Adapters do not choose algorithms or acceptance policies.
+an improver. Workflow views carry component choices, execution strategies and
+parameter metadata. Adapters do not choose algorithms or acceptance policies.
 
 Runtime descriptions cover visible assembled components, including capability-only
 tools and execution environments. They honor each registration's configuration
@@ -33,7 +33,7 @@ remains an injected capability; ordinary search does not imply verification.
 Benchmark execution is provided by the external [Eval CLI](../../../eval/README.md).
 
 ```bash
-.venv/bin/python -m unittest tests.run.test_task_prompt_catalog tests.run.test_improvement_versions tests.workflows.test_improvement_activity -v
+.venv/bin/python -m unittest tests.run.test_task_prompt_catalog tests.run.test_improvement_versions tests.workflows.test_improvement_history -v
 ```
 
 These checks use fake Providers and temporary state without container/model access.

@@ -6,14 +6,12 @@ import asyncio
 from collections import deque
 import copy
 import math
-from uuid import uuid4
 from dataclasses import replace
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Mapping
 
-from fruitfly_agent.core.data_model import AgentLoopResult, AssistantMessage, UserMessage
-from fruitfly_agent.interactive.contracts.learning import CompletedTask
+from fruitfly_agent.core.data_model import AgentLoopResult
 
 from fruitfly_agent.interactive.contracts.configuration import ConfigurationController
 from fruitfly_agent.interactive.contracts.events import EventSink
@@ -66,7 +64,6 @@ class AgentApplication:
         self._authorization_handler = None
         self._last_result: AgentLoopResult | None = None
         self._last_error: BaseException | None = None
-        self._learning_task: asyncio.Task[bool] | None = None
         self._improvement_job = ImprovementJob()
         self._materials = TaskMaterials(
             service=self._task_pack_service,
@@ -208,26 +205,6 @@ class AgentApplication:
             try:
                 result = await self._require_handle().session.submit(prompt)
                 self._last_result = result
-                learning = getattr(self._require_handle(), 'learning', None)
-                if learning is not None:
-                    start = max((i for i, m in enumerate(result.messages) if isinstance(m, UserMessage)), default=-1)
-                    output = '\n'.join(m.text for m in result.messages[start + 1:] if isinstance(m, AssistantMessage))
-                    items = self._require_handle().session.canonical_items()
-                    message_id = next((item.id for item in reversed(items) if isinstance(item.message, UserMessage)), uuid4().hex)
-                    task = CompletedTask(self.status.session_path + '#' + message_id, prompt, output, result.stop_reason,
-                                         str(self.runtime_manifest.get('digest', '')), self.status.session_path)
-                    try:
-                        self._learning_task = asyncio.create_task(learning.observe(task))
-                        await self._learning_task
-                    except asyncio.CancelledError:
-                        current = asyncio.current_task()
-                        if current is not None and current.cancelling():
-                            raise
-                        self._last_error = RuntimeError('learning material collection cancelled')
-                    except Exception as exc:
-                        self._last_error = exc
-                    finally:
-                        self._learning_task = None
                 return result
             finally:
                 if self._state == ApplicationState.RUNNING:
@@ -249,9 +226,6 @@ class AgentApplication:
     def cancel(self) -> bool:
         had_pending = bool(self._pending)
         self._pending.clear()
-        if self._learning_task is not None and not self._learning_task.done():
-            self._learning_task.cancel()
-            return True
         if self._state == ApplicationState.IMPROVING:
             return self._improvement_job.cancel()
         return self._require_handle().session.cancel() or had_pending

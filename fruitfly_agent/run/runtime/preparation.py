@@ -12,8 +12,6 @@ from fruitfly_agent.lab.algorithms.targets import TEXT_TARGET_PREFIX, TextTarget
 from fruitfly_agent.run.configuration.resolution import resolve_profile_models
 from fruitfly_agent.run.configuration.profile import HarnessProfile
 from .assembly import RuntimeAssembly
-from fruitfly_agent.lab.catalog import LEARNING_POLICY_COMPONENT, LEARNING_PROCESSOR_COMPONENT
-from fruitfly_agent.run.learning.service import RunLearningService
 from .recovery import (new_session_path, check_session_manifest, record_session_manifest,
                        session_manifests)
 
@@ -103,11 +101,6 @@ class RuntimePreparer:
                 tool_categories=tool_categories,
             )
             approvals = runtime.components["authorization"]
-            learning = None
-            if LEARNING_POLICY_COMPONENT in runtime.components:
-                learning = RunLearningService(self.cwd, runtime.components[LEARNING_POLICY_COMPONENT],
-                    processor=runtime.components.get(LEARNING_PROCESSOR_COMPONENT))
-                runtime = replace(runtime, components={**runtime.components, 'learning-materials': learning})
             approvals.emit = interaction.emit_frontend_event
             handle = RuntimeHandle(
                 session=interaction,
@@ -118,7 +111,6 @@ class RuntimePreparer:
                 candidate_activation=candidate_service,
                 candidates=candidate_service,
                 task_packs=task_pack_service,
-                learning=learning,
                 authorization=approvals,
             )
             targets = {key[len(TEXT_TARGET_PREFIX):]: value for key, value in runtime.components.items()

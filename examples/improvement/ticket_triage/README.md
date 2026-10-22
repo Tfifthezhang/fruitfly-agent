@@ -43,8 +43,8 @@ cp -R examples/improvement/ticket_triage .fruitfly/improvement/task-packs/ticket
 |---|---|
 | 1 | Start a normal session; no improvement enable switch is required. |
 | 2 | Record the active target hash; `baseline.txt` is not loaded automatically. |
-| 3 | Open `/improvement`; expand **Target**, select editable components and a candidate generator, then set **Task** to the installed ticket pack. |
-| 4 | Review direction, model, cases, and budgets; explicitly start the paid search. |
+| 3 | Open `/improvement`; choose **Editable components** and **Candidate generator**, then set **Task** to the installed ticket pack. |
+| 4 | Set persistent effect scope; review guidance, model, cases and budgets, then explicitly start the paid search. |
 | 5 | Review evidence and changes; confirm the next-session default or a new session. |
 
 Search and live answers may incur model charges. Classification instructions can change general Agent behavior; inspect their scope before adoption.
@@ -59,4 +59,4 @@ Search and live answers may incur model charges. Classification instructions can
 
 These commands are offline. For independent testing, use the same model and six holdout inputs in fresh sessions, without expected labels. Keep all outputs and failures. A correct reference set does not establish model or improvement quality.
 
-The public task-material API can add explicitly corrected examples to train without a model request. Daily recording is configured separately under learning. Do not move holdout cases into train. Search validation is a selection set, not independent evidence. See [Task packs](../../../fruitfly_agent/lab/improvement/tasks/README.md) and [Improvement](../../../fruitfly_agent/lab/improvement/README.md).
+The public task-material API can add explicitly corrected examples to train without a model request. Do not move holdout cases into train. Search validation is a selection set, not independent evidence. See [Task packs](../../../fruitfly_agent/lab/improvement/tasks/README.md) and [Improvement](../../../fruitfly_agent/lab/improvement/README.md).

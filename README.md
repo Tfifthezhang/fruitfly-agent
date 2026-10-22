@@ -11,43 +11,16 @@
 
 [Quickstart](#quickstart) · [Configuration](CONFIGURATION.md) · [Architecture](fruitfly_agent/README.md) · [RSI](fruitfly_agent/lab/rsi/README.md) · [Contributing](CONTRIBUTING.md)
 
-**A lightweight Python agent harness for research into improvement and recursive self-improvement.**
+**An interactive Python Agent harness with replaceable algorithms and explicit improvement experiments.**
 
-Agent research needs a system you can understand, change, and test. FruitFlyAgent keeps the essential runtime in a small Python core, with replaceable algorithms in a pluggable Lab. Small, focused source files make mechanisms easy to inspect and modify, for both developers and coding agents.
+FruitFlyAgent runs model/tool conversations, compares changes to registered Agent
+components, and supports bounded experiments on the editor that proposes those
+changes. Core owns the Agent loop; Lab owns algorithms; Application owns lifecycle;
+Run assembles them. Eval is an optional external benchmark consumer.
 
-Its Python runtime is adapted from [Pi](https://github.com/earendil-works/pi). [RLM-inspired programmatic context externalization](fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md) is one optional, pluggable Lab mechanism that you can enable for an experiment.
-
-The research object is the **whole harness**: context, tools, execution, improvement, and adoption. Python and public extension contracts let you study these mechanisms in the same language as your experiments.
-
-Named after **Thomas Hunt Morgan's fruit-fly research**, FruitFlyAgent uses simple systems to understand agent mechanisms. Our philosophy is **simple systems, controlled changes, rapid validation, repeatable observation, and respect for anomalous evidence**:
-
-- Inspect before changing; take small, clear, reversible steps.
-- Test a specific hypothesis against a baseline; change one factor at a time.
-- Prefer quick, inexpensive checks; repeat important findings and keep them reproducible.
-- Investigate failures and anomalies; revise explanations when evidence disagrees.
-- Separate observations from hypotheses. Verify outcomes and report evidence, limits, and uncertainty.
-
-Our ambition is **recursive self-improvement (RSI)**: agents that improve their own harness and improvement process through independently verified changes. FruitFlyAgent separates generation, evaluation, verification, and adoption so each step can be studied and tested.
-
-## Built for harness research
-
-| Design choice | Why it matters |
-|---|---|
-| Stable Core, pluggable Lab, explicit Catalog assembly | Replace tools, context strategies, execution backends, or search algorithms through public contracts; keep the change identifiable. |
-| Target-owned trial adapters and injected search services | Separate what changes from how candidates are generated and evaluated; supply model roles, evaluators, and budgets explicitly. |
-| Frozen search inputs, candidate journals, and runtime manifests | Bind comparisons to a baseline, tasks, policy, and execution identity; retain observations; ordinary recovery continues history with current configuration and records environment changes. |
-| Separate proposal, verification, and adoption | Search results do not grant activation authority. Verification binds the candidate and policy before adoption. |
-| Version-bound task and improver implementations | The RSI driver resolves the improver again after adoption, so the next generation can use an improved improvement process. |
-| Explicit lifecycle and durable evolution phases | Own resource startup and cleanup; reconcile interrupted activation and avoid blindly replaying work with unknown cost. |
-
-**Improvement and RSI serve different roles:**
-
-| Capability | Role |
-|---|---|
-| [Improvement](fruitfly_agent/lab/improvement/README.md) | Search and compare candidates for a fixed target under a defined objective. It can run independently. |
-| [RSI](fruitfly_agent/lab/rsi/README.md) | Verify and adopt changes to the system or its improver, then continue with the adopted implementation across generations. |
-
-The `/improvement` menu selects task materials, editable components, a candidate generator, exploration and budgets. Public protocols separate proposal, execution, composition, output selection, verification and reflection. Current-task outputs do not change profile defaults; persistent candidates require verification and human adoption. H/S/I retain separate identities. Registered [editor experiments](fruitfly_agent/lab/improvement/improver/README.md) compare downstream gains under fixed initial H/S and shared budgets. Lessons require explicit review before entering retained state. See [Improvement](fruitfly_agent/lab/improvement/README.md) for execution limits and [Learning](fruitfly_agent/lab/learning/README.md) for independent daily observations.
+Named after Thomas Hunt Morgan's fruit-fly research, the project favors small,
+inspectable mechanisms and controlled comparisons. Its runtime is adapted from
+[Pi](https://github.com/earendil-works/pi); attribution is retained below.
 
 | At a glance | Details |
 |---|---|
@@ -58,7 +31,7 @@ The `/improvement` menu selects task materials, editable components, a candidate
 
 ## Quickstart
 
-Download the source and run these commands from the project root:
+Run from the source checkout:
 
 ```bash
 python3 -m venv .venv
@@ -66,51 +39,64 @@ python3 -m venv .venv
 .venv/bin/python -m fruitfly_agent
 ```
 
-If no models are configured, the terminal opens **Add model**. Choose the service, enter its model ID and documented limits, and enter the API key with hidden input. Review and stage the model, then choose **Start new session** to save. For existing configuration, use **Configure → model → Add model…** or **Set API key…**. Setup checks are offline; live model requests use the network and may incur charges. Local tools run with your user permissions; use a dedicated workspace when trying unfamiliar tasks.
+With no configured models, **Add model** collects service settings and a hidden
+API key. Review and choose **Start new session** to save. Setup validates locally;
+submitted tasks contact the service and may incur charges. Local shell tools run
+with your user permissions. See [Getting started](GETTING_STARTED.md) for setup,
+permissions and session recovery.
 
-The home menu keeps Start new session, Configure and Exit. **Configure → Restore
-default configuration** stages default harness settings while preserving the
-selected model and credentials. Save applies them to a new session. Eval uses an
-independent default profile and unrestricted tool execution inside task containers.
-See [restoration](CONFIGURATION.md#restore-default-configuration) and the
-[templates](examples/configuration/README.md).
-
-To explore the extension lifecycle without keys or network access:
+For an offline extension with a fake Provider:
 
 ```bash
 .venv/bin/python -m examples.extensions.offline_guidance
 ```
 
-Expected output: `Offline response: example-guidance is active.` The example registers a context mechanism and runs it through the Application in a temporary workspace. See the [walkthrough](examples/extensions/README.md).
+Expected output: `Offline response: example-guidance is active.`
+See the [walkthrough](examples/extensions/README.md).
 
 ## Choose your mechanisms
 
-Use the terminal configuration menu to assemble the harness for your task or experiment. Select a model and base prompt, enable or disable mechanisms, and choose their registered algorithms. Context, tools and environment are configured through the configuration menu. `/lab` shows the active harness in labelled sections, including its context mechanisms, execution environment and installed tools. `/improvement` provides a separate experiment panel for target, algorithm, tasks, budgets and evaluation.
+Use `/config` to select models, prompts, tools, context and execution environments
+for a new session. `/lab` inspects the active runtime. `/resume` continues saved
+conversation with current configuration after validating history and artifacts.
+See [Configuration](CONFIGURATION.md) and [Terminal](fruitfly_agent/interactive/terminal/README.md).
 
-![Compose a FruitFlyAgent harness: choose a model and base prompt, configure context, environment, tools, and improvement, then assemble a new Agent session](assets/mechanism-selection.svg)
+Context mechanisms include Skill catalogs, file memory, local knowledge,
+summarization and optional [programmatic context externalization](fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md).
+Bash/file tools can use a local or SSH environment. These runtime choices do not
+expand the isolated environment used by native improvement trials.
 
-*A composition overview. Mechanisms are selectable; RLM-inspired externalization is optional and requires the IPython tool.*
+## Built for harness research
 
-![FruitFlyAgent terminal menus: grouped context mechanisms and inline target, algorithm and parameter choices](assets/configuration-choices.svg)
+| Capability | Current behavior | Guide |
+|---|---|---|
+| H/S improvement | Propose, execute and compare registered instruction or retained-document changes; keep the baseline selectable | [Improvement](fruitfly_agent/lab/improvement/README.md) |
+| I experiments | Compare editor instructions by the downstream H/S improvements they produce, then verify on separate task packages | [Editor experiments](fruitfly_agent/lab/improvement/improver/README.md) |
+| Persistent adoption | Publish verified text candidates for explicit review and activation | [Improvement host](fruitfly_agent/run/improvement/README.md) |
+| Experience | Stage attributed lessons; commit or reject separately while idle | [Experience](fruitfly_agent/lab/improvement/experience/README.md) |
+| RSI | An explicitly invoked host repeats verified adoption and loads the adopted version for the next generation | [RSI](fruitfly_agent/lab/rsi/README.md) |
+| Benchmark execution | Run the native Agent in Harbor containers and collect official results | [Eval](eval/README.md) |
 
-*Example terminal selections, not defaults. Use arrow keys to navigate, Space to toggle a mechanism, and Enter to expand its algorithm selector. Green checked markers mean enabled, cyan marks the focus, and yellow marks draft edits. Section titles group augmentation, externalization and reduction. Symbols retain their meaning without color.*
+`/improvement` selects execution, materials, editable components, generator,
+exploration, feedback and scope. Preview is offline; confirmed execution may incur
+charges. Native trials use in-memory file tools, without Bash, network tools or a
+live Session. I experiments edit only declared editor fields at fixed nesting
+depth. They do not train model weights or replace arbitrary source code.
 
-For example, enable RLM-inspired externalization together with the IPython tool to inspect context through Python, or leave it disabled to study other context strategies. Configuration changes apply to a new session; active and resumed sessions retain their runtime identity. Expand a mechanism to edit its parameters; YAML remains available. See [Configuration](CONFIGURATION.md) and [Terminal](fruitfly_agent/interactive/terminal/README.md) for controls and dependencies.
+Output selection is not independent verification. Tests with fake Providers prove
+covered control flow, not real model gains. Task packages are explicitly authored;
+ordinary chat does not collect training material. See [task preparation](fruitfly_agent/lab/improvement/tasks/README.md).
 
 ## What you can do
 
 | Task | Start here |
 |---|---|
-| Install, run a task, or resume a session | [Getting started](GETTING_STARTED.md) |
-| Choose models, prompts, and mechanisms | [Configuration](CONFIGURATION.md) |
-| Run file tools and Bash on an external server | [SSH environment](fruitfly_agent/lab/environment/ssh/README.md) |
-| Use terminal commands and menus | [Terminal](fruitfly_agent/interactive/terminal/README.md) |
-| Inspect externalized context through Python | [Programmatic context](fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md) |
-| Add an algorithm | [Lab](fruitfly_agent/lab/README.md) · [Offline extension example](examples/extensions/README.md) |
-| Investigate and improve harness mechanisms | [Lab](fruitfly_agent/lab/README.md#improvement-and-rsi) · [Improvement](fruitfly_agent/lab/improvement/README.md) |
-| Verify, adopt, and continue across harness or improver versions | [RSI](fruitfly_agent/lab/rsi/README.md) |
-| Evaluate the native Agent in Terminal-Bench 2.1 or SWE-bench containers | [Eval](eval/README.md) |
-| Develop and test | [Contributing](CONTRIBUTING.md) · [Tests](tests/README.md) |
+| Install, configure, run or resume | [Getting started](GETTING_STARTED.md) · [Configuration](CONFIGURATION.md) |
+| Use remote file and shell tools | [SSH environment](fruitfly_agent/lab/environment/ssh/README.md) |
+| Add or replace an algorithm | [Lab development](fruitfly_agent/lab/README.md#develop-an-algorithm) |
+| Prepare an improvement experiment | [Examples](examples/improvement/README.md) · [Task packs](fruitfly_agent/lab/improvement/tasks/README.md) |
+| Run Terminal-Bench or SWE-bench | [Eval](eval/README.md) |
+| Change and verify the implementation | [Contributing](CONTRIBUTING.md) · [Tests](tests/README.md) |
 
 ## Project layout
 
@@ -118,23 +104,19 @@ For example, enable RLM-inspired externalization together with the IPython tool 
 |---|---|
 | [fruitfly_agent/](fruitfly_agent/README.md) | Runtime architecture and module entry points |
 | [eval/](eval/README.md) | Optional benchmark execution and reports |
-| [examples/](examples/README.md) | Runnable extensions and improvement task packs |
-| [tests/](tests/README.md) | Offline contract, architecture, and behavior checks |
-| [AGENTS.md](AGENTS.md) | Engineering instructions for AI-assisted development |
+| [examples/](examples/README.md) | Runnable extensions and task packs |
+| [tests/](tests/README.md) | Offline contracts, architecture and behavior checks |
+| [AGENTS.md](AGENTS.md) | Engineering rules for AI-assisted development |
 
 ## Contribute
 
-Bring a focused mechanism, a reproducible experiment, or a failure that challenges an existing explanation. Include the conditions, observations, and limits needed for someone else to investigate it. Start with [Contributing](CONTRIBUTING.md) and the [engineering rules](AGENTS.md).
-
-**AI-assisted development is welcome.** [AGENTS.md](AGENTS.md) defines the project rules coding agents should follow. Developers must actively guide the work: define the problem and research hypothesis, question proposed designs, inspect the implementation, and verify the evidence. Human judgment and responsibility remain essential throughout development.
-
-Run the offline checks from your source checkout:
+Read the [architecture](fruitfly_agent/README.md), the affected module guide and
+[Contributing](CONTRIBUTING.md). Keep algorithm decisions in Lab and lifecycle
+in Application. Update public behavior, tests and documentation together.
 
 ```bash
 .venv/bin/python -m unittest discover -s tests -t .
 ```
-
-See [Tests](tests/README.md) for selected checks and [Lab](fruitfly_agent/lab/README.md#test-and-evaluate) for research evidence requirements.
 
 ## License
 
@@ -149,5 +131,3 @@ FruitFlyAgent is released under the [MIT License](LICENSE). See [Third-party not
 | [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) | Inspiration for externalizing context into a programmable Python environment; see [Programmatic context](fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md). |
 
 Research sources and the scope of each adaptation are documented in the corresponding algorithm modules.
-
-Terminal features use the [Interactive command extension interface](fruitfly_agent/interactive/terminal/README.md#register-a-command). Application owns lifecycle permission; search, candidate review, and task material services are independently injected.

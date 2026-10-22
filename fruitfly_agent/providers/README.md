@@ -14,7 +14,7 @@ Adapt model APIs to Core's Provider protocol. Run resolves model specifications 
 
 See [Configuration](../../CONFIGURATION.md) for file locations and [Provider guide](PROVIDER_GUIDE.md) for protocol differences and parameter examples.
 
-Use the terminal model wizard or copy the public [model template](../../examples/configuration/models.example.yaml) to local `.fruitfly/models.yaml` for manual setup. The single catalog contains DeepSeek Flash Responses and Messages profiles; configure a DeepSeek key and select a profile before use; keep key values in `.fruitfly/secrets.env` or the process environment. Wizard validation is offline and does not establish remote compatibility or model capability.
+Use the model wizard or the [public template](../../examples/configuration/models.example.yaml). Keep key values in the secret environment and variable names in the catalog. Offline setup validates declarations, not remote service compatibility.
 
 ## Requests and errors
 

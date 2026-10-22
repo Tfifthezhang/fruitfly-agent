@@ -77,7 +77,7 @@ Use the actual workspace's Skill path if running elsewhere. Resolve diagnostics 
 
 The named target `skill-catalog.guidance` can replace rendered catalog text through an explicit artifact binding. It does not change or snapshot `SKILL.md` bodies or references. An empty catalog is a valid baseline; published replacement text must be nonempty and fit the projection budget. See [Improvement](../../../improvement/README.md) and [Run artifacts](../../../../run/README.md#text-artifacts).
 
-When guidance is read from workspace skill files, Catalog registers those Markdown/text dependencies for [original-task experiments](../../../improvement/README.md). Initial files are copied into independent trial workspaces. Bound guidance uses its existing immutable artifact; the configured Skill directory remains an initial-state dependency because referenced files can still be read. Catalog-guidance search changes H; use the separate S document target below to optimize a body.
+Catalog registers Skill directory Markdown/text dependencies in [Improvement](../../../improvement/README.md) initial-state identity. Bound guidance uses its immutable artifact. Native trials do not copy the directory: supply required Skill bodies and references as explicit task input files. Catalog-guidance search changes H; use the separate S document target below to optimize a body.
 
 ## Optimize a Skill body
 

@@ -127,7 +127,7 @@ Mechanism and algorithm menus use readable registered names. Stable IDs remain i
 | `capabilities` checkbox names | Boolean fields under the entry's `capabilities` mapping |
 | `model` / `model.profile` | Harness profile's `model.profile` selection |
 | `prompt` | Harness profile's `prompt` reference |
-| Context / Tools / Environment / Learning | Visual category of the harness `mechanisms` list; categories are not extra YAML fields |
+| Context / Tools / Environment | Visual category of the harness `mechanisms` list; categories are not extra YAML fields |
 | Readable mechanism / algorithm name | `mechanisms[].id`; group names such as `reduction` organize alternatives, with the chosen algorithm ID stored |
 
 The capability page uses arrows and Space/Enter to toggle, then **Continue** to confirm. Numbered fallback toggles the selected row and offers a numbered Continue action. Checked means `true`; unchecked means `false`. Required rows remain checked. Esc, `back`, q, or EOF cancels without staging.
@@ -138,7 +138,7 @@ The capability page uses arrows and Space/Enter to toggle, then **Continue** to 
 |---|---|---|
 | Base prompt | `assistant-default`; choose another prompt in **Configure → prompt** or `/config`. | [Base prompt](fruitfly_agent/lab/base_prompt/README.md) |
 | Skill catalog | Read `.skills/`; enable in **Context → Context augmentation → Skill catalog** (Space toggles; the phase is a section heading). | [Skills](fruitfly_agent/lab/context_manager/augmentation/skills/README.md) |
-| Reduction | Summarizing; expand Reduction to edit typed parameters, or use YAML. | [Reduction](fruitfly_agent/lab/context_manager/reduction/README.md) |
+| Reduction | Summarizing; inspect the mechanism in Context and edit tuning parameters in YAML. | [Reduction](fruitfly_agent/lab/context_manager/reduction/README.md) |
 | Improvement | Choose materials, components, generator, exploration, allocations and scope in `/improvement`; no per-algorithm switch. | [Improvement](fruitfly_agent/lab/improvement/README.md) |
 | Reusable skill document | Disabled; Context augmentation. Set `source_path` to one workspace-relative Skill or enter `initial_text`; `max_chars=16000`. | [Skill body](fruitfly_agent/lab/context_manager/augmentation/skills/README.md#optimize-a-skill-body) |
 | Learned environment memory | Disabled; Context augmentation. Enter `initial_text`; `max_chars=16000`. Updates require explicit Improvement and adoption. | [Learned memory](fruitfly_agent/lab/context_manager/augmentation/information/file_memory/README.md#learn-environment-memory) |
@@ -256,16 +256,6 @@ unspent search allowance can supplement final verification. Missing token/cost
 usage remains unknown. Task and parent-operation timeouts bound child operations.
 External execution needs an explicitly registered compatible runner; the native
 file workspace does not inherit Bash, network tools, containers or live Session.
-
-## Configure daily learning material
-
-Enable **Learning → Learning materials** with Space. Its built-in implementation,
-**Record completed tasks**, works without an improver. Expand it to configure `trigger`
-(`task`, `session`, or `batch`), `batch_size`, `max_records`, and `max_chars` in
-its inline fields or YAML; see [Learning](fruitfly_agent/lab/learning/README.md). Records under
-`.fruitfly/learning/materials/` remain pending until a registered method supplies
-validated acceptance evidence. Recording does not call a model, change H/S/I,
-start a search, or assign observations to independent confirmation.
 
 ## Relocate improvement data
 

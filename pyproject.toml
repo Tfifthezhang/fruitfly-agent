@@ -77,7 +77,6 @@ files = [
     "fruitfly_agent/interactive/contracts/configuration.py",
     "fruitfly_agent/interactive/contracts/improvement.py",
     "fruitfly_agent/interactive/contracts/experience.py",
-    "fruitfly_agent/interactive/contracts/learning.py",
     "fruitfly_agent/interactive/contracts/candidates.py",
     "fruitfly_agent/interactive/contracts/task_packs.py",
     "fruitfly_agent/interactive/application/jobs.py",
@@ -105,8 +104,6 @@ files = [
     "fruitfly_agent/lab/improvement/editor",
     "fruitfly_agent/run/improvement/pipeline.py",
     "fruitfly_agent/lab/improvement/migration.py",
-    "fruitfly_agent/lab/learning",
-    "fruitfly_agent/run/learning",
     "fruitfly_agent/run/migrate_improvement.py",
     "fruitfly_agent/lab/improvement/tasks/__init__.py",
     "fruitfly_agent/lab/improvement/tasks/scoring.py",
@@ -145,3 +142,9 @@ module = [
     "eval.benchmarks.harbor",
 ]
 disallow_untyped_defs = true
+
+# Harbor 0.23.0 contains inline annotations but does not publish a py.typed marker.
+# Read its source when installed; optional-import guards still cover its absence.
+[[tool.mypy.overrides]]
+module = ["harbor.*"]
+follow_untyped_imports = true

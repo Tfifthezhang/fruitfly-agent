@@ -11,9 +11,8 @@ Define the data and capabilities shared by hosts, Application, Session, and fron
 | [events.py](events.py), [models.py](models.py) | Event envelopes, EventSink, status, history, and session views |
 | [configuration.py](configuration.py), [model_setup.py](model_setup.py) | Configuration choices, optional default-restoration capability, model forms and staging |
 | [mechanism_setup.py](mechanism_setup.py) | Optional guided mechanism forms, non-secret credential status and atomic staging |
-| [improvement.py](improvement.py) | Role/target/method/parameter views, search preview/execution, activity, progress, optional history/log queries and submission receipts |
+| [improvement.py](improvement.py) | Component workflow choices and parameters, preview/execution, activity, progress, optional history/log queries and submission receipts |
 | [experience.py](experience.py) | Independent pending-lesson views and explicit commit/reject capability |
-| [learning.py](learning.py) | Completed-task observation and optional material production service |
 | [candidates.py](candidates.py) | Candidate views with evidence assessments, review, and isolated preparation/activation contracts |
 | [task_packs.py](task_packs.py) | Task material and correction views/services |
 
@@ -44,7 +43,7 @@ the fallback used by hosts without a Session store.
 
 No environment variables, model calls, filesystem writes, or resource ownership. Concrete effects belong to service implementations. See [Run adapters](../../run/adapters/README.md) and [terminal feature extensions](../terminal/features/README.md).
 
-Configuration and improvement method views carry registration-owned implementation/guide paths. Configuration also declares `input_parameters`; improvement views identify the active configuration file/profile. Improvement method views declare optional `direction_help` for search-guidance input. Parameter views carry descriptions, choices, nullability and numeric bounds so frontends can show individual fields. These views describe input; task/method previews retain scoring and acceptance authority.
+Configuration mechanism views carry registration-owned implementation/guide paths and `input_parameters`. Workflow views expose available components, generators, execution strategies, materials, verification modes and effect scopes. Parameter views carry descriptions, choices, nullability and numeric bounds. These views describe input; the host validates requests and binds confirmed previews to execution.
 
 ```bash
 .venv/bin/python -m unittest tests.architecture.test_boundaries tests.contracts.test_public_api tests.contracts.test_signatures -v

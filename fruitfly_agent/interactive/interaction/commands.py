@@ -169,7 +169,7 @@ def _lab(
     if status.improvement_available:
         grouped.setdefault("improvement", [])
     order = {name: index for index, name in enumerate((
-        "context-manager", "environment", "tools", "learning", "workflow", "improvement",
+        "context-manager", "environment", "tools", "workflow", "improvement",
     ))}
     sections = []
     for category in sorted(grouped, key=lambda name: (order.get(name, len(order)), name)):

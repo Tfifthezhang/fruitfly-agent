@@ -12,7 +12,6 @@ _SECTION_STYLES = {
     "context-manager": "\x1b[1;37;44m",
     "environment": "\x1b[1;30;46m",
     "tools": "\x1b[1;37;45m",
-    "learning": "\x1b[1;30;42m",
     "workflow": "\x1b[1;37;44m",
     "improvement": "\x1b[1;30;43m",
 }

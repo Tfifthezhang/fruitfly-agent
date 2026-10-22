@@ -106,5 +106,6 @@ Custom tool definitions can declare the slot returned by `guidance_key(name)` in
 `artifact_slots`. `prepare_guidance` consumes enabled tools' bindings and registers
 their object-owned targets. The built-in composition root supplies those slots
 from its declared tool effects. Installing a description does not invoke the tool
-or make a model request. Component experiments require isolated full-runtime
-execution; ordinary tool-free text trials are not a measurement of tool use.
+or make a model request. Native component trials support read/write/edit guidance in their isolated file
+workspace. Bash, web and IPython guidance require a compatible registered runner;
+selecting those tools in the live runtime does not add them to native trials.

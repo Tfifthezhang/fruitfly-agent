@@ -302,14 +302,13 @@ class CatalogTest(unittest.TestCase):
                 "execution-workflow",
                 "skill-document",
                 "learned-memory",
-                "task-material-recording",
                 "component-improvement",
             },
         )
 
     def test_unknown_mechanisms_are_rejected_even_when_disabled(self) -> None:
         catalog = builtin_catalog()
-        for mechanism in ("unregistered-improver", "unregistered-context", "unregistered-tool"):
+        for mechanism in ("unregistered-improver", "unregistered-context", "unregistered-tool", "task-material-recording"):
             for enabled in (True, False):
                 with self.subTest(mechanism=mechanism, enabled=enabled):
                     with self.assertRaisesRegex(ValueError, "unknown mechanism.*Remove this selection"):

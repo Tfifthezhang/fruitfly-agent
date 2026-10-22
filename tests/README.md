@@ -8,7 +8,7 @@ Verify public contracts, module boundaries, and observable behavior with offline
 
 ```bash
 .venv/bin/python -m tests --area lab --area workflows
-.venv/bin/python -m tests --module tests.lab.test_search
+.venv/bin/python -m tests --module tests.lab.test_improvement_pipeline
 .venv/bin/python -m tests --area run --list
 .venv/bin/python -m unittest discover -s tests -t .
 ```
@@ -27,6 +27,10 @@ The development runner rejects integration/support and non-test modules. It does
 ## Static types
 
 Install the optional development dependencies with `pip install -e '.[dev]'` (network download), then run `.venv/bin/python -m mypy` offline. Development dependencies include pinned mypy and PyYAML stubs. The module list and per-module rules in `pyproject.toml` define the gate.
+
+The same gate works with or without the optional `benchmarks` extra. When Harbor
+is installed, mypy reads its inline annotations despite its missing `py.typed`
+marker. CI checks both dependency configurations; it does not run real benchmarks.
 
 | Checked area | Scope |
 |---|---|

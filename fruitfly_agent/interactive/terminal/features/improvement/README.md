@@ -35,8 +35,7 @@ parent, configuration, binding and artifacts.
 
 `ImprovementClients` injects workflow, execution, candidate, activation, history and
 cancellation capabilities independently. A host without the component workflow
-reports unavailable; it does not fall back to an obsolete search engine. Daily
-observation collection belongs to [Learning](../../../../lab/learning/README.md).
+reports unavailable. Task packages are supplied explicitly; ordinary chat does not collect learning material.
 See [Improvement](../../../../lab/improvement/README.md) and
 [Task packages](../../../../lab/improvement/tasks/README.md).
 

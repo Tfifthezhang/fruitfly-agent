@@ -7,7 +7,6 @@ from fruitfly_agent.interactive.contracts.runtime import RuntimeSession, Runtime
 from fruitfly_agent.interactive.contracts.improvement import ImprovementService
 from fruitfly_agent.interactive.contracts.candidates import CandidateActivationService, CandidateService
 from fruitfly_agent.interactive.contracts.task_packs import TaskPackService
-from fruitfly_agent.interactive.contracts.learning import LearningService
 
 
 async def _call_optional(component: Any, method: str) -> Any:
@@ -32,7 +31,6 @@ class RuntimeHandle:
     authorization: RuntimeAuthorization | None = None
     candidates: CandidateService | None = None
     task_packs: TaskPackService | None = None
-    learning: LearningService | None = None
     _closed: bool = field(default=False, init=False, repr=False)
 
     async def start(self) -> None:
