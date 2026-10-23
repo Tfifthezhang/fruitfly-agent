@@ -53,7 +53,7 @@ Follow the dependency table in [Runtime architecture](fruitfly_agent/README.md#m
 
 | Requirement | Action |
 |---|---|
-| Language and style | Write all documentation in English. Use task-oriented headings, concise sentences, and tables wherever they convey the information clearly. |
+| Language and style | Write documentation in English, except the explicitly bilingual [server evaluation guide](eval/SERVER_GUIDE.md). Use task-oriented headings, concise sentences, and tables wherever they convey the information clearly. |
 | Navigation | Link parent READMEs to child guides, add child backlinks, and cross-link related responsibilities. Keep guides in the existing tree; do not create `docs/`. |
 | Module coverage | Give independent modules a README describing purpose, public entry points, behavior, relevant files, configuration/effects, limits, and offline checks. Let parents cover small directories. |
 | Current state | Describe implemented behavior and limits. Do not create histories, changelogs, migration narratives, roadmaps, planning files, or design diaries. |

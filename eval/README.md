@@ -7,6 +7,9 @@ environments, task deadlines and official verifiers. Eval mounts a prepared Agen
 runtime, passes one saved configuration and collects outcomes, trajectories and reports.
 Interactive improvement remains independent of Eval.
 
+For ordered server setup, private-file transfer, YAML/JSON generation and the
+smoke-to-full workflow, use the bilingual [Server Evaluation Guide](SERVER_GUIDE.md).
+
 ## Install and inspect
 
 Use Python 3.12+, Docker Engine and Compose v2:
@@ -20,16 +23,20 @@ docker compose version
 
 | Item | Support |
 |---|---|
-| Datasets | Terminal-Bench 2.1 (`terminal-bench/terminal-bench-2-1`), SWE-bench Verified |
+| Datasets | Terminal-Bench 2.1, Terminal-Bench 4.0.0, SWE-bench Verified; see [task selections](benchmarks/TASKS.md) |
 | Backend | Docker through Harbor `0.23.0` |
 | Selection | Single-task `smoke`, Terminal-Bench five-task `starter`, full `no_gpu` or `gpu` |
-| Formats | Evaluation request, runner result, trial and report schema 2; catalog, host and preparation schema 1 |
+| Formats | Evaluation request, runner result, trial, report and preparation schema 2; catalog and host schema 1 |
 | Output | `.fruitfly/eval/<evaluation-id>/` |
 
 Preflight checks Harbor/Docker availability and Engine/Compose access. It does
 not prove dataset access, cached image tags, architecture compatibility, disk
 space or model connectivity. A `gpu` selection adds an NVIDIA executable check;
 `no_gpu` does not filter GPU tasks from a dataset. Task resources remain official.
+
+Shared and separate verifier environments use the same Harbor adapter. Independent
+verifiers receive prepared dependency assets/caches, without Agent runtime mounts
+or model credentials. Harbor owns artifact transfer and scoring.
 
 ## Run an evaluation
 
@@ -111,6 +118,7 @@ downloads use separately prepared assets/caches, without making the Agent runtim
 | Harbor trial `agent/installation.json` | Exact source/wheel input hashes |
 | Harbor trial `agent/runtime.json` | Shared frozen configuration/model/policy receipt |
 | Harbor job/trial logs | Setup, Agent execution, verifier output and exceptions |
+| Harbor trial `fruitfly-environments/` | Exact Agent and separate-verifier environment ownership for cleanup |
 
 ATIF does not reconstruct request-specific context projections or auxiliary model
 calls. Missing usage/cost remains unknown. The native Session retains original

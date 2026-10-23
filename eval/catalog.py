@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from .benchmarks import BenchmarkAdapter, SWEBenchAdapter, TerminalBenchAdapter
+from .benchmarks import BenchmarkAdapter, SWEBenchAdapter, TerminalBenchAdapter, TerminalBench4Adapter
 
 
 class BenchmarkCatalog:
@@ -56,7 +56,7 @@ class BenchmarkCatalog:
 
 
 def builtin_catalog() -> BenchmarkCatalog:
-    return BenchmarkCatalog((SWEBenchAdapter(), TerminalBenchAdapter()))
+    return BenchmarkCatalog((SWEBenchAdapter(), TerminalBenchAdapter(), TerminalBench4Adapter()))
 
 
 __all__ = ["BenchmarkCatalog", "builtin_catalog"]

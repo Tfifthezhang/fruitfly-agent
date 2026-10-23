@@ -36,7 +36,7 @@ def harbor_descriptor(*, benchmark_id: str, label: str, description: str,
     """Declare a dataset using the shared container execution and reward contract."""
     return BenchmarkDescriptor(
         benchmark_id=benchmark_id, label=label, description=description,
-        version=version, dataset=dataset, adapter_version="6",
+        version=version, dataset=dataset, adapter_version="7",
         variants=(
             BenchmarkVariant("smoke", "Single-task smoke", "Validate one complete evaluation path",
                              task_names=(smoke_task,)),

@@ -10,6 +10,7 @@ native; Harbor owns task environments and verification.
 | [base.py](base.py) | Runner protocol, descriptors, exact task subsets and GPU preflight metadata |
 | [harbor.py](harbor.py) | Shared preflight, commands, result coverage and Harbor job dispatch |
 | [terminal_bench.py](terminal_bench.py) | Terminal-Bench 2.1 dataset and smoke/starter tasks |
+| [terminal_bench_4.py](terminal_bench_4.py) | Terminal-Bench 4.0.0 pinned dataset and CPU smoke task |
 | [swe_bench.py](swe_bench.py) | SWE-bench Verified dataset and smoke task |
 | [TASKS.md](TASKS.md) | Official task format and selection |
 
@@ -22,6 +23,9 @@ declaration supplies measurement names, network surfaces, isolation and full-run
 variants. A variant's `requires_gpu` controls resource preflight without matching
 its name. New datasets require no changes to installation, native CLI startup,
 credentials, trajectories, subprocess handling or result parsing.
+Use `org/dataset@version` to pin a Hub dataset revision. Resolution passes the
+name and version through Harbor's public dataset configuration. Shared versus
+separate verification and step overrides come from the task, not the benchmark ID.
 
 Preparation freezes exact task paths before Harbor starts. Returned names and
 attempt counts must match the frozen set for every variant, including full runs;

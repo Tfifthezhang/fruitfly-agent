@@ -11,7 +11,23 @@ import subprocess
 import time
 from typing import Any
 
-from .material import write_json
+from .material import digest, write_json
+
+
+def compose_project(session_id: str) -> str:
+    """Normalize a recorded session using Docker Compose's project-name rules."""
+    project = session_id.lower()
+    if not re.match(r"^[a-z0-9]", project):
+        project = "0" + project
+    return re.sub(r"[^a-z0-9_-]", "-", project)
+
+
+def record_environment(trial_dir: Path, session_id: str) -> None:
+    """Keep exact environment ownership outside container-mounted log paths."""
+    write_json(trial_dir / "fruitfly-environments" / (digest(session_id) + ".json"), {
+        "trial_directory": str(trial_dir.resolve()), "session_id": session_id,
+        "project": compose_project(session_id),
+    })
 
 
 def request_stop(evaluation: Path, *, wait_seconds: float = 20) -> dict[str, Any]:
@@ -79,10 +95,19 @@ def owned_projects(job_root: Path) -> list[str]:
             # Harbor Docker session_id is <trial_name>__env. Compose project
             # normalization is reflected by the actual label; require its exact
             # value and confirm the trial directory belongs to this evaluation.
-            project = (name + "__env").lower()
-            if not re.match(r"^[a-z0-9]", project):
-                project = "0" + project
-            projects.add(re.sub(r"[^a-z0-9_-]", "-", project))
+            projects.add(compose_project(name + "__env"))
+            for record in (path.parent / "fruitfly-environments").glob("*.json"):
+                try:
+                    value = json.loads(record.read_text())
+                    session = value["session_id"]
+                    if (not isinstance(session, str) or not session
+                            or value["trial_directory"] != str(path.parent.resolve())
+                            or value["project"] != compose_project(session)
+                            or record.name != digest(session) + ".json"):
+                        raise ValueError("environment ownership differs from trial")
+                except (OSError, ValueError, KeyError, TypeError):
+                    raise RuntimeError(f"cannot establish container ownership from {record}") from None
+                projects.add(value["project"])
     return sorted(projects)
 
 

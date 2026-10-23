@@ -9,11 +9,12 @@ from typing import Any, Callable
 from eval.benchmarks.base import BenchmarkDescriptor
 from eval.contracts import EvaluationRequest
 from eval.installation import resolve_installation
-from .dependencies import check_dependencies, dependency_environment, dependency_mounts, prepare_dependencies
+from .dependencies import check_dependencies, prepare_dependencies
 from .host import HostConfig
-from .material import check_material, digest, prepare_material, runtime_mounts, write_json
+from .material import check_material, digest, prepare_material, write_json
 from .tasks import check_tasks, preparation_key, prepare_tasks
-from .environments import environment_key, image_identity, probe_environment
+from .environments import environment_config, environment_key, probe_environment
+from .docker import image_identity
 
 
 def receipt_path(host: HostConfig, descriptor: BenchmarkDescriptor, variant: str) -> Path:
@@ -25,9 +26,9 @@ def load_preparation(host: HostConfig, descriptor: BenchmarkDescriptor, variant:
     if not path.is_file():
         raise ValueError(f"this Harbor selection is not prepared; run eval prepare --request <request>; expected {path}")
     receipt = json.loads(path.read_text(encoding="utf-8"))
-    if (receipt.get("schema_version") != 1 or receipt.get("dataset") != descriptor.dataset
+    if (receipt.get("schema_version") != 2 or receipt.get("dataset") != descriptor.dataset
             or receipt.get("variant") != variant):
-        raise ValueError("prepared selection differs from the requested dataset/variant")
+        raise ValueError("preparation format or dataset/variant differs; run eval prepare again")
     if receipt.get("id") != digest({key: value for key, value in receipt.items() if key != "id"}):
         raise ValueError("preparation record changed; run eval prepare again")
     if not receipt.get("tasks"):
@@ -52,15 +53,15 @@ def prepare(request: EvaluationRequest, descriptor: BenchmarkDescriptor, host: H
     runtime = prepare_material(host, package)
     emit("tasks")
     tasks = prepare_tasks(host, descriptor, request.benchmark.variant)
+    emit("dependencies")
+    dependencies = prepare_dependencies(host, docker)
     emit("environment_probes")
     probes: dict[str, dict[str, Any]] = {}
     for task in tasks:
         key = environment_key(task)
         if key not in probes:
-            probes[key] = probe_environment(task, runtime, docker, host.cache / "checks" / key)
-    emit("dependencies")
-    dependencies = prepare_dependencies(host, docker)
-    receipt = {"schema_version": 1, "dataset": descriptor.dataset, "variant": request.benchmark.variant,
+            probes[key] = probe_environment(task, runtime, docker, host.cache / "checks" / key, host=host)
+    receipt = {"schema_version": 2, "dataset": descriptor.dataset, "variant": request.benchmark.variant,
                "runtime": runtime, "dependencies": dependencies, "tasks": tasks,
                "environments": list(probes.values())}
     receipt["id"] = digest(receipt)
@@ -95,7 +96,7 @@ def inspect(request: EvaluationRequest, descriptor: BenchmarkDescriptor, host: H
         except (OSError, ValueError, subprocess.SubprocessError) as exc:
             checks.append({"id": "dependency_image", "image": image, "status": "failed", "detail": str(exc)})
     checks.append({"id": "runtime", "status": "passed",
-                   "detail": "prepared Python/SSL/import probes cover all unchanged environment identities"})
+                   "detail": "prepared Agent imports and verifier dependency probes match unchanged environment identities"})
     checks.append({"id": "verifier_execution", "status": "unverified", "detail": receipt["dependencies"]["verifier_execution"]})
     checks.append({"id": "model_connectivity", "status": "unverified", "detail": "no model requests were made"})
     return {"available": not any(c["status"] == "failed" for c in checks),
@@ -103,5 +104,4 @@ def inspect(request: EvaluationRequest, descriptor: BenchmarkDescriptor, host: H
 
 
 def job_environment(host: HostConfig, receipt: dict[str, Any]) -> dict[str, Any]:
-    return {"type": "docker", "mounts": [*runtime_mounts(receipt["runtime"]), *dependency_mounts(host)],
-            "env": {**dependency_environment(host), **host.setup_env}}
+    return environment_config(host, receipt["runtime"])

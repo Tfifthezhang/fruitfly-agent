@@ -71,13 +71,25 @@ setup replacements must match once; each applied diff is recorded. Original
 task files remain untouched. Restrict replacements to dependency/bootstrap
 operations; changing assertions or rewards changes the evaluation condition.
 
-Prebuilt Linux images are probed with networking disabled. Dockerfile and Compose
-environments use Harbor's public environment factory, including its startup
-behavior, then are deleted. Preparation may build images or start task services;
-it does not run the Agent or verifier. Probes import the runtime, SSL, SQLite,
-compression, native extensions and Provider dependencies, and record versions
-and actual image identities. Task environment CPU, memory, timeout and network
-declarations remain Harbor's responsibility during trials.
+Preparation records use schema 2. Missing or older preparation records require
+`prepare` again; request and machine-file formats are unchanged. Each record covers
+the Agent environment and every effective separate verifier, including multi-step
+overrides. Configuration inheritance uses Harbor's public resolver. Separate
+verifier build contexts come from `tests/` or an existing `steps/<name>/tests/`.
+Shared verifiers continue to use the Agent environment.
+
+Prebuilt Linux Agent images are probed with networking disabled. Dockerfile,
+Compose and separate-verifier environments use Harbor's public environment
+factory, then their live resources are retired while images remain cached.
+Preparation may build images or start task services; it does not run the Agent
+or scoring assertions. Agent probes import the runtime, SSL, SQLite, compression,
+native extensions and Provider dependencies. Both roles check asset access and
+cache writes using the declared execution user. Verifier probes do not import
+the Agent or require its Python installation. Records retain each role, step,
+build context, effective resource configuration and actual image identities.
+Verifier definitions and build-context contents participate in probe identities.
+Task resource, timeout and network declarations remain Harbor's responsibility
+during trials; probes do not establish complete phase-network or resource compliance.
 
 `check` validates all frozen contents, links and local image identities against
 the recorded probes. It never pulls a missing image. Moving a symlink, modifying
@@ -97,11 +109,19 @@ replacement bytes must match the declared checksum.
 
 | Container path | Access / ownership |
 |---|---|
-| Runtime mount targets | Read-only Agent interpreter, dependencies and libraries |
-| `/installed-agent/fruitfly/source` | Read-only frozen Agent source |
-| `/installed-agent/fruitfly/runtime` | Per-trial configuration and immutable input copies |
-| `/opt/fruitfly-eval-dependencies/assets` | Read-only checksum-verified binaries/assets |
-| `/opt/fruitfly-eval-dependencies/cache` | Writable uv, Python download and pip caches |
+| Runtime mount targets | Agent only: read-only interpreter, dependencies and libraries |
+| `/installed-agent/fruitfly/source` | Agent only: read-only frozen Agent source |
+| `/installed-agent/fruitfly/runtime` | Agent only: per-trial configuration and immutable input copies |
+| `/opt/fruitfly-eval-dependencies/assets` | Both roles: read-only checksum-verified binaries/assets |
+| `/opt/fruitfly-eval-dependencies/cache` | Both roles: writable uv, Python download and pip caches |
+
+The public `environment.import_path` extension in [docker_environment.py](docker_environment.py)
+appends dependency mounts to each Harbor-created environment. Agent runtime mounts
+remain in Harbor's role-specific Agent mount list. The extension does not infer
+roles from names or change artifact transfer, test upload or scoring. Model keys
+remain in the installed Agent's environment; separate verifiers receive none of
+those credentials. Harbor's built-in Docker implementation still owns Compose,
+image selection, resource enforcement and network policies.
 
 Preparation recipes use the declared image's recorded identity and save complete
 output in `dependencies/prepare-<index>.log`. Successful recipes are reused for
@@ -129,7 +149,10 @@ version can require additional cache preparation.
 ```
 
 The runner owns a separate process group, a tokenized stop record and the Compose
-projects recorded by its trials. Normal return, whole-job timeout, Ctrl+C,
+projects recorded by its trials. The environment extension records exact sessions
+under each trial's `fruitfly-environments/` before startup, outside container-mounted
+log paths. This covers separate verifiers and shortened multi-step session names.
+Normal return, whole-job timeout, Ctrl+C,
 SIGTERM and `stop` terminate the owned process group and retire remaining exact
 project containers, networks and volumes. `resources.json` records removed
 identifiers. Unrelated jobs are not selected by process-name patterns.
@@ -154,6 +177,7 @@ not confirmation.
 | [tasks.py](tasks.py) | `prepare_tasks`, `validate_coverage`: frozen selections and all-run coverage |
 | [dependencies.py](dependencies.py) | `prepare_dependencies`, `check_dependencies`: assets and caches |
 | [environments.py](environments.py) | `probe_environment`: prebuilt images and public Harbor environment factory |
+| [docker_environment.py](docker_environment.py) | `PreparedDockerEnvironment`: dependency mounts and exact ownership through Harbor's public environment plugin |
 | [preparation.py](preparation.py) | `prepare`, `inspect`, `load_preparation`: shared readiness |
 | [docker.py](docker.py) | `run_container`: bounded preparation-container retirement |
 | [supervisor.py](supervisor.py), [lifecycle.py](lifecycle.py) | Container Agent and host job ownership |
@@ -162,15 +186,14 @@ not confirmation.
 The [adapter guide](../DEVELOPER_GUIDE.md#add-a-benchmark) describes registration.
 This implementation targets Linux Docker tasks on a local Docker daemon.
 Remote Docker daemons need equivalent bind paths and are unverified. Other Harbor
-backends and Windows task containers are not implemented here. Tasks declaring a
-separate verifier environment are rejected during preparation: Harbor 0.23.0
-does not forward the configured dependency mounts into that separate environment.
-That capability needs an integration extension rather than silently repeating
-downloads without the prepared cache. A different
-Linux benchmark reuses these modules; no TB-specific installation branches exist.
+backends and Windows task containers are not implemented here. Shared and separate
+verifiers use the same prepared dependency contract. A different Linux benchmark
+reuses these modules; no benchmark-name or version branches select execution behavior.
+Compatibility with real images, GPU scheduling and complete verifier execution
+still requires a smoke trial on the evaluation host.
 
 ```bash
-.venv/bin/python -m unittest tests.eval.test_preparation tests.eval.test_harbor_lifecycle -v
+.venv/bin/python -m unittest tests.eval.test_preparation tests.eval.test_verifier_environments tests.eval.test_harbor_lifecycle -v
 ```
 
 These tests are offline. The real `/proc` process test runs only on Linux;

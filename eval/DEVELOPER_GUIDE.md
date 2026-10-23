@@ -4,6 +4,9 @@
 
 Run one selected configuration, inspect reports, or add a benchmark adapter. Real execution uses networks, containers, and model services and may incur charges.
 
+For the ordered Linux server procedure and executable YAML/JSON generators,
+start with the bilingual [Server Evaluation Guide](SERVER_GUIDE.md).
+
 ## Prepare the environment
 
 | Requirement | Contract |
@@ -25,7 +28,8 @@ Catalog preflight locates Harbor/Docker, checks Engine/Compose within five secon
 and locates `nvidia-smi` for GPU variants. Detailed [Harbor preparation](harbor/README.md)
 freezes tasks, probes the mounted Linux runtime and records image identities.
 Host and Docker network/proxy settings are separate paths. Terminal-Bench 2.1
-uses `terminal-bench/terminal-bench-2-1`; other Harbor datasets use the same flow.
+uses `terminal-bench/terminal-bench-2-1`; the separate `terminal-bench-4` ID pins
+`terminal-bench/terminal-bench@4.0.0`. Other Harbor datasets use the same flow.
 Pre-downloaded images must match the resolved task definitions. Prepare a
 dedicated complete Linux Python/Agent environment once, then declare its
 read-only mounts in `.fruitfly/eval-host.yaml`. Agent defaults and key files stay separate.
@@ -85,6 +89,9 @@ The next command executes the model/container path and can incur charges:
 `check` exits 0 for matching preparation, 3 when unavailable and 2 for input errors.
 Verifier completeness/model connectivity remain explicitly unverified without
 a real smoke trial. `prepare` creates no evaluation score or report.
+Preparation schema 2 covers Agent and independent verifier environments. A
+missing or incompatible preparation requires `prepare` again. Machine files
+remain schema 1. See [environment preparation](harbor/README.md#prepare-check-and-run).
 
 For an experimental configuration, explicitly supply `runtime.config_path` and
 optionally `runtime.profile`. Relative paths resolve from `working_directory`.
@@ -170,7 +177,7 @@ Harbor's private content-addressed cache to repair a verifier setup script.
 | Step | Action |
 |---|---|
 | 1 | Declare dataset/version, an exact smoke task and optional exact subsets. |
-| 2 | Subclass `HarborBenchmarkAdapter` and call `harbor_descriptor`. Preparation, runtime mounts, credentials, commands, lifecycle, logs, trajectories and parsing are shared by [the Harbor package](harbor/README.md). Other backends implement `BenchmarkAdapter`. |
+| 2 | Subclass `HarborBenchmarkAdapter` and call `harbor_descriptor`. Preparation, runtime mounts, shared/separate verifiers, credentials, commands, lifecycle, logs, trajectories and parsing are shared by [the Harbor package](harbor/README.md). Other backends implement `BenchmarkAdapter`. |
 | 3 | Export/register its unique ID in [catalog.py](catalog.py). |
 | 4 | Declare machine/cache requirements through the host file, and explicit verifier dependency recipes or exact setup patches where needed. Test preparation, frozen task coverage, failures, rewards and reports offline. |
 | 5 | Inspect catalog output; authorize real smoke separately. |

@@ -30,7 +30,9 @@ async def registry_tasks(dataset: str, cache: Path, names: tuple[str, ...] = ())
         from harbor.tasks.client import TaskClient  # type: ignore[import-not-found, unused-ignore]
     except ImportError as exc:
         raise ValueError("task resolution requires the pinned Harbor benchmark extra") from exc
-    configs = await DatasetConfig(name=dataset, task_names=list(names) or None).get_task_configs()
+    name, separator, version = dataset.partition("@")
+    configs = await DatasetConfig(name=name, version=version if separator else None,
+                                  task_names=list(names) or None).get_task_configs()
     batch = await TaskClient().download_tasks([c.get_task_id() for c in configs], output_dir=cache)
     return [(config.get_task_id().get_name(), downloaded.path)
             for config, downloaded in zip(configs, batch.results, strict=True)]
@@ -99,10 +101,6 @@ def prepare_tasks(host: HostConfig, descriptor: BenchmarkDescriptor, variant: st
         if tree_identity(target) != prepared["sha256"]:
             raise ValueError(f"prepared task contents changed: {identity}")
         config = tomllib.loads((target / "task.toml").read_text(encoding="utf-8"))
-        verifiers = [config.get("verifier", {}), *(step.get("verifier", {}) for step in config.get("steps", []))]
-        if any(v.get("environment_mode") == "separate" or v.get("environment") is not None for v in verifiers):
-            raise ValueError("prepared dependency mounts currently require a shared verifier environment; "
-                             f"separate verifier environments need a Harbor integration extension: {identity}")
         result.append({"id": identity, "name": task_name(target), "path": str(target),
                        "sha256": prepared["sha256"], "image": config.get("environment", {}).get("docker_image"),
                        "original_sha256": task_hash, "patches": prepared["patches"],

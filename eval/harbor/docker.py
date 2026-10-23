@@ -6,6 +6,14 @@ import subprocess
 import uuid
 
 
+def image_identity(docker: str, image: str) -> str:
+    result = subprocess.run([docker, "image", "inspect", image, "--format", "{{.Id}}"],
+                            capture_output=True, text=True, timeout=15)
+    if result.returncode or not result.stdout.strip():
+        raise ValueError(f"image is not cached: {image}; check never pulls images")
+    return result.stdout.strip()
+
+
 def run_container(docker: str, arguments: list[str], *, timeout: int,
                   log: Path | None = None) -> subprocess.CompletedProcess[str]:
     name = "fruitfly-prepare-" + uuid.uuid4().hex

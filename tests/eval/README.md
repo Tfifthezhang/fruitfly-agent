@@ -9,6 +9,7 @@ Verify single-configuration requests, Harbor mapping, artifacts, and reports off
 | `test_catalog.py / test_execution.py` | Availability, execution, failure handling, and reports |
 | `test_harbor.py` | Commands, reported project version, setup, complete logs/events, registry retry boundaries, and parsing |
 | `test_preparation.py` | Machine settings, link/content/image drift, frozen tasks, assets, exact setup patches and cache boundaries |
+| `test_verifier_environments.py` | Public environment extension, role isolation, inherited/step verifier definitions, versioned datasets and exact verifier ownership |
 | `test_harbor_lifecycle.py` | Scoped stop, timeout/process/container cleanup, startup cancellation, PID reuse and multiple phase failures |
 | `test_task_batches.py` | Exact subset filters, task caps, official task/attempt coverage, and catalog declarations |
 | `test_cli.py` | Evaluation-only CLI and saved reports |

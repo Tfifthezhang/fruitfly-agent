@@ -18,7 +18,7 @@ from eval.harbor.dependencies import check_dependencies, dependency_mounts, prep
 from eval.harbor.docker import run_container
 from eval.harbor.environments import environment_key, probe_environment
 from eval.harbor.host import HostConfig
-from eval.harbor.material import check_material, prepare_material, tree_identity
+from eval.harbor.material import check_material, digest, prepare_material, tree_identity
 from eval.harbor.preparation import inspect, load_preparation, prepare
 from eval.harbor.tasks import prepare_tasks, validate_coverage
 from tests.support.evaluation import request_payload
@@ -199,7 +199,7 @@ class PreparationTests(unittest.TestCase):
         self.assertEqual(calls[1], ["docker", "rm", "-f", "-v", calls[0][3]])
 
     def test_preparation_and_check_are_benchmark_independent_and_detect_drift(self):
-        def probe(task, runtime, docker, directory):
+        def probe(task, runtime, docker, directory, *, host):
             return {"environment_key": environment_key(task), "images": [{"reference": "fixture:v1", "id": "sha256:first"}], "detail": "fake imports passed"}
         with patch("eval.harbor.preparation.probe_environment", side_effect=probe) as probes:
             prepared = prepare(self.request, self.descriptor, self.host)
@@ -220,10 +220,39 @@ class PreparationTests(unittest.TestCase):
         self.assertFalse(result["available"])
         self.assertIn("run eval prepare", result["checks"][0]["detail"])
 
-    def test_separate_verifier_environment_is_rejected_without_silent_cache_loss(self):
+    def test_check_detects_verifier_image_drift_and_rejects_incomplete_or_older_preparation(self):
+        def probe(task, runtime, docker, directory, *, host):
+            return {"environment_key": environment_key(task), "images": [
+                {"reference": "agent:v1", "id": "sha256:agent"},
+                {"reference": "verifier:v1", "id": "sha256:verifier"}]}
+        with patch("eval.harbor.preparation.probe_environment", side_effect=probe):
+            result = prepare(self.request, self.descriptor, self.host)
+        path = Path(result["receipt"])
+        receipt = load_preparation(self.host, self.descriptor, "no_gpu")
+        with patch("eval.harbor.preparation.image_identity", side_effect=lambda docker, image:
+                   "sha256:agent" if image == "agent:v1" else "sha256:changed"), patch(
+            "eval.harbor.preparation.probe_environment", side_effect=AssertionError("check must not start environments")
+        ):
+            checked = inspect(self.request, self.descriptor, self.host)
+        self.assertFalse(checked["available"])
+        self.assertEqual([c["image"] for c in checked["checks"] if c["status"] == "failed"], ["verifier:v1"])
+        receipt["schema_version"] = 1
+        path.write_text(json.dumps(receipt))
+        with self.assertRaisesRegex(ValueError, "run eval prepare again"):
+            load_preparation(self.host, self.descriptor, "no_gpu")
+        receipt["schema_version"] = 2
+        receipt["environments"] = []
+        receipt["id"] = digest({key: value for key, value in receipt.items() if key != "id"})
+        path.write_text(json.dumps(receipt))
+        with self.assertRaisesRegex(ValueError, "probes do not cover"):
+            load_preparation(self.host, self.descriptor, "no_gpu")
+
+    def test_separate_verifier_task_is_frozen_without_changing_official_mode(self):
         (self.tasks / "task-a/task.toml").write_text('[verifier]\nenvironment_mode = "separate"\n[environment]\ndocker_image = "fixture:v1"\n')
-        with self.assertRaisesRegex(ValueError, "separate verifier environments"):
-            prepare_tasks(self.host, self.descriptor, "smoke")
+        tasks = prepare_tasks(self.host, self.descriptor, "smoke")
+        self.assertEqual(tasks[0]["configuration"]["verifier"]["environment_mode"], "separate")
+        self.assertEqual((Path(tasks[0]["path"]) / "task.toml").read_bytes(),
+                         (self.tasks / "task-a/task.toml").read_bytes())
 
     def test_dockerfile_and_compose_probes_use_public_harbor_factory_and_cleanup(self):
         directory = self.root / "check"
@@ -237,12 +266,13 @@ class PreparationTests(unittest.TestCase):
                 self.directory.mkdir(parents=True, exist_ok=True)
             def chmod_dir(self):
                 pass
-        model = SimpleNamespace(paths=SimpleNamespace(environment_dir=self.tasks / "task-a/environment"),
-                                short_name="task-a", config=SimpleNamespace(environment=SimpleNamespace(build_timeout_sec=1)))
+        definition = {"role": "agent", "step": None, "context": str(self.tasks / "task-a/environment"),
+                      "configuration": {}, "user": None, "name": "task-a"}
         modules = {}
         for name, attributes in {
             "harbor.environments.factory": {"EnvironmentFactory": factory},
-            "harbor.models.task.task": {"Task": Mock(return_value=model)},
+            "harbor.models.task.config": {"EnvironmentConfig": SimpleNamespace(model_validate=lambda value:
+                SimpleNamespace(build_timeout_sec=1, resolve_baseline=lambda: "official-network-policy"))},
             "harbor.models.trial.config": {"EnvironmentConfig": SimpleNamespace(model_validate=lambda value: SimpleNamespace(**value))},
             "harbor.models.trial.paths": {"TrialPaths": Paths},
         }.items():
@@ -253,10 +283,11 @@ class PreparationTests(unittest.TestCase):
         task = {"id": "example/task-a", "path": str(self.tasks / "task-a"), "image": None, "configuration": {}}
         def docker(command, **kwargs):
             return subprocess.CompletedProcess(command, 0, "owned-container\n" if command[1] == "ps" else "fixture:v1 sha256:fixture\n", "")
-        with patch.dict(sys.modules, modules), patch("eval.harbor.environments.subprocess.run", side_effect=docker), patch(
+        with patch.dict(sys.modules, modules), patch("eval.harbor.environments.environment_definitions", return_value=[definition]), patch(
+            "eval.harbor.environments.subprocess.run", side_effect=docker), patch(
             "eval.harbor.environments.retire_projects"
         ) as retire:
-            probed = probe_environment(task, receipt["runtime"], "docker", directory)
+            probed = probe_environment(task, receipt["runtime"], "docker", directory, host=self.host)
             self.assertEqual(probed["images"], [{"reference": "fixture:v1", "id": "sha256:fixture"}])
             environment.start.assert_awaited_once_with(force_build=False)
             environment.stop.assert_awaited_once_with(delete=False)
@@ -265,5 +296,5 @@ class PreparationTests(unittest.TestCase):
             environment.stop.reset_mock()
             environment.exec.side_effect = RuntimeError("probe error")
             with self.assertRaisesRegex(RuntimeError, "probe error"):
-                probe_environment(task, receipt["runtime"], "docker", directory)
+                probe_environment(task, receipt["runtime"], "docker", directory, host=self.host)
             environment.stop.assert_awaited_once_with(delete=False)

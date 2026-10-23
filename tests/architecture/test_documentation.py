@@ -114,9 +114,25 @@ class DocumentationTest(unittest.TestCase):
                 self.assertIn(path, {target for target, _ in local_links(parent)})
 
     def test_documentation_is_english(self):
+        bilingual = ROOT / 'eval/SERVER_GUIDE.md'
         non_english = [str(path.relative_to(ROOT)) for path in documents()
-                       if re.search(r'[\u3400-\u4dbf\u4e00-\u9fff]', path.read_text(encoding='utf-8'))]
+                       if path != bilingual and re.search(r'[\u3400-\u4dbf\u4e00-\u9fff]', path.read_text(encoding='utf-8'))]
         self.assertEqual([], non_english)
+
+    def test_server_evaluation_guide_has_bilingual_sections(self):
+        path = ROOT / 'eval/SERVER_GUIDE.md'
+        headings = []
+        fenced = False
+        for line in path.read_text(encoding='utf-8').splitlines():
+            if line.startswith('```'):
+                fenced = not fenced
+            elif not fenced and line.startswith(('# ', '## ')):
+                headings.append(line)
+        self.assertTrue(headings)
+        for heading in headings:
+            with self.subTest(heading=heading):
+                self.assertRegex(heading, r'[A-Za-z]')
+                self.assertRegex(heading, r'[\u3400-\u4dbf\u4e00-\u9fff]')
 
     def test_lower_level_files_use_project_identity(self):
         upstream = re.compile(r'\bp' r'i\b', re.I)

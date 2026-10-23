@@ -13,8 +13,7 @@ import httpx
 
 from .host import HostConfig
 from .material import digest, write_json
-from .docker import run_container
-from .environments import image_identity
+from .docker import image_identity, run_container
 
 
 DEPENDENCY_TARGET = "/opt/fruitfly-eval-dependencies"

@@ -18,7 +18,9 @@ FruitFlyAgent separates the Agent loop, model adapters, Application lifecycle, a
 Eval prepares and mounts a Linux Agent runtime, launches the native CLI inside
 Harbor task environments, then collects official verifier results. Shared
 preparation and lifecycle stay in Eval; benchmark declarations do not configure
-runtime interfaces. Removing Eval leaves normal Agent use and generic improvement intact.
+runtime interfaces. Shared and independent verifiers reuse the same Harbor
+integration; only Agent environments receive the Agent runtime and credentials.
+Removing Eval leaves normal Agent use and generic improvement intact.
 
 The [Improvement workflow](lab/improvement/README.md) separates candidate generation, execution, composition, selection, verification and reflection through public ports. Object-owned component adapters expose legal changes; Run and Application retain persistence and activation.
 

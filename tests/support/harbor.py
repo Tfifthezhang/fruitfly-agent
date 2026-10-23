@@ -66,3 +66,25 @@ def load_harbor_agent():
     with patch.dict(sys.modules, modules):
         spec.loader.exec_module(module)
     return module.FruitFlyHarborAgent
+
+
+def load_harbor_environment():
+    """Exercise the extension constructor without importing optional SDK code."""
+    class DockerEnvironmentDouble:
+        def __init__(self, *args, **kwargs):
+            self.constructor = kwargs
+
+    modules = {}
+    for name, attributes in {
+        "harbor.environments.docker.docker": {"DockerEnvironment": DockerEnvironmentDouble},
+        "harbor.models.trial.config": {"ServiceVolumeConfig": dict},
+    }.items():
+        module = ModuleType(name)
+        module.__dict__.update(attributes)
+        modules[name] = module
+    path = Path(__file__).resolve().parents[2] / "eval/harbor/docker_environment.py"
+    spec = importlib.util.spec_from_file_location("eval.harbor._environment_test", path)
+    module = importlib.util.module_from_spec(spec)
+    with patch.dict(sys.modules, modules):
+        spec.loader.exec_module(module)
+    return module.PreparedDockerEnvironment

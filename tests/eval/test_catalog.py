@@ -15,6 +15,12 @@ class BenchmarkCatalogTests(unittest.TestCase):
         self.assertEqual(descriptor.dataset, "terminal-bench/terminal-bench-2-1")
         self.assertEqual(descriptor.variants[0].task_names, ("terminal-bench/fix-git",))
 
+    def test_terminal_bench_4_is_a_separate_version_pinned_declaration(self):
+        descriptor = builtin_catalog().get("terminal-bench-4").descriptor
+        self.assertEqual(descriptor.version, "4.0.0")
+        self.assertEqual(descriptor.dataset, "terminal-bench/terminal-bench@4.0.0")
+        self.assertEqual(descriptor.variants[0].task_names, ("terminal-bench/interleaved-vigenere",))
+
     def test_another_harbor_benchmark_reuses_execution_without_named_branches(self):
         from dataclasses import replace
         from pathlib import Path
@@ -46,7 +52,7 @@ class BenchmarkCatalogTests(unittest.TestCase):
         self.assertNotIn("modes", payload)
         self.assertEqual(
             [item["id"] for item in payload["benchmarks"]],
-            ["swe-bench", "terminal-bench"],
+            ["swe-bench", "terminal-bench", "terminal-bench-4"],
         )
         swe_bench = payload["benchmarks"][0]
         self.assertEqual(swe_bench["version"], "Verified")
