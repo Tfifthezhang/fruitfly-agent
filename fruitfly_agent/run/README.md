@@ -17,8 +17,8 @@ Real tasks call the configured model service and may incur charges. See [Getting
 
 The home menu retains Start new session, Configure and Exit. Configure ends with
 **Restore default configuration**, which stages default harness settings while
-preserving the daily model and credentials. Save applies the draft to a new
-session. Default files are edited manually; Eval uses their complete profile.
+preserving the daily model and credentials. Save persists the draft; Application
+can apply it to the current conversation while idle. Default files are edited manually; Eval uses their complete profile.
 See [restoration](../../CONFIGURATION.md#restore-default-configuration).
 
 | Resume entry | Behavior |
@@ -151,7 +151,7 @@ host = RunEvolutionHost(
 
 The verifier returns `VerificationEvidence` bound to candidate/artifact/parent/policy identities, not merely a search score. For built-in completed proofs, omit `verify` and select `task-holdout-v1` or `improver-paired-v1` as appropriate. The host rechecks exact content, parent, material and execution identity without repeating paid verification. See [proof reuse](improvement/README.md#reuse-a-completed-independent-proof). Jobs live in `.fruitfly/evolution/`. Only confirmed activation advances the version. Unknown paid phases stop; activation interruptions reconcile the actual manifest. One coordinator owns the job; no cross-process commit transaction. See [RSI](../lab/rsi/README.md).
 
-Run exposes an optional `configuration.model_setup` service to the terminal. Model additions and hidden credentials stay in memory until configuration save; reset discards them. The factory's secret environment is updated after successful save, so the next session can use the model without restarting. Existing configuration-controller consumers can omit this service. Use [Configuration](../../CONFIGURATION.md) and [Providers](../providers/README.md) for supported APIs, generated key-variable names, and persistence limits.
+Run exposes an optional `configuration.model_setup` service to the terminal. Model additions and hidden credentials stay in memory until configuration save; reset discards them. The factory's secret environment is updated after successful save, so explicit configuration application or a later start can use the model without restarting. Existing configuration-controller consumers can omit this service. Use [Configuration](../../CONFIGURATION.md) and [Providers](../providers/README.md) for supported APIs, generated key-variable names, and persistence limits.
 
 ```bash
 .venv/bin/python -m unittest discover -s tests/run -t . -v

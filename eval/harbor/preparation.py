@@ -10,11 +10,13 @@ from eval.benchmarks.base import BenchmarkDescriptor
 from eval.contracts import EvaluationRequest
 from eval.installation import resolve_installation
 from .dependencies import check_dependencies, prepare_dependencies
+from .controller import environment_snapshot
 from .host import HostConfig
 from .material import check_material, digest, prepare_material, write_json
 from .tasks import check_tasks, preparation_key, prepare_tasks
 from .environments import environment_config, environment_key, probe_environment
 from .docker import image_identity
+from .selection import inspect_images
 
 
 def receipt_path(host: HostConfig, descriptor: BenchmarkDescriptor, variant: str) -> Path:
@@ -26,13 +28,18 @@ def load_preparation(host: HostConfig, descriptor: BenchmarkDescriptor, variant:
     if not path.is_file():
         raise ValueError(f"this Harbor selection is not prepared; run eval prepare --request <request>; expected {path}")
     receipt = json.loads(path.read_text(encoding="utf-8"))
-    if (receipt.get("schema_version") != 2 or receipt.get("dataset") != descriptor.dataset
+    if (receipt.get("schema_version") != 3 or receipt.get("dataset") != descriptor.dataset
             or receipt.get("variant") != variant):
         raise ValueError("preparation format or dataset/variant differs; run eval prepare again")
     if receipt.get("id") != digest({key: value for key, value in receipt.items() if key != "id"}):
         raise ValueError("preparation record changed; run eval prepare again")
     if not receipt.get("tasks"):
         raise ValueError("prepared task selection is empty")
+    selection = receipt.get("selection", {})
+    if (selection.get("variant") != variant or selection.get("dataset") != descriptor.dataset
+            or selection.get("selected") != [task["id"] for task in receipt["tasks"]]
+            or (variant == "no_gpu" and any(t["requirements"]["gpu_requirements"] for t in receipt["tasks"]))):
+        raise ValueError("prepared selection differs; run eval prepare again")
     check_material(host, receipt["runtime"])
     check_dependencies(host, receipt["dependencies"])
     check_tasks(receipt["tasks"])
@@ -44,15 +51,28 @@ def load_preparation(host: HostConfig, descriptor: BenchmarkDescriptor, variant:
 
 def prepare(request: EvaluationRequest, descriptor: BenchmarkDescriptor, host: HostConfig,
             *, package: Path | None = None, docker: str = "docker",
-            progress: Callable[[dict[str, Any]], None] | None = None) -> dict[str, Any]:
+            progress: Callable[[dict[str, Any]], None] | None = None,
+            tasks_only: bool = False) -> dict[str, Any]:
     def emit(stage: str) -> None:
         if progress:
             progress({"type": "preparation", "stage": stage})
+    if not tasks_only:
+        package = resolve_installation(str(package) if package else None, checkout=Path(__file__).resolve().parents[2])
+    emit("tasks")
+    batch = prepare_tasks(host, descriptor, request.benchmark.variant)
+    tasks = batch["tasks"]
+    inventory = {"selection": batch["selection"], "task_count": len(tasks),
+                 "images": inspect_images(tasks, docker),
+                 "environments": [{"task_id": t["id"], **t["requirements"]} for t in tasks],
+                 "detail": "Task inventory only; runtime, builds, auxiliary Harbor images, verifier and model remain unverified"}
+    selection_path = host.cache / "selections" / (preparation_key(descriptor, request.benchmark.variant) + ".json")
+    write_json(selection_path, inventory)
+    if tasks_only:
+        return {"inventory": str(selection_path), **inventory}
     package = package or resolve_installation(None, checkout=Path(__file__).resolve().parents[2])
     emit("runtime")
     runtime = prepare_material(host, package)
-    emit("tasks")
-    tasks = prepare_tasks(host, descriptor, request.benchmark.variant)
+    controller = environment_snapshot()
     emit("dependencies")
     dependencies = prepare_dependencies(host, docker)
     emit("environment_probes")
@@ -61,14 +81,16 @@ def prepare(request: EvaluationRequest, descriptor: BenchmarkDescriptor, host: H
         key = environment_key(task)
         if key not in probes:
             probes[key] = probe_environment(task, runtime, docker, host.cache / "checks" / key, host=host)
-    receipt = {"schema_version": 2, "dataset": descriptor.dataset, "variant": request.benchmark.variant,
+    receipt = {"schema_version": 3, "dataset": descriptor.dataset, "variant": request.benchmark.variant,
+               "selection": batch["selection"],
+               "controller": controller,
                "runtime": runtime, "dependencies": dependencies, "tasks": tasks,
                "environments": list(probes.values())}
     receipt["id"] = digest(receipt)
     path = receipt_path(host, descriptor, request.benchmark.variant)
     write_json(path, receipt)
     return {"receipt": str(path), "task_count": len(tasks), "runtime_id": runtime["id"],
-            "dependencies": dependencies}
+            "dependencies": dependencies, "selection": batch["selection"], "inventory": str(selection_path)}
 
 
 def inspect(request: EvaluationRequest, descriptor: BenchmarkDescriptor, host: HostConfig,
@@ -79,6 +101,12 @@ def inspect(request: EvaluationRequest, descriptor: BenchmarkDescriptor, host: H
     except (OSError, ValueError, KeyError) as exc:
         return {"available": False, "checks": [{"id": "prepared_material", "status": "failed", "detail": str(exc)}]}
     checks.append({"id": "prepared_material", "status": "passed", "detail": "recorded source, links and dependencies match"})
+    controller = environment_snapshot()
+    checks.append({"id": "controller_environment", "status": "passed" if controller == receipt["controller"] else "failed",
+                   "detail": "controller matches preparation" if controller == receipt["controller"]
+                   else "controller Python or installed packages changed; run eval prepare again"})
+    checks.append({"id": "controller_dependencies", "status": "passed" if controller["dependency_check"] == "passed" else "unverified",
+                   "detail": controller["dependency_check"], "issues": controller["dependency_issues"]})
     for probe in receipt["environments"]:
         for image in probe["images"]:
             try:

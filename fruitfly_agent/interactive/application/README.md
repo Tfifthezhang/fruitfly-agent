@@ -14,6 +14,8 @@ Construct AgentApplication with a [RuntimeFactory](../contracts/runtime.py). App
 
 The Application submission lock and state checks authorize work. ImprovementJob uses injected execution/completion callbacks and cannot activate a runtime. Optional host submission receipts persist intent before scheduling and finish a run cancelled before execution. Application exposes optional history/log queries independently of candidate publication. Its method query returns `None` when an embedding has no method catalog, and an empty tuple when the catalog has no compatible method; only the former permits the configured-host fallback. Correction operations delegate to [Session materials](../session/README.md) after Application permission checks. Failed preparation/startup retains the incumbent; failed retirement is recorded after a successful switch. Shutdown waits are bounded and retain resources still in use.
 
+`apply_configuration()` accepts idle applications with no queued work. It opens the current path with `resume=True`, validates history through the injected Factory, starts the replacement, then retires the old handle. It retains conversation identity without copying or replaying messages. `rebuild()` retains its fresh-session default. Frontends call the injected operation rather than inspecting runtime or Session internals. See [configuration behavior](../../../CONFIGURATION.md#apply-settings-to-the-current-conversation).
+
 Configuration and external effects are owned by injected services and do not automatically roll back. No source reload, model training, or new environment variables. Lifecycle limits and authorization behavior are described by the parent guide.
 
 ```bash

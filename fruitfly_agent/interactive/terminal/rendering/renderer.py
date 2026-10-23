@@ -26,13 +26,13 @@ from fruitfly_agent.interactive.contracts.models import ConversationMessage, Int
 from fruitfly_agent.interactive.contracts.commands import CommandResult
 from fruitfly_agent.interactive.terminal.rendering.history import render_history_message
 from fruitfly_agent.interactive.terminal.rendering.branding import FRUIT_FLY_ICON
-from fruitfly_agent.interactive.terminal.rendering.markdown import MarkdownStreamPresenter, MarkdownUpdate
+from fruitfly_agent.interactive.terminal.rendering.markdown import MarkdownStreamPresenter, MarkdownUpdate, TerminalMarkdownRenderer
 from fruitfly_agent.interactive.terminal.io.text import (
     safe_terminal_text,
     colors_enabled,
     input_styles,
     supports_ansi,
-    terminal_columns,
+    content_columns,
     truncate_cells,
 )
 from fruitfly_agent.interactive.terminal.rendering.welcome import render_welcome
@@ -73,7 +73,7 @@ class TerminalRenderer:
         self._color = colors_enabled(self.output)
         self._markdown = (
             MarkdownStreamPresenter(
-                columns=terminal_columns(self.output),
+                columns=content_columns(self.output),
                 color=self._color,
             )
             if self._terminal_ui
@@ -86,6 +86,12 @@ class TerminalRenderer:
             else None
         )
         self._assistant_markdown_started = False
+        formatted = getattr(self.output, 'formatted_output', None)
+        self._formatted: Callable[..., None] | None = (
+            formatted if self._terminal_ui and callable(formatted) else None
+        )
+        self._source = ''
+        self._source_updated_at = 0.0
         self._assistant_prefix_committed = False
         self._tool_update_chars = 0
         self._tool_update_truncated = False
@@ -101,10 +107,15 @@ class TerminalRenderer:
     def show_welcome(self, status: InteractiveStatus) -> None:
         self._flush_markdown()
         self.finish_line()
+        if self._formatted is not None:
+            self._formatted('', lambda source, columns: render_welcome(
+                status, columns=columns, terminal_ui=True, color=self._color,
+            ), complete=True)
+            return
         self.output.write(
             render_welcome(
                 status,
-                columns=terminal_columns(self.output),
+                columns=content_columns(self.output),
                 terminal_ui=self._terminal_ui,
                 color=self._color,
             )
@@ -119,8 +130,14 @@ class TerminalRenderer:
 
     def write_command_result(self, result: CommandResult) -> None:
         if result.panel is not None:
+            if self._formatted is not None:
+                self.finish_line()
+                self._formatted('', lambda source, columns: render_command_panel(
+                    result.panel, columns=columns, color=self._color,
+                ), complete=True)
+                return
             self.write_system(render_command_panel(
-                result.panel, columns=terminal_columns(self.output), color=self._color,
+                result.panel, columns=content_columns(self.output), color=self._color,
             ))
         elif result.text:
             self.write_system(result.text)
@@ -134,10 +151,15 @@ class TerminalRenderer:
         self.finish_line()
         self.write_system("\n[Restored conversation]\n\n")
         for message in messages:
-            self.output.write(render_history_message(
-                message, columns=terminal_columns(self.output),
-                terminal_ui=self._terminal_ui, color=self._color,
-            ))
+            if self._formatted is not None:
+                def format_history(source: str, columns: int, item: ConversationMessage = message) -> str:
+                    return render_history_message(item, columns=columns, terminal_ui=True, color=self._color)
+                self._formatted('', format_history, complete=True)
+            else:
+                self.output.write(render_history_message(
+                    message, columns=content_columns(self.output),
+                    terminal_ui=self._terminal_ui, color=self._color,
+                ))
             self.output.flush()
             await asyncio.sleep(0)
         self.write_system("[End of restored conversation]\n\n")
@@ -199,9 +221,16 @@ class TerminalRenderer:
                     if not text:
                         return
                     self._assistant_markdown_started = True
+                if self._formatted is not None:
+                    self._source += text
+                    now = time.monotonic()
+                    if now - self._source_updated_at >= 0.05:
+                        self._formatted(self._source, self._format_answer)
+                        self._source_updated_at = now
+                    return
                 update = self._markdown.feed(
                     text,
-                    columns=terminal_columns(self.output),
+                    columns=content_columns(self.output),
                 )
                 self._present_markdown(update)
                 return
@@ -219,7 +248,7 @@ class TerminalRenderer:
             self._flush_markdown()
             self._newline()
             args = summarize_arguments(event.arguments)
-            description = _tool_description(event.description, event.tool_name, terminal_columns(self.output))
+            description = _tool_description(event.description, event.tool_name, content_columns(self.output))
             self._write(
                 f"◐ {description}\n",
                 _category_color(event.category),
@@ -259,7 +288,7 @@ class TerminalRenderer:
                 'cancelled': ('○', 'Cancelled', _YELLOW),
             }.get(event.status, ('·', 'Finished', _category_color(event.category)))
             description = _tool_description(event.description, event.tool_name,
-                terminal_columns(self.output) - len(status) - len(suffix) - 3)
+                content_columns(self.output) - len(status) - len(suffix) - 3)
             self._write(
                 f"{marker} {description} · {status}{suffix}\n", color,
             )
@@ -321,13 +350,24 @@ class TerminalRenderer:
     def _flush_markdown(self) -> None:
         if self._markdown is None or not self._assistant_markdown_started:
             return
-        update = self._markdown.flush(columns=terminal_columns(self.output))
+        if self._formatted is not None:
+            self._formatted(self._source, self._format_answer, complete=True)
+            self._source = ''
+            self._assistant_markdown_started = False
+            self._source_updated_at = 0.0
+            return
+        update = self._markdown.flush(columns=content_columns(self.output))
         self._present_markdown(update)
         if self._assistant_updater is not None and not update.committed:
             self._assistant_updater("", "")
         self._markdown.reset()
         self._assistant_markdown_started = False
         self._assistant_prefix_committed = False
+
+    def _format_answer(self, source: str, columns: int) -> str:
+        return self._assistant_prefix() + '\n' + TerminalMarkdownRenderer(
+            columns=columns, color=self._color,
+        ).render(source)
 
     def _assistant_prefix(self) -> str:
         text = f"{FRUIT_FLY_ICON} "

@@ -110,4 +110,4 @@ class RunMechanismSetup:
             self.stage_profile(original)
             raise
         self.credentials.values.update(additions)
-        return ConfigurationActionResult('Settings and hidden credentials staged; save to use in a new session', changed=True)
+        return ConfigurationActionResult('Settings and hidden credentials staged; save before applying settings', changed=True)

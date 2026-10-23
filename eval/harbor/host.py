@@ -128,6 +128,8 @@ class HostConfig:
         libraries = tuple(container_path(p, "library path") for p in sequence(agent.get("library_paths", []), "library_paths"))
         if any(not PurePosixPath(p).is_absolute() for p in libraries):
             raise ValueError("library paths must be absolute container paths")
+        if any(not any(PurePosixPath(p).is_relative_to(m.target) for m in mounts) for p in libraries):
+            raise ValueError("agent.library_paths must be covered by runtime mounts")
         phases = fields(data.get("environment", {}), {"setup", "agent", "verifier"}, "phase environment")
         deps = fields(data.get("dependencies", {}), {"assets", "prepare", "uv", "offline"}, "dependencies")
         if type(deps.get("offline", False)) is not bool:

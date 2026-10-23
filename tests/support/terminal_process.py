@@ -32,10 +32,13 @@ class TerminalProcess:
     def signal(self):
         os.kill(self.pid, signal.SIGINT)
 
-    def read_until(self, marker, *, timeout=5):
+    def resize(self, rows, columns):
+        fcntl.ioctl(self.fd, termios.TIOCSWINSZ, struct.pack('HHHH', rows, columns, 0, 0))
+
+    def read_until(self, marker, *, timeout=5, start=0):
         marker = marker.encode() if isinstance(marker, str) else marker
         deadline = time.monotonic() + timeout
-        while marker not in self.output:
+        while marker not in self.output[start:]:
             if time.monotonic() >= deadline:
                 raise AssertionError(f'terminal did not report {marker!r}: {self.output[-2000:]!r}')
             self._read()

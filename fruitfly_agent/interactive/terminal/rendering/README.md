@@ -44,3 +44,19 @@ starts do not reset that allowance. Final output has a bounded summary; failed a
 cancelled results retain a bounded reason preview. Truncated live output has an
 explicit omission marker. Display limits do not change stored tool messages or
 model context; tool-side truncation still applies.
+
+Completed assistant Markdown retains its source in the built-in ANSI viewport.
+Rendering supplies a width-dependent formatting callback through the display
+sink’s optional `formatted_output` capability; I/O owns caching, scrolling and repainting, without importing Markdown.
+History, welcome and structured command panels use the same display contract.
+Resizing never replays runtime events. Display records are process-local and grow
+with visible output; they are not model context or a substitute for Session storage.
+
+Tables wrap every cell into multiple lines and retain long paths/descriptions.
+Very narrow windows use wrapped labeled records. The available width reserves the
+terminal's final cell, preventing the right border from wrapping separately.
+Paragraph soft breaks reflow as spaces; explicit Markdown hard breaks remain.
+Code blocks retain literal lines and receive visual wrapping from I/O. Cell widths
+use the shared Unicode approximation; complex emoji sequences may vary by terminal.
+Standalone append-only embeddings keep their existing streaming presenter, and
+redirected streams keep source Markdown.

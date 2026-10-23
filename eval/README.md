@@ -7,8 +7,14 @@ environments, task deadlines and official verifiers. Eval mounts a prepared Agen
 runtime, passes one saved configuration and collects outcomes, trajectories and reports.
 Interactive improvement remains independent of Eval.
 
+`prepare --tasks-only` resolves and freezes task definitions, reports exclusions,
+build contexts and exact local image references, and starts no containers. Full
+preparation records controller versions and declared dependency conflicts. Changed
+controller packages invalidate readiness; reviewed metadata conflicts remain
+explicitly unverified rather than being hidden by a successful smoke.
+
 For ordered server setup, private-file transfer, YAML/JSON generation and the
-smoke-to-full workflow, use the bilingual [Server Evaluation Guide](SERVER_GUIDE.md).
+smoke-to-full workflow, use the [Server Evaluation Guide](SERVER_GUIDE.md).
 
 ## Install and inspect
 
@@ -25,14 +31,16 @@ docker compose version
 |---|---|
 | Datasets | Terminal-Bench 2.1, Terminal-Bench 4.0.0, SWE-bench Verified; see [task selections](benchmarks/TASKS.md) |
 | Backend | Docker through Harbor `0.23.0` |
-| Selection | Single-task `smoke`, Terminal-Bench five-task `starter`, full `no_gpu` or `gpu` |
-| Formats | Evaluation request, runner result, trial, report and preparation schema 2; catalog and host schema 1 |
+| Selection | `smoke`, tasks without GPU requirements (`no_gpu`), or all tasks (`full`) |
+| Formats | Request/result/trial/report schema 2; preparation schema 3; catalog/host schema 1 |
 | Output | `.fruitfly/eval/<evaluation-id>/` |
 
 Preflight checks Harbor/Docker availability and Engine/Compose access. It does
 not prove dataset access, cached image tags, architecture compatibility, disk
-space or model connectivity. A `gpu` selection adds an NVIDIA executable check;
-`no_gpu` does not filter GPU tasks from a dataset. Task resources remain official.
+space or model connectivity. All datasets share the same three selections.
+`no_gpu` excludes declared GPU requirements across effective roles, steps and
+Compose services before image preparation; `full` retains all resolved tasks.
+Task resources remain official. Review exclusions and scope in the preparation receipt.
 
 Shared and separate verifier environments use the same Harbor adapter. Independent
 verifiers receive prepared dependency assets/caches, without Agent runtime mounts
@@ -53,6 +61,7 @@ the [machine runtime and dependencies](harbor/README.md), then run:
 
 ```bash
 # Preparation can download/build/start containers; no model requests.
+.venv/bin/python -m eval prepare --request .fruitfly/eval-request.json --tasks-only
 .venv/bin/python -m eval prepare --request .fruitfly/eval-request.json
 .venv/bin/python -m eval check --request .fruitfly/eval-request.json
 # Agent/model requests and official verification; may incur charges.
@@ -63,7 +72,7 @@ the [machine runtime and dependencies](harbor/README.md), then run:
 Use `stop '<EVALUATION_ID>'` to request scoped shutdown and confirm cleanup.
 Each attempt starts a
 separate native Agent session. `completed` means reports were assembled; inspect
-trial failures and infrastructure errors. A smoke or starter result is not a
+trial failures and infrastructure errors. A smoke result is not a
 representative full-dataset score. See [task selection](benchmarks/TASKS.md).
 
 ## Select installation material
@@ -111,7 +120,7 @@ downloads use separately prepared assets/caches, without making the Agent runtim
 | `report.json`, `report.md`, `trials/` | Official outcomes and available measurements |
 | `artifacts/harbor/config.yaml`, `models.yaml` | Selected configuration |
 | `artifacts/harbor/runtime.json` | Source selection, configuration/model hashes and unrestricted execution mode; no key values |
-| `artifacts/harbor/preparation.json`, `readiness.json` | Frozen task/runtime/image identities and checks; verifier/model execution can remain unverified |
+| `artifacts/harbor/preparation.json`, `readiness.json` | Controller package identity/conflicts, selected/excluded tasks, frozen runtime/images and checks; verifier/model execution can remain unverified |
 | `artifacts/harbor/control.json`, `cleanup.json` | Tokenized process ownership and confirmed/unconfirmed cleanup |
 | Harbor trial `agent/session.jsonl` | Authoritative canonical Session |
 | Harbor trial `agent/trajectory.json` | ATIF-v1.7 projection with tools and observations |

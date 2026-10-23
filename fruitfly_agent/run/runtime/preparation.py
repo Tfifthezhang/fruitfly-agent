@@ -4,13 +4,13 @@ from dataclasses import dataclass, replace
 from inspect import isawaitable
 from pathlib import Path
 
-from fruitfly_agent.core.session.storage import Session
 from fruitfly_agent.core.extensions.protocols import RecoveryValidator
 from fruitfly_agent.interactive import InteractiveSession
 from fruitfly_agent.interactive.application import RuntimeHandle
 from fruitfly_agent.lab.algorithms.targets import TEXT_TARGET_PREFIX, TextTarget
 from fruitfly_agent.run.configuration.resolution import resolve_profile_models
 from fruitfly_agent.run.configuration.profile import HarnessProfile
+from fruitfly_agent.run.storage.sessions import SessionLeases
 from .assembly import RuntimeAssembly
 from .recovery import (new_session_path, check_session_manifest, record_session_manifest,
                        session_manifests)
@@ -37,6 +37,7 @@ class RuntimePreparer:
         self.permission_policy = permission_policy
         self.build = build
         self.describe = describe
+        self.sessions = SessionLeases()
 
     async def open(
         self,
@@ -53,11 +54,12 @@ class RuntimePreparer:
         selection = selection if profile_override is None else replace(selection, profile=profile_override)
         resolve_profile_models(selection.profile, selection.config_path)
         path = session_path or new_session_path(self.cwd)
-        session = Session(path)
+        lease = self.sessions.acquire(path, resume=resume)
+        session = lease.session
         resources: list[object] = []
         try:
             messages = session.messages() if resume else []
-            if resume and not messages:
+            if resume and not messages and not lease.shared:
                 raise ValueError("nothing to resume")
             artifact_bindings = {**selection.profile.artifact_bindings, **self.data_artifact_bindings}
             profile = selection.profile
@@ -106,7 +108,7 @@ class RuntimePreparer:
                 session=interaction,
                 manifest=runtime.manifest.to_dict(),
                 components=runtime.components,
-                close_callback=session.close,
+                close_callback=lease.release,
                 improvement=improvement_service,
                 candidate_activation=candidate_service,
                 candidates=candidate_service,
@@ -124,8 +126,10 @@ class RuntimePreparer:
             handle.activate_callback = activate
             return handle
         except BaseException:
-            await _close_resources(resources)
-            session.close()
+            try:
+                await _close_resources(resources)
+            finally:
+                lease.release()
             raise
 
 

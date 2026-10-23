@@ -142,10 +142,12 @@ def runtime_mounts(receipt: dict[str, Any]) -> list[dict[str, Any]]:
 
 def probe_command(python: str) -> list[str]:
     return [python, "-c", (
-        "import sys,ssl,sqlite3,zlib,ctypes,importlib.metadata as m; "
+        "import sys,ssl,sqlite3,zlib,ctypes,bz2,lzma,uuid,hashlib,importlib.metadata as m; "
         "assert sys.version_info >= (3,11); "
         "import fruitfly_agent,anthropic,openai,httpx,yaml; "
         "from fruitfly_agent.run import main; "
+        "print('Python:',sys.executable); "
+        "print('Certificate paths:',ssl.get_default_verify_paths()); "
         "print(ssl.OPENSSL_VERSION); "
         "print({p:m.version(p) for p in ('anthropic','openai','httpx','PyYAML')})"
     )]

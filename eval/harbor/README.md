@@ -29,19 +29,46 @@ URLs and keep key values in the existing secret environment.
 | `dependencies.offline` | Set uv/pip offline variables during evaluation; preparation remains online |
 | `task_patches` | Optional exact `task` pattern, `tests/` file `path`, `old` and `new` setup text |
 
+Library directories must be covered by runtime mounts.
 Host paths resolve relative to the host YAML. Host paths and container runtime
 paths expand process environment variables and reject unresolved variables.
 Phase environment values are literal strings. Relative task paths do not refer
 to Harbor's private cache. Export the necessary task definitions explicitly.
+`task_directory` accepts one task or immediate `<task>/task.toml` children;
+nested revision caches require a flat export or registry resolution.
 Runtime import/library variables and dependency cache/offline variables are owned
 by their dedicated settings and cannot be overridden by a phase mapping.
+
+## Inspect selection before starting containers
+
+All datasets share `smoke`, `no_gpu` and `full`. The public Harbor resolver supplies
+effective Agent/Verifier/step definitions. `no_gpu` excludes tasks declaring GPUs
+or GPU types in any role and checks Compose auxiliary-service GPU requests.
+External Compose includes or service inheritance are excluded conservatively.
+Scripts can have undeclared resource needs; filtering cannot prove their absence.
+Selection records include source scope, resolved count, exact selected IDs and
+excluded IDs/reasons. Local exports do not establish full official coverage.
+
+`prepare --tasks-only` freezes task copies and writes `selections/<key>.json`
+with full local image lookups and declared builds. It downloads task definitions
+when needed but never pulls/builds images, starts containers, prepares the Agent
+runtime or calls models. Review it before fetching images or preparing large jobs.
+A matching tag is not proof of a locally resolvable repository digest. Preserve
+full references and check every effective role and Compose service. Harbor auxiliary
+images and dynamic build inputs are outside this static inventory.
 
 Use a complete **Linux** Python installation and a dedicated environment with
 the project's runtime dependencies installed once on the evaluation server.
 The host interpreter used by Harbor must also satisfy Harbor's Python 3.12+
-requirement. Preserve absolute symlink targets and Python installation paths
+requirement. Old-host wheel compatibility is separate from container runtime
+compatibility; a venv does not replace glibc. Inspect existing installations before
+resolving dependencies. `controller.environment_snapshot` records Python, libc,
+installed versions and declared dependency conflicts without importing clients or
+saving environment values. Conflicts remain visible as unverified readiness.
+The controller environment must match its preparation before a run. Preserve absolute symlink targets and Python installation paths
 inside containers. Mount any required OpenSSL or other shared libraries as
-additional read-only directories. A macOS venv cannot serve as a Linux runtime.
+additional read-only directories. A macOS venv cannot serve as a Linux runtime. Inspect extension-module
+dependencies too; a static main executable is not proof of a self-contained runtime.
 Task-specific packages belong in the task container, outside the shared Agent
 environment. Do not mount the entire checkout or an environment containing
 credentials, Sessions or research state.
@@ -55,6 +82,7 @@ export FRUITFLY_EVAL_VENV=/absolute/path/to/agent-venv
 
 # Network and containers: resolves tasks, probes environments and warms declared caches.
 # No Agent/model requests or verifier scoring assertions are executed.
+.venv/bin/python -m eval prepare --request .fruitfly/eval-request.json --tasks-only
 .venv/bin/python -m eval prepare --request .fruitfly/eval-request.json
 
 # No downloads, installs, environment creation or model calls.
@@ -64,14 +92,15 @@ export FRUITFLY_EVAL_VENV=/absolute/path/to/agent-venv
 .venv/bin/python -m eval run --request .fruitfly/eval-request.json --events jsonl
 ```
 
-Preparation hashes mounted runtime files, resolved links and source/wheel inputs.
+Full preparation hashes mounted runtime files, resolved links and source/wheel inputs.
 Only package Python and declared build/license files enter the source snapshot.
 It freezes the exact selected tasks outside Harbor's private cache. Explicit
 setup replacements must match once; each applied diff is recorded. Original
 task files remain untouched. Restrict replacements to dependency/bootstrap
 operations; changing assertions or rewards changes the evaluation condition.
 
-Preparation records use schema 2. Missing or older preparation records require
+The preparation receipt also records controller identity and task selection.
+Preparation records use schema 3. Missing or incompatible preparation records require
 `prepare` again; request and machine-file formats are unchanged. Each record covers
 the Agent environment and every effective separate verifier, including multi-step
 overrides. Configuration inheritance uses Harbor's public resolver. Separate
@@ -174,7 +203,9 @@ not confirmation.
 |---|---|
 | [host.py](host.py) | `HostConfig.read`: strict machine configuration |
 | [material.py](material.py) | `prepare_material`, `check_material`: source/runtime identities |
-| [tasks.py](tasks.py) | `prepare_tasks`, `validate_coverage`: frozen selections and all-run coverage |
+| [tasks.py](tasks.py) | `prepare_tasks`, `validate_coverage`: frozen selections, exclusions and all-run coverage |
+| [selection.py](selection.py) | `task_requirements`, `inspect_images`: effective resources, Compose services and exact local image checks |
+| [controller.py](controller.py) | `environment_snapshot`: installed controller identity and declared dependency conflicts |
 | [dependencies.py](dependencies.py) | `prepare_dependencies`, `check_dependencies`: assets and caches |
 | [environments.py](environments.py) | `probe_environment`: prebuilt images and public Harbor environment factory |
 | [docker_environment.py](docker_environment.py) | `PreparedDockerEnvironment`: dependency mounts and exact ownership through Harbor's public environment plugin |

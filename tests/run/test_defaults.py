@@ -89,8 +89,8 @@ class DefaultConfigurationTests(unittest.TestCase):
         self.assertFalse(controller.changed)
         self.assertEqual(controller.model_setup.credentials.values, {})
 
-    def test_active_restore_uses_existing_discard_and_save_new_session_flow(self):
-        for decision, saved in (("@Discard changes", False), ("@Save and start new session", True)):
+    def test_active_restore_uses_discard_and_save_apply_flow(self):
+        for decision, saved in (("@Discard changes", False), ("@Save and apply to this conversation", True)):
             with self.subTest(decision=decision):
                 factory = self.factory()
                 original = factory.configuration.profile()

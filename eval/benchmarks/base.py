@@ -17,9 +17,10 @@ class BenchmarkVariant:
     label: str
     description: str
     task_names: tuple[str, ...] = ()
-    requires_gpu: bool = False
 
     def __post_init__(self) -> None:
+        if self.variant_id not in {"smoke", "no_gpu", "full"}:
+            raise ValueError("variant must be smoke, no_gpu or full")
         object.__setattr__(self, "task_names", tuple(self.task_names))
         if (any(not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_./-]*", name)
                 or ".." in name for name in self.task_names)
@@ -31,7 +32,6 @@ class BenchmarkVariant:
             "id": self.variant_id,
             "label": self.label,
             "description": self.description,
-            "requires_gpu": self.requires_gpu,
         }
         if self.task_names:
             result["task_names"] = list(self.task_names)

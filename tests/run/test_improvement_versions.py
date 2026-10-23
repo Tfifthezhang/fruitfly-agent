@@ -265,11 +265,11 @@ class StartupVersionsTests(unittest.IsolatedAsyncioTestCase):
         frontend = TerminalConfigurationFrontend(SimpleNamespace(), input_stream=io.StringIO(), output_stream=output,
             menu_input=SimpleNamespace(read_event=lambda: RawTerminalMenuInput.decode(next(sequence))))
         frontend.renderer.ansi = True
-        self.assertEqual((False, 'Use for next session'),
+        self.assertEqual((False, 'Use this prompt'),
                          frontend._preview_prompt('Python adapted', 'hash', '\n'.join(f'line {i}' for i in range(20))))
         self.assertIn('Review prompt (2/3)', output.getvalue())
         self.assertIn('❯ Back', output.getvalue())
-        self.assertIn('❯ Use for next session', output.getvalue())
+        self.assertIn('❯ Use this prompt', output.getvalue())
 
     async def test_candidate_section_switch_keeps_action_selection_and_full_text_pages(self):
         record=SimpleNamespace(candidate_id='candidate-1',status='proposed',algorithm='custom',target='target',

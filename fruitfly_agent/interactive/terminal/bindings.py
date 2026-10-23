@@ -40,6 +40,7 @@ class TerminalBindings:
     progress: Callable
     candidate_notice: Callable | None
     acknowledge_notice: Callable | None
+    apply_configuration: Callable[[], Awaitable[None]] | None = None
 
     @classmethod
     def from_session(cls, session: Any) -> TerminalBindings:
@@ -53,12 +54,14 @@ class TerminalBindings:
             discover=getattr(session, "resumable_sessions", None),
             conversation=getattr(session, "conversation", None),
             configuration=lambda: getattr(session, "configuration", None),
-            busy=lambda: bool(getattr(session, "running", False) or getattr(session, "pending_count", 0)),
+            busy=lambda: bool(getattr(session, "running", False) or getattr(session, "pending_count", 0)
+                              or getattr(getattr(session, "status", None), "application_state", "idle") != "idle"),
             authorization=lambda: getattr(session, "authorization", None),
             enable_authorization=getattr(session, "enable_authorization", None),
             progress=lambda: getattr(session, "improvement_progress", None),
             candidate_notice=getattr(session, "candidate_notice", None),
             acknowledge_notice=getattr(session, "acknowledge_candidate_notice", None),
+            apply_configuration=getattr(session, "apply_configuration", None),
         )
 
 

@@ -76,7 +76,7 @@ class RunModelSetup:
         if secret:
             self.credentials.values[entry["api_key_env"]] = secret
         self.stage_profile(replace(profile, model_profile=name))
-        return ConfigurationActionResult("Model and credential staged; save to use in a new session", changed=True)
+        return ConfigurationActionResult("Model and credential staged; save before applying settings", changed=True)
 
     def credential_status(self, model_profile: str) -> str:
         profile = self.current_profile()
@@ -90,7 +90,7 @@ class RunModelSetup:
         self._check_secret(key, secret)
         if secret:
             self.credentials.values[key] = secret
-        return ConfigurationActionResult("Credential staged; save to use in a new session", changed=True)
+        return ConfigurationActionResult("Credential staged; save before applying settings", changed=True)
 
     def _check_secret(self, key, secret):
         if secret and (secret != secret.strip() or any(ord(char) < 33 for char in secret)):

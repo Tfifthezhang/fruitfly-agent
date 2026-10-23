@@ -5,7 +5,7 @@ from dataclasses import replace
 import io
 from types import SimpleNamespace
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, AsyncMock
 
 from fruitfly_agent.interactive import AgentApplication, ApplicationState
 from fruitfly_agent.interactive.contracts.candidates import CandidateView
@@ -100,6 +100,9 @@ class ExtensionTests(unittest.IsolatedAsyncioTestCase):
         task = app.start_improvement("improve")
         await entered.wait()
         self.assertEqual(ApplicationState.IMPROVING, app.state)
+        self.assertTrue(TerminalBindings.from_session(app).busy())
+        with self.assertRaisesRegex(RuntimeError, "finish.*active work"):
+            await app.apply_configuration()
         with self.assertRaisesRegex(RuntimeError, "cannot queue"):
             app.enqueue("next")
         with self.assertRaisesRegex(RuntimeError, "finish active work"):
@@ -166,7 +169,7 @@ class ExtensionTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(TypeError, "CommandResult"):
             await registry.execute(InteractiveCommand("bad"))
 
-    async def test_configuration_flow_restores_menu_on_rebuild_failure(self):
+    async def test_configuration_flow_restores_menu_and_reports_apply_failure(self):
         lifecycle = []
 
         @contextmanager
@@ -184,14 +187,32 @@ class ExtensionTests(unittest.IsolatedAsyncioTestCase):
         controller = MockConfiguration(model="offline")
         handler = configuration_handler(
             configuration=lambda: controller, status=lambda: offline_session().status,
-            busy=lambda: False, rebuild=fail, menu_scope=scope,
+            busy=lambda: False, apply_configuration=fail, menu_scope=scope,
             input_stream=io.StringIO(), output_stream=io.StringIO(),
             line_editor=lambda: ScriptedLines("3", "space", "back", "back", "1"),
             write=lambda text: None, welcome=lambda status: None,
         )
-        with self.assertRaisesRegex(RuntimeError, "replacement failed"):
-            await handler(InteractiveCommand("config"))
+        result = await handler(InteractiveCommand("config"))
+        self.assertIn("saved but not applied", result.text)
+        self.assertIn("replacement failed", result.text)
+        self.assertTrue(controller.saved)
         self.assertEqual(["lend", "restore"], lifecycle)
+
+    async def test_configuration_save_only_does_not_apply_or_exit_the_conversation(self):
+        from tests.support.configuration import MockConfiguration
+        app, provider = await self.app()
+        apply_settings = AsyncMock()
+        bindings = replace(TerminalBindings.from_session(app), apply_configuration=apply_settings)
+        controller = MockConfiguration(model='offline')
+        output = io.StringIO()
+        frontend = TerminalFrontend(app, bindings=bindings, configuration=controller,
+            output_stream=output, line_editor=ScriptedLines('/config', '3', 'space', 'back', 'back', '2', '/status', '/exit'))
+        await frontend.run()
+        apply_settings.assert_not_awaited()
+        self.assertTrue(controller.saved)
+        self.assertIn('configuration saved; active runtime unchanged', output.getvalue())
+        self.assertIn('state: idle', output.getvalue())
+        self.assertEqual([], provider.calls)
 
     async def test_explicit_bindings_replace_optional_capability_discovery(self):
         app, provider = await self.app()

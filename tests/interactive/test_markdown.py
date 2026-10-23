@@ -6,12 +6,36 @@ import re
 import unittest
 
 from fruitfly_agent.interactive.terminal.rendering.markdown import MarkdownStreamPresenter, TerminalMarkdownRenderer
+from fruitfly_agent.interactive.terminal.io.text import cell_width
 
 
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
 
 class TerminalMarkdownRendererTest(unittest.TestCase):
+    def test_long_table_cells_preserve_all_text_at_every_width(self):
+        path = '/workspace/very-long-directory/complete-file-name.jsonl'
+        detail = '完整说明éＡＢand-all-remaining-content'
+        source = f'| Path | Detail |\n|---|---|\n| {path} | {detail} |\n'
+        for width in (8, 20, 40, 79, 120):
+            with self.subTest(width=width):
+                rendered = TerminalMarkdownRenderer(columns=width, color=False).render(source)
+                self.assertNotIn('…', rendered)
+                self.assertTrue(all(cell_width(line) <= width for line in rendered.splitlines()))
+                if '┌' in rendered:
+                    rows = [line.split('│')[1:-1] for line in rendered.splitlines() if line.startswith('│')]
+                    self.assertEqual(''.join(row[0].strip() for row in rows), 'Path' + path)
+                    self.assertEqual(''.join(row[1].strip() for row in rows), 'Detail' + detail)
+                else:
+                    compact = ''.join(rendered.split())
+                    self.assertIn(path, compact)
+                    self.assertIn(detail, compact)
+
+    def test_paragraph_soft_breaks_reflow_but_hard_breaks_remain(self):
+        renderer = TerminalMarkdownRenderer(color=False)
+        self.assertIn('one two', renderer.render('one\ntwo'))
+        self.assertIn('one\ntwo', renderer.render('one  \ntwo'))
+
     def test_common_elements_render_without_source_markers(self) -> None:
         source = """# Root cause
 

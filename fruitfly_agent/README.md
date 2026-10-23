@@ -64,7 +64,7 @@ declarations without vendor-specific branches. Model Providers remain independen
 
 | State | Meaning |
 |---|---|
-| Configuration | Choices for the next session |
+| Configuration | Saved choices; explicitly applied through Application or used on start/recovery |
 | RuntimeManifest | Actual model, normalized mechanism parameters, declared implementation versions, prompt contents, and consumed artifacts |
 | Session | Canonical messages, committed context decisions, manifest, and concise run/failure records |
 | Live events | Frontend observation; not a complete persisted request trace |

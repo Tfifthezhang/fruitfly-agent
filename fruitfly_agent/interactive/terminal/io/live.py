@@ -1,10 +1,4 @@
-"""Concurrent inline transcript and non-canonical terminal editor.
-
-Completed output is appended exactly once so the terminal owns scrollback.  Only
-the unfinished output tail and editable prompt form a small live surface that is
-redrawn under one lock.  Streamed output and input therefore never share cursor
-state, while an update can no longer overwrite already displayed conversation.
-"""
+"""Concurrent display and terminal editor with optional owned history viewport."""
 
 from __future__ import annotations
 
@@ -14,7 +8,9 @@ import os
 import re
 import select
 import threading
-from typing import Sequence, TextIO
+from typing import Callable, Sequence, TextIO
+
+from fruitfly_agent.interactive.terminal.io.transcript import DisplayTranscript, Formatter
 
 from fruitfly_agent.interactive.terminal.io.text import (
     cell_width,
@@ -59,7 +55,7 @@ class InputInterrupted(Exception):
 
 
 class InlineTerminalDisplay:
-    """Append completed output and redraw only the unfinished local surface."""
+    """Serialize transcript and input drawing; optionally own a reflowable screen."""
 
     def __init__(
         self,
@@ -67,8 +63,12 @@ class InlineTerminalDisplay:
         *,
         rows: int | None = None,
         columns: int | None = None,
+        fullscreen: bool = False,
     ) -> None:
         self.output = output
+        self.fullscreen = fullscreen
+        self.transcript = DisplayTranscript(lambda text, width: _visual_lines(_sanitize_output(text), width))
+        self._history_height = 1
         self._fixed_rows = rows
         self._fixed_columns = columns
         self._rows = 0
@@ -95,6 +95,11 @@ class InlineTerminalDisplay:
     def encoding(self) -> str | None:
         return getattr(self.output, "encoding", None)
 
+    @property
+    def formatted_output(self) -> Callable[..., None] | None:
+        """Advertise source-backed output only when this sink can repaint it."""
+        return self.update_formatted if self.fullscreen else None
+
     def isatty(self) -> bool:
         return True
 
@@ -103,7 +108,12 @@ class InlineTerminalDisplay:
 
     def write(self, text: str) -> int:
         with self._lock:
-            if not self._active:
+            if self.fullscreen:
+                self.transcript.append(_sanitize_output(text))
+                if self._active:
+                    self._measure_locked()
+                    self._render_live_locked()
+            elif not self._active:
                 self.output.write(text)
             else:
                 visible = _sanitize_output(text)
@@ -114,6 +124,39 @@ class InlineTerminalDisplay:
                 self._render_live_locked()
             self.output.flush()
         return len(text)
+
+    def update_formatted(self, source: str, formatter: Formatter, *, complete: bool = False) -> None:
+        """Update a source-backed display record using caller-owned formatting."""
+        with self._lock:
+            self.transcript.update(source, formatter, complete=complete)
+            if self._active:
+                self._measure_locked()
+                self._render_live_locked()
+                self.output.flush()
+
+    def scroll_history(self, sequence: bytes) -> bool:
+        """Route viewport navigation without changing the editable draft."""
+        if not self.fullscreen:
+            return False
+        amount: int | None
+        if sequence in {b'\x1b[5~', b'\x1b[5;2~'}:
+            amount = -max(1, self._history_height - 1)
+        elif sequence in {b'\x1b[6~', b'\x1b[6;2~'}:
+            amount = max(1, self._history_height - 1)
+        elif sequence in {b'\x1b[1;5F', b'\x1b[4;5~'}:
+            amount = None
+        elif sequence.startswith(b'\x1b[<64;'):
+            amount = -3
+        elif sequence.startswith(b'\x1b[<65;'):
+            amount = 3
+        else:
+            return False
+        with self._lock:
+            self.transcript.scroll(amount, self._columns - 1, self._history_height)
+            if self._active:
+                self._render_live_locked()
+                self.output.flush()
+        return True
 
     def flush(self) -> None:
         with self._lock:
@@ -145,6 +188,8 @@ class InlineTerminalDisplay:
                 return
             self._measure_locked()
             self._active = True
+            if self.fullscreen:
+                self.output.write('\x1b[?1049h\x1b[2J\x1b[H\x1b[?1000h\x1b[?1006h')
             # Newlines inside a bracketed paste belong to one editable prompt;
             # only an Enter outside the delimiters submits it.
             self.output.write("\x1b[?2004h")
@@ -156,6 +201,12 @@ class InlineTerminalDisplay:
 
         with self._lock:
             if not self._active:
+                return
+            if self.fullscreen:
+                self.output.write('\x1b[0m\x1b[?1006l\x1b[?1000l\x1b[?2004l\x1b[?1049l')
+                self.output.flush()
+                self._active = False
+                self._live_rows = 0
                 return
             self._measure_locked()
             self._erase_live_locked()
@@ -229,7 +280,7 @@ class InlineTerminalDisplay:
             except (AttributeError, OSError, ValueError):
                 rows, columns = 24, terminal_columns(self.output)
         new_rows, new_columns = max(6, rows), max(8, columns)
-        if self._live_rows and self._columns != new_columns:
+        if not self.fullscreen and self._live_rows and self._columns != new_columns:
             # Each rendered row ends in an explicit newline. A narrower terminal
             # can wrap it into several physical rows before we get to repaint.
             lengths = [max(1, len(_visual_lines(row, new_columns))) for row in self._rendered_rows]
@@ -244,7 +295,7 @@ class InlineTerminalDisplay:
     def _commit_ready_output_locked(self) -> None:
         """Commit every complete logical or visual line to terminal history."""
 
-        if not self._pending_output:
+        if self.fullscreen or not self._pending_output:
             return
         width = max(4, self._columns - 1)
         lines = _visual_lines(self._pending_output, width)
@@ -262,7 +313,7 @@ class InlineTerminalDisplay:
     def _erase_live_locked(self) -> None:
         """Erase only rows owned by the live surface, never committed history."""
 
-        if not self._live_rows:
+        if self.fullscreen or not self._live_rows:
             return
         self.output.write("\r")
         if self._cursor_live_row:
@@ -326,6 +377,8 @@ class InlineTerminalDisplay:
             - choice_footer
             - input_padding,
         )
+        if self.fullscreen:
+            max_input_lines = min(max_input_lines, max(1, self._rows // 3))
         input_start = max(0, cursor_line - max_input_lines + 1)
         input_lines = all_input_lines[input_start : input_start + max_input_lines]
         cursor_line -= input_start
@@ -360,6 +413,13 @@ class InlineTerminalDisplay:
             rows.append(input_row_text("", ""))
         if self._choices:
             rows.append(truncate_cells("↑↓ move · Enter select · Esc deny · 1/2/3 select", self._columns - 1))
+        if self.fullscreen:
+            self._history_height = max(1, self._rows - len(rows))
+            history = self.transcript.view(self._columns - 1, self._history_height)
+            padding = [''] * max(0, self._history_height - len(history))
+            rows = history + padding + rows
+            input_base += self._history_height
+            self.output.write('\x1b[H')
         for index, row in enumerate(rows):
             reset = _RESET_STYLE if colors_enabled(self.output) else ""
             self.output.write(f"{reset}{_CLEAR_LINE}{row}")
@@ -550,6 +610,8 @@ class IsolatedLineEditor:
                     return None
                 if first == b"\x1b":
                     sequence = _read_escape_sequence(descriptor, first)
+                    if self.display.scroll_history(sequence):
+                        continue
                     if self._field_input and sequence == b'\x1b':
                         raise InputInterrupted
                     buffer.escape(sequence, descriptor, encoding, self._history)
@@ -609,6 +671,7 @@ class IsolatedLineEditor:
 def create_inline_terminal(
     input_stream: TextIO,
     output_stream: TextIO,
+    *, fullscreen: bool = False,
 ) -> tuple[InlineTerminalDisplay, IsolatedLineEditor] | None:
     """Create the concurrent terminal pair only for a real POSIX ANSI TTY."""
 
@@ -621,13 +684,13 @@ def create_inline_terminal(
         output_stream.fileno()
     except (AttributeError, OSError, ValueError):
         return None
-    display = InlineTerminalDisplay(output_stream)
+    display = InlineTerminalDisplay(output_stream, fullscreen=fullscreen)
     return display, IsolatedLineEditor(input_stream, display)
 
 
 def _read_escape_sequence(descriptor: int, first: bytes) -> bytes:
     sequence = first
-    while len(sequence) < 16 and select.select([descriptor], [], [], 0.02)[0]:
+    while len(sequence) < 32 and select.select([descriptor], [], [], 0.02)[0]:
         sequence += os.read(descriptor, 1)
         if sequence != b"\x1bO" and sequence[-1:] in b"~ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz":
             break

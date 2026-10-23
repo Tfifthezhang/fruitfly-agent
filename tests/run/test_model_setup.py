@@ -224,7 +224,7 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
         self.controller.save()
         catalog = (self.root / ".fruitfly/models.yaml").read_bytes()
         environment = (self.root / ".fruitfly/secrets.env").read_bytes()
-        frontend = self.frontend("1", "2", "1", "second", "another-model", "", "8192", "1024", "", "", "2", "back", "3")
+        frontend = self.frontend("1", "2", "1", "second", "another-model", "", "8192", "1024", "", "", "2", "back", "4")
         self.assertFalse(frontend.run_for_active_session().start)
         self.assertEqual(self.controller.snapshot().model_profile, "local")
         self.assertFalse(self.controller.snapshot().changed)

@@ -484,15 +484,16 @@ class TerminalFrontendTest(unittest.IsolatedAsyncioTestCase):
                 "space",  # Enable the mechanism
                 "back",
                 "back",
-                "1",      # Save and start a new session
+                "1",      # Save and apply to this conversation
+                "/exit",
             ),
             configuration=controller,
         )
 
         self.assertEqual(await frontend.run(), 0)
         self.assertTrue(controller.saved)
-        self.assertIn("New session required", output.getvalue())
-        self.assertIn("embedding host must open a new runtime", output.getvalue())
+        self.assertIn("Apply configuration", output.getvalue())
+        self.assertIn("this host cannot apply settings to the current conversation", output.getvalue())
 
     async def test_config_menu_returns_to_current_session_when_unchanged(self) -> None:
         app = offline_session()

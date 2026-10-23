@@ -24,7 +24,7 @@ belongs in either Agent file.
 The Eval host template is independent of daily/default Agent configuration and
 contains no model/key preferences. See [Harbor preparation](../../eval/harbor/README.md)
 for preparation, path/link changes and verifier cache declarations.
-The bilingual [server guide](../../eval/SERVER_GUIDE.md) walks through private-file
+The [server guide](../../eval/SERVER_GUIDE.md) walks through private-file
 transfer, Linux runtime installation and machine/request file generation in order.
 
 | Profile | `provider` | `model` | `base_url` |

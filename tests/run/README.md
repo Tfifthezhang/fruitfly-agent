@@ -8,6 +8,7 @@ Verify configuration, model selection, assembly, manifest, CLI, candidates, rete
 
 | Files | Protects |
 |---|---|
+| `test_configuration_application.py` | Same-Session model changes, original history, empty-session application, failed startup recovery and exclusive writer lease lifetime |
 | `test_configuration.py / test_profiles.py` | Selection drafts, YAML, and persistence |
 | `test_execution_policy.py` | Guarded/unrestricted native file and shell behavior, environment inheritance, cancellation and launch validation |
 | `test_defaults.py` | Default restoration drafts, model/key preservation, save/discard and read-only default files |

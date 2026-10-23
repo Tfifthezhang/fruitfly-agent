@@ -13,7 +13,8 @@ Run multi-turn sessions through a frontend-independent Application. Inject a Run
 | `enqueue` | Process queued inputs in order. |
 | `steer` | Add text to the active run. |
 | `cancel` | Set the cooperative signal and interrupt owned work after a 50 ms grace; clear pending Application input. User cancellation returns `aborted`; external task cancellation still propagates after end delivery. |
-| `rebuild` / `resume` | Prepare and start a replacement before switching. |
+| `apply_configuration` | While idle, recover the current Session with saved settings; start a replacement before switching. |
+| `rebuild` / `resume` | Open a fresh session or recover another Session; prepare and start a replacement before switching. |
 | `conversation` | Read an immutable snapshot of original user, assistant, and tool messages, independent of model context reduction. |
 | `activate_runtime` | Validate the expected parent and activate a prepared candidate. |
 

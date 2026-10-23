@@ -318,8 +318,9 @@ class HarborAdapterTests(unittest.TestCase):
         ):
             self.assertTrue(adapter.preflight("smoke").available)
             self.assertTrue(adapter.preflight("no_gpu").available)
+            self.assertTrue(adapter.preflight("full").available)
             self.assertFalse(adapter.preflight("gpu").available)
-            self.assertIn("GPU", adapter.preflight("gpu").checks[-1]["detail"])
+            self.assertIn("unknown execution profile", adapter.preflight("gpu").checks[0]["detail"])
 
     def test_harbor_is_found_next_to_active_python_without_venv_activation(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -17,7 +17,7 @@ Keep model specifications, secrets, and runtime selections in separate files.
 | Eval host settings | `.fruitfly/eval-host.yaml` | Machine-local runtime mounts, task source and dependency/cache preparation; see [Harbor settings](eval/harbor/README.md) |
 | CLI overrides | Startup arguments | Workspace, configuration, profile, and session selection |
 
-`--cwd`, `--config`, and `--profile` select the process's workspace and configuration. `--approve-tools` explicitly answers tool confirmation requests for a fresh non-interactive task in a trusted isolated environment; protected paths remain denied. A relative `model.catalog` path resolves from the harness configuration file. The configuration menu saves choices for the next session; an active or resumed session keeps its validated runtime identity.
+`--cwd`, `--config`, and `--profile` select the process's workspace and configuration. `--approve-tools` explicitly answers tool confirmation requests for a fresh non-interactive task in a trusted isolated environment; protected paths remain denied. A relative `model.catalog` path resolves from the harness configuration file. Saving persists choices. An active runtime changes only through explicit Application replacement, including configuration application or recovery.
 
 The Agent CLI reads `.fruitfly/secrets.env` from the selected workspace, including when using `--cwd`. Process environment values take precedence over that file, including explicit empty values. It does not fall back to another workspace's secret file.
 
@@ -32,8 +32,9 @@ parameters and artifact bindings in the selected daily profile. Existing model
 selection, catalog, credentials and other profiles remain unchanged. Experiment
 bindings absent from the defaults are removed from the draft.
 
-Review or adjust the draft, then save for a new session. Discard restores the
-previous saved choices. The active session is unchanged. Missing/invalid defaults
+Review or adjust the draft, then save and apply to this conversation or save only.
+Discard restores the previous saved choices. Staging and saving alone leave the
+active runtime unchanged. Missing/invalid defaults
 leave the draft unchanged; declared auxiliary models must exist in the daily
 catalog. Each restoration reloads the file so manual edits are available immediately.
 
@@ -51,6 +52,31 @@ Use distinct `api_key_env` names only for different credentials; updating a shar
 key affects subsequent use of both catalogs. Keep values in the secret environment.
 Agent configuration does not select an execution-permission policy.
 
+## Apply settings to the current conversation
+
+While idle, `/config` offers these choices after changes:
+
+| Choice | Effect |
+|---|---|
+| Save and apply to this conversation | Save files, then rebuild using the current Session's recovery path. Keep its path and original messages. |
+| Save only | Save files without changing the active runtime. A later start or recovery uses them. |
+| Continue configuring | Keep editing the draft. |
+| Discard changes | Restore saved choices without changing the active runtime. |
+
+Application constructs and starts the candidate before replacing the incumbent.
+Recovery validates recorded history and required artifacts. Changed context
+mechanisms rebuild their model projection from canonical messages. Missing
+artifacts, invalid settings or startup failures leave the old runtime usable;
+configuration files already saved remain saved. No model or tool work is replayed.
+The next submitted turn uses the applied model, prompt and components.
+
+Application requires no active/queued task or improvement job. Rebuilding creates
+fresh runtime resources and approval services; transient algorithm state and
+remembered approval grants are not transferred. Persisted learning state follows
+the selected component's own recovery contract. This changes configuration, not
+Python source loaded into the process. Manually edited secret files still require
+a process restart to reload; the built-in secret forms update the host after save.
+
 ## Relocate workspace configuration
 
 Startup does not move existing files. Preview the explicit offline operation, then apply it if the listed paths are correct:
@@ -64,7 +90,7 @@ Use `--config path/to/custom.yaml` to update a custom harness file. The operatio
 
 ## Configure a model
 
-Run the interactive CLI. **Add model** opens when no models are available; otherwise use **Configure → model → Add model…**. Choose a supported service, enter the model ID and documented token limits, and enter the key with hidden input. Custom services need a base URL. Review and stage the settings; **Start new session** or **Save and start new session** persists them.
+Run the interactive CLI. **Add model** opens when no models are available; otherwise use **Configure → model → Add model…**. Choose a supported service, enter the model ID and documented token limits, and enter the key with hidden input. Custom services need a base URL. Review and stage the settings; **Start new session**, **Save and apply to this conversation**, or **Save only** persists them.
 
 | Service option | Use when |
 |---|---|
@@ -91,7 +117,7 @@ An interactive first run without saved harness configuration or a workspace cata
 | Failures | Ordinary save failures attempt to restore model/credential files and retain the draft for retry; no cross-process or crash transaction. |
 | Validation | Offline format/required-field checks only; no automatic network requests or connection tests. |
 
-The wizard adds models with new labels; editing existing model specifications remains a YAML operation. It refuses additions to external or flow-style catalogs rather than rewriting them. Active and resumed sessions keep their original runtime identity. Newly saved credentials are available to the next session in the same process.
+The wizard adds models with new labels; editing existing model specifications remains a YAML operation. It refuses additions to external or flow-style catalogs rather than rewriting them. Saving alone leaves the active runtime unchanged. Newly saved credentials are available when settings are applied or a session starts in the same process.
 
 For manual setup, create `.fruitfly/`, then copy `examples/configuration/models.example.yaml` to `.fruitfly/models.yaml` and `examples/configuration/.env.example` to `.fruitfly/secrets.env` only if the local files do not already exist. The single catalog contains `deepseek-flash-openai` and `deepseek-flash-anthropic`, both using `deepseek-flash` and `DEEPSEEK_API_KEY` with DeepSeek endpoints. Configure your key and select one profile before making requests. See [example setup, budgets, and thinking limits](examples/configuration/README.md). Local `.fruitfly/models.yaml` is excluded from source distributions.
 

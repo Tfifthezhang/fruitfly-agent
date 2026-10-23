@@ -8,7 +8,7 @@ Assemble resources and prepare new or recovered runtime handles. Application own
 |---|---|
 | [assembly.py](assembly.py): `build_runtime` | Construct Providers, assemble Lab components, and apply host permissions |
 | [manifest.py](manifest.py): `RuntimeManifest` | Actual assembled runtime identity and serialization |
-| [preparation.py](preparation.py): `RuntimePreparer.open` | Open Session, verify recovery, bind injected services, return an unactivated handle |
+| [preparation.py](preparation.py): `RuntimePreparer.open` | Acquire a Session writer lease, verify recovery, bind injected services, return an unactivated handle |
 | [activation.py](activation.py): `bind_activation` | Compose pre-commit and post-commit hooks around prepared handles |
 | [recovery.py](recovery.py) | Session discovery, recorded bindings, manifest checks, and session paths |
 | [permissions.py](permissions.py) | Host permission policy and minimal process environment |
@@ -16,6 +16,8 @@ Assemble resources and prepare new or recovered runtime handles. Application own
 Preparation receives configuration selections, separate improvement/candidate/task material services, and explicit construction/presentation capabilities. It does not inspect a Factory, candidate store, improver implementation, or configuration draft. `PreparedRuntime` reports actual bindings to the composition root only when activation occurs. Successful activation commits the environment snapshot; changed mechanisms also commit a rebuilt model projection.
 
 Catalog registers object-owned improvement targets. The improvement host discovers execution and generator definitions without model requests, then constructs job-local stages after a frozen preview is confirmed. Preparation can create Session files and Provider clients; it does not execute Agent tasks. Failed preparation closes owned resources. Application cleans up failed startup. Activation hooks do not provide cross-process transactions or rollback arbitrary external effects.
+
+Preparation uses [Session writer leases](../storage/README.md) scoped to one preparer. Configuration application recovers the already-owned Session without opening a competing writer. Both handles hold a lease until retirement or failed-start cleanup; Application serializes their use. An empty currently owned conversation can be rebound, while standalone empty-session recovery remains rejected.
 
 Manifest schema remains 5. Recovery validates each recorded manifest against its own contents and allows changed environments; it does not restore arbitrary Python state or replay unknown paid work. See [Run recovery](../README.md#recovery) and [Session](../../core/session/README.md). No module-specific environment variables.
 

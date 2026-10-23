@@ -5,7 +5,7 @@
 Run one selected configuration, inspect reports, or add a benchmark adapter. Real execution uses networks, containers, and model services and may incur charges.
 
 For the ordered Linux server procedure and executable YAML/JSON generators,
-start with the bilingual [Server Evaluation Guide](SERVER_GUIDE.md).
+start with the [Server Evaluation Guide](SERVER_GUIDE.md).
 
 ## Prepare the environment
 
@@ -24,34 +24,39 @@ docker compose version
 .venv/bin/python -m eval catalog --json
 ```
 
-Catalog preflight locates Harbor/Docker, checks Engine/Compose within five seconds,
-and locates `nvidia-smi` for GPU variants. Detailed [Harbor preparation](harbor/README.md)
-freezes tasks, probes the mounted Linux runtime and records image identities.
-Host and Docker network/proxy settings are separate paths. Terminal-Bench 2.1
-uses `terminal-bench/terminal-bench-2-1`; the separate `terminal-bench-4` ID pins
-`terminal-bench/terminal-bench@4.0.0`. Other Harbor datasets use the same flow.
-Pre-downloaded images must match the resolved task definitions. Prepare a
-dedicated complete Linux Python/Agent environment once, then declare its
-read-only mounts in `.fruitfly/eval-host.yaml`. Agent defaults and key files stay separate.
+Catalog preflight locates Harbor/Docker and checks Engine/Compose within five
+seconds. Executable discovery does not prove Harbor imports or diagnose glibc.
+Detailed [Harbor preparation](harbor/README.md) freezes tasks, records controller
+packages, probes the mounted Linux runtime and records image identities.
+Host and Docker network/proxy settings are separate paths. Pre-downloaded images
+must match the complete references in the resolved task definitions. Prepare one
+dedicated Linux Python/Agent environment, declare its read-only mounts in
+`.fruitfly/eval-host.yaml`, and reuse it across compatible datasets.
+Agent defaults and key files stay separate.
 
 Use `FRUITFLY_EVAL_PACKAGE` to select complete source or wheel material when needed; see [installation material](README.md#select-installation-material).
 
 ## Create a CLI request
 
 This example creates a request offline using the independent default configuration.
-Prepare `.fruitfly/default-config.yaml` and its model catalog before running it:
+Prepare `.fruitfly/default-config.yaml` and its model catalog, and set
+`FRUITFLY_BENCHMARK` to a registered catalog ID before running it:
 
 ```bash
 .venv/bin/python - <<'PY'
 import json
+import os
 from pathlib import Path
+from eval.catalog import builtin_catalog
 from eval.contracts import EvaluationRequest
 
 cwd = Path.cwd()
+benchmark = os.environ['FRUITFLY_BENCHMARK']
+builtin_catalog().get(benchmark)
 request = EvaluationRequest.from_dict({
     'schema_version': 2,
     'runtime': {'working_directory': str(cwd)},
-    'benchmark': {'id': 'terminal-bench', 'variant': 'smoke'},
+    'benchmark': {'id': benchmark, 'variant': 'smoke'},
     'execution': {'attempts': 1, 'concurrency': 1, 'timeout_seconds': 3600},
 })
 path = cwd / '.fruitfly/eval-request.json'
@@ -66,6 +71,7 @@ the selection and check it. Preparation can download dependencies and build/star
 containers; it makes no model requests. `check` only validates prepared local identities:
 
 ```bash
+.venv/bin/python -m eval prepare --request .fruitfly/eval-request.json --tasks-only
 .venv/bin/python -m eval prepare --request .fruitfly/eval-request.json
 .venv/bin/python -m eval check --request .fruitfly/eval-request.json
 ```
@@ -89,14 +95,15 @@ The next command executes the model/container path and can incur charges:
 `check` exits 0 for matching preparation, 3 when unavailable and 2 for input errors.
 Verifier completeness/model connectivity remain explicitly unverified without
 a real smoke trial. `prepare` creates no evaluation score or report.
-Preparation schema 2 covers Agent and independent verifier environments. A
+Preparation schema 3 covers controller packages, selected/excluded tasks, Agent
+and independent verifier environments. A
 missing or incompatible preparation requires `prepare` again. Machine files
 remain schema 1. See [environment preparation](harbor/README.md#prepare-check-and-run).
 
 For an experimental configuration, explicitly supply `runtime.config_path` and
 optionally `runtime.profile`. Relative paths resolve from `working_directory`.
 Explicit empty strings and unknown fields fail; defaults never fall back to daily
-configuration. Existing fully specified schema-2 requests remain supported.
+configuration. Requests use schema 2 and one of `smoke`, `no_gpu` or `full`.
 
 The runner normalizes the selected profile, stages referenced main/auxiliary
 models, validates required credentials and rejects remote execution environments
@@ -176,11 +183,17 @@ Harbor's private content-addressed cache to repair a verifier setup script.
 
 | Step | Action |
 |---|---|
-| 1 | Declare dataset/version, an exact smoke task and optional exact subsets. |
+| 1 | Declare dataset/version and one exact smoke task. The shared selections are `smoke`, `no_gpu` and `full`. |
 | 2 | Subclass `HarborBenchmarkAdapter` and call `harbor_descriptor`. Preparation, runtime mounts, shared/separate verifiers, credentials, commands, lifecycle, logs, trajectories and parsing are shared by [the Harbor package](harbor/README.md). Other backends implement `BenchmarkAdapter`. |
 | 3 | Export/register its unique ID in [catalog.py](catalog.py). |
 | 4 | Declare machine/cache requirements through the host file, and explicit verifier dependency recipes or exact setup patches where needed. Test preparation, frozen task coverage, failures, rewards and reports offline. |
 | 5 | Inspect catalog output; authorize real smoke separately. |
 
-`BenchmarkAdapter.run(request_path=..., result_path=..., variant=..., progress=...)` consumes the single-configuration request and writes schema-2 results containing status, metrics, errors, artifacts, and trials. A custom Harbor task needs instructions, task.toml, an environment, and an independent verifier. Dataset identity and exact task subsets belong to the adapter declaration. Other runners implement the same request/result interface; runtime ownership stays outside Eval.
+`BenchmarkAdapter.run(request_path=..., result_path=..., variant=..., progress=...)`
+consumes the single-configuration request and writes schema-2 results containing
+status, metrics, errors, artifacts, and trials. A custom Harbor task needs
+instructions, task.toml, an environment and an official verifier definition.
+Dataset identity and its smoke task belong to the adapter declaration. Resource
+filtering and image/runtime diagnostics belong to the shared Harbor layer. Other
+runners implement the same request/result interface; runtime ownership stays outside Eval.
 

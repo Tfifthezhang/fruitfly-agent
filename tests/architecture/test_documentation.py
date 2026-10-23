@@ -114,16 +114,20 @@ class DocumentationTest(unittest.TestCase):
                 self.assertIn(path, {target for target, _ in local_links(parent)})
 
     def test_documentation_is_english(self):
-        bilingual = ROOT / 'eval/SERVER_GUIDE.md'
         non_english = [str(path.relative_to(ROOT)) for path in documents()
-                       if path != bilingual and re.search(r'[\u3400-\u4dbf\u4e00-\u9fff]', path.read_text(encoding='utf-8'))]
+                       if re.search(r'[\u3400-\u4dbf\u4e00-\u9fff]', path.read_text(encoding='utf-8'))]
         self.assertEqual([], non_english)
 
-    def test_server_evaluation_guide_has_bilingual_sections(self):
+    def test_server_evaluation_guide_has_generic_english_workflow(self):
         path = ROOT / 'eval/SERVER_GUIDE.md'
+        source = path.read_text(encoding='utf-8')
+        self.assertNotRegex(source, r'Terminal-Bench|SWE-bench|workbuddy')
+        for entry in ('--tasks-only', 'controller-versions.txt', 'agent-versions.txt',
+                      'library_paths', '`smoke`', '`no_gpu`', '`full`'):
+            self.assertIn(entry, source)
         headings = []
         fenced = False
-        for line in path.read_text(encoding='utf-8').splitlines():
+        for line in source.splitlines():
             if line.startswith('```'):
                 fenced = not fenced
             elif not fenced and line.startswith(('# ', '## ')):
@@ -132,7 +136,6 @@ class DocumentationTest(unittest.TestCase):
         for heading in headings:
             with self.subTest(heading=heading):
                 self.assertRegex(heading, r'[A-Za-z]')
-                self.assertRegex(heading, r'[\u3400-\u4dbf\u4e00-\u9fff]')
 
     def test_lower_level_files_use_project_identity(self):
         upstream = re.compile(r'\bp' r'i\b', re.I)

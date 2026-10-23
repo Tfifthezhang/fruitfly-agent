@@ -15,6 +15,7 @@ from typing import Any
 from eval.benchmarks.base import BenchmarkDescriptor
 from .host import HostConfig
 from .material import digest, tree_identity, write_json
+from .selection import task_requirements
 
 
 def task_name(path: Path) -> str:
@@ -38,7 +39,7 @@ async def registry_tasks(dataset: str, cache: Path, names: tuple[str, ...] = ())
             for config, downloaded in zip(configs, batch.results, strict=True)]
 
 
-def prepare_tasks(host: HostConfig, descriptor: BenchmarkDescriptor, variant: str) -> list[dict[str, Any]]:
+def prepare_tasks(host: HostConfig, descriptor: BenchmarkDescriptor, variant: str) -> dict[str, Any]:
     selection = next(v for v in descriptor.variants if v.variant_id == variant)
     if host.task_directory is not None:
         directory = host.task_directory
@@ -46,6 +47,9 @@ def prepare_tasks(host: HostConfig, descriptor: BenchmarkDescriptor, variant: st
             candidates = [(task_name(directory), directory)]
         else:
             candidates = [(task_name(p.parent), p.parent) for p in sorted(directory.glob("*/task.toml"))]
+            if not candidates:
+                raise ValueError("task_directory must contain task.toml or immediate <task>/task.toml children; "
+                                 "export a flat task collection or use registry resolution")
     else:
         candidates = asyncio.run(registry_tasks(descriptor.dataset, host.cache / "upstream", selection.task_names))
     selected = []
@@ -61,7 +65,8 @@ def prepare_tasks(host: HostConfig, descriptor: BenchmarkDescriptor, variant: st
     names = [task_name(p) for _, p in selected]
     if len(set(names)) != len(names):
         raise ValueError("prepared local task names must be unique")
-    result = []
+    result: list[dict[str, Any]] = []
+    excluded = []
     for identity, original in selected:
         task_hash = tree_identity(original)
         # A task may contain links to other files in its own tree. External
@@ -69,6 +74,12 @@ def prepare_tasks(host: HostConfig, descriptor: BenchmarkDescriptor, variant: st
         for link in original.rglob("*"):
             if link.is_symlink() and not link.resolve().is_relative_to(original.resolve()):
                 raise ValueError(f"task contains an external link: {identity}/{link.relative_to(original)}")
+        config = tomllib.loads((original / "task.toml").read_text(encoding="utf-8"))
+        requirements = task_requirements({"id": identity, "path": str(original), "configuration": config})
+        if variant == "no_gpu" and requirements["gpu_requirements"]:
+            excluded.append({"id": identity, "reason": "GPU requirements or unresolved Compose resources",
+                             "requirements": requirements["gpu_requirements"], "sha256": task_hash})
+            continue
         key = digest({"id": identity, "upstream": task_hash, "patches": host.task_patches})
         root = host.cache / "tasks" / key
         target = root / original.name
@@ -104,8 +115,13 @@ def prepare_tasks(host: HostConfig, descriptor: BenchmarkDescriptor, variant: st
         result.append({"id": identity, "name": task_name(target), "path": str(target),
                        "sha256": prepared["sha256"], "image": config.get("environment", {}).get("docker_image"),
                        "original_sha256": task_hash, "patches": prepared["patches"],
-                       "original": str(original), "configuration": config})
-    return result
+                       "original": str(original), "configuration": config,
+                       "requirements": requirements})
+    if not result:
+        raise ValueError("no tasks remain after excluding GPU requirements")
+    return {"tasks": result, "selection": {"dataset": descriptor.dataset, "variant": variant,
+            "source": "local" if host.task_directory is not None else "registry",
+            "resolved_count": len(selected), "selected": [t["id"] for t in result], "excluded": excluded}}
 
 
 def check_tasks(tasks: list[dict[str, Any]]) -> None:
@@ -125,5 +141,5 @@ def validate_coverage(tasks: list[dict[str, Any]], trials: list[dict[str, Any]],
 
 def preparation_key(descriptor: BenchmarkDescriptor, variant: str) -> str:
     selection = next(item for item in descriptor.variants if item.variant_id == variant)
-    return digest({"dataset": descriptor.dataset, "version": descriptor.version,
+    return digest({"selection_contract": 2, "dataset": descriptor.dataset, "version": descriptor.version,
                    "variant": variant, "task_names": selection.task_names})

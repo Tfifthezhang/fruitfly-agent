@@ -62,6 +62,11 @@ def cell_width(text: str) -> int:
     return width
 
 
+def content_columns(stream: TextIO) -> int:
+    """Reserve the final terminal cell to avoid automatic right-edge wrapping."""
+    return max(4, terminal_columns(stream) - 1)
+
+
 def truncate_cells(text: str, limit: int, *, ellipsis: str = "…") -> str:
     """Truncate text to a terminal-cell budget without splitting code points."""
     if limit <= 0:
@@ -87,9 +92,31 @@ def pad_cells(text: str, width: int) -> str:
     return text + (" " * max(0, width - cell_width(text)))
 
 
+def wrap_cells(text: str, width: int) -> list[str]:
+    """Wrap plain text without dropping characters or splitting combining marks."""
+    width = max(1, width)
+    lines: list[str] = []
+    current = ""
+    used = 0
+    for char in text:
+        if char == "\n":
+            lines.append(current)
+            current, used = "", 0
+            continue
+        size = cell_width(char)
+        if current and used + size > width:
+            lines.append(current)
+            current, used = "", 0
+        current += char
+        used += size
+    lines.append(current)
+    return lines
+
+
 __all__ = [
     "safe_terminal_text",
     "cell_width",
+    "content_columns",
     "colors_enabled",
     "is_tty",
     "input_styles",
@@ -97,6 +124,7 @@ __all__ = [
     "supports_ansi",
     "terminal_columns",
     "truncate_cells",
+    "wrap_cells",
 ]
 
 

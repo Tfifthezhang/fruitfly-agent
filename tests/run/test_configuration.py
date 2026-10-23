@@ -173,7 +173,7 @@ class HarnessSelectionTest(unittest.TestCase):
         RunConfigurationController(chosen, builtin_catalog()).save()
         self.assertEqual(self.selection(environment={"FRUITFLY_MODEL_PROFILE": "missing"}).profile.model_profile, "b")
 
-    def test_controller_saves_only_profile_state_for_a_future_session(self) -> None:
+    def test_controller_saves_profile_state_without_activating_it(self) -> None:
         root = self.root
         _write_catalog(root / "models.yaml", {"a": "model-a", "b": "model-b"})
         catalog = builtin_catalog()
@@ -189,7 +189,7 @@ class HarnessSelectionTest(unittest.TestCase):
 
         self.assertTrue(before.changed)
         self.assertTrue(result.saved)
-        self.assertIn("newly created session", result.message)
+        self.assertIn("apply settings", result.message)
         self.assertEqual(persisted.select().model_profile, "b")
         self.assertIn(
             "knowledge-files",

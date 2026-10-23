@@ -6,6 +6,7 @@ Persist immutable text, candidate records, and readable outputs. Storage validat
 
 | File / entry | Responsibility |
 |---|---|
+| [sessions.py](sessions.py): `SessionLeases` | Share one exclusive Session writer during serialized runtime replacement |
 | [artifacts.py](artifacts.py): `DataArtifactStore` | Store and verify immutable text and binary bytes under SHA-256 identities |
 | [prompts.py](prompts.py): `resolve_base_prompt` | Resolve built-in or stored prompt contents without assembly |
 | [candidates.py](candidates.py): `CandidateRecord`, `CandidateStore` | Create, read, update, replace, and delete records |
@@ -14,6 +15,8 @@ Persist immutable text, candidate records, and readable outputs. Storage validat
 | [verification.py](verification.py): `VerificationUseStore` | Atomic private-suite claims; unknown work remains consumed |
 | [results.py](results.py): `save_task_result` | Export latest complete task/configuration/profile/target results |
 | [retention.py](retention.py): `compact_candidates` | Protect references before deleting obsolete owned records and contents |
+
+`SessionLeases.acquire(path, resume=True)` reuses a writer already owned by this pool. Each idempotent release decrements its reference count; the final release closes the writer and unlocks the file. Fresh acquisition retains Core locking and validation. The pool grants no execution authority and has no runtime/configuration dependencies. Application must serialize replacement; it does not permit concurrent writers or sharing across processes.
 
 `replace_record` replaces an existing validated record. `delete` removes a record; callers must apply retention rules first. Candidate business rules belong to the [improvement host](../improvement/README.md).
 

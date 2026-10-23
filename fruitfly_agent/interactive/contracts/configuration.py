@@ -1,4 +1,4 @@
-"""Renderer-neutral configuration views for a new-session-only editor."""
+"""Renderer-neutral configuration choices and save/application intent."""
 
 from __future__ import annotations
 
@@ -61,7 +61,7 @@ class ConfigurationSelectionGroup:
 
 @dataclass(frozen=True)
 class ConfigurationSnapshot:
-    """Non-secret, renderer-neutral choices for a future Agent session."""
+    """Non-secret, renderer-neutral choices staged for explicit application."""
 
     config_path: str
     selected_profile: str
@@ -91,7 +91,11 @@ class ConfigurationActionResult:
 
 @dataclass(frozen=True)
 class ConfigurationLaunchResult:
-    """Outcome of a Provider-free startup configuration view."""
+    """Provider-free view result: start the requested new or replacement runtime.
+
+    Active-session callers interpret ``start`` as applying saved settings through
+    recovery; startup callers use it to launch a session. Saving alone is false.
+    """
 
     start: bool
     saved: bool = False
@@ -100,7 +104,7 @@ class ConfigurationLaunchResult:
 
 
 class DefaultConfiguration(Protocol):
-    """Optional host operation staging default harness settings for a new session."""
+    """Optional host operation staging default harness settings for review."""
     def restore_defaults(self) -> ConfigurationActionResult: ...
 
 

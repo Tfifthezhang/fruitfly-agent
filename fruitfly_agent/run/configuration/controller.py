@@ -1,4 +1,4 @@
-"""Harness-profile discovery and the next-session configuration controller."""
+"""Harness-profile discovery and the saved configuration controller."""
 
 from __future__ import annotations
 
@@ -87,7 +87,7 @@ class RunConfigurationController:
             raise ValueError("default mechanisms require model profiles in the daily catalog: " + ", ".join(sorted(missing)))
         self._replace_profile(replace(current, prompt=baseline.prompt, mechanisms=baseline.mechanisms,
                                       artifact_bindings=baseline.artifact_bindings))
-        return _changed("restored default harness settings in the draft; model settings and credentials retained; save for a new session")
+        return _changed("restored default harness settings in the draft; model settings and credentials retained; save, then apply or start a session")
 
     @property
     def changed(self) -> bool:
@@ -204,7 +204,7 @@ class RunConfigurationController:
         self._draft.select(profile_id)
         self._selected = profile_id
         return _changed(
-            f"staged profile {profile_id!r}; save and start a new session"
+            f"staged profile {profile_id!r}; save, then apply or start a session"
         )
 
     def select_model(self, model_profile: str) -> ConfigurationActionResult:
@@ -217,7 +217,7 @@ class RunConfigurationController:
             )
         self._replace_profile(replace(profile, model_profile=model_profile))
         return _changed(
-            f"staged model {model_profile!r}; save and start a new session"
+            f"staged model {model_profile!r}; save, then apply or start a session"
         )
 
     def select_prompt(self, reference: str) -> ConfigurationActionResult:
@@ -225,7 +225,7 @@ class RunConfigurationController:
         resolve_base_prompt(reference, self._artifact_store)
         profile = self._draft.select(self._selected)
         self._replace_profile(replace(profile, prompt=reference))
-        return _changed(f"staged base prompt {reference!r}; save and start a new session")
+        return _changed(f"staged base prompt {reference!r}; save, then apply or start a session")
 
     def bind_target(self, kind: str, key: str, reference: str):
         """Persist a declared host binding; target-specific validation lives in Lab."""
@@ -241,7 +241,7 @@ class RunConfigurationController:
         bindings = dict(profile.artifact_bindings)
         bindings[key] = reference
         self._replace_profile(replace(profile, artifact_bindings=bindings))
-        return _changed("staged target artifact; start a new session")
+        return _changed("staged target artifact; save before applying settings")
 
     def preview_prompt(self, reference: str) -> tuple[str, str, str]:
         from fruitfly_agent.run.storage.prompts import resolve_base_prompt
@@ -260,7 +260,7 @@ class RunConfigurationController:
         suffix = f" and selected {selected!r}" if selected is not None else ""
         return _changed(
             f"staged model catalog {value!r}{suffix}; "
-            "save and start a new session"
+            "save, then apply or start a session"
         )
 
     def set_mechanism(
@@ -368,7 +368,7 @@ class RunConfigurationController:
         )
         return _changed(
             f"staged {mechanism_id!r} {action}{suffix}; "
-            "save and start a new session"
+            "save, then apply or start a session"
         )
 
     def select_algorithm(self, group_id: str, option_id: str | None) -> ConfigurationActionResult:
@@ -404,7 +404,7 @@ class RunConfigurationController:
         except BaseException:
             self._draft = original_draft
             raise
-        return _changed(f"staged selection {option_id or 'disabled'} in {group_id}; save and start a new session")
+        return _changed(f"staged selection {option_id or 'disabled'} in {group_id}; save, then apply or start a session")
 
     def set_parameter(
         self,
@@ -444,7 +444,7 @@ class RunConfigurationController:
         self._replace_profile(replace(profile, mechanisms=tuple(selections)))
         return _changed(
             f"staged {mechanism_id}.{name}={parsed!r}; "
-            "save and start a new session"
+            "save, then apply or start a session"
         )
 
     def save(self) -> ConfigurationActionResult:
@@ -477,8 +477,7 @@ class RunConfigurationController:
         self._persisted = True
         return ConfigurationActionResult(
             message=(
-                f"saved {self._path}; configuration is ready for a newly "
-                "created session"
+                f"saved {self._path}; apply settings or use them on a later start or recovery"
             ),
             saved=True,
         )

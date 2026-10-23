@@ -6,6 +6,7 @@ Exercise actual Application, Run assembly, and terminal paths with offline model
 
 | Files | Protects |
 |---|---|
+| `test_terminal_reflow.py` | Actual TTY resize reflows completed tables and retains drafts without another model request |
 | `test_terminal_interrupt.py` | Actual Ctrl+C/SIGINT, quiet-run continuation, clean exit, and terminal restoration in ANSI and non-ANSI terminals |
 | `test_decoupling.py / test_offline_example.py` | Public extensions and interchangeable improvers/targets |
 | `test_improvement.py / test_evolution.py` | Preview, adoption, explicit policy, and interrupted activation reconciliation |

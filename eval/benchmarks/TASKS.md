@@ -3,60 +3,57 @@
 [Up: Benchmark Adapters](README.md)
 
 Harbor tasks contain `instruction.md`, `task.toml` and an `environment/` definition.
-Shared verifiers use `tests/test.sh`; separate verifiers own their tests in their
-own image, usually built from `tests/`. Multi-step tasks can supply per-step
-instructions and verification contexts. Optional `solution/` material is for task validation, not
-Agent input. Instructions and initial files reach the Agent; the official verifier
-checks resulting files or environment state and writes a reward.
+Shared verifiers use `tests/test.sh`; independent verifiers own their test environment.
+Multi-step tasks can override verifier settings and build contexts. Optional
+`solution/` material is for task validation, not Agent input. Official verifiers
+check resulting state and write rewards.
 
-| Benchmark | Dataset | Small selections |
+## Choose a registered dataset
+
+These are declarations only; preparation and execution use the same public Harbor
+integration for every entry. See the [server guide](../SERVER_GUIDE.md) for the
+shared setup procedure.
+
+| ID | Dataset | Exact smoke task |
 |---|---|---|
-| [Terminal-Bench 2.1](https://github.com/harbor-framework/terminal-bench-2-1) | `terminal-bench/terminal-bench-2-1` | `smoke`: `terminal-bench/fix-git`; `starter`: five exact tasks below |
-| [Terminal-Bench 4.0.0](https://github.com/harbor-framework/terminal-bench/tree/v4.0.0) | `terminal-bench/terminal-bench@4.0.0` | ID `terminal-bench-4`; `smoke`: `terminal-bench/interleaved-vigenere` |
-| [SWE-bench Verified](https://hub.harborframework.com/datasets/swe-bench/swe-bench-verified) | `swe-bench/swe-bench-verified` | `smoke`: `swe-bench/psf__requests-1142` |
+| `terminal-bench` | `terminal-bench/terminal-bench-2-1` | `terminal-bench/fix-git` |
+| `terminal-bench-4` | `terminal-bench/terminal-bench@4.0.0` | `terminal-bench/interleaved-vigenere` |
+| `swe-bench` | `swe-bench/swe-bench-verified` | `swe-bench/psf__requests-1142` |
 
-## Select Terminal-Bench 4.0
+## Choose one of three selections
 
-Set `benchmark.id` to `terminal-bench-4` and `benchmark.variant` to `smoke` in the
-[CLI request](../DEVELOPER_GUIDE.md#create-a-cli-request), then run `prepare`,
-`check` and `run` using that request. The existing `terminal-bench` ID selects
-2.1. The 4.0 smoke uses one CPU task with an independent verifier; it does not
-establish full-dataset or GPU compatibility. Full `no_gpu` and `gpu` variants
-include every resolved task, including GPU tasks. Prepare on a host satisfying
-the selected tasks' resources. Real execution makes model requests and may incur charges.
-
-## Run the Terminal-Bench starter
-
-Set `benchmark.id` to `terminal-bench` and `benchmark.variant` to `starter` in the
-[CLI request](../DEVELOPER_GUIDE.md#create-a-cli-request). Preparation resolves
-tasks and checks images; execution calls models and charges can apply.
-
-| Exact task name | Goal |
+| Variant | Meaning |
 |---|---|
-| `terminal-bench/fix-git` | Recover lost repository changes |
-| `terminal-bench/log-summary-date-ranges` | Summarize log severities across date ranges |
-| `terminal-bench/regex-log` | Match dates on lines with valid IPv4 addresses |
-| `terminal-bench/cancel-async-tasks` | Implement bounded asynchronous execution and cancellation |
-| `terminal-bench/fix-code-vulnerability` | Repair vulnerable code and describe the issue |
+| `smoke` | One exact declared task, preserving its original resources |
+| `no_gpu` | Exclude GPU requirements in effective Agent, Verifier, step and Compose-service definitions |
+| `full` | Every resolved task with its declared resources |
 
-Preparation resolves the five exact names and freezes their local task paths.
-Results must contain
-each selected task exactly once per requested attempt. Smoke applies the same
-coverage rule to its single task. These samples establish execution-path behavior,
-not a representative benchmark score.
+Use `prepare --tasks-only` before image downloads/builds to inspect selected and
+excluded tasks, role/step requirements, exact local image references and build
+contexts. Absence of a GPU requirement cannot be established for external Compose
+includes or service inheritance; `no_gpu` excludes these conservatively and records
+why. Undeclared resource needs in scripts or external services remain unverified.
+No fixed task counts or benchmark-specific CPU lists drive this filtering.
 
-## Match images and task definitions
+Selection records identify registry versus local scope. A local directory does
+not prove official dataset coverage. Only the frozen selected task set determines
+required result coverage: every selected task must appear exactly once per attempt.
+Missing, unexpected or duplicate attempts fail the report and suppress aggregates.
+A single smoke validates its execution path, not a representative dataset score.
 
-Task images alone do not contain all host-side instructions, configuration and
-verifier material. Harbor resolves these through its dataset interface. Check
-image tags, CPU architecture, disk, task resources, host/container connectivity
-and model access. `no_gpu` performs no GPU preflight; it does not remove tasks
-from the dataset. Harbor preserves individual resource and timeout declarations.
+## Preserve task and image identity
 
-The Hub resolves unversioned datasets to their available revision during preparation;
-`@version` selects the declared revision. Eval
-freezes every selected task's content and records original/prepared hashes,
-explicit setup diffs and image identities. Run consumes those local paths and
-checks coverage for full datasets too. `task_directory` can use exported local
-tasks without registry access. Keep preparation and Harbor job artifacts when
-comparing runs. See [Eval results](../README.md#inspect-results).
+Task images do not replace host-side instructions, configuration and verifier
+material. Resolve tasks through Harbor's public dataset API or export a flat local
+collection. `task_directory` accepts one task or immediate `<task>/task.toml` children.
+Nested downloaded revision caches must be exported first. `@version` pins a dataset
+revision; unversioned declarations resolve during preparation.
+
+Preparation preserves content hashes, explicit setup diffs and actual image
+identities. Full repository references, including digests, must resolve locally;
+a short tag or matching image ID alone is insufficient. Keep instructions, scoring,
+resource declarations and digests unchanged. Shared dependency setup and exact
+`tests/` patches belong to the machine contract, not benchmark-specific code.
+
+Keep preparation and job artifacts for comparisons. See
+[Harbor preparation](../harbor/README.md) and [Eval results](../README.md#inspect-results).

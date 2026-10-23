@@ -15,6 +15,7 @@ import yaml
 from eval.benchmarks.harbor import harbor_descriptor
 from eval.contracts import EvaluationRequest
 from eval.harbor.dependencies import check_dependencies, dependency_mounts, prepare_dependencies
+from eval.harbor.controller import environment_snapshot
 from eval.harbor.docker import run_container
 from eval.harbor.environments import environment_key, probe_environment
 from eval.harbor.host import HostConfig
@@ -28,6 +29,9 @@ from tests.support.harbor import prepared_harbor
 class PreparationTests(unittest.TestCase):
     def setUp(self):
         self.root = Path(self.enterContext(tempfile.TemporaryDirectory())).resolve()
+        self.enterContext(patch("eval.harbor.tasks.task_requirements", return_value={
+            "gpu_requirements": [], "images": [{"reference": "fixture:v1", "role": "agent", "step": None}], "builds": []}))
+        self.enterContext(patch("eval.harbor.preparation.inspect_images", return_value=[]))
         self.host, _ = prepared_harbor(self.root)
         runtime = self.root / "runtime/bin"
         runtime.mkdir(parents=True)
@@ -62,6 +66,48 @@ class PreparationTests(unittest.TestCase):
         self.assertEqual(host.mounts[0].source.resolve(), self.root / "runtime")
         self.assertEqual(host.cache, self.root / "cache")
 
+    def test_controller_records_dependency_conflicts_without_importing_clients_or_saving_secrets(self):
+        distributions = [SimpleNamespace(metadata={"Name": "fixture-controller"}, version="1",
+                                        requires=["fixture-client>=2", "unused; extra == 'cloud'"]),
+                         SimpleNamespace(metadata={"Name": "fixture-client"}, version="1", requires=[])]
+        # The optional SDK owns packaging; exercise our audit without installing it.
+        requirements = ModuleType("packaging.requirements")
+        class Specifier:
+            def contains(self, version):
+                return False
+            def __str__(self):
+                return ">=2"
+        requirements.Requirement = lambda text: SimpleNamespace(
+            name="unused" if "extra" in text else "fixture-client", specifier=Specifier(),
+            marker=SimpleNamespace(evaluate=lambda env: False) if "extra" in text else None)
+        utils = ModuleType("packaging.utils")
+        utils.canonicalize_name = lambda name: name.lower()
+        with patch.dict(sys.modules, {"packaging.requirements": requirements, "packaging.utils": utils}), patch(
+            "eval.harbor.controller.metadata.distributions", return_value=distributions
+        ), patch.dict(
+            "os.environ", {"MODEL_API_KEY": "placeholder-do-not-record"}
+        ):
+            snapshot = environment_snapshot()
+        self.assertEqual(snapshot["dependency_check"], "conflicts")
+        self.assertEqual(snapshot["dependency_issues"], [
+            {"package": "fixture-controller", "requirement": "fixture-client>=2", "installed": "1"}])
+        self.assertNotIn("placeholder-do-not-record", json.dumps(snapshot))
+
+    def test_check_detects_controller_changes_and_keeps_declared_conflicts_visible(self):
+        def probe(task, *args, **kwargs):
+            return {"environment_key": environment_key(task), "images": []}
+        with patch("eval.harbor.preparation.probe_environment", side_effect=probe):
+            prepared = prepare(self.request, self.descriptor, self.host)
+        receipt = json.loads(Path(prepared["receipt"]).read_text())
+        conflict = {**receipt["controller"], "dependency_check": "conflicts", "dependency_issues": [{"package": "fixture"}]}
+        receipt["controller"] = conflict
+        with patch("eval.harbor.preparation.environment_snapshot", return_value=conflict):
+            checked = inspect(self.request, self.descriptor, self.host, receipt=receipt)
+        self.assertTrue(checked["available"])
+        self.assertEqual(next(c for c in checked["checks"] if c["id"] == "controller_dependencies")["status"], "unverified")
+        with patch("eval.harbor.preparation.environment_snapshot", return_value={**conflict, "python": "changed"}):
+            self.assertFalse(inspect(self.request, self.descriptor, self.host, receipt=receipt)["available"])
+
     def test_invalid_host_fields_mounts_and_secrets_fail_early(self):
         valid = {"schema_version": 1, "agent": {"python": "/opt/runtime/bin/python", "mounts": [
             {"source": "runtime", "target": "/opt/runtime"}]}}
@@ -72,6 +118,7 @@ class PreparationTests(unittest.TestCase):
             {**valid, "agent": {**valid["agent"], "mounts": "invalid"}},
             {**valid, "agent": {**valid["agent"], "mounts": [{"source": "runtime", "target": "/"}]}},
             {**valid, "agent": {**valid["agent"], "mounts": [{"source": "runtime", "target": "/logs"}]}},
+            {**valid, "agent": {**valid["agent"], "library_paths": ["/unmounted/libraries"]}},
             {**valid, "dependencies": {"assets": [{"url": "file:///tmp/asset", "path": "../escape", "sha256": "0" * 64}]}},
             {**valid, "task_patches": [{"task": "*", "path": "solution/solve.sh", "old": "a", "new": "b"}]},
         ]
@@ -125,7 +172,7 @@ class PreparationTests(unittest.TestCase):
 
     def test_prepare_freezes_full_tasks_and_exact_declared_name(self):
         (self.tasks / "task-b/task.toml").write_text('[task]\nname = "example/renamed"\n[environment]\ndocker_image = "fixture:v1"\n')
-        tasks = prepare_tasks(self.host, self.descriptor, "no_gpu")
+        tasks = prepare_tasks(self.host, self.descriptor, "full")["tasks"]
         self.assertEqual([t["id"] for t in tasks], ["task-a", "example/renamed"])
         (self.tasks / "task-a/tests/test.sh").write_text("upstream changed")
         self.assertIn("download-helper", (Path(tasks[0]["path"]) / "tests/test.sh").read_text())
@@ -143,7 +190,7 @@ class PreparationTests(unittest.TestCase):
     def test_explicit_setup_patch_is_isolated_audited_and_exact(self):
         host = replace(self.host, task_patches=({"task": "example/task-a", "path": "tests/test.sh",
                                                "old": "download-helper", "new": "/opt/pinned/helper"},))
-        tasks = prepare_tasks(host, self.descriptor, "smoke")
+        tasks = prepare_tasks(host, self.descriptor, "smoke")["tasks"]
         self.assertEqual([t["id"] for t in tasks], ["example/task-a"])
         self.assertIn("+", tasks[0]["patches"][0]["diff"])
         self.assertIn("download-helper", (self.tasks / "task-a/tests/test.sh").read_text())
@@ -240,7 +287,7 @@ class PreparationTests(unittest.TestCase):
         path.write_text(json.dumps(receipt))
         with self.assertRaisesRegex(ValueError, "run eval prepare again"):
             load_preparation(self.host, self.descriptor, "no_gpu")
-        receipt["schema_version"] = 2
+        receipt["schema_version"] = 3
         receipt["environments"] = []
         receipt["id"] = digest({key: value for key, value in receipt.items() if key != "id"})
         path.write_text(json.dumps(receipt))
@@ -249,7 +296,7 @@ class PreparationTests(unittest.TestCase):
 
     def test_separate_verifier_task_is_frozen_without_changing_official_mode(self):
         (self.tasks / "task-a/task.toml").write_text('[verifier]\nenvironment_mode = "separate"\n[environment]\ndocker_image = "fixture:v1"\n')
-        tasks = prepare_tasks(self.host, self.descriptor, "smoke")
+        tasks = prepare_tasks(self.host, self.descriptor, "smoke")["tasks"]
         self.assertEqual(tasks[0]["configuration"]["verifier"]["environment_mode"], "separate")
         self.assertEqual((Path(tasks[0]["path"]) / "task.toml").read_bytes(),
                          (self.tasks / "task-a/task.toml").read_bytes())

@@ -1,11 +1,11 @@
 """Actual terminal keys and signals stop a quiet Provider without losing the app."""
 import os
-import time
 import unittest
 from tests.support.terminal_process import TerminalProcess
 
 CODE = '''
 import asyncio, sys, termios
+from fruitfly_agent.interactive.contracts.events import AuthorizationRequested, RunFinished
 from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.core.data_model import AssistantMessage
 from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone
@@ -26,9 +26,21 @@ async def main():
     app = AgentApplication(_Factory([session]))
     await app.start()
     try:
-        result = await TerminalFrontend(app).run()
+        frontend = TerminalFrontend(app)
+        seen = []
+        render = frontend.renderer.render
+        async def observe(event):
+            seen.append(event)
+            await render(event)
+            if isinstance(event, AuthorizationRequested):
+                number = sum(isinstance(item, AuthorizationRequested) for item in seen)
+                asyncio.get_running_loop().call_soon(lambda: print('PROMPT-READY-' + str(number), flush=True))
+        frontend.renderer.render = observe
+        result = await frontend.run()
     finally:
         await app.close()
+    print('CANCEL-COUNT=' + str(sum(isinstance(e, RunFinished) and e.stop_reason == 'aborted' for e in seen)), flush=True)
+    print('PERMISSION-COUNT=' + str(sum(isinstance(e, AuthorizationRequested) for e in seen)), flush=True)
     print('CLEAN-EXIT=' + str(result), flush=True)
     after = termios.tcgetattr(sys.stdin)
     # macOS marks pending input for reprocessing after raw-mode restoration.
@@ -65,7 +77,10 @@ class TerminalInterruptWorkflowTests(unittest.TestCase):
                 output = process.finish()
                 self.assertIn('CLEAN-EXIT=0', output)
                 self.assertIn('TERMINAL-RESTORED=True', output)
-                self.assertEqual(2, output.count('[run cancelled;'))
+                self.assertIn('CANCEL-COUNT=2', output)
+                self.assertIn('[run cancelled;', output)
+                if term != 'dumb':
+                    self.assertIn('\x1b[?1049l', output)
 
     def test_idle_double_interrupt_exits_cleanly_and_restores_terminal(self):
         for term in ('xterm-256color', 'dumb'):
@@ -129,7 +144,7 @@ class TerminalAuthorizationWorkflowTests(unittest.TestCase):
         self.addCleanup(process.close)
         process.read_until('you> ' if term == 'dumb' else '❯ ')
         process.send(b'first\r')
-        process.read_until('3. Deny (Esc)')
+        process.read_until('PROMPT-READY-1')
         return process
 
     def test_enter_allows_once_and_the_next_call_requires_confirmation(self):
@@ -139,12 +154,7 @@ class TerminalAuthorizationWorkflowTests(unittest.TestCase):
                 process.send(b'\r')
                 process.read_until('DONE-ONE')
                 process.send(b'second\r')
-                process.read_until('permission: once')
-                # The second approval is a distinct request; inspect the appended transcript.
-                deadline = time.monotonic() + 3
-                while process.output.count(b'Permission required:') < 2:
-                    self.assertLess(time.monotonic(), deadline)
-                    process._read()
+                process.read_until('PROMPT-READY-2')
                 process.send(b'3' + (b'\r' if term == 'dumb' else b''))
                 process.read_until('DONE-TWO')
                 process.send(b'/exit\r')
@@ -162,7 +172,8 @@ class TerminalAuthorizationWorkflowTests(unittest.TestCase):
                 process.read_until('DONE-TWO')
                 process.send(b'/exit\r')
                 output = process.finish()
-                self.assertEqual(1, output.count('Permission required:'))
+                self.assertIn('PERMISSION-COUNT=1', output)
+                self.assertNotIn('PROMPT-READY-2', output)
                 self.assertIn('EFFECT-COUNT=2', output)
 
     def test_escape_denies_and_ctrl_c_cancels_without_effects(self):

@@ -39,6 +39,10 @@ class BenchmarkSelection:
     benchmark_id: str
     variant: str
 
+    def __post_init__(self) -> None:
+        if self.variant not in {"smoke", "no_gpu", "full"}:
+            raise ValueError("benchmark.variant must be smoke, no_gpu or full")
+
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> BenchmarkSelection:
         _fields(data, {"id", "variant"}, "benchmark")

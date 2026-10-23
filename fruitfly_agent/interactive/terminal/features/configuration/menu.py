@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Callable, Mapping, TextIO
 
 from fruitfly_agent.interactive.contracts.configuration import (
@@ -65,7 +65,7 @@ class TerminalConfigurationFrontend:
         return self._new_session_loop() if editable else self._resume_loop()
 
     def run_for_active_session(self) -> ConfigurationLaunchResult:
-        """Edit future-session choices without ever exiting the Agent client."""
+        """Edit saved choices and optionally apply them to this conversation."""
         self._inside_active_session = True
         try:
             if getattr(self.configuration, "read_only", False):
@@ -76,7 +76,7 @@ class TerminalConfigurationFrontend:
                 snapshot = self.configuration.snapshot()
                 if not snapshot.changed:
                     return ConfigurationLaunchResult(start=False)
-                decision = self._confirm_new_session_loop(snapshot)
+                decision = self._confirm_application(snapshot)
                 if decision == "continue":
                     continue
                 if decision == "discard":
@@ -88,7 +88,7 @@ class TerminalConfigurationFrontend:
                     return ConfigurationLaunchResult(start=False)
                 result = self._start(snapshot)
                 if result is not None:
-                    return result
+                    return replace(result, start=decision == "apply")
         finally:
             self._inside_active_session = False
 
@@ -133,12 +133,12 @@ class TerminalConfigurationFrontend:
                 return ConfigurationLaunchResult(start=False)
 
     def _preview_prompt(self, label: str, content_hash: str, content: str) -> tuple[bool, object]:
-        """Preview complete prompt text before staging a future-session choice."""
+        """Preview complete prompt text before staging a configuration choice."""
         import textwrap
         lines = [part for line in content.splitlines()
                  for part in (textwrap.wrap(line, width=80, replace_whitespace=False) or [''])]
         page, selected, size = 0, 1, 8
-        values = ('Use for next session', 'Back')
+        values = ('Use this prompt', 'Back')
         while True:
             self._render(title='prompt · preview',
                 subtitle=f'{label} · {content_hash}\nReview prompt ({page + 1}/{max(1, (len(lines) + size - 1)//size)})\n'
@@ -174,7 +174,7 @@ class TerminalConfigurationFrontend:
             categories = _group_mechanisms(snapshot)
             rows = [
                 MenuRow("model", snapshot.model_profile or "Select a model"),
-                MenuRow("prompt", f"{snapshot.prompt_label} · next session"),
+                MenuRow("prompt", f"{snapshot.prompt_label} · draft"),
             ]
             rows.extend(
                 MenuRow(
@@ -220,16 +220,17 @@ class TerminalConfigurationFrontend:
             elif restore is not None:
                 self._call(restore)
 
-    def _confirm_new_session_loop(
+    def _confirm_application(
         self,
         snapshot: ConfigurationSnapshot,
     ) -> str:
         selected = 0
         rows = (
             MenuRow(
-                "Save and start new session",
-                f"prompt: {self.active_prompt_label or 'current'} → {snapshot.prompt_label} (next)",
+                "Save and apply to this conversation",
+                f"prompt: {self.active_prompt_label or 'current'} → {snapshot.prompt_label}",
             ),
+            MenuRow("Save only", "Keep the active runtime; use saved settings on a later start or recovery"),
             MenuRow("Continue configuring", "Return to the configuration menu"),
             MenuRow(
                 "Discard changes",
@@ -238,10 +239,10 @@ class TerminalConfigurationFrontend:
         )
         while True:
             self._render(
-                title="New session required",
+                title="Apply configuration",
                 subtitle=(
-                    "Configuration cannot replace the Provider or components in "
-                    "the active session. Start a fresh session to apply it."
+                    "Applying rebuilds the runtime and retains this conversation. "
+                    "Unavailable recovery requirements leave the active runtime unchanged."
                 ),
                 rows=rows,
                 selected=selected,
@@ -256,7 +257,7 @@ class TerminalConfigurationFrontend:
                 return "discard"
             if event.action != MenuAction.ACTIVATE:
                 continue
-            return ("start", "continue", "discard")[selected]
+            return ("apply", "save", "continue", "discard")[selected]
 
     def _resume_loop(self) -> ConfigurationLaunchResult:
         selected = 0
@@ -311,7 +312,7 @@ class TerminalConfigurationFrontend:
             values = snapshot.model_profiles + ("Add model…", "Set API key…")
             labels = {name: f"{name} · {setup.credential_status(name)}" for name in snapshot.model_profiles}
             quit_requested, value = self._choose_value(
-                title="model.profile", subtitle="Choose a model or add one. Changes apply to a new session.",
+                title="model.profile", subtitle="Choose a model or add one. Review and save before applying changes.",
                 values=values, current=snapshot.model_profile, labels=labels,
             )
             if value == "Add model…":
@@ -359,7 +360,7 @@ class TerminalConfigurationFrontend:
             rows.append(MenuRow("Back", "Return to configuration"))
             actions.append(("back", ""))
             selected = min(selected, len(rows) - 1)
-            self._render(title="prompt · next session",
+            self._render(title="prompt · draft",
                          subtitle="Built-in prompts and task / scenario adaptations. Preview before applying.",
                          rows=tuple(rows), selected=selected)
             event = self.menu_input.read_event()
@@ -389,7 +390,7 @@ class TerminalConfigurationFrontend:
             quit_requested, decision = self._preview_prompt(label, content_hash, content)
             if quit_requested:
                 return True
-            if decision == "Use for next session":
+            if decision == "Use this prompt":
                 self._call(self.configuration.select_prompt, value)
                 return False
 
@@ -407,7 +408,7 @@ class TerminalConfigurationFrontend:
             identities = [action.identity for action in actions]
             selected = identities.index(focus) if focus in identities else min(selected, len(rows) - 1)
             self._render(title=_category_label(category),
-                         subtitle='Enter expands algorithms; Space enables/disables. Changes apply to the next session.'
+                         subtitle='Enter expands algorithms; Space enables/disables. Review and save before applying changes.'
                              + (' Unsaved changes.' if snapshot.changed else '')
                              + f'\nConfiguration: {snapshot.config_path} · Profile: {snapshot.selected_profile}',
                          rows=tuple(rows), selected=selected, toggle=True, reference_page=reference_page)

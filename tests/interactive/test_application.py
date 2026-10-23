@@ -60,7 +60,9 @@ class AgentApplicationTest(unittest.IsolatedAsyncioTestCase):
         return app, candidate, lifecycle
 
     async def _switch(self, app, candidate, operation):
-        if operation == "rebuild":
+        if operation == "apply":
+            await app.apply_configuration()
+        elif operation == "rebuild":
             await app.rebuild()
         elif operation == "resume":
             await app.resume("second.jsonl")
@@ -70,7 +72,7 @@ class AgentApplicationTest(unittest.IsolatedAsyncioTestCase):
             await app.activate_runtime(candidate, expected_manifest_digest="sha256:test")
 
     async def test_replacement_activation_failure_preserves_incumbent(self):
-        for operation in ("rebuild", "resume", "adopt", "activate"):
+        for operation in ("apply", "rebuild", "resume", "adopt", "activate"):
             with self.subTest(operation=operation):
                 def fail():
                     raise RuntimeError("activation failed")
@@ -84,7 +86,7 @@ class AgentApplicationTest(unittest.IsolatedAsyncioTestCase):
                 await app.close()
 
     async def test_replacement_retirement_failure_preserves_successful_switch(self):
-        for operation in ("rebuild", "resume", "adopt", "activate"):
+        for operation in ("apply", "rebuild", "resume", "adopt", "activate"):
             with self.subTest(operation=operation):
                 def fail():
                     raise RuntimeError("retirement failed")
@@ -98,7 +100,7 @@ class AgentApplicationTest(unittest.IsolatedAsyncioTestCase):
                 await app.close()
 
     async def test_replacement_start_cancellation_preserves_incumbent(self):
-        for operation in ("rebuild", "resume", "adopt", "activate"):
+        for operation in ("apply", "rebuild", "resume", "adopt", "activate"):
             with self.subTest(operation=operation):
                 entered = asyncio.Event()
 
@@ -160,6 +162,23 @@ class AgentApplicationTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(application.status.model, "second")
         self.assertEqual(application.status.session_path, "second.jsonl")
         await application.close()
+
+    async def test_apply_uses_current_session_recovery_and_rejects_pending_work(self):
+        first = offline_session(model='first', session_path='first.jsonl')
+        second = offline_session(model='second', session_path='first.jsonl')
+        factory = _Factory([first, second])
+        app = AgentApplication(factory)
+        await app.start(session_path=Path('first.jsonl'))
+        self.addAsyncCleanup(app.close)
+        app.enqueue('pending')
+        with self.assertRaisesRegex(RuntimeError, 'finish.*active work'):
+            await app.apply_configuration()
+        app.cancel()
+        await app.wait_until_idle()
+        await app.apply_configuration()
+        self.assertEqual(factory.opened[-1], (True, Path('first.jsonl')))
+        self.assertEqual(app.status.model, 'second')
+        self.assertEqual(app.status.session_path, 'first.jsonl')
 
     async def test_rebuild_waits_for_direct_submission_before_closing_runtime(self) -> None:
         run_started = asyncio.Event()

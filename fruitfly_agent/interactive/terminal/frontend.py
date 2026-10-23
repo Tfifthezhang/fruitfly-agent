@@ -56,7 +56,7 @@ class TerminalFrontend:
         self.output = output_stream or sys.stdout
         self._inline_display: InlineTerminalDisplay | None = None
         if renderer is None and line_editor is None:
-            isolated = create_inline_terminal(self.input, self.output)
+            isolated = create_inline_terminal(self.input, self.output, fullscreen=True)
             if isolated is not None:
                 self._inline_display, line_editor = isolated
                 renderer = TerminalRenderer(self._inline_display)

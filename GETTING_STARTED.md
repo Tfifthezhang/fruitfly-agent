@@ -49,7 +49,7 @@ The standard host allows ordinary workspace file operations, protects known cred
 
 Use **Configure → Restore default configuration** to stage the default tools,
 environment, algorithms and prompt. The action retains your model and credentials;
-review and save for a new session or discard the draft. Prepare the
+review and apply the saved draft to this conversation, save only, or discard it. Prepare the
 [default templates](examples/configuration/README.md) before restoring. Default
 files are edited manually. Eval uses their complete profile inside task containers.
 
@@ -68,7 +68,7 @@ After initial configuration:
 | Use `--resume --session PATH` | Restore a specific session at startup. |
 | Enter `/resume` | Choose a compatible session from the idle terminal and display saved chat. |
 | Supply a task with `--resume` | Continue saved context for one task without printing old chat; model requests may incur charges. |
-| Change configuration | Apply the selection to a new session. |
+| Change configuration | Save and apply to this conversation while idle, or save only. |
 
 See [Terminal](fruitfly_agent/interactive/terminal/README.md) for daily controls and [Run](fruitfly_agent/run/README.md) for startup and recovery contracts.
 

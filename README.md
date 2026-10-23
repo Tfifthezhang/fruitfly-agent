@@ -57,7 +57,7 @@ See the [walkthrough](examples/extensions/README.md).
 ## Choose your mechanisms
 
 Use `/config` to select models, prompts, tools, context and execution environments
-for a new session. `/lab` inspects the active runtime. `/resume` continues saved
+and apply saved choices to the current conversation while idle. `/lab` inspects the active runtime. `/resume` continues saved
 conversation with current configuration after validating history and artifacts.
 See [Configuration](CONFIGURATION.md) and [Terminal](fruitfly_agent/interactive/terminal/README.md).
 

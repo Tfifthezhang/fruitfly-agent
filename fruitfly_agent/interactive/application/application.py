@@ -428,8 +428,16 @@ class AgentApplication:
             self._last_error = error
             raise error from exc
 
-    async def rebuild(self) -> None:
-        """Apply saved configuration by replacing the complete runtime/session."""
+    async def apply_configuration(self) -> None:
+        """Rebuild an idle runtime using saved settings and the same conversation."""
+        if self._handle is None:
+            raise RuntimeError("application is not started")
+        if self._state != ApplicationState.IDLE or self._pending:
+            raise RuntimeError("finish or cancel active work before applying configuration")
+        await self.rebuild(preserve_session=True)
+
+    async def rebuild(self, *, preserve_session: bool = False) -> None:
+        """Replace the runtime; recover its Session only when explicitly selected."""
 
         if self._handle is None:
             raise RuntimeError("application is not started")
@@ -451,9 +459,9 @@ class AgentApplication:
             candidate: RuntimeHandle | None = None
             try:
                 self._factory.reload_configuration()
-                candidate = await self._factory.open(
-                    resume=False, session_path=self._factory.new_session_path(),
-                )
+                candidate = await self._factory.open(resume=preserve_session, session_path=(
+                    Path(previous.session.status.session_path) if preserve_session
+                    else self._factory.new_session_path()))
                 await self._prepare_handle(candidate)
             except BaseException:
                 try:
@@ -463,6 +471,8 @@ class AgentApplication:
                     self._state = ApplicationState.IDLE
                 raise
             self._handle = candidate
+            self._last_result = None
+            self._last_error = None
             await self._close_previous(previous)
             self._state = ApplicationState.IDLE
 

@@ -99,7 +99,7 @@ def configure_credential(form: ModelFormIO, service: ModelSetupService, model_pr
     if secret is None or secret == "/cancel":
         return
     _, action = form.choose_value(
-        title="API key", subtitle="Value hidden. Save configuration to apply to a new session.",
+        title="API key", subtitle="Value hidden. Save configuration before applying settings.",
         values=("Cancel", "Stage API key"), current="Cancel",
     )
     if action == "Stage API key":

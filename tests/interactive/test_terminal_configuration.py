@@ -241,7 +241,7 @@ class TerminalConfigurationFrontendTest(unittest.TestCase):
 
         self.assertEqual(result, ConfigurationLaunchResult(start=True, saved=True))
         self.assertTrue(controller.saved)
-        self.assertIn("New session required", output.getvalue())
+        self.assertIn("Apply configuration", output.getvalue())
 
     def test_active_session_configuration_returns_without_changes(self) -> None:
         controller = MockConfiguration(model="offline")
@@ -261,3 +261,12 @@ class TerminalConfigurationFrontendTest(unittest.TestCase):
 
         self.assertEqual(result, ConfigurationLaunchResult(start=False))
         self.assertIn("✓ offline", output.getvalue())
+
+    def test_active_save_only_retains_runtime_intent_and_discard_drops_draft(self):
+        for decision, saved, enabled in (('2', True, True), ('4', False, False)):
+            with self.subTest(decision=decision):
+                controller = MockConfiguration(model='offline')
+                result = self.frontend(controller, '3', 'space', 'back', 'back', decision).run_for_active_session()
+                self.assertFalse(result.start)
+                self.assertEqual(result.saved, saved)
+                self.assertEqual(controller.enabled, enabled)

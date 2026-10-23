@@ -9,7 +9,7 @@ Use FruitFlyAgent through stdin/stdout, menus, and live events. Application owns
 | Need | Action |
 |---|---|
 | Start | Run `python -m fruitfly_agent`; choose **Start new session**. |
-| Configure | `/config`; save choices for a new session. |
+| Configure | `/config`; save and apply to this conversation, or save only. |
 | Select a prompt | **Configure → prompt** or `/config`; preview and confirm. |
 | Inspect activity | `/status`: model, prompt, workspace, session, committed conversation message count, state, queue, pending candidates, context usage bar/percentage, and session compaction count. |
 | Inspect the active harness | `/lab`: active context mechanisms, execution environment, installed tools and supplied capabilities. |
@@ -22,13 +22,13 @@ Use FruitFlyAgent through stdin/stdout, menus, and live events. Application owns
 
 POSIX ANSI terminals support live input, history, cancellation, and bracketed paste. Non-ANSI POSIX TTY input uses a stoppable canonical reader and handles SIGINT while a run is waiting. Redirected input uses sequential line-based fallback and cannot consume `/cancel` during a run. Display limits do not alter model context or stored messages. `NO_COLOR` and terminal capabilities affect rendering.
 
-The editable input area has a contrasting background, an emphasized `❯` prefix, and vertical spacing without full-width borders. Submitted inputs retain an emphasized prefix and blank lines, without background fill. The input uses a neutral gray background and the terminal’s default text color, with light/dark hints and capability fallbacks described in [I/O](io/README.md); `NO_COLOR` keeps the text and spacing. Terminal resizing refreshes the editable layout while retaining the draft and cursor. Completed transcript lines remain in terminal scrollback.
+The editable input area has a contrasting background, an emphasized `❯` prefix, and vertical spacing without full-width borders. Submitted inputs retain an emphasized prefix and blank lines, without background fill. The input uses a neutral gray background and the terminal’s default text color, with light/dark hints and capability fallbacks described in [I/O](io/README.md); `NO_COLOR` keeps the text and spacing. The built-in POSIX ANSI frontend owns an alternate-screen chat viewport. Resizing reflows completed assistant Markdown and restored history while retaining the draft and cursor. PageUp/PageDown or the mouse wheel browse history; Ctrl+End returns to the latest output. Menus lend and restore the screen. Exit restores the shell screen; persisted conversation remains available through `/resume`. Redirected and non-ANSI streams retain linear output.
 
 Live reasoning text is hidden. The existing activity display indicates reasoning, answer reception, and tool execution; redirected output keeps brief activity milestones without animation. Reasoning summaries are also hidden. This presentation policy adds no model requests and does not change reasoning usage. Ordinary assistant text and bounded tool output remain visible.
 
 ## Restore a conversation
 
-After successful `/resume` or interactive startup with `--resume`, the terminal appends the original conversation in chronological order, followed by an end marker and the normal input prompt. User and assistant text is complete; ANSI terminals format assistant Markdown. Use terminal scrollback to review earlier turns. Existing scrollback is retained, and menus do not replay history.
+After successful `/resume` or interactive startup with `--resume`, the terminal appends the original conversation in chronological order, followed by an end marker and the normal input prompt. User and assistant text is complete; ANSI terminals format assistant Markdown. Use viewport scrolling to review earlier turns in the built-in ANSI frontend. Menus restore the existing display records without replaying runtime events. Linear fallback remains available for other streams.
 
 Tool calls show names without arguments. Tool results show at most 800 characters per message and explicitly mark omitted output. Images show attachment/media-type markers; reasoning shows an omission marker. Internal context summaries and transient activity events are not replayed. History display makes no model requests, executes no tools, and writes no messages. Context reduction may still affect the context sent to the model.
 
@@ -39,12 +39,13 @@ Cancelled or failed restoration keeps the current session and does not display t
 The home menu retains Start new session, Configure and Exit. **Restore default
 configuration** appears immediately before Back in Configure and `/config`. It
 stages the default prompt, mechanisms and bindings while preserving the current
-model and credentials. Review and save for a new session or discard the changes.
+model and credentials. Review and apply the saved draft to this conversation,
+save only, or discard the changes.
 Default files are edited manually. No permission configuration page is supplied.
 
 | Menu | Behavior |
 |---|---|
-| `model` / `prompt` | Select the model and prompt for the next session. |
+| `model` / `prompt` | Stage the model and prompt for review and explicit application. |
 | Add model… | Collect host-provided service fields, hidden API key, and review; stage until configuration save. Opens on first startup when no models exist. |
 | Set API key… | Stage a missing credential for the selected model; the menu shows only set/missing status. |
 | Tools → Set up… | Select a web service and optional key variable, enter a hidden API key, and stage until configuration save. Direct fetch skips key input. |
@@ -54,7 +55,7 @@ Default files are edited manually. No permission configuration page is supplied.
 | User inputs | Edit declared paths, initial text and endpoints with visible input; tune internal parameters in the displayed YAML location. |
 | Prompt results | Current configuration/profile's latest task-scoped prompt candidates, plus built-ins and current selection |
 
-Expanding a prompt group does not change configuration. Choosing a prompt opens a full preview and confirmation. Active and resumed sessions retain their manifest. See [Configuration](../../../CONFIGURATION.md).
+Expanding a prompt group does not change configuration. Choosing a prompt opens a full preview and confirmation. Saving alone retains the active runtime. **Save and apply to this conversation** rebuilds it through recovery while retaining the Session file and messages. Failure retains the incumbent; saved files remain saved. Approval grants and transient component state are recreated. See [Configuration](../../../CONFIGURATION.md#apply-settings-to-the-current-conversation).
 
 Selecting a service replaces the choice menu with one field per screen. Each field shows the selected service, step count, its purpose, and any default. Field prompts use the field name; conversation input uses `❯`. Official and custom services have separate address instructions. `models.<name>` is the menu name; `model` is the service's exact identifier. Other fields use their YAML keys.
 

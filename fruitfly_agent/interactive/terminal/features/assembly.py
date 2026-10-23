@@ -19,7 +19,7 @@ def bind_commands(registry, *, bindings, configuration, status, cancel,
     if configuration() is not None:
         registry.register("config", configuration_handler(
             configuration=configuration, status=status, busy=bindings.busy,
-            rebuild=bindings.rebuild, menu_scope=menu_scope, input_stream=input_stream,
+            apply_configuration=bindings.apply_configuration, menu_scope=menu_scope, input_stream=input_stream,
             output_stream=output_stream, line_editor=line_editor, write=write, welcome=welcome,
         ))
     if bindings.resume is not None:

@@ -21,7 +21,7 @@ from pygments.formatters import TerminalFormatter
 from pygments.lexers import TextLexer, get_lexer_by_name
 from pygments.util import ClassNotFound
 
-from fruitfly_agent.interactive.terminal.io.text import cell_width, pad_cells, truncate_cells
+from fruitfly_agent.interactive.terminal.io.text import cell_width, pad_cells, wrap_cells
 
 
 _RESET = "\033[0m"
@@ -50,7 +50,7 @@ class TerminalMarkdownRenderer:
     """Render a complete Markdown fragment as terminal-oriented text."""
 
     def __init__(self, *, columns: int = 80, color: bool = True) -> None:
-        self.columns = max(8, columns)
+        self.columns = max(4, columns)
         self.color = color
         self._parser = (
             MarkdownIt("commonmark", {"html": False})
@@ -282,26 +282,21 @@ class TerminalMarkdownRenderer:
 
         output = [border("┌", "┬", "┐")]
         for row_index, row in enumerate(rows):
-            cells: list[str] = []
-            for column, value in enumerate(row):
-                visible = truncate_cells(value, widths[column])
-                if alignments[column] == "right":
-                    padded = visible.rjust(
-                        len(visible) + max(0, widths[column] - cell_width(visible))
-                    )
-                elif alignments[column] == "center":
+            wrapped = [wrap_cells(value, widths[column]) for column, value in enumerate(row)]
+            for line_index in range(max(map(len, wrapped))):
+                cells: list[str] = []
+                for column, parts in enumerate(wrapped):
+                    visible = parts[line_index] if line_index < len(parts) else ""
                     remaining = max(0, widths[column] - cell_width(visible))
-                    padded = (" " * (remaining // 2)) + visible
-                    padded = pad_cells(padded, widths[column])
-                else:
-                    padded = pad_cells(visible, widths[column])
-                cells.append(
-                    self._paint(padded, "1")
-                    if row_index < header_rows
-                    else padded
-                )
-            divider = self._paint("│", "2")
-            output.append(f"{divider} " + f" {divider} ".join(cells) + f" {divider}")
+                    if alignments[column] == "right":
+                        padded = (" " * remaining) + visible
+                    elif alignments[column] == "center":
+                        padded = pad_cells((" " * (remaining // 2)) + visible, widths[column])
+                    else:
+                        padded = pad_cells(visible, widths[column])
+                    cells.append(self._paint(padded, "1") if row_index < header_rows else padded)
+                divider = self._paint("│", "2")
+                output.append(f"{divider} " + f" {divider} ".join(cells) + f" {divider}")
             if row_index + 1 == header_rows and row_index < len(rows) - 1:
                 output.append(border("├", "┼", "┤"))
         output.append(border("└", "┴", "┘"))
@@ -323,8 +318,7 @@ class TerminalMarkdownRenderer:
             if row_index:
                 output.append("")
             for header, value in zip(headers, row):
-                label = self._paint(f"{header}:", "1", "36")
-                output.append(f"{label} {value}".rstrip())
+                output.extend(wrap_cells(f"{header}: {value}".rstrip(), self.columns))
         return output
 
     def _render_inline(
@@ -342,7 +336,9 @@ class TerminalMarkdownRenderer:
                 output.append(self._paint(token.content, *(code for _, code in styles)))
             elif kind == "code_inline":
                 output.append(self._paint(token.content, "36"))
-            elif kind in {"softbreak", "hardbreak"}:
+            elif kind == "softbreak":
+                output.append(" ")
+            elif kind == "hardbreak":
                 output.append("\n")
             elif kind in {"strong_open", "em_open", "s_open"}:
                 code = {"strong_open": "1", "em_open": "3", "s_open": "9"}[kind]
@@ -389,7 +385,7 @@ class MarkdownStreamPresenter:
     """Incrementally render stable blocks and replace the unfinished preview."""
 
     def __init__(self, *, columns: int = 80, color: bool = True) -> None:
-        self.columns = max(8, columns)
+        self.columns = max(4, columns)
         self.color = color
         self._pending = ""
         self._renderer = TerminalMarkdownRenderer(
@@ -403,8 +399,8 @@ class MarkdownStreamPresenter:
     def feed(self, text: str, *, columns: int | None = None) -> MarkdownUpdate:
         resized = False
         if columns is not None:
-            resized = max(8, columns) != self.columns
-            self.columns = max(8, columns)
+            resized = max(4, columns) != self.columns
+            self.columns = max(4, columns)
             self._renderer.columns = self.columns
         self._pending += _strip_controls(text)
         stable_end = _stable_prefix_end(self._pending)
@@ -440,7 +436,7 @@ class MarkdownStreamPresenter:
 
     def flush(self, *, columns: int | None = None) -> MarkdownUpdate:
         if columns is not None:
-            self.columns = max(8, columns)
+            self.columns = max(4, columns)
             self._renderer.columns = self.columns
         committed = self._renderer.render(self._pending) if self._pending.strip() else ""
         preview_changed = bool(self._preview)
@@ -502,7 +498,7 @@ def _trim_blank_lines(lines: list[str]) -> list[str]:
 def _fit_table_widths(natural: list[int], columns: int) -> list[int] | None:
     available = columns - (3 * len(natural)) - 1
     # A one- or two-cell column is technically drawable but no longer readable;
-    # use labeled records instead of presenting a table made only of ellipses.
+    # use labeled records when a table would be unreadable.
     if available < 3 * len(natural):
         return None
     widths = natural.copy()

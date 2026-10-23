@@ -31,19 +31,16 @@ HARBOR_AGENT_IMPORT = "eval.harbor_agent:FruitFlyHarborAgent"
 
 
 def harbor_descriptor(*, benchmark_id: str, label: str, description: str,
-                      version: str, dataset: str, smoke_task: str,
-                      subsets: tuple[BenchmarkVariant, ...] = ()) -> BenchmarkDescriptor:
+                      version: str, dataset: str, smoke_task: str) -> BenchmarkDescriptor:
     """Declare a dataset using the shared container execution and reward contract."""
     return BenchmarkDescriptor(
         benchmark_id=benchmark_id, label=label, description=description,
-        version=version, dataset=dataset, adapter_version="7",
+        version=version, dataset=dataset, adapter_version="8",
         variants=(
             BenchmarkVariant("smoke", "Single-task smoke", "Validate one complete evaluation path",
                              task_names=(smoke_task,)),
-            *subsets,
-            BenchmarkVariant("no_gpu", "Full dataset · CPU host", "Run the full dataset without a GPU preflight"),
-            BenchmarkVariant("gpu", "Full dataset · GPU host", "Run the full dataset with a GPU preflight",
-                             requires_gpu=True),
+            BenchmarkVariant("no_gpu", "Tasks without GPU requirements", "Exclude tasks declaring GPUs in any effective environment or Compose service"),
+            BenchmarkVariant("full", "Full dataset", "Run every resolved task with its declared resources"),
         ),
         metric_names=("success_rate", "official_reward", "error_rate", "timeout_rate",
                       "input_tokens", "output_tokens", "cost_usd", "latency_ms"),
@@ -89,11 +86,9 @@ class HarborBenchmarkAdapter:
         *,
         harbor_command: str | None = None,
         docker_command: str | None = None,
-        gpu_command: str | None = None,
     ) -> None:
         self._harbor_command = harbor_command
         self._docker_command = docker_command
-        self._gpu_command = gpu_command
         self.host_config_path: str | None = None
 
     def configure_host(self, path: str) -> None:
@@ -140,8 +135,8 @@ class HarborBenchmarkAdapter:
                         "--format",
                         "{{.ServerVersion}}",
                         failure=(
-                            "Docker engine is unavailable; start Docker Desktop or "
-                            "Colima, then run `docker info`"
+                            "Docker engine is unavailable; check the selected Docker context, "
+                            "daemon and socket access with `docker info`"
                         ),
                     ),
                 }
@@ -158,17 +153,6 @@ class HarborBenchmarkAdapter:
                             "Docker Compose v2 is unavailable; install its plugin "
                             "and run `docker compose version`"
                         ),
-                    ),
-                }
-            )
-        if next(item for item in self.descriptor.variants if item.variant_id == variant).requires_gpu:
-            gpu = self._gpu_command or shutil.which("nvidia-smi")
-            checks.append(
-                {
-                    "id": "gpu",
-                    "ok": bool(gpu),
-                    "detail": (
-                        str(gpu) if gpu else "NVIDIA GPU runtime was not detected"
                     ),
                 }
             )

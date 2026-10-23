@@ -33,6 +33,9 @@ def _parser() -> argparse.ArgumentParser:
         command = sub.add_parser(name, help=help_text)
         command.add_argument("--request", required=True)
         command.add_argument("--host-config", help="defaults to workspace .fruitfly/eval-host.yaml")
+        if name == "prepare":
+            command.add_argument("--tasks-only", action="store_true",
+                                 help="resolve/freeze tasks and inspect local image references; do not build/start environments")
     stop = sub.add_parser("stop", help="stop one owned evaluation and confirm cleanup")
     stop.add_argument("evaluation_id")
     stop.add_argument("--output-root", default=".fruitfly/eval")
@@ -117,13 +120,15 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError("unknown benchmark variant")
             host = HostConfig.read(Path(request.runtime.working_directory).resolve(), args.host_config)
             if args.command == "prepare":
-                package = resolve_installation(os.environ.get("FRUITFLY_EVAL_PACKAGE"), checkout=Path(__file__).resolve().parent.parent)
+                package = None if args.tasks_only else resolve_installation(
+                    os.environ.get("FRUITFLY_EVAL_PACKAGE"), checkout=Path(__file__).resolve().parent.parent)
                 def interrupt_preparation(signum: int, frame: object) -> None:
                     raise KeyboardInterrupt("preparation interrupted")
                 previous = signal.signal(signal.SIGTERM, interrupt_preparation)
                 try:
                     payload = prepare(request, adapter.descriptor, host, package=package,
-                                      progress=lambda event: print(event["stage"], file=sys.stderr, flush=True))
+                                      progress=lambda event: print(event["stage"], file=sys.stderr, flush=True),
+                                      tasks_only=args.tasks_only)
                 finally:
                     signal.signal(signal.SIGTERM, previous)
                 _print_json(payload)

@@ -37,25 +37,43 @@ class EvalCliTests(unittest.TestCase):
         request.write_text(json.dumps(payload))
         host, _ = prepared_harbor(root)
         for command, response, expected in (("prepare", {"task_count": 1}, 0),
+                                             ("prepare --tasks-only", {"task_count": 1}, 0),
                                              ("check", {"available": True}, 0),
                                              ("check", {"available": False}, 3)):
             output = StringIO()
-            function = "prepare" if command == "prepare" else "inspect"
+            function = "prepare" if command.startswith("prepare") else "inspect"
             with self.subTest(command=command, response=response), patch(
                 "eval.__main__.builtin_catalog", return_value=BenchmarkCatalog((SWEBenchAdapter(),))
             ), patch("eval.harbor.host.HostConfig.read", return_value=host) as read, patch(
                 "eval.harbor.preparation." + function, return_value=response
             ) as action, patch("eval.__main__.execute_request", side_effect=AssertionError("unexpected Agent run")), redirect_stdout(output):
-                code = main([command, "--request", str(request), "--host-config", "machine.yaml"])
+                code = main([*command.split(), "--request", str(request), "--host-config", "machine.yaml"])
             self.assertEqual(code, expected)
             self.assertEqual(json.loads(output.getvalue()), response)
             self.assertEqual(read.call_args.args[1], "machine.yaml")
             self.assertEqual(action.call_args.args[1].dataset, "swe-bench/swe-bench-verified")
+            if function == "prepare":
+                self.assertEqual(action.call_args.kwargs["tasks_only"], "--tasks-only" in command)
 
     def test_stop_is_not_successful_until_cleanup_is_confirmed(self):
         for state, code in (("finished", 0), ("stop_requested", 1), ("cleanup_failed", 1)):
             with self.subTest(state=state), patch("eval.harbor.lifecycle.request_stop", return_value={"state": state}), redirect_stdout(StringIO()):
                 self.assertEqual(main(["stop", "owned-job"]), code)
+
+    def test_task_inventory_does_not_resolve_agent_installation_material(self):
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        payload = request_payload()
+        payload["runtime"]["working_directory"] = str(root)
+        request = root / "request.json"
+        request.write_text(json.dumps(payload))
+        from tests.support.harbor import prepared_harbor
+        host, _ = prepared_harbor(root)
+        with patch("eval.harbor.host.HostConfig.read", return_value=host), patch(
+            "eval.installation.resolve_installation", side_effect=AssertionError("unexpected Agent material")
+        ), patch("eval.harbor.preparation.prepare", return_value={"task_count": 1}) as prepare, redirect_stdout(StringIO()):
+            self.assertEqual(main(["prepare", "--request", str(request), "--tasks-only"]), 0)
+        self.assertTrue(prepare.call_args.kwargs["tasks_only"])
+        self.assertIsNone(prepare.call_args.kwargs["package"])
 
     def test_legacy_reports_are_read_without_regeneration(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
