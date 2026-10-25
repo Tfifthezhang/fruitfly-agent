@@ -237,8 +237,10 @@ class ExtensionTests(unittest.IsolatedAsyncioTestCase):
             line_editor=ScriptedLines('/improvement', 'q', '/exit'))
         await frontend.run()
         self.assertIn('Component improvement', output.getvalue())
-        self.assertIn('Editable components', output.getvalue())
-        self.assertIn('Candidate generator', output.getvalue())
+        self.assertIn('Input files', output.getvalue())
+        self.assertIn('Start improvement', output.getvalue())
+        self.assertNotIn('Editable components', output.getvalue())
+        self.assertNotIn('Candidate generator', output.getvalue())
         workflow.workflow_preview.assert_not_called()
         self.assertEqual(provider.calls, [])
 

@@ -6,7 +6,7 @@ Implement generic interaction behavior shared by frontends and sessions. These m
 
 | File / entry | Responsibility |
 |---|---|
-| [commands.py](commands.py): parse_command, CommandRouter | Parse local commands and route renderer-neutral built-in/custom handlers |
+| [commands.py](commands.py): parse_command, CommandRouter | Parse commands, register handlers with descriptions, expose snapshots and route renderer-neutral results |
 | [dispatch.py](dispatch.py): EventDispatcher | Run-scoped event sequencing, bounded traces, and observer failure isolation |
 | [authorization.py](authorization.py): AuthorizationService | Serialize confirmations, reject stale replies, and retain transient runtime grants |
 
@@ -26,3 +26,12 @@ These mechanisms consume public contracts and Core permission types. They cannot
 ```bash
 .venv/bin/python -m unittest tests.interactive.test_commands tests.interactive.test_authorization tests.interactive.test_session -v
 ```
+
+`CommandRouter.register()` accepts optional `summary`, `usage` and `discoverable`
+metadata alongside each handler. `descriptions()` returns a read-only snapshot
+without invoking handlers. Default `/help` formats that snapshot. Terminal
+composition merges base and terminal descriptions with terminal-first precedence;
+its default help and completion use that effective view. Explicit custom help
+handlers retain their normal priority. `HELP_TEXT` is the generated reference of built-in router entries,
+including frontend-dependent placeholders; live help omits unavailable
+placeholders. `/quit` parsing and description share the declared `/exit` alias.

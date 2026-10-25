@@ -68,6 +68,7 @@ class DefaultConfigurationTests(unittest.TestCase):
         controller = factory.configuration
         artifact = factory.artifact_store.put_text("Fixture experiment instructions")
         original_profile = replace(controller.profile(), prompt=artifact.artifact_id,
+            execution={"max_tool_calls_per_turn": 128},
             artifact_bindings={"skill-catalog.guidance": artifact.artifact_id})
         controller.stage_profile(original_profile)
         controller.save()
@@ -79,6 +80,7 @@ class DefaultConfigurationTests(unittest.TestCase):
         self.assertEqual(controller.profile().model_catalog, original_profile.model_catalog)
         self.assertEqual(controller.profile().model_profile, original_profile.model_profile)
         self.assertEqual(controller.profile().artifact_bindings, {})
+        self.assertEqual(controller.profile().execution, {})
         self.assertEqual(controller.profile().prompt, "assistant-default")
         self.assertEqual(controller.model_setup.credentials.values, {"PENDING_FIXTURE_KEY": "offline-pending"})
         self.assertEqual(factory.environment["SHARED_MODEL_KEY"], "offline-fixture")
@@ -127,9 +129,11 @@ class DefaultConfigurationTests(unittest.TestCase):
         path = self.root / ".fruitfly/default-config.yaml"
         config = yaml.safe_load(path.read_text())
         config["profiles"]["baseline"]["mechanisms"] = [{"id": "local-env"}, {"id": "write-tool"}]
+        config["profiles"]["baseline"]["execution"] = {"max_tool_calls_per_turn": 96}
         path.write_text(yaml.safe_dump(config))
         controller.restore_defaults()
         self.assertEqual({m.mechanism_id for m in controller.profile().mechanisms}, {"local-env", "write-tool"})
+        self.assertEqual(controller.profile().execution, {"max_tool_calls_per_turn": 96})
 
     def test_default_file_stays_read_only_and_has_no_model_wizard(self):
         controller = self.factory(config_path=".fruitfly/default-config.yaml").configuration

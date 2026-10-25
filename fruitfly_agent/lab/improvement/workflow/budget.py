@@ -78,6 +78,52 @@ class BudgetScope:
             self.parent._charge_child(kind, amount)
         self.used[kind] += amount
 
+    def settle(self, kind, amount):
+        """Charge previously held external work even after deadline/cancellation.
+
+        This cannot allocate new work. Unknown outcomes consume their held maximum;
+        callers record observed usage separately from conservative quota charges.
+        """
+        if self.closed or self.parent is None or kind not in self.limits or type(amount) is not int or amount < 0:
+            raise ValueError('invalid external budget settlement')
+        if amount > self.limits[kind] - self.used[kind] - self.held[kind]:
+            raise ValueError('settlement exceeds held external allocation')
+        parent = self.parent
+        while parent is not None:
+            if parent.held[kind] < amount:
+                raise ValueError('external allocation is no longer held')
+            parent.held[kind] -= amount
+            parent.used[kind] += amount
+            parent = parent.parent
+        self.used[kind] += amount
+
+    def snapshot(self):
+        if self.parent is not None or any(self.held.values()):
+            raise ValueError('snapshot requires an unheld root allocation')
+        return {'limits': dict(self.limits), 'used': dict(self.used),
+            'deadline_utc': time.time() + self.deadline - time.monotonic() if self.deadline is not None else None}
+
+    def restore(self, snapshot):
+        if self.parent is not None or self.closed or any(self.held.values()) or snapshot.get('limits') != self.limits:
+            raise ValueError('persisted root allocation differs or is already active')
+        used = snapshot.get('used')
+        if not isinstance(used, dict) or set(used) != set(self.limits) or any(
+                type(used[k]) is not int or not 0 <= used[k] <= self.limits[k] for k in self.limits):
+            raise ValueError('invalid persisted allocation usage')
+        for kind in self.limits:
+            self.used[kind] = max(self.used[kind], used[kind])
+        deadline = snapshot.get('deadline_utc')
+        if deadline is not None:
+            if isinstance(deadline, bool) or not isinstance(deadline, (int, float)) or not math.isfinite(deadline):
+                raise ValueError('invalid persisted allocation deadline')
+            self.deadline = min(self.deadline or float('inf'), time.monotonic() + deadline - time.time())
+
+    def forfeit(self):
+        """Conservatively consume uncertain external work after process loss."""
+        if self.parent is not None or any(self.held.values()):
+            raise ValueError('forfeit requires an unheld root allocation')
+        self.used.update(self.limits)
+
     def extend(self, extra):
         """Borrow unused parent quota for a protected final phase, never raise root limits."""
         self.check()

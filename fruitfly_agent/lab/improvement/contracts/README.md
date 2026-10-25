@@ -50,3 +50,43 @@ readable. A preview is never restored as authorization to rerun unknown work.
 
 See [execution](../execution/README.md), [editor experiments](../improver/README.md)
 and [budget/stop behavior](../workflow/README.md).
+
+## Import contracts by responsibility
+
+| File | Values |
+|---|---|
+| `components.py` | Documents, snapshots, publication/build/runtime/activation seams |
+| `tasks.py` | Materials, resources and private acceptance-case values |
+| `execution.py` | Final execution records and established TaskRunner signature |
+| `facts.py` | Immutable facts, budget scope and artifact collection status |
+| `search.py` | Attributed exploration decisions |
+| `task_sets.py` | Frozen collection identities, task objectives and private source construction ports |
+| `evaluation.py` | Expected batches, leaf trials, candidate evaluations and joint selection outcomes |
+| `live.py` | Immutable event positions, assessments, metrics and controls |
+| `editing.py` | Proposal/composition requests and bounded editing services |
+| `assessment.py` | Measurements, selection and verification ports |
+| `plans.py` | Plans and attributed experience |
+| `stopping.py` | Shared cycle state and structured decisions |
+
+`pipeline.py` retains explicit compatible exports and orchestration outcomes.
+There are no parallel definitions or implicit dynamic imports. Live payloads are
+canonical JSON snapshots; readers cannot mutate committed evidence. Online
+assessment status describes scope/completeness, not independent verification.
+
+`PreparedExecution.task` explicitly accepts `TaskMaterial` or `TaskSetSnapshot`.
+`ExecutionPorts.search_problem` supplies operations for the shared engine, and
+`ExecutionDefinition.plan_factory` owns mode-specific bounded plans. Ordinary
+`RunPlan` limits remain compatible; `TaskSetRunPlan` permits larger explicit finite
+totals and binds task-set settings into comparison conditions. Batch outcomes keep
+candidate evaluation IDs instead of fabricating single task executions.
+
+`TaskSetProposalRequest` grants only development tasks and their evidence.
+`TaskSetCandidateGenerator` describes that request; generator metadata declares
+`supports_task_sets`. Existing single-task generator and runner signatures remain.
+
+`ComponentBinding` and target bindings support the declared `configuration` kind.
+Only supported section keys have executable adapters. `RunPlan.component_options`
+freezes component field permissions and bounds; unknown or out-of-scope options
+fail. `ExecutionDefinition.capabilities_for(tool_names)` derives configured tool
+capabilities when `uses_configured_tools` is declared. Other backend capabilities
+remain explicitly owned by the backend.

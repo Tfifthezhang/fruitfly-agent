@@ -10,6 +10,7 @@ SKILL_DOCUMENT = 'skill-document'
 
 def definition():
     from fruitfly_agent.lab.catalog.models import MechanismDefinition
+    from fruitfly_agent.lab.catalog.components import ComponentSpec
     return MechanismDefinition(MechanismDescriptor(SKILL_DOCUMENT, 'Reusable skill document',
         'Retain a compact procedural Skill body; improve it explicitly through Improvement.',
         contributions=(MechanismContribution('online', 'context', 'augmentation'),),
@@ -22,6 +23,7 @@ def definition():
                 'Maximum complete Skill body projected into context.', 16000, minimum=128, maximum=30000)),
         install_order=32), _install, implementation_id='retained-skill-v1',
         artifact_slots=frozenset({SKILL_DOCUMENT}),
+        component_specs=lambda parameters, enabled: (ComponentSpec(SKILL_DOCUMENT, 'S', 'retained-document', 'skill-document-v1'),) if enabled else (),
         implementation_path='fruitfly_agent/lab/context_manager/augmentation/skills/document.py',
         documentation_path='fruitfly_agent/lab/context_manager/augmentation/skills/README.md',
         input_parameters=('initial_text', 'source_path'))

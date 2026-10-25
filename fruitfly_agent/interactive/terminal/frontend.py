@@ -12,7 +12,8 @@ from contextlib import contextmanager
 
 from fruitfly_agent.interactive.contracts.events import AuthorizationRequested, AuthorizationResolved
 from fruitfly_agent.interactive.terminal.bindings import TerminalBindings, TerminalSession, ImprovementClients
-from fruitfly_agent.interactive.terminal.commands import TerminalCommandRegistry, TerminalCommandHandler
+from fruitfly_agent.interactive.terminal.commands import TerminalCommandRegistry, TerminalCommandHandler, effective_commands, complete_command
+from fruitfly_agent.interactive.contracts.commands import CommandDescription, CommandResult, format_command_help
 from fruitfly_agent.interactive.terminal.features.assembly import bind_commands
 from fruitfly_agent.interactive.terminal.notifications import ImprovementNotifications
 
@@ -87,6 +88,13 @@ class TerminalFrontend:
         )
         for name, handler in (command_handlers or {}).items():
             self.commands.register(name, handler)
+        if self.command_router.uses_default_help and not any(item.name == 'help' for item in self.commands.descriptions()):
+            help_description = next(item for item in self.command_router.descriptions() if item.name == 'help')
+            self.commands.register('help', lambda command: CommandResult(text=format_command_help(self.command_descriptions())),
+                summary=help_description.summary)
+        configure_completion = getattr(self.line_editor, 'set_completion_provider', None)
+        if self._inline_display is not None and callable(configure_completion):
+            configure_completion(lambda query: complete_command(query, self.command_descriptions()))
         self._notifications = ImprovementNotifications(
             progress=self.bindings.progress, notice=self.bindings.candidate_notice,
             acknowledge=self.bindings.acknowledge_notice, busy=self.bindings.busy,
@@ -311,6 +319,9 @@ class TerminalFrontend:
 
     def show_notifications(self) -> None:
         self._notifications.show()
+
+    def command_descriptions(self) -> tuple[CommandDescription, ...]:
+        return effective_commands(self.command_router.descriptions(), self.commands.descriptions())
 
     @property
     def configuration(self):

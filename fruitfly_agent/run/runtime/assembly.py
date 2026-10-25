@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from fruitfly_agent.core.config import AgentLoopConfig
+from fruitfly_agent.runtime_spec import execution_kwargs, effective_execution
 from fruitfly_agent.core.extensions.hooks import HookRegistry
 from fruitfly_agent.core.context import ContextPipeline
 from fruitfly_agent.core.session.storage import Session
@@ -27,6 +28,8 @@ from fruitfly_agent.run.configuration.resolution import resolve_profile_models
 from fruitfly_agent.run.storage.artifacts import DataArtifactStore
 from fruitfly_agent.run.storage.prompts import resolve_base_prompt
 from .manifest import RuntimeManifest, digest_manifest as _digest
+from fruitfly_agent.lab.catalog import resolve_harness, verify_runtime
+from fruitfly_agent.lab.algorithms.targets import TEXT_TARGET_PREFIX
 
 
 @dataclass(frozen=True)
@@ -126,6 +129,7 @@ def build_runtime(
         env=None,
         session=session,
         hooks=HookRegistry(session=session),
+        **execution_kwargs(profile.execution),
     )
     bindings = dict(profile.artifact_bindings if artifact_bindings is None else artifact_bindings)
     supported_bindings = {slot for definition in catalog.definitions() for slot in definition.artifact_slots}
@@ -186,9 +190,12 @@ def build_runtime(
             "runtime data artifact binding(s) were not consumed by an enabled "
             "mechanism: " + ", ".join(missing)
         )
-    manifest_version = 5
+    inventory = verify_runtime(resolve_harness(profile, catalog), assembled.config,
+        tuple(value for key, value in assembled.components.items() if key.startswith(TEXT_TARGET_PREFIX)))
+    manifest_version = 7
     manifest_payload: dict[str, Any] = {
         "schema_version": manifest_version,
+        "harness": inventory.to_dict(),
         "profile": profile.profile_id,
         "model_profile": selected_model_profile,
         "models": {
@@ -202,6 +209,7 @@ def build_runtime(
         ),
         "base_prompt": prompt_identity,
         "permissions": permission_identity,
+        'execution': effective_execution(assembled.config),
     }
     if data_artifacts:
         manifest_payload["data_artifacts"] = [dict(item) for item in data_artifacts]
@@ -217,6 +225,8 @@ def build_runtime(
         base_prompt=prompt_identity,
         digest=digest,
         permissions=permission_identity,
+        execution=manifest_payload['execution'],
+        harness=manifest_payload['harness'],
     )
     optional_ids = tuple(
         item.definition.descriptor.mechanism_id

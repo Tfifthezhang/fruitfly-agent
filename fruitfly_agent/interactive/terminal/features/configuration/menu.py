@@ -17,11 +17,11 @@ from fruitfly_agent.interactive.contracts.configuration import (
 from fruitfly_agent.interactive.terminal.io.input import LineEditor, create_line_editor, read_field_line, field_prompt, parse_field_value
 from fruitfly_agent.interactive.terminal.io.live import InputInterrupted
 from fruitfly_agent.interactive.terminal.features.configuration.model_setup import (
-    ModelFormIO,
     configure_credential,
     run_model_setup,
 )
 from .mechanism_setup import run_mechanism_setup
+from .forms import FormIO, CANCELLED as _CANCELLED, choose_value, select_field
 from fruitfly_agent.interactive.terminal.io.menu import (
     MenuAction,
     MenuInput,
@@ -300,8 +300,8 @@ class TerminalConfigurationFrontend:
             else:
                 return ConfigurationLaunchResult(start=False)
 
-    def _model_form(self) -> ModelFormIO:
-        return ModelFormIO(
+    def _model_form(self) -> FormIO:
+        return FormIO(
             choose_value=self._choose_value, apply=self._call, line_editor=self.line_editor,
             menu_input=self.menu_input, renderer=self.renderer, input=self.input, output=self.output,
         )
@@ -454,13 +454,19 @@ class TerminalConfigurationFrontend:
             if event.action == MenuAction.ACTIVATE and action.kind == 'parameter':
                 spec = action.parameter
                 assert spec is not None
-                self.renderer.begin_input(field_prompt(spec, spec.value), selected=selected)
                 try:
-                    value = read_field_line(self.line_editor, spec.label)
-                    if value is not None and value.strip() and value.strip() != '/cancel':
-                        parse_field_value(spec, value)
-                        self._call(self.configuration.set_parameter, action.active, spec.name,
-                            '' if value.strip() == '/clear' else value.strip())
+                    if spec.choices:
+                        choice = select_field(self._model_form(), title=spec.label, description=spec.description,
+                            choices=spec.choices, current=spec.value)
+                        if choice is not _CANCELLED:
+                            self._call(self.configuration.set_parameter, action.active, spec.name, str(choice))
+                    else:
+                        self.renderer.begin_input(field_prompt(spec, spec.value), selected=selected)
+                        value = read_field_line(self.line_editor, spec.label)
+                        if value is not None and value.strip() and value.strip() != '/cancel':
+                            parse_field_value(spec, value)
+                            self._call(self.configuration.set_parameter, action.active, spec.name,
+                                '' if value.strip() == '/clear' else value.strip())
                 except (InputInterrupted, KeyboardInterrupt):
                     pass
                 except ValueError as exc:
@@ -505,43 +511,9 @@ class TerminalConfigurationFrontend:
         labels: Mapping[str, str] | None = None,
         details: Mapping[str, str] | None = None,
     ) -> tuple[bool, Any]:
-        if not values:
-            self.notice = (
-                "No models are available. Configure .fruitfly/models.yaml and "
-                ".fruitfly/config.yaml "
-                "before starting a session."
-            )
-            return False, _CANCELLED
-        try:
-            selected = values.index(current)
-        except ValueError:
-            selected = 0
-        while True:
-            rows = tuple(
-                MenuRow(
-                    (labels or {}).get(value, str(value)),
-                    detail=(details or {}).get(value, ""),
-                    marker="✓" if value == current else " ",
-                )
-                for value in values
-            )
-            self._render(
-                title=title,
-                subtitle=subtitle,
-                rows=rows,
-                selected=selected,
-            )
-            event = self.menu_input.read_event()
-            selected, handled = navigate_menu(event, selected, len(rows))
-            if handled:
-                continue
-            if event.action == MenuAction.QUIT:
-                return True, _CANCELLED
-            if event.action == MenuAction.BACK:
-                return False, _CANCELLED
-            if event.action != MenuAction.ACTIVATE:
-                continue
-            return False, values[selected]
+        notice, self.notice = self.notice, ''
+        return choose_value(self.menu_input, self.renderer, title=title, subtitle=subtitle,
+            values=values, current=current, labels=labels, details=details, notice=notice)
 
     def _review_loop(self, snapshot: ConfigurationSnapshot) -> bool:
         selected = 0
@@ -653,7 +625,6 @@ class TerminalConfigurationFrontend:
         self.notice = ""
 
 
-_CANCELLED = object()
 
 
 @dataclass(frozen=True)

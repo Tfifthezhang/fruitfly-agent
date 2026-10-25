@@ -155,12 +155,12 @@ cp -R examples/improvement/python_functions .fruitfly/improvement/task-packs/pyt
 
 | Step | Action |
 |---|---|
-| 1 | Start a normal session; no improvement enable switch is required. |
-| 2 | Open `/improvement`; choose **Task**, **Editable components**, and **Candidate generator**. Native packages use **Agent task execution**. |
-| 3 | Review the package policy. **Verification** selects behavior or measured feedback; **Improvement guidance** supplies optional search hints. |
-| 4 | Set **Effect scope** to persistent for independent verification and a publishable candidate; review the frozen preview and budgets. |
-| 5 | Choose **Start improvement** and confirm the paid search; Cancel is selected initially. |
-| 6 | Inspect the result and evidence before setting the next-session default or starting a new session. |
+| 1 | Prepare the default Agent configuration, model catalog and secret environment. |
+| 2 | Set `task.source: files` and `task.pack` to the installed package ID in `.fruitfly/experiment.yaml`. |
+| 3 | Use `improvement.components` for registered targets; default feedback uses the pack measurement. |
+| 4 | Set `improvement.scope: persistent` for independent verification, and enough executions for paired train/selection/holdout checks. |
+| 5 | Run `fruitfly-agent-lab improvement check`, then explicitly `improvement run`; model requests may incur charges. |
+| 6 | Inspect the result and evidence; `rsi run` performs verified adoption into its experiment configuration copy. |
 
 Selecting a pack changes one job, not the YAML or runtime manifest. `/improvement TEXT` prefills direction, not a path. Search only changes target text, not Python task outputs. See [Improvement](../README.md) for budgets, results, and retention.
 
@@ -203,3 +203,9 @@ Host services exclude holdout contents from generation and material review; this
 ```bash
 .venv/bin/python -m unittest tests.lab.test_task_packs tests.lab.test_pack_format tests.lab.test_coding_tasks tests.workflows.test_unified_packs
 ```
+
+Scoring implementations and the restricted worker belong to
+[Assessment scorers](../assessment/scorers/README.md). Existing `tasks.scoring`
+imports remain compatible. Package parsing, partition validation and discovery
+remain task responsibilities. Scorer/worker identities change when their actual
+implementation bytes change; prior proof is not silently reused.

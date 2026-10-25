@@ -176,8 +176,12 @@ class RunCandidates:
 
     def apply_candidate(self, profile, record):
         for kind, key, reference in self.candidate_bindings(record):
-            profile = (replace(profile, prompt=reference) if kind == 'prompt' else
-                       replace(profile, artifact_bindings={**profile.artifact_bindings, key: reference}))
+            if kind == 'configuration':
+                from fruitfly_agent.runtime_spec import apply_profile_binding
+                profile = apply_profile_binding(profile, kind, key, self.artifacts.read_text(reference))
+            else:
+                profile = (replace(profile, prompt=reference) if kind == 'prompt' else
+                           replace(profile, artifact_bindings={**profile.artifact_bindings, key: reference}))
         return profile
 
     def candidate_profile(self, active_manifest, candidate_id):

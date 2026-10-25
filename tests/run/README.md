@@ -8,9 +8,11 @@ Verify configuration, model selection, assembly, manifest, CLI, candidates, rete
 
 | Files | Protects |
 |---|---|
+| `test_runtime_spec.py` | Shared profile types, Core defaults, explicit reference conflicts and strict scalar candidates |
 | `test_configuration_application.py` | Same-Session model changes, original history, empty-session application, failed startup recovery and exclusive writer lease lifetime |
 | `test_configuration.py / test_profiles.py` | Selection drafts, YAML, and persistence |
 | `test_execution_policy.py` | Guarded/unrestricted native file and shell behavior, environment inheritance, cancellation and launch validation |
+| `test_execution_limits.py` | Configured task tool limits, runtime identity and detached-trial facts |
 | `test_defaults.py` | Default restoration drafts, model/key preservation, save/discard and read-only default files |
 | `test_model_setup.py` | First-run form, secret isolation, preservation, cancel/discard, rollback, and immediate offline assembly |
 | `test_mechanism_setup.py` | Guided SSH enable/repair, hidden account/password, per-field retries, shared model/SSH persistence and rollback |
@@ -30,3 +32,6 @@ Configuration and assembly tests share local setup helpers while keeping model i
 ```
 
 Assembly checks record permission identity while allowing configuration changes on resume, require the current authorizer, protect the Session writer, and construct fresh approval services.
+
+`test_model_budget.py` verifies a shared main/auxiliary request allowance, atomic
+receipts and rejection before an additional Provider invocation.

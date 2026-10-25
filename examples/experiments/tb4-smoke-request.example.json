@@ -1,0 +1,17 @@
+{
+  "schema_version": 2,
+  "runtime": {
+    "config_path": null,
+    "profile": null,
+    "working_directory": "."
+  },
+  "benchmark": {
+    "id": "terminal-bench-4",
+    "variant": "smoke"
+  },
+  "execution": {
+    "attempts": 1,
+    "concurrency": 1,
+    "timeout_seconds": 3600
+  }
+}

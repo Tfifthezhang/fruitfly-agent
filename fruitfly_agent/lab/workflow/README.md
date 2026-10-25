@@ -6,7 +6,7 @@ Execute bounded sequences of model stages through Core's existing follow-up call
 
 ## Enable a workflow
 
-Enable **Execution workflow** in configuration and start a new session. Its default is one solve-and-answer step. Select **Execution workflow** under **Editable components** in `/improvement` to search alternatives. Construction and discovery make no model calls.
+Enable **Execution workflow** in the experiment Agent configuration. Its default is one solve-and-answer step. Select `execution-workflow` in `improvement.components` to search alternatives through the independent experiment CLI. Construction and discovery make no model calls.
 
 ```json
 {"steps":["Solve the user task.","Check the reasoning and return only the final answer."]}

@@ -7,7 +7,8 @@ import json
 import re
 from typing import Any, Mapping
 import yaml
-from fruitfly_agent.lab.catalog import MechanismSelection, builtin_catalog
+from fruitfly_agent.lab.catalog import builtin_catalog
+from fruitfly_agent.runtime_spec import load_harness_config
 from fruitfly_agent.providers.registry import load_model_specs
 
 
@@ -20,49 +21,19 @@ def prepare_runtime(
     workspace = Path(runtime.get("working_directory") or ".").resolve()
     original_config = (workspace / (runtime.get("config_path") or ".fruitfly/default-config.yaml")).resolve()
     config_bytes = original_config.read_bytes()
-    try:
-        raw_config = yaml.safe_load(config_bytes)
-    except yaml.YAMLError as exc:
-        raise ValueError(f"invalid harness YAML: {original_config}") from exc
-    if not isinstance(raw_config, Mapping):
-        raise ValueError("harness config must be a mapping")
-    if type(raw_config.get("schema_version")) is not int or raw_config["schema_version"] != 1:
-        raise ValueError("harness config requires schema_version 1")
-    if set(raw_config) - {"schema_version", "default_profile", "profiles"}:
-        raise ValueError("unsupported harness config fields")
-    profile_id = runtime.get("profile") or raw_config.get("default_profile")
-    if not isinstance(profile_id, str) or not profile_id.strip():
-        raise ValueError("harness profile must be a non-empty string")
-    profiles = raw_config.get("profiles")
-    if not isinstance(profiles, Mapping) or not isinstance(profiles.get(profile_id), Mapping):
-        raise ValueError(f"harness profile {profile_id!r} is missing")
-    profile = dict(profiles[profile_id])
-    if set(profile) - {"model", "mechanisms", "prompt", "artifact_bindings"}:
-        raise ValueError("unsupported harness profile fields")
-    prompt = profile.get("prompt", "assistant-default")
-    bindings = profile.get("artifact_bindings", {})
-    if not isinstance(prompt, str) or not prompt.strip():
-        raise ValueError("harness prompt must be a non-empty reference")
-    if not isinstance(bindings, Mapping) or any(not isinstance(k, str) or not k or not isinstance(v, str) or not v for k, v in bindings.items()):
-        raise ValueError("artifact bindings must map slot names to references")
-    model = profile.get("model")
-    mechanisms = profile.get("mechanisms")
-    if not isinstance(model, Mapping) or not isinstance(mechanisms, list):
-        raise ValueError(f"harness profile {profile_id!r} has invalid model or mechanisms")
-    if set(model) - {"catalog", "profile"}:
-        raise ValueError("unsupported model selection fields")
+    selected = load_harness_config(original_config).select(runtime.get("profile"))
+    profile_id = selected.profile_id
+    profile = selected.to_dict()
+    prompt, bindings = selected.prompt, selected.artifact_bindings
+    model = profile["model"]
+    raw_config = {"schema_version": 1}
     source_catalog = Path(str(model.get("catalog", "models.yaml")))
     if not source_catalog.is_absolute():
         source_catalog = original_config.parent / source_catalog
     source_catalog = source_catalog.resolve()
     if not source_catalog.is_file():
         raise FileNotFoundError(f"model catalog not found: {source_catalog}")
-    selections = []
-    for item in mechanisms:
-        if not isinstance(item, Mapping) or set(item) - {"id", "enabled", "parameters"} or "id" not in item:
-            raise ValueError("invalid mechanism selection")
-        selections.append(MechanismSelection(item["id"], enabled=item.get("enabled", True),
-                                              parameters=item.get("parameters", {})))
+    selections = selected.mechanisms
     catalog = builtin_catalog()
     resolved = catalog.resolve(selections)
     normalized = {item.definition.descriptor.mechanism_id: dict(item.parameters) for item in resolved}

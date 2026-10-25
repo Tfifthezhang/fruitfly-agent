@@ -12,6 +12,8 @@ profiles:
     model:
       catalog: models.yaml
       profile: deepseek-flash-openai
+    execution:
+      max_tool_calls_per_turn: 64
     mechanisms:
       - id: compaction
         enabled: true
@@ -21,7 +23,9 @@ profiles:
 | Field / API | Meaning |
 |---|---|
 | `HarnessConfig` | Schema version, default profile, and profile mapping |
-| `HarnessProfile` | Model catalog/profile, prompt, artifact bindings, and mechanism selections |
+| `HarnessProfile` | Model catalog/profile, prompt, execution limits, artifact bindings, and mechanism selections |
+| `execution` | Declared turn/tool/recovery limits and nested tool scheduling; see [shared fields](../../runtime_spec/README.md#configure-execution) |
+| `execution.max_tool_calls_per_turn` | Nonnegative integer, default 64; per outer turn, including detached task trials; 0 prevents tool attempts |
 | `prompt` | Optional; `assistant-default` or a text artifact ID |
 | `artifact_bindings` | Named slots declared by enabled consumers |
 | `load_harness_config(path)` | Parse and validate configuration. |
@@ -43,9 +47,13 @@ Missing or invalid defaults leave the draft unchanged. Explicitly selected defau
 files retain a read-only controller. See the
 [configuration reference](../../../CONFIGURATION.md#restore-default-configuration).
 
+Restoration also stages execution limits. These file settings do not add a
+terminal parameter form. Unknown execution fields, booleans and negative/fractional
+limits are rejected. Model-call and editor budgets are separate settings.
+
 | File | Responsibility |
 |---|---|
-| [profile.py](profile.py) | Schema 1 values, YAML validation and persistence |
+| [profile.py](profile.py) | Explicit compatibility exports from the [shared runtime specification](../../runtime_spec/README.md) |
 | [controller.py](controller.py) | Draft selection, edits, save/reset, and public profile operations |
 | [operations.py](operations.py) | Narrow binding/profile edit contracts for host consumers |
 | [resolution.py](resolution.py) | Workspace/profile discovery and model catalog resolution |

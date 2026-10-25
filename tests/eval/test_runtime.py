@@ -96,6 +96,43 @@ class RuntimeStagingTests(unittest.TestCase):
             self.assertEqual(names, ("EDITOR_KEY", "SHARED_KEY"))
             self.assertEqual(set(yaml.safe_load(models.read_text())["models"]), {"main", "editor"})
 
+    def test_explicit_execution_parameters_survive_the_real_container_staging_path(self):
+        from fruitfly_agent.runtime_spec import load_harness_config, execution_kwargs
+        from fruitfly_agent.core.config import AgentLoopConfig
+        from tests.support.faux_provider import FauxProvider
+        for limit in (0, 256):
+            with self.subTest(limit=limit), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                state, profile, output = self.fixture(root)
+                profile['execution'] = {'max_tool_calls_per_turn': limit, 'max_turns': 12,
+                    'max_context_recovery_attempts': 3,
+                    'tool_execution': {'max_parallel': 2, 'default_execution_mode': 'sequential'}}
+                (state / 'default-config.yaml').write_text(yaml.safe_dump({'schema_version': 1,
+                    'default_profile': 'baseline', 'profiles': {'baseline': profile}}))
+                config, _, _ = prepare_runtime(runtime={'working_directory': str(root)}, output_dir=output)
+                staged = load_harness_config(config).select()
+                self.assertEqual(staged.execution, profile['execution'])
+                loop = AgentLoopConfig(provider=FauxProvider(), **execution_kwargs(staged.execution))
+                self.assertEqual(loop.max_tool_calls_per_turn, limit)
+                self.assertEqual(loop.max_turns, 12)
+                self.assertEqual(loop.tool_execution.max_parallel, 2)
+                self.assertEqual(loop.tool_execution.default_execution_mode, 'sequential')
+
+    def test_invalid_execution_parameters_fail_before_any_staging(self):
+        for value in ({'max_tool_calls_per_turn': True}, {'max_turns': -1},
+                      {'max_context_recovery_attempts': 0}, {'unknown': 2},
+                      {'tool_execution': {'max_parallel': 0}},
+                      {'tool_execution': {'default_execution_mode': 'unknown'}}, []):
+            with self.subTest(value=value), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                state, profile, output = self.fixture(root)
+                profile['execution'] = value
+                (state / 'default-config.yaml').write_text(yaml.safe_dump({'schema_version': 1,
+                    'default_profile': 'baseline', 'profiles': {'baseline': profile}}))
+                with self.assertRaisesRegex(ValueError, 'execution'):
+                    prepare_runtime(runtime={'working_directory': str(root)}, output_dir=output)
+                self.assertEqual(list(output.iterdir()), [])
+
     def test_remote_execution_environment_is_rejected_before_container_launch(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

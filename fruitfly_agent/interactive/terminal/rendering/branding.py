@@ -32,4 +32,7 @@ FRUIT_FLY_MARK = (
 
 FRUIT_FLY_ICON = "🪰"
 
-__all__ = ["FRUIT_FLY_ICON", "FRUIT_FLY_MARK", "WORDMARK_FONT"]
+FRUIT_FLY_SMALL_MARK = ('  \\  /', ' (o)(o)', ' /|==|\\', '/ |==| \\', '  /  \\')
+FRUIT_FLY_TINY_MARK = ('\\|/', '(o)', '/|\\')
+
+__all__ = ["FRUIT_FLY_ICON", "FRUIT_FLY_MARK", "FRUIT_FLY_SMALL_MARK", "FRUIT_FLY_TINY_MARK", "WORDMARK_FONT"]

@@ -26,7 +26,7 @@ Extend through [Information source contracts](../README.md#extend-a-source). Pre
 
 ## Learn environment memory
 
-The separate **Learned environment memory** mechanism (`learned-memory`) appears under **Context → Context augmentation**. [learned.py](learned.py) registers a bounded retained document and its S target. Enter `initial_text` in the visible configuration field; `max_chars=16000` bounds the complete document. Enable the mechanism and start a session, then select its S document under **Editable components** in `/improvement`.
+The separate **Learned environment memory** mechanism (`learned-memory`) appears under **Context → Context augmentation**. [learned.py](learned.py) registers a bounded retained document and its S target. Enter `initial_text` in the visible configuration field; `max_chars=16000` bounds the complete document. Enable the mechanism in the experiment Agent profile, then select its S document in `improvement.components` for the independent experiment CLI.
 
 Enable the retained memory document and select its S component in [Improvement](../../../../improvement/README.md). Independent verification precedes persistent publication. Accepted text is projected into later sessions, and its exact body enters S identity. Ordinary task-local experience is recorded separately by the workflow.
 

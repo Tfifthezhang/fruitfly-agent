@@ -31,6 +31,7 @@ from .models import (
 from fruitfly_agent.lab.improvement.migration import migrate_legacy_improvement_config_text, migrate_legacy_improvement_candidate
 
 __all__ = [
+    "ComponentSpec", "ResolvedHarness", "resolve_harness", "verify_runtime",
     "migrate_legacy_improvement_config_text", "migrate_legacy_improvement_candidate",
     "PermissionPolicy", "apply_permission_policy",
     "ActivationScope",
@@ -60,3 +61,5 @@ __all__ = [
 
 from .permissions import PermissionPolicy, apply_permission_policy
 
+
+from .components import ComponentSpec, ResolvedHarness, resolve_harness, verify_runtime

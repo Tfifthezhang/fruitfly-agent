@@ -23,6 +23,8 @@ class EditorInstructions:
         'otherwise JSON {"cue":"situation shape","lesson":"component operation",'
         '"evidence_ids":["run-id","run-id"],"limitations":"limits and confounders"}. '
         'A lesson must cite completed runs with different harnesses.')
+    propose: str = ('Inspect the task requirements and supplied execution evidence. '
+        'Propose a supported change to the granted components, or retain the baseline when evidence is insufficient.')
 
     def __post_init__(self):
         for value in asdict(self).values():
@@ -41,7 +43,8 @@ class EditorInstructions:
                 result[name] = value
             return result
         value = json.loads(text, object_pairs_hook=unique)
-        if not isinstance(value, dict) or set(value) != set(cls.__dataclass_fields__):
+        fields = set(cls.__dataclass_fields__)
+        if not isinstance(value, dict) or set(value) not in (fields, fields - {'propose'}):
             raise ValueError('editor instructions require exactly the registered stage fields')
         return cls(**value)
 
@@ -60,10 +63,13 @@ class EditorInstructionTarget:
 
     def snapshot(self):
         return TargetSnapshot('improvement-editor', self.text,
-            TargetBinding('artifact', 'improvement-editor'), 'editor-instructions-v1', 'I')
+            TargetBinding('artifact', 'improvement-editor'),
+            'editor-instructions-v2' if 'propose' in json.loads(self.text) else 'editor-instructions-v1', 'I')
 
     def validate(self, text):
         candidate = EditorInstructions.parse(text)
+        if set(json.loads(text)) != set(json.loads(self.text)):
+            raise ValueError('editor instruction schema cannot change within a candidate')
         for name in ('system', 'select', 'reflect'):
             if getattr(candidate, name) != getattr(self.instructions, name):
                 raise ValueError('editor field is frozen during self-improvement: ' + name)

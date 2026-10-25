@@ -21,6 +21,12 @@ class ExecutionContext:
     verifier: Any = None
     claim_verification: Any = None
     remaining_verification: Any = None
+    assessor_config: Any = None
+    completed_assessment_factory: Any = None
+    exploration_factory: Any = None
+    save_record: Any = None
+    component_ids: tuple[str, ...] = ()
+    generator_definitions: tuple = ()
 
 
 class ExecutionRegistry:

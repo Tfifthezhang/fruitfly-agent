@@ -43,3 +43,7 @@ lessons retain their own schema 1, including initial library identity and review
 status. Only explicit commit changes the S snapshot. Verification claims use a
 locked atomic ledger; completed-proof reuse does not claim a new use. These stores
 do not validate model quality or grant activation authority.
+
+`evolution.py` owns atomic schema-2 evolution jobs under `.fruitfly/evolution/`,
+including phase, strategy identity, charged root usage and deadline. Schema-1 jobs
+remain readable; writes normalize updated jobs. Storage does not score or adopt.

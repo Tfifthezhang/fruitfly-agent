@@ -8,6 +8,7 @@ import hashlib
 import json
 import math
 from pathlib import Path
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -50,6 +51,7 @@ class SearchReport:
     trial_limit: int = 0
     model_calls: int = 0
     model_limit: int = 0
+    uncertain_model_allowance: int = 0
     tokens: TokenUsage = TokenUsage()
 
     def __post_init__(self):
@@ -68,6 +70,8 @@ class SearchReport:
             raise ValueError('invalid comparison conclusion')
         if self.direction not in {'', 'max', 'min'}:
             raise ValueError('invalid report objective direction')
+        if type(self.uncertain_model_allowance) is not int or self.uncertain_model_allowance < 0:
+            raise ValueError('uncertain model allowance must be nonnegative')
 
 
 def token_usage(rows, model_calls):
@@ -93,7 +97,7 @@ def build_report(rows, *, baseline_id, candidate_id, train_count, validation_cou
                  seed_score=None, candidate_score=None, metric='', direction='',
                  stop_reason='', exhausted_kind='', model_calls=0, model_limit=0,
                  trial_calls=0, trial_limit=0):
-    values = {}
+    values: dict[str, Any] = {}
     for prefix, identity in (('baseline', baseline_id), ('candidate', candidate_id)):
         for partition, count in (('train', train_count), ('validation', validation_count)):
             evaluations = [r for r in rows if r.get('kind') == 'evaluation'
@@ -139,10 +143,10 @@ def restore_search_report(workspace, *, history, history_hash, candidate_id, bas
     if any(r.get('parent_manifest') != parent_manifest or r.get('cases_digest') != cases_digest
                        or r.get('search_id') != rows[0].get('search_id') for r in rows):
         raise ValueError('report search identity mismatch')
-    problem = next((r for r in rows if r.get('kind') == 'problem'), {})
-    context = next((r for r in rows if r.get('kind') == 'report-context'), {})
+    problem: dict[str, Any] = next((r for r in rows if r.get('kind') == 'problem'), {})
+    context: dict[str, Any] = next((r for r in rows if r.get('kind') == 'report-context'), {})
     problem = {**problem, **context}
-    result = next((r for r in reversed(rows) if r.get('kind') == 'search-result'), {})
+    result: dict[str, Any] = next((r for r in reversed(rows) if r.get('kind') == 'search-result'), {})
     if problem.get('baseline_hash') != baseline_id or candidate_id not in result.get('candidates', ()):
         raise ValueError('report candidate identity mismatch')
     task = {}

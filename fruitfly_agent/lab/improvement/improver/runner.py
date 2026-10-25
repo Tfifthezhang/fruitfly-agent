@@ -7,6 +7,8 @@ from ..contracts.pipeline import ExecutionRecord, Measurement, Resource, TaskMat
 from ..contracts.versions import content_hash
 from ..workflow.budget import AllocationExhausted
 from .episodes import NativeEpisodeExecutor
+from ..execution.facts import attach_facts, receipt_facts
+from ..contracts.facts import BudgetFact
 
 
 class ImproverTaskRunner:
@@ -89,11 +91,17 @@ class ImproverTaskRunner:
         reference = self.context.artifacts.put(canonical_json(asdict(report)).encode())
         run_id = 'trial-' + uuid4().hex
         self.reports[run_id] = report
-        return ExecutionRecord(run_id, task.task_id, task.material_id, harness.snapshot_id,
+        record = ExecutionRecord(run_id, task.task_id, task.material_id, harness.snapshot_id,
             plan.parent.state, plan.conditions_id, 'error' if report.failures else 'completed',
             f'Development improvement gain: {report.mean_gain:.6f}; failures: {report.failures}; '
             f'model calls: {report.model_calls}. This is not independent verification.',
             (Resource('trial-report.json', reference, 'application/json', 'diagnostic'),), report.model_calls)
+        facts = receipt_facts(record, self.context.artifacts,
+            termination_reason='episode_failed' if report.failures else 'composite_completed',
+            budgets=(BudgetFact('model_calls', 'composite', report.model_calls, source='paired development trial'),
+                     BudgetFact('executions', 'composite', report.executions, source='paired development trial')),
+            counters=(('episode_failures', report.failures),), children=report.evidence)
+        return attach_facts(record, facts, self.context.artifacts)
 
 
 class TrialMeasurements:

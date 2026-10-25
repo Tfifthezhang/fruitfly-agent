@@ -21,11 +21,11 @@ def state_artifact_path(key):
 
 @dataclass(frozen=True)
 class TargetBinding:
-    kind: Literal['prompt', 'artifact', 'components']
+    kind: Literal['prompt', 'artifact', 'components', 'configuration']
     key: str = ''
 
     def __post_init__(self):
-        if self.kind not in {'prompt', 'artifact', 'components'} or (self.kind == 'artifact' and not self.key):
+        if self.kind not in {'prompt', 'artifact', 'components', 'configuration'} or (self.kind in {'artifact', 'configuration'} and not self.key):
             raise ValueError('invalid target binding')
 
 

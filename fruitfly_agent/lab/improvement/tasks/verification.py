@@ -35,7 +35,16 @@ def migrate_material(payload):
                 references[row["id"]] = row.pop("expected")
             rows.append(row)
         material[partition] = rows
-    manifest, cases, holdout = package_documents(material)
+    # Migration starts from unvalidated legacy mappings, not a _TaskMaterial.
+    # Build the raw v2 envelopes and let validate_pack establish the typed boundary.
+    metadata = {'id', 'input', 'tags', 'group_id', 'reason', 'source'}
+    def envelopes(partition):
+        return [{**{k: v for k, v in row.items() if k in metadata},
+            'acceptance': {k: v for k, v in row.items() if k not in metadata}}
+            for row in material.get(partition, [])]
+    manifest = {k: v for k, v in material.items() if k not in {'train', 'validation', 'holdout'}}
+    cases = {p: envelopes(p) for p in ('train', 'validation')}
+    holdout = {'holdout': envelopes('holdout')} if 'holdout' in manifest['files'] else None
     return validate_pack(manifest, cases=cases, holdout=holdout), references
 
 

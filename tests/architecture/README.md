@@ -21,3 +21,7 @@ Interactive checks reject private cross-module access in helpers/feature handler
 ```bash
 .venv/bin/python -m unittest discover -s tests/architecture -t . -v
 ```
+
+`test_improvement_boundaries.py` protects separate editing/assessment ownership,
+independent Improvement/RSI direction and the optional Eval boundary. Existing
+module dependency allowances are unchanged.

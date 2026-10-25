@@ -82,14 +82,15 @@ class ViewportTest(unittest.IsolatedAsyncioTestCase):
         display.write(''.join(f'line-{i}\n' for i in range(30)))
         editor = IsolatedLineEditor(io.StringIO(), display)
         with patch.object(editor.input, 'fileno', return_value=99), patch.object(editor, 'start'), patch.object(editor, 'stop'), patch(
-            'fruitfly_agent.interactive.terminal.io.live.select.select', return_value=([99], [], []),
-        ), patch('fruitfly_agent.interactive.terminal.io.live.os.read', side_effect=[b'a', b'\x1b', b'b', b'\r']), patch(
-            'fruitfly_agent.interactive.terminal.io.live._read_escape_sequence', return_value=b'\x1b[5~',
+            'fruitfly_agent.interactive.terminal.io.editor.select.select', return_value=([99], [], []),
+        ), patch('fruitfly_agent.interactive.terminal.io.editor.os.read', side_effect=[b'a', b'\x1b', b'b', b'\r']), patch(
+            'fruitfly_agent.interactive.terminal.io.editor._read_escape_sequence', return_value=b'\x1b[5~',
         ):
             self.assertEqual(editor.read_line(), 'ab')
         self.assertIsNotNone(display.transcript.anchor)
         self.assertTrue(display.scroll_history(b'\x1b[1;5F'))
         self.assertIsNone(display.transcript.anchor)
+        self.assertTrue(display.scroll_history(b'\x1bOR'))
         self.assertTrue(display.scroll_history(b'\x1b[<64;1;1M'))
         self.assertIsNotNone(display.transcript.anchor)
         display.suspend()

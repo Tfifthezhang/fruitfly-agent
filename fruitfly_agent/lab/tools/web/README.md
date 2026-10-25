@@ -8,6 +8,12 @@ disabled by default, and independent of execution workflows.
 
 ## Enable the tools
 
+Service fields are selections generated from the registered `choices`: search
+supports `brave`, `tavily`, and `deepseek`; fetch supports `direct` and `deepseek`.
+Use arrows and Enter, or numbered choices in line-based menus. Extension registries
+supply their own choices without terminal changes; unsupported YAML values fail
+validation.
+
 In **Configure → Tools**, expand **Search the web** or **Fetch web pages** and
 choose **Set up…**. Select the service, optionally enter an API key variable name,
 then enter the key with hidden input. Choose **Stage settings**, return to startup,

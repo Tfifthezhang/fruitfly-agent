@@ -55,6 +55,7 @@ CORE_PUBLIC_API = {
 }
 
 DATA_MODEL_PUBLIC_API = {
+    "LoopDiagnostics",
     "TextBlock",
     "ThinkingBlock",
     "ToolCallBlock",

@@ -36,16 +36,16 @@ From the project root, with a destination that does not exist:
 ```bash
 mkdir -p .fruitfly/improvement/task-packs
 cp -R examples/improvement/ticket_triage .fruitfly/improvement/task-packs/ticket-triage
-.venv/bin/python -m fruitfly_agent
+# Prepare experiment configuration before explicitly starting model work.
 ```
 
 | Step | Action |
 |---|---|
-| 1 | Start a normal session; no improvement enable switch is required. |
-| 2 | Record the active target hash; `baseline.txt` is not loaded automatically. |
-| 3 | Open `/improvement`; choose **Editable components** and **Candidate generator**, then set **Task** to the installed ticket pack. |
-| 4 | Set persistent effect scope; review guidance, model, cases and budgets, then explicitly start the paid search. |
-| 5 | Review evidence and changes; confirm the next-session default or a new session. |
+| 1 | Prepare the independent default Agent/model files and credentials. |
+| 2 | Set `task.source: files` and `task.pack: ticket-triage` in `.fruitfly/experiment.yaml`. |
+| 3 | For persistent verification, set `improvement.scope: persistent` and `improvement.max_executions: 64` to fund the declared paired cases. |
+| 4 | Run `fruitfly-agent-lab improvement check`, then explicitly `improvement run`; model calls may incur charges. |
+| 5 | Inspect the linked candidate and evidence. `rsi run` performs verified adoption into its experiment copy. |
 
 Search and live answers may incur model charges. Classification instructions can change general Agent behavior; inspect their scope before adoption.
 

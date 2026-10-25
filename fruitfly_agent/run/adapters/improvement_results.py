@@ -2,6 +2,14 @@
 from fruitfly_agent.interactive.contracts.candidates import CandidateSection
 
 
+def model_usage(report):
+    uncertain = getattr(report, 'uncertain_model_allowance', 0)
+    if uncertain:
+        return (f'Model calls: unknown ({report.model_calls} confirmed)\n'
+                f'Model quota charged: {report.model_calls + uncertain}/{report.model_limit}')
+    return f'Model calls: {report.model_calls}/{report.model_limit}'
+
+
 def result_sections(completion, records, *, error='', stop_reason=''):
     report = completion.report if completion is not None else None
     if completion is not None and completion.summary and report is not None:
@@ -11,7 +19,7 @@ def result_sections(completion, records, *, error='', stop_reason=''):
                 + ('\nError: ' + error if error else ''), initial=True),
             CandidateSection('Task output', completion.output or '(no completed output)'),
             CandidateSection('Verification', completion.assurance + '\nBehavioral selection does not establish correctness or a quality gain.'),
-            CandidateSection('Usage', f'Model calls: {report.model_calls}/{report.model_limit}\nTask executions: {report.trial_calls}/{report.trial_limit}\nToken receipts: unavailable'),
+            CandidateSection('Usage', model_usage(report) + f'\nTask executions: {report.trial_calls}/{report.trial_limit}\nToken receipts: unavailable'),
             CandidateSection('Evidence', '\n'.join(f'{k}: {v}' for k, v in completion.evidence)),
         )
     if report is None and records and records[0].report is not None:
@@ -38,7 +46,7 @@ def result_sections(completion, records, *, error='', stop_reason=''):
         tokens = report.tokens
         token_text = (f'{tokens.total_tokens} reported ({tokens.reported_calls}/{report.model_calls} calls); '
                       'missing receipts remain unknown' if tokens.reported_calls else 'Unknown')
-        usage = (f'Model calls: {report.model_calls}/{report.model_limit}\n'
+        usage = (model_usage(report) + '\n'
                  f'Task trials: {report.trial_calls}/{report.trial_limit}\nTokens: {token_text}')
     evaluation += f'\nIndependent confirmation: {confirmation}'
     if evidence.get('Confirmation baseline score'):

@@ -53,6 +53,10 @@ class EvidenceWorkspace:
 
     @classmethod
     def build(cls, request, artifacts, *, record=None):
+        from ..contracts.editing import TaskSetProposalRequest
+        if isinstance(request, TaskSetProposalRequest):
+            from .task_sets import build_workspace
+            return build_workspace(request, artifacts, record=record)
         task, baseline = request.task, request.baseline
         files = {'context/task.md': task.instruction.encode('utf-8')}
         for resource in task.inputs:

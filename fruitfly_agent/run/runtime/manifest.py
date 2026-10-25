@@ -18,6 +18,8 @@ class RuntimeManifest:
     base_prompt: Mapping[str, str]
     digest: str
     permissions: Mapping[str, Any] | None = None
+    execution: Mapping[str, Any] | None = None
+    harness: Mapping[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         result = {
@@ -32,8 +34,12 @@ class RuntimeManifest:
             "base_prompt": dict(self.base_prompt),
             "digest": self.digest,
         }
+        if self.harness is not None:
+            result["harness"] = dict(self.harness)
         if self.permissions is not None:
             result["permissions"] = dict(self.permissions)
+        if self.execution is not None:
+            result['execution'] = dict(self.execution)
         if self.data_artifacts:
             result["data_artifacts"] = [dict(value) for value in self.data_artifacts]
         return result
@@ -51,7 +57,8 @@ def digest_manifest(payload: Mapping[str, Any]) -> str:
 
 def execution_version_payload(manifest: Mapping[str, Any], source: str) -> dict[str, Any]:
     """Execution identity excludes the independently versioned improvement strategy."""
-    return {"source": source, "components": [c for c in manifest["components"]
+    return {**({'execution': manifest['execution']} if 'execution' in manifest else {}),
+            "source": source, "components": [c for c in manifest["components"]
             if not any(x.get("layer") == "improvement" for x in c.get("contributions", ()))],
             "context_pipeline": manifest.get("context_pipeline"),
             "base_prompt": {"content_hash": manifest["base_prompt"]["content_hash"]},

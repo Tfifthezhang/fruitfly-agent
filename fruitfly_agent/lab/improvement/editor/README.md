@@ -11,9 +11,11 @@ no Bash, production environment, adoption operation or live Session.
 artifact adapter. Editing I requires an improver-comparison runner. The file-task runner rejects that scope before model work. The registered
 [editor experiment](../improver/README.md) executes it through a separate comparison
 runner. Candidate validation freezes `system`, `select` and `reflect`; only
-`invariant`, `domain` and `compose` can change.
+`propose`, `invariant`, `domain` and `compose` can change. New instruction snapshots
+use schema `editor-instructions-v2`; exact legacy six-field texts remain readable
+as v1 with a default generic proposal mission.
 
-Proposal missions distinguish invariant execution behavior and domain behavior.
+The simple strategy uses `propose`; Harness² distinguishes invariant and domain missions.
 The composer can retain, revise or reject edits. Every changed component needs a
 supplied execution ID. Invalid structural/attribution output allows one repair;
 otherwise the original snapshot is retained. This validates structure, not quality.
@@ -30,3 +32,13 @@ bounded. PNG/JPEG are visual; other binary originals require an explicit rendere
 Requests use injected model configuration and may incur cost only during a job.
 
 Offline checks: `tests.lab.test_improvement_pipeline`.
+
+## Keep judgments independent
+
+`agent.py` owns candidate editing; `generators.py` owns generator registration and
+composition. A bounded [workspace session](../evidence/session.py) supplies tools
+without owning editing or scoring policy. Selection now belongs to
+[Assessment](../assessment/README.md); reflection belongs to
+[Experience](../experience/README.md). Legacy imports remain explicit compatible
+exports, not duplicate implementations. Run constructs a separate read-only
+inspector by default, even when editor and inspector use the same model profile.

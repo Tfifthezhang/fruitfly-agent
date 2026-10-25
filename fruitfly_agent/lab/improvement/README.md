@@ -11,35 +11,41 @@ execution and adoption. Container benchmark evaluation belongs to the separate E
 
 ```text
 Freeze plan, task, H/I/S and experience
-  → reference executions
-  → propose invariant and domain edits
-  → validate component ownership and evidence
-  → probe candidates
-  → compose and execute
-  → select an existing output
+  → execute a reference
+  → propose and validate a candidate
+  → execute and independently compare
+  → retain an existing result
   → optionally verify a persistent change
-  → reflect and stage attributed experience for explicit review
 ```
 
 | Stage | Public contract | Default |
 |---|---|---|
 | Materials | `TaskSource`, `TaskMaterial`, `ArtifactAccess` | Freeze explicitly selected workspace inputs as immutable bytes |
 | Components | `ComponentAdapter`, `HarnessSnapshot`, `CandidateBundle` | Object-owned text adapters; complete named file sets |
-| Propose | `CandidateGenerator`, `ProposalRequest`, `ProposalResult` | Tool-using editor with invariant/domain missions |
-| Probe | `TaskRunner`, `ExecutionRecord` | Detached read/write/edit file workspace |
+| Propose | `CandidateGenerator`, `ProposalRequest`, `ProposalResult` | Tool-using editor with a strategy-declared mission |
+| Probe | `TaskRunner`, `ExecutionRecord`, `ExecutionFacts` | Detached read/write/edit file workspace with attributable facts |
+| Assess | Completed assessor registry and service | Disabled by default; read-only facts and optional model judgment |
 | Compose | `Composer`, `CompositionRequest` | Editor compares executions and resolves component changes |
 | Select | `Selector`, `SelectionDecision` | Read-only comparison of anonymous executed outputs |
+| Explore | `ExplorationRegistry`, `ExplorationDecision` | Continue from the official incumbent; optional process-guided seed |
 | Verify | `VerificationPolicy`, optional `MeasurementSource` | Independent task-package comparison when provided |
 | Reflect | `Reflector`, `ExperienceEntry` | Evidence-grounded lesson or no entry |
 | Retain | `ExperienceRepository` | Host stages lessons; explicit review precedes an S library update |
-| Orchestrate | `WorkflowController` | Bounded parallel or sequential exploration |
+| Orchestrate | `WorkflowController`, `StrategyRegistry` | Shared validation/accounting; a separately registered search schedule |
+
+The independent [experiment CLI](../../experiments/README.md) defaults to
+`simple`: one reference and one candidate per round, no composition and no
+reflection. [Search strategies](strategies/README.md) keep Harness² optional.
+Existing embedding plans retain their Harness² default for compatibility.
 
 Parallel width `k` uses `k` references, `2k` proposals, and `k` compositions when
 each proposal returns one candidate. All proposals in one round receive the same
 reference evidence and prior history. They cannot inspect their peers. Probes
 start after the proposal pool is complete. Sequential mode performs invariant and
-domain proposals and one composition per depth. Only a selected incumbent becomes
-the next editing baseline; failed or worse compositions do not advance it. Every composition is executed, including an unchanged one.
+domain proposals and one composition per depth. By default the selected incumbent
+becomes the next editing baseline. Optional process-guided exploration can choose
+another completed execution as the next seed without changing the official winner.
+Every composition is executed, including an unchanged one.
 Generators may return no candidates or request an early stop. The built-in
 `parallel` pool is independent but currently awaited sequentially. All successful
 executions, including original references and probes, remain selectable.
@@ -51,7 +57,7 @@ executions, including original references and probes, remain selectable.
 | Propose | Task requirements, declared guidance, trajectories and optional measured feedback supply hypotheses. |
 | Stop | `StopPolicy` records round limits, repeated candidates, no candidate or generator stop. Shared allocation exhaustion has its own reason. |
 | Select | Consider original and candidate outputs. Measured selection maximizes declared utility and retains the earlier result on ties. Missing measurements retain the incumbent. |
-| Retain | Sequential rounds carry the selected configuration rather than the latest composition. |
+| Explore | The next editing seed is a separate decision; default to the official incumbent, or use declared completed-process comparison. |
 | Verify | Only an independent policy can grant `verified`; selected outputs remain `selected`. |
 
 Budget stopping is not convergence. Selection without an acceptance policy is a
@@ -90,6 +96,13 @@ references and available invocation counts. Neither requires a score. Original
 binary inputs are preserved. Text evidence is paginated; PNG/JPEG can be read
 visually. Other binary formats need an explicit reader.
 
+Every hosted execution also carries `execution-facts.json` as an immutable
+diagnostic resource: identities, termination cause, scoped budgets, counters,
+artifact collection status and granted evidence references. Unknown stays unknown;
+collection failure does not prove absence. Native, benchmark and nested editor
+executions share this contract without requiring containers. Existing editors read
+it through their ordinary evidence workspace; no auxiliary summary is generated.
+
 [Task packages](tasks/README.md) provide optional private scoring and independent
 holdout. The first training task supplies diagnosis; all training regression cases, selection and holdout run
 only after generation. Answers, checks and holdout inputs are absent from editor
@@ -99,14 +112,17 @@ grading outside the behavior-based editing path.
 
 ## Start improvement
 
-1. Start a normal session and open `/improvement [DIRECTION]`.
-2. Choose an execution strategy, task materials, editable components and a generator.
-   Native tasks use explicit instructions/files or task packages; editor experiments
-   use a registered experiment manifest.
-3. Choose parallel/sequential exploration, allocations, feedback and effect scope.
-4. Review the frozen preview and explicitly confirm. Calls may incur model cost.
-5. Inspect outputs, assurance, history and logs. Persistent candidates require
-   independent verification and remain pending until explicit adoption.
+1. Edit `.fruitfly/experiment.yaml`; choose explicit file material, a task package,
+   an editor experiment or an optional Eval source.
+2. Run `fruitfly-agent-lab improvement check` to inspect resolved defaults and inputs.
+3. Run `fruitfly-agent-lab improvement run` explicitly. Calls may incur model cost.
+4. Inspect the run report, evidence and stopping reason. Use `rsi run` for verified
+   adoption across generations; benchmark development reward alone is insufficient.
+
+`/improvement [DIRECTION]` retains a light explicit instruction/file/package flow
+and result review. Its base-prompt search uses `simple`; there is no experiment
+configuration editor in chat. Advanced component, strategy, feedback, scope and
+allocation choices belong to experiment files or the public embedding API.
 
 Current-task output selection does not prove improvement or change profile
 defaults. Reflection is staged in a separate pending queue. Use Results and history
@@ -186,6 +202,10 @@ There is no parallel method selector or legacy search engine.
 | Module | Responsibility |
 |---|---|
 | [Execution definitions](execution/README.md) | Material and runner registration without host algorithm branches |
+| [Task sets](task_sets/README.md) | Shared candidates, bounded task parallelism, sampling and joint selection |
+| [Search strategies](strategies/README.md) | Simple candidate comparison and optional Harness² schedules |
+| [Assessment](assessment/README.md) | Read-only completed/online judgments and independent verification |
+| [Termination](termination/README.md) | Composable iteration, resource, score and process conditions |
 | [Editor experiments](improver/README.md) | Fixed-depth I comparison and private paired verification |
 | [Contracts](contracts/README.md) | Immutable values and public stage protocols |
 | [Workflow](workflow/README.md) | Orchestration, accounting and native file execution |
@@ -210,3 +230,23 @@ instruction experiments implement a bounded, explicitly verified extension.
 Offline fake Providers and synthetic rewards establish control flow and isolation,
 not model quality, real API compatibility or benchmark gains. The
 [offline example](../../../examples/improvement/README.md) uses replaceable ports.
+
+## Separate editing, assessment and evolution
+
+Improvement searches and compares changes. [RSI](../rsi/README.md) adopts eligible
+versions and continues with the adopted H/S/I. [Eval](../../../eval/README.md) runs
+fixed-version benchmarks and optionally registers execution/official-assessment
+ports through its [adapter](../../../eval/improvement/README.md). Eval is not an
+Improvement dependency and does not start evolution implicitly.
+
+[Components](components/README.md) own legal changes and publication bindings.
+[Assessment](assessment/README.md) owns independent read-only judgments, process
+metrics, comparison and verification. [Termination](termination/README.md) owns
+composable stopping. The editor diagnoses supplied evidence; task-specific fixes
+are not hard-coded into the framework. Existing public stage signatures remain.
+
+File execution offers `assessment_interval` in execution parameters: 0 disables
+online evaluation; a positive integer batches assessment triggers. Fresh process
+assessors observe all committed events. Optional model judges have a separate
+configuration and consume the root budget. Online judgments do not feed back or
+change components without a separately injected control policy and runner support.

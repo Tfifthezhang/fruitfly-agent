@@ -33,3 +33,6 @@ state remains `.fruitfly/improvement/experience.json`. Rejected/committed pendin
 records are retained as attributed decisions. They protect artifact references
 during retention. [Editor experiments](../improver/README.md) never stage or commit
 experimental lessons, and no inner episode has a production writer.
+
+`reflection.py` owns model-based reflection. It consumes an injected read-only evidence inspector and services; it
+cannot commit its own result. Public `AgentReflector` imports remain compatible.

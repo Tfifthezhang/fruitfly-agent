@@ -7,7 +7,7 @@ Define the data and capabilities shared by hosts, Application, Session, and fron
 | File | Public entries / responsibility |
 |---|---|
 | [runtime.py](runtime.py) | RuntimeFactory, RuntimeSession, RuntimeAuthorization, and the RuntimeHandle protocol |
-| [commands.py](commands.py) | InteractiveCommand, CommandResult, optional read-only CommandPanel/CommandSection, CommandContext, and CommandHandler |
+| [commands.py](commands.py) | CommandDescription and help formatting, InteractiveCommand, CommandResult, optional read-only panels, CommandContext and CommandHandler |
 | [events.py](events.py), [models.py](models.py) | Event envelopes, EventSink, status, history, and session views |
 | [configuration.py](configuration.py), [model_setup.py](model_setup.py) | Configuration choices, optional default-restoration capability, model forms and staging |
 | [mechanism_setup.py](mechanism_setup.py) | Optional guided mechanism forms, non-secret credential status and atomic staging |
@@ -63,3 +63,8 @@ IDs, material choices, typed parameters and declared defaults. `WorkflowRequest`
 adds `execution_id` and `execution_parameters` without changing existing positional
 fields. The terminal can select editor comparison without encoding algorithm IDs.
 Hosts can omit the new execution views to keep existing custom menus.
+
+`CommandDescription` carries name, summary, usage, discovery visibility and declared
+aliases. Discovery views contain no handlers. `format_command_help()` presents
+those views without querying a host. Command registration and dispatch remain with
+Interaction and Terminal; terminal completion data belongs to I/O.

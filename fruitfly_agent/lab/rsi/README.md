@@ -27,7 +27,7 @@ Improvement does not require RSI. Human adoption alone is not a complete RSI loo
 |---|---|
 | Candidate | Must change an artifact reference and match the current parent. |
 | Verification | Must match candidate identity and fixed policy. Search score alone is insufficient. |
-| Rejected / failed verification | Do not adopt. The persistent driver stops on rejection. |
+| Rejected / failed verification | Do not adopt. The persistent driver stops on rejection by default. |
 | Confirmed adoption | Resolve the active improver again for the next generation. |
 | `planned` result | Does not advance the version; only `activated` does. |
 | Adoption exception / timeout | Propagate; the host must reconcile external state rather than assume rollback. |
@@ -46,7 +46,13 @@ Improvement does not require RSI. Human adoption alone is not a complete RSI loo
 | Coordination | One coordinator per incumbent/job; no cross-process transaction. |
 | Unsupported | Source replacement, general code candidates, arbitrary Python heap or learning-state recovery |
 
-There is no default autonomous CLI or Catalog mechanism. Real injected capabilities may incur charges. The [Run host example](../../run/README.md#explicit-text-evolution) shows explicit integration without requiring Eval.
+Use the independent [experiment CLI](../../experiments/README.md):
+`fruitfly-agent-lab rsi check` then explicit `rsi run`. File defaults provide a
+finite shared budget and three-generation limit. The command activates only
+independently verified candidates into its experiment configuration copy, never
+the daily or baseline profile. No background Catalog mechanism starts evolution.
+Real capabilities may incur charges. The [Run host example](../../run/README.md#explicit-text-evolution)
+also supports explicit integration without requiring Eval.
 
 ## Files and verification
 
@@ -80,3 +86,41 @@ custom verifier callbacks remain supported.
 exercise actual inner editor calls, independent measurement, two I activations,
 proof reuse and restart behavior without keys or network access. Their synthetic
 response model is not evidence of real recursive capability gains.
+
+## Configure continuation and stopping
+
+Improvement searches one frozen experiment; RSI adopts eligible changes and
+continues across generations. Eval is an optional execution/official-result
+adapter, not an RSI dependency. `eval run` never starts evolution implicitly.
+
+Both drivers use `controller.py` for generation accounting and consume pure
+[termination policies](../improvement/termination/README.md). `EvolutionDriver`
+accepts `stop_policy` and returns `stop_reason`. Its verification may carry an
+optional finite score. Rejected proposals retain the parent and bounded feedback.
+
+`PersistentEvolutionDriver.evolve` accepts `continue_on_rejection` and `stop_policy`.
+The default still stops on rejection; opting in continues until a declared
+condition or step limit. Persisted schema 2 records strategy identity, no-gain and
+failure counters and stop reason. Schema-1 jobs remain readable. Changed strategy
+rejects continuation; uncertain proposing/verifying work is never replayed.
+
+For one allowance across generations, pass a root `BudgetScope` as `budget` to
+`RunEvolutionHost`. Child jobs share it and return unused quota. Without this
+optional embedding capability, legacy per-job allowances and step limits remain;
+they do not constitute a global model/monetary limit. Custom verifier callbacks
+must use their explicitly supplied accounting capability. Built-in completed
+proof reuse makes no additional model request.
+
+Online assessment may stop a probe through a declared control policy. It cannot
+silently change the active H/S/I or grant independent adoption. Component changes
+remain boundary-scoped; arbitrary code hot replacement is not implemented.
+
+```bash
+.venv/bin/python -m unittest tests.lab.test_evolution_policies tests.workflows.test_evolution tests.workflows.test_editor_evolution
+```
+
+Durable roots retain charged usage and absolute deadlines. Resume restores them
+before another proposal and rejects changed limits. Unknown interrupted paid phases
+forfeit the remaining allowance conservatively and stay interrupted; this does not
+claim those requests actually occurred. Active coordinator elapsed time is retained;
+absolute root deadlines also include downtime.

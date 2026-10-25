@@ -19,7 +19,12 @@ Catalog registers object-owned improvement targets. The improvement host discove
 
 Preparation uses [Session writer leases](../storage/README.md) scoped to one preparer. Configuration application recovers the already-owned Session without opening a competing writer. Both handles hold a lease until retirement or failed-start cleanup; Application serializes their use. An empty currently owned conversation can be rebound, while standalone empty-session recovery remains rejected.
 
-Manifest schema remains 5. Recovery validates each recorded manifest against its own contents and allows changed environments; it does not restore arbitrary Python state or replay unknown paid work. See [Run recovery](../README.md#recovery) and [Session](../../core/session/README.md). No module-specific environment variables.
+Manifest schema 7 records all effective declared execution parameters and the
+resolved harness inventory in runtime identity. Recovery also reads schemas 3, 4, 5 and 6 without adding invented
+historical limits. It validates each manifest against its own contents and allows
+changed environments; it does not restore arbitrary Python state or replay unknown
+paid work. See [Run recovery](../README.md#recovery) and [Session](../../core/session/README.md).
+No module-specific environment variables.
 
 ```bash
 .venv/bin/python -m unittest tests.run.test_assembly tests.run.test_resources tests.run.test_cli tests.workflows.test_resume_history tests.workflows.test_decoupling -v
@@ -51,3 +56,14 @@ the effective strategy. Timeout, cancellation and cleanup remain unchanged.
 Both flags reject interactive/resumed launches and conflict with each other.
 Eval invokes `--unrestricted` inside Harbor task environments. Agent configuration
 contains no permission preference.
+
+## Bound fresh-task model requests
+
+`limits.py` supplies `ModelCallBudget` and a Provider registry wrapper shared by
+main and auxiliary models. Fresh non-interactive CLI tasks accept
+`--max-model-calls`; `FRUITFLY_MAX_MODEL_CALLS` is the fallback. Interactive/resumed
+launches reject this per-process allowance. An optional
+`FRUITFLY_MODEL_USAGE_PATH` receives an atomic count before each Provider call.
+Unknown responses remain charged. SDK-internal retries and shell-issued service
+requests are outside this harness-invocation count; it is not a price limit.
+The override does not rewrite harness/model configuration or create new keys.

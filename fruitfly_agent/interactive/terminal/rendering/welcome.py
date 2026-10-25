@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fruitfly_agent.interactive.contracts.models import InteractiveStatus
-from fruitfly_agent.interactive.terminal.rendering.branding import FRUIT_FLY_MARK, WORDMARK_FONT
+from fruitfly_agent.interactive.terminal.rendering.branding import FRUIT_FLY_MARK, FRUIT_FLY_SMALL_MARK, FRUIT_FLY_TINY_MARK, WORDMARK_FONT
 from fruitfly_agent.interactive.terminal.io.text import cell_width, pad_cells, truncate_cells
 
 
@@ -43,7 +43,7 @@ def render_welcome(
 
     if width >= _SIDE_BY_SIDE_MIN_WIDTH:
         lines = _wide_lines(status, width)
-    elif width >= 60:
+    elif width >= _ART_WIDTH + 3 + cell_width("FruitFlyAgent"):
         lines = _medium_lines(status, width)
     else:
         lines = _compact_lines(status, width)
@@ -79,18 +79,10 @@ def _medium_lines(
     status: InteractiveStatus,
     width: int,
 ) -> list[str]:
-    lines = [
-        "",
-        *_render_word("FRUITFLY"),
-        _brand_line(),
-        "The model organism for agent research.",
-        "",
-        *_status_lines(status, width),
-        "",
-        _tip_line(width),
-        "",
-    ]
-    return lines
+    right = ['', '', 'FruitFlyAgent', 'AGENT', '', 'The model organism for agent research.']
+    header = [truncate_cells(f'{pad_cells(line, _ART_WIDTH)}   {right[i] if i < len(right) else ""}', width)
+              for i, line in enumerate(FRUIT_FLY_MARK)]
+    return ['', *header, '', *_status_lines(status, width), '', _tip_line(width), '']
 
 
 def _compact_lines(
@@ -98,9 +90,13 @@ def _compact_lines(
     width: int,
 ) -> list[str]:
     brand = "✦ FruitFlyAgent"
+    mark = FRUIT_FLY_SMALL_MARK
+    if max(map(cell_width, mark)) > width:
+        mark = FRUIT_FLY_TINY_MARK
     session = "resumed" if status.message_count else "new session"
     lines = [
         "",
+        *(truncate_cells(line, width) for line in mark),
         truncate_cells(brand, width),
         truncate_cells("The model organism for agent research.", width),
         truncate_cells(f"{status.model} · {session}", width),
@@ -180,7 +176,7 @@ def _colorize(lines: list[str]) -> list[str]:
             )
         elif any(_glyph_color(char) for char in line):
             colored.append(_colorize_glyphs(line))
-        elif line.startswith("✦ FruitFlyAgent"):
+        elif line.startswith(("✦ FruitFlyAgent", "FruitFlyAgent")):
             colored.append(f"{_CYAN}{line}{_RESET}")
         elif line.startswith("  "):
             colored.append(f"{_DIM}{line}{_RESET}")

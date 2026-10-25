@@ -20,7 +20,7 @@ def session_manifests(session: Session | SessionSnapshot) -> list[dict]:
         if entry.type != "meta" or entry.payload.get("kind") != _RUNTIME_MANIFEST_KIND:
             continue
         manifest = entry.payload.get("manifest")
-        if not isinstance(manifest, dict) or manifest.get("schema_version") not in (3, 4, 5):
+        if not isinstance(manifest, dict) or manifest.get("schema_version") not in (3, 4, 5, 6, 7):
             raise ValueError(f"session entry {entry.id}: unsupported runtime manifest")
         if not isinstance(manifest.get("models"), dict) or not isinstance(manifest.get("components"), list):
             raise ValueError(f"session entry {entry.id}: malformed runtime manifest")

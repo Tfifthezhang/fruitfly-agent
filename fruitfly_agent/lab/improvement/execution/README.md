@@ -54,3 +54,56 @@ Registration is not an OS sandbox or permission to deploy code.
 
 No secrets or environment variables are introduced. Real execution calls the
 configured models and may incur charges.
+
+## Record execution facts
+
+`facts.py` attaches immutable `ExecutionFacts` to an ordinary execution receipt.
+Facts bind task/material, harness, initial state, conditions, source, termination,
+recorded counters, budgets and collected artifacts. Missing diagnostics remain
+unknown. Collection failure differs from confirmed absence; counters do not
+establish task quality. Native and external runners retain their original logs.
+See [completed assessment](../assessment/README.md) for read-only feedback.
+
+## Schedule task batches
+
+`scheduler.py` owns `TaskScheduler`: a bounded queue with fixed result ordering,
+cancellation and cleanup. Single-task execution uses the same queue at concurrency
+one; multiple tasks at concurrency one run serially.
+
+`batches.py` owns `BatchEvaluator`. It receives source bindings and an injected
+aggregation callback; it does not import a concrete scorer or benchmark. Each
+trial builds fresh ports with child model/leaf-execution quota and records exact
+task/harness/state/condition identities. Admission waits for active sibling holds,
+never for protected final-selection quota. Confirmed reusable trials are cached
+within the same frozen run and attempt; reused receipts do not become new samples.
+
+Task and source failures remain distinct from scored zero. Interrupted batches
+save completed receipts and incomplete coverage. Root exhaustion/cancellation
+propagate. Optional completed-process assessment runs on development evidence;
+private selection trials do not produce editor feedback. See [Task sets](../task_sets/README.md).
+
+## Stream evidence and control a probe
+
+`file_runner.py` owns native execution; `workflow.execution` remains a compatible
+import. `FileTaskRunner.start` returns a `ManagedExecution` with `events`, `result`,
+`control` and `aclose`. Final-only runners use `CompletionOnlyRunner` and expose no
+invented intermediate measurements. `events.py` persists immutable ordered event
+references for independent readers. Text streaming is not required by every backend.
+
+`control.py` validates capability, version, evidence position and idempotency.
+Current managed handles support scoped stop, not arbitrary steering, checkpoint,
+fork or live component replacement. Unsupported/stale controls are rejected. A handler failure records an unknown
+control outcome and the same request is not replayed.
+`segments.py` defines explicit version/checkpoint/state-transfer lineage for
+backends supplying those capabilities; a contract is not a filesystem or process
+snapshot implementation. Stopping a probe does not cancel the root job.
+
+[Online assessment](../assessment/README.md) consumes committed evidence without
+accessing mutable Core state. In-flight changes are not installed into the same
+Agent loop. A changed I is rebound at the next editor invocation/generation.
+
+Hosted native file execution restricts its read/write/edit tools to the configured
+tool set. Standalone `FileTaskRunner` callers may explicitly pass `tool_names`;
+omission retains the detached runner's established three-tool default. All
+declared scalar execution settings reach Core; final values are saved as
+`runtime-execution.json`. Backend isolation and fixed root quotas remain active.

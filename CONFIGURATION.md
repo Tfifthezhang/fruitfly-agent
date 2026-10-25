@@ -15,6 +15,7 @@ Keep model specifications, secrets, and runtime selections in separate files.
 | Default configuration | `.fruitfly/default-config.yaml` | Independent baseline; editable manually, read-only in terminal configuration |
 | Default model catalog | `.fruitfly/default-models.yaml` | Baseline model settings; may reference the same key variable as daily models |
 | Eval host settings | `.fruitfly/eval-host.yaml` | Machine-local runtime mounts, task source and dependency/cache preparation; see [Harbor settings](eval/harbor/README.md) |
+| Experiment settings | `.fruitfly/experiment.yaml` | File-only task references, role-model overrides and bounded Improvement/RSI settings |
 | CLI overrides | Startup arguments | Workspace, configuration, profile, and session selection |
 
 `--cwd`, `--config`, and `--profile` select the process's workspace and configuration. `--approve-tools` explicitly answers tool confirmation requests for a fresh non-interactive task in a trusted isolated environment; protected paths remain denied. A relative `model.catalog` path resolves from the harness configuration file. Saving persists choices. An active runtime changes only through explicit Application replacement, including configuration application or recovery.
@@ -28,7 +29,7 @@ Model discovery prefers `.fruitfly/models.yaml` and accepts root `models.yaml` w
 The home menu has **Start new session**, **Configure**, and **Exit**. In Configure
 or `/config`, **Restore default configuration** is the final action before Back.
 It reads `.fruitfly/default-config.yaml` and stages its prompt, mechanisms,
-parameters and artifact bindings in the selected daily profile. Existing model
+parameters, execution limits and artifact bindings in the selected daily profile. Existing model
 selection, catalog, credentials and other profiles remain unchanged. Experiment
 bindings absent from the defaults are removed from the draft.
 
@@ -44,6 +45,14 @@ default paths only when absent. The template enables local execution, basic
 read/Bash/edit/write tools and explicitly parameterized compaction. Default files
 are edited manually. Explicit `--config .fruitfly/default-config.yaml` selections
 have a read-only terminal controller.
+
+Alternatively, `fruitfly-agent-lab init` generates these defaults plus a minimal
+experiment and an empty-key secret file in the selected workspace. Existing
+secrets are preserved, and existing configuration destinations are rejected.
+`init --source task-set --benchmark terminal-bench-4` also generates a request and
+host template with explicit Linux runtime path variables. Initialization reads no
+private project settings and performs no model, Docker or installation work.
+See [experiment setup](examples/experiments/README.md).
 
 [Eval](eval/README.md) uses the complete default profile, including its independent
 model catalog, unless the request explicitly selects another configuration. The
@@ -138,7 +147,7 @@ Keep only usable profiles. For different credentials, assign distinct `api_key_e
 |---|---|
 | [Providers](fruitfly_agent/providers/README.md) | Model specifications and request behavior |
 | [Provider guide](fruitfly_agent/providers/PROVIDER_GUIDE.md) | Protocol-specific parameters and reasoning limitations |
-| [Core runtime rules](fruitfly_agent/core/README.md#runtime-rules) | Embedded loop tool/turn budgets and the fixed three-response truncation ceiling; these are not new YAML fields. |
+| [Core runtime rules](fruitfly_agent/core/README.md#runtime-rules) | Tool/turn budget semantics and the fixed three-response truncation ceiling |
 | [Harness schema](fruitfly_agent/run/configuration/README.md) | YAML example, validation, and persistence |
 | [Run](fruitfly_agent/run/README.md) | CLI, assembly, artifacts, and recovery |
 
@@ -165,14 +174,14 @@ The capability page uses arrows and Space/Enter to toggle, then **Continue** to 
 | Base prompt | `assistant-default`; choose another prompt in **Configure → prompt** or `/config`. | [Base prompt](fruitfly_agent/lab/base_prompt/README.md) |
 | Skill catalog | Read `.skills/`; enable in **Context → Context augmentation → Skill catalog** (Space toggles; the phase is a section heading). | [Skills](fruitfly_agent/lab/context_manager/augmentation/skills/README.md) |
 | Reduction | Summarizing; inspect the mechanism in Context and edit tuning parameters in YAML. | [Reduction](fruitfly_agent/lab/context_manager/reduction/README.md) |
-| Improvement | Choose materials, components, generator, exploration, allocations and scope in `/improvement`; no per-algorithm switch. | [Improvement](fruitfly_agent/lab/improvement/README.md) |
+| Improvement | Edit experiment files for components, strategy, feedback, allocations, scope and stopping; `/improvement` keeps a small instruction/file flow. | [Improvement](fruitfly_agent/lab/improvement/README.md) |
 | Reusable skill document | Disabled; Context augmentation. Set `source_path` to one workspace-relative Skill or enter `initial_text`; `max_chars=16000`. | [Skill body](fruitfly_agent/lab/context_manager/augmentation/skills/README.md#optimize-a-skill-body) |
 | Learned environment memory | Disabled; Context augmentation. Enter `initial_text`; `max_chars=16000`. Updates require explicit Improvement and adoption. | [Learned memory](fruitfly_agent/lab/context_manager/augmentation/information/file_memory/README.md#learn-environment-memory) |
 | Execution workflow | Disabled; a bounded sequence of model stages. One solve-and-answer step until an artifact is selected. | [Workflow](fruitfly_agent/lab/workflow/README.md) |
 | Web search / fetch | Disabled; enable **Search the web** and **Fetch web pages** under Tools. Search uses Brave, Tavily or DeepSeek. Fetch uses `direct` (no key) or `deepseek`. Expand either tool and choose **Set up…** to select the service and enter a hidden API key. Save writes the secret file. DeepSeek search/fetch use separate default variables; `api_key_env` can select a shared key. | [Web tools and YAML settings](fruitfly_agent/lab/tools/web/README.md) |
 | Programmatic context | Explicitly enable `ipython-tool` or `rlm-ipython`. | [Programmatic context](fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md) |
 | Remote execution | Enable **Remote environment** under Environment to run file and Bash tools through SSH. Complete settings and credentials are reused; missing values open the six-step form. Expand **Set up…** to edit explicitly. Disabling retains saved settings across restarts in the same workspace/profile. Mutually exclusive with local execution, local IPython/RLM and file memory. | [SSH setup and limits](fruitfly_agent/lab/environment/ssh/README.md) |
-| RSI | Host-injected capabilities and verification policy; no default CLI switch. | [RSI](fruitfly_agent/lab/rsi/README.md) |
+| RSI | Explicit independent CLI or injected host; finite shared allowances and independent verification. | [RSI](fruitfly_agent/lab/rsi/README.md) |
 
 Menus show mechanism switches and algorithm choices. Edit `.fruitfly/config.yaml` for detailed parameters. Summaries, improvement, and auxiliary model queries may incur model charges.
 
@@ -187,6 +196,53 @@ Menus show mechanism switches and algorithm choices. Edit `.fruitfly/config.yaml
 
 Source paths resolve within the workspace. All three sources require `information-context`. Live HTTP sends the current query to the configured service. See [Information spaces](fruitfly_agent/lab/context_manager/augmentation/information/README.md).
 
+## Bound task tool calls
+
+Set the limit in the Agent configuration selected for execution, usually
+`.fruitfly/default-config.yaml` for experiments:
+
+```yaml
+profiles:
+  baseline:
+    # Include the profile's existing model and mechanism settings here.
+    execution:
+      max_tool_calls_per_turn: 128
+```
+
+Omission uses 64. The value must be a nonnegative integer; 0 permits no tool
+attempts. It bounds attempts in
+one outer task turn; follow-up turns receive a fresh allowance. It is independent
+of `task.model_calls`, total search allocations and the editor's 48-tool allowance.
+The assembled limit is recorded in runtime identity and execution facts. Native
+detached trials preserve it. Benchmark trials use the request's Agent profile and
+require compatible prepared source; run `eval prepare` after changing runtime
+implementation. Raising the limit permits more work and does not establish quality.
+
+## Configure the complete execution policy
+
+Run and Eval use the [shared runtime specification](fruitfly_agent/runtime_spec/README.md).
+The profile's `execution` mapping also accepts:
+
+| Field | Default | Meaning |
+|---|---|---|
+| `max_turns` | 32 | Maximum outer turns, including follow-ups; not model calls |
+| `max_context_recovery_attempts` | 6 | Positive overflow-recovery bound |
+| `tool_execution.max_parallel` | 8 | Positive tool batch concurrency |
+| `tool_execution.default_execution_mode` | `parallel` | `parallel` or `sequential` |
+
+Models and token limits retain their model-catalog owner. Callbacks, Session,
+Provider and authorization objects cannot be supplied in this mapping. Runtime
+manifest schema 7 records the final effective execution values and configured
+component inventory; old manifests retain their original identities.
+
+Use `improvement.components` to explicitly permit edits and `component_options`
+to constrain component-owned fields. The [execution policy component](fruitfly_agent/lab/execution_policy/README.md)
+provides the parameter adapter. Enabled mechanisms determine available components;
+backend capabilities and experiment permissions further restrict them. Absent
+state owners do not expose editable S components. Invalid explicit selections fail.
+The experiment check prints the resolved inventory and exercises Eval staging
+offline before real execution.
+
 ## Text artifacts
 
 | Field | Meaning |
@@ -197,7 +253,7 @@ Source paths resolve within the workspace. All three sources require `informatio
 
 Create custom text with `DataArtifactStore.put_text`; see the [Run example](fruitfly_agent/run/README.md#text-artifacts). Artifacts are plaintext model instructions. Unknown or unused bindings are rejected; recovery verifies the original contents and manifest. Keep secrets out of artifacts, configuration, sessions, and reports.
 
-`tool-guidance.<name>` replaces an enabled tool description with its owner-validated text. `/improvement` selects one or more editable components. A joint candidate expands into ordinary prompt/artifact bindings; tool schemas, execution and permissions retain their existing contracts. Preview is offline; execution may incur model and external-runner costs.
+`tool-guidance.<name>` replaces an enabled tool description with its owner-validated text. Experiment files select one or more editable components. A joint candidate expands into ordinary prompt/artifact bindings; tool schemas, execution and permissions retain their existing contracts. Preview is offline; execution may incur model and external-runner costs.
 
 `execution-workflow` validates bounded stage instructions. `skill-document` and `learned-memory` are retained S documents; adopted artifacts override initial text. `improvement-editor` is a six-field I instruction artifact. The registered editor-comparison execution can modify `invariant`, `domain` and `compose`; `system`, `select` and `reflect` stay fixed during an experiment. Persistent publication requires independent verification and explicit adoption.
 
@@ -207,6 +263,8 @@ Create custom text with `DataArtifactStore.put_text`; see the [Run example](frui
 |---|---|
 | `FRUITFLY_MODEL_PROFILE` | Initial model choice when no harness configuration has been saved; unset, empty, or whitespace-only means unselected |
 | `FRUITFLY_EVENT_STREAM_PATH` | Optional JSONL event output in one-shot mode |
+| `FRUITFLY_MAX_MODEL_CALLS` | Fresh-task main/auxiliary Provider allowance; overridden by `--max-model-calls` |
+| `FRUITFLY_MODEL_USAGE_PATH` | Optional atomic request-count receipt for a configured allowance |
 | `NO_COLOR` | Disable terminal colors |
 | Model-specific `api_key_env` | Name of the variable containing that model's API key |
 | `FRUITFLY_SSH_USERNAME` / `FRUITFLY_SSH_PASSWORD` | Secret SSH account/password; `ssh-env.username_env` and `password_env` can select different variable names |
@@ -283,6 +341,36 @@ usage remains unknown. Task and parent-operation timeouts bound child operations
 External execution needs an explicitly registered compatible runner; the native
 file workspace does not inherit Bash, network tools, containers or live Session.
 
+### Assess completed executions
+
+These optional sections belong in `.fruitfly/experiment.yaml`, alongside
+`improvement`, rather than in the Agent profile:
+
+```yaml
+process_assessment:
+  assessors: [execution-facts-v1, completed-model-v1]
+  max_model_calls: 16
+  timeout_seconds: 120
+  required: false
+exploration:
+  policy: process-guided
+```
+
+Defaults are `assessors: []` and `policy: incumbent`, which add no process-judge
+model calls. `execution-facts-v1` projects recorded counters without a model or
+quality score. `completed-model-v1` uses `models.assessor` for read-only judgments
+and comparisons. Both consume completed execution facts; they do not modify live
+execution. The model allowance covers judgments and comparisons together within
+each search, inside its shared root budget. Optional assessment failure falls
+back to the incumbent; required failure stops with `assessment_unavailable`.
+Root exhaustion and cancellation still propagate.
+
+`process-guided` requires a comparison-capable assessor. It may choose a different
+executed version as the next editing seed. Official selection, development scores
+and independent verification retain their own rules. Process preference alone
+does not publish or adopt a candidate. See the [assessment guide](fruitfly_agent/lab/improvement/assessment/README.md)
+and [complete experiment reference](examples/experiments/benchmark.example.yaml).
+
 ## Relocate improvement data
 
 Use the explicit offline entry to preview, then apply the namespace migration:
@@ -307,8 +395,16 @@ cross-process transaction. Repeating a completed migration makes no changes.
 
 ## Choose a candidate generator
 
-`/improvement` selects task materials, components, generator, exploration, feedback
-and effect scope. `GeneratorRegistry` declares factories and capabilities;
+The [experiment CLI](fruitfly_agent/experiments/README.md) reads task materials,
+components, search strategy, feedback and effect scope from one file with defaults.
+The [single-task reference](examples/experiments/benchmark.example.yaml) and
+[joint task-set reference](examples/experiments/multi-task.example.yaml)
+list current fields, alternatives, bounds and disabled recipes. They also mark
+termination contracts that the standard CLI does not yet populate. Keep model
+specifications, Agent mechanisms, scoring material and credentials in their owning
+files; comments in the reference identify those locations.
+It uses the built-in Agent editor; embeddings can replace generation through
+`GeneratorRegistry`, which declares factories and capabilities;
 `WorkflowRequest` freezes each job. Discovery and previews make no model requests.
 Retired algorithm selections are rejected, including disabled YAML entries. Remove
 them explicitly; there is no automatic equivalence to the new generator contract.
@@ -317,11 +413,12 @@ retired algorithms into the new workflow.
 
 ## Configure the component editor
 
-The hidden default `component-improvement` registration has `editor_profile`
-(empty reuses the active model), `max_model_calls=64`, `max_executions=32` and
+The hidden default `component-improvement` registration has `editor_profile` and
+`assessor_profile` (each empty reuses the active model), `max_model_calls=64`, `max_executions=32` and
 `operation_timeout=120`. Model profiles use the existing catalog and secret
-configuration. Registration and previews make no model requests. Per-job component,
-generator, exploration, feedback and scope choices belong to `/improvement`.
+configuration. Registration and previews make no model requests. Advanced per-job
+choices belong to experiment files or the public API; `/improvement` keeps a
+small explicit-material flow.
 
 Python embeddings inject `WorkflowBindings` into `RunApplicationFactory` to replace
 stages. Changing an execution backend requires a compatible `TaskRunner`; the
@@ -331,14 +428,14 @@ credentials remain independent tool settings.
 
 ## Configure an editor comparison
 
-In `/improvement`, choose **Execution strategy → Editor self-improvement** and an
-installed experiment under **Task**. **Execution parameters** declares inner H/S
+Use `task.source: editor` and an installed `task.material` in the experiment file.
+`task.parameters` declares inner H/S
 components, repetitions, inner allocations, development trial limit and fixed
 acceptance thresholds. These are per-job settings, not new model credentials or
 harness YAML fields. The strategy recommends 512 root model calls and 256 leaf
 executions; preview rejects a budget below its calculated minimum. Longer model
 latency or larger suites may require a higher operation timeout and allocations.
-Actual calls incur cost only after explicit confirmation.
+Actual calls incur cost only after explicitly running the experiment.
 
 Prepare independent development and verification packages, each with train,
 selection and holdout. The exact manifest, parameters, data separation, proof and

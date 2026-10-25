@@ -14,6 +14,10 @@ Validate arguments and dispatch tools. Concrete factories belong in [Lab Tools](
 
 Invalid arguments and ordinary tool failures become error tool results. Tools use the injected execution environment. Add concrete operations in Lab rather than Core. No module-specific environment variables.
 
+`AgentToolResult.error(...)` explicitly marks a failed result. Core preserves its
+`is_error` flag and records actual dispatch facts separately: rejected/attempted
+calls do not imply that a tool body started. See [loop diagnostics](../README.md#runtime-rules).
+
 ```bash
 .venv/bin/python -m unittest tests.core.test_schema tests.core.test_loop tests.lab.test_builtin_tools -v
 ```

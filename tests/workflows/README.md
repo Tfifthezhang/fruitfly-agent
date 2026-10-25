@@ -6,6 +6,7 @@ Exercise actual Application, Run assembly, and terminal paths with offline model
 
 | Files | Protects |
 |---|---|
+| `test_execution_policy.py` | Isolated configuration candidates, effective native limits and verified H-only activation |
 | `test_terminal_reflow.py` | Actual TTY resize reflows completed tables and retains drafts without another model request |
 | `test_terminal_interrupt.py` | Actual Ctrl+C/SIGINT, quiet-run continuation, clean exit, and terminal restoration in ANSI and non-ANSI terminals |
 | `test_decoupling.py / test_offline_example.py` | Public extensions and interchangeable improvers/targets |
@@ -23,3 +24,6 @@ Verify usable integration, not model quality. New algorithms should reuse generi
 ```
 
 Terminal interrupt workflows also exercise permission Enter/numeric/arrow selection, Esc denial, Ctrl+C cancellation, and session approval in ANSI and non-ANSI PTYs.
+
+`test_evolution_scope.py` verifies frozen stop parameters and one root allowance
+across successive host jobs. No model service is contacted.

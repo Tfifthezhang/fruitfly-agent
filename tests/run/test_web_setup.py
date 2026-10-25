@@ -28,8 +28,10 @@ class WebSetupTests(unittest.TestCase):
         self.output = io.StringIO()
 
     def frontend(self, *lines, secrets='fixture-search-secret\n'):
+        reader = MenuScriptedLines(self.output, *lines)
+        reader.offset = len(self.output.getvalue())
         return TerminalConfigurationFrontend(self.configuration, input_stream=io.StringIO(secrets),
-            output_stream=self.output, line_editor=MenuScriptedLines(self.output, *lines))
+            output_stream=self.output, line_editor=reader)
 
     def wizard(self, mechanism, *lines, secrets='fixture-search-secret\n'):
         frontend = self.frontend(*lines, secrets=secrets)
@@ -43,9 +45,50 @@ class WebSetupTests(unittest.TestCase):
             if path.exists():
                 self.assertNotIn(value, path.read_text())
 
+    def test_registered_extension_appears_in_the_same_wizard_without_frontend_changes(self):
+        from fruitfly_agent.lab.catalog import LabCatalog, builtin_catalog
+        from fruitfly_agent.lab.tools.web import default_service_registry, WebServiceDefinition, WebServiceRegistry
+        from fruitfly_agent.lab.tools.web.registration import definitions
+        base = default_service_registry()
+        extended = WebServiceRegistry(
+            search=tuple(base.get('search', name) for name in base.choices('search')) +
+                (WebServiceDefinition('fixture', lambda client, key: None, 'FIXTURE_SEARCH_KEY'),),
+            fetch=tuple(base.get('fetch', name) for name in base.choices('fetch')))
+        builtin = builtin_catalog()
+        replacements = definitions(extended)
+        replaced = {d.descriptor.mechanism_id for d in replacements}
+        catalog = LabCatalog(tuple(d for d in builtin.definitions() if d.descriptor.mechanism_id not in replaced) +
+            replacements, bootstrap=builtin.bootstrap)
+        factory = RunApplicationFactory(cwd=self.root, environment={'TEST_API_KEY': 'fixture-model-key'}, catalog=catalog)
+        frontend = TerminalConfigurationFrontend(factory.configuration, input_stream=io.StringIO('fixture-key\n'),
+            output_stream=self.output, line_editor=MenuScriptedLines(self.output, '@fixture', '', '@Stage settings'))
+        self.assertTrue(run_mechanism_setup(frontend._model_form(), factory.configuration.mechanism_setup, 'web-search-tool'))
+        selection = next(m for m in factory.configuration.profile().mechanisms if m.mechanism_id == 'web-search-tool')
+        self.assertEqual('fixture', selection.parameters['backend'])
+        self.assertIn('FIXTURE_SEARCH_KEY', self.output.getvalue())
+        self.assertNotIn('fixture-key', self.output.getvalue())
+        self.assertFalse((self.root / '.fruitfly/secrets.env').exists())
+
+    def test_choice_cancel_keeps_profile_and_credentials_untouched(self):
+        before = self.configuration.profile()
+        self.assertFalse(self.wizard('web-search-tool', 'back', secrets=''))
+        self.assertEqual(before, self.configuration.profile())
+        self.assertFalse(self.service.credentials.available('BRAVE_SEARCH_API_KEY'))
+
+    def test_expanded_parameter_uses_the_same_service_choices(self):
+        self.factory.environment.update(BRAVE_SEARCH_API_KEY='fixture-brave', TAVILY_API_KEY='fixture-tavily')
+        self.configuration.set_mechanism('web-search-tool', enabled=True)
+        frontend = self.frontend('@Tools', '@Search the web', '@Search service', '@tavily',
+            'back', 'back', 'back', '@Save only', secrets='')
+        self.assertTrue(frontend.run_for_active_session().saved)
+        selection = next(m for m in self.configuration.profile().mechanisms if m.mechanism_id == 'web-search-tool')
+        self.assertEqual('tavily', selection.parameters['backend'])
+        self.assertTrue(selection.enabled)
+        self.assertFalse((self.root / '.fruitfly/secrets.env').exists())
+
     def test_interactive_search_selects_new_service_and_saves_hidden_key(self):
         frontend = self.frontend('@Configure', '@Tools', '@Search the web', 'space',
-            'deepseek', '', '@Stage settings', 'back', 'back', 'back', '@Start new session')
+            '@deepseek', '', '@Stage settings', 'back', 'back', 'back', '@Start new session')
         result = frontend.run()
         self.assertTrue(result.start)
         self.assertTrue(result.saved)
@@ -71,7 +114,7 @@ class WebSetupTests(unittest.TestCase):
 
     def test_interactive_fetch_switches_from_direct_and_saves_separate_key(self):
         frontend = self.frontend('@Configure', '@Tools', '@Fetch web pages', '@Set up…',
-            'deepseek', '', '@Stage settings', 'back', 'back', 'back', '@Start new session',
+            '@deepseek', '', '@Stage settings', 'back', 'back', 'back', '@Start new session',
             secrets='fixture-fetch-secret\n')
         self.assertTrue(frontend.run().saved)
         values = load_env(self.root / '.fruitfly/secrets.env')
@@ -81,7 +124,7 @@ class WebSetupTests(unittest.TestCase):
 
     def test_custom_variable_validation_uses_current_form_values(self):
         self.factory.environment['CUSTOM_SEARCH_KEY'] = 'fixture-existing-key'
-        self.assertTrue(self.wizard('web-search-tool', 'deepseek', 'CUSTOM_SEARCH_KEY', '@Stage settings', secrets='\n'))
+        self.assertTrue(self.wizard('web-search-tool', '@deepseek', 'CUSTOM_SEARCH_KEY', '@Stage settings', secrets='\n'))
         self.configuration.save()
         selection = next(m for m in self.configuration.profile().mechanisms if m.mechanism_id == 'web-search-tool')
         self.assertEqual('CUSTOM_SEARCH_KEY', selection.parameters['api_key_env'])
@@ -91,7 +134,7 @@ class WebSetupTests(unittest.TestCase):
 
     def test_clearing_previous_service_override_uses_new_service_default(self):
         self.configuration.set_parameter('web-search-tool', 'api_key_env', 'BRAVE_SEARCH_API_KEY')
-        self.assertTrue(self.wizard('web-search-tool', 'deepseek', '/clear', '@Stage settings'))
+        self.assertTrue(self.wizard('web-search-tool', '@deepseek', '/clear', '@Stage settings'))
         self.configuration.save()
         self.assertEqual({'DEEPSEEK_SEARCH_API_KEY': 'fixture-search-secret'}, load_env(self.root / '.fruitfly/secrets.env'))
 
@@ -99,7 +142,7 @@ class WebSetupTests(unittest.TestCase):
         self.configuration.set_parameter('web-fetch-tool', 'backend', 'deepseek')
         with patch('fruitfly_agent.interactive.terminal.features.configuration.mechanism_setup.read_secret',
                    side_effect=AssertionError('direct fetch requested a key')):
-            self.assertTrue(self.wizard('web-fetch-tool', 'direct', '', '@Stage settings', secrets=''))
+            self.assertTrue(self.wizard('web-fetch-tool', '@direct', '', '@Stage settings', secrets=''))
         self.assertEqual((), self.service.form('web-fetch-tool').credentials)
         self.configuration.save()
         self.assertFalse((self.root / '.fruitfly/secrets.env').exists())
@@ -124,10 +167,10 @@ class WebSetupTests(unittest.TestCase):
     def test_cancel_eof_and_interrupt_leave_no_staged_key_or_configuration(self):
         before = self.configuration.profile()
         for lines, secrets in (
-            (('deepseek', '/cancel'), ''),
-            (('deepseek', ''), '/cancel\n'),
-            (('deepseek', ''), ''),
-            (('deepseek', '', '@Cancel'), 'fixture-cancelled-key\n'),
+            (('@deepseek', '/cancel'), ''),
+            (('@deepseek', ''), '/cancel\n'),
+            (('@deepseek', ''), ''),
+            (('@deepseek', '', '@Cancel'), 'fixture-cancelled-key\n'),
         ):
             with self.subTest(lines=lines, secrets=bool(secrets)):
                 self.assertFalse(self.wizard('web-search-tool', *lines, secrets=secrets))
@@ -136,19 +179,19 @@ class WebSetupTests(unittest.TestCase):
                 self.assertFalse((self.root / '.fruitfly/secrets.env').exists())
                 self.assertFalse((self.root / '.fruitfly/config.yaml').exists())
         with patch('fruitfly_agent.interactive.terminal.features.configuration.mechanism_setup.read_secret', side_effect=KeyboardInterrupt):
-            self.assertFalse(self.wizard('web-search-tool', 'deepseek', '', secrets=''))
+            self.assertFalse(self.wizard('web-search-tool', '@deepseek', '', secrets=''))
         self.assertEqual(before, self.configuration.profile())
         self.assert_hidden('fixture-cancelled-key')
 
     def test_empty_invalid_and_conflicting_key_retry_without_echo(self):
-        self.assertTrue(self.wizard('web-search-tool', 'deepseek', '', '@Stage settings',
+        self.assertTrue(self.wizard('web-search-tool', '@deepseek', '', '@Stage settings',
                                    secrets='\nkey with spaces\nfixture-search-secret\n'))
         self.assertIn('API key is missing or conflicts', self.output.getvalue())
         self.assert_hidden('key with spaces', 'fixture-search-secret')
         self.configuration.reset()
         self.factory.environment['DEEPSEEK_SEARCH_API_KEY'] = 'fixture-original-key'
         self.output = io.StringIO()
-        self.assertTrue(self.wizard('web-search-tool', 'deepseek', '', '@Stage settings',
+        self.assertTrue(self.wizard('web-search-tool', '@deepseek', '', '@Stage settings',
                                    secrets='fixture-replacement-key\n\n'))
         self.assertIn('API key: reused', self.output.getvalue())
         self.assertEqual('fixture-original-key', self.factory.environment['DEEPSEEK_SEARCH_API_KEY'])
@@ -159,8 +202,8 @@ class WebSetupTests(unittest.TestCase):
         path.parent.mkdir(exist_ok=True)
         original = '# Keep this comment\nUNRELATED=value\n'
         path.write_text(original)
-        self.assertTrue(self.wizard('web-search-tool', 'deepseek', '', '@Stage settings'))
-        self.assertTrue(self.wizard('web-fetch-tool', 'deepseek', '', '@Stage settings', secrets='fixture-fetch-secret\n'))
+        self.assertTrue(self.wizard('web-search-tool', '@deepseek', '', '@Stage settings'))
+        self.assertTrue(self.wizard('web-fetch-tool', '@deepseek', '', '@Stage settings', secrets='fixture-fetch-secret\n'))
         self.assertEqual(original, path.read_text(), 'staging must not write keys')
         with patch('fruitfly_agent.run.configuration.controller.save_harness_config', side_effect=OSError('fixture save failure')):
             with self.assertRaises(OSError):
@@ -177,7 +220,7 @@ class WebSetupTests(unittest.TestCase):
 
     def test_discard_removes_staged_key_without_touching_files(self):
         before = self.configuration.profile()
-        self.assertTrue(self.wizard('web-search-tool', 'deepseek', '', '@Stage settings'))
+        self.assertTrue(self.wizard('web-search-tool', '@deepseek', '', '@Stage settings'))
         self.assertTrue(self.service.credentials.available('DEEPSEEK_SEARCH_API_KEY'))
         self.configuration.reset()
         self.assertEqual(before, self.configuration.profile())

@@ -17,6 +17,8 @@ Shared message, context, and runtime values. This module performs no I/O and imp
 | Context decisions | Proposals committed by Core, not by algorithms. |
 | Optional cancellation signal | Run-local `asyncio.Event`, default `None`; not persisted or restored. |
 | Algorithm state | Owned by its Lab implementation or explicit artifacts. |
+| `LoopDiagnostics` | Optional immutable terminal facts on `AgentLoopResult`; counts and termination, not quality or verification |
+| `AgentToolResult.is_error` | Defaults false; `.error(...)` sets true and Core preserves it |
 
 No module-specific environment variables or installation steps.
 

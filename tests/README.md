@@ -41,6 +41,8 @@ marker. CI checks both dependency configurations; it does not run real benchmark
 | Terminal | Command registration/bindings, live input, generic menus, and configuration menus |
 | Eval | Benchmark adapters, catalog, requests, execution, reports, storage, and installation |
 
+Command routing, command metadata/completion, terminal input/display, screen controls, hidden input and shared configuration choices are also checked with complete function annotations. Copy-view regressions use fake streaming events and a local PTY; they verify frozen output, retained drafts and terminal-mode restoration without model access.
+
 The Core loop, task packages/scoring, message codecs, runtime-description adapter, live input, generic/configuration menus, and Harbor result adapter also reject definitions with missing annotations. Policy-defined case mappings and SDK/JSON boundaries retain dynamic data where needed; this is not a fully strict whole-project check. Imported types outside the selected modules are analyzed silently. Terminal rendering, other feature menus, most algorithm implementations, the Eval CLI, and the optional installed Harbor Agent bridge remain outside the gate.
 
 ## Groups
@@ -56,6 +58,7 @@ The Core loop, task packages/scoring, message codecs, runtime-description adapte
 | [Run](run/README.md) | Configuration, assembly, manifest, candidates, recovery, and subprocess bridges |
 | [Workflows](workflows/README.md) | Complete offline user paths across modules |
 | [Eval](eval/README.md) | Optional single-configuration benchmarks, artifacts, and reports |
+| [Experiments](experiments/README.md) | Independent entry points, file defaults, model roles and scoped lifecycle |
 | [Support](support/README.md) | Shared substitutes and temporary material, no TestCases |
 | [Integration](integration/README.md) | Explicit real Provider smoke requests |
 
@@ -93,3 +96,8 @@ The [Eval tests](eval/README.md) use fake Providers and local processes. Real mo
 quality, Harbor containers and Docker image identity require separately authorized
 integration work. Generic improvement remains covered independently by the
 [workflow tests](workflows/README.md).
+
+Command-completion checks cover registered/hidden/overridden commands, custom help,
+range edits, prefix filtering, dismissal, history, paste and permission/copy input.
+Local PTY checks exercise the complete frontend: typing shows candidates, Tab edits
+without executing, Enter dispatches once, and terminal modes restore on exit.

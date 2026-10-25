@@ -8,12 +8,14 @@ FruitFlyAgent separates the Agent loop, model adapters, Application lifecycle, a
 
 | Module | Owns | Depends on |
 |---|---|---|
+| [Runtime specification](runtime_spec/README.md) | Serializable harness profiles and execution parameters | Core and basic serialization only |
 | [Core](core/README.md) | Messages, loop, tools, context contracts, and Session persistence | Core only |
 | [Providers](providers/README.md) | Model API requests, streaming, and error mapping | Core and Providers |
 | [Interactive](interactive/README.md) | Application lifecycle, multi-turn state, events, and terminal | Core and Interactive |
-| [Lab](lab/README.md) | Tools, environments, context strategies, improvement, and RSI | Core and Lab |
+| [Lab](lab/README.md) | Tools, environments, context strategies, improvement, and RSI | Core, Runtime specification and Lab |
 | [Run](run/README.md) | Configuration, Provider construction, assembly, and CLI | All runtime layers |
-| [Eval](../eval/README.md) | Optional single-configuration benchmark execution and reports | Core, Providers, Lab, and Eval |
+| [Eval](../eval/README.md) | Optional single-configuration benchmark execution and reports | Core, Runtime specification, Providers, Lab, and Eval |
+| [Experiments](experiments/README.md) | Independent CLI, file defaults and public service composition | Run, Lab, Providers, Interactive and optional Eval; no reverse imports |
 
 Eval prepares and mounts a Linux Agent runtime, launches the native CLI inside
 Harbor task environments, then collects official verifier results. Shared
@@ -34,6 +36,12 @@ that measures the downstream H/S changes produced by each editor.
 Task materials and executions need no score. Persistent publication requires an injected verification policy; current-task selection retains its weaker assurance. The experience library is a separate attributed S update after explicit pending-lesson review.
 Search preserves reference results, separates stopping from assurance, and charges nested
 work to one root budget. No component changes during a task execution.
+
+Hosted executions expose immutable terminal facts through the common
+[execution contract](lab/improvement/execution/README.md#record-execution-facts).
+Optional completed-process assessment supplies feedback and can guide a separate
+next editing seed. Official selection and independent adoption retain their own
+rules; generic files and container benchmarks use the same contracts.
 
 Run separates [configuration](run/configuration/README.md), [runtime preparation](run/runtime/README.md), [storage](run/storage/README.md), [improvement hosting](run/improvement/README.md), and [adapters](run/adapters/README.md). Its Factory composes these services; leaf services receive explicit capabilities and own their local state.
 
@@ -69,7 +77,13 @@ declarations without vendor-specific branches. Model Providers remain independen
 | Session | Canonical messages, committed context decisions, manifest, and concise run/failure records |
 | Live events | Frontend observation; not a complete persisted request trace |
 
-Core enforces per-turn tool allowances and bounds consecutive truncated responses; see [runtime rules](core/README.md#runtime-rules). Provider retries and monetary cost require separate accounting.
+Core enforces per-turn tool allowances and bounds consecutive truncated responses;
+Run and Eval share the declarative execution configuration (tool limit default 64).
+Manifest schema 7 records effective execution parameters and the resolved harness
+inventory. Historical manifests remain validated against their original contents. Terminal loop diagnostics distinguish
+budget stops from normal completion without granting task success. See
+[runtime rules](core/README.md#runtime-rules). Provider retries and monetary cost
+require separate accounting.
 
 Recovery validates recorded contents and required artifacts, then continues with current configuration. Complete environment snapshots are appended in the same Session when they change. It does not restore arbitrary Python objects, snapshot algorithm source, or replay requests with unknown cost. Details belong to [Run](run/README.md#recovery) and [Session](core/session/README.md).
 
@@ -82,6 +96,7 @@ Recovery validates recorded contents and required artifacts, then continues with
 | Replace filesystem or shell access | [Environment](lab/environment/README.md) |
 | Execute on an external SSH server | [SSH environment](lab/environment/ssh/README.md) |
 | Search text candidates | [Improvement](lab/improvement/README.md) |
+| Optimize a shared candidate across tasks | [Task sets](lab/improvement/task_sets/README.md) |
 | Verify and adopt across generations | [RSI](lab/rsi/README.md) |
 | Register and assemble a mechanism | [Catalog](lab/catalog/README.md) |
 | Add a frontend | [Interactive](interactive/README.md) |
@@ -95,3 +110,16 @@ save/discard flow while preserving daily model selections. Eval consumes the
 independent default profile, freezes runtime inputs and explicitly selects an
 unrestricted host strategy inside task containers. Benchmark adapters do not
 define runtime configuration fields; tools and Core share one execution path.
+
+## Separate search, evolution and evaluation
+
+Improvement searches and compares candidate changes. RSI adopts eligible versions
+and binds their H/S/I in later generations. Eval executes a fixed Agent on external
+benchmarks and can optionally register a runner/official-assessment adapter.
+Normal Improvement/RSI remain usable without Eval; `eval run` does not evolve.
+
+Editing, [assessment](lab/improvement/assessment/README.md), execution and
+[termination](lab/improvement/termination/README.md) have separate owners. Online
+assessment consumes immutable event positions. Feedback/control is explicit;
+version switching requires an implemented backend boundary. Current managed
+handles support scoped stop; live code/state replacement is not implied.

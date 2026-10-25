@@ -8,6 +8,32 @@ from fruitfly_agent.interactive.contracts.models import InteractiveStatus
 
 
 @dataclass(frozen=True)
+class CommandDescription:
+    """Read-only discovery metadata; never grants execution authority."""
+    name: str
+    summary: str = ''
+    usage: str = ''
+    discoverable: bool = True
+    aliases: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        for name in (self.name, *self.aliases):
+            if not name or name != name.lower() or any(c.isspace() or c in '/\\' for c in name):
+                raise ValueError('command name must be one lowercase path-free token')
+
+
+def format_command_help(descriptions: tuple[CommandDescription, ...], *, include_hidden: bool = False) -> str:
+    rows = ['Commands:']
+    for item in sorted(descriptions, key=lambda value: value.name):
+        if not item.discoverable and not include_hidden:
+            continue
+        usage = item.usage or '/' + item.name
+        aliases = ' (alias: ' + ', '.join('/' + name for name in item.aliases) + ')' if item.aliases else ''
+        rows.append(f'  {usage:<22} {item.summary}{aliases}'.rstrip())
+    return '\n'.join(rows) + '\n'
+
+
+@dataclass(frozen=True)
 class InteractiveCommand:
     name: str
     arguments: tuple[str, ...] = ()

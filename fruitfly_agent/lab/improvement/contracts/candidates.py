@@ -86,3 +86,52 @@ class TargetRegistry:
         for change in candidate.changes:
             adapter = self.resolve(change)
             adapter.validate_change(change)
+
+
+from .components import HarnessSnapshot
+from .validation import identifier, bounded
+
+@dataclass(frozen=True)
+class EditReason:
+    component_id: str
+    explanation: str
+    evidence_ids: tuple[str, ...]
+
+    def __post_init__(self):
+        identifier(self.component_id)
+        bounded(self.explanation, 4000)
+        object.__setattr__(self, 'evidence_ids', tuple(self.evidence_ids))
+        if not self.evidence_ids or any(not isinstance(v, str) or not v for v in self.evidence_ids):
+            raise ValueError('edits need attributable evidence')
+
+
+@dataclass(frozen=True)
+class CandidateBundle:
+    parent: SystemVersion
+    base: HarnessSnapshot
+    harness: HarnessSnapshot
+    generator_id: str
+    reasons: tuple[EditReason, ...] = ()
+
+    def __post_init__(self):
+        identifier(self.generator_id)
+        object.__setattr__(self, 'reasons', tuple(self.reasons))
+        if {c.component_id for c in self.base.components} != {c.component_id for c in self.harness.components}:
+            raise ValueError('candidates must preserve the registered component set')
+        for c in self.harness.components:
+            old = self.base.component(c.component_id)
+            if (c.kind, c.role, c.schema) != (old.kind, old.role, old.schema):
+                raise ValueError('candidates cannot change component ownership or schema')
+
+    @property
+    def changed_ids(self):
+        return tuple(c.component_id for c in self.harness.components if c != self.base.component(c.component_id))
+
+    @property
+    def changed_roles(self):
+        return frozenset(self.harness.component(v).role for v in self.changed_ids)
+
+    @property
+    def candidate_id(self):
+        return content_hash(canonical_json(asdict(self)))
+

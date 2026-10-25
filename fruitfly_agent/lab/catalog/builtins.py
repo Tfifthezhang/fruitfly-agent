@@ -52,6 +52,8 @@ from fruitfly_agent.lab.tools import (
 
 from .assembly import AssemblyContext, AssemblyState, require_workspace_path
 from .catalog import LabCatalog
+from .components import ComponentSpec
+from fruitfly_agent.lab.execution_policy import validate_component_options
 from .models import (
     MechanismDefinition,
     MechanismContribution,
@@ -70,7 +72,10 @@ def builtin_catalog() -> LabCatalog:
                 'Expose execution instructions as independently bound improvement components.',
                 contributions=(MechanismContribution('capability', 'tools'),)),
             lambda state, context, parameters: state, visible=False,
-            prepare_targets=_prepare_instruction_components,
+            prepare_targets=_prepare_instruction_components, component_validator=validate_component_options,
+            component_specs=lambda parameters, enabled: (ComponentSpec('base_prompt'),
+                ComponentSpec('execution-policy', kind='execution-policy', schema='execution-policy-v1',
+                    required_capabilities=frozenset({'execution-config'}))),
             implementation_path='fruitfly_agent/lab/algorithms/components.py',
             documentation_path='fruitfly_agent/lab/algorithms/README.md'),
         ssh_definition(),
@@ -167,6 +172,7 @@ def builtin_catalog() -> LabCatalog:
         _definition(
             "skill-catalog",
             artifact_slots=frozenset({SKILL_CATALOG_GUIDANCE_KEY}),
+            component_specs=lambda parameters, enabled: (ComponentSpec(SKILL_CATALOG_GUIDANCE_KEY),) if enabled else (),
             layer="online",
             family="context",
             context_phase="augmentation",
@@ -319,8 +325,11 @@ def builtin_catalog() -> LabCatalog:
 
 
 def _prepare_instruction_components(state, context):
+    from fruitfly_agent.lab.execution_policy import ExecutionPolicyTarget
+    if TEXT_TARGET_PREFIX + 'base_prompt' not in state.components:
+        state = state.with_component(TEXT_TARGET_PREFIX + 'base_prompt', BasePromptTarget(state.config.system_prompt))
     state = prepare_guidance(state, context)
-    return state
+    return state.with_component(TEXT_TARGET_PREFIX + "execution-policy", ExecutionPolicyTarget(state.config, fixed_fields=context.execution_owners))
 
 
 def _definition(
@@ -353,6 +362,7 @@ def _definition(
     selection_group_label: str | None = None,
     selection_group_allow_disabled: bool = True,
     validate_parameters=None,
+    component_specs=None,
 ) -> MechanismDefinition:
     return MechanismDefinition(
         MechanismDescriptor(
@@ -376,6 +386,7 @@ def _definition(
         implementation_id=implementation_id, visible=visible,
         artifact_slots=artifact_slots, provides=provides,
         requires_capabilities=requires_capabilities, validate_parameters=validate_parameters,
+        component_specs=component_specs,
         selection_group=selection_group, selection_group_label=selection_group_label,
         selection_group_allow_disabled=selection_group_allow_disabled,
         implementation_path=implementation_path, documentation_path=documentation_path,

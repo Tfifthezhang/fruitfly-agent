@@ -43,7 +43,7 @@ Prepare `.fruitfly/default-config.yaml` and its model catalog, and set
 `FRUITFLY_BENCHMARK` to a registered catalog ID before running it:
 
 ```bash
-.venv/bin/python - <<'PY'
+.venv/bin/python - <<'PYTHON'
 import json
 import os
 from pathlib import Path
@@ -61,9 +61,9 @@ request = EvaluationRequest.from_dict({
 })
 path = cwd / '.fruitfly/eval-request.json'
 path.parent.mkdir(parents=True, exist_ok=True)
-path.write_text(json.dumps(request.to_dict(), indent=2) + '\n')
+path.write_text(json.dumps(request.to_dict(), indent=2) + chr(10))
 print(path)
-PY
+PYTHON
 ```
 
 After configuring the [machine file](harbor/README.md#configure-a-machine), prepare
@@ -87,6 +87,7 @@ The next command executes the model/container path and can incur charges:
 |---|---|
 | Runtime | Optional configuration path/profile; defaults to `.fruitfly/default-config.yaml` and its default profile. Working directory defaults to the process workspace. |
 | Execution | Positive integer attempts, concurrency, and total job timeout |
+| `benchmark.task_names` | Optional distinct exact names from the prepared selection; omission executes the full variant |
 | `--output-root` | Override output location; use the same root to read reports |
 | `--host-config` | Machine YAML override for prepare/check/run; defaults to workspace `.fruitfly/eval-host.yaml` |
 | Exit codes | completed 0, failed 1, input/file error 2, blocked 3 |
@@ -96,16 +97,17 @@ The next command executes the model/container path and can incur charges:
 Verifier completeness/model connectivity remain explicitly unverified without
 a real smoke trial. `prepare` creates no evaluation score or report.
 Preparation schema 3 covers controller packages, selected/excluded tasks, Agent
-and independent verifier environments. A
-missing or incompatible preparation requires `prepare` again. Machine files
-remain schema 1. See [environment preparation](harbor/README.md#prepare-check-and-run).
+and independent verifier environments. A missing or incompatible preparation
+requires `prepare` again. Machine files remain schema 1. See
+[environment preparation](harbor/README.md#prepare-check-and-run).
 
 For an experimental configuration, explicitly supply `runtime.config_path` and
 optionally `runtime.profile`. Relative paths resolve from `working_directory`.
 Explicit empty strings and unknown fields fail; defaults never fall back to daily
 configuration. Requests use schema 2 and one of `smoke`, `no_gpu` or `full`.
 
-The runner normalizes the selected profile, stages referenced main/auxiliary
+The runner parses the selected profile through the shared runtime specification,
+preserves declared execution limits and tool scheduling, stages referenced main/auxiliary
 models, validates required credentials and rejects remote execution environments
 before starting Harbor. `runtime.json` records source, selected profile and
 configuration/model hashes and unrestricted execution mode. Each attempt consumes the same staged files;
@@ -160,7 +162,8 @@ proof that a phase succeeded.
 `stop` returns success only after cleanup is confirmed, or for an already finished
 job. A pending request or cleanup failure returns nonzero. Ctrl+C/SIGTERM and job
 timeout use the same process/container retirement. Normal Agent completion keeps
-task background services alive for the verifier. See [ownership limits](harbor/README.md#stop-and-inspect-ownership).
+task background services alive for the verifier. See
+[ownership limits](harbor/README.md#stop-and-inspect-ownership).
 
 ## Diagnose failures
 
@@ -196,4 +199,3 @@ instructions, task.toml, an environment and an official verifier definition.
 Dataset identity and its smoke task belong to the adapter declaration. Resource
 filtering and image/runtime diagnostics belong to the shared Harbor layer. Other
 runners implement the same request/result interface; runtime ownership stays outside Eval.
-

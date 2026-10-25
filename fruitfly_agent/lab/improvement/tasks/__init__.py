@@ -498,6 +498,15 @@ class TaskPackCatalog:
         policy = task_policy(payload["objective"]["policy_id"], policies=self.policies)
         return tuple(policy.project(c) for c in payload.get("holdout", []))
 
+    def case_groups(self, pack_id: str) -> dict[str, str]:
+        """Public grouping metadata without exposing acceptance fields."""
+        if pack_id == LEGACY_PACK_ID:
+            return {}
+        payload = self._locate(pack_id)[2]
+        policy = task_policy(payload['objective']['policy_id'], policies=self.policies)
+        return {policy.project(c).case_id: c.get('group_id', '')
+                for partition in ('train', 'validation', 'holdout') for c in _partition(payload, partition)}
+
     @contextmanager
     def _writer(self) -> Iterator[None]:
         safe_path(self.workspace, self.root).mkdir(parents=True, exist_ok=True)

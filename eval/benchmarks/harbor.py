@@ -177,6 +177,8 @@ class HarborBenchmarkAdapter:
         readiness = inspect_preparation(request, self.descriptor, host, docker=self._docker_command or "docker", receipt=preparation)
         if not readiness["available"]:
             raise ValueError("Harbor preparation check failed: " + json.dumps(readiness["checks"]))
+        from eval.task_selection import select_prepared_tasks
+        preparation = select_prepared_tasks(preparation, request.benchmark.task_names)
         runtime, execution = asdict(request.runtime), asdict(request.execution)
         job_root = result_path.parent / "harbor"
         job_root.mkdir(parents=True, exist_ok=True)

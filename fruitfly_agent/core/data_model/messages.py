@@ -296,10 +296,29 @@ class AgentToolResult:
     content: list[TextBlock | ImageBlock] = field(default_factory=list)
     details: dict[str, Any] = field(default_factory=dict)
     terminate: bool = False
+    is_error: bool = False
 
     @classmethod
     def error(cls, message: str, *, terminate: bool = False) -> "AgentToolResult":
-        return cls(content=[TextBlock(text=message)], details={}, terminate=terminate)
+        return cls(content=[TextBlock(text=message)], details={}, terminate=terminate, is_error=True)
+
+
+@dataclass(frozen=True)
+class LoopDiagnostics:
+    """Loop facts, independent of task quality and external accounting."""
+    termination_reason: str
+    provider_attempts: int
+    provider_failures: int
+    tool_requests: int
+    tool_attempts: int
+    tool_started: int
+    tool_errors: int
+    tool_denied: int
+    tool_budget_skipped: int
+    tool_output_skipped: int
+    tool_limit_per_turn: int
+    last_turn_tool_attempts: int
+    turn_limit: int
 
 
 @dataclass(frozen=True)
@@ -313,6 +332,7 @@ class AgentLoopResult:
     is_error: bool = False
     error_details: dict[str, Any] | None = None
     canonical_messages: list[AgentMessage] = field(default_factory=list)
+    diagnostics: LoopDiagnostics | None = None
 
 
 def encode_image_bytes(data: bytes, media_type: str) -> ImageBlock:
@@ -338,5 +358,6 @@ __all__ = [
     "message_from_dict",
     "AgentToolResult",
     "AgentLoopResult",
+    "LoopDiagnostics",
     "encode_image_bytes",
 ]

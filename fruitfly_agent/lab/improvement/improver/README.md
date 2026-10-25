@@ -21,7 +21,7 @@ Outer current editor -> propose candidate editor I'
 ```
 
 The executed I changes `AgentEditor` instructions, not the task Agent's base
-prompt. `invariant`, `domain` and `compose` are editable. `system`, `select` and
+prompt. `propose`, `invariant`, `domain` and `compose` are editable. `system`, `select` and
 `reflect` must equal their frozen parent values. Unknown fields and changes to
 component ownership fail. Loaded I snapshots preserve the exact bound source bytes,
 including valid JSON formatting, so saved-default reconciliation and recovery
@@ -72,13 +72,15 @@ fresh suites for later research. This limit does not establish statistical valid
 
 ## Supply the experiment inputs
 
-Open `/improvement`, choose **Execution strategy → Editor self-improvement**,
-choose the experiment under **Task**, and review **Execution parameters**.
-The definition selects I, measured feedback and persistent scope by default.
-Review the complete frozen preview before explicitly confirming model work.
+Use the [experiment CLI](../../../experiments/README.md) with `task.source: editor`
+and `task.material: editor-study`. Its defaults select the I component, measured
+feedback and a larger allocation. Run `improvement check`, then explicitly
+`improvement run` or `rsi run`; real requests may incur charges. Public embedding
+requests remain available below.
 
 | Parameter | Default | Meaning |
 |---|---|---|
+| `inner_strategy` | `harness2` in embeddings; `simple` in CLI | Registered inner search schedule |
 | `inner_components` | `base_prompt` | Space-separated registered H/S IDs; must be runnable in the file environment |
 | `repetitions` | 2 | Independent fresh episodes per package, 2–10 |
 | `inner_depth` | 1 | Sequential inner search depth, 1–3 |
@@ -159,8 +161,8 @@ Persistent candidates use ordinary [host adoption](../../../run/improvement/READ
 Only an idle Application can activate a separately prepared runtime. Startup
 failure retains the old version. The [RSI driver](../../rsi/README.md) can reuse
 the exact completed proof, then load the activated I for the next generation.
-No autonomous background CLI, code replacement, model training or online editing
-is installed.
+The independent CLI starts only explicitly. No background evolution, arbitrary
+code replacement, model training or online editing is installed.
 
 ## Verify offline
 
@@ -172,3 +174,10 @@ Synthetic Providers test actual prompt loading, private trials, paired checks,
 budgeting and two-generation activation. Their designed response behavior proves
 control flow only. Real quality and API behavior require explicitly authorized
 integration experiments. No new secret environment variables are introduced.
+
+Embedding hosts can supply another `EpisodeExecutor` through
+`ImproverTaskRunner(..., episode_factory=...)` and register the enclosing execution
+definition. The public request/result contracts keep budgets, source identity and
+private comparison separate from the task backend. The bundled material catalog
+still uses task packages and the native file executor; automatic benchmark episode
+construction is not implied by registering an Eval task runner.

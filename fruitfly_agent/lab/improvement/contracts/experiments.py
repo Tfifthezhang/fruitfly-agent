@@ -6,6 +6,8 @@ from typing import Any, Callable, Protocol
 
 from .pipeline import HarnessSnapshot, ImprovementOutcome, TaskMaterial, identifier, bounded
 from .versions import content_hash, canonical_json
+from .plans import RunPlan
+from .task_sets import TaskSetSnapshot
 
 
 @dataclass(frozen=True)
@@ -124,7 +126,7 @@ class MaterialOption:
 
 @dataclass
 class PreparedExecution:
-    task: TaskMaterial
+    task: TaskMaterial | TaskSetSnapshot
     source_id: str
     details: tuple[tuple[str, str], ...]
     current_source: Callable[[], str]
@@ -140,6 +142,7 @@ class ExecutionPorts:
     selector: Any = None
     verification_reserve: dict[str, int] = field(default_factory=lambda: {'model': 0, 'execution': 0})
     retain_experience: bool = True
+    search_problem: Any = None
 
 
 @dataclass(frozen=True)
@@ -156,6 +159,11 @@ class ExecutionDefinition:
     notice: str = 'Explicit execution calls models; no activation occurs inside a trial.'
     defaults: tuple[tuple[str, Any], ...] = ()
     accepts_runner_override: bool = False
+    plan_factory: Callable = RunPlan
+    uses_configured_tools: bool = False
+
+    def capabilities_for(self, tool_names):
+        return self.capabilities | (frozenset("tool:" + name for name in tool_names) if self.uses_configured_tools else frozenset())
 
     def __post_init__(self):
         identifier(self.execution_id)

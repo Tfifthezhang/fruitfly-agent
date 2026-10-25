@@ -11,7 +11,7 @@ Present frontend events, canonical history, Markdown, and status. Rendering obse
 | [history.py](history.py) | Static canonical conversation rendering |
 | [panels.py](panels.py) | Generic read-only command sections, title color blocks and responsive text rows |
 | [markdown.py](markdown.py) | Markdown formatting and streamed presentation |
-| [welcome.py](welcome.py), [branding.py](branding.py) | Welcome/status layout and project identity |
+| [welcome.py](welcome.py), [branding.py](branding.py) | Width-based welcome layout, full/small fly marks and project identity |
 
 Use [Contracts](../../contracts/README.md) for event/status/history inputs and [I/O](../io/README.md) for safe text, terminal capabilities, and inline display primitives. This layer never imports features or TerminalFrontend.
 
@@ -60,3 +60,10 @@ Code blocks retain literal lines and receive visual wrapping from I/O. Cell widt
 use the shared Unicode approximation; complex emoji sequences may vary by terminal.
 Standalone append-only embeddings keep their existing streaming presenter, and
 redirected streams keep source Markdown.
+
+Welcome layout measures glyph cell widths. Wide screens pair the full fly with the
+large wordmark; medium screens retain the full fly and use plain brand text.
+Narrow screens use a small fly mark, with a minimal variant for very small widths.
+Brand assets contain no layout logic. Welcome rendering reads no terminal state;
+its caller supplies width and display capabilities. Short screens retain viewport
+scrolling rather than changing the global formatting callback contract.

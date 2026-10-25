@@ -1,0 +1,100 @@
+# Copy to WORKSPACE/.fruitfly/experiment.yaml only when absent.
+# All paths/pack IDs below are placeholders. Configure prepared sources first.
+# check is model-free. run calls models and containers and may incur charges.
+schema_version: 1
+
+runtime:
+  config: default-config.yaml
+  # profile: baseline
+
+models:
+  editor: deepseek-flash-openai
+  assessor: deepseek-flash-openai
+  # Executor is the shared Agent profile; Eval requests must select the same one.
+
+task:
+  source: task-set
+  collections:
+    - id: terminal
+      source: eval
+      request: ../terminal/request.json
+      host: ../terminal/host.yaml
+      model_calls: 80
+      # Leaf requests use attempts=1/concurrency=1; the shared scheduler owns both.
+      # task_names: [exact-prepared-task-name]  # Optional exact prepared subset.
+      # objective: {minimum: 0, maximum: 1, direction: max}
+      # partitions: {exact-task-name: selection}  # development | selection | confirmation
+      # groups: {exact-task-name: shared-problem-family}
+    - id: repository
+      source: eval
+      request: ../repository/request.json
+      host: ../repository/host.yaml
+      model_calls: 80
+    # Native alternative/addition; an installed pack owns its scorer and splits.
+    # - id: daily
+    #   source: files
+    #   pack: daily-materials
+    #   model_calls: 8
+    #   objective: {minimum: 0, maximum: 1}
+  # Requests share this workspace, Agent configuration and executor profile.
+  # New task families register sources/backends; names never select optimizer logic.
+
+improvement:
+  # Optional structured H edits: add execution-policy to components, then enable:
+  # component_options:
+  #   execution-policy:
+  #     editable_fields: [max_tool_calls_per_turn]
+  #     bounds:
+  #       max_tool_calls_per_turn: {minimum: 32, maximum: 512}
+  # Configured components must exist and be supported by every selected backend.
+  # Enabled mechanisms define availability; only components explicitly selected may change.
+  strategy: simple                # Current task-set strategy; one candidate per round.
+  components: [base_prompt]       # Compatible H/S components across all collections.
+  rounds: 3                      # 1..10.
+  feedback: scored               # auto also resolves to scored; behavior is rejected.
+  scope: task                    # No task-set independent adoption policy is installed.
+  retain_experience: false
+  # max_model_calls: 4096         # Optional positive finite integer root allowance.
+  # max_executions: 128           # Counts all leaf executions, including selection.
+  # Omission derives bounded totals from material size and per-task caps.
+  # Explicit totals must fund initial probes and protected final selection.
+  operation_timeout: 1200
+  timeout_seconds: 10800
+
+multi_task:
+  sampling:
+    policy: stratified-cycle      # Choices: stratified-cycle | all | fixed.
+    batch_size: 8                 # Must cover every development collection.
+    seed: 42                      # Selects a reproducible task cycle, not a model seed.
+    # task_keys: [key-from-check-json]  # Required only for fixed sampling.
+  execution:
+    concurrency: 2                # 1 serializes any task count; positive integer.
+    candidate_concurrency: 1      # Reserved interface; values >1 are rejected.
+    attempts: 1                   # Repeat each task; average attempts, never best-of-N.
+  evaluation:
+    aggregation: collection-macro # Choices: collection-macro | task-macro.
+    weights: {}                   # Default equal collection weights.
+    # weights: {terminal: 1, repository: 1}  # Positive; collection-macro only.
+    # Each objective's declared finite range/direction normalizes raw scores.
+    # Missing/failed tasks leave utility unknown; real zero remains a valid score.
+  promotion:
+    every_rounds: 3
+    final_selection: all          # All common selection tasks; currently only choice.
+    minimum_gain: 0               # Strict gain above this normalized threshold.
+    max_collection_regression: null # Optional nonnegative per-collection tolerance.
+
+process_assessment:
+  assessors: []                   # Optional: execution-facts-v1, completed-model-v1.
+  max_model_calls: 16             # Shared across this search, never reset per task.
+  timeout_seconds: 120
+  required: false
+exploration:
+  policy: incumbent              # process-guided needs a batch-capable assessor.
+
+# Optional goal after complete common selection; does not grant verified assurance.
+# stop:
+#   improvement:
+#     type: score
+#     policy_id: joint-development-v1
+#     threshold: 0.8
+#     assurance: selected

@@ -7,6 +7,7 @@ LEARNED_MEMORY = 'learned-memory'
 
 def definition():
     from fruitfly_agent.lab.catalog.models import MechanismDefinition
+    from fruitfly_agent.lab.catalog.components import ComponentSpec
     return MechanismDefinition(MechanismDescriptor(LEARNED_MEMORY, 'Learned environment memory',
         'Reuse verified procedures, constraints and failure lessons from explicit exploration.',
         contributions=(MechanismContribution('online', 'context', 'augmentation'),),
@@ -17,6 +18,7 @@ def definition():
                 'Maximum complete memory document projected into context.', 16000, minimum=128, maximum=30000)),
         install_order=33), _install, implementation_id='retained-memory-v1',
         artifact_slots=frozenset({LEARNED_MEMORY}),
+        component_specs=lambda parameters, enabled: (ComponentSpec(LEARNED_MEMORY, 'S', 'retained-document', 'environment-memory-v1'),) if enabled else (),
         implementation_path='fruitfly_agent/lab/context_manager/augmentation/information/file_memory/learned.py',
         documentation_path='fruitfly_agent/lab/context_manager/augmentation/information/file_memory/README.md',
         input_parameters=('initial_text',))

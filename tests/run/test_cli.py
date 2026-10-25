@@ -291,7 +291,7 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(events[0]["type"], "run_started")
         self.assertEqual(events[-1]["type"], "run_finished")
         self.assertEqual(len(bindings), 1)
-        self.assertEqual(bindings[0].payload["manifest"]["schema_version"], 5)
+        self.assertEqual(bindings[0].payload["manifest"]["schema_version"], 7)
         self.assertEqual(
             bindings[0].payload["manifest"]["models"]["main"]["model"],
             "offline-model",

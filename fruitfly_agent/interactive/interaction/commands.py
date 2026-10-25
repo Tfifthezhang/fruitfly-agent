@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
+from threading import RLock
+from dataclasses import replace as replace_description
 
 from fruitfly_agent.interactive.contracts.commands import (
+    CommandDescription,
+    format_command_help,
     InteractiveCommand,
     CommandResult,
     CommandPanel,
@@ -13,18 +17,6 @@ from fruitfly_agent.interactive.contracts.commands import (
     CommandHandler,
 )
 from fruitfly_agent.interactive.contracts.models import InteractiveMechanism, InteractiveStatus
-
-
-HELP_TEXT = """Commands:
-  /help          show this help
-  /status        show model, workspace, session, and context state
-  /lab           inspect active context, tools, environment, and capabilities
-  /config        open the model and mechanism selection menu
-  /improvement [TEXT]  choose an H/S/I target, run improvement, or review candidates
-  /resume [PATH] continue saved history using current configuration
-  /cancel        cooperatively stop the active run
-  /permissions clear  revoke temporary approvals\n  /trace [N]     show the latest N frontend events (default: 12)
-  /exit          leave the interactive session"""
 
 
 def parse_command(text: str) -> InteractiveCommand | None:
@@ -39,8 +31,7 @@ def parse_command(text: str) -> InteractiveCommand | None:
     # commands. Command names are a single path-free token such as ``/help``.
     if "/" in name or "\\" in name:
         return None
-    if name == "quit":
-        name = "exit"
+    name = _ALIASES.get(name, name)
     return InteractiveCommand(name=name, arguments=tuple(parts[1:]))
 
 
@@ -51,19 +42,45 @@ class CommandRouter:
         self,
         handlers: Mapping[str, CommandHandler] | None = None,
     ) -> None:
-        self._handlers = dict(_BUILTIN_HANDLERS)
-        self._handlers["config"] = _configuration_unavailable
-        self._handlers["resume"] = _resume_unavailable
-        self._handlers["improvement"] = _improvement_unavailable
-        if handlers is not None:
-            self._handlers.update(handlers)
+        self._lock = RLock()
+        self._entries: dict[str, tuple[CommandDescription, CommandHandler]] = {description.name: (description, self._show_help if handler is None else handler)
+                         for description, handler in _BUILTIN_ENTRIES}
+        for name, handler in (handlers or {}).items():
+            self.register(name, handler, replace=True)
+
+    def register(self, name: str, handler: CommandHandler, *, replace: bool = False,
+                 summary: str = '', usage: str = '', discoverable: bool = True) -> None:
+        if not callable(handler):
+            raise TypeError('command handler must be callable')
+        description = CommandDescription(name, summary, usage, discoverable)
+        with self._lock:
+            if name in self._entries and not replace:
+                raise ValueError(f'command already registered: {name}')
+            prior = self._entries.get(name)
+            if prior is not None:
+                description = replace_description(description, aliases=prior[0].aliases)
+            self._entries[name] = description, handler
+
+    def descriptions(self) -> tuple[CommandDescription, ...]:
+        with self._lock:
+            return tuple(description for description, _ in self._entries.values())
+
+    @property
+    def uses_default_help(self) -> bool:
+        with self._lock:
+            return self._entries['help'][1] == self._show_help
+
+    def _show_help(self, command: InteractiveCommand, context: CommandContext) -> CommandResult:
+        return CommandResult(text=format_command_help(self.descriptions()))
 
     def execute(
         self,
         command: InteractiveCommand,
         context: CommandContext,
     ) -> CommandResult:
-        handler = self._handlers.get(command.name)
+        with self._lock:
+            entry = self._entries.get(command.name)
+        handler = entry[1] if entry is not None else None
         if handler is None:
             return CommandResult(
                 text=f"unknown command: /{command.name}; use /help\n"
@@ -76,13 +93,6 @@ def _exit(
     context: CommandContext,
 ) -> CommandResult:
     return CommandResult(should_exit=True)
-
-
-def _help(
-    command: InteractiveCommand,
-    context: CommandContext,
-) -> CommandResult:
-    return CommandResult(text=HELP_TEXT + "\n")
 
 
 def _status(
@@ -259,7 +269,7 @@ def _resume_unavailable(
     )
 
 
-def _permissions(command, context):
+def _permissions(command: InteractiveCommand, context: CommandContext) -> CommandResult:
     if command.arguments != ('clear',):
         return CommandResult(text='usage: /permissions clear\n')
     clear = getattr(context, 'clear_authorizations', None)
@@ -268,14 +278,20 @@ def _permissions(command, context):
     clear()
     return CommandResult(text='temporary approvals cleared\n')
 
-_BUILTIN_HANDLERS: dict[str, CommandHandler] = {
-    "permissions": _permissions,
-    "exit": _exit,
-    "help": _help,
-    "status": _status,
-    "lab": _lab,
-    "trace": _trace,
-}
+_BUILTIN_ENTRIES: tuple[tuple[CommandDescription, CommandHandler | None], ...] = (
+    (CommandDescription('help', 'show this help'), None),
+    (CommandDescription('status', 'show model, workspace, session, and context state'), _status),
+    (CommandDescription('lab', 'inspect active context, tools, environment, and capabilities'), _lab),
+    (CommandDescription('trace', 'show the latest N frontend events (default: 12)', '/trace [N]'), _trace),
+    (CommandDescription('permissions', 'revoke temporary approvals', '/permissions clear'), _permissions),
+    (CommandDescription('exit', 'leave the interactive session', aliases=('quit',)), _exit),
+    (CommandDescription('config', 'requires a configuration frontend', '/config', False), _configuration_unavailable),
+    (CommandDescription('resume', 'requires a session picker', '/resume [PATH]', False), _resume_unavailable),
+    (CommandDescription('improvement', 'requires an improvement frontend', '/improvement [TEXT]', False), _improvement_unavailable),
+)
+_ALIASES = {alias: description.name for description, _ in _BUILTIN_ENTRIES for alias in description.aliases}
+# Router reference, including frontend placeholders; live help uses effective registrations.
+HELP_TEXT = format_command_help(tuple(description for description, _ in _BUILTIN_ENTRIES), include_hidden=True).rstrip()
 
 
 __all__ = [

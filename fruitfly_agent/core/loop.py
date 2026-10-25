@@ -52,6 +52,7 @@ from .tool_runtime.execution import execute_tool_batch
 from .extensions.callbacks import call_extension
 from .data_model.messages import (
     AgentLoopResult,
+    LoopDiagnostics,
     AgentMessage,
     AssistantMessage,
     StopReason,
@@ -110,6 +111,7 @@ async def run_agent_loop(
             messages=list(ctx.messages), stop_reason="aborted", model=ctx.model, usage=ctx.usage,
             canonical_messages=[item.message for item in ctx.canonical_items],
             turn_count=ctx.turn_count, tool_call_count=ctx.tool_call_count,
+            diagnostics=_diagnostics(config, ctx, 'cancelled'),
         )
         _record_run_end(ctx, result)
         # Cancellation remains cancellation. Hosts may observe the committed
@@ -134,6 +136,7 @@ async def run_agent_loop(
                 "model": ctx.model,
                 "context_window": ctx.context_window,
             },
+            diagnostics=_diagnostics(config, ctx, 'runtime_error'),
         )
         _record_run_end(ctx, result)
         return result
@@ -153,6 +156,7 @@ async def _run(
     turn_count = 0
     tool_call_count = 0
     truncated_responses = 0
+    termination_reason = 'turn_budget_exhausted'
 
     # Outer loop: turns (steering + follow-up can extend a turn).
     while turn_count < config.max_turns:
@@ -161,6 +165,8 @@ async def _run(
         turn_count += 1
         ctx.turn_count = turn_count
         turn_tool_call_count = 0
+        ctx.turn_tool_call_count = 0
+        termination_reason = 'model_complete'
 
         follow_up_used = False
         first_iteration = True
@@ -232,6 +238,7 @@ async def _run(
 
             # Truncated responses must not execute any tool calls in the batch.
             if assistant.stop_reason == "length":
+                ctx.tool_output_skipped_count += len(assistant.tool_calls)
                 _record_truncated_calls(ctx, assistant)
                 truncated_responses += 1
                 if truncated_responses >= _MAX_CONSECUTIVE_TRUNCATED_RESPONSES:
@@ -261,11 +268,19 @@ async def _run(
             tool_call_count += executed
             ctx.tool_call_count = tool_call_count
             turn_tool_call_count += executed
+            ctx.turn_tool_call_count = turn_tool_call_count
             for result in batch_results:
                 _append(ctx, result)
             if terminate:
-                return await _finish(config, ctx, hooks, "stop", turn_count, tool_call_count)
+                return await _finish(config, ctx, hooks, "stop", turn_count, tool_call_count,
+                                     termination_reason='tool_terminated')
             if executed < len(tool_calls):
+                ctx.tool_budget_skipped_count += len(tool_calls) - executed
+                termination_reason = 'tool_budget_exhausted'
+                _append_session_record(ctx, 'budget_exhausted', {
+                    'resource': 'tool_calls', 'scope': 'turn', 'turn': turn_count,
+                    'limit': config.max_tool_calls_per_turn, 'used': turn_tool_call_count,
+                    'skipped': len(tool_calls) - executed})
                 break
 
         # Agent would stop here. Follow-up messages keep it going.
@@ -276,6 +291,7 @@ async def _run(
                 for message in follow_ups:
                     _append(ctx, message)
                 follow_up_used = True
+                termination_reason = 'turn_budget_exhausted'
         if not follow_up_used:
             # failure default: False → continue (the outer loop is bounded by max_turns)
             if config.should_stop_after_turn is not None:
@@ -283,7 +299,8 @@ async def _run(
                     break
             break
 
-    return await _finish(config, ctx, hooks, "stop", turn_count, tool_call_count)
+    return await _finish(config, ctx, hooks, "stop", turn_count, tool_call_count,
+                         termination_reason=termination_reason)
 
 
 # ---------------------------------------------------------------------------
@@ -389,6 +406,7 @@ async def _record_response(
     )
     assistant = response_event.assistant
     _append(ctx, assistant)
+    ctx.tool_request_count += len(assistant.tool_calls)
     ctx.last_input_tokens = assistant.usage.input_tokens if assistant.usage else None
     response_event.receipt_timestamp = time.time()
     _append_session_record(ctx, "request_receipt", {
@@ -478,6 +496,8 @@ async def _handle_failure(
         "model": ctx.model,
         **({"timeout_kind": error.details["timeout_kind"]}
            if isinstance(error.details, dict) and "timeout_kind" in error.details else {}),
+        **({'termination_reason': error.details['kind']}
+           if isinstance(error.details, dict) and error.details.get('kind') == 'model_budget_exhausted' else {}),
     }
 
 
@@ -491,7 +511,12 @@ async def _finish(
     *,
     is_error: bool = False,
     error_details: dict | None = None,
+    termination_reason: str | None = None,
 ) -> AgentLoopResult:
+    reason = termination_reason or ('cancelled' if stop_reason == 'aborted' else
+        (error_details or {}).get('termination_reason') or
+        ('output_limit' if (error_details or {}).get('kind') == 'output_limit' else
+         'provider_error' if is_error else 'model_complete'))
     result = AgentLoopResult(
         messages=ctx.messages,
         stop_reason=stop_reason,
@@ -502,6 +527,7 @@ async def _finish(
         usage=ctx.usage,
         is_error=is_error,
         error_details=error_details,
+        diagnostics=_diagnostics(config, ctx, reason),
     )
     end_event = await hooks.run(BEFORE_RUN_END, BeforeRunEndEvent(result=result))
     result = end_event.result  # active handlers may rewrite the final result
@@ -521,7 +547,15 @@ def _record_run_end(ctx: AgentLoopContext, result: AgentLoopResult) -> None:
         "usage": result.usage.to_dict(),
         "is_error": result.is_error,
         "error": _session_error(result.error_details),
+        "diagnostics": asdict(result.diagnostics) if result.diagnostics is not None else None,
     })
+
+
+def _diagnostics(config: AgentLoopConfig, ctx: AgentLoopContext, reason: str) -> LoopDiagnostics:
+    return LoopDiagnostics(reason, ctx.provider_attempt_count, ctx.provider_failure_count,
+        ctx.tool_request_count, ctx.tool_call_count, ctx.tool_started_count, ctx.tool_error_count,
+        ctx.tool_denied_count, ctx.tool_budget_skipped_count, ctx.tool_output_skipped_count,
+        config.max_tool_calls_per_turn, ctx.turn_tool_call_count, config.max_turns)
 
 
 def _append_session_record(

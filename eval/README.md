@@ -7,6 +7,12 @@ environments, task deadlines and official verifiers. Eval mounts a prepared Agen
 runtime, passes one saved configuration and collects outcomes, trajectories and reports.
 Interactive improvement remains independent of Eval.
 
+The independent [experiment CLI](../fruitfly_agent/experiments/README.md) provides
+`fruitfly-agent-lab eval` with file defaults, alongside separate Improvement and
+RSI commands. Existing `fruitfly-agent-eval` and `python -m eval` invocations remain
+supported. [api.py](api.py) exposes reusable operations; [service.py](service.py)
+owns preparation/check/report/stop without argument parsing or runtime imports.
+
 `prepare --tasks-only` resolves and freezes task definitions, reports exclusions,
 build contexts and exact local image references, and starts no containers. Full
 preparation records controller versions and declared dependency conflicts. Changed
@@ -70,10 +76,9 @@ the [machine runtime and dependencies](harbor/README.md), then run:
 ```
 
 Use `stop '<EVALUATION_ID>'` to request scoped shutdown and confirm cleanup.
-Each attempt starts a
-separate native Agent session. `completed` means reports were assembled; inspect
-trial failures and infrastructure errors. A smoke result is not a
-representative full-dataset score. See [task selection](benchmarks/TASKS.md).
+Each attempt starts a separate native Agent session. `completed` means reports
+were assembled; inspect trial failures and infrastructure errors. A smoke result
+is not a representative full-dataset score. See [task selection](benchmarks/TASKS.md).
 
 ## Select installation material
 
@@ -86,6 +91,8 @@ SHA-256 source/wheel inputs in `agent/installation.json`. The trial installation
 hook probes the mounted interpreter and stages configuration; it never installs
 Python, creates a venv or runs pip. Task Python versions remain independent.
 
+The selected profile uses the [shared runtime specification](../fruitfly_agent/runtime_spec/README.md).
+Declared execution parameters are validated and preserved during staging.
 The selected profile is normalized and its referenced main/auxiliary models are
 staged before Harbor starts. Enabled mechanism dependencies are resolved through
 Catalog without Provider construction. Missing required credentials and remote
@@ -152,7 +159,7 @@ and omits aggregate benchmark metrics.
 | [Harbor preparation](harbor/README.md) | Machine paths, frozen tasks/runtime, verifier assets/caches and lifecycle |
 | [catalog.py](catalog.py), [contracts.py](contracts.py) | Discovery and single-configuration requests |
 | [execution.py](execution.py), [storage.py](storage.py), [report.py](report.py) | Evaluation lifecycle, artifacts and reports |
-| [runtime.py](runtime.py) | Profile, immutable artifacts and credential staging |
+| [runtime.py](runtime.py) | Shared profile parsing, immutable artifacts and credential staging |
 | [installation.py](installation.py), [harbor_agent.py](harbor_agent.py) | Validate material, check mounts and launch the native Agent |
 | [runner.py](runner.py), [results.py](results.py) | Process/log handling and official result parsing |
 | [trajectory.py](trajectory.py) | Canonical Session to ATIF projection |
@@ -163,3 +170,11 @@ and omits aggregate benchmark metrics.
 
 Offline tests use fake Providers and local processes. Real container, registry and
 model compatibility require a separately authorized smoke run.
+
+## Register benchmark execution for Improvement
+
+[The optional adapter](improvement/README.md) registers prepared task material,
+a runner and official development measurements with the independent Improvement
+framework. Improvement proposes and compares; RSI adopts and continues; Eval runs
+one fixed configuration at a time. Daily/non-container tasks need neither Eval
+nor Harbor. No implicit evolution or additional `eval improve` CLI is installed.

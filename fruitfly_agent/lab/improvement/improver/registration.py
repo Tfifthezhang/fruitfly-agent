@@ -11,6 +11,8 @@ from .verification import ImproverVerification
 
 
 PARAMETERS = (
+    P('inner_strategy', 'Inner search strategy', 'string', 'harness2',
+      description='Registered strategy used for each fixed-I episode; simple or harness2.'),
     P('inner_components', 'Inner editable components', 'string', 'base_prompt',
       description='Space-separated registered H/S IDs; I is forbidden inside an episode.'),
     P('repetitions', 'Paired repetitions', 'integer', 2, 2, 10),
@@ -27,6 +29,8 @@ PARAMETERS = (
 
 def prepare(context, request):
     params = definition().normalize(request.parameters)
+    from ..strategies import builtin_strategies
+    builtin_strategies().get(params['inner_strategy'])
     if request.component_ids != ('improvement-editor',) or request.input_paths:
         raise ValueError('editor comparison changes only the registered I target; episode packs own inputs')
     if request.feedback != 'scored':
@@ -38,7 +42,7 @@ def prepare(context, request):
         if document.role == 'I':
             raise ValueError('inner experiments cannot modify I')
         required: frozenset[str] = getattr(context.components.adapters[name], 'required_capabilities', frozenset())
-        from ..workflow.execution import FileTaskRunner
+        from ..execution.file_runner import FileTaskRunner
         if required - FileTaskRunner.capabilities:
             raise ValueError('inner file runner lacks component capabilities')
     frozen = freeze(context, request.material_id, ids[0] if ids else 'base_prompt')
@@ -53,7 +57,7 @@ def prepare(context, request):
         params['repetitions'])
     task = TaskMaterial('editor-comparison',
         'Improve the editor instructions using the supplied development trials. '
-        'Only invariant, domain and compose may change; preserve system, select and reflect. '
+        'Only propose, invariant, domain and compose may change; preserve system, select and reflect. '
         'Judge changes by downstream improvement evidence, not wording or prompt length.',
         environment_id='improver-comparison-v1', origin='experiment:' + request.material_id)
     prepared = PreparedExecution(task, frozen.source_id,

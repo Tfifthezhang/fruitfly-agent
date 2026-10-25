@@ -23,3 +23,7 @@ independence, budgets and failure behavior.
 Offline fake scoring establishes control flow, not actual model quality.
 Checks: `tests.lab.test_improvement_pipeline`,
 `tests.workflows.test_improvement_pipeline`.
+
+Implementations now live in [Assessment](../assessment/README.md).
+This module retains explicit compatible `CaseMeasurements` and
+`HoldoutVerification` exports; it does not own a second verification engine.

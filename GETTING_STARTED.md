@@ -91,16 +91,39 @@ This uses a temporary workspace and a fixed Provider, with no keys or network. S
 
 ## Try improvement
 
-Install the [Python task pack](examples/improvement/python_functions/README.md) into a destination that does not already exist:
+Experiments have independent file settings and do not need a chat session.
+From the checkout after installation, initialize an existing workspace whose
+experiment/default configuration files do not yet exist:
 
 ```bash
-mkdir -p .fruitfly/improvement/task-packs
-cp -R examples/improvement/python_functions .fruitfly/improvement/task-packs/python-functions
-.venv/bin/python -m fruitfly_agent.lab.improvement.tasks.verification check .fruitfly/improvement/task-packs/python-functions/pack.json
-.venv/bin/python -m fruitfly_agent.lab.improvement.tasks.verification self-check .fruitfly/improvement/task-packs/python-functions/pack.json
+.venv/bin/fruitfly-agent-lab init
 ```
 
-The checks are offline. Start a normal session and use `/improvement` to select the package, editable components, candidate generator and budget. Persistent publication requires independent verification; review the frozen preview before confirming paid model work. The active component snapshot supplies the baseline; `baseline.txt` is an optional reference.
+Review `.fruitfly/default-models.yaml`, put the selected model's key privately in
+`.fruitfly/secrets.env`, and edit the instruction in `.fruitfly/experiment.yaml`.
+Daily model settings are separate. Existing secrets are preserved; existing
+experiment/default destinations cause an error rather than being overwritten.
+Initialization does not invoke models, install dependencies or start containers.
+
+```bash
+.venv/bin/fruitfly-agent-lab improvement check
+# Model requests; may incur charges.
+.venv/bin/fruitfly-agent-lab improvement run --events jsonl
+```
+
+The minimal native example exercises candidate search with detached file tools
+and behavioral feedback; it has no objective task score. For scored tasks and
+independent verification, follow the [Python pack setup](examples/improvement/python_functions/README.md#install-and-check)
+and its [search configuration](examples/improvement/python_functions/README.md#search-and-review).
+`rsi run` additionally requires independent verification material. `/improvement`
+retains a small instruction/file entry for daily interaction; experiment settings
+stay in files.
+
+For a remote Linux TB4 experiment, follow the [server walkthrough](examples/experiments/TB4_SERVER.md).
+It covers controller/Agent runtime setup, `init --source task-set --benchmark
+terminal-bench-4`, preparation and explicit execution. See
+[experiment templates](examples/experiments/README.md) for file responsibilities,
+model roles and larger task collections.
 
 | Next step | Guide |
 |---|---|

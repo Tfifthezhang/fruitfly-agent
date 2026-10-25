@@ -65,6 +65,8 @@ class WorkflowRequest:
     task_pack_id: str = ''
     execution_id: str = 'file-task'
     execution_parameters: tuple[tuple[str, object], ...] = ()
+    strategy_id: str = 'harness2'
+    retain_experience: bool = True
 
 
 @runtime_checkable

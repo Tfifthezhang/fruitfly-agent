@@ -26,27 +26,7 @@ from fruitfly_agent.core.mechanisms import (
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 
 
-@dataclass(frozen=True)
-class MechanismSelection:
-    mechanism_id: str
-    enabled: bool = True
-    parameters: Mapping[str, Any] = field(default_factory=dict)
-
-    def __post_init__(self) -> None:
-        if not _ID.fullmatch(self.mechanism_id):
-            raise ValueError("selection mechanism_id must be a stable identifier")
-        if not isinstance(self.enabled, bool):
-            raise ValueError("selection enabled must be a boolean")
-        if not isinstance(self.parameters, Mapping):
-            raise ValueError("selection parameters must be a mapping")
-        object.__setattr__(self, "parameters", dict(self.parameters))
-
-    def to_dict(self) -> dict[str, Any]:
-        values = {
-            name: list(value) if isinstance(value, tuple) else value
-            for name, value in self.parameters.items()
-        }
-        return {"id": self.mechanism_id, "enabled": self.enabled, "parameters": values}
+from fruitfly_agent.runtime_spec.selections import MechanismSelection
 
 
 MechanismInstaller = Callable[["AssemblyState", "AssemblyContext", Mapping[str, Any]], "AssemblyState"]
@@ -91,8 +71,18 @@ class MechanismDefinition:
     credential_variables: Callable[[Mapping[str, Any]], tuple[str, ...]] | None = None
     model_profiles: Callable[[Mapping[str, Any]], tuple[str, ...]] | None = None
     prepare_targets: Callable[[Any, Any], Any] | None = None
+    component_specs: Callable[[Mapping[str, Any], bool], tuple] | None = None
+    execution_fields: frozenset[str] = frozenset()
+    component_validator: Callable | None = None
 
     def __post_init__(self) -> None:
+        for callback in (self.component_specs, self.component_validator):
+            if callback is not None and not callable(callback):
+                raise TypeError('component metadata callbacks must be callable')
+        from fruitfly_agent.runtime_spec.execution import flatten_execution
+        if isinstance(self.execution_fields, str) or set(self.execution_fields) - set(flatten_execution({})):
+            raise ValueError('execution_fields must name declared scalar execution fields')
+        object.__setattr__(self, 'execution_fields', frozenset(self.execution_fields))
         if self.prepare_targets is not None and not callable(self.prepare_targets):
             raise TypeError('object target preparation must be callable')
         if self.configuration_category is not None and not _ID.fullmatch(self.configuration_category):

@@ -10,7 +10,7 @@ from tests.support.improvement_ui import panel
 
 class ImprovementFrontendTests(unittest.IsolatedAsyncioTestCase):
     async def test_task_sources_contain_only_generic_materials(self):
-        view, client, frames, _ = panel((0, 1, 9, None), confirmed=True)
+        view, client, frames, _ = panel((0, 1, 2, None), confirmed=True)
         await view.run()
         rows = next(rows for title, rows, _ in frames if title == 'Task material')
         self.assertEqual([row.label for row in rows], ['Current task and input files', 'Saved package'])
@@ -19,7 +19,7 @@ class ImprovementFrontendTests(unittest.IsolatedAsyncioTestCase):
         view.execute.assert_awaited_once_with(client.workflow_preview.return_value, '')
 
     async def test_confirmation_is_required_before_generic_execution(self):
-        view, client, _, _ = panel((9, None), confirmed=False)
+        view, client, _, _ = panel((2, None), confirmed=False)
         await view.run()
         client.workflow_preview.assert_called_once()
         view.execute.assert_not_awaited()

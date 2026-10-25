@@ -1,5 +1,5 @@
 """Shared candidate evidence, adoption outcomes and durable evolution host boundary."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import math
 from typing import Protocol, Literal
 
@@ -12,12 +12,15 @@ class VerificationEvidence:
     policy_id: str
     passed: bool
     feedback: str = ''
+    score: float | None = None
 
     def __post_init__(self):
         if not all(isinstance(v, str) and v for v in (self.candidate_id, self.artifact_id, self.parent_manifest_digest, self.policy_id)):
             raise ValueError('verification must bind candidate, content, parent and policy')
         if not isinstance(self.passed, bool):
             raise TypeError('verification passed must be boolean')
+        if self.score is not None and (isinstance(self.score, bool) or not isinstance(self.score, (int, float)) or not math.isfinite(self.score)):
+            raise ValueError('verification score must be finite or unknown')
 
 
 @dataclass(frozen=True)
@@ -44,10 +47,16 @@ class EvolutionJob:
     phase: str = 'ready'
     candidate_id: str = ''
     evidence: VerificationEvidence | None = None
-    schema_version: int = 1
+    schema_version: int = 2
+    strategy_id: str = ''
+    stop_reason: str = ''
+    consecutive_no_gain: int = 0
+    consecutive_failures: int = 0
+    budget_state: dict = field(default_factory=dict)
+    elapsed_seconds: float = 0
 
     def __post_init__(self):
-        if self.schema_version != 1 or isinstance(self.schema_version, bool):
+        if self.schema_version not in (1, 2) or isinstance(self.schema_version, bool):
             raise ValueError("unsupported evolution job schema")
         if not all(isinstance(v, str) and v for v in (self.job_id, self.policy_id, self.direction, self.current_manifest)):
             raise ValueError('evolution job identities and direction must not be empty')
@@ -61,6 +70,12 @@ class EvolutionJob:
             raise ValueError('evolution phase requires a fixed candidate')
         if self.phase in {'verified', 'activating'} and not isinstance(self.evidence, VerificationEvidence):
             raise ValueError('evolution phase requires verification evidence')
+        if any(type(v) is not int or v < 0 for v in (self.consecutive_no_gain, self.consecutive_failures)):
+            raise ValueError('evolution counters must be nonnegative integers')
+        if isinstance(self.elapsed_seconds, bool) or not isinstance(self.elapsed_seconds, (int, float)) or not math.isfinite(self.elapsed_seconds) or self.elapsed_seconds < 0:
+            raise ValueError('evolution elapsed time must be finite and nonnegative')
+        if not isinstance(self.budget_state, dict) or not isinstance(self.stop_reason, str):
+            raise ValueError('invalid evolution budget or stopping record')
 
 
 class EvolutionHost(Protocol):

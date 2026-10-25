@@ -21,6 +21,9 @@ from fruitfly_agent.lab.context_manager.externalization.programmatic_context imp
 from fruitfly_agent.lab.improvement.tasks.scoring import python_case, score_python
 from fruitfly_agent.interactive import TerminalConfigurationFrontend
 from fruitfly_agent.run import RunApplicationFactory
+from fruitfly_agent.experiments.scaffolding import initialize_workspace
+from fruitfly_agent.experiments.configuration import load_configuration
+from fruitfly_agent.experiments.composition import prepare_experiment
 
 
 async def check(wheel: Path) -> None:
@@ -66,17 +69,30 @@ async def check(wheel: Path) -> None:
         assert (root / ".fruitfly/secrets.env").stat().st_mode & 0o777 == 0o600
         assert not (root / "models.yaml").exists()
         assert not (root / ".env").exists()
+        # Resources must work from the installed wheel, without reading examples/.
+        experiment = root / 'experiment'
+        experiment.mkdir()
+        initialize_workspace(experiment)
+        prepared = prepare_experiment(load_configuration(experiment), 'improvement',
+            environment={'DEEPSEEK_API_KEY': 'offline-placeholder'})
+        assert prepared.model_roles['executor'] == 'deepseek-flash-openai'
+        benchmark = root / 'benchmark'
+        benchmark.mkdir()
+        initialize_workspace(benchmark, source='task-set', benchmark='terminal-bench-4')
+        assert (benchmark / '.fruitfly/eval-host.yaml').is_file()
         agent = FruitFlyHarborAgent.__new__(FruitFlyHarborAgent)
         package = resolve_installation(str(wheel), checkout=root)
         identity = source_snapshot(package, root / "source")
         assert (root / "source/eval/harbor/supervisor.py").is_file()
-        agent.config_path = root / "config.yaml"
-        agent.model_catalog_path = root / "models.yaml"
+        installation = root / "prepared-installation"
+        installation.mkdir()
+        agent.config_path = installation / "config.yaml"
+        agent.model_catalog_path = installation / "models.yaml"
         agent.config_path.write_text("offline configuration", encoding="utf-8")
         agent.model_catalog_path.write_text("offline catalog", encoding="utf-8")
         agent.exec_as_root = AsyncMock()
         agent.exec_as_agent = AsyncMock()
-        (root / "preparation.json").write_text(json.dumps({"runtime": {
+        (installation / "preparation.json").write_text(json.dumps({"runtime": {
             "python": "/opt/runtime/bin/python", "environment": {}, "installation": identity,
         }}), encoding="utf-8")
         environment = SimpleNamespace(
@@ -84,10 +100,10 @@ async def check(wheel: Path) -> None:
             upload_dir=AsyncMock(), upload_file=AsyncMock(),
         )
         await agent.install(environment)
-        environment.upload_file.assert_any_await(root / "config.yaml", "/installed-agent/fruitfly/runtime/config.yaml")
+        environment.upload_file.assert_any_await(installation / "config.yaml", "/installed-agent/fruitfly/runtime/config.yaml")
         environment.upload_dir.assert_not_called()
         assert "pip" not in agent.exec_as_root.call_args.kwargs["command"]
-    print("Installed model wizard, extension, function worker, IPython, and prepared Eval checks passed.")
+    print("Installed model wizard, experiment templates, extension, function worker, IPython, and prepared Eval checks passed.")
 
 
 if __name__ == "__main__":

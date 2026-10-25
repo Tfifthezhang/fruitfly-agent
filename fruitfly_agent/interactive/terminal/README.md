@@ -11,6 +11,9 @@ Use FruitFlyAgent through stdin/stdout, menus, and live events. Application owns
 | Start | Run `python -m fruitfly_agent`; choose **Start new session**. |
 | Configure | `/config`; save and apply to this conversation, or save only. |
 | Select a prompt | **Configure → prompt** or `/config`; preview and confirm. |
+| Complete a command | Type `/` or a prefix, use ↑↓ to select and Tab to fill it; Enter submits the current text, Esc hides suggestions. |
+| Copy text | Drag to select; F2 freezes the view during streaming, Esc/F2 returns to live output. |
+| Mouse-wheel browsing | F3 toggles application mouse capture; PageUp/PageDown work without it. |
 | Inspect activity | `/status`: model, prompt, workspace, session, committed conversation message count, state, queue, pending candidates, context usage bar/percentage, and session compaction count. |
 | Inspect the active harness | `/lab`: active context mechanisms, execution environment, installed tools and supplied capabilities. |
 | Cancel active work | `/cancel` or the first Ctrl+C; clear pending Application input. |
@@ -22,9 +25,26 @@ Use FruitFlyAgent through stdin/stdout, menus, and live events. Application owns
 
 POSIX ANSI terminals support live input, history, cancellation, and bracketed paste. Non-ANSI POSIX TTY input uses a stoppable canonical reader and handles SIGINT while a run is waiting. Redirected input uses sequential line-based fallback and cannot consume `/cancel` during a run. Display limits do not alter model context or stored messages. `NO_COLOR` and terminal capabilities affect rendering.
 
-The editable input area has a contrasting background, an emphasized `❯` prefix, and vertical spacing without full-width borders. Submitted inputs retain an emphasized prefix and blank lines, without background fill. The input uses a neutral gray background and the terminal’s default text color, with light/dark hints and capability fallbacks described in [I/O](io/README.md); `NO_COLOR` keeps the text and spacing. The built-in POSIX ANSI frontend owns an alternate-screen chat viewport. Resizing reflows completed assistant Markdown and restored history while retaining the draft and cursor. PageUp/PageDown or the mouse wheel browse history; Ctrl+End returns to the latest output. Menus lend and restore the screen. Exit restores the shell screen; persisted conversation remains available through `/resume`. Redirected and non-ANSI streams retain linear output.
+The editable input area has a contrasting background, an emphasized `❯` prefix, and vertical spacing without full-width borders. Submitted inputs retain an emphasized prefix and blank lines, without background fill. The input uses a neutral gray background and the terminal’s default text color, with light/dark hints and capability fallbacks described in [I/O](io/README.md); `NO_COLOR` keeps the text and spacing. The built-in POSIX ANSI frontend owns an alternate-screen chat viewport. Resizing reflows completed assistant Markdown and restored history while retaining the draft and cursor. PageUp/PageDown browse history; Ctrl+End returns to the latest output. Mouse capture is off by default for native text selection. F3 enables mouse-wheel browsing and shows a capture notice; F3 again releases the mouse. Menus lend and restore the screen. Exit restores the shell screen; persisted conversation remains available through `/resume`. Redirected and non-ANSI streams retain linear output.
+
+F2 opens a fixed copy view while background work and display-record collection continue. Drag to select and use the terminal’s copy shortcut. PageUp/PageDown browse the fixed history; Esc/F2 restores the latest output and original draft. Ordinary typing and Enter do not edit or submit a prompt in copy mode. Resize, permission choices and menu lending leave copy mode. Ctrl+C retains its cancellation behavior. Terminal modes and shortcuts are local presentation state, outside Agent configuration and Session persistence.
 
 Live reasoning text is hidden. The existing activity display indicates reasoning, answer reception, and tool execution; redirected output keeps brief activity milestones without animation. Reasoning summaries are also hidden. This presentation policy adds no model requests and does not change reasoning usage. Ordinary assistant text and bounded tool output remain visible.
+
+## Complete a command
+
+The built-in ANSI chat editor suggests registered commands as you type the first
+slash token. Candidates show descriptions and argument usage. Up/Down selects a
+candidate; Tab replaces only the command token and keeps surrounding text. Enter
+submits the existing draft without accepting a suggestion. Esc hides the list until
+the text or cursor changes and restores normal input-history navigation. Candidate
+rows scroll within a bounded area and are never added to conversation history.
+
+Ordinary text, command arguments, multiline input and multi-segment paths do not
+trigger suggestions. Bracketed paste retains literal tabs and newlines. Permission
+input, copy mode and configuration/secret fields take priority. Redirected and
+non-ANSI input keep their existing line behavior. Completion makes no model,
+filesystem or command-handler requests.
 
 ## Restore a conversation
 
@@ -63,6 +83,8 @@ The `capabilities` page renders host-provided booleans as checkboxes with defaul
 
 Model forms accept `/cancel` or EOF without staging. Review includes the selected service and defaults to Cancel. API key input disables TTY echo and bypasses readline/history; redirected input is read directly without writing its value to output. The host validates and saves settings; the terminal performs no Provider requests or filesystem configuration writes.
 
+Enumerated fields use registered choices with arrow-key selection and Enter confirmation; line-based menus use numbered choices. The same chooser serves editable mechanism parameters and setup forms. Unknown choices remain invalid in host validation.
+
 Mechanism forms refresh credential requirements from pending non-secret field
 values before hidden input. Switching a service or key variable changes the
 binding within that form. `/clear` clears an ordinary field; required-field
@@ -71,20 +93,16 @@ history, cancellation and staging behavior. The host owns secret-file writes.
 
 ## Improve against a task set
 
-`/improvement [DIRECTION]` opens a component workflow panel. Choose current
-instructions and input files or a saved package, editable components, a generator,
-exploration, budget, verification and effect scope. H/S/I identify component
-ownership. Review the frozen preview before one explicit submission.
+`/improvement [DIRECTION]` opens a small task-material panel for one simple
+base-prompt comparison. Choose explicit instructions/files or a saved package,
+then review the frozen preview before submission. Advanced H/S/I experiments,
+models, strategies and allocations use the independent experiment CLI and files;
+chat does not edit experiment configuration.
 
 | Action | Behavior |
 |---|---|
 | Start improvement | Fresh preview and one confirmation, defaulting to Cancel; model work may incur charges |
-| Budget | Edit typed method-declared limits without JSON |
-| Editable components / Candidate generator | Choose the registered changes and how proposals are generated |
 | Task / Input files | Select explicit task materials |
-| Exploration / Improvement guidance | Set parallel width or sequential depth and optional search hints |
-| Verification / Effect scope | Select feedback and task-local or persistent effect; persistent publication needs independent verification |
-| Execution strategy / Execution parameters | Choose native H/S trials or registered I experiments and their typed inputs |
 | Pending experience | Review and explicitly commit or reject lessons while idle |
 | Return to chat while running | Continue Application-owned work; inspect `/status`, `/cancel`, or Results and history |
 | Results and history | Inspect every submitted run, including empty, failed and cancelled experiments |
@@ -144,11 +162,12 @@ from fruitfly_agent.interactive.terminal import TerminalFrontend
 async def describe(command):
     return CommandResult(text=f"Runtime: {application.runtime_manifest['digest']}\n")
 
-frontend = TerminalFrontend(application, command_handlers={"describe": describe})
+frontend = TerminalFrontend(application)
+frontend.commands.register("describe", describe, summary="Show the runtime identity")
 # await frontend.run() starts terminal input.
 ```
 
-Names are lowercase, path-free tokens. Duplicate registration raises an error. `frontend.commands.register(name, handler, replace=True)` explicitly replaces a registered terminal handler. `/quit` is parsed as `/exit`. Custom commands are not added to `/help` automatically. Handler exceptions propagate through the frontend's normal cleanup; handlers own their service-specific diagnostics.
+Names are lowercase, path-free tokens. Duplicate registration raises an error. Terminal descriptions override same-name base descriptions in the same order as execution; `/quit` retains its `/exit` alias. `frontend.commands.register(name, handler, replace=True)` explicitly replaces a registered terminal handler. `/quit` is parsed as `/exit`. Custom commands appear in default `/help` and completion automatically. Optional `summary`, `usage` and `discoverable` registration fields control discovery. Hidden registrations still retain execution behavior. Original `command_handlers={...}` mappings remain supported without metadata. Default help uses the effective registry; explicitly supplied help handlers retain their dispatch priority. Handler exceptions propagate through the frontend's normal cleanup; handlers own their service-specific diagnostics.
 
 [Built-in features](features/README.md) register configuration, recovery, improvement, and cancellation outside the input loop. The frontend owns stdin and lending/restoring the menu display. A handler needing a menu can use `frontend.menu_scope()` while the main loop is dispatching it; do not start a second reader. Operations that change work or runtimes must call Application's public APIs so its state checks remain authoritative.
 
@@ -158,7 +177,7 @@ Names are lowercase, path-free tokens. Duplicate registration raises an error. `
 
 `ImprovementClients` independently injects search, candidate review, task materials, and activation clients. Pass it as `improvement_clients=` when these capabilities come from different objects. The improvement menu offers the supplied workflow and review capabilities. Corrections are available through the host task-material API, not a terminal form. `improvement_frontend()` returns the current menu view; `show_history()` and `show_notifications()` expose observation without granting execution.
 
-`ModelFormIO` in [model_setup.py](features/configuration/model_setup.py) supplies menu selection, input, rendering, and staging callbacks. Forms do not receive a configuration frontend or use its private methods. The host model service still owns validation and persistence. No new environment variables or independent lifecycle state.
+`FormIO` in [forms.py](features/configuration/forms.py) supplies menu selection, input, rendering, and staging callbacks. Forms do not receive a configuration frontend or use its private methods. The host model service still owns validation and persistence. No new environment variables or independent lifecycle state.
 
 ## Modules
 

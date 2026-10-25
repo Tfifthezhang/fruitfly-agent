@@ -76,6 +76,7 @@ class WorkflowTarget:
 
 def definition():
     from fruitfly_agent.lab.catalog.models import MechanismDefinition
+    from fruitfly_agent.lab.catalog.components import ComponentSpec
     return MechanismDefinition(MechanismDescriptor(WORKFLOW_TARGET, 'Execution workflow',
         'Execute bounded model stages, including critique and revision, through normal Agent turns.',
         contributions=(MechanismContribution('online', 'workflow'),), install_order=70,
@@ -83,6 +84,8 @@ def definition():
             lifecycle_hooks=('get_follow_up_messages',),
             cost_notice='Each workflow stage uses normal model calls and may incur cost.')),
         _install, implementation_id='declarative-workflow-v1', artifact_slots=frozenset({WORKFLOW_TARGET}),
+        component_specs=lambda parameters, enabled: (ComponentSpec(WORKFLOW_TARGET, kind='execution-workflow',
+            schema='execution-workflow-v1'),) if enabled else (), execution_fields=frozenset({'max_turns'}),
         implementation_path='fruitfly_agent/lab/workflow/__init__.py',
         documentation_path='fruitfly_agent/lab/workflow/README.md')
 

@@ -1,32 +1,7 @@
-"""Component registry and bridges to existing object-owned text adapters."""
-
-from .contracts.pipeline import ComponentDocument, ComponentFile, HarnessSnapshot
-
-
-class ComponentRegistry:
-    def __init__(self, adapters=()):
-        self.adapters = {}
-        for adapter in adapters:
-            self.register(adapter)
-
-    def register(self, adapter):
-        document = adapter.snapshot()
-        if document.component_id in self.adapters:
-            raise ValueError('duplicate component owner: ' + document.component_id)
-        self.adapters[document.component_id] = adapter
-
-    def snapshot(self):
-        return HarnessSnapshot(tuple(a.snapshot() for a in self.adapters.values()))
-
-    def validate(self, snapshot):
-        if {c.component_id for c in snapshot.components} != set(self.adapters):
-            raise ValueError('harness must preserve its registered component set')
-        for document in snapshot.components:
-            adapter = self.adapters[document.component_id]
-            old = adapter.snapshot()
-            if (old.role, old.kind, old.schema) != (document.role, document.kind, document.schema):
-                raise ValueError('component ownership cannot change')
-            adapter.validate(document)
+"""Owned component adapters and validation."""
+from ..contracts.components import ComponentDocument, ComponentFile, HarnessSnapshot
+from .registry import ComponentRegistry
+from ..contracts.components import ComponentBinding
 
 
 class TextComponentAdapter:
@@ -46,6 +21,15 @@ class TextComponentAdapter:
         if document != self.snapshot():
             self.target.validate(document.files[0].text)
 
+    def validate_options(self, options):
+        validate = getattr(self.target, 'validate_options', None)
+        if validate is None:
+            raise ValueError('component does not declare editable options')
+        validate(options)
+
+    def validate_change(self, document, options):
+        self.target.validate_change(document.files[0].text, options)
+
     def prepare_trial(self, config, document):
         self.validate(document)
         if not document.files[0].text and document == self.snapshot():
@@ -58,21 +42,10 @@ class TextComponentAdapter:
         self.validate(document)
         return document.files[0].text
 
-
-class FileComponentAdapter:
-    """An explicitly installed source component with injected object validation.
-
-    Registration alone grants no execution capability. The runner must install
-    the declared component. Compile checks do not establish correctness.
-    """
-    def __init__(self, document, validate):
-        self.document, self.validator = document, validate
-
-    def snapshot(self):
-        return self.document
-
-    def validate(self, document):
-        self.validator(document)
+    def export(self, document):
+        self.validate(document)
+        binding = self.target.snapshot().binding
+        return ComponentBinding(document.component_id, binding.kind, binding.key, document.files[0].text)
 
 
 def component_registry(targets):
@@ -93,10 +66,8 @@ def bundle_target(targets):
 
 
 def bundle_text(target, harness):
-    from .contracts.pipeline import canonical_json
+    from ..contracts.versions import canonical_json
     return canonical_json({t.snapshot().target_id:
         TextComponentAdapter(t, getattr(t, 'component_kind', 'instructions')).to_text(harness.component(t.snapshot().target_id))
         for t in target.targets})
 
-
-__all__ = ['ComponentRegistry', 'TextComponentAdapter', 'FileComponentAdapter', 'component_registry', 'bundle_target', 'bundle_text']

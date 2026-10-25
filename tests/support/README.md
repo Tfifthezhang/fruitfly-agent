@@ -13,6 +13,7 @@ Reusable substitutes and temporary materials. This module contains no TestCases 
 | [loop.py](loop.py) | Core configuration and counting tools |
 | [materials.py](materials.py), [run.py](run.py) | Models, tasks, CLI input, and temporary sessions |
 | [task_packs.py](task_packs.py) | Text/Python pack fixtures |
+| [task_sets.py](task_sets.py) | Frozen collections, explicit objectives and observable fake parallel execution |
 | [application.py](application.py) | Offline Sessions, RuntimeFactory substitutes, and Applications |
 | [terminal.py](terminal.py), [configuration.py](configuration.py) | Finite input, TTY streams, fixed completion events, and configuration controller substitutes |
 | [pipeline.py](pipeline.py), [self_improver.py](self_improver.py) | Shared deterministic stages and synthetic fixed-depth editor experiments |

@@ -55,7 +55,9 @@ async def execute_tool_batch(
                 raise asyncio.CancelledError
             started.add(tc.id)
             ctx.tool_call_count += 1
+            ctx.turn_tool_call_count += 1
             result = await _execute_one(ctx, tc, config, hooks, signal)
+            ctx.tool_error_count += int(result.is_error)
             completed[tc.id] = result
             await report(tc.name, result)
             return result
@@ -160,6 +162,7 @@ async def _execute_one(
                  if config.tool_authorizer is not None else unrestricted_authorization())
         async with scope as decision:
             if not isinstance(decision, AuthorizationDecision) or decision.allowed is not True:
+                ctx.tool_denied_count += 1
                 reason = decision.reason if isinstance(decision, AuthorizationDecision) else "invalid authorization decision"
                 return _error_result(tc.id, f"Permission denied: {reason}")
             if request.arguments != args:
@@ -167,6 +170,7 @@ async def _execute_one(
             if signal is not None and signal.is_set():
                 raise asyncio.CancelledError
             execution_started = True
+            ctx.tool_started_count += 1
             result = tool.execute(ToolCallContext(tc.id, tool.name, args, ctx.env, on_update, signal))
             if hasattr(result, "__await__"):
                 result = await result
@@ -204,6 +208,6 @@ async def _execute_one(
     return ToolResultMessage(
         tool_call_id=tc.id,
         content=list(result.content),
-        is_error=False,
+        is_error=result.is_error,
         terminate=result.terminate,
     )

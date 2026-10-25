@@ -38,18 +38,28 @@ class RuntimeReference:
 class BenchmarkSelection:
     benchmark_id: str
     variant: str
+    task_names: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.variant not in {"smoke", "no_gpu", "full"}:
             raise ValueError("benchmark.variant must be smoke, no_gpu or full")
+        object.__setattr__(self, 'task_names', tuple(self.task_names))
+        if len(set(self.task_names)) != len(self.task_names) or any(not isinstance(v, str) or not v.strip() for v in self.task_names):
+            raise ValueError('benchmark.task_names must contain distinct exact task names')
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> BenchmarkSelection:
-        _fields(data, {"id", "variant"}, "benchmark")
-        return cls(_text(data.get("id"), "benchmark.id"), _text(data.get("variant"), "benchmark.variant"))
+        _fields(data, {"id", "variant", "task_names"}, "benchmark")
+        names = data.get('task_names', [])
+        if not isinstance(names, list):
+            raise ValueError('benchmark.task_names must be a list')
+        return cls(_text(data.get("id"), "benchmark.id"), _text(data.get("variant"), "benchmark.variant"), tuple(names))
 
-    def to_dict(self) -> dict[str, str]:
-        return {"id": self.benchmark_id, "variant": self.variant}
+    def to_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {"id": self.benchmark_id, "variant": self.variant}
+        if self.task_names:
+            result['task_names'] = list(self.task_names)
+        return result
 
 
 @dataclass(frozen=True)

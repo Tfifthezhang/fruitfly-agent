@@ -1,12 +1,7 @@
 """Durable RSI adapter over the existing improvement inbox and Application."""
-from dataclasses import asdict
-import json
-import os
-from pathlib import Path
-import re
-import tempfile
 
 from fruitfly_agent.lab.algorithms.evolution import AdoptionResult, EvolutionJob, VerificationEvidence
+from fruitfly_agent.run.storage.evolution import EvolutionStore
 
 
 class RunEvolutionHost:
@@ -28,44 +23,18 @@ class RunEvolutionHost:
         self.activate = activate
         self.policy_id = policy_id
         self.verifier = verify
-        self.root = workspace / '.fruitfly' / 'evolution'
+        self.store = EvolutionStore(workspace)
+        self.root = self.store.root
 
     def active_manifest(self):
         return self.manifest()['digest']
 
-    def _path(self, job_id):
-        if not isinstance(job_id, str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,127}', job_id):
-            raise ValueError('invalid evolution job id')
-        path = self.root / (job_id + '.json')
-        if path.is_symlink():
-            raise ValueError('evolution job must not be a symlink')
-        if not path.resolve().is_relative_to(self.workspace):
-            raise ValueError('evolution jobs must stay inside the workspace')
-        return path
 
     def load_job(self, job_id):
-        path = self._path(job_id)
-        if not path.exists():
-            return None
-        data = json.loads(path.read_text(encoding='utf-8'))
-        if data.get('job_id') != job_id:
-            raise ValueError('evolution job identity mismatch')
-        if data.get('evidence') is not None:
-            data['evidence'] = VerificationEvidence(**data['evidence'])
-        return EvolutionJob(**data)
+        return self.store.load(job_id)
 
     def save_job(self, job):
-        path = self._path(job.job_id)
-        self.root.mkdir(parents=True, exist_ok=True)
-        descriptor, name = tempfile.mkstemp(prefix='.evolution-', dir=self.root)
-        try:
-            with os.fdopen(descriptor, 'w', encoding='utf-8') as stream:
-                json.dump(asdict(job), stream, ensure_ascii=False, sort_keys=True)
-                stream.flush()
-                os.fsync(stream.fileno())
-            os.replace(name, path)
-        finally:
-            Path(name).unlink(missing_ok=True)
+        self.store.save(job)
 
     async def propose(self, direction):
         records = await self.propose_operation(direction)

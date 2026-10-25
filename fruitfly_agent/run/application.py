@@ -152,9 +152,10 @@ class RunApplicationFactory:
             config=lambda: self._current_runtime_config, targets=lambda: tuple(self._current_targets.values()),
             tasks=self.task_pack_catalog, publish=self.publish_component_candidate,
             **{f.name: getattr(pipeline_bindings, f.name) for f in fields(pipeline_bindings)})
-        from fruitfly_agent.lab.improvement.api import EDITOR_CONFIG, EDITOR_INSTRUCTIONS, SETTINGS
+        from fruitfly_agent.lab.improvement.api import EDITOR_CONFIG, ASSESSOR_CONFIG, EDITOR_INSTRUCTIONS, SETTINGS
         self._component_jobs.defaults = lambda: self._current_components.get(SETTINGS, {})
         self._component_jobs.editor_configuration = lambda: self._current_components.get(EDITOR_CONFIG, self._current_runtime_config)
+        self._component_jobs.assessor_configuration = lambda: self._current_components.get(ASSESSOR_CONFIG, self._current_runtime_config)
         self._component_jobs.editor_instructions = lambda: self._current_components.get(EDITOR_INSTRUCTIONS)
         self._improvement_service = RunImprovementService(
             jobs=self._component_jobs, activity=self.improvement_activity, cancel=self.cancel_improvement,
@@ -247,6 +248,9 @@ class RunApplicationFactory:
 
     def improvement_target_id(self):
         return next(iter(self._current_targets))
+
+    def improvement_budget_scope(self, budget):
+        return self._component_jobs.budget_scope(budget)
 
     def task_pack_catalog(self):
         if self._current_runtime_config is None:

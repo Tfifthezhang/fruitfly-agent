@@ -34,15 +34,13 @@ These checks make no model requests. See [Task packs](../../../fruitfly_agent/la
 
 | Step | Action |
 |---|---|
-| 1 | Start the terminal with a configured model; no improvement switch is required. |
-| 2 | Record the active prompt hash from `/status`. |
-| 3 | Open `/improvement`; choose **Editable components** and **Candidate generator**, then set **Task** to the installed Python pack. |
-| 4 | Set optional guidance and persistent effect scope; review model, budgets and the 8 train / 4 selection / 6 holdout package. |
-| 5 | Explicitly confirm search. **Model requests may incur charges.** |
-| 6 | Review evaluation, usage, differences, text, and scope. |
-| 7 | Confirm **Set as next-session default** or **Set default and start a new session**. |
+| 1 | Prepare the independent default Agent/model files and credentials. |
+| 2 | Set `task.source: files` and `task.pack: python-functions` in `.fruitfly/experiment.yaml`. |
+| 3 | For persistent verification, set `improvement.scope: persistent` and `improvement.max_executions: 64` to fund the declared paired cases. |
+| 4 | Run `fruitfly-agent-lab improvement check`, then explicitly `improvement run`; model calls may incur charges. |
+| 5 | Inspect the linked candidate and evidence. `rsi run` performs verified adoption into its experiment copy. |
 
-The active target supplies the baseline; selecting the pack does not load `baseline.txt`. `/status` observes progress and `/cancel` stops search. Latest candidates do not guarantee better results. Use **Configure → prompt** to preview and select task results for future sessions.
+The active target supplies the baseline; selecting the pack does not load `baseline.txt`. The experiment CLI records progress and supports `stop`. Latest candidates do not guarantee better results. The run retains its separate configuration and evidence for review.
 
 ## Test independently
 
@@ -52,7 +50,7 @@ For each of the 6 holdout cases, send only its input in a new empty session with
 .venv/bin/python -m fruitfly_agent.lab.improvement.tasks.verification score examples/improvement/python_functions/pack.json --case holdout-001 --answer-file /tmp/function-answer.py
 ```
 
-Compare baseline and candidate under the same model, materials and policy. Selection scores are not independent holdout evidence. The [verification policy](../../../fruitfly_agent/lab/improvement/verification/README.md) runs independent comparison before persistent publication. Adoption remains an explicit human decision.
+Compare baseline and candidate under the same model, materials and policy. Selection scores are not independent holdout evidence. The [verification policy](../../../fruitfly_agent/lab/improvement/verification/README.md) runs independent comparison before persistent publication. Task-local selection does not adopt; explicit RSI uses the independent verification policy.
 
 | Boundary | Scope |
 |---|---|

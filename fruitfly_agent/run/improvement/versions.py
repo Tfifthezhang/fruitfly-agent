@@ -91,7 +91,11 @@ class RunVersions:
             return candidate
         import json
         harness = json.loads(self.artifacts.read_text(parent.harness))
-        if snapshot.binding.kind == "prompt":
+        if snapshot.binding.kind == 'configuration':
+            from fruitfly_agent.runtime_spec import HarnessProfile, apply_profile_binding
+            profile = apply_profile_binding(HarnessProfile('candidate'), snapshot.binding.kind, snapshot.binding.key, text)
+            harness['execution'] = dict(profile.execution)
+        elif snapshot.binding.kind == "prompt":
             harness["base_prompt"] = {"content_hash": after}
         else:
             artifacts = [a for a in harness.get('data_artifacts', ()) if a.get('key') != snapshot.binding.key]

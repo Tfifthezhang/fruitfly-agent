@@ -47,12 +47,15 @@ class Verification:
     policy_id: str
     passed: bool
     feedback: str = ""
+    score: float | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.version, AgentVersion):
             raise TypeError("verification version must be an AgentVersion")
         if not isinstance(self.policy_id, str) or not self.policy_id.strip():
             raise ValueError("verification policy_id must be non-empty")
+        if self.score is not None and (isinstance(self.score, bool) or not isinstance(self.score, (int, float)) or not math.isfinite(self.score)):
+            raise ValueError("verification score must be finite or unknown")
         if not isinstance(self.passed, bool) or not isinstance(self.feedback, str):
             raise TypeError("verification requires boolean passed and text feedback")
 
@@ -95,6 +98,7 @@ class EvolutionAttempt:
 class EvolutionResult:
     version: AgentVersion
     attempts: tuple[EvolutionAttempt, ...]
+    stop_reason: str = "step_limit"
 
 
 __all__ = [

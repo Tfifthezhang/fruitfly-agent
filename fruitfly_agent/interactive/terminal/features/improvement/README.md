@@ -2,20 +2,21 @@
 
 [Up: Terminal Features](../README.md)
 
-Use `/improvement [DIRECTION]` to configure and explicitly submit a component
-workflow. The terminal consumes renderer-neutral contracts and imports no Lab,
+Use `/improvement [DIRECTION]` for explicit task material and one simple base-prompt
+comparison. Experiment configuration is edited in files and run through the
+independent CLI. The terminal consumes renderer-neutral contracts and imports no Lab,
 Run or Eval implementation.
 
 | File | Responsibility |
 |---|---|
-| [workflow_panel.py](workflow_panel.py) | Task/input selection, component toggles, generator, exploration, budgets, feedback and scope |
+| [workflow_panel.py](workflow_panel.py) | Explicit task/input selection, preview/start and result history |
 | [menu.py](menu.py) | Confirmation, progress, history, results and candidate review |
 | [command.py](command.py) | Borrow and restore terminal input/display scope |
 | [formatting.py](formatting.py) | Generic activity and usage |
 
 Task sources include explicit current instructions and input files or saved
-packages. Invalid or cancelled field input preserves the prior value. Components
-and generators show capability availability. The panel has no benchmark-specific
+packages. Invalid or cancelled field input preserves the prior value. Search uses
+`simple` without automatic reflection. The panel has no benchmark-specific
 source, runner or configuration.
 
 Start creates a fresh frozen preview and one confirmation with Cancel selected by
@@ -46,13 +47,13 @@ See [Improvement](../../../../lab/improvement/README.md) and
 These checks are offline and establish interaction/lifecycle behavior, not model
 quality or real container integration. Model execution may incur charges.
 
-## Choose registered execution and review lessons
+## Review results and lessons
 
-**Execution strategy** changes compatible component availability and material
-choices from host metadata. **Execution parameters** edits declared string/integer/
-number fields. Switching strategies clears incompatible material/component choices
-and applies its declared defaults. The terminal contains no concrete execution or
-scoring implementation. Start always creates a fresh preview after edits.
+The menu has Task, Input files, Start improvement and Results and history.
+Saved materials own their input files. Components, algorithms, model roles,
+allocations, feedback and scope are configured through the
+[experiment CLI files](../../../../experiments/README.md), not chat settings.
+Start creates a fresh preview after material edits.
 
 For **Editor self-improvement**, follow the [experiment guide](../../../../lab/improvement/improver/README.md).
 Progress counts all nested model calls and leaf executions. Results retain stopping

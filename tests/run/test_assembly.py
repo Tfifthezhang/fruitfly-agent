@@ -147,12 +147,15 @@ class RuntimeAssemblyTest(unittest.TestCase):
         from fruitfly_agent.run.runtime.manifest import digest_manifest
         catalog = builtin_catalog()
         profile = HarnessProfile("default", str(self.model_path), "offline", ())
-        for version in (3, 4, 5):
+        for version in (3, 4, 5, 6):
             with self.subTest(version=version), Session(self.root / f"legacy-{version}.jsonl") as session:
                 runtime = self.assemble(profile, session, catalog=catalog)
                 stored = runtime.manifest.to_dict()
                 stored.pop("digest")
                 stored.pop("permissions")
+                stored.pop("harness")
+                if version < 6:
+                    stored.pop("execution")
                 stored["schema_version"] = version
                 if version < 5:
                     stored.pop("base_prompt")
@@ -199,7 +202,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
                 artifact_bindings={'skill-catalog.guidance': ref.artifact_id},
             )
 
-        self.assertEqual(runtime.manifest.schema_version, 5)
+        self.assertEqual(runtime.manifest.schema_version, 7)
         self.assertEqual(
             runtime.manifest.data_artifacts[0]["id"], ref.artifact_id
         )
@@ -281,7 +284,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
             runtime.mechanism_ids,
             ("skill-catalog", "information-context", "compaction", "component-improvement"),
         )
-        self.assertEqual(runtime.manifest.schema_version, 5)
+        self.assertEqual(runtime.manifest.schema_version, 7)
         self.assertEqual(runtime.manifest.data_artifacts, ())
 
     def test_runtime_manifest_ignores_unused_model_catalog_entries(self) -> None:

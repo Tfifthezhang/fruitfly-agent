@@ -43,10 +43,14 @@ benchmarks = [
 [project.scripts]
 fruitfly-agent = "fruitfly_agent.run:main"
 fruitfly-agent-eval = "eval.__main__:main"
+fruitfly-agent-lab = "fruitfly_agent.experiments.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["fruitfly_agent*", "eval*"]
+
+[tool.setuptools.package-data]
+"fruitfly_agent.experiments" = ["templates/*.yaml"]
 
 [tool.mypy]
 python_version = "3.11"
@@ -55,6 +59,9 @@ check_untyped_defs = true
 no_implicit_optional = true
 warn_unused_ignores = true
 files = [
+    "fruitfly_agent/runtime_spec",
+    "fruitfly_agent/lab/execution_policy",
+    "fruitfly_agent/lab/catalog/components.py",
     "fruitfly_agent/core/tool_runtime/authorization.py",
     "fruitfly_agent/interactive/interaction/authorization.py",
     "fruitfly_agent/lab/environment/permissions.py",
@@ -84,31 +91,30 @@ files = [
     "fruitfly_agent/interactive/terminal/commands.py",
     "fruitfly_agent/interactive/terminal/bindings.py",
     "fruitfly_agent/run/application.py",
+    "fruitfly_agent/run/cli.py",
     "fruitfly_agent/run/configuration/resolution.py",
     "fruitfly_agent/run/configuration/views.py",
     "fruitfly_agent/run/configuration/controller.py",
     "fruitfly_agent/run/runtime/recovery.py",
     "fruitfly_agent/run/improvement/versions.py",
-    "fruitfly_agent/lab/improvement/contracts/versions.py",
-    "fruitfly_agent/lab/improvement/contracts/candidates.py",
     "fruitfly_agent/lab/algorithms/snapshots.py",
-    "fruitfly_agent/lab/improvement/evidence/receipts.py",
-    "fruitfly_agent/lab/improvement/contracts/__init__.py",
-    "fruitfly_agent/lab/improvement/api.py",
-    "fruitfly_agent/lab/improvement/contracts/pipeline.py",
-    "fruitfly_agent/lab/improvement/contracts/experiments.py",
-    "fruitfly_agent/lab/improvement/execution",
-    "fruitfly_agent/lab/improvement/improver",
-    "fruitfly_agent/lab/improvement/components.py",
-    "fruitfly_agent/lab/improvement/workflow",
-    "fruitfly_agent/lab/improvement/editor",
+    "fruitfly_agent/lab/improvement",
+    "fruitfly_agent/lab/rsi",
+    "fruitfly_agent/experiments",
+    "fruitfly_agent/run/runtime/limits.py",
+    "fruitfly_agent/run/evolution.py",
+    "fruitfly_agent/run/improvement/evolution.py",
     "fruitfly_agent/run/improvement/pipeline.py",
-    "fruitfly_agent/lab/improvement/migration.py",
     "fruitfly_agent/run/migrate_improvement.py",
-    "fruitfly_agent/lab/improvement/tasks/__init__.py",
-    "fruitfly_agent/lab/improvement/tasks/scoring.py",
-    "fruitfly_agent/lab/improvement/tasks/cases.py",
     "fruitfly_agent/interactive/terminal/io/live.py",
+    "fruitfly_agent/interactive/terminal/io/display.py",
+    "fruitfly_agent/interactive/terminal/io/editor.py",
+    "fruitfly_agent/interactive/terminal/io/controls.py",
+    "fruitfly_agent/interactive/terminal/io/completion.py",
+    "fruitfly_agent/interactive/interaction/commands.py",
+    "fruitfly_agent/interactive/terminal/io/screen.py",
+    "fruitfly_agent/interactive/terminal/io/secret.py",
+    "fruitfly_agent/interactive/terminal/features/configuration/forms.py",
     "fruitfly_agent/interactive/terminal/io/menu.py",
     "fruitfly_agent/interactive/terminal/features/configuration/menu.py",
     "fruitfly_agent/providers",
@@ -116,6 +122,10 @@ files = [
     "fruitfly_agent/run/adapters",
     "eval/benchmarks",
     "eval/harbor",
+    "eval/improvement",
+    "eval/api.py",
+    "eval/task_selection.py",
+    "eval/service.py",
     "eval/catalog.py",
     "eval/contracts.py",
     "eval/execution.py",
@@ -133,7 +143,17 @@ module = [
     "fruitfly_agent.core.loop",
     "fruitfly_agent.lab.improvement.tasks",
     "fruitfly_agent.lab.improvement.tasks.scoring",
+    "fruitfly_agent.lab.improvement.assessment.scorers.policies",
     "fruitfly_agent.interactive.terminal.io.live",
+    "fruitfly_agent.interactive.terminal.io.display",
+    "fruitfly_agent.interactive.terminal.io.editor",
+    "fruitfly_agent.interactive.terminal.io.controls",
+    "fruitfly_agent.interactive.terminal.io.completion",
+    "fruitfly_agent.interactive.terminal.commands",
+    "fruitfly_agent.interactive.interaction.commands",
+    "fruitfly_agent.interactive.terminal.io.screen",
+    "fruitfly_agent.interactive.terminal.io.secret",
+    "fruitfly_agent.interactive.terminal.features.configuration.forms",
     "fruitfly_agent.interactive.terminal.io.menu",
     "fruitfly_agent.interactive.terminal.features.configuration.menu",
     "fruitfly_agent.providers.openai_codec",

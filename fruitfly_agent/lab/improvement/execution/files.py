@@ -2,12 +2,14 @@
 from uuid import uuid4
 from dataclasses import asdict
 
-from ..contracts.experiments import ExecutionDefinition, MaterialOption, PreparedExecution, ExecutionPorts
+from ..contracts.experiments import ExecutionDefinition, ExecutionParameter, MaterialOption, PreparedExecution, ExecutionPorts
 from ..contracts.pipeline import TaskMaterial, canonical_json
 from ..contracts.versions import content_hash
 from ..materials import WorkspaceTaskSource
-from ..workflow.execution import FileTaskRunner
-from ..verification import CaseMeasurements, HoldoutVerification
+from ..execution.file_runner import FileTaskRunner
+from ..assessment.verification import CaseMeasurements, HoldoutVerification
+from ..assessment.online import AssessedRunner
+from ..assessment.metrics import ProcessMetrics
 
 
 def materials(context):
@@ -17,6 +19,7 @@ def materials(context):
 
 
 def prepare(context, request):
+    parameters = definition().normalize(request.parameters)
     if request.feedback == 'scored' and not request.material_id and context.measurements is None:
         raise ValueError('measured feedback requires a task package or registered measurement source')
     if request.material_id:
@@ -39,6 +42,7 @@ def prepare(context, request):
         if request.scope == 'persistent':
             count = 2 * (len(suite.train) + len(suite.validation) + len(holdout))
             prepared.minimum_budget = {'model': count + 1, 'execution': count + 1}
+        prepared.private = (suite, holdout, parameters)
         return prepared
     if not request.instruction.strip():
         raise ValueError('provide the current task instruction')
@@ -46,18 +50,23 @@ def prepare(context, request):
         raise ValueError('select a task package with independent verification material')
     task = WorkspaceTaskSource(context.workspace, context.artifacts).freeze('task-' + uuid4().hex,
         request.instruction, paths=request.input_paths, environment_id='file-workspace-v1')
-    return PreparedExecution(task, task.material_id, (), lambda: task.material_id)
+    return PreparedExecution(task, task.material_id, (), lambda: task.material_id,
+                             (None, (), parameters))
 
 
 def build(context, prepared):
     plan, services = context.plan, context.services
     runner = (context.runner_factory(plan, context.components, context.artifacts, services)
-              if context.runner_factory else FileTaskRunner(context.config, context.components, context.artifacts, services))
+              if context.runner_factory else FileTaskRunner(context.config, context.components, context.artifacts, services,
+                  tool_names={tool.name for tool in context.config.tools}))
     services.own(runner)
+    suite, holdout, parameters = prepared.private
+    if parameters['assessment_interval']:
+        runner = AssessedRunner(runner, artifacts=context.artifacts, services=services,
+            assessors=(ProcessMetrics,), interval=parameters['assessment_interval'])
     measurements, verifier = context.measurements, context.verifier
     reserve = {'model': 0, 'execution': 0}
-    if prepared.private is not None:
-        suite, holdout = prepared.private
+    if suite is not None:
         def project(prefix, cases):
             return tuple(TaskMaterial(f'{prefix}-{i}', c.input, origin=prepared.task.origin,
                 environment_id=prepared.task.environment_id) for i, c in enumerate(cases))
@@ -86,5 +95,7 @@ def build(context, prepared):
 
 
 def definition():
-    return ExecutionDefinition('file-task', 'Agent task execution', 'file-task-v2', frozenset({'H', 'S'}),
-        FileTaskRunner.capabilities, materials, prepare, build, accepts_runner_override=True)
+    return ExecutionDefinition('file-task', 'Agent task execution', 'file-task-v3', frozenset({'H', 'S'}),
+        FileTaskRunner.capabilities, materials, prepare, build,
+        parameters=(ExecutionParameter('assessment_interval', 'Online assessment interval', 'integer', 0, 0, 1000,
+            'Events per assessment; 0 disables online process/resource assessment.'),), accepts_runner_override=True)

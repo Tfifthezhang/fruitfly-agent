@@ -130,6 +130,35 @@ class RunAlgorithmBoundaryTests(unittest.TestCase):
 
 
 class InteractiveExtensibilityTests(unittest.TestCase):
+    def test_completion_layers_do_not_encode_command_vocabulary(self):
+        root = ROOT / 'fruitfly_agent/interactive/terminal/io'
+        commands = {'/help', '/status', '/config', '/resume', '/improvement', '/trace', '/exit', '/quit'}
+        violations = []
+        for name in ('completion.py', 'editor.py', 'display.py'):
+            path = root / name
+            for node in ast.walk(ast.parse(path.read_text())):
+                if isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value in commands:
+                    violations.append(f'{path.name} contains {node.value}')
+        self.assertEqual([], violations, 'Inject a completion provider instead of command names')
+
+    def test_terminal_shared_helpers_do_not_import_their_consumers(self):
+        terminal = ROOT / 'fruitfly_agent/interactive/terminal'
+        owners = {
+            'io/editor.py': ('fruitfly_agent.interactive.terminal.io.display',
+                             'fruitfly_agent.interactive.terminal.io.live'),
+            'io/display.py': ('fruitfly_agent.interactive.terminal.io.editor',
+                              'fruitfly_agent.interactive.terminal.io.live'),
+            'features/configuration/forms.py': (
+                'fruitfly_agent.interactive.terminal.features.configuration.menu',
+                'fruitfly_agent.interactive.terminal.features.configuration.model_setup',
+                'fruitfly_agent.interactive.terminal.features.configuration.mechanism_setup'),
+            'features/configuration/mechanism_setup.py': (
+                'fruitfly_agent.interactive.terminal.features.configuration.model_setup',),
+        }
+        violations = [f'{name} imports {target}' for name, forbidden in owners.items()
+                      for target in _project_imports(terminal / name) if target.startswith(forbidden)]
+        self.assertEqual([], violations, 'Inject shared capabilities instead of importing their consumers')
+
     def test_helpers_do_not_depend_on_application_or_foreign_private_state(self):
         interactive = ROOT / "fruitfly_agent" / "interactive"
         features = interactive / "terminal" / "features"

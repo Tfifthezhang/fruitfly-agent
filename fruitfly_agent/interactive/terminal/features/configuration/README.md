@@ -8,7 +8,8 @@ Use `TerminalConfigurationFrontend` as the menu entry and `configuration_handler
 |---|---|
 | [menu.py](menu.py) | Generic configuration choices, draft review, and save confirmation |
 | [command.py](command.py) | Busy feedback, menu lending, injected configuration application and saved/active feedback |
-| [model_setup.py](model_setup.py) | ModelFormIO, field/capability forms, review, and hidden secret input |
+| [forms.py](forms.py) | FormIO and shared value/field selection with distinct cancellation |
+| [model_setup.py](model_setup.py) | Model fields, capability forms and review |
 | [mechanism_setup.py](mechanism_setup.py) | Registration-driven guided settings, hidden credentials, per-field retry and review |
 
 The home menu retains Start new session, Configure and Exit. An optional
@@ -26,7 +27,7 @@ disabling a mechanism retains its parameters and credentials. Expansion
 offers **Set up…** even when disabled. Staging enables the configured mechanism
 and resolves conflicts; cancellation preserves the original selection. Starting
 a new session first repairs enabled mechanisms with missing setup information.
-Hidden fields reuse the same secret reader as model keys; blank reuses an
+Hidden fields use the shared [secret reader](../../io/secret.py), also used for model keys; blank reuses an
 existing value, and invalid/missing fields retry without echoing secrets.
 
 Saving persists the draft. In an active conversation, **Save and apply to this conversation** requests the injected `apply_configuration` operation; **Save only** leaves the runtime unchanged. Application owns recovery, replacement and cleanup. A missing operation reports that the host cannot apply settings; it does not exit or create a blank conversation. Application failures return a saved-but-not-applied diagnostic and retain the current conversation. Model form inspection makes no Provider requests. Configuration writes and credential effects belong to the host and are not automatically rolled back.
@@ -42,3 +43,11 @@ Only explicitly declared user inputs, such as paths, initial text and endpoints,
 ```bash
 .venv/bin/python -m unittest tests.interactive.test_terminal_configuration tests.run.test_model_setup tests.interactive.test_extensions -v
 ```
+
+Mechanism setup and ordinary parameter editing render enumerated fields through
+`forms.py`. Options come from host field metadata, never a terminal-owned service
+list. The selected original value remains separate from its display label;
+`CANCELLED` differs from false, null and empty values. ANSI menus use arrows and
+Enter; line menus use numbered options. Host validation and staging remain the
+same. Model and mechanism flows depend on shared forms and I/O; neither imports
+the other's helpers.

@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 from typing import Callable, Protocol
 
+from .controller import EvolutionController
+
 from .models import (
     AgentVersion, Candidate, EvolutionAttempt, EvolutionBudget, EvolutionResult, Verification,
 )
@@ -52,16 +54,20 @@ class EvolutionDriver:
         adopt: CandidateAdopter,
         policy_id: str,
         budget: EvolutionBudget | None = None,
+        stop_policy=None,
     ) -> None:
         if not isinstance(policy_id, str) or not policy_id.strip():
             raise ValueError("policy_id must be non-empty")
         if budget is not None and not isinstance(budget, EvolutionBudget):
             raise TypeError("budget must be an EvolutionBudget")
+        if stop_policy is not None and not callable(getattr(stop_policy, 'decide', None)):
+            raise ValueError('stop policy must implement decide')
         self.generator_for = generator_for
         self.verify = verify
         self.adopt = adopt
         self.policy_id = policy_id
         self.budget = budget or EvolutionBudget()
+        self.stop_policy = stop_policy
 
     async def evolve(
         self,
@@ -75,6 +81,19 @@ class EvolutionDriver:
         current = initial
         attempts: list[EvolutionAttempt] = []
         feedback = feedback[:self.budget.max_feedback_chars]
+        controller = EvolutionController(self.stop_policy)
+        reason = 'step_limit'
+        def finish_attempt():
+            nonlocal reason
+            attempt = attempts[-1]
+            verification = attempt.verification
+            value = controller.finish(steps=len(attempts), limit=self.budget.max_steps,
+                outcome=attempt.outcome, score=verification.score if verification else None,
+                policy_id=self.policy_id, run_id='generation-' + str(len(attempts)),
+                assurance='verified' if verification and verification.passed else 'selected')
+            if value:
+                reason = value
+            return value
         for _ in range(self.budget.max_steps):
             self._check_cancelled(signal)
             feedback = feedback[:self.budget.max_feedback_chars]
@@ -85,14 +104,19 @@ class EvolutionDriver:
             except Exception as exc:
                 feedback = f"proposal failed: {type(exc).__name__}"
                 attempts.append(EvolutionAttempt(current, None, None, "proposal_failed", feedback))
+                if finish_attempt():
+                    break
                 continue
             self._check_cancelled(signal)
             if candidate is None:
                 attempts.append(EvolutionAttempt(current, None, None, "no_candidate"))
+                reason = 'no_candidate'
                 break
             if not isinstance(candidate, Candidate) or candidate.parent != current:
                 feedback = "candidate type or parent version mismatch"
                 attempts.append(EvolutionAttempt(current, None, None, "invalid_candidate", feedback))
+                if finish_attempt():
+                    break
                 continue
             try:
                 async with asyncio.timeout(self.budget.phase_timeout_seconds):
@@ -106,11 +130,15 @@ class EvolutionDriver:
             except Exception as exc:
                 feedback = f"verification failed: {type(exc).__name__}"
                 attempts.append(EvolutionAttempt(current, candidate, None, "verification_failed", feedback))
+                if finish_attempt():
+                    break
                 continue
             self._check_cancelled(signal)
             feedback = verification.feedback[:self.budget.max_feedback_chars]
             if not verification.passed:
                 attempts.append(EvolutionAttempt(current, candidate, verification, "rejected", feedback))
+                if finish_attempt():
+                    break
                 continue
             # Errors here must surface to the host rather than claiming rollback.
             async with asyncio.timeout(self.budget.phase_timeout_seconds):
@@ -123,7 +151,9 @@ class EvolutionDriver:
             ))
             if adopted:
                 current = candidate.version
-        return EvolutionResult(current, tuple(attempts))
+            if finish_attempt():
+                break
+        return EvolutionResult(current, tuple(attempts), reason)
 
     @staticmethod
     def _check_cancelled(signal: asyncio.Event | None) -> None:

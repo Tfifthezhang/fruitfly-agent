@@ -7,10 +7,15 @@ Provide replaceable input readers and terminal control primitives. This layer ha
 | File | Responsibility |
 |---|---|
 | [input.py](input.py) | LineEditor, redirected/readline/canonical readers, and field input |
-| [live.py](live.py) | InlineTerminalDisplay, owned/inline display modes, concurrent editing, bracketed paste, and interruption |
+| [live.py](live.py) | Stable public entry points and composition of display and editor |
+| [display.py](display.py) | Transcript viewport, input surface, fixed copy view and repainting |
+| [editor.py](editor.py) | Single-owner POSIX editing, paste, history and permission input through EditorDisplay |
+| [completion.py](completion.py) | Immutable completion queries/results/views and candidate selection/dismissal state |
+| [controls.py](controls.py) | Terminal-local view actions, shortcut decoding and InputInterrupted |
+| [secret.py](secret.py) | Echo-suppressed credential input outside line history |
 | [transcript.py](transcript.py) | Source-backed display records, injected formatting, cached layout and scroll anchors |
 | [menu.py](menu.py) | MenuInput, key decoding, navigation, generic rows, and menu display |
-| [screen.py](screen.py) | transient_screen lending/restoration |
+| [screen.py](screen.py) | TerminalScreen mode ownership and transient_screen lending/restoration |
 | [text.py](text.py) | TTY/color checks, safe terminal text, cell width, content width, wrapping and truncation |
 
 TerminalFrontend owns the active input loop. Features borrow the supplied reader/menu scope; they must not start a second background stdin reader. TTY mode and screen restoration run on every exit. Raw menu input additionally offers bounded `poll_event(timeout)` reads through the same owner, preserving queued keys and restoring blocking/terminal modes. Polling restores modes without waiting for output to drain. Rendering consumes these primitives; I/O never imports rendering or feature modules.
@@ -38,7 +43,7 @@ Checks use local PTYs and isolated streams.
 `DisplayTranscript` accepts plain fragments or `update(source, formatter,
 complete=...)` records. Formatting callbacks and visual wrapping are injected;
 the module knows no Markdown, message roles, Session files or lifecycle state.
-Cached layouts are invalidated by changed source or width. PageUp/PageDown and
+Cached layouts are invalidated by changed source or width. PageUp/PageDown and optional
 SGR mouse-wheel input move a display-only anchor; Ctrl+End resumes bottom-follow.
 Anchors use a record and visible-character offset, so appended text does not pull
 a reader to the bottom. Width-dependent decorations, including table borders,
@@ -49,3 +54,33 @@ the shell screen. Reactivation restores retained display records, including afte
 menus; output received while suspended is buffered. The cache lasts for the
 frontend's lifetime and is not persisted. Exit does not copy the alternate-screen
 transcript into shell scrollback; use Session recovery to review saved messages.
+
+Mouse capture defaults to off. F3 toggles wheel capture; its notice explains how to
+restore native selection. F2 freezes an immutable layout view and releases mouse
+capture while the live transcript keeps receiving output. Only explicit navigation
+repaints that snapshot. Esc/F2 returns to the latest live history; resize, required
+choices and suspension end copy mode. Other input is ignored in copy mode, apart
+from cancellation. New data is retained once in the existing transcript; the fixed
+view retains layout strings, not a second event or message store.
+
+The editor dispatches `ViewAction` values through `EditorDisplay`; it knows no
+concrete display constructor. Field editing asks the injected display for a field
+surface. `live.py` keeps the established constructors and imports available while
+implementations live in their owning modules. I/O implementations do not import
+that composition entry. No additional reader or application task is created.
+
+`IsolatedLineEditor.set_completion_provider()` opts into a synchronous, injected
+completion query. `CompletionState` owns selection and dismissal; acceptance
+returns a replacement range edit without execution. The editor publishes a
+`CompletionView` through `EditorDisplay.set_completions()`; display never queries
+providers or interprets command names. Queries use Python text offsets; visual
+wrapping uses terminal cell widths. The built-in frontend wires the command
+adapter only for its fullscreen chat editor.
+
+Candidate lists preserve the draft, have at most five visible rows and scroll to
+the selected item. Very short screens reduce input padding to retain the input
+and history viewport. Esc hides candidates until text/cursor changes; Up/Down then
+returns to input history. Tab accepts a candidate; Enter always submits the draft.
+Permission choices and copy controls take priority and clear candidates. Field
+and hidden input do not query completion. Paste payloads bypass shortcut handling.
+Candidate rows are transient display state outside the transcript and Session.

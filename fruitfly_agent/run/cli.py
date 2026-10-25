@@ -17,6 +17,8 @@ from fruitfly_agent.providers.workspace import WorkspacePaths
 
 from fruitfly_agent.run.application import RunApplicationFactory, resolve_session_path as _resolve_path
 from fruitfly_agent.lab.catalog import PermissionPolicy
+from fruitfly_agent.providers.registry import default_registry
+from fruitfly_agent.run.runtime.limits import ModelCallBudget, BudgetedProviderRegistry
 
 
 async def run_cli(args: argparse.Namespace) -> int:
@@ -32,10 +34,20 @@ async def run_cli(args: argparse.Namespace) -> int:
         for notice in paths.notices():
             print(f"notice: {notice}", file=sys.stderr)
         environment = {**load_env(paths.secret_file()), **os.environ}
+        raw_limit = getattr(args, 'max_model_calls', None)
+        if raw_limit is None:
+            raw_limit = environment.get('FRUITFLY_MAX_MODEL_CALLS')
+        registry = None
+        if raw_limit is not None:
+            if not args.task or args.resume:
+                raise ValueError('model request allowance requires a fresh non-interactive task')
+            budget = ModelCallBudget(int(raw_limit), receipt=environment.get('FRUITFLY_MODEL_USAGE_PATH'))
+            registry = BudgetedProviderRegistry(default_registry(), budget)
         factory = RunApplicationFactory(
             cwd=cwd, environment=environment, config_path=args.config,
             profile_id=args.profile, allow_incomplete=not bool(args.task),
             permission_policy=PermissionPolicy.unrestricted(cwd) if unrestricted else None,
+            provider_registry=registry,
         )
         if not args.task:
             with transient_screen(sys.stdin, sys.stdout):
@@ -130,6 +142,8 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument("--unrestricted", action="store_true",
                         help="disable application tool permission checks for a fresh task in an externally isolated environment")
     parser.add_argument("--cwd", default=None, help="working directory")
+    parser.add_argument('--max-model-calls', type=int, default=None,
+                        help='shared main/auxiliary Provider request allowance for a fresh task')
     parser.add_argument(
         "--session",
         default=None,

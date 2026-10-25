@@ -12,6 +12,7 @@ services receive explicit callbacks and stores, never the composition Factory.
 | [candidates.py](candidates.py): `RunCandidates` | Review, scope validation, adoption and recovery |
 | [evolution.py](evolution.py): `RunEvolutionHost` | Durable RSI phases with independent verification |
 | [startup_versions.py](startup_versions.py) | Explicit temporary or remembered version choices |
+| [results.py](results.py) | Public material/result projections for single tasks and task sets |
 
 Preview freezes the instruction, byte resources, components, parent H/I/S,
 experience and comparison materials. Its one-use token binds exact guidance and
@@ -39,7 +40,7 @@ See [Lab Improvement](../../lab/improvement/README.md),
 [Application adapters](../adapters/README.md). There are no new secret variables.
 
 ```bash
-.venv/bin/python -m unittest tests.run.test_host_services tests.workflows.test_improvement_pipeline tests.workflows.test_improvement_history tests.workflows.test_evolution
+.venv/bin/python -m unittest tests.run.test_host_services tests.workflows.test_improvement_pipeline tests.workflows.test_evolution
 ```
 
 ## Bind registered execution without algorithm dispatch
@@ -72,6 +73,42 @@ selection into proof. Private-suite claims are durable and are not replayed afte
 uncertain work. See [editor experiments](../../lab/improvement/improver/README.md).
 
 Experience review is an independent capability. Task-local lessons are staged;
-Application guards explicit commit/reject while idle. Experimental I jobs have no
-production experience writer. Storage owns pending records and use ledgers, while
-quality decisions remain in Lab.
+Application guards explicit commit/reject while idle. Storage owns pending records
+and use ledgers, while quality decisions remain in Lab.
+
+## Keep assessment and allocations separate
+
+Registered task-set preparation supplies a search problem through public execution
+ports. Run persists typed material and batch/trial/evaluation/comparison records,
+then projects candidate IDs, utilities and coverage through `results.py`. It adds
+no dataset-specific dispatch or quality logic. Existing retention follows these
+nested JSON records and artifact references.
+
+Run constructs an independent read-only inspector for selection/reflection.
+`WorkflowBindings.inspector` can supply another configuration/implementation;
+assessors never acquire candidate write tools. Native execution parameters can
+request online process assessment without changing the editor.
+
+`WorkflowBindings.process_assessment`, `completed_assessors`, `exploration` and
+`explorations` independently supply completed-assessment settings/registry and
+next-seed settings/registry. Defaults disable process judgments and follow the
+official incumbent. Previews freeze settings and implementation identities; changed
+configuration rejects stale work. Run supplies the artifact port and separately
+configured assessor, owns factory products through job services and persists their
+results. It does not interpret process metrics or benchmark failures.
+
+Reports identify the official execution separately from the exploration seed.
+Only ordinary selection plus independent verification can support persistent
+publication. See [completed assessment](../../lab/improvement/assessment/README.md)
+and [exploration](../../lab/improvement/strategies/README.md#choose-the-next-editing-seed).
+
+`RunComponentJobs.budget_scope` and Factory `improvement_budget_scope` borrow a
+root allocation for explicitly coordinated evolution. Scopes cannot overlap;
+child jobs retain their own records and charge the common root. No concrete
+benchmark imports or new lifecycle authority are introduced.
+
+Configuration candidates use the shared declarative binding adapter. Their
+normalized execution values change H identity and are applied to an isolated
+profile before activation. I and S remain unchanged unless separately declared
+components change. [Execution policy](../../lab/execution_policy/README.md) documents
+field permissions, mechanism ownership and offline activation tests.

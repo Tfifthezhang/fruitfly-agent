@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 from pathlib import Path
 import sys
 import signal
@@ -108,47 +107,34 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"[report: {store.path / 'report.md'}]")
             return {"completed": 0, "blocked": 3}.get(report.status, 1)
         if args.command in {"prepare", "check"}:
-            from .benchmarks.harbor import HarborBenchmarkAdapter
-            from .harbor.host import HostConfig
-            from .harbor.preparation import inspect, prepare
-            from .installation import resolve_installation
+            from .service import prepare_evaluation, check_evaluation
             request = EvaluationRequest.read(args.request)
-            adapter = builtin_catalog().get(request.benchmark.benchmark_id)
-            if not isinstance(adapter, HarborBenchmarkAdapter):
-                raise ValueError("preparation commands require a Harbor adapter")
-            if request.benchmark.variant not in {v.variant_id for v in adapter.descriptor.variants}:
-                raise ValueError("unknown benchmark variant")
-            host = HostConfig.read(Path(request.runtime.working_directory).resolve(), args.host_config)
             if args.command == "prepare":
-                package = None if args.tasks_only else resolve_installation(
-                    os.environ.get("FRUITFLY_EVAL_PACKAGE"), checkout=Path(__file__).resolve().parent.parent)
                 def interrupt_preparation(signum: int, frame: object) -> None:
                     raise KeyboardInterrupt("preparation interrupted")
                 previous = signal.signal(signal.SIGTERM, interrupt_preparation)
                 try:
-                    payload = prepare(request, adapter.descriptor, host, package=package,
-                                      progress=lambda event: print(event["stage"], file=sys.stderr, flush=True),
-                                      tasks_only=args.tasks_only)
+                    payload = prepare_evaluation(request, host_config_path=args.host_config,
+                        tasks_only=args.tasks_only, catalog=builtin_catalog(),
+                        progress=lambda event: print(event["stage"], file=sys.stderr, flush=True))
                 finally:
                     signal.signal(signal.SIGTERM, previous)
                 _print_json(payload)
                 return 0
-            payload = inspect(request, adapter.descriptor, host)
+            payload = check_evaluation(request, host_config_path=args.host_config, catalog=builtin_catalog())
             _print_json(payload)
             return 0 if payload["available"] else 3
         if args.command == "stop":
-            from .harbor.lifecycle import request_stop
-            if Path(args.evaluation_id).name != args.evaluation_id or args.evaluation_id in {".", ".."}:
-                raise ValueError("invalid evaluation ID")
-            payload = request_stop(Path(args.output_root) / args.evaluation_id)
+            from .service import stop_evaluation
+            payload = stop_evaluation(args.evaluation_id, output_root=args.output_root)
             _print_json(payload)
             return 0 if payload["state"] == "finished" else 1
-        report_path = Path(args.output_root) / args.evaluation_id / "report.json"
+        from .service import read_report
+        payload = read_report(args.evaluation_id, output_root=args.output_root, as_json=args.json)
         if args.json:
-            payload = json.loads(report_path.read_text(encoding="utf-8"))
             _print_json(payload)
         else:
-            print(report_path.with_name("report.md").read_text(encoding="utf-8"), end="")
+            print(payload, end="")
         return 0
     except KeyboardInterrupt:
         print("error: evaluation command interrupted", file=sys.stderr)

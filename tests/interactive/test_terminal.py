@@ -130,7 +130,7 @@ class TerminalFrontendTest(unittest.IsolatedAsyncioTestCase):
             input_stream=io.StringIO(),
             output_stream=output,
             line_editor=MenuScriptedLines(output,
-                '/improvement be concise', '@Next page', '@Start improvement', '@Start the frozen workflow',
+                '/improvement be concise', '@Start improvement', '@Start the frozen workflow',
                 '@Review candidate', '@Set as next-session default', '@Set as next-session default', 'q', '/exit',
             ),
         )

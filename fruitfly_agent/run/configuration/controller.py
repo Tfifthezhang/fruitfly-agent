@@ -86,7 +86,7 @@ class RunConfigurationController:
         if missing:
             raise ValueError("default mechanisms require model profiles in the daily catalog: " + ", ".join(sorted(missing)))
         self._replace_profile(replace(current, prompt=baseline.prompt, mechanisms=baseline.mechanisms,
-                                      artifact_bindings=baseline.artifact_bindings))
+                                      artifact_bindings=baseline.artifact_bindings, execution=baseline.execution))
         return _changed("restored default harness settings in the draft; model settings and credentials retained; save, then apply or start a session")
 
     @property
@@ -231,6 +231,11 @@ class RunConfigurationController:
         """Persist a declared host binding; target-specific validation lives in Lab."""
         if kind == "prompt":
             return self.select_prompt(reference)
+        if kind == 'configuration':
+            from fruitfly_agent.runtime_spec import apply_profile_binding
+            profile = self._draft.select(self._selected)
+            self._replace_profile(apply_profile_binding(profile, kind, key, self._artifact_store.read_text(reference)))
+            return _changed('staged execution configuration; save before applying settings')
         if kind != "artifact":
             raise ValueError("unsupported target binding kind")
         profile = self._draft.select(self._selected)

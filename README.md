@@ -54,6 +54,12 @@ For an offline extension with a fake Provider:
 Expected output: `Offline response: example-guidance is active.`
 See the [walkthrough](examples/extensions/README.md).
 
+For independent experiments, generate editable defaults with
+`.venv/bin/fruitfly-agent-lab init`, configure the model/key, then run
+`improvement check` before `improvement run` (model charges may apply).
+See [native setup](examples/experiments/README.md#start-a-native-experiment) or
+the [remote Linux TB4 walkthrough](examples/experiments/TB4_SERVER.md).
+
 ## Choose your mechanisms
 
 Use `/config` to select models, prompts, tools, context and execution environments
@@ -70,15 +76,17 @@ expand the isolated environment used by native improvement trials.
 
 | Capability | Current behavior | Guide |
 |---|---|---|
-| H/S improvement | Propose, execute and compare registered instruction or retained-document changes; keep the baseline selectable | [Improvement](fruitfly_agent/lab/improvement/README.md) |
+| H/S improvement | Propose, execute and compare registered instructions, permitted execution parameters or retained documents; keep the baseline selectable | [Improvement](fruitfly_agent/lab/improvement/README.md) |
 | I experiments | Compare editor instructions by the downstream H/S improvements they produce, then verify on separate task packages | [Editor experiments](fruitfly_agent/lab/improvement/improver/README.md) |
 | Persistent adoption | Publish verified text candidates for explicit review and activation | [Improvement host](fruitfly_agent/run/improvement/README.md) |
 | Experience | Stage attributed lessons; commit or reject separately while idle | [Experience](fruitfly_agent/lab/improvement/experience/README.md) |
 | RSI | An explicitly invoked host repeats verified adoption and loads the adopted version for the next generation | [RSI](fruitfly_agent/lab/rsi/README.md) |
 | Benchmark execution | Run the native Agent in Harbor containers and collect official results | [Eval](eval/README.md) |
 
-`/improvement` selects execution, materials, editable components, generator,
-exploration, feedback and scope. Preview is offline; confirmed execution may incur
+Use the independent [experiment CLI](fruitfly_agent/experiments/README.md) for Eval,
+Improvement and RSI. File settings have bounded defaults; `simple` proposes one
+candidate, while Harness² remains optional. `/improvement` retains a small explicit
+task/material entry and result review. Preview is offline; execution may incur
 charges. Native trials use in-memory file tools, without Bash, network tools or a
 live Session. I experiments edit only declared editor fields at fixed nesting
 depth. They do not train model weights or replace arbitrary source code.
@@ -95,6 +103,7 @@ ordinary chat does not collect training material. See [task preparation](fruitfl
 | Use remote file and shell tools | [SSH environment](fruitfly_agent/lab/environment/ssh/README.md) |
 | Add or replace an algorithm | [Lab development](fruitfly_agent/lab/README.md#develop-an-algorithm) |
 | Prepare an improvement experiment | [Examples](examples/improvement/README.md) · [Task packs](fruitfly_agent/lab/improvement/tasks/README.md) |
+| Start Eval, Improvement or RSI | [Experiment CLI](fruitfly_agent/experiments/README.md) · [File templates](examples/experiments/README.md) |
 | Run Terminal-Bench or SWE-bench | [Eval](eval/README.md) |
 | Change and verify the implementation | [Contributing](CONTRIBUTING.md) · [Tests](tests/README.md) |
 
@@ -131,3 +140,20 @@ FruitFlyAgent is released under the [MIT License](LICENSE). See [Third-party not
 | [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) | Inspiration for externalizing context into a programmable Python environment; see [Programmatic context](fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md). |
 
 Research sources and the scope of each adaptation are documented in the corresponding algorithm modules.
+
+## Understand Improvement, RSI and Eval
+
+| Capability | Responsibility |
+|---|---|
+| Improvement | Search, execute, assess and compare changes to registered H/S/I components |
+| RSI | Adopt eligible changes and continue with the adopted version |
+| Eval | Execute a fixed version on benchmarks; optionally supply an external runner and official assessment |
+
+Improvement/RSI are independent of Eval. Daily and file tasks use their declared
+backends. `eval run` does not implicitly improve the Agent. See
+[architecture](fruitfly_agent/README.md#separate-search-evolution-and-evaluation)
+and the optional [benchmark adapter](eval/improvement/README.md).
+
+[Online assessment](fruitfly_agent/lab/improvement/assessment/README.md) can inspect
+intermediate events. Explicit control policies may request supported actions;
+phase judgments alone do not prove improvement or activate a version.

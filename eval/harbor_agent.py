@@ -147,6 +147,8 @@ class FruitFlyHarborAgent(BaseInstalledAgent):  # type: ignore[misc]
         # expired Harbor await must not leave an Agent making requests behind.
         env = {**self.runtime_environment, **self.preparation["runtime"]["host"].get("agent", {}),
                "FRUITFLY_EVENT_STREAM_PATH": "/logs/agent/live-events.jsonl"}
+        if env.get('FRUITFLY_MAX_MODEL_CALLS'):
+            env['FRUITFLY_MODEL_USAGE_PATH'] = '/logs/agent/model-budget.json'
         try:
             await self.exec_as_agent(environment, command=command, env=env)
         except BaseException:

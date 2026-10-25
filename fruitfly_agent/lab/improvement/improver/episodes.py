@@ -7,11 +7,13 @@ from ..components import ComponentRegistry, TextComponentAdapter
 from ..contracts.experiments import EpisodeResult
 from ..contracts.pipeline import RunPlan, TaskMaterial, canonical_json
 from ..contracts.versions import SystemVersion, content_hash
-from ..editor import AgentEditor, AgentSelector, model_completion
+from ..editor import AgentEditor, model_completion
+from ..assessment.selection import AgentSelector
+from ..assessment.inspection import ReadOnlyInspector
 from ..editor.instructions import EditorInstructions, EditorInstructionTarget
 from ..workflow import ImprovementWorkflow, WorkflowServices, GeneratorRegistry, AgentGenerator, AgentComposer
-from ..workflow.execution import FileTaskRunner
-from ..verification import CaseMeasurements
+from ..execution.file_runner import FileTaskRunner
+from ..assessment.verification import CaseMeasurements
 
 
 class NativeEpisodeExecutor:
@@ -32,7 +34,8 @@ class NativeEpisodeExecutor:
         plan = RunPlan(request.episode_id, parent, request.component_ids,
             generator_id=self.generator_factory.generator_id, mode='sequential', depth=params['inner_depth'],
             max_model_calls=params['inner_model_calls'], max_executions=params['inner_executions'],
-            operation_timeout=context.plan.operation_timeout)
+            operation_timeout=context.plan.operation_timeout,
+            strategy_id=params.get('inner_strategy', 'harness2'), retain_experience=False)
         selection = budget.child({'model': params['inner_model_calls'], 'execution': params['inner_executions']})
         services = WorkflowServices(plan, budget=selection,
             record=lambda event, **fields: context.services.record(event, episode_id=request.episode_id, **fields))
@@ -44,7 +47,11 @@ class NativeEpisodeExecutor:
             generators = GeneratorRegistry()
             generators.register(self.generator_factory.generator_id, self.generator_factory)
             flow = ImprovementWorkflow(generators=generators, components=registry, runner=runner,
-                composer=services.own(self.composer_factory()), selector=AgentSelector(editor, services))
+                artifacts=context.artifacts,
+                completed_assessment=context.completed_assessment_factory(services) if context.completed_assessment_factory else None,
+                exploration=context.exploration_factory(services) if context.exploration_factory else None,
+                composer=services.own(self.composer_factory()), selector=AgentSelector(
+                    ReadOnlyInspector(context.assessor_config or context.editor_config, context.artifacts, instructions=instructions), services))
             baseline = registry.snapshot()
             outcome = await flow.run(plan, request.task, baseline, services, experience=tuple(context.experience))
         finally:

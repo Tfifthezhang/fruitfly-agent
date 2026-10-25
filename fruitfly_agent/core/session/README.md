@@ -12,7 +12,7 @@ Store and replay the canonical conversation in an append-only JSONL file.
 | Context decisions | Committed reduction decisions |
 | RuntimeManifest | Complete assembled environment snapshots written and validated by Run |
 | Metadata contextProjection | Atomic replacement of the model projection when restoring with changed mechanisms; canonical facts remain intact |
-| Run start/end | Model, message/turn/tool counts, stop reason, usage, and bounded error summaries |
+| Run start/end | Model, counts, stop reason, usage, bounded errors and optional immutable loop diagnostics with termination cause and scoped limits |
 | Provider failure | Error category, harness request count, and recovered or terminal disposition |
 | Request context / receipt | Final projection estimate/source, configured limits, model, timestamp, and available input receipt; never cumulative occupancy |
 | Provider activity | Adapter waiting/retrying/timeout phase, attempt limits, delay, and sanitized category/status |

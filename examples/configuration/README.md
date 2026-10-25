@@ -4,6 +4,14 @@
 
 Use the interactive model wizard for first setup, or copy the single model catalog below for DeepSeek Flash examples using two API protocols.
 
+For independent experiments, `fruitfly-agent-lab init` creates the default
+Agent/model files and a minimal experiment from installed templates. It preserves
+daily files and existing secrets, and rejects conflicting configuration files.
+Use `--source task-set --benchmark terminal-bench-4` for benchmark request/host
+templates as well. See [native setup](../experiments/README.md#start-a-native-experiment)
+or the [remote Linux walkthrough](../experiments/TB4_SERVER.md). No model or
+container starts during initialization.
+
 | Template | Workspace destination | Contents |
 |---|---|---|
 | [models.example.yaml](models.example.yaml) | `.fruitfly/models.yaml` | Both DeepSeek Flash protocol profiles in one file |

@@ -1,13 +1,16 @@
 """Supported composition entry for the capability-injected evolution host."""
 from .improvement.evolution import RunEvolutionHost as EvolutionHost
 from dataclasses import replace
+from contextlib import nullcontext
 
 
 class RunEvolutionHost(EvolutionHost):
-    def __init__(self, application, factory, *, policy_id, request, verify=None):
+    def __init__(self, application, factory, *, policy_id, request, verify=None, budget=None):
+        self.budget = budget
         async def propose(direction):
-            preview = application.workflow_preview(replace(request, direction=direction, scope='persistent'))
-            return await application.improve(direction, preview_token=preview.preview_token)
+            with factory.improvement_budget_scope(budget) if budget is not None else nullcontext():
+                preview = application.workflow_preview(replace(request, direction=direction, scope='persistent'))
+                return await application.improve(direction, preview_token=preview.preview_token)
         async def completed_verification(record, text):
             return factory.verified_candidate(record, policy_id)
         super().__init__(

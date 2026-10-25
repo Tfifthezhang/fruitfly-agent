@@ -39,6 +39,7 @@ class AssemblyContext:
     resource_sink: list[Any] | None = None
     task_pack_sources: tuple[Any, ...] = ()
     process_environment: Mapping[str, str] | None = None
+    execution_owners: Mapping[str, str] = field(default_factory=dict)
     secret_resolver: Callable[[str], str | None] | None = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
@@ -114,6 +115,8 @@ def assemble_lab(
     """Validate first, then install every enabled mechanism in stable order."""
 
     resolved = catalog.resolve(selections)
+    context = replace(context, execution_owners={key: item.definition.descriptor.mechanism_id
+        for item in resolved for key in item.definition.execution_fields})
     state = AssemblyState(config=base_config)
     if catalog.bootstrap is not None:
         state = catalog.bootstrap(state, context)

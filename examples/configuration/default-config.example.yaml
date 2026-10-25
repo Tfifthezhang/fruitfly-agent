@@ -3,10 +3,21 @@ schema_version: 1
 default_profile: baseline
 profiles:
   baseline:
+    # Executor model for actual tasks. Select a default-models.yaml entry here.
+    # Editor and assessor models are selected separately in experiment.yaml.
     model:
       catalog: default-models.yaml
       profile: deepseek-flash-openai
     prompt: assistant-default
+    execution:
+      # Nonnegative integer; 0 disables tools. Resets for each outer task turn.
+      # This is independent of model-call budgets and the editor's tool allowance.
+      max_tool_calls_per_turn: 64
+      max_turns: 32
+      max_context_recovery_attempts: 6
+      tool_execution:
+        max_parallel: 8
+        default_execution_mode: parallel  # parallel | sequential
     mechanisms:
     - id: local-env
       enabled: true

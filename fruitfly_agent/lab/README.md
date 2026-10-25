@@ -14,6 +14,7 @@ Add tools, execution backends, context strategies, and improvement algorithms th
 | [Tools](tools/README.md) | Model-callable file, shell, IPython and public web operations |
 | [Environment](environment/README.md) | Local filesystem and process backend |
 | [Base prompt](base_prompt/README.md) | Built-in prompt text and its target adapter |
+| [Execution policy](execution_policy/README.md) | Typed execution parameters and the H candidate adapter |
 | [Workflow](workflow/README.md) | Bounded sequential execution and its H target |
 | [Improvement](improvement/README.md) | Component workflow, task evidence, experience and optional verification |
 | [RSI](rsi/README.md) | Verified adoption and continuation across generations |
@@ -60,7 +61,7 @@ It registers a context transformer, assembles it through Run, and submits a task
 
 | Concern | Required behavior |
 |---|---|
-| Dependencies | Import only Core and Lab; inject model, filesystem, network, and host capabilities. |
+| Dependencies | Import only Core, the shared Runtime specification and Lab; inject model, filesystem, network, and host capabilities. |
 | Input ownership | Treat context frames and nested messages as read-only; return new projections or decisions. |
 | State | Specify request, run, Session, or workspace scope; define reset and recovery behavior. |
 | Budgets | State which calls, bytes, tokens, time, and queue waits are actually bounded. |

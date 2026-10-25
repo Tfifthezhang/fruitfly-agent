@@ -2,10 +2,11 @@
 from fruitfly_agent.interactive.contracts.mechanism_setup import MechanismSetupService
 from fruitfly_agent.interactive.terminal.io.input import read_field_line
 from fruitfly_agent.interactive.terminal.io.live import InputInterrupted
-from .model_setup import ModelFormIO, read_secret
+from .forms import FormIO, CANCELLED, select_field
+from fruitfly_agent.interactive.terminal.io.secret import read_secret
 
 
-def run_mechanism_setup(form: ModelFormIO, service: MechanismSetupService, mechanism_id: str) -> bool:
+def run_mechanism_setup(form: FormIO, service: MechanismSetupService, mechanism_id: str) -> bool:
     setup = service.form(mechanism_id)
     values: dict[str, str] = {}
     secrets: dict[str, str] = {}
@@ -22,12 +23,20 @@ def run_mechanism_setup(form: ModelFormIO, service: MechanismSetupService, mecha
             default = str(field.value if field.value is not None else '')
             notice = ''
             while True:
-                render(step, field.label, field.description, (f'Press Enter to use: {default}' if default else 'Blank uses the default when available.') +
-                    (' Choices: ' + ', '.join(str(choice) for choice in field.choices) if field.choices else ''), notice)
-                line = read_field_line(form.line_editor, field.label)
-                if line is None or line.strip() == '/cancel':
-                    return False
-                value = '' if line.strip() == '/clear' else line.strip() or default
+                if field.choices:
+                    selected = select_field(form, title=f'Set up {setup.label} · Step {step} of {total} · {field.label}',
+                        description=field.description + ('\n' + notice if notice else ''),
+                        choices=field.choices, current=field.value)
+                    if selected is CANCELLED:
+                        return False
+                    value = str(selected)
+                else:
+                    render(step, field.label, field.description,
+                        f'Press Enter to use: {default}' if default else 'Blank uses the default when available.', notice)
+                    line = read_field_line(form.line_editor, field.label)
+                    if line is None or line.strip() == '/cancel':
+                        return False
+                    value = '' if line.strip() == '/clear' else line.strip() or default
                 try:
                     service.validate_field(mechanism_id, field.name, value, values)
                 except (TypeError, ValueError) as exc:

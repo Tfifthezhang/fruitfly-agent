@@ -15,17 +15,57 @@ from .components import (ComponentRegistry, TextComponentAdapter, FileComponentA
     component_registry, bundle_target, bundle_text)
 from .workflow import (ImprovementWorkflow as ComponentWorkflow, WorkflowServices,
     GeneratorRegistry, AgentGenerator, AgentComposer, AllocationExhausted)
-from .workflow.execution import FileTaskRunner
+from .execution.file_runner import FileTaskRunner
 from .editor import AgentEditor, AgentSelector, AgentReflector, model_completion
+from .assessment.inspection import ReadOnlyInspector
+from .assessment.online import AssessedRunner
+from .assessment.metrics import ProcessMetrics
+from .assessment.comparison import Objective, LexicographicComparison
+from .contracts.live import (EvidencePosition, ExecutionEvent, Metric, Assessment,
+    ExecutionHandle, OnlineAssessor, ExecutionControlPolicy, ControlRequest, ControlReceipt)
+from .execution.handles import ManagedExecution, CompletionOnlyRunner
+from .termination import (StopDecision, AnyOf, AllOf, StopRegistry, IterationLimit,
+    NoImprovement, FailureLimit, ResourceLimit, ScoreAtLeast, MetricThreshold)
+from .termination.composition import policy_spec
+from .workflow.adaptive import StopExecutionPolicy
+from .contracts.components import ComponentBinding, CandidateBuilder, CandidateRuntime, ActivationHost
+from .contracts.versions import content_hash
+from .contracts.validation import relative_path
+from .contracts.facts import ExecutionFacts, BudgetFact, ArtifactFact
+from .execution.facts import attach_facts, read_facts, receipt_facts, ensure_facts, loop_fact_values
+from .components.changes import FileChange, ChangeSet
+from .execution.segments import ExecutionSegment
+from .assessment.registry import AssessorRegistry
+from .assessment.registry import CompletedAssessorRegistry, CompletedAssessorDefinition, builtin_completed_assessors
+from .assessment.configuration import ProcessAssessmentSettings
+from .assessment.completed import CompletedAssessmentService
+from .contracts.assessment import AssessmentUnavailable
+from .contracts.search import ExplorationDecision
+from .contracts.task_sets import (TaskEntry, TaskSetSnapshot, ScoreSpec, CollectionBinding, TaskSetSourceDefinition)
+from .contracts.evaluation import (EvaluationBatch, TrialResult, CandidateEvaluation, JointAssessment,
+    CandidateComparison, JointSelection, TaskSetOutcome)
+from .contracts.editing import TaskSetProposalRequest, TaskSetCandidateGenerator
+from .contracts.plans import TaskSetRunPlan
+from .task_sets import TaskSetSourceRegistry, MultiTaskSettings, sample_batch
+from .task_sets.execution import execution_definition as task_set_execution
+from .task_sets.execution import minimum_budget as task_set_minimum_budget
+from .execution.scheduler import TaskScheduler
+from .execution.batches import BatchEvaluator
+from .strategies.exploration import (ExplorationSettings, ExplorationRegistry, ExplorationDefinition,
+    builtin_explorations, validate_process_configuration)
+from .assessment.scorers.model import ModelAssessor
+from .assessment.aggregation import WeightedSum
+from .assessment.feedback import FeedbackProjection
 from .editor.instructions import EditorInstructions, EditorInstructionTarget
-from .registration import SETTINGS, EDITOR_CONFIG, EDITOR_INSTRUCTIONS
+from .registration import SETTINGS, EDITOR_CONFIG, ASSESSOR_CONFIG, EDITOR_INSTRUCTIONS
 from .materials import WorkspaceTaskSource
 from .experience import entry_to_dict, entry_from_dict, experience_id
-from .verification import CaseMeasurements, HoldoutVerification
+from .assessment.verification import CaseMeasurements, HoldoutVerification
 from .contracts.experiments import (ExperimentSpec, EpisodeRequest, EpisodeResult, EpisodeExecutor,
     TrialReport, ExecutionRequest, ExecutionParameter, MaterialOption, PreparedExecution, ExecutionPorts, ExecutionDefinition)
 from .execution import ExecutionContext, ExecutionRegistry, builtin_executions
 from .workflow.budget import BudgetScope
+from .strategies import StrategyRegistry, StrategyDefinition, SearchSchedule, builtin_strategies
 from .workflow.stopping import StopPolicy, SearchState, BoundedStopPolicy
 from .evidence.receipts import TaskReference, TaskRunEvidence, EvidenceArtifact
 from .evidence.reporting import SearchReport, TokenUsage, restore_search_report
@@ -47,6 +87,12 @@ class WorkflowBindings:
     components: Callable[..., ComponentRegistry] | None = None
     executions: ExecutionRegistry | None = None
     stop_policy: StopPolicy | None = None
+    strategies: StrategyRegistry | None = None
+    process_assessment: ProcessAssessmentSettings | None = None
+    exploration: ExplorationSettings | None = None
+    completed_assessors: CompletedAssessorRegistry | None = None
+    explorations: ExplorationRegistry | None = None
+    component_options: dict | None = None
 
 
 @dataclass(frozen=True)

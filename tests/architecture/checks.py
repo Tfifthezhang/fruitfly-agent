@@ -7,9 +7,15 @@ SOURCE_ROOTS = (ROOT / "fruitfly_agent", ROOT / "eval")
 DOCUMENTED_ROOTS = (*SOURCE_ROOTS, ROOT / "tests")
 
 ALLOWED_EDGES = {
+    "fruitfly_agent.runtime_spec": {"fruitfly_agent.runtime_spec", "fruitfly_agent.core"},
+    # External experiment composition. Existing runtime dependency edges stay unchanged.
+    "fruitfly_agent.experiments": {"fruitfly_agent.runtime_spec", 
+        "fruitfly_agent.experiments", "fruitfly_agent.run", "fruitfly_agent.lab",
+        "fruitfly_agent.providers", "fruitfly_agent.interactive", "eval",
+    },
     "fruitfly_agent.core": {"fruitfly_agent.core"},
-    "fruitfly_agent.lab": {"fruitfly_agent.core", "fruitfly_agent.lab"},
-    "eval": {
+    "fruitfly_agent.lab": {"fruitfly_agent.runtime_spec", "fruitfly_agent.core", "fruitfly_agent.lab"},
+    "eval": {"fruitfly_agent.runtime_spec", 
         "fruitfly_agent.core",
         "fruitfly_agent.lab",
         "eval",
@@ -21,7 +27,7 @@ ALLOWED_EDGES = {
         "fruitfly_agent.interactive",
     },
     "fruitfly_agent": {"fruitfly_agent.core"},
-    "fruitfly_agent.run": {
+    "fruitfly_agent.run": {"fruitfly_agent.runtime_spec", 
         "fruitfly_agent.run",
         "fruitfly_agent.core",
         "fruitfly_agent.lab",

@@ -22,6 +22,7 @@ Improvement registers one shared workflow configuration. Per-job generator facto
 
 | File | Responsibility |
 |---|---|
+| [components.py](components.py) | Offline `ComponentSpec` / `ResolvedHarness` inventory and actual assembly verification |
 | [models.py](models.py) | Definitions, selections, and UI selection groups |
 | [catalog.py](catalog.py) | Parameter, dependency, capability, and conflict resolution |
 | [builtins.py](builtins.py) | Explicit built-in definitions and installers |
@@ -162,3 +163,31 @@ Built-in file memory, workspace skill files and local knowledge register initial
 ## Declare per-job improvement support
 
 Per-job candidate generators register through `GeneratorRegistry`; stage factories are injected with `WorkflowBindings`. Catalog owns mechanism construction and object adapters, without a parallel algorithm selector or method binder.
+## Resolve one harness inventory
+
+`resolve_harness(profile, catalog)` reads enabled selections and owner declarations
+without constructing Providers or running installers. `ResolvedHarness.select`
+checks configured component existence, execution capabilities and H/S/I roles.
+Availability is not authorization: experiments explicitly select editable IDs.
+Absent owners provide no editable state. Unsupported explicit selections fail
+rather than enabling mechanisms or silently removing components.
+
+Enabled mechanisms' declared tools supply guidance components generically. Other
+components use `component_specs(parameters, enabled)` returning `ComponentSpec`
+values. The callback is pure and receives normalized enabled parameters; disabled
+owners receive an empty mapping. Owners with no active component return an empty
+tuple. Object-target preparation and this declaration must agree.
+
+`component_validator(component_id, options, inventory)` optionally validates
+component-owned search options offline. `execution_fields` declares controlled
+scalar runtime settings. No component names are interpreted by the experiment CLI.
+Actual assembly verifies declared tools, targets and roles before execution and
+records the final schema and effective execution values.
+
+Run, Lab and Eval consume the [shared runtime specification](../../runtime_spec/README.md);
+Catalog retains mechanism dependency, conflict, parameter and component ownership.
+The [execution policy adapter](../execution_policy/README.md) uses these contracts.
+
+```bash
+.venv/bin/python -m unittest tests.lab.test_harness_inventory tests.experiments.test_harness_validation
+```

@@ -43,6 +43,13 @@ class AgentLoopContext:
     provider_failure_count: int = 0
     turn_count: int = 0
     tool_call_count: int = 0
+    tool_request_count: int = 0
+    tool_started_count: int = 0
+    tool_error_count: int = 0
+    tool_denied_count: int = 0
+    tool_budget_skipped_count: int = 0
+    tool_output_skipped_count: int = 0
+    turn_tool_call_count: int = 0
     signal: asyncio.Event | None = field(default=None, repr=False, compare=False)
 
 

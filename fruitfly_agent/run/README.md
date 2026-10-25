@@ -95,8 +95,8 @@ Assembly occurs at `factory.open()` or `Application.start()`. See the [offline A
 
 | Concern | Rule |
 |---|---|
-| RuntimeManifest | Schema 5 records assembled model/transport, mechanisms, prompt, artifacts, and current permissions. |
-| History validation | Validate each saved manifest against its own digest and validate messages/projections. Known schema 3/4/5 contents remain readable; missing newer fields are not fabricated. |
+| RuntimeManifest | Schema 6 records assembled model/transport, mechanisms, prompt, artifacts, execution limits and current permissions. |
+| History validation | Validate each saved manifest against its own digest and validate messages/projections. Known schema 3/4/5/6 contents remain readable; missing newer fields are not fabricated. |
 | Configuration changes | Model/profile names, transport, prompts, permissions, and mechanism changes do not by themselves block continuation. Use the selected current configuration. |
 | Environment recording | Append a complete snapshot after startup succeeds when the environment changes. Runs belong to the most recent preceding snapshot; original records remain intact. |
 | Context changes | Rebuild the projection from canonical messages when mechanisms change; record it atomically with the environment snapshot. This does not count as a compaction. |
@@ -122,7 +122,12 @@ Canonical data and record semantics belong to [Session](../core/session/README.m
 | Activate | Prepare a separate handle; commit host references only after successful startup. |
 | Retain | Protect configuration, Session, candidate-parent, and RSI references. |
 
-The terminal edits one experiment panel and exposes scoped run history through the improvement service. Submitted jobs receive summaries even when cancelled before execution or completed without a candidate; native reports retain measured usage, stopping reasons and verified journal references. History protects referenced candidates without relaxing activation checks.
+The terminal retains a small explicit-material entry and scoped run history.
+The independent [experiment CLI](../experiments/README.md) owns file-based experiment
+assembly. Submitted jobs receive summaries even when cancelled before execution
+or completed without a candidate; reports retain usage, stopping reasons and
+verified journal references. History protects referenced candidates without
+relaxing activation checks.
 
 Component and generator views declare capability availability. Typed workflow requests select materials, component scope, exploration, allocations and optional feedback. Adding an implementation does not add algorithm branches to Run or the terminal.
 
@@ -186,11 +191,11 @@ Authorization audit entries contain call/tool identity, operation, outcome, and 
 
 ## Start component improvement
 
-Use `/improvement` to select current instructions and explicit input files or a
-saved task package. Preview components, generator, budgets, verification and scope
-before submitting the Application-owned job. Candidates retain explicit human
-review and fresh-session adoption. See [Improvement](../lab/improvement/README.md).
-Container benchmark execution uses the separate [Eval CLI](../../eval/README.md).
+Use `/improvement` for explicit instructions/input files or a saved package,
+one simple base-prompt comparison and result review. Advanced settings and RSI
+use the independent [experiment CLI](../experiments/README.md), which also composes
+optional [Eval](../../eval/README.md) through public services. Run itself does not
+import Eval. See [Improvement](../lab/improvement/README.md).
 
 `--approve-tools` answers ordinary confirmations for a fresh headless task while
 keeping protected checks. `--unrestricted` selects the unrestricted strategy for

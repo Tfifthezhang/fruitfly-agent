@@ -46,7 +46,7 @@ class ConfirmationNavigationTests(unittest.IsolatedAsyncioTestCase):
         for events, expected, start in scenarios:
             with self.subTest(events=events):
                 frontend, session, output = self.frontend(events)
-                pending = iter(('Next page', 'Start improvement', *events, b'q'))
+                pending = iter(('Start improvement', *events, b'q'))
                 def read():
                     value = next(pending)
                     if isinstance(value, str):

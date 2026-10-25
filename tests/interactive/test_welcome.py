@@ -63,11 +63,12 @@ class WelcomeRenderingTest(unittest.TestCase):
         self.assertIn("AGENT", rendered)
         self._assert_fits(rendered, 79)
 
-    def test_medium_layout_keeps_larger_wordmark_when_fly_cannot_fit(self) -> None:
+    def test_medium_layout_preserves_fly_with_plain_wordmark(self) -> None:
         rendered = self._render(70)
 
-        self.assertNotIn("⣀⣈⣷⡴⢦⣾⣁⣀", rendered)
-        self.assertIn("████ ███  █  █ ████", rendered)
+        self.assertIn("⣀⣈⣷⡴⢦⣾⣁⣀", rendered)
+        self.assertIn("FruitFlyAgent", rendered)
+        self.assertNotIn("████", rendered)
         self.assertIn("AGENT", rendered)
         self._assert_fits(rendered, 69)
 
@@ -75,6 +76,7 @@ class WelcomeRenderingTest(unittest.TestCase):
         rendered = self._render(44)
 
         self.assertIn("✦ FruitFlyAgent", rendered)
+        self.assertIn("(o)(o)", rendered)
         self.assertNotIn("███", rendered)
         self.assertIn("offline-model", rendered)
         self._assert_fits(rendered, 43)
@@ -91,6 +93,13 @@ class WelcomeRenderingTest(unittest.TestCase):
         self.assertIn("sha256:12345678", wide)
         self.assertIn("prompt:", compact)
         self._assert_fits(compact, 43)
+
+    def test_every_width_keeps_a_fly_variant_and_fits_without_clipping(self) -> None:
+        for columns in range(8, 125):
+            with self.subTest(columns=columns):
+                rendered = self._render(columns)
+                self.assertTrue(any(mark in rendered for mark in ('(o)', '(o)(o)', '⣀⣈⣷⡴⢦⣾⣁⣀')))
+                self._assert_fits(rendered, columns - 1)
 
     def test_non_terminal_output_preserves_the_plain_startup_contract(self) -> None:
         rendered = render_welcome(

@@ -9,6 +9,7 @@ import builtins
 import json
 import resource
 import sys
+from typing import Any
 
 BUILTINS = (
     "abs", "all", "any", "bool", "dict", "enumerate", "float", "int", "len", "list",
@@ -90,7 +91,7 @@ def run(payload):
     code = validate(payload["code"], payload["entry_point"])
     passed, failure = 0, ""
     for index, case in enumerate(payload["tests"], 1):
-        scope = {"__builtins__": {name: getattr(builtins, name) for name in BUILTINS}}
+        scope: dict[str, Any] = {"__builtins__": {name: getattr(builtins, name) for name in BUILTINS}}
         # Fresh globals/default arguments for every check; no cross-test state.
         exec(code, scope)
         initial = json.dumps([case.get("args", []), case.get("kwargs", {})], ensure_ascii=False)

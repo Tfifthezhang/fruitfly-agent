@@ -1,50 +1,16 @@
 """Generic model form and secret input; the injected host owns persistence."""
 
-import termios
-from dataclasses import dataclass
-from typing import Callable, TextIO
 
 from fruitfly_agent.interactive.terminal.io.input import LineEditor
-from fruitfly_agent.interactive.terminal.io.menu import MenuInput, TerminalMenuRenderer
 
+from .forms import FormIO, CANCELLED, select_field
+from fruitfly_agent.interactive.terminal.io.secret import read_secret
 from fruitfly_agent.interactive.contracts.model_setup import ModelSetupService
 from fruitfly_agent.interactive.terminal.io.input import read_field_line
 from fruitfly_agent.interactive.terminal.io.menu import MenuAction, MenuRow, navigate_menu
 
 
-@dataclass(frozen=True)
-class ModelFormIO:
-    """Explicit menu, rendering, and staging operations used by a model form."""
-    choose_value: Callable
-    apply: Callable
-    line_editor: LineEditor
-    menu_input: MenuInput
-    renderer: TerminalMenuRenderer
-    input: TextIO
-    output: TextIO
-
-
-def read_secret(input_stream, output_stream, *, prompt="API key (hidden; blank reuses an existing key): ") -> str | None:
-    """Bypass readline/history and disable TTY echo, restoring it on every exit."""
-    descriptor = input_stream.fileno() if input_stream.isatty() else None
-    original = termios.tcgetattr(descriptor) if descriptor is not None else None
-    try:
-        if original is not None:
-            hidden = list(original)
-            hidden[3] &= ~(termios.ECHO | termios.ECHONL)
-            termios.tcsetattr(descriptor, termios.TCSANOW, hidden)
-        output_stream.write(prompt)
-        output_stream.flush()
-        line = input_stream.readline()
-        return None if line == "" else line.rstrip("\r\n")
-    finally:
-        if original is not None:
-            termios.tcsetattr(descriptor, termios.TCSADRAIN, original)
-        output_stream.write("\n")
-        output_stream.flush()
-
-
-def run_model_setup(form: ModelFormIO, service: ModelSetupService) -> None:
+def run_model_setup(form: FormIO, service: ModelSetupService) -> None:
     options = service.options()
     quit_requested, chosen = form.choose_value(
         title="Add model · Choose a service", subtitle=(
@@ -67,6 +33,13 @@ def run_model_setup(form: ModelFormIO, service: ModelSetupService) -> None:
         default = str(field.value or "")
         _render_field(form, option.label, step, total, field.label, field.description,
                       f"Press Enter to use: {default}" if default else "")
+        if field.choices:
+            choice = select_field(form, title=f'Add model · {field.label}', description=field.description,
+                choices=field.choices, current=field.value)
+            if choice is CANCELLED:
+                return
+            values[field.name] = str(choice)
+            continue
         line = read_field_line(form.line_editor, field.label)
         if line is None or line.strip() == "/cancel":
             return
@@ -91,7 +64,7 @@ def run_model_setup(form: ModelFormIO, service: ModelSetupService) -> None:
         form.apply(service.stage, option.option_id, values, secret)
 
 
-def configure_credential(form: ModelFormIO, service: ModelSetupService, model_profile: str) -> None:
+def configure_credential(form: FormIO, service: ModelSetupService, model_profile: str) -> None:
     _render_field(form, model_profile, 1, 1, "API key",
                   "Enter the key for this model. Input is hidden and excluded from history.", "",
                   title="Set API key", context="Model")

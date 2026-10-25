@@ -25,6 +25,7 @@ Configure `AgentLoopConfig` with a Provider, tools, execution environment, conte
 | Case | Behavior |
 |---|---|
 | Tool failure | Lookup, argument, blocking, and ordinary execution failures become error `ToolResultMessage` entries. |
+| Declared tool error | `AgentToolResult.error(...)` preserves `is_error` in the message and diagnostic counters. |
 | Tool result observation | Optional `on_tool_result` receives isolated batch-result snapshots, including failures and cancellation; see [Tool runtime](tool_runtime/README.md#observe-tool-calls). |
 | Callback failure | Use the default defined at the call site; propagate task cancellation. |
 | Environment failure | Operations return `Result`; `unwrap()` raises on a failed result. |
@@ -40,6 +41,14 @@ Configure `AgentLoopConfig` with a Provider, tools, execution environment, conte
 | Streaming failure | Return an error terminal state rather than an assistant message; close suspended stream producers. |
 
 Concrete algorithms belong in Lab. Extend Core only when an existing public protocol cannot express a general runtime requirement. Core has no module-specific environment variables.
+
+`AgentLoopResult.diagnostics` supplies immutable `LoopDiagnostics`, also persisted
+in the Session's terminal run record. It distinguishes the termination cause,
+Provider attempts/failures, requested/attempted/started tools, errors, denials and
+budget/output skips. Attempts include rejected calls; started counts tool bodies.
+The last-turn allowance is separate from whole-execution counters. A tool-budget
+stop keeps its established result status while reporting `tool_budget_exhausted`;
+it is not evidence of task success. Older results may have no diagnostics.
 
 ## Verify
 
