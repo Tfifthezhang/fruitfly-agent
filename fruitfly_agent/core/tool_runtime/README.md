@@ -14,6 +14,13 @@ Validate arguments and dispatch tools. Concrete factories belong in [Lab Tools](
 
 Invalid arguments and ordinary tool failures become error tool results. Tools use the injected execution environment. Add concrete operations in Lab rather than Core. No module-specific environment variables.
 
+`AgentTool.validate_arguments` optionally supplies a synchronous validator returning
+`Result[dict]`. Core calls it with a private copy before hooks and again after
+argument hooks. Invalid returns or exceptions reject dispatch without exposing
+exception values. Omission retains the existing subset validator and primitive
+coercion. The [MCP client](../../lab/mcp/README.md) supplies exact JSON Schema
+validation; Core imports no external schema or transport library.
+
 `AgentToolResult.error(...)` explicitly marks a failed result. Core preserves its
 `is_error` flag and records actual dispatch facts separately: rejected/attempted
 calls do not imply that a tool body started. See [loop diagnostics](../README.md#runtime-rules).

@@ -112,6 +112,8 @@ class WelcomeRenderingTest(unittest.TestCase):
         self.assertEqual(
             rendered,
             "FruitFlyAgent interactive · offline-model-with-a-deliberately-long-suffix\n"
+            "  workspace: /Users/example/research/FruitFlyAgent\n"
+            "  execution: Unavailable\n"
             "Type a task, or /help for commands.\n",
         )
         self.assertNotIn("\x1b", rendered)

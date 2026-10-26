@@ -52,6 +52,7 @@ class InlineTerminalDisplay:
         self._rows = 0
         self._columns = 0
         self._active = False
+        self._buffer_suspended_output = False
         self._pending_output = ""
         self._assistant_preview = ""
         self._activity = ""
@@ -92,6 +93,8 @@ class InlineTerminalDisplay:
                 if self._active:
                     self._measure_locked()
                     self._render_live_locked()
+            elif not self._active and self._buffer_suspended_output:
+                self._pending_output += _sanitize_output(text)
             elif not self._active:
                 self.output.write(text)
             else:
@@ -203,7 +206,10 @@ class InlineTerminalDisplay:
         with self._lock:
             committed = _sanitize_output(committed)
             preview = _sanitize_output(preview)
-            if not self._active:
+            if not self._active and self._buffer_suspended_output:
+                self._pending_output += committed
+                self._assistant_preview = preview
+            elif not self._active:
                 if committed:
                     self.output.write(committed)
                 self._assistant_preview = preview
@@ -224,6 +230,8 @@ class InlineTerminalDisplay:
             self._measure_locked()
             self._active = True
             self.screen.activate()
+            self._buffer_suspended_output = False
+            self._commit_ready_output_locked()
             if self.fullscreen and self._mouse_requested:
                 self.screen.set_mouse(True)
             # Newlines inside a bracketed paste belong to one editable prompt;
@@ -231,10 +239,12 @@ class InlineTerminalDisplay:
             self._render_live_locked()
             self.output.flush()
 
-    def suspend(self) -> None:
+    def suspend(self, *, preserve_output: bool = False) -> None:
         """Remove the editable frame and leave a normal terminal viewport."""
 
         with self._lock:
+            if preserve_output:
+                self._buffer_suspended_output = True
             if not self._active:
                 return
             if self.fullscreen:
@@ -247,11 +257,11 @@ class InlineTerminalDisplay:
                 return
             self._measure_locked()
             self._erase_live_locked()
-            if self._pending_output:
+            if self._pending_output and not preserve_output:
                 self.output.write(self._pending_output)
                 self.output.write("\r\n")
                 self._pending_output = ""
-            if self._assistant_preview:
+            if self._assistant_preview and not preserve_output:
                 self.output.write(self._assistant_preview)
                 self.output.write("\r\n")
                 self._assistant_preview = ""
@@ -306,8 +316,6 @@ class InlineTerminalDisplay:
 
     def set_completions(self, view: CompletionView) -> None:
         """Render a read-only candidate view without replacing the editable draft."""
-        if not self.fullscreen:
-            return
         with self._lock:
             if self._choices or self.copying:
                 view = CompletionView()
@@ -316,6 +324,7 @@ class InlineTerminalDisplay:
             self._completion_view = view
             if self._active:
                 self._measure_locked()
+                self._erase_live_locked()
                 self._render_live_locked()
                 self.output.flush()
 
@@ -407,7 +416,7 @@ class InlineTerminalDisplay:
             all_input_lines = [truncate_cells(label, input_width) for label in self._choices]
             cursor_line, cursor_cells = self._selected_choice, 0
         choice_footer = int(bool(self._choices))
-        view_footer = int(self.fullscreen and not self._choices)
+        view_footer = int(not self._choices and (self.fullscreen or bool(self._completion_view.items)))
         input_padding = 0 if self._choices or (self._completion_view.items and self._rows < 12) else 2
         pending_lines = (
             _visual_lines(self._pending_output, max(4, self._columns - 1))
@@ -488,6 +497,8 @@ class InlineTerminalDisplay:
             rows.append(input_row_text("", ""))
         if self._choices:
             rows.append(truncate_cells("↑↓ move · Enter select · Esc deny · 1/2/3 select", self._columns - 1))
+        if not self.fullscreen and completion_lines:
+            rows.append(truncate_cells('↑↓ select · Tab complete · Esc hide · Enter submit', self._columns - 1))
         if self.fullscreen:
             if view_footer:
                 if completion_lines:

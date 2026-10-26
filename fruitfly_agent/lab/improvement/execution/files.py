@@ -56,11 +56,11 @@ def prepare(context, request):
 
 def build(context, prepared):
     plan, services = context.plan, context.services
+    suite, holdout, parameters = prepared.private
     runner = (context.runner_factory(plan, context.components, context.artifacts, services)
               if context.runner_factory else FileTaskRunner(context.config, context.components, context.artifacts, services,
-                  tool_names={tool.name for tool in context.config.tools}))
+                  tool_names={tool.name for tool in context.config.tools}, model_calls=parameters['model_calls'] or None))
     services.own(runner)
-    suite, holdout, parameters = prepared.private
     if parameters['assessment_interval']:
         runner = AssessedRunner(runner, artifacts=context.artifacts, services=services,
             assessors=(ProcessMetrics,), interval=parameters['assessment_interval'])
@@ -98,4 +98,6 @@ def definition():
     return ExecutionDefinition('file-task', 'Agent task execution', 'file-task-v3', frozenset({'H', 'S'}),
         FileTaskRunner.capabilities, materials, prepare, build,
         parameters=(ExecutionParameter('assessment_interval', 'Online assessment interval', 'integer', 0, 0, 1000,
-            'Events per assessment; 0 disables online process/resource assessment.'),), accepts_runner_override=True)
+            'Events per assessment; 0 disables online process/resource assessment.'),
+            ExecutionParameter('model_calls', 'Task model allowance', 'integer', 0, 0, 10000,
+                'Maximum task Provider calls; 0 uses the root allowance only.')), accepts_runner_override=True)

@@ -4,6 +4,32 @@
 
 Keep model specifications, secrets, and runtime selections in separate files.
 
+## Navigate the configuration tree
+
+```text
+Configuration overview (this page)
+├── Runtime specification / Component documents: write H/S/I and model roles
+├── Catalog / Configurable components: register your own implementation
+├── Experiments / Experiment configuration: tasks, edit grants and comparison
+└── Configuration and experiment examples: initialize, inspect and run
+```
+
+| Task | Authoritative guide |
+|---|---|
+| Write a system config or H/S/I document | [Component documents](fruitfly_agent/runtime_spec/COMPONENTS.md) |
+| Register a component and expose its fields | [Catalog configuration](fruitfly_agent/lab/catalog/CONFIGURATION.md) |
+| Write an experiment and authorize changes | [Experiment configuration](fruitfly_agent/experiments/CONFIGURATION.md) |
+| Start from installed templates | [Configuration examples](examples/configuration/README.md) and [experiment recipes](examples/experiments/README.md) |
+| Inspect or export an existing system | [Run configuration](fruitfly_agent/run/configuration/README.md) |
+
+New system files use schema 2. `config.yaml`, `default-config.yaml` and generated
+candidate configs use the same protocol. Each profile selects model aliases and
+referenced H/S/I documents. H contains execution instructions/mechanisms, S
+retained content, and I editor/feedback/search settings. Short text uses YAML
+block scalars; no separate prompt text file is required. Registered definitions
+own defaults and legal fields; experiment grants own modification permission.
+Schema-1 profiles remain readable through the same runtime assembly path.
+
 ## Files and precedence
 
 | Source | Default location | Contents |
@@ -11,14 +37,17 @@ Keep model specifications, secrets, and runtime selections in separate files.
 | Model template | [models.example.yaml](examples/configuration/models.example.yaml) | DeepSeek Flash profiles for Responses and Messages APIs in one file; configure a key before use |
 | Model catalog | `.fruitfly/models.yaml` in the working directory | API protocol, model ID, endpoint, capabilities, limits, and key variable name |
 | Secrets | `.fruitfly/secrets.env` or process environment | API keys and SSH account/password values |
-| Harness configuration | `.fruitfly/config.yaml` | Profiles, catalog path, model choice, prompt references, and mechanism parameters |
+| Harness configuration | `.fruitfly/config.yaml` | Profiles, model roles and selected H/S/I component documents |
+| Component documents | `.fruitfly/components/H/`, `S/`, `I/` | Registered implementations, enabled state, text and parameters |
+| Optional MCP services | `.fruitfly/mcp.yaml` | Local stdio commands, selected tool names, limits and secret-variable references |
 | Default configuration | `.fruitfly/default-config.yaml` | Independent baseline; editable manually, read-only in terminal configuration |
 | Default model catalog | `.fruitfly/default-models.yaml` | Baseline model settings; may reference the same key variable as daily models |
 | Eval host settings | `.fruitfly/eval-host.yaml` | Machine-local runtime mounts, task source and dependency/cache preparation; see [Harbor settings](eval/harbor/README.md) |
-| Experiment settings | `.fruitfly/experiment.yaml` | File-only task references, role-model overrides and bounded Improvement/RSI settings |
+| Experiment settings | `.fruitfly/experiment.yaml` | Baseline, referenced tasks/comparison, edit grants, root/trial limits and explicit RSI settings |
+| Comparison and task documents | `.fruitfly/comparison.yaml`, `tasks/` | Fixed comparison conditions and task sources/materials |
 | CLI overrides | Startup arguments | Workspace, configuration, profile, and session selection |
 
-`--cwd`, `--config`, and `--profile` select the process's workspace and configuration. `--approve-tools` explicitly answers tool confirmation requests for a fresh non-interactive task in a trusted isolated environment; protected paths remain denied. A relative `model.catalog` path resolves from the harness configuration file. Saving persists choices. An active runtime changes only through explicit Application replacement, including configuration application or recovery.
+`--cwd`, `--config`, and `--profile` select the process's workspace and configuration. `--approve-tools` explicitly answers tool confirmation requests for a fresh non-interactive task in a trusted isolated environment; protected paths remain denied. A relative catalog path resolves from the system config; component/task references resolve from their declaring files. Saving persists choices. An active runtime changes only through explicit Application replacement, including configuration application or recovery.
 
 The Agent CLI reads `.fruitfly/secrets.env` from the selected workspace, including when using `--cwd`. Process environment values take precedence over that file, including explicit empty values. It does not fall back to another workspace's secret file.
 
@@ -39,9 +68,9 @@ active runtime unchanged. Missing/invalid defaults
 leave the draft unchanged; declared auxiliary models must exist in the daily
 catalog. Each restoration reloads the file so manual edits are available immediately.
 
-Copy [default-config.example.yaml](examples/configuration/default-config.example.yaml) and
-[default-models.example.yaml](examples/configuration/default-models.example.yaml) to their
-default paths only when absent. The template enables local execution, basic
+Initialize the complete tree, or copy [default-config.example.yaml](examples/configuration/default-config.example.yaml),
+[default-models.example.yaml](examples/configuration/default-models.example.yaml) and their
+referenced component files only when absent. The template enables local execution, basic
 read/Bash/edit/write tools and explicitly parameterized compaction. Default files
 are edited manually. Explicit `--config .fruitfly/default-config.yaml` selections
 have a read-only terminal controller.
@@ -96,6 +125,29 @@ Startup does not move existing files. Preview the explicit offline operation, th
 ```
 
 Use `--config path/to/custom.yaml` to update a custom harness file. The operation moves root `models.yaml` and the entire root `.env` into `.fruitfly/`, removes their originals after successful writes, and updates every matching catalog reference in the selected harness file. Other harness files need separate path updates before relocation. Model and secret file contents remain unchanged; harness comments and unrelated settings remain. Existing destinations and symlinks are rejected. Ordinary failures attempt rollback; concurrent writers and process crashes are not covered. Stop other configuration writers before applying, then restart the CLI to reload secrets. Session recovery still verifies artifacts and the complete manifest.
+
+## Connect MCP tools
+
+Install the optional `fruitfly-agent[mcp]` extra and install each server separately.
+Copy [mcp.example.yaml](examples/configuration/mcp.example.yaml) to
+`.fruitfly/mcp.yaml` only when absent, then replace its placeholders. Enable
+`mcp-tools` under Tools; its `config` parameter defaults to that workspace-local
+file. Saving alone starts nothing. Start or apply the profile to review and
+authorize each local stdio process before its catalog is frozen.
+
+Keep credentials in the secret environment. `secret_env` maps child variable names
+to host variable names; `env` contains non-secret values recorded in identity.
+The CLI denies process startup without an interactive TTY; embedders must supply
+an explicit startup approval callback. Tool calls then use separate per-tool
+approvals. Local execution grants do not authorize MCP calls.
+
+Stdio runs on the local Agent host even when the file/Bash execution environment
+is remote. `/lab` shows both independently. Catalog changes and disconnected or
+uncertain calls require explicit configuration application; there is no automatic
+restart or replay. See [the client guide](fruitfly_agent/lab/mcp/README.md) for
+limits, supported schemas, artifacts and recovery, or the independent
+[REA example](examples/mcp/rea/README.md). HTTP/OAuth and an outbound FruitFlyAgent
+MCP server are not implemented.
 
 ## Configure a model
 
@@ -153,7 +205,10 @@ Keep only usable profiles. For different credentials, assign distinct `api_key_e
 
 ## Match menus to YAML
 
-Mechanism and algorithm menus use readable registered names. Stable IDs remain in implementation details and YAML. Model forms retain their documented field names. Stored fields and schema versions are unchanged.
+Mechanism and algorithm menus use readable registered names. Stable IDs remain in
+YAML. Model forms retain their documented field names. The table below describes
+the resolved profile and accepted schema-1 representation; schema-2 authored
+values live in the selected component documents and `models.roles`.
 
 | Menu / form name | Stored location |
 |---|---|
@@ -174,7 +229,7 @@ The capability page uses arrows and Space/Enter to toggle, then **Continue** to 
 | Base prompt | `assistant-default`; choose another prompt in **Configure → prompt** or `/config`. | [Base prompt](fruitfly_agent/lab/base_prompt/README.md) |
 | Skill catalog | Read `.skills/`; enable in **Context → Context augmentation → Skill catalog** (Space toggles; the phase is a section heading). | [Skills](fruitfly_agent/lab/context_manager/augmentation/skills/README.md) |
 | Reduction | Summarizing; inspect the mechanism in Context and edit tuning parameters in YAML. | [Reduction](fruitfly_agent/lab/context_manager/reduction/README.md) |
-| Improvement | Edit experiment files for components, strategy, feedback, allocations, scope and stopping; `/improvement` keeps a small instruction/file flow. | [Improvement](fruitfly_agent/lab/improvement/README.md) |
+| Improvement | Edit I component files for strategy and feedback; experiment grants and conditions control edits, allocations, scope and stopping; `/improvement` keeps a small instruction/file flow. | [Improvement](fruitfly_agent/lab/improvement/README.md) |
 | Reusable skill document | Disabled; Context augmentation. Set `source_path` to one workspace-relative Skill or enter `initial_text`; `max_chars=16000`. | [Skill body](fruitfly_agent/lab/context_manager/augmentation/skills/README.md#optimize-a-skill-body) |
 | Learned environment memory | Disabled; Context augmentation. Enter `initial_text`; `max_chars=16000`. Updates require explicit Improvement and adoption. | [Learned memory](fruitfly_agent/lab/context_manager/augmentation/information/file_memory/README.md#learn-environment-memory) |
 | Execution workflow | Disabled; a bounded sequence of model stages. One solve-and-answer step until an artifact is selected. | [Workflow](fruitfly_agent/lab/workflow/README.md) |
@@ -201,18 +256,21 @@ Source paths resolve within the workspace. All three sources require `informatio
 Set the limit in the Agent configuration selected for execution, usually
 `.fruitfly/default-config.yaml` for experiments:
 
+Edit the referenced `components/H/execution-policy.yaml`:
+
 ```yaml
-profiles:
-  baseline:
-    # Include the profile's existing model and mechanism settings here.
-    execution:
-      max_tool_calls_per_turn: 128
+schema_version: 1
+id: execution-policy
+role: H
+implementation: execution-policy
+parameters:
+  max_tool_calls_per_turn: 128
 ```
 
 Omission uses 64. The value must be a nonnegative integer; 0 permits no tool
 attempts. It bounds attempts in
 one outer task turn; follow-up turns receive a fresh allowance. It is independent
-of `task.model_calls`, total search allocations and the editor's 48-tool allowance.
+of `trial.model_calls`, total search allocations and the editor's configured tool allowance (48 by default).
 The assembled limit is recorded in runtime identity and execution facts. Native
 detached trials preserve it. Benchmark trials use the request's Agent profile and
 require compatible prepared source; run `eval prepare` after changing runtime
@@ -221,7 +279,7 @@ implementation. Raising the limit permits more work and does not establish quali
 ## Configure the complete execution policy
 
 Run and Eval use the [shared runtime specification](fruitfly_agent/runtime_spec/README.md).
-The profile's `execution` mapping also accepts:
+The execution-policy component's `parameters` mapping also accepts:
 
 | Field | Default | Meaning |
 |---|---|---|
@@ -235,8 +293,8 @@ Provider and authorization objects cannot be supplied in this mapping. Runtime
 manifest schema 7 records the final effective execution values and configured
 component inventory; old manifests retain their original identities.
 
-Use `improvement.components` to explicitly permit edits and `component_options`
-to constrain component-owned fields. The [execution policy component](fruitfly_agent/lab/execution_policy/README.md)
+Use experiment `edit` grants to select component fields and bounds. The accepted
+schema-1 reader retains `improvement.components/component_options` semantics. The [execution policy component](fruitfly_agent/lab/execution_policy/README.md)
 provides the parameter adapter. Enabled mechanisms determine available components;
 backend capabilities and experiment permissions further restrict them. Absent
 state owners do not expose editable S components. Invalid explicit selections fail.
@@ -343,22 +401,29 @@ file workspace does not inherit Bash, network tools, containers or live Session.
 
 ### Assess completed executions
 
-These optional sections belong in `.fruitfly/experiment.yaml`, alongside
-`improvement`, rather than in the Agent profile:
+Configure the selected `components/I/improvement-feedback.yaml`:
 
 ```yaml
-process_assessment:
-  assessors: [execution-facts-v1, completed-model-v1]
-  max_model_calls: 16
-  timeout_seconds: 120
-  required: false
-exploration:
-  policy: process-guided
+schema_version: 1
+id: improvement-feedback
+role: I
+implementation: improvement-feedback
+parameters:
+  process_assessment:
+    assessors: [execution-facts-v1, completed-model-v1]
+    max_model_calls: 16
+    timeout_seconds: 120
+    required: false
 ```
+
+Set `parameters.exploration: process-guided` in the selected
+`components/I/improvement-search.yaml`. Model aliases belong to the system config's
+`models.roles`; [component syntax](fruitfly_agent/runtime_spec/COMPONENTS.md) owns
+the complete payload reference. Raw execution facts remain immutable.
 
 Defaults are `assessors: []` and `policy: incumbent`, which add no process-judge
 model calls. `execution-facts-v1` projects recorded counters without a model or
-quality score. `completed-model-v1` uses `models.assessor` for read-only judgments
+quality score. `completed-model-v1` uses `models.roles.assessor` for read-only judgments
 and comparisons. Both consume completed execution facts; they do not modify live
 execution. The model allowance covers judgments and comparisons together within
 each search, inside its shared root budget. Optional assessment failure falls
@@ -395,14 +460,13 @@ cross-process transaction. Repeating a completed migration makes no changes.
 
 ## Choose a candidate generator
 
-The [experiment CLI](fruitfly_agent/experiments/README.md) reads task materials,
-components, search strategy, feedback and effect scope from one file with defaults.
-The [single-task reference](examples/experiments/benchmark.example.yaml) and
-[joint task-set reference](examples/experiments/multi-task.example.yaml)
-list current fields, alternatives, bounds and disabled recipes. They also mark
-termination contracts that the standard CLI does not yet populate. Keep model
-specifications, Agent mechanisms, scoring material and credentials in their owning
-files; comments in the reference identify those locations.
+The [experiment CLI](fruitfly_agent/experiments/README.md) composes a system config,
+referenced tasks/comparison, explicit edit grants and fixed budgets. The selected I
+search document supplies the strategy and generator. The CLI currently composes
+`agent-editor-v1`; other registered generators use the embedding composition API.
+The [single-task](examples/experiments/benchmark.example.yaml) and
+[joint task-set](examples/experiments/multi-task.example.yaml) examples share the
+[experiment grammar](fruitfly_agent/experiments/CONFIGURATION.md).
 It uses the built-in Agent editor; embeddings can replace generation through
 `GeneratorRegistry`, which declares factories and capabilities;
 `WorkflowRequest` freezes each job. Discovery and previews make no model requests.
@@ -413,12 +477,13 @@ retired algorithms into the new workflow.
 
 ## Configure the component editor
 
-The hidden default `component-improvement` registration has `editor_profile` and
-`assessor_profile` (each empty reuses the active model), `max_model_calls=64`, `max_executions=32` and
-`operation_timeout=120`. Model profiles use the existing catalog and secret
-configuration. Registration and previews make no model requests. Advanced per-job
-choices belong to experiment files or the public API; `/improvement` keeps a
-small explicit-material flow.
+Select editor/assessor aliases in the system config's `models.roles`. Configure
+editor instructions and its tool allowance in the I editor component, feedback
+in I feedback, and scheduling in I search. The [component grammar](fruitfly_agent/runtime_spec/COMPONENTS.md)
+owns these fields. The accepted schema-1 `component-improvement` mechanism retains
+its existing model aliases and allocation defaults. Experiment budgets and trial
+allowances remain fixed outside candidate editing. Registration and previews make
+no model requests; `/improvement` keeps a small explicit-material flow.
 
 Python embeddings inject `WorkflowBindings` into `RunApplicationFactory` to replace
 stages. Changing an execution backend requires a compatible `TaskRunner`; the
@@ -428,8 +493,8 @@ credentials remain independent tool settings.
 
 ## Configure an editor comparison
 
-Use `task.source: editor` and an installed `task.material` in the experiment file.
-`task.parameters` declares inner H/S
+Reference a task document with `source: editor` and an installed `material`.
+Its `parameters` declare inner H/S
 components, repetitions, inner allocations, development trial limit and fixed
 acceptance thresholds. These are per-job settings, not new model credentials or
 harness YAML fields. The strategy recommends 512 root model calls and 256 leaf

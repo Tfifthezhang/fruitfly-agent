@@ -26,7 +26,7 @@ Focus uses cyan emphasis and the neutral `input_styles` background; enabled/sele
 
 `field_prompt` and `parse_field_value` interpret generic field metadata; host validation remains authoritative. `read_field_line(editor, label)` borrows the existing reader with a visible display and separate field history while chat is suspended. Submission, EOF, Esc and interruption restore display, history and terminal mode. Typing/cursor edits remain visible with terminal echo disabled. `q`, spaces and digits are literal text during input. Readline/stream readers retain labeled fallback; `/cancel` belongs to the form. Secret fields retain their separate echo-suppressed reader.
 
-The live editor uses a background-filled input area with a bold `❯` prefix and one padding row above and below. It keeps full-width borders out of the transcript and creates a text/cursor/history-navigation buffer for each submission. Its existing reader polls terminal size while idle; `InlineTerminalDisplay.refresh()` redraws on dimension changes. The built-in frontend requests `fullscreen=True`: alternate-screen output uses original display sources to reflow history and input. Default embedding construction remains append-only and redraws its live tail; it cannot reflow terminal-owned scrollback. Plain readline prompts are the default; embeddings may explicitly request framed forms. Control keys and escape sequences edit that buffer; permission choices return a request reply without editing it. Submission history belongs to the editor, while an unsubmitted draft belongs to the current read. Generic `navigate_menu` handles wrapping and rejects numbered choices outside the displayed rows.
+The live editor uses a background-filled input area with a bold `❯` prefix and one padding row above and below. It keeps full-width borders out of the transcript and creates a text/cursor/history-navigation buffer for each submission. Its existing reader polls terminal size while idle; `InlineTerminalDisplay.refresh()` redraws on dimension changes. The built-in frontend and default embeddings use append-only main-screen output and redraw the live tail. Committed output belongs to native terminal scrollback, including after exit; the application cannot reformat it on resize. Drafts, cursor, previews and command candidates remain editable. Menus temporarily borrow an alternate screen. Plain readline prompts are the default; embeddings may explicitly request framed forms. Control keys and escape sequences edit that buffer; permission choices return a request reply without editing it. Submission history belongs to the editor, while an unsubmitted draft belongs to the current read. Generic `navigate_menu` handles wrapping and rejects numbered choices outside the displayed rows.
 
 `InlineTerminalDisplay.set_choices(labels, selected)` replaces the input area with transient choice rows. A `❯` marks the current row; color-enabled terminals also highlight it. Arrow keys move the selection, Enter submits it, numeric shortcuts select directly, and Esc denies permission. The permission menu uses the host-provided session scope, respects terminal width/height and NO_COLOR, and clears on resolution. Choice redraws do not append menu rows to conversation history. Non-ANSI readers retain numbered line input.
 
@@ -40,6 +40,8 @@ TERM, COLORTERM, COLORFGBG, NO_COLOR, locale, and stream capabilities affect dis
 
 Checks use local PTYs and isolated streams.
 
+Embeddings can explicitly select `fullscreen=True` for an application-owned
+viewport. Only this optional mode uses the following history and copy controls.
 `DisplayTranscript` accepts plain fragments or `update(source, formatter,
 complete=...)` records. Formatting callbacks and visual wrapping are injected;
 the module knows no Markdown, message roles, Session files or lifecycle state.
@@ -63,6 +65,12 @@ choices and suspension end copy mode. Other input is ignored in copy mode, apart
 from cancellation. New data is retained once in the existing transcript; the fixed
 view retains layout strings, not a second event or message store.
 
+Main-screen menu lending uses `suspend(preserve_output=True)` to retain the
+unfinished preview and buffer new assistant/tool output while another screen owns
+the terminal. Reactivation appends completed buffered output once, then redraws
+the current preview and draft. Ordinary `suspend()` finalizes the visible tail on
+exit. Menu output uses its own stream and is not included in chat history.
+
 The editor dispatches `ViewAction` values through `EditorDisplay`; it knows no
 concrete display constructor. Field editing asks the injected display for a field
 surface. `live.py` keeps the established constructors and imports available while
@@ -75,7 +83,8 @@ returns a replacement range edit without execution. The editor publishes a
 `CompletionView` through `EditorDisplay.set_completions()`; display never queries
 providers or interprets command names. Queries use Python text offsets; visual
 wrapping uses terminal cell widths. The built-in frontend wires the command
-adapter only for its fullscreen chat editor.
+adapter for its main-screen chat editor. Candidate changes erase only the live
+surface before redrawing; they never rewrite committed history.
 
 Candidate lists preserve the draft, have at most five visible rows and scroll to
 the selected item. Very short screens reduce input padding to retain the input

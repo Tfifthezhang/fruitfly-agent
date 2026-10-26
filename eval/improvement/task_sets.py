@@ -68,7 +68,7 @@ def freeze(spec, context, *, executor=None):
             'limit': limit, 'objective': objective_data, 'partitions': partitions, 'groups': groups}))
 
     prepared, selected, identity = current()
-    from fruitfly_agent.runtime_spec import load_harness_config
+    from fruitfly_agent.lab.catalog import load_system_config as load_harness_config
     from fruitfly_agent.lab.catalog import resolve_harness, builtin_catalog as runtime_catalog
     inventory = resolve_harness(load_harness_config(builder.source).select(builder.profile), runtime_catalog())
     capabilities = EvalTaskRunner.capabilities | frozenset('tool:' + name for name in inventory.tools)

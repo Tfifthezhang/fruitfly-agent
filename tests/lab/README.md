@@ -11,6 +11,7 @@ Verify algorithms and components through Core contracts and Catalog assembly.
 | `test_ssh_env.py` | Remote paths, secret injection boundaries, SSH lifecycle, permissions and supervised cancellation without network |
 | `test_web_tools.py` | Offline search/fetch adapters, extraction, pagination, HTTP deadlines, retries, cache and cancellation |
 | `test_web_services.py` | Service injection, registry extension, credential metadata and known/unknown final URLs |
+| `test_mcp_config.py / test_mcp_client.py / test_mcp_tools.py / test_mcp_authorization.py` | Optional SDK isolation, stdio lifecycle, exact schemas, reply retention and separate per-tool grants |
 | `test_catalog.py / test_base_prompt.py` | Registered identities, actionable rejection errors, and validation of disabled selections |
 | `test_failure_processing.py / test_automatic_improvement.py` | Derived exercises, provenance, original-task gates, independent confirmation, and isolated task execution |
 | `test_skill_catalog.py / test_algorithm_contracts.py` | Bounded guidance, transformer forms, signals, and cancellation |
@@ -38,3 +39,7 @@ versioned file changes with no real model requests.
 
 `test_evolution_recovery_budget.py` verifies root allowance restoration, changed
 limit rejection and conservative handling of unknown paid phases after restart.
+
+`test_improvement_configuration.py` verifies configured I search rounds in real
+fake-Provider episodes, exact returned evidence pages, independent assessor
+guidance and immutable local allowances. These are wiring tests, not quality gains.

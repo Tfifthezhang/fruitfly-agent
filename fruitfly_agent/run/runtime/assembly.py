@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from fruitfly_agent.lab.catalog import PermissionPolicy, apply_permission_policy
+from fruitfly_agent.lab.catalog import PermissionPolicy, apply_permission_policy, ProviderToolAuthorizer
 from fruitfly_agent.interactive.interaction.authorization import AuthorizationService
 from fruitfly_agent.run.runtime.permissions import default_permission_policy
 
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, replace, field
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -28,7 +28,7 @@ from fruitfly_agent.run.configuration.resolution import resolve_profile_models
 from fruitfly_agent.run.storage.artifacts import DataArtifactStore
 from fruitfly_agent.run.storage.prompts import resolve_base_prompt
 from .manifest import RuntimeManifest, digest_manifest as _digest
-from fruitfly_agent.lab.catalog import resolve_harness, verify_runtime
+from fruitfly_agent.lab.catalog import resolve_harness, verify_runtime, configure_profile
 from fruitfly_agent.lab.algorithms.targets import TEXT_TARGET_PREFIX
 
 
@@ -41,6 +41,7 @@ class RuntimeAssembly:
     components: Mapping[str, Any]
     model_profile: str
     manifest: RuntimeManifest
+    tool_providers: Mapping[str, Any] = field(default_factory=dict)
 
 
 def build_runtime(
@@ -57,10 +58,23 @@ def build_runtime(
     artifact_bindings: Mapping[str, str] | None = None,
     task_pack_sources: tuple = (),
     permission_policy: PermissionPolicy | None = None,
+    tool_providers: Mapping[str, Any] | None = None,
 ) -> RuntimeAssembly:
     """Build a fresh runtime; no result is applied until all installers succeed."""
 
+    profile = configure_profile(profile, catalog)
+    prepared = dict(tool_providers or {})
+    enabled = catalog.resolve(profile.mechanisms)
+    expected_providers = {item.definition.descriptor.mechanism_id for item in enabled if item.definition.tool_provider is not None}
+    if set(prepared) - expected_providers:
+        raise ValueError('prepared tools have no enabled owner')
+    for item in enabled:
+        if item.definition.tool_provider is not None and item.definition.descriptor.mechanism_id not in prepared:
+            raise ValueError('tool provider requires asynchronous preparation: ' + item.definition.descriptor.mechanism_id)
     store = artifact_store or DataArtifactStore(cwd / ".fruitfly" / "artifacts")
+    for reference, text in profile.artifact_contents.items():
+        if store.put_text(text).artifact_id != reference:
+            raise ValueError('configured artifact content identity differs')
     prompt_text, prompt_identity = resolve_base_prompt(profile.prompt, store)
     models, selected_model_profile, main_spec = resolve_profile_models(
         profile,
@@ -133,6 +147,7 @@ def build_runtime(
     )
     bindings = dict(profile.artifact_bindings if artifact_bindings is None else artifact_bindings)
     supported_bindings = {slot for definition in catalog.definitions() for slot in definition.artifact_slots}
+    supported_bindings.update('tool-guidance.' + tool.name for provider in prepared.values() for tool in provider.tools)
     unsupported_bindings = sorted(set(bindings) - supported_bindings)
     if unsupported_bindings:
         raise ValueError(
@@ -155,6 +170,11 @@ def build_runtime(
             task_pack_sources=task_pack_sources,
             process_environment=process_environment,
             secret_resolver=environment.get,
+            tool_providers=prepared,
+            component_settings=profile.component_settings,
+            model_roles=profile.model_roles,
+            model_metadata={name: {'model': spec.model, 'context_window': spec.context_window,
+                                   'max_tokens': spec.max_output_tokens} for name, spec in models.items()},
         ),
     )
     # Apply host policy after all installers, so an installer cannot accidentally omit it.
@@ -162,6 +182,9 @@ def build_runtime(
         replace(policy, readonly_paths=(*policy.readonly_paths, session.path.resolve())),
         confirm=approvals.confirm, audit=audit, process_environment=process_environment)
     permission_identity = getattr(secured.tool_authorizer, 'identity', policy.identity)()
+    external_policies = {name: rule for provider in prepared.values() for name, rule in provider.policies.items()}
+    if external_policies:
+        secured = replace(secured, tool_authorizer=ProviderToolAuthorizer(secured.tool_authorizer, external_policies, approvals.confirm, audit=audit))
     assembled = replace(assembled, config=secured,
                         components={**assembled.components, "authorization": approvals})
     main_spec.require(tools=bool(assembled.config.tools), streaming=True)
@@ -190,9 +213,10 @@ def build_runtime(
             "runtime data artifact binding(s) were not consumed by an enabled "
             "mechanism: " + ", ".join(missing)
         )
-    inventory = verify_runtime(resolve_harness(profile, catalog), assembled.config,
+    inventory = verify_runtime(resolve_harness(profile, catalog, tool_providers=prepared), assembled.config,
         tuple(value for key, value in assembled.components.items() if key.startswith(TEXT_TARGET_PREFIX)))
-    manifest_version = 7
+    service_identity = tuple(dict(entry) for provider in prepared.values() for entry in provider.identity)
+    manifest_version = 8 if service_identity else 7
     manifest_payload: dict[str, Any] = {
         "schema_version": manifest_version,
         "harness": inventory.to_dict(),
@@ -213,6 +237,8 @@ def build_runtime(
     }
     if data_artifacts:
         manifest_payload["data_artifacts"] = [dict(item) for item in data_artifacts]
+    if service_identity:
+        manifest_payload['tool_services'] = list(service_identity)
     digest = _digest(manifest_payload)
     manifest = RuntimeManifest(
         schema_version=manifest_version,
@@ -227,6 +253,7 @@ def build_runtime(
         permissions=permission_identity,
         execution=manifest_payload['execution'],
         harness=manifest_payload['harness'],
+        tool_services=service_identity,
     )
     optional_ids = tuple(
         item.definition.descriptor.mechanism_id
@@ -245,6 +272,7 @@ def build_runtime(
                     **{f"owned:{i}": value for i, value in enumerate(resource_sink or ())}},
         model_profile=selected_model_profile,
         manifest=manifest,
+        tool_providers=prepared,
     )
 
 

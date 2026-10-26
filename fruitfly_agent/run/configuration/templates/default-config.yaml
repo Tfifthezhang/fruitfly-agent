@@ -1,0 +1,35 @@
+schema_version: 2
+default_profile: baseline
+profiles:
+  baseline:
+    models:
+      catalog: default-models.yaml
+      roles:
+        executor: deepseek-flash-openai
+        editor: deepseek-flash-openai
+        assessor: deepseek-flash-openai
+    H:
+      local-env:
+        file: components/H/local-env.yaml
+      read-tool:
+        file: components/H/tools/read-tool.yaml
+      bash-tool:
+        file: components/H/tools/bash-tool.yaml
+      edit-tool:
+        file: components/H/tools/edit-tool.yaml
+      write-tool:
+        file: components/H/tools/write-tool.yaml
+      compaction:
+        file: components/H/compaction.yaml
+      base_prompt:
+        file: components/H/base-prompt.yaml
+      execution-policy:
+        file: components/H/execution-policy.yaml
+    S: {}
+    I:
+      improvement-editor:
+        file: components/I/improvement-editor.yaml
+      improvement-feedback:
+        file: components/I/improvement-feedback.yaml
+      improvement-search:
+        file: components/I/improvement-search.yaml

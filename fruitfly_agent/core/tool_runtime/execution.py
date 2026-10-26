@@ -12,6 +12,7 @@ from ..data_model.runtime import AgentLoopContext, BeforeToolCallResult
 from ..extensions.callbacks import call_extension
 from ..extensions.hooks import AFTER_TOOL, BEFORE_TOOL, AfterToolEvent, HookRegistry, ToolEvent
 from ..context_runtime import append_message
+from ..errors import Result
 from . import ToolCallContext
 from .schema import validate_tool_arguments
 from .authorization import AuthorizationRequest, AuthorizationDecision, unrestricted_authorization
@@ -115,7 +116,17 @@ async def _execute_one(
         except Exception as exc:  # noqa: BLE001
             return _error_result(tc.id, f'Argument preparation failed: {exc}')
 
-    validated = validate_tool_arguments(tool.parameters, args)
+    def validate(arguments: dict[str, Any]) -> Result[dict[str, Any]]:
+        try:
+            result = (tool.validate_arguments(copy.deepcopy(arguments)) if tool.validate_arguments is not None
+                      else validate_tool_arguments(tool.parameters, arguments))
+            if not isinstance(result, Result) or result.is_ok and not isinstance(result.value, dict):
+                return Result.failure('tool validator returned an invalid result')
+            return result
+        except Exception:
+            return Result.failure('tool argument validator failed')
+
+    validated = validate(args)
     if not validated.is_ok:
         return _error_result(tc.id, validated.error or 'invalid arguments')
     args = validated.unwrap()
@@ -141,7 +152,7 @@ async def _execute_one(
     )
     tool_event = await hooks.run(BEFORE_TOOL, tool_event)
     args = dict(tool_event.args)
-    revalidated = validate_tool_arguments(tool.parameters, args)
+    revalidated = validate(args)
     if not revalidated.is_ok:
         return _error_result(tc.id, revalidated.error or 'invalid arguments after before_tool hook')
     args = revalidated.unwrap()

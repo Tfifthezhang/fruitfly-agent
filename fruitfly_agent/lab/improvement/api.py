@@ -57,7 +57,8 @@ from .assessment.scorers.model import ModelAssessor
 from .assessment.aggregation import WeightedSum
 from .assessment.feedback import FeedbackProjection
 from .editor.instructions import EditorInstructions, EditorInstructionTarget
-from .registration import SETTINGS, EDITOR_CONFIG, ASSESSOR_CONFIG, EDITOR_INSTRUCTIONS
+from .registration import SETTINGS, EDITOR_CONFIG, ASSESSOR_CONFIG, EDITOR_INSTRUCTIONS, SYSTEM_SETTINGS
+from .system_configuration import process_configuration, process_settings_values
 from .materials import WorkspaceTaskSource
 from .experience import entry_to_dict, entry_from_dict, experience_id
 from .assessment.verification import CaseMeasurements, HoldoutVerification

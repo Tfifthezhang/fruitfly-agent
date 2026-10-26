@@ -28,6 +28,14 @@ Application sets `improvement_available` when its injected service implements th
 component-workflow client protocol, without querying or constructing that service.
 Availability does not mean an experiment is running.
 
+`InteractiveStatus.working_directory` remains the local host workspace.
+Its optional `execution_environment` is an immutable
+`InteractiveExecutionEnvironment` from `models.py`, carrying a display label,
+execution directory and optional server address. Run supplies this view from the
+installed Lab backend; missing metadata is Unavailable. It describes the current
+runtime, without credentials, transport objects or live health guarantees.
+Existing hosts can omit it. Welcome, `/lab` and `/status` share this status data.
+
 `CommandResult.panel` optionally carries a `CommandPanel` of titled
 `CommandSection` values, each containing a category hint and labelled text rows.
 The original `text` field remains a complete plain-text fallback. These frozen
@@ -42,6 +50,13 @@ not count. See [Session integration](../session/README.md) for live counting and
 the fallback used by hosts without a Session store.
 
 No environment variables, model calls, filesystem writes, or resource ownership. Concrete effects belong to service implementations. See [Run adapters](../../run/adapters/README.md) and [terminal feature extensions](../terminal/features/README.md).
+
+`ToolServiceStartPlan` and `ToolServiceStartupApproval` describe a host decision
+before an external tool process starts. Only executable, arguments, local directory
+and injected variable names are exposed. `InteractiveStatus.tool_services` contains
+generic `ToolServiceStatus` views with observed state, location, transport and tool
+names. These are distinct from `execution_environment`; status never probes a
+service or grants permission. See [MCP startup](../../lab/mcp/README.md).
 
 Configuration mechanism views carry registration-owned implementation/guide paths and `input_parameters`. Workflow views expose available components, generators, execution strategies, materials, verification modes and effect scopes. Parameter views carry descriptions, choices, nullability and numeric bounds. These views describe input; the host validates requests and binds confirmed previews to execution.
 

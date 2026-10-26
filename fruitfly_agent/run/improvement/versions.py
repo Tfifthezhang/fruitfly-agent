@@ -9,9 +9,11 @@ from fruitfly_agent.run.runtime.manifest import execution_version_payload
 
 
 class RunVersions:
-    def __init__(self, *, workspace, artifacts, manifest, improvement_identity, state_sources):
+    def __init__(self, *, workspace, artifacts, manifest, improvement_identity, state_sources,
+                 restore_improvement_identity=None):
         self.workspace, self.artifacts = workspace, artifacts
         self.manifest, self.improvement_identity, self.state_sources = manifest, improvement_identity, state_sources
+        self.restore_improvement_identity = restore_improvement_identity
         self.snapshots = SnapshotStore(artifacts)
         self.versions = VersionStore(artifacts)
 
@@ -43,7 +45,13 @@ class RunVersions:
         source = self.freeze_source()
         harness = execution_version_payload(manifest, source)
         h = self.artifacts.put_text(canonical_json(harness)).artifact_id
-        i = self.artifacts.put_text(canonical_json({"source": source, "strategy": self.improvement_identity(),
+        identity = self.improvement_identity()
+        if self.restore_improvement_identity is not None:
+            for artifact in manifest.get('data_artifacts', ()):
+                if artifact.get('role') == 'I':
+                    identity = self.restore_improvement_identity(identity, artifact['key'],
+                        self.artifacts.read_text(artifact['id']))
+        i = self.artifacts.put_text(canonical_json({"source": source, "strategy": identity,
             "artifacts": sorted((a for a in manifest.get("data_artifacts", ()) if a.get("role") == "I"), key=lambda a: a["key"])})).artifact_id
         version = SystemVersion(h, i, self.freeze_state(manifest))
         self.versions.put(version)
@@ -81,6 +89,8 @@ class RunVersions:
         if snapshot.role == 'I':
             import json
             payload = json.loads(self.artifacts.read_text(parent.improver))
+            if self.restore_improvement_identity is not None:
+                payload['strategy'] = self.restore_improvement_identity(payload['strategy'], snapshot.binding.key, text)
             payload['artifacts'] = sorted([a for a in payload.get('artifacts', ()) if a['key'] != snapshot.binding.key] + [
                 {'key': snapshot.binding.key, 'id': after, 'role': 'I', 'media_type': 'application/json',
                  'size_bytes': len(text.encode('utf-8'))}], key=lambda a: a['key'])

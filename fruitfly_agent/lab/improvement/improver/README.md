@@ -1,4 +1,4 @@
-# Improve Editor Instructions
+# Improve Improvement Components
 
 [Up: Improvement](../README.md)
 
@@ -20,8 +20,13 @@ Outer current editor -> propose candidate editor I'
   -> pending I candidate -> explicit adoption -> next RSI generation
 ```
 
-The executed I changes `AgentEditor` instructions, not the task Agent's base
-prompt. `propose`, `invariant`, `domain` and `compose` are editable. `system`, `select` and
+The executed I can change `AgentEditor` instructions, feedback settings and search
+settings through the same registered component configuration. Each episode holds
+candidate I fixed while executing a fresh inner H/S search. Supported settings are
+listed in the [system grammar](../../../runtime_spec/COMPONENTS.md); grants and bounds
+are enforced by the component's adapter. Search rounds are capped by the fixed
+`inner_depth`; assessment and task work consume the same outer hard allowances.
+The task Agent's base prompt remains an inner H component. `propose`, `invariant`, `domain` and `compose` are editable. `system`, `select` and
 `reflect` must equal their frozen parent values. Unknown fields and changes to
 component ownership fail. Loaded I snapshots preserve the exact bound source bytes,
 including valid JSON formatting, so saved-default reconciliation and recovery
@@ -72,9 +77,10 @@ fresh suites for later research. This limit does not establish statistical valid
 
 ## Supply the experiment inputs
 
-Use the [experiment CLI](../../../experiments/README.md) with `task.source: editor`
-and `task.material: editor-study`. Its defaults select the I component, measured
-feedback and a larger allocation. Run `improvement check`, then explicitly
+Use the [experiment CLI](../../../experiments/README.md) with a referenced task
+document containing `source: editor` and `material: editor-study`. Grant the selected
+I fields in experiment `edit`. The [editor recipe](../../../../examples/experiments/editor.example.yaml)
+selects measured feedback and a larger allocation. Run `improvement check`, then explicitly
 `improvement run` or `rsi run`; real requests may incur charges. Public embedding
 requests remain available below.
 

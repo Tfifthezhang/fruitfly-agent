@@ -54,6 +54,25 @@ class ResumableSession:
 
 
 @dataclass(frozen=True)
+class InteractiveExecutionEnvironment:
+    """Installed execution target; activation does not imply ongoing health."""
+
+    label: str
+    working_directory: str
+    server: str = ""
+
+
+@dataclass(frozen=True)
+class ToolServiceStatus:
+    name: str
+    transport: str
+    working_directory: str
+    state: str
+    tools: tuple[str, ...] = ()
+    location: str = 'Local host'
+
+
+@dataclass(frozen=True)
 class InteractiveStatus:
     model: str
     working_directory: str
@@ -84,6 +103,8 @@ class InteractiveStatus:
     permission_write_roots: tuple[str, ...] = ()
     compaction_count: int = 0
     improvement_available: bool = False
+    execution_environment: InteractiveExecutionEnvironment | None = None
+    tool_services: tuple[ToolServiceStatus, ...] = ()
 
 
-__all__ = ["ConversationBlock", "ConversationMessage", "InteractiveMechanism", "InteractiveStatus", "ResumableSession"]
+__all__ = ["ConversationBlock", "ConversationMessage", "InteractiveMechanism", "InteractiveExecutionEnvironment", "InteractiveStatus", "ResumableSession", "ToolServiceStatus"]

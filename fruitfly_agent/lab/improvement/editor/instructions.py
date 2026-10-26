@@ -76,3 +76,16 @@ class EditorInstructionTarget:
 
     def prepare_trial(self, config, text):
         raise ValueError('editor instruction changes require an improver comparison runner')
+
+    def validate_options(self, options):
+        if (not isinstance(options, dict) or set(options) != {'editable_fields'}
+                or not isinstance(options['editable_fields'], list) or not options['editable_fields']
+                or set(options['editable_fields']) - {'propose', 'invariant', 'domain', 'compose'}):
+            raise ValueError('editor options must select mutable instruction fields')
+
+    def validate_change(self, text, options):
+        self.validate(text)
+        value = EditorInstructions.parse(text)
+        for field in self.instructions.__dataclass_fields__:
+            if field not in options['editable_fields'] and getattr(value, field) != getattr(self.instructions, field):
+                raise ValueError('candidate changed a fixed editor instruction: ' + field)

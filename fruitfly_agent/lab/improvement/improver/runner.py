@@ -36,7 +36,9 @@ class ImproverTaskRunner:
         if any(c != baseline.component(c.component_id) for c in harness.components if c.role != 'I'):
             raise ValueError('I trials must preserve all H/S components')
         instructions = harness.component('improvement-editor').files[0].text
-        instructions_id = content_hash(instructions)
+        i_documents = tuple(c for c in harness.components if c.role == 'I')
+        instructions_id = (content_hash(instructions) if len(i_documents) == 1
+                           else content_hash(canonical_json([asdict(c) for c in i_documents])))
         gains, regressions, evidence, identities, case_gains = [], [], [], [], []
         start = dict(context.services.used)
         failures = 0
@@ -48,7 +50,8 @@ class ImproverTaskRunner:
                     'model': params['inner_model_calls'] + evaluations * params['evaluation_model_calls'],
                     'execution': params['inner_executions'] + evaluations})
                 request = EpisodeRequest(identity, instructions, baseline, self.spec.inner_components,
-                    TaskMaterial('adaptation', episode.suite.train[0].input, environment_id='file-workspace-v1'), repeat)
+                    TaskMaterial('adaptation', episode.suite.train[0].input, environment_id='file-workspace-v1'), repeat,
+                    improver=harness)
                 context.services.record('episode-start', episode_id=identity, partition=partition,
                     instructions_id=instructions_id, experiment_id=self.spec.conditions_id, repeat=repeat)
                 try:

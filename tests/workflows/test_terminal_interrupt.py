@@ -80,7 +80,8 @@ class TerminalInterruptWorkflowTests(unittest.TestCase):
                 self.assertIn('CANCEL-COUNT=2', output)
                 self.assertIn('[run cancelled;', output)
                 if term != 'dumb':
-                    self.assertIn('\x1b[?1049l', output)
+                    self.assertNotIn('\x1b[?1049h', output)
+                    self.assertIn('\x1b[?2004l', output)
 
     def test_idle_double_interrupt_exits_cleanly_and_restores_terminal(self):
         for term in ('xterm-256color', 'dumb'):

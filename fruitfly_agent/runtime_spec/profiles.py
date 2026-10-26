@@ -15,6 +15,8 @@ import yaml
 
 from .selections import MechanismSelection
 from .execution import validate_execution
+from .components import ComponentConfiguration
+from .documents import DocumentReader, mapping
 DEFAULT_PROMPT_ID = "assistant-default"
 
 
@@ -33,6 +35,12 @@ class HarnessProfile:
     prompt: str = DEFAULT_PROMPT_ID
     artifact_bindings: Mapping[str, str] = field(default_factory=dict)
     execution: Mapping[str, Any] = field(default_factory=dict)
+    component_documents: tuple[ComponentConfiguration, ...] = ()
+    model_roles: Mapping[str, str] = field(default_factory=dict)
+    source_files: tuple = field(default=(), compare=False, repr=False)
+    artifact_contents: Mapping[str, str] = field(default_factory=dict, repr=False)
+    configured: bool = field(default=False, compare=False, repr=False)
+    component_settings: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not _ID.fullmatch(self.profile_id):
@@ -48,13 +56,26 @@ class HarnessProfile:
         object.__setattr__(self, "artifact_bindings", dict(self.artifact_bindings))
         object.__setattr__(self, "execution", validate_execution(self.execution))
         object.__setattr__(self, "mechanisms", tuple(self.mechanisms))
+        object.__setattr__(self, 'component_documents', tuple(self.component_documents))
+        if len({d.id for d in self.component_documents}) != len(self.component_documents):
+            raise ValueError('component IDs must be distinct across H/S/I')
+        if not isinstance(self.model_roles, Mapping) or any(not isinstance(k, str) or not k or
+                not isinstance(v, str) or not v for k, v in self.model_roles.items()):
+            raise ValueError('model roles must map role names to catalog aliases')
+        object.__setattr__(self, 'model_roles', dict(self.model_roles))
+        object.__setattr__(self, 'artifact_contents', dict(self.artifact_contents))
         if not isinstance(self.prompt, str) or not self.prompt.strip():
             raise ValueError("harness profile prompt must be a non-empty reference")
 
     @property
     def profile_hash(self) -> str:
+        payload = self.to_dict()
+        if self.component_documents or self.model_roles:
+            payload = {'runtime': payload, 'settings': dict(self.component_settings), 'models': dict(self.model_roles)}
+            if not self.configured:
+                payload['documents'] = [d.to_dict() for d in self.component_documents]
         encoded = json.dumps(
-            self.to_dict(),
+            payload,
             ensure_ascii=False,
             sort_keys=True,
             separators=(",", ":"),
@@ -77,6 +98,15 @@ class HarnessProfile:
             result['execution'] = dict(self.execution)
         return result
 
+    def to_component_dict(self, *, references=True):
+        groups: dict[str, dict[str, Any]] = {role: {} for role in ('H', 'S', 'I')}
+        for document in self.component_documents:
+            groups[document.role][document.id] = (dict(document.reference) if references and document.reference
+                                                else {'inline': document.to_dict()})
+        return {'models': {'catalog': self.model_catalog,
+                           'roles': {**self.model_roles, **({'executor': self.model_profile} if self.model_profile else {})}},
+                **groups}
+
 
 @dataclass(frozen=True)
 class HarnessConfig:
@@ -85,9 +115,7 @@ class HarnessConfig:
     schema_version: int = HARNESS_PROFILE_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
-        if self.schema_version != HARNESS_PROFILE_SCHEMA_VERSION or isinstance(
-            self.schema_version, bool
-        ):
+        if type(self.schema_version) is not int or self.schema_version not in (1, 2):
             raise ValueError(
                 f"unsupported harness profile schema_version: {self.schema_version}"
             )
@@ -117,17 +145,16 @@ class HarnessConfig:
             "schema_version": self.schema_version,
             "default_profile": self.default_profile,
             "profiles": {
-                key: self.profiles[key].to_dict() for key in sorted(self.profiles)
+                key: (self.profiles[key].to_component_dict() if self.schema_version == 2
+                      else self.profiles[key].to_dict()) for key in sorted(self.profiles)
             },
         }
 
 
 def load_harness_config(path: str | Path) -> HarnessConfig:
     target = Path(path)
-    try:
-        raw = yaml.safe_load(target.read_text(encoding="utf-8")) or {}
-    except yaml.YAMLError as exc:
-        raise ValueError(f"invalid harness YAML: {target}") from exc
+    reader = DocumentReader()
+    raw = reader.read(target) or {}
     if not isinstance(raw, Mapping):
         raise ValueError("harness config must be a mapping")
     _reject_unknown(
@@ -136,7 +163,7 @@ def load_harness_config(path: str | Path) -> HarnessConfig:
         "harness config",
     )
     version = raw.get("schema_version")
-    if version != HARNESS_PROFILE_SCHEMA_VERSION or isinstance(version, bool):
+    if type(version) is not int or version not in (1, 2):
         raise ValueError(f"unsupported harness profile schema_version: {version}")
     default_profile = raw.get("default_profile")
     if not isinstance(default_profile, str) or not default_profile:
@@ -145,14 +172,39 @@ def load_harness_config(path: str | Path) -> HarnessConfig:
     if not isinstance(raw_profiles, Mapping):
         raise ValueError("harness config profiles must be a mapping")
     profiles = {
-        str(profile_id): _profile_from_mapping(str(profile_id), value)
+        str(profile_id): (_component_profile(str(profile_id), value, target.resolve(), reader)
+                          if version == 2 else _profile_from_mapping(str(profile_id), value))
         for profile_id, value in raw_profiles.items()
     }
+    from dataclasses import replace
+    profiles = {key: replace(profile, source_files=tuple(reader.sources.values())) for key, profile in profiles.items()}
     return HarnessConfig(
         default_profile=default_profile,
         profiles=profiles,
         schema_version=version,
     )
+
+
+def _component_profile(profile_id, raw, target, reader):
+    mapping(raw, {'models', 'H', 'S', 'I'}, 'system profile')
+    models = mapping(raw.get('models'), {'catalog', 'roles'}, 'system models')
+    roles = models.get('roles', {})
+    if not isinstance(roles, dict):
+        raise ValueError('model roles must be a mapping')
+    documents = []
+    for role in ('H', 'S', 'I'):
+        entries = raw.get(role, {})
+        if not isinstance(entries, dict):
+            raise ValueError(role + ' components must be a mapping')
+        for name, reference in entries.items():
+            value, origin = reader.reference(reference, target)
+            document = ComponentConfiguration.from_dict(value, source=str(origin), reference=reference)
+            if document.id != name or document.role != role:
+                raise ValueError('component ID/role differs from its configuration position: ' + str(name))
+            documents.append(document)
+    return HarnessProfile(profile_id, model_catalog=models.get('catalog', 'models.yaml'),
+                          model_profile=roles.get('executor'), model_roles=roles,
+                          component_documents=tuple(documents))
 
 
 def save_harness_config(path: str | Path, config: HarnessConfig) -> None:

@@ -34,7 +34,7 @@ class ScaffoldingTests(unittest.TestCase):
              redirect_stdout(output):
             self.assertEqual(main(['--cwd', str(self.root), 'init', '--json']), 0)
             initialized = json.loads(output.getvalue())
-            self.assertEqual(len(initialized['created']), 4)
+            self.assertEqual(len(initialized['created']), len(workspace_templates()) + 1)
             self.assertEqual(initialized['preserved'], [])
             output.seek(0); output.truncate()
             self.assertEqual(main(['improvement', 'check', '--cwd', str(self.root), '--json']), 0)
@@ -75,7 +75,8 @@ class ScaffoldingTests(unittest.TestCase):
             actual_request = prepare.call_args.args[0]
             self.assertEqual(actual_request.runtime.working_directory, str(self.root))
             self.assertEqual(Path(actual_request.runtime.config_path), self.root / '.fruitfly/default-config.yaml')
-        self.assertEqual(len(json.loads(output.getvalue())['created']), 6)
+        self.assertEqual(len(json.loads(output.getvalue())['created']),
+                         len(workspace_templates(source='task-set', benchmark='terminal-bench-4')) + 1)
 
     def test_generated_task_set_checks_with_prepared_material_from_another_directory(self):
         from eval.improvement.configuration import resolve_benchmark
@@ -138,10 +139,10 @@ class ScaffoldingTests(unittest.TestCase):
         self.assertEqual(existing.read_text(), 'user settings and comments\n')
         existing.unlink()
         initialize_workspace(self.root)
-        before = {p.name: p.read_bytes() for p in directory.iterdir()}
+        before = {str(p.relative_to(directory)): p.read_bytes() for p in directory.rglob('*') if p.is_file()}
         with self.assertRaisesRegex(ValueError, 'will not overwrite'):
             initialize_workspace(self.root)
-        self.assertEqual(before, {p.name: p.read_bytes() for p in directory.iterdir()})
+        self.assertEqual(before, {str(p.relative_to(directory)): p.read_bytes() for p in directory.rglob('*') if p.is_file()})
 
     def test_existing_daily_files_and_secret_are_preserved_without_reading_secret(self):
         directory = self.root / '.fruitfly'
@@ -153,7 +154,7 @@ class ScaffoldingTests(unittest.TestCase):
         original = secret.stat()
         result = initialize_workspace(self.root)
         self.assertEqual(result['preserved'], [str(secret)])
-        self.assertEqual(len(result['created']), 3)
+        self.assertEqual(len(result['created']), len(workspace_templates()))
         self.assertEqual(secret.stat(), original)
         for name in ('config.yaml', 'models.yaml', 'secrets.env'):
             self.assertEqual((directory / name).read_text(), 'existing offline fixture\n')

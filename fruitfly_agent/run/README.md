@@ -58,6 +58,11 @@ Interactive recovery displays original saved conversation through the same histo
 
 Composition entries delegate to one owning implementation. Internal consumers import the owning module. Run consumes public [Catalog](../lab/catalog/README.md) and [Improvement](../lab/improvement/README.md) contracts; it does not implement search, scoring, or concrete algorithm branches.
 
+`RunApplicationFactory(tool_service_startup_approval=...)` optionally supplies an
+async host approval callback for enabled external tool processes. Absence denies
+startup. Generic Catalog preparation freezes declarations before `build_runtime`;
+tool-call approval remains independent. See [MCP tools](../lab/mcp/README.md).
+
 ## Text artifacts
 
 This example stores text and creates a factory; it does not assemble a runtime or call a model:

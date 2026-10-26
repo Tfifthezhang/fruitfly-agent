@@ -1,0 +1,7 @@
+schema_version: 1
+source: task-set
+collections:
+- id: benchmark
+  source: eval
+  request: ../eval-request.json
+  host: ../eval-host.yaml

@@ -2,10 +2,10 @@
 from fruitfly_agent.lab.base_prompt import get_builtin
 from .artifacts import DataArtifactStore
 
-def resolve_base_prompt(reference: str, store: DataArtifactStore) -> tuple[str, dict[str, str]]:
+def resolve_base_prompt(reference: str, store: DataArtifactStore, *, contents=None) -> tuple[str, dict[str, str]]:
     """Resolve and verify the one immutable base prompt for a runtime."""
     if reference.startswith("sha256:"):
-        content = store.read_text(reference)
+        content = contents[reference] if contents is not None and reference in contents else store.read_text(reference)
         identity = {
             "reference": reference,
             "label": f"Candidate {reference[7:15]}",

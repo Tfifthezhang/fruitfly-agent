@@ -20,6 +20,7 @@ class RuntimeManifest:
     permissions: Mapping[str, Any] | None = None
     execution: Mapping[str, Any] | None = None
     harness: Mapping[str, Any] | None = None
+    tool_services: tuple[Mapping[str, Any], ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         result = {
@@ -42,6 +43,8 @@ class RuntimeManifest:
             result['execution'] = dict(self.execution)
         if self.data_artifacts:
             result["data_artifacts"] = [dict(value) for value in self.data_artifacts]
+        if self.tool_services:
+            result['tool_services'] = [dict(value) for value in self.tool_services]
         return result
 
 
@@ -58,6 +61,7 @@ def digest_manifest(payload: Mapping[str, Any]) -> str:
 def execution_version_payload(manifest: Mapping[str, Any], source: str) -> dict[str, Any]:
     """Execution identity excludes the independently versioned improvement strategy."""
     return {**({'execution': manifest['execution']} if 'execution' in manifest else {}),
+            **({'tool_services': manifest['tool_services']} if manifest.get('tool_services') else {}),
             "source": source, "components": [c for c in manifest["components"]
             if not any(x.get("layer") == "improvement" for x in c.get("contributions", ()))],
             "context_pipeline": manifest.get("context_pipeline"),

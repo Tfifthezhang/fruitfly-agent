@@ -67,3 +67,15 @@ def validate_component_options(name, options, inventory):
     target = ExecutionPolicyTarget(SimpleNamespace(**execution_kwargs(inventory.execution)),
         fixed_fields=dict(inventory.execution_owners))
     target.validate_options(options)
+
+
+def configuration_surface():
+    from fruitfly_agent.lab.catalog.configuration import ConfigurationSurface
+    from fruitfly_agent.runtime_spec import validate_execution
+    def options(fields, bounds):
+        if any(not field.startswith('parameters.') for field in fields):
+            raise ValueError('execution grants must select parameters fields')
+        return {'editable_fields': [field.removeprefix('parameters.') for field in fields],
+                'bounds': {key.removeprefix('parameters.'): value for key, value in bounds.items()}}
+    return ConfigurationSurface('execution-policy', 'H', 'configuration', 'execution', validate_execution,
+                                edit_options=options)

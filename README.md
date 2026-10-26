@@ -18,6 +18,10 @@ components, and supports bounded experiments on the editor that proposes those
 changes. Core owns the Agent loop; Lab owns algorithms; Application owns lifecycle;
 Run assembles them. Eval is an optional external benchmark consumer.
 
+Daily systems, experiment baselines and candidates share one H/S/I component
+configuration. Start at the [configuration guide tree](CONFIGURATION.md#navigate-the-configuration-tree)
+to write a config, register a component or declare bounded experiment changes.
+
 Named after Thomas Hunt Morgan's fruit-fly research, the project favors small,
 inspectable mechanisms and controlled comparisons. Its runtime is adapted from
 [Pi](https://github.com/earendil-works/pi); attribution is retained below.
@@ -67,17 +71,26 @@ and apply saved choices to the current conversation while idle. `/lab` inspects 
 conversation with current configuration after validating history and artifacts.
 See [Configuration](CONFIGURATION.md) and [Terminal](fruitfly_agent/interactive/terminal/README.md).
 
+Optional [MCP tools](fruitfly_agent/lab/mcp/README.md) connect independently
+installed local stdio servers with `fruitfly-agent[mcp]`. Startup and tool calls
+have separate approval. See the [REA example](examples/mcp/rea/README.md); no
+external server or native analysis engine is bundled.
+
 Context mechanisms include Skill catalogs, file memory, local knowledge,
 summarization and optional [programmatic context externalization](fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md).
 Bash/file tools can use a local or SSH environment. These runtime choices do not
 expand the isolated environment used by native improvement trials.
+
+Welcome, `/lab` and `/status` show the local workspace separately from the active
+file/Bash environment, including the SSH server and remote directory when used.
+Chat uses native terminal scrollback; temporary menus restore it on return.
 
 ## Built for harness research
 
 | Capability | Current behavior | Guide |
 |---|---|---|
 | H/S improvement | Propose, execute and compare registered instructions, permitted execution parameters or retained documents; keep the baseline selectable | [Improvement](fruitfly_agent/lab/improvement/README.md) |
-| I experiments | Compare editor instructions by the downstream H/S improvements they produce, then verify on separate task packages | [Editor experiments](fruitfly_agent/lab/improvement/improver/README.md) |
+| I experiments | Compare supported editor, feedback and search changes by downstream H/S behavior, then verify on separate task packages | [Editor experiments](fruitfly_agent/lab/improvement/improver/README.md) |
 | Persistent adoption | Publish verified text candidates for explicit review and activation | [Improvement host](fruitfly_agent/run/improvement/README.md) |
 | Experience | Stage attributed lessons; commit or reject separately while idle | [Experience](fruitfly_agent/lab/improvement/experience/README.md) |
 | RSI | An explicitly invoked host repeats verified adoption and loads the adopted version for the next generation | [RSI](fruitfly_agent/lab/rsi/README.md) |
@@ -88,7 +101,7 @@ Improvement and RSI. File settings have bounded defaults; `simple` proposes one
 candidate, while Harness² remains optional. `/improvement` retains a small explicit
 task/material entry and result review. Preview is offline; execution may incur
 charges. Native trials use in-memory file tools, without Bash, network tools or a
-live Session. I experiments edit only declared editor fields at fixed nesting
+live Session. I experiments edit only registered fields at fixed nesting
 depth. They do not train model weights or replace arbitrary source code.
 
 Output selection is not independent verification. Tests with fake Providers prove

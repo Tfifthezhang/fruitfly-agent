@@ -1,56 +1,19 @@
-# Copy to WORKSPACE/.fruitfly/experiment.yaml only when absent.
-# Pair with eval-request.json, eval-host.yaml and the default configuration/catalog.
-# One task at concurrency 1 uses the same task-set path as larger collections.
-schema_version: 1
-runtime:
+schema_version: 2
+baseline:
   config: default-config.yaml
-models:
-  editor: deepseek-flash-openai
-  assessor: deepseek-flash-openai
-task:
-  source: task-set
-  collections:
-    - id: benchmark
-      source: eval
-      request: eval-request.json
-      host: eval-host.yaml
-      model_calls: 80             # Per leaf execution; independent of tool calls.
-improvement:
-  strategy: simple
-  components: [base_prompt]       # Explicit editing permission; baseline stays intact.
-  rounds: 1
-  feedback: scored
-  scope: task
-  retain_experience: false
-  # Root model/execution totals are derived from task count and leaf allowances.
-  # max_model_calls: 1024         # Optional explicit positive total; check minimum.
-  # max_executions: 16
-  operation_timeout: 3600         # Seconds per operation; not a monetary limit.
-  timeout_seconds: 10800          # Whole search deadline in seconds.
-multi_task:
-  sampling:
-    policy: all                   # stratified-cycle | all | fixed.
-    batch_size: 1                 # Used by stratified-cycle; all includes every task.
-    seed: 0
-  execution:
-    concurrency: 1
-    candidate_concurrency: 1      # Values above 1 are currently rejected.
-    attempts: 1
-  evaluation:
-    aggregation: collection-macro
-    weights: {}
-  promotion:
-    every_rounds: 1
-    final_selection: all
-    minimum_gain: 0
-    max_collection_regression: null
-process_assessment:
-  assessors: []                   # Optional: [execution-facts-v1, completed-model-v1].
-  max_model_calls: 16
-  timeout_seconds: 120
-  required: false
-exploration:
-  policy: incumbent              # process-guided requires completed-model-v1.
-# More fields, component options and stop recipes: benchmark.example.yaml.
-# Multi-collection/sampling example: multi-task.example.yaml.
-# RSI requires independent verification; benchmark rewards alone do not supply it.
+  profile: baseline
+tasks:
+  file: tasks/tb4-smoke.yaml
+comparison:
+  file: comparison.yaml
+edit:
+  base_prompt:
+    fields:
+    - parameters.text
+budget:
+  timeout_seconds: 10800
+trial:
+  operation_timeout_seconds: 3600
+  model_calls: 80
+  concurrency: 1
+  attempts: 1

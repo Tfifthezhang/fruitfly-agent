@@ -96,6 +96,36 @@ class RuntimeStagingTests(unittest.TestCase):
             self.assertEqual(names, ("EDITOR_KEY", "SHARED_KEY"))
             self.assertEqual(set(yaml.safe_load(models.read_text())["models"]), {"main", "editor"})
 
+    def test_component_staging_preserves_i_and_inactive_role_metadata_without_requesting_its_key(self):
+        from fruitfly_agent.lab.catalog import load_system_config
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state, _, output = self.fixture(root)
+            def component(name, role, parameters):
+                return {'inline': {'schema_version': 1, 'id': name, 'role': role,
+                    'implementation': name, 'parameters': parameters}}
+            (state / 'default-config.yaml').write_text(yaml.safe_dump({'schema_version': 2,
+                'default_profile': 'baseline', 'profiles': {'baseline': {
+                    'models': {'catalog': 'default-models.yaml', 'roles': {
+                        'executor': 'main', 'editor': 'editor', 'assessor': 'editor'}},
+                    'H': {'execution-policy': component('execution-policy', 'H', {'max_tool_calls_per_turn': 128}),
+                          'base_prompt': component('base_prompt', 'H', {'text': 'Exact prompt.\n'})},
+                    'I': {'improvement-feedback': component('improvement-feedback', 'I', {
+                        'evidence': {'page_characters': 23}, 'judgment_guidance': 'Inspect loops.'}),
+                          'improvement-search': component('improvement-search', 'I', {'rounds': 2})}}}}))
+            generated, models, names = prepare_runtime(runtime={'working_directory': str(root)},
+                output_dir=output, environment={'SHARED_KEY': 'fixture'})
+            staged = load_system_config(generated).select()
+            self.assertEqual(yaml.safe_load(generated.read_text())['schema_version'], 2)
+            self.assertEqual(staged.component_settings['feedback']['evidence']['page_characters'], 23)
+            self.assertEqual(staged.component_settings['feedback']['judgment_guidance'], 'Inspect loops.')
+            self.assertEqual(staged.component_settings['search']['rounds'], 2)
+            self.assertEqual(staged.execution['max_tool_calls_per_turn'], 128)
+            self.assertEqual(staged.artifact_contents[staged.prompt], 'Exact prompt.\n')
+            self.assertEqual(staged.model_roles['editor'], 'editor')
+            self.assertEqual(set(yaml.safe_load(models.read_text())['models']), {'main', 'editor'})
+            self.assertEqual(names, ('SHARED_KEY',))
+
     def test_explicit_execution_parameters_survive_the_real_container_staging_path(self):
         from fruitfly_agent.runtime_spec import load_harness_config, execution_kwargs
         from fruitfly_agent.core.config import AgentLoopConfig

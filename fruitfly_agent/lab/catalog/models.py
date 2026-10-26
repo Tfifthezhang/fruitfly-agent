@@ -74,9 +74,24 @@ class MechanismDefinition:
     component_specs: Callable[[Mapping[str, Any], bool], tuple] | None = None
     execution_fields: frozenset[str] = frozenset()
     component_validator: Callable | None = None
+    tool_provider: Callable | None = None
+    configuration_role: str = 'H'
+    configuration_surfaces: tuple = ()
+    model_role_parameters: Mapping[str, str] = field(default_factory=dict)
+    configuration_edit: Callable | None = None
+    configuration_snapshot: Callable | None = None
 
     def __post_init__(self) -> None:
-        for callback in (self.component_specs, self.component_validator):
+        if self.configuration_role not in {'H', 'S', 'I'}:
+            raise ValueError('configuration role must be H/S/I')
+        if self.configuration_edit is not None and not callable(self.configuration_edit):
+            raise TypeError('configuration edit normalizer must be callable')
+        if self.configuration_snapshot is not None and not callable(self.configuration_snapshot):
+            raise TypeError('configuration snapshot must be callable')
+        if (not isinstance(self.model_role_parameters, Mapping)
+                or set(self.model_role_parameters.values()) - {p.name for p in self.descriptor.parameters}):
+            raise ValueError('model roles must bind declared parameter fields')
+        for callback in (self.component_specs, self.component_validator, self.tool_provider):
             if callback is not None and not callable(callback):
                 raise TypeError('component metadata callbacks must be callable')
         from fruitfly_agent.runtime_spec.execution import flatten_execution

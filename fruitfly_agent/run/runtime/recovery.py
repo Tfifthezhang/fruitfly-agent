@@ -2,6 +2,7 @@
 from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
+import re
 import uuid
 from fruitfly_agent.core.errors import SessionCorruptError
 from fruitfly_agent.core.data_model import AgentMessage
@@ -20,10 +21,19 @@ def session_manifests(session: Session | SessionSnapshot) -> list[dict]:
         if entry.type != "meta" or entry.payload.get("kind") != _RUNTIME_MANIFEST_KIND:
             continue
         manifest = entry.payload.get("manifest")
-        if not isinstance(manifest, dict) or manifest.get("schema_version") not in (3, 4, 5, 6, 7):
+        if not isinstance(manifest, dict) or manifest.get("schema_version") not in (3, 4, 5, 6, 7, 8):
             raise ValueError(f"session entry {entry.id}: unsupported runtime manifest")
         if not isinstance(manifest.get("models"), dict) or not isinstance(manifest.get("components"), list):
             raise ValueError(f"session entry {entry.id}: malformed runtime manifest")
+        if manifest.get('schema_version') == 8 and (not isinstance(manifest.get('tool_services'), list)
+                or not manifest['tool_services'] or any(not isinstance(item, dict) or
+                    not isinstance(item.get('name'), str) or not item['name']
+                    or any(not isinstance(item.get(key), str) or not re.fullmatch(r'sha256:[0-9a-f]{64}', item[key])
+                           for key in ('artifact', 'digest'))
+                    or not isinstance(item.get('tools'), list)
+                    or any(not isinstance(name, str) or not name for name in item['tools'])
+                    for item in manifest['tool_services'])):
+            raise ValueError(f'session entry {entry.id}: malformed tool service identity')
         content = {key: value for key, value in manifest.items() if key != "digest"}
         if manifest.get("digest") != digest_manifest(content):
             raise ValueError(f"session entry {entry.id}: runtime manifest digest does not match its contents")

@@ -41,9 +41,10 @@ def completed_input(task, record, artifacts):
 
 
 class CompletedAssessmentService:
-    def __init__(self, settings, *, config, artifacts, services, registry):
+    def __init__(self, settings, *, config, artifacts, services, registry, instructions=None):
         self.settings, self.config, self.artifacts, self.services = settings, config, artifacts, services
         self.registry = registry
+        self.instructions = dict(instructions or {})
         self.model_calls = 0
         self.values = {}
         self.feedback = FeedbackProjection(include_detail=True, all_metrics=True)

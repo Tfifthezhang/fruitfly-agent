@@ -41,6 +41,10 @@ class AssemblyContext:
     process_environment: Mapping[str, str] | None = None
     execution_owners: Mapping[str, str] = field(default_factory=dict)
     secret_resolver: Callable[[str], str | None] | None = field(default=None, repr=False, compare=False)
+    tool_providers: Mapping[str, Any] = field(default_factory=dict)
+    component_settings: Mapping[str, Any] = field(default_factory=dict)
+    model_roles: Mapping[str, str] = field(default_factory=dict)
+    model_metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "workspace", self.workspace.resolve())
@@ -127,6 +131,8 @@ def assemble_lab(
     for item in resolved:
         descriptor = item.definition.descriptor
         item_context = context
+        if item.definition.tool_provider is not None and descriptor.mechanism_id not in context.tool_providers:
+            raise ValueError('tool provider requires asynchronous preparation: ' + descriptor.mechanism_id)
         names = item.definition.required_credentials(item.parameters)
         if names:
             secrets = {name: context.secret_resolver(name) if context.secret_resolver is not None else None for name in names}

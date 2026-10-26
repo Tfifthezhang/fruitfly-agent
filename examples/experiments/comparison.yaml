@@ -1,0 +1,8 @@
+schema_version: 1
+scope: task
+feedback: auto
+aggregation: collection-macro
+selection: all
+minimum_gain: 0
+max_collection_regression: null
+adoption: none

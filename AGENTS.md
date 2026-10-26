@@ -36,6 +36,7 @@ Follow the dependency table in [Runtime architecture](fruitfly_agent/README.md#m
 | Add algorithm-specific branches to Run or the terminal | Register a definition and installer in [Catalog](fruitfly_agent/lab/catalog/README.md); extend a generic host contract only when required. |
 | Let a benchmark dictate runtime, configuration, lifecycle, or algorithm interfaces | Extend [Eval](eval/DEVELOPER_GUIDE.md#add-a-benchmark) as a consumer. Normal interaction must work without Eval. |
 | Bypass boundaries with hidden imports, dynamic imports, or copied code | Use the owning module's public interface. |
+| Add selectable behavior without a configuration position | Declare its H/S/I identity, strict parameters/defaults, dependencies, lifecycle/state and edit/trial/activation support through [Catalog configuration](fruitfly_agent/lab/catalog/CONFIGURATION.md). Daily, experiment and candidate execution must consume the shared configuration and assembly path. |
 | Restore a session using configuration alone | Validate history and required artifacts, use current configuration, and record its environment through [Run recovery](fruitfly_agent/run/README.md#recovery). |
 | Leave shadow packages after a directory move | Update imports, examples, and tests; add compatibility only when explicitly chosen. |
 
@@ -55,6 +56,7 @@ Follow the dependency table in [Runtime architecture](fruitfly_agent/README.md#m
 |---|---|
 | Language and style | Write all documentation in English. Use task-oriented headings, concise sentences, and tables wherever they convey the information clearly. |
 | Navigation | Link parent READMEs to child guides, add child backlinks, and cross-link related responsibilities. Keep guides in the existing tree; do not create `docs/`. |
+| Configuration guide ownership | Keep [Configuration](CONFIGURATION.md#navigate-the-configuration-tree) as the navigation root. Component syntax belongs to Runtime specification, admission to Catalog, experiment fields to Experiments, and operational recipes to Examples. Link to the owner instead of duplicating field catalogs. |
 | Module coverage | Give independent modules a README describing purpose, public entry points, behavior, relevant files, configuration/effects, limits, and offline checks. Let parents cover small directories. |
 | Current state | Describe implemented behavior and limits. Do not create histories, changelogs, migration narratives, roadmaps, planning files, or design diaries. |
 | Examples | Check imports, arguments, profile IDs, commands, and results against the implementation. Identify placeholders and network/cost requirements beside the operation. |

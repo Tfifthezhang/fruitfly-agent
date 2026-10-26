@@ -1,0 +1,3 @@
+schema_version: 1
+source: files
+instruction: Produce a short, self-contained checklist for reviewing a Python function.

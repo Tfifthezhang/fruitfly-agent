@@ -8,6 +8,20 @@ def guidance_key(name):
     return 'tool-guidance.' + name
 
 
+def configuration_surface(name, *, tool_factory=None):
+    from fruitfly_agent.lab.catalog.configuration import ConfigurationSurface, text_edit_options
+    def normalize(parameters):
+        if set(parameters) != {'text'}:
+            raise ValueError('tool guidance parameters require text')
+        validate_text(parameters['text'])
+        if len(parameters['text']) > 6000:
+            raise ValueError('tool guidance exceeds 6000 characters')
+        return parameters
+    return ConfigurationSurface(guidance_key(name), 'H', 'artifact', guidance_key(name), normalize,
+        edit_options=text_edit_options,
+        default=(lambda: {'text': tool_factory().description}) if tool_factory is not None else None)
+
+
 class ToolGuidanceTarget:
     requires_runtime_trials = True
     component_kind = 'tool-guidance'

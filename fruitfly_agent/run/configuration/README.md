@@ -4,21 +4,11 @@
 
 Store runtime selections independently of model specifications and mechanism definitions. Manage configuration drafts and resolve model choices without constructing Providers or running algorithms. Candidate-backed menus are supplied through presentation callbacks.
 
-```yaml
-schema_version: 1
-default_profile: default
-profiles:
-  default:
-    model:
-      catalog: models.yaml
-      profile: deepseek-flash-openai
-    execution:
-      max_tool_calls_per_turn: 64
-    mechanisms:
-      - id: compaction
-        enabled: true
-        parameters: {}
-```
+Daily `.fruitfly/config.yaml` and experiment `.fruitfly/default-config.yaml` use
+system schema 2. Write model roles and H/S/I references using the
+[component guide](../../runtime_spec/COMPONENTS.md). Schema-1 profiles remain
+readable and use the same runtime assembly. The public profile types are shared;
+Run's loader additionally applies registered Catalog projections.
 
 | Field / API | Meaning |
 |---|---|
@@ -34,7 +24,7 @@ profiles:
 
 The example uses `.fruitfly/models.yaml`, resolved relative to `.fruitfly/config.yaml`. Explicit catalog paths keep precedence over workspace discovery. See the [file selection rules](../../../CONFIGURATION.md#files-and-precedence).
 
-Unknown fields and unsupported schema versions raise `ValueError`. Catalog validates mechanism IDs and parameters. Store key variable names in model specifications and key values in the environment; do not store secrets or full prompt text in YAML.
+Unknown fields and unsupported schema versions raise `ValueError`. Catalog validates mechanism IDs and parameters. Store key variable names in model specifications and key values in the environment; keep secret values outside YAML. Short prompt text is supported in component block scalars.
 
 ## Files and ownership
 
@@ -53,7 +43,10 @@ limits are rejected. Model-call and editor budgets are separate settings.
 
 | File | Responsibility |
 |---|---|
-| [profile.py](profile.py) | Explicit compatibility exports from the [shared runtime specification](../../runtime_spec/README.md) |
+| [profile.py](profile.py) | Shared profile types and registered loading/saving |
+| [inspection.py](inspection.py) | Offline effective values, model aliases and source documents |
+| [conversion.py](conversion.py) | Explicit selected-profile export to a new complete schema-2 bundle |
+| [scaffolding.py](scaffolding.py) | Shared installed H/S/I templates for daily and experiment setup |
 | [controller.py](controller.py) | Draft selection, edits, save/reset, and public profile operations |
 | [operations.py](operations.py) | Narrow binding/profile edit contracts for host consumers |
 | [resolution.py](resolution.py) | Workspace/profile discovery and model catalog resolution |
@@ -94,3 +87,37 @@ The public `RunConfigurationController` in [Run](../README.md) composes this con
 ```bash
 .venv/bin/python -m unittest tests.run.test_profiles.HarnessProfileTest tests.run.test_configuration.HarnessSelectionTest -v
 ```
+
+## Inspect and export a system
+
+```bash
+.venv/bin/python -m fruitfly_agent.run.configuration.inspection --config .fruitfly/default-config.yaml
+# Preview only; replace paths with your own source and an absent output directory.
+.venv/bin/python -m fruitfly_agent.run.configuration.conversion --config .fruitfly/config.yaml --output /tmp/fruitfly-config-export
+# Write the reviewed selected profile and frozen model/component content.
+.venv/bin/python -m fruitfly_agent.run.configuration.conversion --config .fruitfly/config.yaml --output /tmp/fruitfly-config-export --apply
+```
+
+These operations create no Providers or Sessions and make no requests. Inspection
+shows catalog aliases separately from API model IDs and does not print credentials.
+Export writes a new directory and refuses existing destinations. `--profile`
+selects a profile; omitted selects the source default. `--cwd` supplies the source
+workspace for persisted artifact lookup when needed. External environment paths,
+stateful sources and services retain their owner's requirements; export does not
+create a portable container or restore a Session.
+
+Candidate and Eval builders use Catalog's public `materialize_system` and
+`bind_component_changes` ports. Generated candidates contain ordinary configs,
+frozen catalogs and exact text bindings. File references are retained on ordinary
+save when unchanged; changed documents are written inline in the config rather
+than overwriting shared component files. Source inputs remain intact.
+
+Follow [the configuration tree](../../../CONFIGURATION.md#navigate-the-configuration-tree)
+for syntax, registration and experiment grants; this guide owns persistence and
+application behavior.
+
+First-run daily configuration saves schema 2 through the same component exporter.
+Existing schema-1 files retain their version until explicit conversion. Saving
+round-trips built-in prompt identity and derived default tool guidance; disabling
+a tool removes its active guidance binding. No generated default override changes
+the behavior identity of an unchanged component.

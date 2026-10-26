@@ -19,3 +19,17 @@ class BasePromptTarget:
     def prepare_trial(self, config, text):
         self.validate(text)
         return replace(config, system_prompt=text)
+
+
+def configuration_surface():
+    from fruitfly_agent.lab.catalog.configuration import ConfigurationSurface, text_edit_options
+    def normalize(parameters):
+        if set(parameters) != {'text'}:
+            raise ValueError('base_prompt parameters require text')
+        validate_text(parameters['text'])
+        return parameters
+    def reference(parameters):
+        from . import builtins
+        return next((prompt.prompt_id for prompt in builtins() if prompt.text == parameters['text']), None)
+    return ConfigurationSurface('base_prompt', 'H', 'prompt', '', normalize,
+                                edit_options=text_edit_options, reference=reference)

@@ -60,9 +60,9 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
             calls = []
             async def executor(evaluation, host_path, *, directory, output_root, emit):
                 self.assertGreaterEqual(context.services.budget.held['model'], 2)
-                data = yaml.safe_load(Path(evaluation.runtime.config_path).read_text())
-                prompt = data['profiles']['default']['prompt']
-                candidate = (root / '.fruitfly/artifacts' / prompt[7:]).read_text() != 'baseline'
+                from fruitfly_agent.lab.catalog import load_system_config
+                selected = load_system_config(evaluation.runtime.config_path).select()
+                candidate = selected.artifact_contents[selected.prompt] != 'baseline'
                 calls.append(candidate)
                 path = output_root / ('evaluation-' + str(len(calls)))
                 agent = path / 'artifacts/harbor/job/trial/agent'; agent.mkdir(parents=True)

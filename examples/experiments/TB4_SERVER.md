@@ -65,7 +65,9 @@ An existing regular workspace secret file is preserved.
 |---|---|
 | `default-models.yaml` | Model ID, protocol, endpoint, capabilities, token limits and key variable name |
 | `default-config.yaml` | Executor profile, enabled mechanisms and tool-call limit, initially 64 per turn |
-| `experiment.yaml` | Editor/assessor profiles, editable components, rounds, leaf model allowance and task-set settings |
+| `components/H/`, `components/I/` | Execution/tool values, editor instructions, feedback and search settings |
+| `tasks/tb4-smoke.yaml`, `comparison.yaml` | Task material and fixed comparison rules |
+| `experiment.yaml` | Baseline/task/comparison references, editable fields and hard allocations |
 | `secrets.env` | Fill the empty model key privately, or use the process environment; never commit it |
 | `eval-request.json` | TB4 `smoke`, one attempt, concurrency 1 and whole-job timeout |
 | `eval-host.yaml` | Linux runtime mounts, cache location and optional task/dependency settings |
@@ -73,12 +75,11 @@ An existing regular workspace secret file is preserved.
 The [request template](tb4-smoke-request.example.json) is identical to the generated
 request. Its `working_directory: .` resolves from the experiment workspace when
 used through `fruitfly-agent-lab --cwd`. Omitted runtime config/profile inherits
-`experiment.yaml` and the baseline profile. Experiment-relative request/host paths
-point to files beside that YAML.
+`experiment.yaml` and the baseline profile. Request/host paths resolve relative to their declaring task document.
 
 All three model roles initially use the catalog entry `deepseek-flash-openai`.
-Change the executor in `default-config.yaml` and editor/assessor in
-`experiment.yaml` to select different entries in `default-models.yaml`. The
+Change `models.roles.executor/editor/assessor` in `default-config.yaml` to select
+different case-sensitive aliases from `default-models.yaml`. The
 template's remote model compatibility is not established by offline checks.
 
 Set `DEEPSEEK_API_KEY` privately. Keep `FRUITFLY_EVAL_PYTHON_ROOT` and
@@ -108,7 +109,7 @@ identities; see [preparation evidence](../../eval/SERVER_GUIDE.md#8-prepare-chec
 The [smoke experiment template](benchmark-smoke.example.yaml) enables only
 `base_prompt` editing. Enabled tools do not grant candidate editing permission.
 Select additional available components explicitly and inspect the check inventory.
-Tool attempts (`default-config.yaml`), per-leaf model calls (`model_calls: 80`),
+Tool attempts (the H `execution-policy` file), per-leaf model calls (`trial.model_calls: 80`),
 and root model/execution totals are independent allowances. Root totals are derived
 when omitted. Raising one allowance does not automatically raise the others;
 check after changes and review the [complete reference](benchmark.example.yaml).
@@ -131,6 +132,12 @@ copy; they do not edit the source checkout or baseline defaults. Official task
 scores select results. Optional completed-process feedback is disabled in this
 minimal template; the [experiment guide](../../fruitfly_agent/experiments/README.md#enable-completed-process-feedback)
 shows how to enable it and separate exploration from official selection.
+
+Edit model-role selections in `default-config.yaml`, execution values in
+`components/H/execution-policy.yaml`, and search/feedback in their I component
+files. `experiment.yaml` selects the baseline, task document and comparison,
+grants changes and bounds the job. The [field guide](../../fruitfly_agent/experiments/CONFIGURATION.md)
+describes the complete configuration tree. Refresh preparation after runtime changes.
 
 | Evidence | Workspace location |
 |---|---|

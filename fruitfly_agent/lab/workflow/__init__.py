@@ -77,6 +77,17 @@ class WorkflowTarget:
 def definition():
     from fruitfly_agent.lab.catalog.models import MechanismDefinition
     from fruitfly_agent.lab.catalog.components import ComponentSpec
+    from fruitfly_agent.lab.catalog.configuration import ConfigurationSurface
+    def normalize(parameters):
+        if set(parameters) - {'steps'}:
+            raise ValueError('workflow parameters accept only steps')
+        steps = parameters.get('steps', json.loads(DEFAULT_WORKFLOW)['steps'])
+        parse_workflow(json.dumps({'steps': steps}))
+        return {'steps': steps}
+    def edits(fields, bounds):
+        if fields != ['parameters.steps'] or bounds:
+            raise ValueError('workflow grants permit parameters.steps without numeric bounds')
+        return {}
     return MechanismDefinition(MechanismDescriptor(WORKFLOW_TARGET, 'Execution workflow',
         'Execute bounded model stages, including critique and revision, through normal Agent turns.',
         contributions=(MechanismContribution('online', 'workflow'),), install_order=70,
@@ -84,6 +95,9 @@ def definition():
             lifecycle_hooks=('get_follow_up_messages',),
             cost_notice='Each workflow stage uses normal model calls and may incur cost.')),
         _install, implementation_id='declarative-workflow-v1', artifact_slots=frozenset({WORKFLOW_TARGET}),
+        configuration_surfaces=(ConfigurationSurface(WORKFLOW_TARGET, 'H', 'artifact', WORKFLOW_TARGET,
+            normalize, encode=lambda parameters: json.dumps(parameters, separators=(',', ':')),
+            decode=json.loads, edit_options=edits, allow_disabled=True),),
         component_specs=lambda parameters, enabled: (ComponentSpec(WORKFLOW_TARGET, kind='execution-workflow',
             schema='execution-workflow-v1'),) if enabled else (), execution_fields=frozenset({'max_turns'}),
         implementation_path='fruitfly_agent/lab/workflow/__init__.py',

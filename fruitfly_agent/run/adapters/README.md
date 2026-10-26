@@ -24,8 +24,16 @@ tools and execution environments. They honor each registration's configuration
 category and exclude hidden internal components. The experimental ID collection
 keeps its original scope. These read-only descriptions drive
 [`/lab`](../../interactive/terminal/README.md#inspect-the-active-harness) without
-giving the command access to Catalog or a configuration draft. No parameters,
-credentials or algorithm objects enter this overview.
+giving the command access to Catalog or a configuration draft. General parameter
+maps, credentials and algorithm objects do not enter this overview.
+
+`describe_execution_environment` translates Catalog's installed
+`ExecutionEnvironmentDescription` into `InteractiveExecutionEnvironment`. It
+passes only label, directory and optional server, separately from the local
+workspace. No concrete backend inspection, secret access or network query is
+needed. An absent description remains absent; a malformed published view fails
+preparation explicitly. Welcome, `/lab` and `/status` read the resulting active
+status snapshot.
 
 Confirmed workflow submissions use Application's existing lifecycle. History
 retains completed, failed, empty and cancelled work. Independent verification

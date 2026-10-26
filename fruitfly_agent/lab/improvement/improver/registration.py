@@ -31,7 +31,8 @@ def prepare(context, request):
     params = definition().normalize(request.parameters)
     from ..strategies import builtin_strategies
     builtin_strategies().get(params['inner_strategy'])
-    if request.component_ids != ('improvement-editor',) or request.input_paths:
+    if (not request.component_ids or any(context.components.snapshot().component(name).role != 'I'
+            for name in request.component_ids) or request.input_paths):
         raise ValueError('editor comparison changes only the registered I target; episode packs own inputs')
     if request.feedback != 'scored':
         raise ValueError('editor comparison requires measured feedback')
@@ -56,8 +57,9 @@ def prepare(context, request):
         content_hash(canonical_json({'plan': asdict(context.plan), 'source': frozen.source_id, 'parameters': params})), ids,
         params['repetitions'])
     task = TaskMaterial('editor-comparison',
-        'Improve the editor instructions using the supplied development trials. '
-        'Only propose, invariant, domain and compose may change; preserve system, select and reflect. '
+        'Improve the granted I components using the supplied development trials. '
+        'Preserve fixed fields, model bindings, budgets and the outer evaluation. '
+        'For editor instructions only propose, invariant, domain and compose may change. '
         'Judge changes by downstream improvement evidence, not wording or prompt length.',
         environment_id='improver-comparison-v1', origin='experiment:' + request.material_id)
     prepared = PreparedExecution(task, frozen.source_id,

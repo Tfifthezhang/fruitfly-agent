@@ -112,3 +112,32 @@ normalized execution values change H identity and are applied to an isolated
 profile before activation. I and S remain unchanged unless separately declared
 components change. [Execution policy](../../lab/execution_policy/README.md) documents
 field permissions, mechanism ownership and offline activation tests.
+
+## Inspect complete candidate configurations
+
+The host freezes the model catalog and registered initial state before search.
+Every proposed candidate is exported once to
+`.fruitfly/improvement/jobs/<job-id>/candidates/<candidate-id>/` with `config.yaml`,
+`models.yaml`, `snapshot.json` and `changes.json`. The config uses the ordinary
+schema-2 loader. Changes record complete before/after component payloads, parent
+H/S/I and cited reasons. These review bundles do not grant activation.
+
+Configured and derived prompt/tool guidance, workflow, retained text and I values
+use Catalog's shared materializer. Immutable component text is embedded in the
+bundle. Registered initial files are copied under `resources/`; the snapshot lists
+the original workspace-relative locations and hashes. Use that directory as the
+working directory when replaying dependencies. External services and dynamic
+schemas retain their declared preparation requirements. The source component files
+and daily defaults are never overwritten by candidate generation.
+
+I feedback/search/editor settings come from the active system configuration.
+Explicit embedding `WorkflowBindings` overrides retain precedence. Previews bind
+the effective settings, while configured assessor guidance and editor page/tool
+limits reach their independently constructed stage ports. Supported I candidates
+execute through the registered fixed-I episode runner; ordinary file/Eval runners
+reject I modification.
+
+I publication restores the settings identity through the registered surface adapter.
+Fresh activation verifies the resulting I settings and exact artifact bytes against
+the proven candidate, including after a saved-default restart. It does not reuse
+the currently active editor's settings as the prepared candidate's identity.

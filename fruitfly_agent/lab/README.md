@@ -12,6 +12,7 @@ Add tools, execution backends, context strategies, and improvement algorithms th
 | [Algorithms](algorithms/README.md) | Algorithm identity and text-target contracts |
 | [Context manager](context_manager/README.md) | Augmentation, externalization, and reduction |
 | [Tools](tools/README.md) | Model-callable file, shell, IPython and public web operations |
+| [MCP client](mcp/README.md) | Optional selected tools from independently installed local stdio services |
 | [Environment](environment/README.md) | Local filesystem and process backend |
 | [Base prompt](base_prompt/README.md) | Built-in prompt text and its target adapter |
 | [Execution policy](execution_policy/README.md) | Typed execution parameters and the H candidate adapter |

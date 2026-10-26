@@ -12,6 +12,14 @@ after staging. Cancelling the form preserves the previous environment.
 Configuration and construction are offline; Application startup opens the
 connection. Authentication failure prevents activation.
 
+After successful startup, welcome, `/lab` and `/status` show the local workspace
+separately from Remote SSH, the server/port and remote execution directory.
+Startup verifies the host key, authentication, SFTP and the remote directory;
+these descriptions do not claim continuous connection health or preflight every
+remote command dependency. Saved drafts do not change the active description.
+Failed replacement retains it; recovery displays the current activated settings.
+Account and password values are excluded from this metadata.
+
 After saving once, selecting Remote environment again reuses the server settings and stored
 credentials without reopening the form. Unchecking it or selecting the local
 environment retains them, including across restarts in the same workspace and

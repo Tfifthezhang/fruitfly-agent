@@ -1,0 +1,6 @@
+schema_version: 1
+source: editor
+material: editor-study
+parameters:
+  inner_strategy: simple
+  inner_depth: 3

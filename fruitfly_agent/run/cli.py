@@ -19,6 +19,7 @@ from fruitfly_agent.run.application import RunApplicationFactory, resolve_sessio
 from fruitfly_agent.lab.catalog import PermissionPolicy
 from fruitfly_agent.providers.registry import default_registry
 from fruitfly_agent.run.runtime.limits import ModelCallBudget, BudgetedProviderRegistry
+from fruitfly_agent.interactive.terminal.features.tool_services.approval import approve_start
 
 
 async def run_cli(args: argparse.Namespace) -> int:
@@ -48,6 +49,7 @@ async def run_cli(args: argparse.Namespace) -> int:
             profile_id=args.profile, allow_incomplete=not bool(args.task),
             permission_policy=PermissionPolicy.unrestricted(cwd) if unrestricted else None,
             provider_registry=registry,
+            tool_service_startup_approval=approve_start,
         )
         if not args.task:
             with transient_screen(sys.stdin, sys.stdout):

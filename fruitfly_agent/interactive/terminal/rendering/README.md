@@ -45,12 +45,14 @@ cancelled results retain a bounded reason preview. Truncated live output has an
 explicit omission marker. Display limits do not change stored tool messages or
 model context; tool-side truncation still applies.
 
-Completed assistant Markdown retains its source in the built-in ANSI viewport.
-Rendering supplies a width-dependent formatting callback through the display
-sink’s optional `formatted_output` capability; I/O owns caching, scrolling and repainting, without importing Markdown.
-History, welcome and structured command panels use the same display contract.
-Resizing never replays runtime events. Display records are process-local and grow
-with visible output; they are not model context or a substitute for Session storage.
+The built-in ANSI frontend commits completed assistant Markdown, history, welcome
+and structured panels to native terminal scrollback. Its streaming presenter
+replaces the unfinished tail and appends completed blocks once. Resize redraws
+input and the live tail without rewriting committed history or replaying events.
+Optional fullscreen sinks advertise `formatted_output`: rendering supplies a
+width-dependent formatting callback and I/O owns caching and repainting without
+importing Markdown. Those display records are process-local and are not model
+context or a substitute for Session storage.
 
 Tables wrap every cell into multiple lines and retain long paths/descriptions.
 Very narrow windows use wrapped labeled records. The available width reserves the
@@ -58,12 +60,14 @@ terminal's final cell, preventing the right border from wrapping separately.
 Paragraph soft breaks reflow as spaces; explicit Markdown hard breaks remain.
 Code blocks retain literal lines and receive visual wrapping from I/O. Cell widths
 use the shared Unicode approximation; complex emoji sequences may vary by terminal.
-Standalone append-only embeddings keep their existing streaming presenter, and
-redirected streams keep source Markdown.
+Append-only embeddings use the same streaming presenter; redirected streams keep
+source Markdown.
 
 Welcome layout measures glyph cell widths. Wide screens pair the full fly with the
 large wordmark; medium screens retain the full fly and use plain brand text.
 Narrow screens use a small fly mark, with a minimal variant for very small widths.
 Brand assets contain no layout logic. Welcome rendering reads no terminal state;
-its caller supplies width and display capabilities. Short screens retain viewport
-scrolling rather than changing the global formatting callback contract.
+its caller supplies width and display capabilities. Local workspace, execution
+label, optional server and execution directory appear in every layout and in
+plain output. Locations wrap without ellipsis. Short screens use native terminal
+scrollback in the built-in frontend.

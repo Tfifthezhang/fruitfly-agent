@@ -63,7 +63,7 @@ def native(config):
         raise ValueError('select task.instruction/input_paths or an installed task.pack in experiment.yaml')
     from fruitfly_agent.lab.improvement.api import builtin_executions
     parameters = builtin_executions().get('file-task').normalize(tuple(mapping(
-        task.get('parameters', {}), {'assessment_interval'}, 'file execution parameters').items()))
+        task.get('parameters', {}), {'assessment_interval', 'model_calls'}, 'file execution parameters').items()))
     return SourceBinding('file-task', pack, instruction, relative, tuple(sorted(parameters.items())), bool(pack),
         source_identity=identity, minimum_budget={'model': confirmations + 8, 'execution': confirmations + 2},
         persistent_policy='task-holdout-v1' if pack and catalog.holdout(pack) else '')
@@ -103,7 +103,7 @@ def editor(config):
         source_identity=frozen.source_id, minimum_budget=minimum_budget, persistent_policy='improver-paired-v1',
         defaults={**{k: v for k, v in definition.defaults if k in {'max_model_calls', 'max_executions', 'operation_timeout'}},
             'components': ('improvement-editor',)},
-        required_components=('improvement-editor',), forbidden_components=())
+        required_components=(), forbidden_components=())
 
 
 def benchmark(config):

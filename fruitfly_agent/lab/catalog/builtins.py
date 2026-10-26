@@ -10,7 +10,9 @@ from fruitfly_agent.lab.context_manager.reduction import (
 )
 from fruitfly_agent.core.context import ContextStage
 from fruitfly_agent.lab.environment import LocalEnv
+from fruitfly_agent.lab.environment.description import EXECUTION_ENVIRONMENT_COMPONENT, ExecutionEnvironmentDescription
 from fruitfly_agent.lab.environment.ssh.registration import definition as ssh_definition
+from fruitfly_agent.lab.mcp.registration import definition as mcp_definition
 from fruitfly_agent.lab.context_manager.augmentation.information.adapter import (
     InformationRecallTransformer,
 )
@@ -41,7 +43,7 @@ from fruitfly_agent.lab.improvement.contracts.versions import STATE_SNAPSHOTS_CO
 from fruitfly_agent.lab.context_manager.augmentation.information.file_memory.snapshots import FileMemorySnapshots
 from fruitfly_agent.lab.algorithms.snapshots import WorkspaceTextSnapshots
 from fruitfly_agent.lab.improvement.contracts.versions import EXPERIMENT_BLOCKERS_COMPONENT
-from fruitfly_agent.lab.base_prompt.target import BasePromptTarget
+from fruitfly_agent.lab.base_prompt.target import BasePromptTarget, configuration_surface as prompt_surface
 from fruitfly_agent.lab.tools.guidance import prepare_guidance, guidance_key
 from fruitfly_agent.lab.tools import (
     create_bash_tool,
@@ -53,7 +55,7 @@ from fruitfly_agent.lab.tools import (
 from .assembly import AssemblyContext, AssemblyState, require_workspace_path
 from .catalog import LabCatalog
 from .components import ComponentSpec
-from fruitfly_agent.lab.execution_policy import validate_component_options
+from fruitfly_agent.lab.execution_policy import validate_component_options, configuration_surface as execution_surface
 from .models import (
     MechanismDefinition,
     MechanismContribution,
@@ -73,12 +75,14 @@ def builtin_catalog() -> LabCatalog:
                 contributions=(MechanismContribution('capability', 'tools'),)),
             lambda state, context, parameters: state, visible=False,
             prepare_targets=_prepare_instruction_components, component_validator=validate_component_options,
+            configuration_surfaces=(prompt_surface(), execution_surface()),
             component_specs=lambda parameters, enabled: (ComponentSpec('base_prompt'),
                 ComponentSpec('execution-policy', kind='execution-policy', schema='execution-policy-v1',
                     required_capabilities=frozenset({'execution-config'}))),
             implementation_path='fruitfly_agent/lab/algorithms/components.py',
             documentation_path='fruitfly_agent/lab/algorithms/README.md'),
         ssh_definition(),
+        mcp_definition(),
         *web_definitions(),
         _definition(
             "local-env",
@@ -171,6 +175,8 @@ def builtin_catalog() -> LabCatalog:
         ),
         _definition(
             "skill-catalog",
+            configuration_snapshot=lambda parameters, workspace: WorkspaceTextSnapshots(
+                require_workspace_path(workspace, parameters['root'], name='Skill root'), workspace).freeze(),
             artifact_slots=frozenset({SKILL_CATALOG_GUIDANCE_KEY}),
             component_specs=lambda parameters, enabled: (ComponentSpec(SKILL_CATALOG_GUIDANCE_KEY),) if enabled else (),
             layer="online",
@@ -213,6 +219,8 @@ def builtin_catalog() -> LabCatalog:
         ),
         _definition(
             "memory-files",
+            configuration_snapshot=lambda parameters, workspace: FileMemorySnapshots(
+                require_workspace_path(workspace, parameters['root'], name='memory root'), workspace).freeze(),
             layer="capability",
             family="context",
             label="File memory",
@@ -228,6 +236,8 @@ def builtin_catalog() -> LabCatalog:
         ),
         _definition(
             "knowledge-files",
+            configuration_snapshot=lambda parameters, workspace: WorkspaceTextSnapshots(
+                require_workspace_path(workspace, parameters['root'], name='knowledge root'), workspace).freeze(),
             layer="capability",
             family="context",
             label="Local knowledge",
@@ -316,8 +326,14 @@ def builtin_catalog() -> LabCatalog:
         skill_document_definition(),
         learned_memory_definition(),
     )
+    from fruitfly_agent.lab.tools.guidance import configuration_surface as guidance_surface
+    tool_factories = {'read': create_read_tool, 'bash': create_bash_tool,
+                      'write': create_write_tool, 'edit': create_edit_tool}
     definitions = tuple(replace(d, artifact_slots=d.artifact_slots | frozenset(
-        guidance_key(name) for name in d.descriptor.effects.tools)) for d in definitions)
+        guidance_key(name) for name in d.descriptor.effects.tools),
+        configuration_surfaces=(*d.configuration_surfaces,
+            *(guidance_surface(name, tool_factory=tool_factories.get(name))
+              for name in d.descriptor.effects.tools))) for d in definitions)
     return LabCatalog(definitions, bootstrap=lambda state, context: (
         state.with_component(TEXT_TARGET_PREFIX + "base_prompt", BasePromptTarget(state.config.system_prompt))
         .with_component(TASK_PACK_COMPONENT, TaskPackCatalog(context.workspace, context.task_pack_sources))
@@ -363,6 +379,7 @@ def _definition(
     selection_group_allow_disabled: bool = True,
     validate_parameters=None,
     component_specs=None,
+    configuration_snapshot=None,
 ) -> MechanismDefinition:
     return MechanismDefinition(
         MechanismDescriptor(
@@ -387,6 +404,7 @@ def _definition(
         artifact_slots=artifact_slots, provides=provides,
         requires_capabilities=requires_capabilities, validate_parameters=validate_parameters,
         component_specs=component_specs,
+        configuration_snapshot=configuration_snapshot,
         selection_group=selection_group, selection_group_label=selection_group_label,
         selection_group_allow_disabled=selection_group_allow_disabled,
         implementation_path=implementation_path, documentation_path=documentation_path,
@@ -456,10 +474,12 @@ def _compaction_parameters() -> tuple[ParameterDescriptor, ...]:
 
 
 def _install_local_env(state: AssemblyState, context: AssemblyContext, parameters: Mapping[str, Any]) -> AssemblyState:
+    backend = LocalEnv(str(context.workspace))
     return replace(
         state,
-        config=replace(state.config, env=LocalEnv(str(context.workspace))),
-    )
+        config=replace(state.config, env=backend),
+    ).with_component(EXECUTION_ENVIRONMENT_COMPONENT,
+        ExecutionEnvironmentDescription("Local", backend.cwd))
 
 
 def _install_read_tool(state: AssemblyState, context: AssemblyContext, parameters: Mapping[str, Any]) -> AssemblyState:

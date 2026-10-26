@@ -14,7 +14,7 @@ from fruitfly_agent.lab.improvement.api import (RunPlan, ComponentWorkflow, Work
     model_completion, EvidenceInspector, ExecutionContext, ExecutionRequest, builtin_executions,
     HarnessSnapshot, bundle_target, bundle_text, ReadOnlyInspector, policy_spec, AllocationExhausted, builtin_strategies,
     ProcessAssessmentSettings, ExplorationSettings, builtin_completed_assessors, builtin_explorations,
-    validate_process_configuration, CompletedAssessmentService, relative_path)
+    validate_process_configuration, CompletedAssessmentService, relative_path, process_settings_values)
 from fruitfly_agent.lab.algorithms.targets import SystemVersion, content_hash
 from fruitfly_agent.lab.algorithms.evolution import VerificationEvidence
 from fruitfly_agent.interactive.contracts.improvement import (WorkflowConfiguration,
@@ -60,11 +60,15 @@ class RunComponentJobs:
         self.assessor_configuration = None
         self.strategies = strategies or builtin_strategies()
         self.defaults: Callable[[], dict] = lambda: {}
+        self.system_settings: Callable[[], dict] = lambda: {}
+        self.prepare_materialization = None
         self.tasks, self.publish = tasks, publish
         self.executions = executions or builtin_executions()
         self.stop_policy = stop_policy
         self.process_settings = process_assessment or ProcessAssessmentSettings()
         self.exploration_settings = exploration or ExplorationSettings()
+        self.process_from_system = process_assessment is None
+        self.exploration_from_system = exploration is None
         self.completed_assessors = completed_assessors or builtin_completed_assessors()
         self.explorations = explorations or builtin_explorations()
         validate_process_configuration(self.process_settings, self.exploration_settings,
@@ -92,12 +96,15 @@ class RunComponentJobs:
         registry.configure(self.component_options)
         return registry
 
-    def identity(self):
+    def identity(self, *, system_settings=None):
+        values = self.system_settings() if system_settings is None else system_settings
+        process, exploration = self.process_configuration(values)
         def identity(value, default):
             return getattr(value, 'implementation_id',
                 getattr(value, '__module__', type(value).__module__) + '.' +
                 getattr(value, '__qualname__', type(value).__qualname__)) if value is not None else default
         return {'workflow': 'component-search-v1',
+                **({'system_settings': values} if values else {}),
                 'strategies': [(d.strategy_id, d.implementation_id) for d in self.strategies.definitions()],
                 'executions': [(d.execution_id, d.implementation_id) for d in self.executions.definitions()],
                 'generators': tuple(asdict(d) | {'required_capabilities': sorted(d.required_capabilities)} for d in self.generators.definitions()),
@@ -110,18 +117,26 @@ class RunComponentJobs:
                     ('workflow', self.controller_factory, 'component-search-v1'))},
                 'stop_policy': policy_spec(self.stop_policy),
                 'component_options': self.component_options,
-                'process_assessment': asdict(self.process_settings),
+                'process_assessment': asdict(process),
                 'completed_assessors': [(d.assessor_id, d.implementation_id) for d in self.completed_assessors.definitions()],
-                'exploration': {**asdict(self.exploration_settings),
-                    'implementation_id': self.explorations.get(self.exploration_settings.policy).implementation_id}}
+                'exploration': {**asdict(exploration),
+                    'implementation_id': self.explorations.get(exploration.policy).implementation_id}}
+
+    def process_configuration(self, values=None):
+        process, exploration = process_settings_values(self.system_settings() if values is None else values)
+        process = process if self.process_from_system else self.process_settings
+        exploration = exploration if self.exploration_from_system else self.exploration_settings
+        validate_process_configuration(process, exploration, self.completed_assessors, self.explorations)
+        return process, exploration
 
     def completed_assessment(self, services):
-        return CompletedAssessmentService(self.process_settings,
+        return CompletedAssessmentService(self.process_configuration()[0],
             config=self.assessor_configuration() if self.assessor_configuration else self.editor_configuration(),
-            artifacts=self.artifacts, services=services, registry=self.completed_assessors)
+            artifacts=self.artifacts, services=services, registry=self.completed_assessors,
+            instructions=self.system_settings().get('feedback', {}))
 
     def exploration_policy(self, services):
-        return self.explorations.create(self.exploration_settings.policy, own=services.own)
+        return self.explorations.create(self.process_configuration()[1].policy, own=services.own)
 
     def context(self, plan=None, services=None, experience=()):
         return ExecutionContext(self.workspace, self.artifacts, self.registry(),
@@ -131,7 +146,7 @@ class RunComponentJobs:
             remaining_verification=self.verification_uses.remaining,
             assessor_config=self.assessor_configuration() if self.assessor_configuration else self.editor_configuration(),
             completed_assessment_factory=self.completed_assessment, exploration_factory=self.exploration_policy,
-            generator_definitions=self.generators.definitions())
+            generator_definitions=self.generators.definitions(), system_settings=self.system_settings())
 
     def workflow_configuration(self):
         context = self.context()
@@ -257,10 +272,13 @@ class RunComponentJobs:
         self._completion = None
         stop = 'error'
         try:
+            materialize = self.prepare_materialization(root) if self.prepare_materialization else None
             services.completer = model_completion(self.editor_configuration())
             if self.editor_factory is AgentEditor:
                 editor = self.editor_factory(self.editor_configuration(), self.artifacts, registry,
-                                             instructions=self.editor_instructions())
+                    instructions=self.editor_instructions(),
+                    max_tool_calls=self.system_settings().get('editor', {}).get('max_tool_calls', 48),
+                    page_characters=self.system_settings().get('feedback', {}).get('evidence', {}).get('page_characters', 12000))
             else:
                 editor = self.editor_factory(self.editor_configuration(), self.artifacts, registry)
             services.own(editor)
@@ -323,6 +341,12 @@ class RunComponentJobs:
                     'harness': outcome.harness.to_dict(), 'evidence': proof}, sort_keys=True).encode())
                 outcome = replace(outcome, verification=reference)
             self.outcome = outcome
+            if materialize is not None:
+                for candidate in {c.candidate_id: c for c in outcome.candidates}.values():
+                    destination = root / 'candidates' / candidate.candidate_id.removeprefix('sha256:')
+                    path = materialize(candidate, registry, destination)
+                    record('candidate-configuration', candidate_id=candidate.candidate_id,
+                           config=str(path.relative_to(self.workspace)), conditions_id=plan.conditions_id)
             stop = outcome.stop_reason
             services.record('workflow-completed', stop_reason=stop,
                 selected=result_view(outcome)['id'] or None,

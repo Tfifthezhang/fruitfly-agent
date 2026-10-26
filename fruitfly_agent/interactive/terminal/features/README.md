@@ -8,6 +8,7 @@ Keep each user-facing function's command flow and menus in one package. Features
 |---|---|
 | [Configuration](configuration/README.md) | Future-session choices, model forms, and rebuild requests |
 | [Resume](resume/README.md) | Session selection, restoration requests, and history display |
+| [tool_services/approval.py](tool_services/approval.py) | TTY-only external process startup review while ordinary terminal input is suspended |
 | [Improvement](improvement/README.md) | Task source selection, iterative improvement, candidate review/activation, and saved cases |
 | [assembly.py](assembly.py): bind_commands | Bind available built-in features and cancellation to the terminal registry |
 

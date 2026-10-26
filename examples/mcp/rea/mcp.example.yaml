@@ -1,0 +1,17 @@
+servers:
+  rea:
+    transport: stdio
+    command: /absolute/path/to/node
+    args:
+      - /absolute/path/to/rea-install/node_modules/rea-agents/scripts/rea.mjs
+      - mcp
+    cwd: /absolute/path/to/rea-install
+    tools: [analyze_javascript_application]
+    env:
+      REA_MCP_INPUT_SCHEMA_PROFILE: compact
+    startup_timeout: 30
+    call_timeout: 120
+    close_timeout: 10
+    max_parallel: 1
+    max_result_bytes: 16777216
+    inline_result_chars: 12000

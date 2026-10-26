@@ -12,6 +12,7 @@ from fruitfly_agent.run.configuration.resolution import resolve_profile_models
 from fruitfly_agent.run.configuration.profile import HarnessProfile
 from fruitfly_agent.run.storage.sessions import SessionLeases
 from .assembly import RuntimeAssembly
+from .tool_providers import prepare_tool_providers
 from .recovery import (new_session_path, check_session_manifest, record_session_manifest,
                        session_manifests)
 
@@ -26,7 +27,8 @@ class PreparedRuntime:
 
 class RuntimePreparer:
     def __init__(self, *, workspace, catalog, environment, artifacts, provider_registry,
-                 pinned_bindings, task_pack_sources, permission_policy, build, describe):
+                 pinned_bindings, task_pack_sources, permission_policy, build, describe, describe_environment,
+                 describe_services=None, approve_start=None):
         self.cwd = workspace
         self.catalog = catalog
         self.environment = environment
@@ -37,6 +39,9 @@ class RuntimePreparer:
         self.permission_policy = permission_policy
         self.build = build
         self.describe = describe
+        self.describe_environment = describe_environment
+        self.describe_services = describe_services
+        self.approve_start = approve_start
         self.sessions = SessionLeases()
 
     async def open(
@@ -59,10 +64,20 @@ class RuntimePreparer:
         resources: list[object] = []
         try:
             messages = session.messages() if resume else []
+            if resume:
+                for manifest in session_manifests(session):
+                    for service in manifest.get('tool_services', ()):
+                        # read_text verifies the content-addressed artifact before any new service starts.
+                        self.artifact_store.read_text(service['artifact'])
+                        if service['digest'] != service['artifact']:
+                            raise ValueError('external tool declaration artifact differs from recorded identity')
             if resume and not messages and not lease.shared:
                 raise ValueError("nothing to resume")
             artifact_bindings = {**selection.profile.artifact_bindings, **self.data_artifact_bindings}
             profile = selection.profile
+            prepared_tools = await prepare_tool_providers(profile, self.catalog,
+                workspace=self.cwd, environment=self.environment, approve_start=self.approve_start,
+                resources=resources, artifacts=self.artifact_store)
             runtime = self.build(
                 profile,
                 config_path=selection.config_path,
@@ -76,6 +91,7 @@ class RuntimePreparer:
                 artifact_bindings=artifact_bindings,
                 task_pack_sources=self.task_pack_sources,
                 permission_policy=self.permission_policy,
+                tool_providers=prepared_tools,
             )
             check_session_manifest(session, runtime, resume=resume)
             saved = session_manifests(session)
@@ -101,6 +117,8 @@ class RuntimePreparer:
                 mechanisms=visible_mechanism_ids,
                 mechanism_details=details,
                 tool_categories=tool_categories,
+                execution_environment=self.describe_environment(runtime),
+                tool_services=(lambda: self.describe_services(runtime)) if self.describe_services is not None else None,
             )
             approvals = runtime.components["authorization"]
             approvals.emit = interaction.emit_frontend_event

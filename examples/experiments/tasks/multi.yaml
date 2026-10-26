@@ -1,0 +1,11 @@
+schema_version: 1
+source: task-set
+collections:
+- id: terminal
+  source: eval
+  request: ../../terminal/request.json
+  host: ../../terminal/host.yaml
+- id: repository
+  source: eval
+  request: ../../repository/request.json
+  host: ../../repository/host.yaml

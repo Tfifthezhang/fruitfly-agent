@@ -38,3 +38,19 @@ selection/confirmation content is rejected. `resources.py` supplies read-only
 artifact references so original logs need not all be copied into the editable
 workspace. Existing text pagination and image handling still apply. This is not
 an extraction or summarization stage. Candidate write permissions are unchanged.
+
+## Inspect what the editor received
+
+The selected I feedback component owns `evidence.projection` and default
+`evidence.page_characters`. `projections.py` registers pure text views; the bundled
+`granted-full` view returns exact pages from already granted originals. It cannot
+add private files or change immutable execution facts. Custom embedding sessions
+may inject an `EvidenceProjectionRegistry`; the standard config accepts the
+bundled registry's IDs.
+
+Each successful read journals `editor-evidence-page` with the original artifact
+hash and path. Text receipts include offset/limit, returned interval, total source
+characters, truncation, projection implementation and returned page hash. Image
+and unavailable binary reads retain their status and size. Full originals remain
+in the ordinary artifact store. `context/edit-grants.json` gives the editor the
+same owner-normalized field permissions enforced during candidate validation.

@@ -4,6 +4,11 @@
 
 Register mechanisms, validate selections, and assemble a runtime deterministically. Run supplies workspace, Session, and Provider bindings; Catalog owns registration and assembly contracts. Object modules own target adapters; Improvement owns per-job stage contracts.
 
+Start with [Register configurable components](CONFIGURATION.md) to expose a new
+implementation through the shared H/S/I configuration protocol. See
+[Component documents](../../runtime_spec/COMPONENTS.md) for the file grammar and
+[Experiment configuration](../../experiments/CONFIGURATION.md) for edit grants.
+
 ## Register a mechanism
 
 | Step | Action |
@@ -28,6 +33,7 @@ Improvement registers one shared workflow configuration. Per-job generator facto
 | [builtins.py](builtins.py) | Explicit built-in definitions and installers |
 | [SSH registration](../environment/ssh/README.md) | Optional remote execution, credentials and namespace permissions |
 | [assembly.py](assembly.py) | Assembly context, state, and installer execution |
+| [tool_providers.py](tool_providers.py) | Async external-tool preparation, status and separate authorization contracts |
 
 ## Assembly contract
 
@@ -49,6 +55,24 @@ Improvement registers one shared workflow configuration. Per-job generator facto
 | Implementation identity | Explicit `implementation_id` enters the manifest; it is not an automatic source hash. |
 
 `AssemblyContext` supplies workspace, Session, main model, `provider_resolver(profile, max_output_tokens)`, and optional artifact readers/bindings. Installers must not run research jobs or call models during assembly. Failed assembly prevents activation but does not roll back arbitrary file writes.
+
+## Prepare external tools
+
+`MechanismDefinition.tool_provider(parameters, ToolProviderContext)` optionally
+prepares dynamic tool declarations asynchronously. Run calls it only for enabled
+mechanisms before `build_runtime`. The context supplies workspace, secret lookup,
+startup approval, immediate resource ownership and content-addressed artifact I/O.
+Return `PreparedToolProvider` with frozen tools, resources, compact identity,
+one external authorization policy per tool and a read-only status callback.
+Register each resource through `context.own` before awaiting startup so later
+failures can clean it up. Configuration discovery never invokes this callback.
+
+Pass prepared results through `AssemblyContext.tool_providers` and
+`resolve_harness(..., tool_providers=...)`; the installer adds exactly those tools.
+Synchronous assembly rejects an enabled provider without preparation. An offline
+inventory cannot claim dynamic names before preparation. Generic status/startup
+views keep transport logic out of Run and Interactive. See [MCP](../mcp/README.md)
+for the implemented stdio provider and its limits.
 
 ## Configuration and targets
 
@@ -125,6 +149,19 @@ hosts do not branch on concrete algorithm names.
 `AssemblyContext.process_environment` supplies an explicit minimal environment to owned process backends. IPython uses it at process startup; Providers retain host-managed credentials.
 
 `AssemblyContext.secret_resolver(name)` is an optional host capability for selected network tools. It defaults to absent for existing callers. Run binds its secret environment lookup; Lab does not read ambient environment variables. Returned values must stay out of selection parameters, manifests, process environments and errors. The [web tools](../tools/web/README.md) use this capability for search credentials without making requests during construction.
+
+## Describe the execution environment
+
+Catalog exports `ExecutionEnvironmentDescription` and
+`EXECUTION_ENVIRONMENT_COMPONENT` from [Environment](../environment/README.md).
+An environment installer can register
+`state.with_component(EXECUTION_ENVIRONMENT_COMPONENT, description)` with the
+backend's display label, working directory and optional server address. Publish
+only non-secret text; never include authentication values or transport objects.
+This adds no connection or health request. Run translates the installed view into
+Interactive status; Application exposes a replacement only after successful startup
+and activation. Backends without a description remain supported and display
+Unavailable. Permission wrappers do not alter this metadata.
 
 ## Declare credential requirements
 

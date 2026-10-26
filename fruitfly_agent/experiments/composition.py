@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 import yaml
 
-from fruitfly_agent.lab.catalog import builtin_catalog, MechanismSelection
+from fruitfly_agent.lab.catalog import builtin_catalog, MechanismSelection, materialize_system, configuration_resources
 from fruitfly_agent.lab.improvement.api import (WorkflowBindings, builtin_executions,
     builtin_completed_assessors, builtin_explorations, validate_process_configuration)
 from fruitfly_agent.providers.config import load_env
@@ -40,6 +40,7 @@ class PreparedExperiment:
     request: WorkflowRequest
     policy_id: str
     harness: dict | None = None
+    resources: tuple = ()
 
     def summary(self):
         snapshot = self.config.snapshot()
@@ -52,6 +53,10 @@ class PreparedExperiment:
         snapshot['harness'] = self.harness
         snapshot['runtime_hashes'] = {'config': hashlib.sha256(self.config_bytes).hexdigest(),
             'models': hashlib.sha256(self.model_bytes).hexdigest()}
+        snapshot['configuration_sources'] = [{'path': source.path, 'sha256': source.digest}
+            for source in (*self.profile.source_files, *self.config.source_files)]
+        snapshot['configuration_resources'] = [{'path': entry.path, 'content_hash': entry.digest}
+                                               for entry in self.resources]
         snapshot['sources'] = {**snapshot['sources'],
             **{'models.' + role: ('experiment override' if role in self.config.models else str(self.config_path))
                 for role in self.model_roles}}
@@ -73,17 +78,20 @@ class PreparedExperiment:
     def stage_runtime(self, directory):
         root = Path(directory) / 'runtime'
         root.mkdir(parents=True, exist_ok=False)
-        models = root / 'models.yaml'
-        models.write_bytes(self.model_bytes)
-        data = {'schema_version': 1, 'default_profile': self.profile.profile_id,
-            'profiles': {self.profile.profile_id: replace(self.profile, model_catalog=str(models)).to_dict()}}
-        path = root / 'config.yaml'
-        path.write_text(yaml.safe_dump(data, sort_keys=False), encoding='utf-8')
-        return path
+        def read(reference):
+            if reference in self.profile.artifact_contents:
+                return self.profile.artifact_contents[reference]
+            return (self.config.workspace / '.fruitfly/artifacts' / reference[7:]).read_text(encoding='utf-8')
+        return materialize_system(self.profile, root / 'config.yaml', artifact_reader=read,
+            model_source=self.model_path, resources=self.resources)
 
     def verify_sources(self):
+        for source in (*self.profile.source_files, *self.config.source_files):
+            source.check()
         if self.config_path.read_bytes() != self.config_bytes or self.model_path.read_bytes() != self.model_bytes:
             raise ValueError('runtime configuration or model catalog changed after checking')
+        if configuration_resources(self.profile, builtin_catalog(), self.config.workspace) != self.resources:
+            raise ValueError('registered configuration resources changed after checking')
         if resolve_source(self.config, default_source='eval' if self.operation == 'eval' else 'files').source_identity != self.source.source_identity:
             raise ValueError('task material changed after checking')
 
@@ -131,6 +139,9 @@ def prepare_experiment(config, operation, *, require_prepared=True, environment=
     selected = list(profile.mechanisms)
     existing = next((s for s in selected if s.mechanism_id == 'component-improvement'), None)
     parameters = dict(existing.parameters) if existing is not None else {}
+    for role in ('editor', 'assessor'):
+        if role in profile.model_roles:
+            parameters[role + '_profile'] = profile.model_roles[role]
     for role in ('editor', 'assessor') if operation != 'eval' else ():
         if role in config.models:
             parameters[role + '_profile'] = config.models[role]
@@ -203,7 +214,8 @@ def prepare_experiment(config, operation, *, require_prepared=True, environment=
     inventory = validate_harness(config, profile, source, operation=operation,
         environment=process_env if require_credentials else None)
     return PreparedExperiment(config, operation, source, profile, config_path, model_path,
-        config_path.read_bytes(), model_path.read_bytes(), roles, process_env, request, policy_id, inventory)
+        config_path.read_bytes(), model_path.read_bytes(), roles, process_env, request, policy_id, inventory,
+        configuration_resources(profile, catalog, config.workspace))
 
 
 def application_factory(prepared, runtime_path, *, provider_registry=None):

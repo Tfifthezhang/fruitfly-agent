@@ -14,6 +14,7 @@ from typing import Any, Awaitable, Callable
 from ..data_model.messages import AgentToolResult
 from ..env.protocols import ExecutionEnv
 from .authorization import ToolPermission
+from ..errors import Result
 
 
 @dataclass(frozen=True)
@@ -38,6 +39,7 @@ class AgentTool:
     hide_from_model: bool = False
     permission: ToolPermission | None = None
     describe_call: Callable[[dict[str, Any]], str] | None = None
+    validate_arguments: Callable[[dict[str, Any]], Result[dict[str, Any]]] | None = None
 
     def to_schema(self) -> dict[str, Any]:
         return {

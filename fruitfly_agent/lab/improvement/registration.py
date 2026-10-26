@@ -10,11 +10,13 @@ SETTINGS = 'component-improvement-settings'
 EDITOR_CONFIG = 'component-improvement-editor-config'
 ASSESSOR_CONFIG = 'component-improvement-assessor-config'
 EDITOR_INSTRUCTIONS = 'component-improvement-editor-instructions'
+SYSTEM_SETTINGS = 'system-component-settings'
 
 
 def definition():
     from fruitfly_agent.lab.catalog.models import MechanismDefinition
     from fruitfly_agent.lab.catalog.components import ComponentSpec
+    from .system_configuration import configuration_surfaces, validate_component_options
     return MechanismDefinition(MechanismDescriptor('component-improvement', 'Component improvement',
         'Configure shared editing and execution allocations without starting improvement.',
         contributions=(MechanismContribution('improvement', 'context'),),
@@ -26,9 +28,12 @@ def definition():
             P('operation_timeout', 'number', 'Operation timeout', 'Seconds per stage.', 120, minimum=1, maximum=14400)),
         install_order=76, effects=MechanismEffects(uses_provider=True, uses_network=True, writes_files=True,
             cost_notice="Explicit improvement runs call models and execute tasks; registration makes no requests.")),
-        _install, visible=False, implementation_id='component-workflow-v1',
+        _install, visible=False, implementation_id='component-workflow-v1', configuration_role='I',
+        configuration_surfaces=configuration_surfaces(),
+        model_role_parameters={'editor': 'editor_profile', 'assessor': 'assessor_profile'},
+        component_validator=validate_component_options,
         model_profiles=lambda parameters: tuple(parameters[name] for name in ('editor_profile', 'assessor_profile') if parameters[name]),
-        artifact_slots=frozenset({'improvement-editor'}), prepare_targets=_prepare_targets,
+        artifact_slots=frozenset({'improvement-editor', 'improvement-feedback', 'improvement-search'}), prepare_targets=_prepare_targets,
         component_specs=lambda parameters, enabled: (ComponentSpec('improvement-editor', 'I', kind='improvement-instructions', schema='editor-instructions-v2',
             required_capabilities=frozenset({'improver-comparison'})),),
         implementation_path='fruitfly_agent/lab/improvement/registration.py',
@@ -53,7 +58,21 @@ def _install(state, context, parameters):
 
 
 def _prepare_targets(state, context):
-    instructions = EditorInstructions()
+    from .components.configuration import ImprovementSettingsTarget
+    settings = dict(context.component_settings)
+    for key in ('feedback', 'search'):
+        name = 'improvement-' + key
+        reference = context.artifact_bindings.get(name)
+        if key in settings or reference is not None:
+            target = ImprovementSettingsTarget(key, settings.get(key, {}))
+            if reference is not None:
+                text = context.artifact_reader(reference)
+                target = ImprovementSettingsTarget(key, target.parse(text))
+                state = state.with_data_artifact({'key': name, 'id': reference, 'role': 'I',
+                    'media_type': 'application/json', 'size_bytes': len(text.encode('utf-8'))})
+            settings[key] = target.parameters
+            state = state.with_component(TEXT_TARGET_PREFIX + name, target)
+    instructions = EditorInstructions(**context.component_settings.get('editor', {}).get('instructions', {}))
     text = None
     reference = context.artifact_bindings.get('improvement-editor')
     if reference is not None:
@@ -61,8 +80,39 @@ def _prepare_targets(state, context):
             raise ValueError('editor instructions require an artifact reader')
         text = context.artifact_reader(reference)
         instructions = EditorInstructions.parse(text)
+        if 'editor' in settings:
+            from dataclasses import asdict
+            settings['editor'] = {**settings['editor'], 'instructions': asdict(instructions)}
         if not any(a['key'] == 'improvement-editor' for a in state.data_artifacts):
             state = state.with_data_artifact({'key': 'improvement-editor', 'id': reference, 'role': 'I',
                 'media_type': 'application/json', 'size_bytes': len(text.encode('utf-8'))})
-    return (state.with_component(EDITOR_INSTRUCTIONS, instructions)
+    for role, key in (('editor', EDITOR_CONFIG), ('assessor', ASSESSOR_CONFIG)):
+        if key not in state.components:
+            state = state.with_component(key, _lazy_role_config(state.config, context, role))
+    return (state.with_component(SYSTEM_SETTINGS, settings)
+        .with_component(EDITOR_INSTRUCTIONS, instructions)
         .with_component(TEXT_TARGET_PREFIX + 'improvement-editor', EditorInstructionTarget(instructions, text=text)))
+
+
+def _lazy_role_config(config, context, role):
+    alias = context.model_roles.get(role)
+    if alias is None or alias == context.model_roles.get('executor'):
+        return config
+    if alias not in context.model_metadata:
+        raise ValueError('unknown model role profile: ' + alias)
+    metadata = context.model_metadata[alias]
+    class LazyProvider:
+        binding = None
+        def __call__(self, view, *, signal=None):
+            if self.binding is None:
+                self.binding = context.provider_resolver(alias, None)
+            return self.binding.provider(replace(view, model=self.binding.model), signal=signal)
+        async def aclose(self):
+            from inspect import isawaitable
+            if self.binding is not None:
+                close = getattr(self.binding.provider, 'aclose', None) or getattr(self.binding.provider, 'close', None)
+                if close is not None:
+                    result = close()
+                    if isawaitable(result):
+                        await result
+    return replace(config, provider=context.own(LazyProvider()), **metadata)

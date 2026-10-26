@@ -26,8 +26,11 @@ choice retains the first reference. Model-request errors still propagate. Reflec
 lesson citing completed executions of distinct harnesses. Lessons retain cue,
 limitations and the reusable snapshot. No entry is committed inside the editor.
 
-Tools are bounded to 48 operations and 12 turns; all requests consume the job's
-shared model allocation. Text pages and the complete evidence workspace are
+The I editor component configures `max_tool_calls` (default 48, range 1–256)
+and stage `instructions`. Sessions use at most 12 turns; all requests consume the
+job's shared model allocation. The I feedback component sets default text page size
+(12000 characters, range 1–24000). Experiment grants may narrow mutable instruction
+fields; the editor sees those exact grants in `context/edit-grants.json`. Text pages and the complete evidence workspace are
 bounded. PNG/JPEG are visual; other binary originals require an explicit renderer.
 Requests use injected model configuration and may incur cost only during a job.
 

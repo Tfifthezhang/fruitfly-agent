@@ -12,8 +12,8 @@ Use FruitFlyAgent through stdin/stdout, menus, and live events. Application owns
 | Configure | `/config`; save and apply to this conversation, or save only. |
 | Select a prompt | **Configure → prompt** or `/config`; preview and confirm. |
 | Complete a command | Type `/` or a prefix, use ↑↓ to select and Tab to fill it; Enter submits the current text, Esc hides suggestions. |
-| Copy text | Drag to select; F2 freezes the view during streaming, Esc/F2 returns to live output. |
-| Mouse-wheel browsing | F3 toggles application mouse capture; PageUp/PageDown work without it. |
+| Copy text | Use native terminal selection and its copy shortcut. |
+| Browse earlier chat | Scroll with the terminal's mouse wheel, touchpad or scrollback controls. |
 | Inspect activity | `/status`: model, prompt, workspace, session, committed conversation message count, state, queue, pending candidates, context usage bar/percentage, and session compaction count. |
 | Inspect the active harness | `/lab`: active context mechanisms, execution environment, installed tools and supplied capabilities. |
 | Cancel active work | `/cancel` or the first Ctrl+C; clear pending Application input. |
@@ -25,9 +25,9 @@ Use FruitFlyAgent through stdin/stdout, menus, and live events. Application owns
 
 POSIX ANSI terminals support live input, history, cancellation, and bracketed paste. Non-ANSI POSIX TTY input uses a stoppable canonical reader and handles SIGINT while a run is waiting. Redirected input uses sequential line-based fallback and cannot consume `/cancel` during a run. Display limits do not alter model context or stored messages. `NO_COLOR` and terminal capabilities affect rendering.
 
-The editable input area has a contrasting background, an emphasized `❯` prefix, and vertical spacing without full-width borders. Submitted inputs retain an emphasized prefix and blank lines, without background fill. The input uses a neutral gray background and the terminal’s default text color, with light/dark hints and capability fallbacks described in [I/O](io/README.md); `NO_COLOR` keeps the text and spacing. The built-in POSIX ANSI frontend owns an alternate-screen chat viewport. Resizing reflows completed assistant Markdown and restored history while retaining the draft and cursor. PageUp/PageDown browse history; Ctrl+End returns to the latest output. Mouse capture is off by default for native text selection. F3 enables mouse-wheel browsing and shows a capture notice; F3 again releases the mouse. Menus lend and restore the screen. Exit restores the shell screen; persisted conversation remains available through `/resume`. Redirected and non-ANSI streams retain linear output.
+The editable input area has a contrasting background, an emphasized `❯` prefix, and vertical spacing without full-width borders. Submitted inputs retain an emphasized prefix and blank lines, without background fill. The input uses a neutral gray background and the terminal’s default text color, with light/dark hints and capability fallbacks described in [I/O](io/README.md); `NO_COLOR` keeps the text and spacing. The built-in POSIX ANSI frontend appends completed chat to the main screen and redraws only its live tail. Mouse capture stays off. Earlier chat remains in terminal scrollback after menus and exit, subject to the terminal's scrollback limit. Resizing retains the draft and cursor; the terminal owns committed history, which the application does not reformat or replay. Temporary menus use an alternate screen and restore chat on return. Redirected and non-ANSI streams retain linear output.
 
-F2 opens a fixed copy view while background work and display-record collection continue. Drag to select and use the terminal’s copy shortcut. PageUp/PageDown browse the fixed history; Esc/F2 restores the latest output and original draft. Ordinary typing and Enter do not edit or submit a prompt in copy mode. Resize, permission choices and menu lending leave copy mode. Ctrl+C retains its cancellation behavior. Terminal modes and shortcuts are local presentation state, outside Agent configuration and Session persistence.
+Embeddings may explicitly request the optional fullscreen display, with its separate browsing and copy controls described in [I/O](io/README.md). The built-in chat does not require F2/F3 for browsing or selection. Terminal modes remain presentation state, outside Agent configuration and Session persistence.
 
 Live reasoning text is hidden. The existing activity display indicates reasoning, answer reception, and tool execution; redirected output keeps brief activity milestones without animation. Reasoning summaries are also hidden. This presentation policy adds no model requests and does not change reasoning usage. Ordinary assistant text and bounded tool output remain visible.
 
@@ -48,7 +48,7 @@ filesystem or command-handler requests.
 
 ## Restore a conversation
 
-After successful `/resume` or interactive startup with `--resume`, the terminal appends the original conversation in chronological order, followed by an end marker and the normal input prompt. User and assistant text is complete; ANSI terminals format assistant Markdown. Use viewport scrolling to review earlier turns in the built-in ANSI frontend. Menus restore the existing display records without replaying runtime events. Linear fallback remains available for other streams.
+After successful `/resume` or interactive startup with `--resume`, the terminal appends the original conversation in chronological order, followed by an end marker and the normal input prompt. User and assistant text is complete; ANSI terminals format assistant Markdown. Use native terminal scrollback to review earlier turns. Menus restore the main screen without replaying runtime events. Linear fallback remains available for other streams.
 
 Tool calls show names without arguments. Tool results show at most 800 characters per message and explicitly mark omitted output. Images show attachment/media-type markers; reasoning shows an omission marker. Internal context summaries and transient activity events are not replayed. History display makes no model requests, executes no tools, and writes no messages. Context reduction may still affect the context sent to the model.
 
@@ -116,6 +116,14 @@ Current tasks and saved packages use the same running/result flow. Raw TTY input
 
 ## Inspect the active harness
 
+The welcome block, `/lab` and `/status` distinguish the local workspace from the
+active file/Bash execution environment. Local execution shows its directory;
+SSH execution also shows the server and port. Long locations wrap completely.
+Sessions, configuration and context resources remain local. These views describe
+the activated runtime, not a configuration draft or a continuous connection-health
+check. Failed replacement retains the previous target. Hosts without execution
+metadata show Unavailable rather than assuming local execution.
+
 `/lab` inspects the current runtime, including tools and execution capabilities.
 It reads a supplied status snapshot, so saved configuration drafts do not appear
 as active. Unselected algorithms remain available through `/config`. Hidden
@@ -136,6 +144,10 @@ Context Manager
   Reduction        Summarizing
 
 Environment
+  Local workspace        /Users/example/fruitfly-agent
+  Execution environment  Remote SSH
+  Server                 server.example:2222
+  Execution directory    /srv/project
   Remote environment  Enabled
 
 Tools
@@ -205,6 +217,13 @@ The real interactive terminal presents the tool, operation, canonical targets, c
 The existing input reader routes approval keys; no second stdin reader is started. Ordinary non-ANSI TTY input uses numbered choices followed by Enter. Redirected input does not enable confirmations and therefore cannot silently approve local execution or external file operations. `/permissions clear` revokes remembered approvals while normal command input is available; use Esc to deny an active prompt.
 
 Local execution approval is not a sandbox. Approved Bash or Python retains current-user filesystem/network access. The terminal shows this boundary beside execution confirmation. File directory approval is separate from local execution approval.
+
+Optional [MCP services](../../lab/mcp/README.md) require a separate local-process
+startup review before ordinary input starts or while configuration input is lent.
+The review shows command, arguments, directory and injected variable names, never
+resolved secret values. Redirected startup is denied. External tool calls use the
+normal approval frame with grants scoped to one tool and frozen runtime identity.
+`/lab` shows tool services separately from the file/Bash execution backend.
 
 ## Inspect tool execution
 

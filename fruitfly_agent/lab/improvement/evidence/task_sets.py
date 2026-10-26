@@ -5,7 +5,8 @@ from ..contracts.versions import canonical_json
 
 
 def build_workspace(request, artifacts, *, record=None):
-    files, references = {}, {}
+    files, references = {'context/edit-grants.json': canonical_json({
+        'component_ids': request.plan.component_ids, 'options': request.plan.component_options}).encode()}, {}
     allowed = {entry.key: entry for entry in request.tasks}
     if any(entry.partition != 'development' for entry in request.tasks):
         raise ValueError('private task partitions cannot enter editing')

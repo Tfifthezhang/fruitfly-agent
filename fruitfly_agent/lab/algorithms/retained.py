@@ -6,6 +6,12 @@ from .targets import TargetBinding, TargetSnapshot, validate_text, state_artifac
 from fruitfly_agent.lab.improvement.contracts.versions import SnapshotFile, StateSnapshot
 
 
+def configuration_edit(fields, bounds):
+    if fields != ['parameters.initial_text'] or bounds:
+        raise ValueError('retained text grants permit parameters.initial_text without numeric bounds')
+    return {}
+
+
 @dataclass(frozen=True)
 class RetainedText:
     key: str

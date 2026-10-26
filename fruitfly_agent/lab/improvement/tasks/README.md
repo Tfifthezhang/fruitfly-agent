@@ -156,9 +156,9 @@ cp -R examples/improvement/python_functions .fruitfly/improvement/task-packs/pyt
 | Step | Action |
 |---|---|
 | 1 | Prepare the default Agent configuration, model catalog and secret environment. |
-| 2 | Set `task.source: files` and `task.pack` to the installed package ID in `.fruitfly/experiment.yaml`. |
-| 3 | Use `improvement.components` for registered targets; default feedback uses the pack measurement. |
-| 4 | Set `improvement.scope: persistent` for independent verification, and enough executions for paired train/selection/holdout checks. |
+| 2 | Reference a task document with `source: files` and `pack` set to the installed package ID. |
+| 3 | Use experiment `edit` grants for registered component fields; default feedback uses the pack measurement. |
+| 4 | Set `scope: persistent` in the referenced comparison document, and fund paired train/selection/holdout checks in the experiment budget. |
 | 5 | Run `fruitfly-agent-lab improvement check`, then explicitly `improvement run`; model requests may incur charges. |
 | 6 | Inspect the result and evidence; `rsi run` performs verified adoption into its experiment configuration copy. |
 

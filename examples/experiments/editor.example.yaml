@@ -1,15 +1,22 @@
-# Minimal editor example. All optional task.parameters, search and stop settings
-# are annotated in benchmark.example.yaml in this directory, under Editor/I.
-schema_version: 1
-task:
-  source: editor
-  material: editor-study
-  parameters:
-    inner_strategy: simple
-# Install the editor-study material and independent task packages first.
-# The source declares larger model/execution defaults; check before live use.
-# Both roles explicitly use the entry provided by default-models.example.yaml.
-# Change these names if your workspace catalog uses different entries.
-models:
-  editor: deepseek-flash-openai    # Proposes candidate changes.
-  assessor: deepseek-flash-openai  # Model-based assessment when needed.
+# Requires installed editor-study material with private comparison episodes.
+schema_version: 2
+baseline:
+  config: default-config.yaml
+  profile: baseline
+tasks:
+  file: tasks/editor.yaml
+comparison:
+  file: comparison.yaml
+edit:
+  improvement-editor:
+    fields:
+    - parameters.instructions.propose
+    - parameters.instructions.invariant
+    - parameters.instructions.domain
+    - parameters.instructions.compose
+budget:
+  max_model_calls: 512
+  max_executions: 256
+  timeout_seconds: 10800
+trial:
+  operation_timeout_seconds: 1200

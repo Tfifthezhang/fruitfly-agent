@@ -7,6 +7,9 @@ from unittest.mock import Mock, patch
 
 from fruitfly_agent.core.session import Session
 from fruitfly_agent.interactive import AgentApplication
+from fruitfly_agent.interactive.contracts.commands import InteractiveCommand
+from fruitfly_agent.interactive.interaction.commands import CommandRouter
+from fruitfly_agent.interactive.terminal.rendering.welcome import render_welcome
 from fruitfly_agent.lab.catalog import builtin_catalog, MechanismSelection
 from fruitfly_agent.lab.environment.ssh import SshEnv
 from fruitfly_agent.run import build_runtime
@@ -66,6 +69,56 @@ class SshRunTests(unittest.IsolatedAsyncioTestCase):
         enabled = {m.mechanism_id for m in factory.configuration.profile().mechanisms if m.enabled}
         self.assertIn('local-env', enabled)
         self.assertNotIn('ssh-env', enabled)
+
+    async def test_environment_display_tracks_activation_and_retains_previous_target_on_failure(self):
+        factory = self.factory()
+        app = AgentApplication(factory)
+        self.addAsyncCleanup(app.close)
+        server = self.root / 'server-fixture'
+        (server / 'srv/project').mkdir(parents=True)
+        def connect(backend):
+            if backend.config.host == 'unavailable.example':
+                raise OSError('fixture startup failed')
+            return Mock(), SftpFixture(server)
+        def display():
+            status = app.status
+            self.assertEqual(str(self.root.resolve()), status.working_directory)
+            return '\n'.join((render_welcome(status, columns=100, terminal_ui=True, color=False),
+                CommandRouter().execute(InteractiveCommand('lab'), app).text,
+                CommandRouter().execute(InteractiveCommand('status'), app).text))
+        with patch.object(SshEnv, '_connect', autospec=True, side_effect=connect) as connection:
+            await app.start()
+            initial = app.status.execution_environment
+            self.assertEqual('Remote SSH', initial.label)
+            self.assertEqual('server.example:2222', initial.server)
+            self.assertEqual('/srv/project', initial.working_directory)
+            for token in (str(self.root.resolve()), 'server.example:2222', '/srv/project', 'Remote SSH'):
+                self.assertGreaterEqual(display().count(token), 3)
+            for secret in self.secrets.values():
+                self.assertNotIn(secret, display())
+            self.assertEqual(1, connection.call_count, 'inspection must not reconnect')
+            factory.configuration.set_parameter('ssh-env', 'host', 'unavailable.example')
+            self.assertEqual(initial, app.status.execution_environment, 'a draft is not active')
+            factory.configuration.save()
+            self.assertEqual(initial, app.status.execution_environment, 'saving alone does not activate')
+            with self.assertRaisesRegex(RuntimeError, 'SSH connection failed'):
+                await app.apply_configuration()
+            self.assertEqual(initial, app.status.execution_environment)
+            self.assertNotIn('unavailable.example', display())
+            factory.configuration.set_parameter('ssh-env', 'host', 'replacement.example')
+            factory.configuration.save()
+            await app.apply_configuration()
+            self.assertEqual('replacement.example:2222', app.status.execution_environment.server)
+            self.assertNotIn('server.example', display())
+            factory.configuration.set_mechanism('local-env', enabled=True)
+            factory.configuration.save()
+            await app.apply_configuration()
+            local = app.status.execution_environment
+            self.assertEqual('Local', local.label)
+            self.assertEqual(str(self.root.resolve()), local.working_directory)
+            self.assertEqual('', local.server)
+            self.assertNotIn('replacement.example', display())
+            self.assertEqual([], self.registry.create.return_value.calls)
 
     async def test_assembly_is_offline_and_secret_rotation_does_not_serialize_credentials(self):
         profile = HarnessProfile('remote', str(self.root / 'models.yaml'), 'offline', (
@@ -146,7 +199,16 @@ class SshRunTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual('remote world', (server / 'srv/project/hello.txt').read_text())
             self.assertFalse((self.root / 'hello.txt').exists())
             await app.close()
+            factory.configuration.set_parameter('ssh-env', 'host', 'resumed.example')
+            factory.configuration.set_parameter('ssh-env', 'port', '2223')
+            factory.configuration.set_parameter('ssh-env', 'cwd', '/srv/resumed')
+            (server / 'srv/resumed').mkdir()
+            factory.configuration.save()
+            factory.reload_configuration()
             await app.start(resume=True, session_path=path)
+            self.assertEqual('resumed.example:2223', app.status.execution_environment.server)
+            self.assertEqual('/srv/resumed', app.status.execution_environment.working_directory)
+            self.assertEqual(str(self.root.resolve()), app.status.working_directory)
             self.assertEqual(2, len(connections))
             await app.close()
         for client, sftp in connections:

@@ -3,6 +3,7 @@ include LICENSE THIRD_PARTY_NOTICES.md .gitignore
 include assets/logo.svg
 recursive-include fruitfly_agent *.py *.md
 recursive-include fruitfly_agent/experiments/templates *.yaml
+recursive-include fruitfly_agent/run/configuration/templates *.yaml
 recursive-include eval *.py *.md
 recursive-include tests *.py *.md *.json *.yaml
 recursive-include examples *.py *.md *.json *.txt *.yaml

@@ -28,28 +28,62 @@ class NativeEpisodeExecutor:
         registry = deepcopy(context.components)
         registry.adapters['improvement-editor'] = TextComponentAdapter(
             EditorInstructionTarget(instructions, text=request.instructions), 'improvement-instructions')
+        settings = deepcopy(context.system_settings or {})
+        from ..components.configuration import ImprovementSettingsTarget
+        for key in ('feedback', 'search'):
+            name = 'improvement-' + key
+            if request.improver is not None and name in registry.adapters:
+                document = request.improver.component(name)
+                target = ImprovementSettingsTarget(key, registry.adapters[name].target.parse(document.files[0].text))
+                settings[key] = target.parameters
+                registry.adapters[name] = TextComponentAdapter(target, 'improvement-settings')
+        search = settings.get('search', {})
+        feedback = settings.get('feedback', {})
+        depth = search.get('rounds', params['inner_depth'])
+        if depth > params['inner_depth']:
+            raise ValueError('candidate search rounds exceed fixed episode depth allowance')
         if any(registry.snapshot().component(name).role == 'I' for name in request.component_ids):
             raise ValueError('inner experiments cannot modify I')
-        parent = SystemVersion(context.plan.parent.harness, content_hash(request.instructions), context.plan.parent.state)
+        parent = SystemVersion(context.plan.parent.harness,
+            request.improver.snapshot_id if request.improver is not None else content_hash(request.instructions),
+            context.plan.parent.state)
         plan = RunPlan(request.episode_id, parent, request.component_ids,
-            generator_id=self.generator_factory.generator_id, mode='sequential', depth=params['inner_depth'],
+            generator_id=self.generator_factory.generator_id, mode='sequential', depth=depth,
             max_model_calls=params['inner_model_calls'], max_executions=params['inner_executions'],
             operation_timeout=context.plan.operation_timeout,
-            strategy_id=params.get('inner_strategy', 'harness2'), retain_experience=False)
+            strategy_id=search.get('strategy', params.get('inner_strategy', 'harness2')), retain_experience=False)
         selection = budget.child({'model': params['inner_model_calls'], 'execution': params['inner_executions']})
         services = WorkflowServices(plan, budget=selection,
             record=lambda event, **fields: context.services.record(event, episode_id=request.episode_id, **fields))
         try:
-            editor = services.own(AgentEditor(context.editor_config, context.artifacts, registry, instructions=instructions))
+            editor = services.own(AgentEditor(context.editor_config, context.artifacts, registry, instructions=instructions,
+                max_tool_calls=settings.get('editor', {}).get('max_tool_calls', 48),
+                page_characters=feedback.get('evidence', {}).get('page_characters', 12000)))
             services.editor = editor.edit
             services.completer = model_completion(context.editor_config)
             runner = services.own(self.runner_factory(context.config, registry, context.artifacts, services))
             generators = GeneratorRegistry()
             generators.register(self.generator_factory.generator_id, self.generator_factory)
+            completed = context.completed_assessment_factory(services) if context.completed_assessment_factory else None
+            exploration = context.exploration_factory(services) if context.exploration_factory else None
+            if feedback:
+                from ..assessment.completed import CompletedAssessmentService
+                from ..assessment.configuration import ProcessAssessmentSettings
+                from ..assessment.registry import builtin_completed_assessors
+                assessment_values = {key: value for key, value in feedback['process_assessment'].items() if key != 'model_role'}
+                completed = CompletedAssessmentService(ProcessAssessmentSettings(**assessment_values),
+                    config=context.assessor_config or context.editor_config, artifacts=context.artifacts, services=services,
+                    registry=completed.registry if completed is not None else builtin_completed_assessors(), instructions=feedback)
+            if search:
+                from ..assessment.configuration import ProcessAssessmentSettings
+                from ..strategies.exploration import builtin_explorations, validate_process_configuration, ExplorationSettings
+                from ..assessment.registry import builtin_completed_assessors
+                validate_process_configuration(completed.settings if completed is not None else ProcessAssessmentSettings(),
+                    ExplorationSettings(search['exploration']), builtin_completed_assessors(), builtin_explorations())
+                exploration = builtin_explorations().create(search['exploration'], own=services.own)
             flow = ImprovementWorkflow(generators=generators, components=registry, runner=runner,
                 artifacts=context.artifacts,
-                completed_assessment=context.completed_assessment_factory(services) if context.completed_assessment_factory else None,
-                exploration=context.exploration_factory(services) if context.exploration_factory else None,
+                completed_assessment=completed, exploration=exploration,
                 composer=services.own(self.composer_factory()), selector=AgentSelector(
                     ReadOnlyInspector(context.assessor_config or context.editor_config, context.artifacts, instructions=instructions), services))
             baseline = registry.snapshot()

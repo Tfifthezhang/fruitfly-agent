@@ -85,7 +85,8 @@ class LabCommandTests(unittest.TestCase):
 
     def test_empty_and_unavailable_hosts_do_not_claim_improvement(self):
         result = lab(status())
-        self.assertIn('Mechanisms: None enabled', result.text)
+        self.assertIn('Local workspace: /workspace', result.text)
+        self.assertIn('Execution environment: Unavailable', result.text)
         self.assertNotIn('Available · /improvement', result.text)
         self.assertEqual('usage: /lab\n', CommandRouter().execute(
             InteractiveCommand('lab', ('unexpected',)), SimpleNamespace(),

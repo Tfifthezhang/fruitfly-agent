@@ -27,6 +27,8 @@ from fruitfly_agent.interactive.contracts.events import (
 from fruitfly_agent.interactive.contracts.models import (
     ConversationMessage,
     InteractiveMechanism,
+    InteractiveExecutionEnvironment,
+    ToolServiceStatus,
     InteractiveStatus,
 )
 from fruitfly_agent.interactive.session.conversation import conversation_snapshot
@@ -48,6 +50,8 @@ class InteractiveSession:
         session_path: str | Path = "",
         mechanisms: Sequence[str] = (),
         mechanism_details: Sequence[InteractiveMechanism] = (),
+        execution_environment: InteractiveExecutionEnvironment | None = None,
+        tool_services: Callable[[], tuple[ToolServiceStatus, ...]] | None = None,
         tool_categories: Mapping[str, str] | None = None,
         event_sink: EventSink | None = None,
         run_loop: RunLoop = run_agent_loop,
@@ -59,6 +63,8 @@ class InteractiveSession:
         self._session_path = str(session_path)
         self._mechanisms = tuple(mechanisms)
         self._mechanism_details = tuple(mechanism_details)
+        self._execution_environment = execution_environment
+        self._tool_services = tool_services
         self._run_lock = asyncio.Lock()
         self._active_signal: asyncio.Event | None = None
         self._active_task: asyncio.Task[AgentLoopResult] | None = None
@@ -100,6 +106,8 @@ class InteractiveSession:
             tool_names=tuple(tool.name for tool in self._config.tools or ()),
             mechanisms=self._mechanisms,
             mechanism_details=self._mechanism_details,
+            execution_environment=self._execution_environment,
+            tool_services=self._tool_services() if self._tool_services is not None else (),
             **{**{"context_window": self._config.context_window,
                   "max_output_tokens": self._config.max_tokens}, **self._bridge.context_status},
         )

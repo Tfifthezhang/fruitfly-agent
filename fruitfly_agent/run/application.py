@@ -34,7 +34,8 @@ from .storage.experience import ExperienceStore
 from .adapters.improvement import RunImprovementService
 from .adapters.candidates import RunCandidateService
 from .adapters.task_packs import RunTaskPackService
-from .adapters.runtime import describe_runtime
+from .adapters.runtime import describe_runtime, describe_execution_environment, describe_tool_services
+from fruitfly_agent.interactive.contracts.tool_services import ToolServiceStartPlan, ToolServiceStartupApproval
 from fruitfly_agent.interactive.contracts.improvement import ImprovementTargetView
 
 
@@ -55,12 +56,14 @@ class RunApplicationFactory:
         task_pack_sources: tuple = (),
         permission_policy: PermissionPolicy | None = None,
         improvement_bindings=None,
+        tool_service_startup_approval: ToolServiceStartupApproval | None = None,
     ) -> None:
         self.cwd = cwd.resolve()
         if (self.cwd / '.fruitfly' / 'optimization').exists():
             raise ValueError('legacy improvement data requires explicit migration: python -m fruitfly_agent.run.migrate_improvement --apply')
         self.permission_policy = permission_policy
         self.improvement_bindings = improvement_bindings
+        self.tool_service_startup_approval = tool_service_startup_approval
         self.task_pack_sources = tuple(task_pack_sources)
         self._task_snapshots = TaskSnapshotStore(self.cwd)
         self.environment = dict(environment)
@@ -103,10 +106,19 @@ class RunApplicationFactory:
             pinned_bindings=self.data_artifact_bindings, task_pack_sources=self.task_pack_sources,
             permission_policy=self.permission_policy,
             describe=lambda runtime: describe_runtime(runtime, self.catalog),
+            describe_environment=describe_execution_environment,
+            describe_services=describe_tool_services,
+            approve_start=self._approve_tool_service,
             build=lambda *args, **kwargs: build_runtime(
                 *args, **{**kwargs, "provider_registry": self.provider_registry}),
         )
         self._compose_improvement()
+
+    async def _approve_tool_service(self, plan):
+        if self.tool_service_startup_approval is None:
+            return False
+        return await self.tool_service_startup_approval(ToolServiceStartPlan(plan.name, plan.command,
+            plan.arguments, plan.working_directory, plan.environment_names))
 
     @property
     def read_only_configuration(self) -> bool:
@@ -128,6 +140,7 @@ class RunApplicationFactory:
         self._versions = RunVersions(
             workspace=self.cwd, artifacts=self.artifact_store, manifest=self.system_manifest,
             improvement_identity=self.improvement_identity,
+            restore_improvement_identity=self.restore_improvement_identity,
             state_sources=lambda: (*self._current_components.get(STATE_SNAPSHOTS_COMPONENT, ()), self._experience_store),
         )
         self._candidate_service = RunCandidates(
@@ -152,11 +165,13 @@ class RunApplicationFactory:
             config=lambda: self._current_runtime_config, targets=lambda: tuple(self._current_targets.values()),
             tasks=self.task_pack_catalog, publish=self.publish_component_candidate,
             **{f.name: getattr(pipeline_bindings, f.name) for f in fields(pipeline_bindings)})
-        from fruitfly_agent.lab.improvement.api import EDITOR_CONFIG, ASSESSOR_CONFIG, EDITOR_INSTRUCTIONS, SETTINGS
+        from fruitfly_agent.lab.improvement.api import EDITOR_CONFIG, ASSESSOR_CONFIG, EDITOR_INSTRUCTIONS, SETTINGS, SYSTEM_SETTINGS
         self._component_jobs.defaults = lambda: self._current_components.get(SETTINGS, {})
         self._component_jobs.editor_configuration = lambda: self._current_components.get(EDITOR_CONFIG, self._current_runtime_config)
         self._component_jobs.assessor_configuration = lambda: self._current_components.get(ASSESSOR_CONFIG, self._current_runtime_config)
         self._component_jobs.editor_instructions = lambda: self._current_components.get(EDITOR_INSTRUCTIONS)
+        self._component_jobs.system_settings = lambda: self._current_components.get(SYSTEM_SETTINGS, {})
+        self._component_jobs.prepare_materialization = self.prepare_candidate_materialization
         self._improvement_service = RunImprovementService(
             jobs=self._component_jobs, activity=self.improvement_activity, cancel=self.cancel_improvement,
             runs=ImprovementRunStore(self.cwd), scope=self.candidate_scope,
@@ -222,6 +237,11 @@ class RunApplicationFactory:
         from fruitfly_agent.lab.improvement.api import SETTINGS
         return {**self._component_jobs.identity(),
                 'configuration': self._current_components.get(SETTINGS, {})}
+
+    def restore_improvement_identity(self, identity, key, text):
+        from fruitfly_agent.lab.catalog import restore_component_settings
+        settings = restore_component_settings(identity.get('system_settings', {}), key, text, self.catalog)
+        return {**identity, **self._component_jobs.identity(system_settings=settings)}
 
     def improvement_targets(self):
         return tuple(ImprovementTargetView(c.role, c.component_id, c.label, c.available, c.reason)
@@ -307,6 +327,33 @@ class RunApplicationFactory:
         save_task_result(self.cwd, record, text)
         self.compact_candidates()
         return (record,)
+
+    def prepare_candidate_materialization(self, directory):
+        from copy import deepcopy
+        import json
+        from dataclasses import asdict
+        from fruitfly_agent.lab.catalog import bind_component_changes, materialize_system
+        from fruitfly_agent.run.configuration.resolution import model_catalog_path
+        profile = deepcopy(self._active_profile or self.selection.profile)
+        model_path = model_catalog_path(profile, self.selection.config_path)
+        frozen_models = directory / 'baseline-models.yaml'
+        frozen_state = self._versions.snapshots.read(self.system_version().state)
+        with frozen_models.open('xb') as stream:
+            stream.write(model_path.read_bytes())
+        def materialize(candidate, registry, destination):
+            bound = bind_component_changes(profile, registry.export(candidate.harness, changed_only=False))
+            path = materialize_system(bound, destination / 'config.yaml', catalog=self.catalog,
+                artifact_reader=self.artifact_store.read_text, model_source=frozen_models,
+                resources=frozen_state.files)
+            (destination / 'changes.json').write_text(json.dumps({
+                'parent': asdict(candidate.parent), 'candidate_id': candidate.candidate_id,
+                'changed_components': candidate.changed_ids,
+                'changes': [{'component_id': name, 'before': asdict(candidate.base.component(name)),
+                    'after': asdict(candidate.harness.component(name))} for name in candidate.changed_ids],
+                'reasons': [asdict(r) for r in candidate.reasons]},
+                ensure_ascii=False, indent=2), encoding='utf-8')
+            return path
+        return materialize
 
     def candidate_scope(self):
         return str(self.selection.config_path.resolve()), self.selection.profile.profile_id

@@ -41,6 +41,12 @@ returns a read-only structured panel and plain-text fallback; terminal rendering
 owns section colors, alignment and width adaptation. Inspection makes no service
 queries, model calls or configuration changes. See [active harness inspection](terminal/README.md#inspect-the-active-harness).
 
+Welcome, `/lab` and `/status` distinguish the local workspace from the optional
+execution-environment view. Remote execution includes its server/port and working
+directory. These are active runtime facts, independent of saved drafts and ongoing
+connection health. Failed replacement retains the previous facts. Built-in chat
+uses native terminal scrollback, including after menus and exit.
+
 `conversation()` projects canonical messages into `ConversationMessage` and `ConversationBlock` views. Text remains complete; image blocks contain only their media type, thinking blocks contain an omission marker, and tool calls contain only their name. Internal context summaries are excluded. Reading history emits no events and changes neither persisted messages nor model context.
 
 ## Inject independent capabilities

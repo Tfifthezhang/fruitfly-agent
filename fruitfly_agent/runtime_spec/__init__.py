@@ -5,7 +5,10 @@ from .execution import (validate_execution, execution_values, execution_kwargs, 
                         parse_execution, apply_profile_binding)
 
 from .references import runtime_reference
+from .components import ComponentConfiguration
+from .documents import DocumentReader, DocumentSource
 
 __all__ = ['HarnessConfig', 'HarnessProfile', 'MechanismSelection', 'load_harness_config', 'save_harness_config',
            'validate_execution', 'execution_values', 'execution_kwargs', 'effective_execution',
-           'parse_execution', 'apply_profile_binding', 'runtime_reference']
+           'parse_execution', 'apply_profile_binding', 'runtime_reference',
+           'ComponentConfiguration', 'DocumentReader', 'DocumentSource']

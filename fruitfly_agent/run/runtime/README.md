@@ -12,8 +12,14 @@ Assemble resources and prepare new or recovered runtime handles. Application own
 | [activation.py](activation.py): `bind_activation` | Compose pre-commit and post-commit hooks around prepared handles |
 | [recovery.py](recovery.py) | Session discovery, recorded bindings, manifest checks, and session paths |
 | [permissions.py](permissions.py) | Host permission policy and minimal process environment |
+| [tool_providers.py](tool_providers.py) | Drive enabled Catalog preparations and own resources before synchronous assembly |
 
 Preparation receives configuration selections, separate improvement/candidate/task material services, and explicit construction/presentation capabilities. It does not inspect a Factory, candidate store, improver implementation, or configuration draft. `PreparedRuntime` reports actual bindings to the composition root only when activation occurs. Successful activation commits the environment snapshot; changed mechanisms also commit a rebuilt model projection.
+
+An injected execution-description adapter supplies Session's optional execution
+view independently of the local workspace path. Application exposes it after
+backend startup succeeds; failed replacement retains the previous view. This
+presentation data adds no probes or persisted schema changes.
 
 Catalog registers object-owned improvement targets. The improvement host discovers execution and generator definitions without model requests, then constructs job-local stages after a frozen preview is confirmed. Preparation can create Session files and Provider clients; it does not execute Agent tasks. Failed preparation closes owned resources. Application cleans up failed startup. Activation hooks do not provide cross-process transactions or rollback arbitrary external effects.
 
@@ -24,6 +30,15 @@ resolved harness inventory in runtime identity. Recovery also reads schemas 3, 4
 historical limits. It validates each manifest against its own contents and allows
 changed environments; it does not restore arbitrary Python state or replay unknown
 paid work. See [Run recovery](../README.md#recovery) and [Session](../../core/session/README.md).
+Optional external tool providers are prepared before Providers and synchronous
+assembly. `build_runtime(tool_providers=...)` accepts those prepared declarations;
+missing enabled preparations fail explicitly. Startup approval is a host callback,
+separate from tool-call approval. Manifest schema 8 adds verified declaration
+artifacts for external services. Recovery checks those artifacts before launching
+current services, creates fresh grants and never replays calls. Ordinary runtimes
+continue to use schema 7. Live service views come from Catalog status callbacks
+without transport probes. See [MCP](../../lab/mcp/README.md).
+
 No module-specific environment variables.
 
 ```bash

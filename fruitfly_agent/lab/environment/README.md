@@ -25,6 +25,7 @@ and remote process supervision. Local sessions and model calls stay local.
 | File | Responsibility |
 |---|---|
 | [local.py](local.py) | `LocalEnv` implementation |
+| [description.py](description.py) | Immutable execution description published through Catalog for host presentation |
 | [permissions.py](permissions.py), [guarded.py](guarded.py) | Guarded host strategy, authorizer and environment wrapper |
 | [execution.py](execution.py) | Explicit unrestricted strategy and allow authorizer |
 | [ssh](ssh/README.md) | `SshConfig`, `SshEnv`, remote permissions and Catalog registration |
@@ -32,6 +33,13 @@ and remote process supervision. Local sessions and model calls stay local.
 | [Core protocols](../../core/env/protocols.py) | Required filesystem and shell operations |
 
 Implement `ExecutionEnv` for another backend. Document paths, symlinks, encoding, environment inheritance, permissions, output, timeout, and cleanup. Register backend resources once through [Catalog](../catalog/README.md); tools share the injected backend. Container and read-only backends are extension options, not built-in capabilities.
+
+Environment installers publish an `ExecutionEnvironmentDescription` under
+`EXECUTION_ENVIRONMENT_COMPONENT`; both are host-facing exports of
+[Catalog](../catalog/README.md#describe-the-execution-environment). The view carries
+only a label, actual execution directory and optional server address. Local and
+SSH installers supply it from their installed backend. It is presentation metadata,
+independent of permission wrapping and Session/runtime identity schemas.
 
 No module-specific environment variables. See [Known limitations](../ALGORITHM_AUDIT.md).
 

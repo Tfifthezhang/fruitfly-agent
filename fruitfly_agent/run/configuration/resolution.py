@@ -36,7 +36,7 @@ def resolve_harness_selection(
 
     target = _resolve_config_path(cwd, config_path)
     if target.is_file():
-        config = load_harness_config(target)
+        config = load_harness_config(target, catalog=catalog)
         profile = config.select(profile_id)
         return HarnessSelection(config, profile, target, True)
     if config_path is not None and not allow_incomplete:
@@ -89,7 +89,7 @@ def resolve_harness_selection(
         model_profile=selected_model,
         mechanisms=catalog.default_selections(),
     )
-    config = HarnessConfig(default_profile="default", profiles={"default": profile})
+    config = HarnessConfig(default_profile="default", profiles={"default": profile}, schema_version=2)
     return HarnessSelection(config, profile, target, False)
 
 
@@ -161,7 +161,7 @@ def _incomplete_selection(
         model_profile=None,
         mechanisms=catalog.default_selections(),
     )
-    config = HarnessConfig(default_profile="default", profiles={"default": profile})
+    config = HarnessConfig(default_profile="default", profiles={"default": profile}, schema_version=2)
     return HarnessSelection(config, profile, target, False)
 
 

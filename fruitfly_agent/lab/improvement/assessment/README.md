@@ -26,8 +26,9 @@ separate configuration and read-only contexts. No assessor activates a candidate
 ## Assess after execution
 
 Hosted searches normalize [execution facts](../execution/README.md#record-execution-facts)
-before assessment. Configure `process_assessment` in the
-[experiment file](../../../experiments/README.md); the default empty assessor list
+before assessment. Configure `parameters.process_assessment` in the selected
+I feedback component; see the [system grammar](../../../runtime_spec/COMPONENTS.md).
+The default empty assessor list
 adds no judgment calls. This path does not require an online event stream.
 
 | Assessor ID | Evidence and behavior |
@@ -38,7 +39,9 @@ adds no judgment calls. This path does not require an online event stream.
 `CompletedAssessorRegistry` registers factories and comparison/model requirements.
 `CompletedAssessmentService` owns fresh instances, validates receipt identities and
 evidence grants, and saves `process-assessments.json` plus journal references.
-Judgments use `models.assessor` with no tools. Model calls and comparisons share
+Judgments use the system's `models.roles.assessor` with no tools. Configured
+`judgment_guidance` and `comparison_guidance` append task-independent instructions
+to the fixed output protocols; they do not change the outer objective or proof. Model calls and comparisons share
 `max_model_calls` (default 16) within each search and the root ledger. Each operation
 has a `timeout_seconds` bound (default 120). Full granted input above 2 MB becomes
 unavailable; it is not silently truncated or summarized. Binary content retains

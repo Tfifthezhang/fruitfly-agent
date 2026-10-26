@@ -1,0 +1,19 @@
+# Copy to .fruitfly/mcp.yaml only when absent; edit the executable and tool names.
+# The server must already be installed. Enabling mcp-tools starts a local process
+# after explicit startup review, even if the execution environment uses SSH.
+servers:
+  example:
+    enabled: true
+    transport: stdio
+    command: /absolute/path/to/server-executable
+    args: ["--stdio"]
+    cwd: .
+    tools: ["replace_with_exact_remote_tool_name"]
+    env: {}
+    secret_env: {} # Example: SERVICE_API_KEY: MY_SERVICE_API_KEY (names only).
+    startup_timeout: 30
+    call_timeout: 120
+    close_timeout: 10
+    max_parallel: 1
+    max_result_bytes: 16777216
+    inline_result_chars: 12000

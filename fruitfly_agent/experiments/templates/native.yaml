@@ -1,13 +1,16 @@
-# Minimal native example. For every field, choice and disabled recipe, see
-# benchmark.example.yaml in this directory; replace its task block for native use.
-schema_version: 1
-task:
-  source: files
-  instruction: Produce a short, self-contained checklist for reviewing a Python function.
-# Agent/model defaults: .fruitfly/default-config.yaml and its referenced catalog.
-# Executor: default-config.yaml -> profiles.baseline.model.profile.
-# Both roles explicitly use the entry provided by default-models.example.yaml.
-# Change a role to another catalog entry, or remove it to inherit the executor.
-models:
-  editor: deepseek-flash-openai    # Proposes candidate changes.
-  assessor: deepseek-flash-openai  # Model-based assessment when needed.
+schema_version: 2
+baseline:
+  config: default-config.yaml
+  profile: baseline
+tasks:
+  file: tasks/native.yaml
+comparison:
+  file: comparison.yaml
+edit:
+  base_prompt:
+    fields:
+    - parameters.text
+budget:
+  timeout_seconds: 3600
+trial:
+  operation_timeout_seconds: 1200

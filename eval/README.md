@@ -93,8 +93,9 @@ Python, creates a venv or runs pip. Task Python versions remain independent.
 
 The selected profile uses the [shared runtime specification](../fruitfly_agent/runtime_spec/README.md).
 Declared execution parameters are validated and preserved during staging.
-The selected profile is normalized and its referenced main/auxiliary models are
-staged before Harbor starts. Enabled mechanism dependencies are resolved through
+Schema-2 staging preserves the full H/S/I documents and role bindings through the
+shared loader. Referenced model definitions are staged before Harbor starts;
+inactive roles retain catalog metadata without requiring unused credentials. Enabled mechanism dependencies are resolved through
 Catalog without Provider construction. Missing required credentials and remote
 execution environments are rejected before launching tasks. Unselected models
 and unrelated credential variables are excluded. Explicit

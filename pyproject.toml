@@ -29,6 +29,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+mcp = [
+    "mcp==2.3.0",
+    "jsonschema>=4.23,<5",
+]
 ssh = [
     "paramiko>=3.4,<5",
 ]
@@ -50,7 +54,8 @@ where = ["."]
 include = ["fruitfly_agent*", "eval*"]
 
 [tool.setuptools.package-data]
-"fruitfly_agent.experiments" = ["templates/*.yaml"]
+"fruitfly_agent.experiments" = ["templates/*.yaml", "templates/tasks/*.yaml"]
+"fruitfly_agent.run.configuration" = ["templates/*.yaml", "templates/components/H/*.yaml", "templates/components/H/tools/*.yaml", "templates/components/S/*.yaml", "templates/components/I/*.yaml"]
 
 [tool.mypy]
 python_version = "3.11"
@@ -62,6 +67,10 @@ files = [
     "fruitfly_agent/runtime_spec",
     "fruitfly_agent/lab/execution_policy",
     "fruitfly_agent/lab/catalog/components.py",
+    "fruitfly_agent/lab/catalog/tool_providers.py",
+    "fruitfly_agent/lab/mcp",
+    "fruitfly_agent/run/runtime/tool_providers.py",
+    "fruitfly_agent/interactive/contracts/tool_services.py",
     "fruitfly_agent/core/tool_runtime/authorization.py",
     "fruitfly_agent/interactive/interaction/authorization.py",
     "fruitfly_agent/lab/environment/permissions.py",
@@ -168,3 +177,8 @@ disallow_untyped_defs = true
 [[tool.mypy.overrides]]
 module = ["harbor.*"]
 follow_untyped_imports = true
+
+# Optional SDK/schema boundaries remain dynamically typed when the extra is absent.
+[[tool.mypy.overrides]]
+module = ["mcp", "mcp.*", "jsonschema", "jsonschema.*"]
+ignore_missing_imports = true

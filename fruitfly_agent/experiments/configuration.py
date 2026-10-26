@@ -3,6 +3,7 @@ from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any
 import yaml
+from fruitfly_agent.runtime_spec.documents import DocumentReader
 
 from fruitfly_agent.lab.improvement.configuration import ImprovementSettings, TaskSetImprovementSettings
 from fruitfly_agent.lab.rsi.configuration import EvolutionSettings
@@ -59,6 +60,7 @@ class ExperimentConfig:
     process_assessment: ProcessAssessmentSettings = field(default_factory=ProcessAssessmentSettings)
     exploration: ExplorationSettings = field(default_factory=ExplorationSettings)
     multi_task: MultiTaskSettings = field(default_factory=MultiTaskSettings)
+    source_files: tuple = field(default=(), compare=False, repr=False)
 
     def resolve(self, value: str) -> Path:
         if not isinstance(value, str) or not value.strip():
@@ -86,11 +88,14 @@ def load_configuration(workspace, path=None, *, overrides=None):
         raise ValueError('experiment configuration not found: ' + str(target))
     raw = {}
     sources = {}
+    source_files: tuple = ()
     if target.is_file():
-        try:
-            raw = yaml.load(target.read_text(encoding='utf-8'), Loader=UniqueLoader)
-        except yaml.YAMLError:
-            raise ValueError('invalid experiment YAML') from None
+        reader = DocumentReader()
+        raw = reader.read(target)
+        if isinstance(raw, dict) and type(raw.get('schema_version')) is int and raw['schema_version'] == 2:
+            from .comparison import normalize_experiment
+            raw, source_files, _ = normalize_experiment(raw, target)
+        source_files = (*reader.sources.values(), *source_files)
         mapping(raw, {'schema_version', 'task', 'runtime', 'models', 'improvement', 'rsi', 'stop',
             'process_assessment', 'exploration', 'multi_task'}, 'experiment')
         if type(raw.get('schema_version')) is not int or raw['schema_version'] != 1:
@@ -114,4 +119,4 @@ def load_configuration(workspace, path=None, *, overrides=None):
         settings(EvolutionSettings, raw.get('rsi', {}), 'rsi'), stop, sources,
         settings(ProcessAssessmentSettings, raw.get('process_assessment', {}), 'process_assessment'),
         settings(ExplorationSettings, raw.get('exploration', {}), 'exploration'),
-        MultiTaskSettings.from_dict(raw.get('multi_task', {})))
+        MultiTaskSettings.from_dict(raw.get('multi_task', {})), source_files)

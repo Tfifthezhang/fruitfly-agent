@@ -1,4 +1,4 @@
-"""Completed answers reflow on real TTY resize without another model request."""
+"""Native terminal history survives resize while the live input reflows."""
 import os
 import unittest
 
@@ -25,7 +25,7 @@ asyncio.run(main())
 
 @unittest.skipUnless(os.name == 'posix', 'requires POSIX terminal controls')
 class TerminalReflowTest(unittest.TestCase):
-    def test_resize_reformats_completed_table_and_preserves_unsent_draft(self):
+    def test_resize_preserves_completed_table_once_and_unsent_draft(self):
         process = TerminalProcess(CODE)
         self.addCleanup(process.close)
         process.resize(20, 32)
@@ -36,12 +36,18 @@ class TerminalReflowTest(unittest.TestCase):
         process.read_until('unsent draft')
         offset = len(process.output)
         process.resize(20, 100)
-        process.read_until('complete-long-directory-name.jsonl', start=offset)
-        process.read_until('complete-description-for-this-record', start=offset)
         process.read_until('unsent draft', start=offset)
         # Ctrl+U clears only the unsent text. Resize must not submit it.
         process.send(b'\x15/exit\r')
         output = process.finish()
         self.assertIn('REQUEST-COUNT=1', output)
-        self.assertIn('\x1b[?1049h', output)
-        self.assertIn('\x1b[?1049l', output)
+        # Completed content stays in native history; widening only redraws input.
+        after_resize = process.output[offset:].decode(errors='replace')
+        self.assertNotIn('complete-lon', after_resize)
+        self.assertNotIn('complete-des', after_resize)
+        self.assertNotIn('\x1b[?1049h', output)
+        self.assertNotIn('\x1b[H', output)
+        # Both cells wrap at the original narrow width, preserving every segment.
+        for segment in ('complete-lon', 'g-directory-', 'name.jsonl',
+                        'complete-des', 'cription-for', '-this-record'):
+            self.assertIn(segment, output)

@@ -1,5 +1,5 @@
 """Offline harness inventory from owner declarations, without installers or clients."""
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 import hashlib
 import json
 
@@ -28,9 +28,12 @@ class ResolvedHarness:
     components: tuple[ComponentSpec, ...]
     owners: tuple[tuple[str, str], ...]
     execution_owners: tuple[tuple[str, str], ...] = ()
+    settings: dict = field(default_factory=dict)
 
     def to_dict(self):
         result = asdict(self)
+        if not self.settings:
+            result.pop('settings')
         for component in result['components']:
             component['required_capabilities'] = sorted(component['required_capabilities'])
         return json.loads(json.dumps(result))
@@ -52,7 +55,7 @@ class ResolvedHarness:
         return tuple(components[name] for name in component_ids)
 
 
-def resolve_harness(profile, catalog):
+def resolve_harness(profile, catalog, *, tool_providers=None):
     resolved = catalog.resolve(profile.mechanisms)
     enabled = {item.definition.descriptor.mechanism_id: item for item in resolved}
     components, owners, tools, controlled = {}, {}, set(), {}
@@ -60,7 +63,15 @@ def resolve_harness(profile, catalog):
         name = definition.descriptor.mechanism_id
         active = enabled.get(name)
         if active:
-            for tool in definition.descriptor.effects.tools:
+            dynamic = ()
+            if definition.tool_provider is not None:
+                prepared = (tool_providers or {}).get(name)
+                if prepared is None:
+                    raise ValueError('tool provider requires asynchronous preparation: ' + name)
+                dynamic = tuple(tool.name for tool in prepared.tools)
+            for tool in (*definition.descriptor.effects.tools, *dynamic):
+                if tool in tools:
+                    raise ValueError('duplicate tool declaration: ' + tool)
                 tools.add(tool)
                 key = 'tool-guidance.' + tool
                 if key in components:
@@ -82,8 +93,16 @@ def resolve_harness(profile, catalog):
                 components[key], owners[key] = component, name
     mechanisms = tuple({'id': item.definition.descriptor.mechanism_id, 'parameters': dict(item.parameters),
         'implementation_id': item.definition.implementation_id} for item in resolved)
+    from .configuration import configuration_surfaces
+    for name, (owner, surface) in configuration_surfaces(catalog).items():
+        if surface.binding == 'settings' and name not in components and (
+                surface.key in profile.component_settings or name in profile.artifact_bindings):
+            components[name] = ComponentSpec(name, surface.role, kind='improvement-settings',
+                schema='improvement-settings-v1', required_capabilities=frozenset({'improver-comparison'}))
+            owners[name] = owner
     return ResolvedHarness(profile.profile_id, mechanisms, tuple(sorted(tools)), execution_values(profile.execution),
-        tuple(components[key] for key in sorted(components)), tuple(sorted(owners.items())), tuple(sorted(controlled.items())))
+        tuple(components[key] for key in sorted(components)), tuple(sorted(owners.items())), tuple(sorted(controlled.items())),
+        dict(profile.component_settings))
 
 
 def verify_runtime(inventory, config, targets):

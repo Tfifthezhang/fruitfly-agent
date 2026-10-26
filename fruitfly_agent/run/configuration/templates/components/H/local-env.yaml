@@ -1,0 +1,6 @@
+schema_version: 1
+id: local-env
+role: H
+implementation: local-env
+enabled: true
+parameters: {}

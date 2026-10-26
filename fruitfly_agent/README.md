@@ -4,6 +4,13 @@
 
 FruitFlyAgent separates the Agent loop, model adapters, Application lifecycle, and replaceable algorithms. Run assembles them into an interactive runtime.
 
+System configuration selects H/S/I component documents through one versioned
+[runtime specification](runtime_spec/COMPONENTS.md). Daily config, experiment
+baseline and generated candidate use the same loader/projection and runtime
+assembly. [Catalog declarations](lab/catalog/CONFIGURATION.md) own supported
+fields and adapters; [experiment grants](experiments/CONFIGURATION.md) authorize
+bounded changes. See the [configuration navigation tree](../CONFIGURATION.md#navigate-the-configuration-tree).
+
 ## Modules
 
 | Module | Owns | Depends on |
@@ -46,6 +53,12 @@ rules; generic files and container benchmarks use the same contracts.
 Run separates [configuration](run/configuration/README.md), [runtime preparation](run/runtime/README.md), [storage](run/storage/README.md), [improvement hosting](run/improvement/README.md), and [adapters](run/adapters/README.md). Its Factory composes these services; leaf services receive explicit capabilities and own their local state.
 
 Interactive separates Contracts, Application, Session, Interaction, and Terminal. It keeps lifecycle authority in Application and exposes independent search, candidate, and task material contracts. Its terminal uses [registered command handlers](interactive/terminal/README.md#register-a-command); feature flows consume explicit capabilities and share one input owner.
+
+Built-in chat appends completed output to native terminal scrollback; menus borrow
+an alternate screen. Lab publishes execution descriptions through Catalog, and
+Run projects them into Interactive status separately from the local workspace.
+Welcome, `/lab` and `/status` describe the activated environment without backend
+inspection in the terminal.
 
 ## Follow a request
 
@@ -93,6 +106,7 @@ Recovery validates recorded contents and required artifacts, then continues with
 |---|---|
 | Change request context | [Context manager](lab/context_manager/README.md) |
 | Add model-callable operations | [Tools](lab/tools/README.md) |
+| Connect independently installed MCP tools | [MCP client](lab/mcp/README.md) |
 | Replace filesystem or shell access | [Environment](lab/environment/README.md) |
 | Execute on an external SSH server | [SSH environment](lab/environment/ssh/README.md) |
 | Search text candidates | [Improvement](lab/improvement/README.md) |
@@ -104,6 +118,13 @@ Recovery validates recorded contents and required artifacts, then continues with
 The [offline extension example](../examples/extensions/README.md) demonstrates registration, assembly, and interaction without model access. [Tests](../tests/README.md) enforce boundaries and covered behavior; [Lab limitations](lab/ALGORITHM_AUDIT.md) describe remaining constraints.
 
 Runtime authorization has a Core contract, a Lab file/execution policy, Interactive confirmation, and Run assembly. Standard Run protects known credential paths and asks for external file access and local code execution. See [Environment permissions](lab/environment/README.md#apply-lightweight-permissions). It does not provide OS isolation or sandbox arbitrary trusted Python plugins.
+
+Optional external tool providers use Catalog's asynchronous preparation contract
+before synchronous assembly. Lab owns transport and exact schemas; Run supplies
+startup approval, ownership and artifacts; Interactive exposes generic tool-service
+status and separate call authorization. The [MCP client](lab/mcp/README.md) supports
+local stdio, including alongside SSH execution. Its frozen declaration artifacts
+enter manifest schema 8; ordinary runtimes retain schema 7.
 
 Run's configuration menu restores default harness settings through its ordinary
 save/discard flow while preserving daily model selections. Eval consumes the

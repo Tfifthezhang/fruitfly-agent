@@ -21,18 +21,17 @@ declare `execution-config`. No arbitrary YAML file or Python callback is editabl
 Add the component explicitly in the experiment configuration:
 
 ```yaml
-improvement:
-  components: [base_prompt, execution-policy]
-  component_options:
-    execution-policy:
-      editable_fields: [max_tool_calls_per_turn]
-      bounds:
-        max_tool_calls_per_turn: {minimum: 64, maximum: 512}
+edit:
+  execution-policy:
+    fields: [parameters.max_tool_calls_per_turn]
+    bounds:
+      parameters.max_tool_calls_per_turn: {minimum: 64, maximum: 256}
 ```
 
-Without options, all declared fields are editable except fields owned by another
-enabled mechanism. Nested fields use dotted names such as
-`tool_execution.max_parallel`. Options for unselected, absent or unsupported
+Schema-2 experiments require explicit fields. Nested fields use dotted paths such
+as `parameters.tool_execution.max_parallel`. The embedding adapter and schema-1
+reader retain their existing default grants; enabled mechanism owners exclude
+fields they control. Options for unselected, absent or unsupported
 components fail. A fixed field cannot change, and every proposal must also satisfy
 the base parameter schema. The initial value must fit the declared bounds.
 

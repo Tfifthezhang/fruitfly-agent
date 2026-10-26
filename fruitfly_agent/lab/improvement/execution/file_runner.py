@@ -25,9 +25,12 @@ class FileTaskRunner:
     """
     capabilities = frozenset({'file-workspace', 'tool:read', 'tool:write', 'tool:edit', 'events', 'stop', 'execution-config'})
 
-    def __init__(self, config, components, artifacts, services, *, tool_names=None):
+    def __init__(self, config, components, artifacts, services, *, tool_names=None, model_calls=None):
         self.config, self.components, self.artifacts, self.services = config, components, artifacts, services
         self.tool_names = frozenset({"read", "write", "edit"} if tool_names is None else tool_names)
+        if model_calls is not None and (type(model_calls) is not int or model_calls < 1):
+            raise ValueError('task model_calls must be a positive integer')
+        self.model_limit = model_calls
         self.capabilities = frozenset(c for c in type(self).capabilities if not c.startswith("tool:") or c[5:] in self.tool_names)
 
     async def start(self, plan, task, harness):
@@ -49,6 +52,7 @@ class FileTaskRunner:
         files = {r.path: self.artifacts.read(r.artifact_id) for r in task.inputs}
         originals = dict(files)
         calls = 0
+        model_limit_hit = False
         def read_path(path):
             relative_path(path)
             if path not in files:
@@ -97,7 +101,11 @@ class FileTaskRunner:
         tools = tuple(tool for tool in (replace(factory(), execute=execute) for factory, execute in (
             (create_read_tool, read), (create_write_tool, write), (create_edit_tool, edit))) if tool.name in self.tool_names)
         def provider(view, *, signal=None):
-            nonlocal calls
+            nonlocal calls, model_limit_hit
+            if self.model_limit is not None and calls >= self.model_limit:
+                model_limit_hit = True
+                from ..workflow.budget import AllocationExhausted
+                raise AllocationExhausted('task model-call limit exhausted')
             self.services.reserve('model')
             calls += 1
             journal.publish('model-request', model=view.model, call=calls)
@@ -151,7 +159,9 @@ class FileTaskRunner:
         record = ExecutionRecord(run_id, task.task_id, task.material_id, harness.snapshot_id,
             plan.parent.state, plan.conditions_id, 'completed' if status == 'completed' else 'error', output, tuple(artifacts), calls)
         values = loop_fact_values(result.diagnostics)
-        values['budgets'] = (*values.get('budgets', ()), BudgetFact('model_calls', 'execution', calls,
+        if model_limit_hit:
+            values['termination_reason'] = 'model_budget_exhausted'
+        values['budgets'] = (*values.get('budgets', ()), BudgetFact('model_calls', 'execution', calls, self.model_limit,
             source='budgeted file-task Provider'))
         facts = receipt_facts(record, self.artifacts, elapsed_seconds=time.monotonic() - started, **values)
         return attach_facts(record, facts, self.artifacts)

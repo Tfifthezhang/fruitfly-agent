@@ -57,7 +57,7 @@ class TerminalFrontend:
         self.output = output_stream or sys.stdout
         self._inline_display: InlineTerminalDisplay | None = None
         if renderer is None and line_editor is None:
-            isolated = create_inline_terminal(self.input, self.output, fullscreen=True)
+            isolated = create_inline_terminal(self.input, self.output)
             if isolated is not None:
                 self._inline_display, line_editor = isolated
                 renderer = TerminalRenderer(self._inline_display)
@@ -330,7 +330,7 @@ class TerminalFrontend:
     @contextmanager
     def menu_scope(self):
         """Lend terminal input/display to one menu and restore it on every exit."""
-        self._suspend_inline_terminal()
+        self._suspend_inline_terminal(preserve_output=True)
         try:
             with transient_screen(self.input, self.output):
                 yield
@@ -357,11 +357,11 @@ class TerminalFrontend:
             start()
         self._inline_display.activate()
 
-    def _suspend_inline_terminal(self) -> None:
+    def _suspend_inline_terminal(self, *, preserve_output: bool = False) -> None:
         if self._inline_display is None:
             return
         try:
-            self._inline_display.suspend()
+            self._inline_display.suspend(preserve_output=preserve_output)
         finally:
             stop = getattr(self.line_editor, "stop", None)
             if stop is not None:

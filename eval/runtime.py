@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+from dataclasses import replace
 import hashlib
 import json
 import re
 from typing import Any, Mapping
 import yaml
-from fruitfly_agent.lab.catalog import builtin_catalog
-from fruitfly_agent.runtime_spec import load_harness_config
+from fruitfly_agent.lab.catalog import builtin_catalog, component_profile
+from fruitfly_agent.lab.catalog import load_system_config as load_harness_config
 from fruitfly_agent.providers.registry import load_model_specs
 
 
@@ -21,12 +22,12 @@ def prepare_runtime(
     workspace = Path(runtime.get("working_directory") or ".").resolve()
     original_config = (workspace / (runtime.get("config_path") or ".fruitfly/default-config.yaml")).resolve()
     config_bytes = original_config.read_bytes()
-    selected = load_harness_config(original_config).select(runtime.get("profile"))
+    system = load_harness_config(original_config)
+    selected = system.select(runtime.get("profile"))
     profile_id = selected.profile_id
     profile = selected.to_dict()
     prompt, bindings = selected.prompt, selected.artifact_bindings
     model = profile["model"]
-    raw_config = {"schema_version": 1}
     source_catalog = Path(str(model.get("catalog", "models.yaml")))
     if not source_catalog.is_absolute():
         source_catalog = original_config.parent / source_catalog
@@ -51,14 +52,16 @@ def prepare_runtime(
             raise ValueError("select one model profile for evaluation")
         selected_model = next(iter(source_models))
     required_models = {selected_model, *catalog.required_model_profiles(selections)}
-    if required_models - source_models.keys():
-        raise ValueError("unknown model profiles: " + ", ".join(sorted(required_models - source_models.keys())))
+    declared_models = required_models | set(selected.model_roles.values())
+    if declared_models - source_models.keys():
+        raise ValueError("unknown model profiles: " + ", ".join(sorted(declared_models - source_models.keys())))
     staged_models = {}
     secret_names = set(catalog.required_credentials(selections))
-    for name in sorted(required_models):
+    for name in sorted(declared_models):
         spec = source_models[name]
-        spec.require(tools=any(c.family == "tools" for item in resolved for c in item.definition.descriptor.contributions), streaming=True)
-        secret_names.add(spec.provider.api_key_env)
+        if name in required_models:
+            spec.require(tools=any(c.family == "tools" for item in resolved for c in item.definition.descriptor.contributions), streaming=True)
+            secret_names.add(spec.provider.api_key_env)
         staged_models[name] = {"provider": spec.provider.type, "model": spec.model,
             "api_key_env": spec.provider.api_key_env, "base_url": spec.provider.base_url,
             "context_window": spec.context_window, "max_output_tokens": spec.max_output_tokens,
@@ -80,10 +83,22 @@ def prepare_runtime(
     adjusted_profile["mechanisms"] = [{**item.to_dict(), "parameters": normalized.get(item.mechanism_id, dict(item.parameters))}
                                        for item in selections]
     adjusted = {
-        "schema_version": raw_config.get("schema_version", 1),
+        "schema_version": system.schema_version,
         "default_profile": profile_id,
         "profiles": {profile_id: adjusted_profile},
     }
+    if system.schema_version == 2:
+        def read_artifact(reference):
+            source = workspace / ".fruitfly/artifacts" / reference[7:]
+            if source.is_symlink():
+                raise ValueError("runtime artifact must not be a symlink")
+            body = source.read_bytes()
+            if "sha256:" + hashlib.sha256(body).hexdigest() != reference:
+                raise ValueError("runtime artifact content differs from its reference")
+            return body.decode("utf-8")
+        projected = component_profile(replace(selected, model_catalog=remote_catalog,
+            model_profile=selected_model), catalog, artifact_reader=read_artifact)
+        adjusted["profiles"] = {profile_id: projected.to_component_dict(references=False)}
     config_path = output_dir / "config.yaml"
     model_path = output_dir / "models.yaml"
     config_path.write_text(
@@ -102,7 +117,8 @@ def prepare_runtime(
         source = workspace / ".fruitfly/artifacts" / reference[7:]
         if source.is_symlink():
             raise ValueError("runtime artifact must not be a symlink")
-        body = source.read_bytes()
+        body = (selected.artifact_contents[reference].encode('utf-8') if reference in selected.artifact_contents
+                else source.read_bytes())
         if hashlib.sha256(body).hexdigest() != reference[7:]:
             raise ValueError("runtime artifact content differs from its reference")
         destination = output_dir / "artifacts" / reference[7:]
@@ -111,6 +127,8 @@ def prepare_runtime(
     receipt = {"schema_version": 1, "source": "default" if not runtime.get("config_path") else "explicit",
         "config_path": str(original_config), "profile": profile_id, "model_catalog": str(source_catalog),
         "source_config_sha256": hashlib.sha256(config_bytes).hexdigest(),
+        "configuration_sources": [{"path": source.path, "sha256": source.digest}
+                                  for source in selected.source_files],
         "execution_policy": "unrestricted", "isolation": "harbor_task_container",
         "files": {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (config_path, model_path)}}
     (output_dir / "runtime.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")

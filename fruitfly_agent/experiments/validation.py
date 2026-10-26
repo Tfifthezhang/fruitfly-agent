@@ -2,7 +2,7 @@
 from pathlib import Path
 import tempfile
 
-from fruitfly_agent.lab.catalog import builtin_catalog, resolve_harness
+from fruitfly_agent.lab.catalog import builtin_catalog, resolve_harness, configuration_inventory
 from fruitfly_agent.lab.improvement.api import builtin_executions
 
 
@@ -56,6 +56,12 @@ def validate_harness(config, profile, source, *, operation, environment):
             reason = str(exc)
         rows.append({'id': component.component_id, 'role': component.role, 'owner': dict(inventory.owners)[component.component_id],
             'available': not reason, 'selected': component.component_id in selected, 'reason': reason})
+    configuration = configuration_inventory(profile, catalog,
+        artifact_reader=lambda reference: (Path(config.workspace) / '.fruitfly/artifacts' / reference[7:]).read_text(encoding='utf-8'))
+    for component in configuration:
+        component['authorized'] = component['id'] in selected
+        component['edit_options'] = config.improvement.component_options.get(component['id'], {}) if operation != 'eval' else {}
     return {**inventory.to_dict(), 'identity': inventory.identity, 'editable_components': rows,
+            'configuration': configuration,
             'component_options': config.improvement.component_options,
             'backend_capabilities': sorted(capabilities), 'backend_roles': sorted(roles)}

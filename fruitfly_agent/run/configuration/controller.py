@@ -74,19 +74,26 @@ class RunConfigurationController:
         self._assert_editable()
         if not self.default_config_path.is_file():
             raise ValueError(f"default configuration not found: {self.default_config_path}")
-        baseline = load_harness_config(self.default_config_path).select()
+        defaults = load_harness_config(self.default_config_path, catalog=self._catalog)
+        baseline = defaults.select()
         self._catalog.resolve(baseline.mechanisms)
         from fruitfly_agent.run.storage.prompts import resolve_base_prompt
-        resolve_base_prompt(baseline.prompt, self._artifact_store)
+        resolve_base_prompt(baseline.prompt, self._artifact_store, contents=baseline.artifact_contents)
         for reference in baseline.artifact_bindings.values():
-            self._artifact_store.read_text(reference)
+            if reference not in baseline.artifact_contents:
+                self._artifact_store.read_text(reference)
         current = self.profile()
         models = self._models(current)
         missing = set(self._catalog.required_model_profiles(baseline.mechanisms)) - models.keys()
         if missing:
             raise ValueError("default mechanisms require model profiles in the daily catalog: " + ", ".join(sorted(missing)))
         self._replace_profile(replace(current, prompt=baseline.prompt, mechanisms=baseline.mechanisms,
-                                      artifact_bindings=baseline.artifact_bindings, execution=baseline.execution))
+            artifact_bindings=baseline.artifact_bindings, execution=baseline.execution,
+            artifact_contents=baseline.artifact_contents, component_settings=baseline.component_settings,
+            component_documents=tuple(replace(d, reference={}) for d in baseline.component_documents),
+            configured=baseline.configured))
+        if defaults.schema_version == 2:
+            self._draft = replace(self._draft, schema_version=2)
         return _changed("restored default harness settings in the draft; model settings and credentials retained; save, then apply or start a session")
 
     @property
@@ -144,7 +151,7 @@ class RunConfigurationController:
             warnings.append(str(exc))
             ready = False
         try:
-            _, prompt_identity = resolve_base_prompt(profile.prompt, self._artifact_store)
+            _, prompt_identity = resolve_base_prompt(profile.prompt, self._artifact_store, contents=profile.artifact_contents)
             prompt_label = prompt_identity["label"]
         except (OSError, TypeError, ValueError) as exc:
             warnings.append(str(exc))
@@ -250,7 +257,7 @@ class RunConfigurationController:
 
     def preview_prompt(self, reference: str) -> tuple[str, str, str]:
         from fruitfly_agent.run.storage.prompts import resolve_base_prompt
-        content, identity = resolve_base_prompt(reference, self._artifact_store)
+        content, identity = resolve_base_prompt(reference, self._artifact_store, contents=self.profile().artifact_contents)
         return dict(self._prompt_choices(self.profile())[1]).get(reference, identity["label"]), identity["content_hash"], content
 
     def select_model_catalog(self, path: str) -> ConfigurationActionResult:
@@ -458,6 +465,7 @@ class RunConfigurationController:
         candidate = HarnessConfig(
             default_profile=self._selected,
             profiles=self._draft.profiles,
+            schema_version=self._draft.schema_version,
         )
         for profile in candidate.profiles.values():
             self._catalog.resolve(profile.mechanisms)
@@ -471,11 +479,12 @@ class RunConfigurationController:
                 models = self._models(profile)
                 if profile.model_profile not in models and not (profile.model_profile is None and len(models) == 1):
                     raise ValueError("Select a valid model before saving")
-            resolve_base_prompt(profile.prompt, self._artifact_store)
+            resolve_base_prompt(profile.prompt, self._artifact_store, contents=profile.artifact_contents)
         if self.model_setup is not None and self.model_setup.changed:
-            self.model_setup.persist(lambda: save_harness_config(self._path, candidate))
+            self.model_setup.persist(lambda: save_harness_config(self._path, candidate, catalog=self._catalog,
+                artifact_reader=self._artifact_store.read_text))
         else:
-            save_harness_config(self._path, candidate)
+            save_harness_config(self._path, candidate, catalog=self._catalog, artifact_reader=self._artifact_store.read_text)
         self._draft = candidate
         self._original = candidate
         self._original_selected = self._selected
@@ -503,6 +512,7 @@ class RunConfigurationController:
         self._draft = HarnessConfig(
             default_profile=self._draft.default_profile,
             profiles=profiles,
+            schema_version=self._draft.schema_version,
         )
 
     def _assert_editable(self) -> None:

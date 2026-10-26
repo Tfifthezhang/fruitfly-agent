@@ -1,0 +1,11 @@
+schema_version: 1
+id: skill-document
+role: S
+implementation: skill-document
+parameters:
+  initial_text: '# Initial skill
+
+    Read task requirements before acting.
+
+    '
+  max_chars: 16000

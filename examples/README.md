@@ -8,6 +8,7 @@ Runnable demonstrations of public extension and improvement capabilities.
 |---|---|---|
 | [Configuration templates](configuration/README.md) | Public model and secret placeholders for manual setup | Copy only; live tasks may incur charges |
 | [Offline extension](extensions/README.md) | Register, assemble, and use a context mechanism | Temporary local files; no network |
+| [MCP client and REA](mcp/README.md) | Connect a separately installed stdio tool server; optional no-model protocol probe | Explicit local process startup; server tools have independent effects |
 | [Installed package checks](packaging/README.md) | Validate installed extension and subprocess paths | Temporary local files/processes; no network |
 | [Improvement packs](improvement/README.md) | Search, review, and independently test text candidates | Checks are offline; real search and answers may incur model charges |
 | [Experiment files](experiments/README.md) | Initialization, native setup, remote benchmark setup and templates for Eval, Improvement and RSI | Initialization/checks are offline; preparation uses downloads/containers; execution may incur model charges |

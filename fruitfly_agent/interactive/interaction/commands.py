@@ -118,7 +118,7 @@ def _status(
         text=(
             f"model: {status.model}\n"
             f"{prompt_line}"
-            f"cwd: {status.working_directory}\n"
+            f"{_environment_status(status)}"
             f"session: {status.session_path}\n"
             f"messages: {status.message_count}\n"
             f"state: {status.application_state}\n"
@@ -127,6 +127,23 @@ def _status(
             f"{_context_status(status)}"
         )
     )
+
+
+def _environment_rows(status: InteractiveStatus) -> tuple[tuple[str, str], ...]:
+    environment = status.execution_environment
+    rows: tuple[tuple[str, str], ...] = (
+        ("Local workspace", status.working_directory),
+        ("Execution environment", environment.label if environment is not None else "Unavailable"),
+    )
+    if environment is not None:
+        if environment.server:
+            rows += (("Server", environment.server),)
+        rows += (("Execution directory", environment.working_directory),)
+    return rows
+
+
+def _environment_status(status: InteractiveStatus) -> str:
+    return "".join(f"{label.lower()}: {value}\n" for label, value in _environment_rows(status))
 
 
 def _context_status(status: InteractiveStatus) -> str:
@@ -178,6 +195,7 @@ def _lab(
         grouped.setdefault("tools", [])
     if status.improvement_available:
         grouped.setdefault("improvement", [])
+    grouped.setdefault("environment", [])
     order = {name: index for index, name in enumerate((
         "context-manager", "environment", "tools", "workflow", "improvement",
     ))}
@@ -192,6 +210,9 @@ def _lab(
             phase_order = ("augmentation", "externalization", "reduction")
             rows = [(_category_label(phase), " · ".join(phases.get(phase, ())) or "Not enabled")
                     for phase in (*phase_order, *sorted(set(phases) - set(phase_order)))]
+        elif category == "environment":
+            rows = list(_environment_rows(status))
+            rows.extend((item.label, "Enabled") for item in mechanisms)
         elif category == "tools":
             rows = []
             described: set[str] = set()
@@ -210,6 +231,13 @@ def _lab(
             sections.append(CommandSection(category, _category_label(category), tuple(rows)))
     if not sections:
         sections.append(CommandSection("overview", "Overview", (("Mechanisms", "None enabled"),)))
+    if status.tool_services:
+        rows = []
+        for service in status.tool_services:
+            rows.extend(((service.name, service.state), ('Transport', service.transport),
+                ('Runs on', service.location), ('Working directory', service.working_directory),
+                ('Selected remote tools', ', '.join(service.tools))))
+        sections.append(CommandSection('tool-services', 'Tool services', tuple(rows)))
     panel = CommandPanel("Lab · Active session", tuple(sections), "Next-session settings: /config")
     text = [panel.title, ""]
     for section in panel.sections:

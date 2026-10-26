@@ -4,6 +4,11 @@
 
 Use the interactive model wizard for first setup, or copy the single model catalog below for DeepSeek Flash examples using two API protocols.
 
+For H/S/I authoring, follow [Component documents](../../fruitfly_agent/runtime_spec/COMPONENTS.md).
+For your own implementation, follow [Catalog registration](../../fruitfly_agent/lab/catalog/CONFIGURATION.md).
+The [configuration overview](../../CONFIGURATION.md#navigate-the-configuration-tree)
+is the navigation root; this page owns template setup rather than another schema table.
+
 For independent experiments, `fruitfly-agent-lab init` creates the default
 Agent/model files and a minimal experiment from installed templates. It preserves
 daily files and existing secrets, and rejects conflicting configuration files.
@@ -17,17 +22,25 @@ container starts during initialization.
 | [models.example.yaml](models.example.yaml) | `.fruitfly/models.yaml` | Both DeepSeek Flash protocol profiles in one file |
 | [.env.example](.env.example) | `.fruitfly/secrets.env` | Empty model/search keys and optional SSH account/password variables |
 | [ssh.example.yaml](ssh.example.yaml) | `.fruitfly/config.yaml` | Minimal remote profile; addresses are placeholders, credentials stay in the secret file |
-| [default-config.example.yaml](default-config.example.yaml) | `.fruitfly/default-config.yaml` | Local baseline with basic tools and explicit compaction parameters; manual editing only |
+| [mcp.example.yaml](mcp.example.yaml) | `.fruitfly/mcp.yaml` | Optional local stdio servers, explicit selected tools and limits; edit placeholders before enabling `mcp-tools` |
+| [default-config.example.yaml](default-config.example.yaml) | `.fruitfly/default-config.yaml` | Schema-2 baseline selecting model roles and referenced H/S/I component files |
 | [default-models.example.yaml](default-models.example.yaml) | `.fruitfly/default-models.yaml` | Independent default model settings referencing a shared or separate key variable |
 | [eval-host.example.yaml](eval-host.example.yaml) | `.fruitfly/eval-host.yaml` | Machine-local Linux runtime mounts and dependency/cache settings; configure path variables before use |
 
-Copy the default configuration and model templates together only when their
+Copy the default configuration, model template and referenced `components/` tree together only when their
 destinations are absent. **Configure → Restore default configuration** stages the
 default harness settings while retaining the daily model and credentials. Save
 for a new session or discard the draft. Eval uses the complete default profile
 unless explicitly overridden, including the independent default model catalog.
 It passes `--unrestricted` inside task containers; no permission configuration
 belongs in either Agent file.
+
+The generated tree includes H prompt/execution/environment/context/tool files and
+I editor/feedback/search files. S is optional; examples include
+[memory](components/S/learned-memory.yaml) and [Skill content](components/S/skill-document.yaml).
+Select those files under the profile's S mapping before use. Initialization does
+not create placeholder S state. Candidate editing additionally needs an explicit
+[experiment grant](../../fruitfly_agent/experiments/CONFIGURATION.md#grant-component-changes).
 
 The Eval host template is independent of daily/default Agent configuration and
 contains no model/key preferences. See [Harbor preparation](../../eval/harbor/README.md)

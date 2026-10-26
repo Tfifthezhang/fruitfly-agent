@@ -54,6 +54,19 @@ See [Tests](tests/README.md) for groups and [Lab](fruitfly_agent/lab/README.md#d
 
 Describe the problem, resulting behavior, validation, and unverified external paths in each change description. Shared test helpers belong in `tests/support`; do not import helpers or TestCases from another `test_*.py` file.
 
+Every selectable component needs a discoverable configuration position. Follow
+[Catalog admission](fruitfly_agent/lab/catalog/CONFIGURATION.md): declare identity,
+parameters/defaults, dependencies/effects, state/reset/recovery and lifecycle.
+State configuration, editing, trial execution and activation support separately.
+Show that changed values reach actual execution before advertising editing.
+Daily, experiment and candidate configs share one assembler; no new algorithm
+branches belong in Run, the terminal or Eval.
+
+Maintain the [configuration documentation tree](CONFIGURATION.md#navigate-the-configuration-tree).
+Syntax belongs to Runtime specification, registration to Catalog, experiment
+fields to Experiments and operational examples to Examples. Cross-link the owning
+guide instead of copying its field table into each module.
+
 The ignore rule for local `models.yaml` does not remove an already tracked file. When preparing a source repository for publication, check that only public templates under `examples/configuration/` are tracked; local catalogs must stay outside the published source. VCS operations require workspace authorization under [Project rules](AGENTS.md).
 
 ## Push source changes to GitHub

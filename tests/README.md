@@ -60,6 +60,7 @@ The Core loop, task packages/scoring, message codecs, runtime-description adapte
 | [Eval](eval/README.md) | Optional single-configuration benchmarks, artifacts, and reports |
 | [Experiments](experiments/README.md) | Independent entry points, file defaults, model roles and scoped lifecycle |
 | [Support](support/README.md) | Shared substitutes and temporary material, no TestCases |
+| [Process fixtures](fixtures/README.md) | Offline child-process protocol peers, no TestCases |
 | [Integration](integration/README.md) | Explicit real Provider smoke requests |
 
 ## Write tests
@@ -80,6 +81,12 @@ The Core loop, task packages/scoring, message codecs, runtime-description adapte
 Contract changes require explicit authorization, independent review, caller/compatibility analysis, and synchronized tests/docs. A static import guard is not an arbitrary Python sandbox, and the same editor can change both implementation and baseline.
 
 ## External effects
+
+Optional MCP protocol tests use a standard-library peer in a local child process,
+with no network or real server. Install `.[mcp]` to run them; SDK-dependent cases
+skip without that extra. Configuration and default-import isolation checks always
+run. [The REA probe](../examples/mcp/rea/README.md) is an explicit external check,
+excluded from discovery.
 
 | Path | Effects |
 |---|---|

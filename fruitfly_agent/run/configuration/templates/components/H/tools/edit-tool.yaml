@@ -1,0 +1,6 @@
+schema_version: 1
+id: edit-tool
+role: H
+implementation: edit-tool
+enabled: true
+parameters: {}

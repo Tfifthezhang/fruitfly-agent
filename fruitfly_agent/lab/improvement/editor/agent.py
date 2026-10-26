@@ -24,11 +24,12 @@ def model_completion(config):
 class AgentEditor:
     implementation_id = 'workspace-editor-v1'
 
-    def __init__(self, config, artifacts, components, *, max_tool_calls=48, instructions=None):
+    def __init__(self, config, artifacts, components, *, max_tool_calls=48, instructions=None, page_characters=12000):
         self.config, self.artifacts, self.components = config, artifacts, components
         self.max_tool_calls = max_tool_calls
         self.instructions = instructions or EditorInstructions()
-        self.workspace_session = WorkspaceSession(config, artifacts, max_tool_calls=max_tool_calls)
+        self.workspace_session = WorkspaceSession(config, artifacts, max_tool_calls=max_tool_calls,
+                                                  page_characters=page_characters)
 
     async def session(self, mission, workspace, services, *, writable=True):
         return await self.workspace_session.session(mission, workspace, services,

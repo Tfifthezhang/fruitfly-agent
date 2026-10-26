@@ -27,6 +27,7 @@ class ExecutionContext:
     save_record: Any = None
     component_ids: tuple[str, ...] = ()
     generator_definitions: tuple = ()
+    system_settings: Any = None
 
 
 class ExecutionRegistry:

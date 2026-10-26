@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fruitfly_agent.interactive.contracts.models import InteractiveStatus
 from fruitfly_agent.interactive.terminal.rendering.branding import FRUIT_FLY_MARK, FRUIT_FLY_SMALL_MARK, FRUIT_FLY_TINY_MARK, WORDMARK_FONT
-from fruitfly_agent.interactive.terminal.io.text import cell_width, pad_cells, truncate_cells
+from fruitfly_agent.interactive.terminal.io.text import cell_width, pad_cells, truncate_cells, wrap_cells, safe_terminal_text
 
 
 _BLUE = "\x1b[34m"
@@ -36,10 +36,9 @@ def render_welcome(
     """Render one startup block; never emits ANSI outside a capable TTY."""
     width = max(4, columns - 1)
     if not terminal_ui:
-        return (
-            f"FruitFlyAgent interactive · {status.model}\n"
-            "Type a task, or /help for commands.\n"
-        )
+        lines = [f"FruitFlyAgent interactive · {status.model}",
+                 *_environment_lines(status), "Type a task, or /help for commands."]
+        return "\n".join(lines) + "\n"
 
     if width >= _SIDE_BY_SIDE_MIN_WIDTH:
         lines = _wide_lines(status, width)
@@ -104,7 +103,7 @@ def _compact_lines(
     if status.prompt_label:
         lines.append(truncate_cells(f"prompt: {status.prompt_label} · {status.prompt_hash[:15]}… (active)", width))
     lines.extend([
-        truncate_cells(status.working_directory, width),
+        *_environment_lines(status, width),
         truncate_cells("Tip: /help commands · /lab mechanisms", width),
         "",
     ])
@@ -141,11 +140,23 @@ def _status_lines(status: InteractiveStatus, width: int) -> list[str]:
     if status.prompt_label:
         lines.append(_labeled_line("prompt", f"{status.prompt_label} · {status.prompt_hash[:15]}… (active)", width))
     lines.extend([
-        _labeled_line("cwd", status.working_directory, width),
+        *_environment_lines(status, width),
         _labeled_line("session", session, width),
         _labeled_line("lab", lab, width),
     ])
     return lines
+
+
+def _environment_lines(status: InteractiveStatus, width: int | None = None) -> list[str]:
+    environment = status.execution_environment
+    rows = [("workspace", status.working_directory),
+            ("execution", environment.label if environment is not None else "Unavailable")]
+    if environment is not None:
+        if environment.server:
+            rows.append(("server", environment.server))
+        rows.append(("exec cwd", environment.working_directory))
+    lines = [f"  {label}: {safe_terminal_text(value)}" for label, value in rows]
+    return lines if width is None else [part for line in lines for part in wrap_cells(line, width)]
 
 
 def _labeled_line(label: str, value: str, width: int) -> str:

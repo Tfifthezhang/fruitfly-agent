@@ -58,7 +58,9 @@ class EvidenceWorkspace:
             from .task_sets import build_workspace
             return build_workspace(request, artifacts, record=record)
         task, baseline = request.task, request.baseline
-        files = {'context/task.md': task.instruction.encode('utf-8')}
+        files = {'context/task.md': task.instruction.encode('utf-8'),
+                 'context/edit-grants.json': canonical_json({'component_ids': request.plan.component_ids,
+                     'options': request.plan.component_options}).encode('utf-8')}
         for resource in task.inputs:
             files['context/inputs/' + resource.path] = artifacts.read(resource.artifact_id)
         rows = []

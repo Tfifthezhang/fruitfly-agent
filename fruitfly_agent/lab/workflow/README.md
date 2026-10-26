@@ -6,11 +6,21 @@ Execute bounded sequences of model stages through Core's existing follow-up call
 
 ## Enable a workflow
 
-Enable **Execution workflow** in the experiment Agent configuration. Its default is one solve-and-answer step. Select `execution-workflow` in `improvement.components` to search alternatives through the independent experiment CLI. Construction and discovery make no model calls.
+Select an H component with ID/implementation `execution-workflow` and configure
+`parameters.steps`. Its default is one solve-and-answer step. An experiment grant
+with `fields: [parameters.steps]` permits alternatives. Construction and discovery
+make no model calls. See the [component format](../../runtime_spec/COMPONENTS.md).
 
-```json
-{"steps":["Solve the user task.","Check the reasoning and return only the final answer."]}
+```yaml
+schema_version: 1
+id: execution-workflow
+role: H
+implementation: execution-workflow
+parameters:
+  steps: [Solve the user task., Check the reasoning and return only the final answer.]
 ```
+
+The immutable target artifact uses JSON with the same `steps` array.
 
 | Contract | Behavior |
 |---|---|

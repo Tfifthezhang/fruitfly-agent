@@ -8,6 +8,7 @@ Verify configuration, model selection, assembly, manifest, CLI, candidates, rete
 
 | Files | Protects |
 |---|---|
+| `test_component_configuration.py` | Schema-2 parsing/assembly, exact text, derived configuration, portable candidate reload, registered resource capture and source integrity |
 | `test_runtime_spec.py` | Shared profile types, Core defaults, explicit reference conflicts and strict scalar candidates |
 | `test_configuration_application.py` | Same-Session model changes, original history, empty-session application, failed startup recovery and exclusive writer lease lifetime |
 | `test_configuration.py / test_profiles.py` | Selection drafts, YAML, and persistence |
@@ -19,7 +20,8 @@ Verify configuration, model selection, assembly, manifest, CLI, candidates, rete
 | `test_web_setup.py` | Hidden web keys, pending service/variable bindings, direct fetch, cancel/discard, rollback and same-process startup |
 | `test_assembly.py / test_resources.py` | Runtime identity, complete visible runtime descriptions, registration-owned display categories and failed assembly cleanup |
 | `test_web_tools.py` | Search credential injection, network-read policy, offline Application search/fetch, recovery and HTTP resource cleanup |
-| `test_ssh_environment.py` | Local/remote environment labels in configuration and runtime views, SSH selection, secret-free identity, remote file tools, recovery and failed-resource cleanup |
+| `test_mcp_tools.py` | Optional stdio tool preparation, selected identity, separate approvals, current-config recovery, failed apply and multi-server cleanup |
+| `test_ssh_environment.py` | Distinct local/remote descriptions, draft/save isolation, successful and failed activation, SSH selection, secret-free identity, remote file tools, current-target recovery and failed-resource cleanup |
 | `test_cli.py` | Startup, one-shot, resume, and rebuild |
 | `test_improvement_versions.py / test_task_prompt_catalog.py / test_base_prompt_flow.py` | Candidate scope, prompt selection, and recovery |
 

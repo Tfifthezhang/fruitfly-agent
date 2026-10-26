@@ -1,0 +1,8 @@
+schema_version: 1
+id: base_prompt
+role: H
+implementation: base_prompt
+enabled: true
+parameters:
+  text: You are FruitFlyAgent, a general-purpose assistant. Help the user understand,
+    create, and solve problems. Use available tools when useful; be concise.

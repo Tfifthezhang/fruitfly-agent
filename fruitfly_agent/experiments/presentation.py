@@ -21,6 +21,10 @@ def show_summary(summary):
         for component in summary['harness']['editable_components']:
             state = 'selected' if component['selected'] else 'available' if component['available'] else 'unavailable'
             print(f"  {component['role']} {component['id']}: {state}" + (': ' + component['reason'] if component['reason'] else ''))
+        for component in summary['harness'].get('configuration', ()):
+            print(f"  Source {component['role']} {component['id']}: {component['source']}")
+            if component.get('edit_options'):
+                print('    Edit bounds/fields: ' + json.dumps(component['edit_options'], ensure_ascii=False))
     request = summary['request']
     print(f"Task: {request['execution_id']} / {request['task_pack_id'] or 'explicit inputs'}")
     if 'task_set' in summary:

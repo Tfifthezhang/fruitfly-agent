@@ -13,6 +13,11 @@ Integrate the public Core loop with multi-turn conversation state and frontend o
 
 InteractiveSession implements [RuntimeSession](../contracts/runtime.py). Canonical facts remain distinct from model context projections. History reads do not emit events or run tools/models. TaskMaterials selects completed text tasks and records original-output hashes, message identity, session path, and parent manifest. It does not decide when saving is allowed; Application checks that boundary.
 
+The host can inject `execution_environment` as an immutable
+`InteractiveExecutionEnvironment` view. Status exposes it independently of the
+local `working_directory`; remote paths never pass through local path resolution.
+Session does not inspect backends or open connections to construct this view.
+
 With a Session store, `status.message_count` and `RunStarted.message_count` count
 committed `message` records, including user, assistant and tool-result messages.
 Reads include records appended by the active loop and preserve the original total

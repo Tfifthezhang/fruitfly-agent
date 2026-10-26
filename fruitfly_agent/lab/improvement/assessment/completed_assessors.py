@@ -41,6 +41,8 @@ class CompletedModelAssessor:
 
     def __init__(self, service):
         self.service = service
+        self.instruction = type(self).instruction + '\n' + getattr(service, 'instructions', {}).get('judgment_guidance', '')
+        self.comparison_instruction = type(self).comparison_instruction + '\n' + getattr(service, 'instructions', {}).get('comparison_guidance', '')
 
     async def assess(self, value):
         data = await self.service.complete(self.instruction, self.service.render((value,)))

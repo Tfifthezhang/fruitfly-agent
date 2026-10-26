@@ -292,6 +292,7 @@ class CatalogTest(unittest.TestCase):
                 "ipython-tool",
                 "web-search-tool",
                 "web-fetch-tool",
+                "mcp-tools",
                 "skill-catalog",
                 "information-context",
                 "memory-files",

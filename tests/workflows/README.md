@@ -7,7 +7,8 @@ Exercise actual Application, Run assembly, and terminal paths with offline model
 | Files | Protects |
 |---|---|
 | `test_execution_policy.py` | Isolated configuration candidates, effective native limits and verified H-only activation |
-| `test_terminal_reflow.py` | Actual TTY resize reflows completed tables and retains drafts without another model request |
+| `test_terminal_reflow.py` | Actual TTY resize retains completed table output and redraws drafts without another model request |
+| `test_terminal_scrollback.py` | Multi-turn long answers and output received during an asynchronous menu remain in native scrollback after return and exit |
 | `test_terminal_interrupt.py` | Actual Ctrl+C/SIGINT, quiet-run continuation, clean exit, and terminal restoration in ANSI and non-ANSI terminals |
 | `test_decoupling.py / test_offline_example.py` | Public extensions and interchangeable improvers/targets |
 | `test_improvement.py / test_evolution.py` | Preview, adoption, explicit policy, and interrupted activation reconciliation |
@@ -27,3 +28,7 @@ Terminal interrupt workflows also exercise permission Enter/numeric/arrow select
 
 `test_evolution_scope.py` verifies frozen stop parameters and one root allowance
 across successive host jobs. No model service is contacted.
+
+`test_candidate_configuration.py` executes a changed tool allowance through the
+native Core loop, exports the complete candidate, reloads it through ordinary
+configuration, and verifies unchanged baseline files.

@@ -40,6 +40,7 @@ class EpisodeRequest:
     component_ids: tuple[str, ...]
     task: TaskMaterial
     repeat: int
+    improver: HarnessSnapshot | None = None
 
 
 @dataclass(frozen=True)

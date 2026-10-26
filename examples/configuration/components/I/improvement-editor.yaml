@@ -1,0 +1,6 @@
+schema_version: 1
+id: improvement-editor
+role: I
+implementation: improvement-editor
+enabled: true
+parameters: {}

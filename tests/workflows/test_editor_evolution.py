@@ -17,6 +17,36 @@ from fruitfly_agent.core.model_stream import AssistantMessageEventStream
 
 
 class EditorEvolutionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_configured_i_candidate_activates_and_reloads_with_matching_identity(self):
+        import yaml
+        from fruitfly_agent.run.application import RunApplicationFactory
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            factory, provider, request = experiment_factory(root)
+            path = root / '.fruitfly/config.yaml'
+            document = yaml.safe_load(path.read_text())
+            profile = document['profiles'][document['default_profile']]
+            profile['I']['improvement-editor'] = {'inline': {'schema_version': 1,
+                'id': 'improvement-editor', 'role': 'I', 'implementation': 'improvement-editor', 'parameters': {}}}
+            path.write_text(yaml.safe_dump(document))
+            factory.reload_configuration()
+            app = AgentApplication(factory)
+            await app.start()
+            try:
+                candidate = (await app.improve('', preview_token=app.workflow_preview(request).preview_token))[0]
+                await app.adopt_candidate(candidate.candidate_id)
+                self.assertEqual(factory.candidate_store.read(candidate.candidate_id).status, 'adopted')
+            finally:
+                await app.close()
+            fresh = RunApplicationFactory(cwd=root, environment={}, provider_registry=factory.provider_registry,
+                improvement_bindings=factory.improvement_bindings)
+            restored = AgentApplication(fresh)
+            await restored.start()
+            try:
+                self.assertEqual(fresh._current_components['component-improvement-editor-instructions'].invariant.count('STEP'), 1)
+            finally:
+                await restored.close()
+
     async def test_file_runner_override_does_not_change_editor_execution_capabilities(self):
         from fruitfly_agent.lab.improvement.api import FileTaskRunner
         class FileOverride:

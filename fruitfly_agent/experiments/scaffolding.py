@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 from typing import Any
+from fruitfly_agent.run.configuration.scaffolding import system_templates
 
 
 def _template(name: str) -> str:
@@ -17,10 +18,12 @@ def workspace_templates(*, source: str = 'files', benchmark: str | None = None,
         raise ValueError('init source must be files or task-set')
     if source == 'files' and (benchmark is not None or variant != 'smoke'):
         raise ValueError('--benchmark and --variant require --source task-set')
+    task = 'tasks/native.yaml' if source == 'files' else 'tasks/tb4-smoke.yaml'
     result = {
-        'default-config.yaml': _template('default-config.yaml'),
-        'default-models.yaml': _template('default-models.yaml'),
+        **system_templates(),
         'experiment.yaml': _template('native.yaml' if source == 'files' else 'task-set.yaml'),
+        task: _template(task),
+        'comparison.yaml': _template('comparison.yaml'),
     }
     if source == 'task-set':
         if not benchmark:
@@ -55,6 +58,12 @@ def initialize_workspace(workspace: Path, *, source: str = 'files',
     conflicts = [name for name in payloads if (directory / name).exists() or (directory / name).is_symlink()]
     if conflicts:
         raise ValueError('init will not overwrite existing configuration: ' + ', '.join(conflicts))
+    for name in payloads:
+        parent = (directory / name).parent
+        while parent != directory:
+            if parent.is_symlink() or (parent.exists() and not parent.is_dir()):
+                raise ValueError('configuration parent must be a real directory: ' + str(parent))
+            parent = parent.parent
     secret = directory / 'secrets.env'
     preserved = []
     if secret.is_symlink() or (secret.exists() and not secret.is_file()):
@@ -65,12 +74,21 @@ def initialize_workspace(workspace: Path, *, source: str = 'files',
         payloads['secrets.env'] = '# Set the key privately here, or export it in the process environment.\nDEEPSEEK_API_KEY=\n'
     created: list[tuple[Path, int, int]] = []
     made_directory = False
+    created_directories = []
     try:
         if not directory.exists():
             directory.mkdir(mode=0o700)
             made_directory = True
         for name, contents in payloads.items():
             target = directory / name
+            missing = []
+            parent = target.parent
+            while not parent.exists():
+                missing.append(parent)
+                parent = parent.parent
+            for parent in reversed(missing):
+                parent.mkdir(mode=0o700)
+                created_directories.append(parent)
             descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
             with os.fdopen(descriptor, 'w', encoding='utf-8') as handle:
                 identity = os.fstat(handle.fileno())
@@ -84,6 +102,11 @@ def initialize_workspace(workspace: Path, *, source: str = 'files',
                     target.unlink()
             except OSError:
                 pass
+        for parent in reversed(created_directories):
+            try:
+                parent.rmdir()
+            except OSError:
+                pass
         if made_directory:
             try:
                 directory.rmdir()
@@ -91,7 +114,8 @@ def initialize_workspace(workspace: Path, *, source: str = 'files',
                 pass
         raise
     steps = [
-        'Edit .fruitfly/default-models.yaml and default-config.yaml; review experiment.yaml.',
+        'Edit .fruitfly/default-models.yaml, select H/S/I in default-config.yaml, then edit their component files.',
+        'Review experiment.yaml edit grants, comparison.yaml and the selected tasks file.',
         'Set DEEPSEEK_API_KEY privately in .fruitfly/secrets.env or the process environment.',
     ]
     if source == 'task-set':

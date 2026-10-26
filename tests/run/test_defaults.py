@@ -148,6 +148,27 @@ class DefaultConfigurationTests(unittest.TestCase):
         self.assertNotIn("Restore default configuration", output.getvalue())
         self.assertNotIn("Permissions", output.getvalue())
 
+    def test_component_defaults_restore_exact_inline_prompt_and_i_settings_into_daily_config(self):
+        path = self.root / '.fruitfly/default-config.yaml'
+        def component(name, role, parameters):
+            return {'inline': {'schema_version': 1, 'id': name, 'role': role,
+                'implementation': name, 'parameters': parameters}}
+        path.write_text(yaml.safe_dump({'schema_version': 2, 'default_profile': 'baseline',
+            'profiles': {'baseline': {'models': {'catalog': 'default-models.yaml', 'roles': {'executor': 'fake'}},
+                'H': {'base_prompt': component('base_prompt', 'H', {'text': 'Exact restored prompt.\n'})},
+                'I': {'improvement-search': component('improvement-search', 'I', {'rounds': 2})}}}}))
+        original = path.read_bytes()
+        controller = self.factory().configuration
+        controller.restore_defaults()
+        controller.save()
+        config = load_harness_config(self.root / '.fruitfly/config.yaml')
+        self.assertEqual(config.schema_version, 2)
+        profile = config.select()
+        self.assertEqual(profile.component_settings['search']['rounds'], 2)
+        self.assertEqual(profile.artifact_contents[profile.prompt], 'Exact restored prompt.\n')
+        self.assertEqual(profile.model_catalog, 'models.yaml')
+        self.assertEqual(path.read_bytes(), original)
+
     def test_default_auxiliary_model_missing_from_daily_catalog_rejects_restoration(self):
         controller = self.factory().configuration
         original = controller.profile()

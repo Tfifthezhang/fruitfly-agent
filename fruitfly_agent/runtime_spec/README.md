@@ -6,15 +6,28 @@ Share serializable harness selections across Run, Lab and Eval. This module
 depends only on Core and basic serialization libraries. Core does not depend on
 it. It constructs no Providers, tools, Sessions or external resources.
 
+## Read the configuration guides
+
+Start with [configuration responsibilities](../../CONFIGURATION.md). The guide tree is:
+
+- [Component documents](COMPONENTS.md): write H/S/I files and model-role references.
+- [Runtime configuration](../run/configuration/README.md): load, save and assemble a selected system.
+- [Catalog](../lab/catalog/README.md): declare component parameters and capabilities.
+- [Experiments](../experiments/README.md): grant edits and compare frozen candidates.
+
 | File | Public entry points and responsibility |
 |---|---|
 | `profiles.py` | `HarnessProfile`, `HarnessConfig`, `load_harness_config`, `save_harness_config` |
+| `components.py` | Serializable H/S/I instance envelopes and explicit references |
+| `documents.py` | Strict duplicate-key rejection, relative references and source hashes |
 | `selections.py` | `MechanismSelection`; Catalog validates registered IDs and dependencies |
 | `execution.py` | Validation, effective defaults, Core keyword projection and configuration bindings |
 | `references.py` | One baseline path/profile; conflicting explicit references fail |
 
-Existing Run profile imports and Catalog selection imports explicitly re-export
-these types. They retain one implementation, not parallel schemas.
+Run and Catalog use the same profile and selection types. Run's loader delegates
+registered projection to Catalog; the pure specification loader constructs no
+clients or artifacts. Schema-1 profiles remain readable; new H/S/I documents use
+system schema 2. There is one runtime assembler.
 
 ## Configure execution
 

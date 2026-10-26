@@ -221,6 +221,7 @@ class HarnessSelectionTest(unittest.TestCase):
 
         self.assertTrue(result.saved)
         self.assertEqual(persisted.select().model_profile, "only")
+        self.assertEqual(persisted.schema_version, 2)
         self.assertEqual(persisted.select().model_catalog, "../models.yaml")
 
     def test_disabling_a_requirement_disables_dependent_mechanisms(self) -> None:
