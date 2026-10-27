@@ -1,4 +1,4 @@
-"""Strict, versioned harness profiles shared by frontends and Python callers."""
+"""One strict component configuration shared by frontends and Python callers."""
 
 from __future__ import annotations
 
@@ -20,7 +20,6 @@ from .documents import DocumentReader, mapping
 DEFAULT_PROMPT_ID = "assistant-default"
 
 
-HARNESS_PROFILE_SCHEMA_VERSION = 1
 DEFAULT_HARNESS_CONFIG_NAME = ".fruitfly/config.yaml"
 
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
@@ -69,7 +68,7 @@ class HarnessProfile:
 
     @property
     def profile_hash(self) -> str:
-        payload = self.to_dict()
+        payload = self.to_runtime_dict()
         if self.component_documents or self.model_roles:
             payload = {'runtime': payload, 'settings': dict(self.component_settings), 'models': dict(self.model_roles)}
             if not self.configured:
@@ -82,7 +81,8 @@ class HarnessProfile:
         ).encode("utf-8")
         return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_runtime_dict(self) -> dict[str, Any]:
+        """Return resolved runtime inputs, independent of authored file encoding."""
         result = {
             "model": {
                 "catalog": self.model_catalog,
@@ -98,7 +98,7 @@ class HarnessProfile:
             result['execution'] = dict(self.execution)
         return result
 
-    def to_component_dict(self, *, references=True):
+    def to_dict(self, *, references=True):
         groups: dict[str, dict[str, Any]] = {role: {} for role in ('H', 'S', 'I')}
         for document in self.component_documents:
             groups[document.role][document.id] = (dict(document.reference) if references and document.reference
@@ -112,13 +112,8 @@ class HarnessProfile:
 class HarnessConfig:
     default_profile: str
     profiles: Mapping[str, HarnessProfile] = field(default_factory=dict)
-    schema_version: int = HARNESS_PROFILE_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
-        if type(self.schema_version) is not int or self.schema_version not in (1, 2):
-            raise ValueError(
-                f"unsupported harness profile schema_version: {self.schema_version}"
-            )
         profiles = dict(self.profiles)
         if not profiles:
             raise ValueError("harness config requires at least one profile")
@@ -142,11 +137,9 @@ class HarnessConfig:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "schema_version": self.schema_version,
             "default_profile": self.default_profile,
             "profiles": {
-                key: (self.profiles[key].to_component_dict() if self.schema_version == 2
-                      else self.profiles[key].to_dict()) for key in sorted(self.profiles)
+                key: self.profiles[key].to_dict() for key in sorted(self.profiles)
             },
         }
 
@@ -159,12 +152,9 @@ def load_harness_config(path: str | Path) -> HarnessConfig:
         raise ValueError("harness config must be a mapping")
     _reject_unknown(
         raw,
-        {"schema_version", "default_profile", "profiles"},
+        {"default_profile", "profiles"},
         "harness config",
     )
-    version = raw.get("schema_version")
-    if type(version) is not int or version not in (1, 2):
-        raise ValueError(f"unsupported harness profile schema_version: {version}")
     default_profile = raw.get("default_profile")
     if not isinstance(default_profile, str) or not default_profile:
         raise ValueError("harness config default_profile must be a non-empty string")
@@ -172,8 +162,7 @@ def load_harness_config(path: str | Path) -> HarnessConfig:
     if not isinstance(raw_profiles, Mapping):
         raise ValueError("harness config profiles must be a mapping")
     profiles = {
-        str(profile_id): (_component_profile(str(profile_id), value, target.resolve(), reader)
-                          if version == 2 else _profile_from_mapping(str(profile_id), value))
+        str(profile_id): _component_profile(str(profile_id), value, target.resolve(), reader)
         for profile_id, value in raw_profiles.items()
     }
     from dataclasses import replace
@@ -181,7 +170,6 @@ def load_harness_config(path: str | Path) -> HarnessConfig:
     return HarnessConfig(
         default_profile=default_profile,
         profiles=profiles,
-        schema_version=version,
     )
 
 
@@ -236,46 +224,6 @@ def save_harness_config(path: str | Path, config: HarnessConfig) -> None:
         raise
 
 
-def _profile_from_mapping(profile_id: str, raw: Any) -> HarnessProfile:
-    if not isinstance(raw, Mapping):
-        raise ValueError(f"harness profile {profile_id!r} must be a mapping")
-    _reject_unknown(raw, {"model", "mechanisms", "prompt", "artifact_bindings", "execution"}, f"profile {profile_id!r}")
-    model = raw.get("model")
-    if not isinstance(model, Mapping):
-        raise ValueError(f"profile {profile_id!r} model must be a mapping")
-    _reject_unknown(model, {"catalog", "profile"}, "model selection")
-    catalog = model.get("catalog", "models.yaml")
-    model_profile = model.get("profile")
-    raw_mechanisms = raw.get("mechanisms", [])
-    if not isinstance(raw_mechanisms, list):
-        raise ValueError(f"profile {profile_id!r} mechanisms must be a list")
-    mechanisms = tuple(
-        _selection_from_mapping(item, index=index)
-        for index, item in enumerate(raw_mechanisms)
-    )
-    return HarnessProfile(
-        profile_id=profile_id,
-        model_catalog=catalog,
-        model_profile=model_profile,
-        mechanisms=mechanisms,
-        prompt=raw.get("prompt", DEFAULT_PROMPT_ID),
-        artifact_bindings=raw.get("artifact_bindings", {}),
-        execution=raw.get('execution', {}),
-    )
-
-
-def _selection_from_mapping(raw: Any, *, index: int) -> MechanismSelection:
-    if not isinstance(raw, Mapping):
-        raise ValueError(f"mechanism selection {index} must be a mapping")
-    _reject_unknown(raw, {"id", "enabled", "parameters"}, "mechanism selection")
-    mechanism_id = raw.get("id")
-    if not isinstance(mechanism_id, str):
-        raise ValueError(f"mechanism selection {index} id must be a string")
-    enabled = raw.get("enabled", True)
-    parameters = raw.get("parameters", {})
-    return MechanismSelection(mechanism_id, enabled=enabled, parameters=parameters)
-
-
 def _reject_unknown(
     raw: Mapping[Any, Any], allowed: set[str], location: str
 ) -> None:
@@ -285,7 +233,6 @@ def _reject_unknown(
 
 
 __all__ = [
-    "HARNESS_PROFILE_SCHEMA_VERSION",
     "DEFAULT_HARNESS_CONFIG_NAME",
     "HarnessProfile",
     "HarnessConfig",

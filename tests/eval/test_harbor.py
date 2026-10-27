@@ -1,4 +1,5 @@
 from __future__ import annotations
+from tests.support.configuration import profile_document
 
 import asyncio
 import json
@@ -547,30 +548,11 @@ class HarborAdapterTests(unittest.TestCase):
             root = Path(directory)
             config_path = root / "config.yaml"
             models_path = root / "models.yaml"
-            config_path.write_text(
-                """schema_version: 1
-default_profile: default
-profiles:
-  default:
-    model:
-      catalog: models.yaml
-      profile: test
-    mechanisms:
-      - id: compaction
-        enabled: true
-        parameters: {}
-""",
-                encoding="utf-8",
-            )
+            config_path.write_text(yaml.safe_dump({'default_profile': 'default', 'profiles': {
+                'default': profile_document(catalog='models.yaml', executor='test',
+                    mechanisms=[{'id': 'compaction', 'enabled': True, 'parameters': {}}])}}))
             models_path.write_text(
-                """models:
-  test:
-    provider: openai
-    api_key_env: TEST_API_KEY
-    model: test-model
-    context_window: 8192
-    max_output_tokens: 1024
-""",
+                'models:\n  test:\n    sdk: openai\n    protocol: responses\n    api_key_env: TEST_API_KEY\n    model: test-model\n    context_window: 8192\n    max_output_tokens: 1024\n',
                 encoding="utf-8",
             )
             output = root / "runtime"
@@ -580,10 +562,11 @@ profiles:
                 output_dir=output,
             )
             payload = yaml.safe_load(generated.read_text(encoding="utf-8"))
-            profile = payload["profiles"]["default"]
-            enabled = {item["id"]: item["enabled"] for item in profile["mechanisms"]}
+            from fruitfly_agent.lab.catalog import load_system_config
+            profile = load_system_config(generated).select()
+            enabled = {item.mechanism_id: item.enabled for item in profile.mechanisms}
             self.assertEqual(
-                profile["model"]["catalog"],
+                profile.model_catalog,
                 "/installed-agent/fruitfly/runtime/models.yaml",
             )
             self.assertEqual(enabled, {"compaction": True})
@@ -596,7 +579,7 @@ profiles:
     def test_runtime_forwards_independent_web_secrets_with_defaults_and_overrides(self) -> None:
         root = Path(self.enterContext(tempfile.TemporaryDirectory()))
         (root / "models.yaml").write_text(yaml.safe_dump({"models": {
-            "test": {"provider": "openai", "model": "fake", "context_window": 8192, "api_key_env": "MODEL_KEY"}}}))
+            "test": {'sdk': 'openai', 'protocol': 'responses', "model": "fake", "context_window": 8192, "api_key_env": "MODEL_KEY"}}}))
         for backend, search_key, fetch_key, expected in (
             ("deepseek", "", "", {"DEEPSEEK_SEARCH_API_KEY", "DEEPSEEK_FETCH_API_KEY"}),
             ("deepseek", "SEARCH_ONLY", "FETCH_ONLY", {"SEARCH_ONLY", "FETCH_ONLY"}),
@@ -610,34 +593,36 @@ profiles:
                     {"id": "web-fetch-tool", "parameters": {"backend": "deepseek" if backend == "deepseek" else "direct", "api_key_env": fetch_key}},
                 ]
                 config = root / "config.yaml"
-                config.write_text(yaml.safe_dump({"schema_version": 1, "default_profile": "default", "profiles": {"default": {
-                    "model": {"catalog": "models.yaml"}, "mechanisms": mechanisms}}}))
+                config.write_text(yaml.safe_dump({"default_profile": "default", "profiles": {"default": profile_document(catalog="models.yaml", mechanisms=mechanisms)}}))
                 output = root / "runtime"
                 output.mkdir(exist_ok=True)
                 generated, _, names = prepare_runtime(
                     runtime={"config_path": str(config), "profile": "default"}, output_dir=output)
                 self.assertEqual(expected | {"MODEL_KEY"}, set(names))
                 self.assertNotIn("DISABLED_KEY", names)
-                staged = yaml.safe_load(generated.read_text())["profiles"]["default"]["mechanisms"]
-                self.assertEqual([m["id"] for m in mechanisms], [m["id"] for m in staged])
-                for original, copied in zip(mechanisms, staged):
+                from fruitfly_agent.lab.catalog import load_system_config
+                staged = {item.mechanism_id: item.to_dict() for item in load_system_config(generated).select().mechanisms}
+                self.assertEqual({m['id'] for m in mechanisms}, set(staged))
+                for original in mechanisms:
+                    copied = staged[original['id']]
                     self.assertEqual(copied["enabled"], original.get("enabled", True))
                     for key, value in original.get("parameters", {}).items():
                         self.assertEqual(copied["parameters"][key], value)
 
     def test_runtime_collects_non_web_component_credentials_through_catalog(self) -> None:
         root = Path(self.enterContext(tempfile.TemporaryDirectory()))
-        (root / "models.yaml").write_text("models: {test: {provider: openai, model: fake, context_window: 8192, api_key_env: MODEL_KEY}}")
-        (root / "config.yaml").write_text(yaml.safe_dump({"schema_version": 1, "default_profile": "default", "profiles": {"default": {
-            "model": {"catalog": "models.yaml"}, "mechanisms": [{"id": "fixture-resource"}]}}}))
+        (root / "models.yaml").write_text('models: {test: {sdk: openai, protocol: responses, model: fake, context_window: 8192, api_key_env: MODEL_KEY}}')
         definition = MechanismDefinition(
             MechanismDescriptor("fixture-resource", "Fixture resource", "Fixture credential consumer.",
                                 contributions=(MechanismContribution("capability", "tools"),)),
             lambda *args: self.fail("credential discovery ran an installer"),
             credential_variables=lambda parameters: ("RESOURCE_KEY",),
             implementation_path="tests/eval/test_harbor.py", documentation_path="tests/eval/README.md")
+        catalog = builtin_catalog().extended((definition,))
+        (root / 'config.yaml').write_text(yaml.safe_dump({'default_profile': 'default', 'profiles': {
+            'default': profile_document(catalog='models.yaml', mechanisms=[{'id': 'fixture-resource'}], lab=catalog)}}))
         (root / "runtime").mkdir()
-        with patch("eval.runtime.builtin_catalog", return_value=builtin_catalog().extended((definition,))):
+        with patch("eval.runtime.builtin_catalog", return_value=catalog):
             _, _, names = prepare_runtime(runtime={"config_path": str(root / "config.yaml"), "profile": "default"},
                                          output_dir=root / "runtime")
         self.assertEqual(("MODEL_KEY", "RESOURCE_KEY"), names)

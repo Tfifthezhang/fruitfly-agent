@@ -47,6 +47,12 @@ No module-specific environment variables.
 
 Checks use fake Providers and temporary state.
 
+Model identity includes the explicit service, request parameters and effective
+transport policy. Providers retain exact continuation in Session messages and
+validate model/credential/context bindings when used. Current configuration still
+selects the runtime on recovery; an incompatible signed active tool turn fails
+before a remote request. See [continuation rules](../../providers/PROVIDER_GUIDE.md#preserve-a-tool-conversation).
+
 Assembly supplies an optional generic secret resolver from the host environment to Lab. Selected [web tools](../../lab/tools/web/README.md) receive only the named search credential; keys are not added to manifest parameters or the minimal child-process environment. Construction makes no search or fetch requests.
 
 The optional [SSH environment](../../lab/environment/ssh/README.md) uses this

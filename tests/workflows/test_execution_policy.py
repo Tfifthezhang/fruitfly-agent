@@ -42,6 +42,29 @@ class PolicyRunner(OfflineRunner):
 
 
 class ExecutionPolicyTests(unittest.IsolatedAsyncioTestCase):
+    async def test_detached_execution_keeps_state_for_tools_but_excludes_it_from_editor_trajectory(self):
+        from fruitfly_agent.core.data_model import AssistantMessage, TextBlock
+        provider = FauxProvider()
+        provider.respond(AssistantMessage([TextBlock('working')], stop_reason='stop',
+            provider_state={'opaque': 'private-continuation'}, continue_turn=True))
+        provider.respond_text('finished')
+        config = AgentLoopConfig(provider=provider)
+        components = ComponentRegistry((TextComponentAdapter(ExecutionPolicyTarget(config), 'execution-policy'),))
+        artifacts = MemoryArtifacts()
+        plan = RunPlan('continuation-trial', version(), ('execution-policy',))
+        services = WorkflowServices(plan)
+        try:
+            record = await FileTaskRunner(config, components, artifacts, services).execute(plan,
+                TaskMaterial('task', 'Finish.'), components.snapshot())
+            self.assertEqual(record.status, 'completed')
+            self.assertEqual(record.output, 'finished')
+            self.assertEqual(len(provider.calls), 2)
+            self.assertEqual(services.used['model'], 2)
+            self.assertEqual(provider.calls[1]['messages'][1].provider_state, {'opaque': 'private-continuation'})
+            resource = next(r for r in record.artifacts if r.path == 'trajectory.json')
+            self.assertNotIn(b'private-continuation', artifacts.read(resource.artifact_id))
+        finally:
+            await services.close()
     async def test_verified_configuration_candidate_activates_and_changes_only_h(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

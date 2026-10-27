@@ -1,4 +1,3 @@
-schema_version: 1
 id: learned-memory
 role: S
 implementation: learned-memory

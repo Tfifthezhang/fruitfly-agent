@@ -24,6 +24,7 @@ from fruitfly_agent.run import RunApplicationFactory
 from fruitfly_agent.experiments.scaffolding import initialize_workspace
 from fruitfly_agent.experiments.configuration import load_configuration
 from fruitfly_agent.experiments.composition import prepare_experiment
+from fruitfly_agent.providers.registry import load_model_specs
 
 
 async def check(wheel: Path) -> None:
@@ -53,7 +54,7 @@ async def check(wheel: Path) -> None:
         finally:
             await runtime.close()
         factory = RunApplicationFactory(cwd=root, environment={}, allow_incomplete=True)
-        lines = iter(("1", "wheel-check", "offline-model", "", "8192", "1024", "", "", "2", "1"))
+        lines = iter(("1", "wheel-check", "offline-model", "", "8192", "1024", "", "", "", "", "2", "1"))
         output = io.StringIO()
         frontend = TerminalConfigurationFrontend(
             factory.configuration, input_stream=io.StringIO("offline-placeholder\n"),
@@ -66,6 +67,9 @@ async def check(wheel: Path) -> None:
         assert factory.selection.profile.model_profile == "wheel-check"
         assert factory.environment.get("FRUITFLY_MODEL_WHEEL_CHECK_API_KEY") == "offline-placeholder"
         assert (root / ".fruitfly/models.yaml").is_file()
+        model = load_model_specs(root / '.fruitfly/models.yaml')['wheel-check']
+        assert (model.provider.sdk, model.provider.protocol) == ('openai', 'responses')
+        assert 'provider' not in model.to_dict()
         assert (root / ".fruitfly/secrets.env").stat().st_mode & 0o777 == 0o600
         assert not (root / "models.yaml").exists()
         assert not (root / ".env").exists()

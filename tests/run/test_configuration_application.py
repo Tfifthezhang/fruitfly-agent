@@ -16,7 +16,7 @@ from tests.support.run import _write_catalog
 class ConfigurationApplicationTest(unittest.IsolatedAsyncioTestCase):
     async def fixture(self):
         root = Path(self.enterContext(tempfile.TemporaryDirectory()))
-        _write_catalog(root / 'models.yaml', {'a': 'model-a', 'b': 'model-b'})
+        _write_catalog(root / '.fruitfly/models.yaml', {'a': 'model-a', 'b': 'model-b'})
         provider = FauxProvider()
         registry = Mock()
         registry.create.return_value = provider

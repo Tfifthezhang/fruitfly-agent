@@ -1,5 +1,4 @@
 # Multi-collection recipe. Request and host paths in tasks/multi.yaml are placeholders.
-schema_version: 2
 baseline:
   config: default-config.yaml
   profile: baseline

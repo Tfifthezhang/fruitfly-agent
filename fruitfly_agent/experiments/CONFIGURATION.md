@@ -10,7 +10,6 @@ using the [examples](../../examples/experiments/README.md).
 ## Assemble an experiment
 
 ```yaml
-schema_version: 2
 baseline:
   config: default-config.yaml
   profile: baseline
@@ -30,6 +29,11 @@ trial:
 `baseline.config` resolves from the experiment file. `tasks` and `comparison`
 accept exactly one `file` or `inline` reference. Their paths resolve from the
 declaring file. Unknown/duplicate fields fail; there is no deep-merge inheritance.
+
+The baseline and daily system configs normally reference the same workspace
+`models.yaml`. Each config selects its own `models.roles` aliases. Model definitions
+belong in the shared catalog; experiment sections do not override them. Candidates
+freeze the selected definitions for their executions.
 
 | Section | Responsibility |
 |---|---|
@@ -63,7 +67,7 @@ arbitrary YAML paths. An enabled component unsupported by the selected runner
 cannot be edited. The editor receives `context/edit-grants.json`; the owner
 enforces those grants again on every candidate.
 
-| Target | Supported schema-2 grant |
+| Target | Supported field grant |
 |---|---|
 | `base_prompt`, enabled `tool-guidance.<name>` | `parameters.text` |
 | `execution-policy` | Declared scalar `parameters.*` fields and integer bounds |
@@ -83,7 +87,6 @@ candidate editing requires an explicitly registered adapter.
 
 ```yaml
 # tasks/native.yaml
-schema_version: 1
 source: files
 instruction: Produce a concise inventory of the supplied material.
 input_paths: []
@@ -96,7 +99,6 @@ File-task parameters support `assessment_interval` and `model_calls`.
 
 ```yaml
 # comparison.yaml
-schema_version: 1
 scope: task
 feedback: auto
 aggregation: collection-macro
@@ -178,12 +180,11 @@ capabilities and normalized edit bounds. Root and local allowances have differen
 scopes; raising a tool limit never raises a model allowance.
 
 Inputs are frozen before execution and checked again before starting work.
-Generated candidates contain ordinary schema-2 configs under
+Generated candidates contain ordinary component configs under
 `.fruitfly/improvement/jobs/<job-id>/candidates/<id>/config.yaml`, with model
 catalog and exact component content. `changes.json` retains parent and evidence.
 The source baseline is not overwritten. Reused trials remain the same sample.
 
-Existing schema-1 experiment files remain readable through their versioned
-adapter; they retain their existing override behavior. New templates use schema 2.
-There is one runtime assembler. See [Run configuration](../run/configuration/README.md)
+There is one experiment format and one runtime assembler. Unknown fields and
+configuration version markers fail validation. See [Run configuration](../run/configuration/README.md)
 for offline system inspection and explicit config export.

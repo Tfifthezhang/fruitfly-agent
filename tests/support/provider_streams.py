@@ -2,6 +2,7 @@
 from dataclasses import replace
 from types import SimpleNamespace as NS
 from unittest.mock import AsyncMock, Mock, patch
+from itertools import chain
 from fruitfly_agent.core.data_model import ProviderView, UserMessage
 from fruitfly_agent.providers.openai import OpenAIProvider
 from fruitfly_agent.providers.anthropic import AnthropicProvider
@@ -43,6 +44,13 @@ def view(tools=()):
 
 def adapter(kind, streams, **options):
     if kind == 'openai':
+        # Fixtures model successful terminal responses explicitly. Failure/quiet
+        # stream subclasses still raise or wait before this terminal event.
+        for sdk in streams:
+            events = list(sdk.events)
+            if not any(getattr(e, 'type', '') in {'response.completed', 'response.incomplete', 'response.failed'} for e in events):
+                events.append(NS(type='response.completed', response=NS(usage=None, incomplete_details=None)))
+            sdk.events = iter(events)
         client = NS(responses=NS(create=AsyncMock(side_effect=streams)))
         with patch('openai.AsyncOpenAI', return_value=client):
             provider = OpenAIProvider(api_key='offline-placeholder', model='fallback', retry_base_delay=0, **options)

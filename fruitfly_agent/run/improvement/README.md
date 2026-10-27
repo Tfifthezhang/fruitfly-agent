@@ -119,7 +119,7 @@ The host freezes the model catalog and registered initial state before search.
 Every proposed candidate is exported once to
 `.fruitfly/improvement/jobs/<job-id>/candidates/<candidate-id>/` with `config.yaml`,
 `models.yaml`, `snapshot.json` and `changes.json`. The config uses the ordinary
-schema-2 loader. Changes record complete before/after component payloads, parent
+component loader. Changes record complete before/after component payloads, parent
 H/S/I and cited reasons. These review bundles do not grant activation.
 
 Configured and derived prompt/tool guidance, workflow, retained text and I values

@@ -1,4 +1,5 @@
 """Host strategies change actual tool behavior without benchmark-aware tools."""
+from tests.support.configuration import profile_document
 import asyncio
 import contextlib
 import io
@@ -24,11 +25,10 @@ from tests.support.run import _args
 
 def workspace_files(root):
     (root / "models.yaml").write_text(yaml.safe_dump({"models": {"fixture": {
-        "provider": "openai", "model": "fixture", "api_key_env": "FIXTURE_MODEL_KEY",
+        'sdk': 'openai', 'protocol': 'responses', "model": "fixture", "api_key_env": "FIXTURE_MODEL_KEY",
         "context_window": 32768, "max_output_tokens": 1024}}}))
-    (root / "config.yaml").write_text(yaml.safe_dump({"schema_version": 1, "default_profile": "fixture",
-        "profiles": {"fixture": {"model": {"catalog": "models.yaml", "profile": "fixture"},
-            "mechanisms": [{"id": n} for n in ("local-env", "read-tool", "write-tool", "bash-tool")]}}}))
+    (root / "config.yaml").write_text(yaml.safe_dump({"default_profile": "fixture",
+        "profiles": {"fixture": profile_document(catalog="models.yaml", executor="fixture", mechanisms=[{"id": n} for n in ("local-env", "read-tool", "write-tool", "bash-tool")])}}))
 
 
 class ExecutionPolicyTests(unittest.IsolatedAsyncioTestCase):

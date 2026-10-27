@@ -29,14 +29,9 @@ class FactoryResourceTests(unittest.IsolatedAsyncioTestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            (root / "models.yaml").write_text(
-                """models:
-  offline:
-    provider: anthropic
-    model: offline
-    api_key_env: TEST_KEY
-    context_window: 4096
-""",
+            (root / ".fruitfly").mkdir()
+            (root / ".fruitfly/models.yaml").write_text(
+                'models:\n  offline:\n    sdk: anthropic\n    protocol: messages\n    model: offline\n    api_key_env: TEST_KEY\n    context_window: 4096\n',
                 encoding="utf-8",
             )
             factory = RunApplicationFactory(cwd=root, environment={})

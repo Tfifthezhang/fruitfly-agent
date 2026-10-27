@@ -10,7 +10,7 @@ class TaskPackGuideTests(unittest.TestCase):
     def test_text_and_python_examples_follow_public_schema(self):
         text = (Path(__file__).resolve().parents[2] / 'fruitfly_agent/lab/improvement/tasks/README.md').read_text()
         examples = [json.loads(s) for s in re.findall(r'```json\n(.*?)\n```', text, re.S)]
-        manifest = next(p for p in examples if p.get('schema_version') == 2)
+        manifest = next(p for p in examples if 'files' in p and 'objective' in p)
         cases = next(p for p in examples if 'train' in p)
         holdout = next(p for p in examples if 'holdout' in p)
         validate_pack(manifest, cases=cases, holdout=holdout)

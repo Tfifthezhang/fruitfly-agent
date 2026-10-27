@@ -64,20 +64,20 @@ class ComponentExperimentTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     self.prepare()
 
-    def test_inspection_and_conversion_are_offline_and_preserve_sources(self):
+    def test_inspection_and_export_are_offline_and_preserve_sources(self):
         from fruitfly_agent.run.configuration.inspection import inspect_configuration
-        from fruitfly_agent.run.configuration.conversion import convert_configuration
+        from fruitfly_agent.run.configuration.export import export_configuration
         source = self.directory / 'default-config.yaml'
         destination = self.root / 'export'
         original = source.read_bytes()
         with patch('fruitfly_agent.providers.registry.ProviderRegistry.create', side_effect=AssertionError('Provider')):
             inspected = inspect_configuration(source)
-            preview = convert_configuration(source, destination)
+            preview = export_configuration(source, destination)
             self.assertEqual(preview['status'], 'preview')
             self.assertFalse(destination.exists())
-            convert_configuration(source, destination, apply=True)
+            export_configuration(source, destination, apply=True)
             exported = inspect_configuration(destination / 'config.yaml')
         self.assertEqual(inspected['models'], exported['models'])
         self.assertEqual(source.read_bytes(), original)
         with self.assertRaisesRegex(ValueError, 'already exists'):
-            convert_configuration(source, destination, apply=True)
+            export_configuration(source, destination, apply=True)

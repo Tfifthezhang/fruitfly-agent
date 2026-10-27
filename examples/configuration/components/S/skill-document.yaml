@@ -1,4 +1,3 @@
-schema_version: 1
 id: skill-document
 role: S
 implementation: skill-document

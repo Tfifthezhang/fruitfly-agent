@@ -20,14 +20,14 @@ class ComponentConfigurationTests(unittest.TestCase):
         self.root = Path(self.enterContext(tempfile.TemporaryDirectory())).resolve()
         _write_catalog(self.root / 'models.yaml', {'offline': 'offline-model'})
         self.path = self.root / 'config.yaml'
-        self.document = {'schema_version': 1, 'id': 'execution-policy', 'role': 'H',
+        self.document = {'id': 'execution-policy', 'role': 'H',
                          'implementation': 'execution-policy', 'parameters': {'max_tool_calls_per_turn': 128}}
-        self.config = {'schema_version': 2, 'default_profile': 'baseline', 'profiles': {'baseline': {
+        self.config = {'default_profile': 'baseline', 'profiles': {'baseline': {
             'models': {'catalog': 'models.yaml', 'roles': {'executor': 'offline'}},
             'H': {'execution-policy': {'file': 'execution.yaml'}, 'base_prompt': {'inline': {
-                'schema_version': 1, 'id': 'base_prompt', 'role': 'H', 'implementation': 'base_prompt',
+                'id': 'base_prompt', 'role': 'H', 'implementation': 'base_prompt',
                 'parameters': {'text': 'Use the supplied evidence.\nKeep exact text.\n'}}}},
-            'I': {'improvement-editor': {'inline': {'schema_version': 1, 'id': 'improvement-editor',
+            'I': {'improvement-editor': {'inline': {'id': 'improvement-editor',
                 'role': 'I', 'implementation': 'improvement-editor', 'parameters': {}}}}}}}
 
     def write(self):
@@ -66,10 +66,10 @@ class ComponentConfigurationTests(unittest.TestCase):
     def test_export_copies_owner_registered_state_and_verifies_artifact_contents(self):
         from fruitfly_agent.lab.catalog import configuration_resources
         self.config['profiles']['baseline']['H']['knowledge-files'] = {'inline': {
-            'schema_version': 1, 'id': 'knowledge-files', 'role': 'H', 'implementation': 'knowledge-files',
+            'id': 'knowledge-files', 'role': 'H', 'implementation': 'knowledge-files',
             'parameters': {'root': 'notes'}}}
         self.config['profiles']['baseline']['H']['information-context'] = {'inline': {
-            'schema_version': 1, 'id': 'information-context', 'role': 'H',
+            'id': 'information-context', 'role': 'H',
             'implementation': 'information-context', 'parameters': {}}}
         self.write()
         (self.root / 'notes').mkdir()
@@ -92,7 +92,7 @@ class ComponentConfigurationTests(unittest.TestCase):
         self.config['profiles']['baseline']['H']['execution-policy'] = {'inline': self.document}
         self.path.write_text(yaml.safe_dump(self.config))
         inline = load_system_config(self.path).select()
-        self.assertEqual(file_profile.to_dict(), inline.to_dict())
+        self.assertEqual(file_profile.to_runtime_dict(), inline.to_runtime_dict())
         with self.assertRaisesRegex(ValueError, 'source changed'):
             file_profile.source_files[0].check()
 
@@ -111,6 +111,27 @@ class ComponentConfigurationTests(unittest.TestCase):
         self.write()
         load_system_config(self.path)
         self.assertFalse((self.root / '.fruitfly').exists())
-        (self.root / 'execution.yaml').write_text('schema_version: 1\nid: x\nid: y\n')
+        (self.root / 'execution.yaml').write_text('id: x\nid: y\n')
         with self.assertRaisesRegex(ValueError, 'distinct'):
             load_system_config(self.path)
+
+    def test_version_markers_flat_profiles_and_duplicate_model_bindings_are_rejected(self):
+        import copy
+        for location in ('system', 'component', 'flat', 'model-binding'):
+            with self.subTest(location=location):
+                document = copy.deepcopy(self.config)
+                component = copy.deepcopy(self.document)
+                if location == 'system':
+                    document['schema_version'] = 2
+                elif location == 'component':
+                    component['schema_version'] = 1
+                elif location == 'flat':
+                    document['profiles']['baseline'] = {'model': {'catalog': 'models.yaml'}, 'mechanisms': []}
+                else:
+                    document['profiles']['baseline']['I']['component-improvement'] = {'inline': {
+                        'id': 'component-improvement', 'role': 'I', 'implementation': 'component-improvement',
+                        'parameters': {'editor_profile': 'offline'}}}
+                self.path.write_text(yaml.safe_dump(document))
+                (self.root / 'execution.yaml').write_text(yaml.safe_dump(component))
+                with self.assertRaises(ValueError):
+                    load_system_config(self.path)

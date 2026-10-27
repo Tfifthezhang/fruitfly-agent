@@ -26,7 +26,7 @@ review shows only entered/reused status, never the value. Field `/clear` removes
 an existing variable override so the selected service default is used. API keys
 bypass input history and terminal echo. Values remain staged until configuration
 save, which writes the workspace `.fruitfly/secrets.env` with owner-only permissions
-and updates the current process. Existing legacy secret-file selection follows
+and updates the current process. Secret-file selection follows
 [Configuration](../../../../CONFIGURATION.md#files-and-precedence), as for model keys.
 Cancel, EOF, interruption or discarded configuration does not save new keys.
 Ordinary save failures restore written files and retain the draft for retry.

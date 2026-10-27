@@ -9,6 +9,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
+import yaml
 
 from fruitfly_agent.experiments.cli import main
 from fruitfly_agent.experiments.configuration import load_configuration
@@ -131,7 +132,7 @@ class ScaffoldingTests(unittest.TestCase):
     def test_collision_or_repeated_init_never_overwrites_or_adds_partial_files(self):
         directory = self.root / '.fruitfly'
         directory.mkdir()
-        existing = directory / 'default-models.yaml'
+        existing = directory / 'default-config.yaml'
         existing.write_text('user settings and comments\n')
         with self.assertRaisesRegex(ValueError, 'will not overwrite'):
             initialize_workspace(self.root)
@@ -153,11 +154,75 @@ class ScaffoldingTests(unittest.TestCase):
         secret.chmod(0o600)
         original = secret.stat()
         result = initialize_workspace(self.root)
-        self.assertEqual(result['preserved'], [str(secret)])
-        self.assertEqual(len(result['created']), len(workspace_templates()))
+        self.assertEqual(result['preserved'], [str(directory / 'models.yaml'), str(secret)])
+        self.assertEqual(len(result['created']), len(workspace_templates()) - 1)
         self.assertEqual(secret.stat(), original)
         for name in ('config.yaml', 'models.yaml', 'secrets.env'):
             self.assertEqual((directory / name).read_text(), 'existing offline fixture\n')
+
+    def test_daily_and_experiment_select_distinct_models_from_existing_shared_catalog(self):
+        from fruitfly_agent.run.configuration.profile import load_harness_config
+        from fruitfly_agent.run.configuration.resolution import model_catalog_path, resolve_profile_models
+        directory = self.root / '.fruitfly'
+        directory.mkdir()
+        models = directory / 'models.yaml'
+        spec = {'sdk': 'openai', 'protocol': 'responses', 'model': 'offline-model',
+                'api_key_env': 'OFFLINE_KEY', 'context_window': 16000}
+        models.write_text('# Keep my model catalog comments.\n' + yaml.safe_dump({
+            'models': {'daily-model': spec, 'experiment-model': {**spec, 'model': 'offline-experiment'}}}))
+        original = models.read_bytes()
+        daily = directory / 'config.yaml'
+        daily.write_text(yaml.safe_dump({'default_profile': 'daily', 'profiles': {'daily': {
+            'models': {'catalog': 'models.yaml', 'roles': {'executor': 'daily-model'}},
+            'H': {}, 'S': {}, 'I': {}}}}))
+        daily_bytes = daily.read_bytes()
+        result = initialize_workspace(self.root)
+        self.assertIn(str(models), result['preserved'])
+        baseline = directory / 'default-config.yaml'
+        config = yaml.safe_load(baseline.read_text())
+        self.assertEqual(config['profiles']['baseline']['models']['catalog'], 'models.yaml')
+        config['profiles']['baseline']['models']['roles'] = dict.fromkeys(
+            ('executor', 'editor', 'assessor'), 'experiment-model')
+        baseline.write_text(yaml.safe_dump(config))
+        daily_profile = load_harness_config(daily).select()
+        baseline_profile = load_harness_config(baseline).select()
+        self.assertEqual(model_catalog_path(daily_profile, daily), models)
+        self.assertEqual(model_catalog_path(baseline_profile, baseline), models)
+        self.assertEqual(resolve_profile_models(daily_profile, daily)[1], 'daily-model')
+        self.assertEqual(resolve_profile_models(baseline_profile, baseline)[1], 'experiment-model')
+        self.assertEqual(models.read_bytes(), original)
+        self.assertEqual(daily.read_bytes(), daily_bytes)
+
+    def test_shared_catalog_must_be_regular_and_failure_preserves_existing_files(self):
+        directory = self.root / '.fruitfly'
+        directory.mkdir()
+        models = directory / 'models.yaml'
+        models.symlink_to(self.root / 'absent-models.yaml')
+        with self.assertRaisesRegex(ValueError, 'models.yaml must be a regular file'):
+            initialize_workspace(self.root)
+        self.assertEqual(list(directory.iterdir()), [models])
+        models.unlink()
+        models.mkdir()
+        with self.assertRaisesRegex(ValueError, 'models.yaml must be a regular file'):
+            initialize_workspace(self.root)
+        self.assertEqual(list(directory.iterdir()), [models])
+
+    def test_write_failure_keeps_reused_catalog_and_secret_intact(self):
+        directory = self.root / '.fruitfly'
+        directory.mkdir()
+        for name in ('models.yaml', 'secrets.env'):
+            (directory / name).write_text('existing offline fixture\n')
+        original_open = os.open
+        def fail_on_experiment(path, *args, **kwargs):
+            if Path(path).name == 'experiment.yaml':
+                raise OSError('offline simulated failure')
+            return original_open(path, *args, **kwargs)
+        with patch('fruitfly_agent.experiments.scaffolding.os.open', side_effect=fail_on_experiment):
+            with self.assertRaisesRegex(OSError, 'simulated failure'):
+                initialize_workspace(self.root)
+        self.assertEqual({p.name for p in directory.iterdir()}, {'models.yaml', 'secrets.env'})
+        for path in directory.iterdir():
+            self.assertEqual(path.read_text(), 'existing offline fixture\n')
 
     def test_symlink_targets_and_nonfile_secrets_fail_before_writes(self):
         elsewhere = self.root / 'elsewhere'
@@ -202,7 +267,7 @@ class ScaffoldingTests(unittest.TestCase):
         templates = workspace_templates()
         expected = {
             'default-config.yaml': 'examples/configuration/default-config.example.yaml',
-            'default-models.yaml': 'examples/configuration/default-models.example.yaml',
+            'models.yaml': 'examples/configuration/models.example.yaml',
             'experiment.yaml': 'examples/experiments/native.example.yaml',
         }
         for name, path in expected.items():

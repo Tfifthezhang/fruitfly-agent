@@ -1,4 +1,4 @@
-"""Versioned declarative I instructions, independent of any execution component."""
+"""Declarative I instructions, independent of any execution component."""
 from dataclasses import asdict, dataclass
 import json
 
@@ -44,7 +44,7 @@ class EditorInstructions:
             return result
         value = json.loads(text, object_pairs_hook=unique)
         fields = set(cls.__dataclass_fields__)
-        if not isinstance(value, dict) or set(value) not in (fields, fields - {'propose'}):
+        if not isinstance(value, dict) or set(value) != fields:
             raise ValueError('editor instructions require exactly the registered stage fields')
         return cls(**value)
 
@@ -64,7 +64,7 @@ class EditorInstructionTarget:
     def snapshot(self):
         return TargetSnapshot('improvement-editor', self.text,
             TargetBinding('artifact', 'improvement-editor'),
-            'editor-instructions-v2' if 'propose' in json.loads(self.text) else 'editor-instructions-v1', 'I')
+            'editor-instructions-v2', 'I')
 
     def validate(self, text):
         candidate = EditorInstructions.parse(text)

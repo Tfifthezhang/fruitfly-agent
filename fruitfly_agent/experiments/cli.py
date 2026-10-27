@@ -97,7 +97,8 @@ def dispatch(args):
     overrides = {}
     if args.request:
         overrides['task'] = {'source': 'eval', 'request': str((workspace / args.request).resolve())}
-    config = load_configuration(workspace, args.config, overrides=overrides)
+    config = load_configuration(workspace, args.config, overrides=overrides,
+        material_only=command == 'prepare' and args.tasks_only)
     if command == 'prepare' and config.task.get('source') == 'task-set':
         from .task_sets import prepare_collections
         print_json(prepare_collections(config, tasks_only=args.tasks_only,

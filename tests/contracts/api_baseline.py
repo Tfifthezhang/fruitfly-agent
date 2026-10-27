@@ -148,7 +148,6 @@ MODULE_EXPORTS = {
     },
     "fruitfly_agent.run.configuration": {
         "DEFAULT_HARNESS_CONFIG_NAME",
-        "HARNESS_PROFILE_SCHEMA_VERSION",
         "HarnessConfig",
         "HarnessProfile",
         "load_harness_config",

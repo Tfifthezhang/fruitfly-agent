@@ -55,8 +55,14 @@ class BudgetedProviderRegistry(ProviderRegistry):
         super().__init__()
         self.registry, self.budget = registry, budget
 
-    def register(self, name, factory):
-        self.registry.register(name, factory)
+    def register(self, sdk, protocol, factory):
+        self.registry.register(sdk, protocol, factory)
+
+    def registered_pairs(self):
+        return self.registry.registered_pairs()
+
+    def validate(self, spec):
+        self.registry.validate(spec)
 
     def create(self, spec, env=None):
         return BudgetedProvider(self.registry.create(spec, env), self.budget)

@@ -4,7 +4,7 @@ from fruitfly_agent.lab.improvement.tasks import package_documents, validate_pac
 
 
 def package():
-    return dict(schema_version=2, id="project", name="Project regression", description="Regression tasks", files={"cases":"cases.json", "holdout":"holdout.json"},
+    return dict(id="project", name="Project regression", description="Regression tasks", files={"cases":"cases.json", "holdout":"holdout.json"},
         task_schema="single-turn-text-v1", target_schema="text-v1",
         compatible_targets=["base_prompt", "skill-catalog.guidance"],
         objective=dict(policy_id="normalized-exact-v1", direction="max"),
@@ -30,7 +30,7 @@ def install(root, payload=None):
     return path
 
 def coding_pack():
-    return dict(schema_version=2, id="coding", name="Coding regression", description="Coding tasks", files={"cases":"cases.json", "holdout":"holdout.json"},
+    return dict(id="coding", name="Coding regression", description="Coding tasks", files={"cases":"cases.json", "holdout":"holdout.json"},
         task_schema="python-function-v1", target_schema="text-v1", compatible_targets=["base_prompt"],
         objective=dict(policy_id="python-function-tests-v1", direction="max"),
         train=[dict(id="train-add", input="Implement add_one(value), returning value + 1.", entry_point="add_one",

@@ -37,7 +37,8 @@ from fruitfly_agent.providers.specs import ModelSpec
 class SmokeOutcome:
     scenario: str
     passed: bool
-    provider: str
+    sdk: str
+    protocol: str
     model: str
     model_profile: str
     duration_s: float
@@ -83,7 +84,8 @@ def _outcome(
     return SmokeOutcome(
         scenario=scenario,
         passed=passed,
-        provider=spec.provider.type,
+        sdk=spec.provider.sdk,
+        protocol=spec.provider.protocol,
         model=spec.model,
         model_profile=spec.id,
         duration_s=time.monotonic() - started,
@@ -208,7 +210,8 @@ async def _run(args: argparse.Namespace) -> int:
             outcome = SmokeOutcome(
                 scenario=name,
                 passed=False,
-                provider=spec.provider.type,
+                sdk=spec.provider.sdk,
+                protocol=spec.provider.protocol,
                 model=spec.model,
                 model_profile=spec.id,
                 duration_s=0.0,
@@ -221,7 +224,8 @@ async def _run(args: argparse.Namespace) -> int:
     payload = {
         "kind": "integration-smoke",
         "model_profile": spec.id,
-        "provider": spec.provider.type,
+        "sdk": spec.provider.sdk,
+        "protocol": spec.provider.protocol,
         "model": spec.model,
         "outcomes": [asdict(outcome) for outcome in outcomes],
     }

@@ -30,7 +30,7 @@ inspectable mechanisms and controlled comparisons. Its runtime is adapted from
 |---|---|
 | Version | 0.1 |
 | Runtime | Python 3.11+, macOS or Linux (POSIX) |
-| Model APIs | Anthropic Messages and OpenAI Responses |
+| Model APIs | Responses, Chat Completions and Anthropic Messages, with explicit SDK/protocol selection |
 | License | [MIT](LICENSE) · [Third-party notices](THIRD_PARTY_NOTICES.md) |
 
 ## Quickstart

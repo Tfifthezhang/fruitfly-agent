@@ -31,6 +31,7 @@ Configure `AgentLoopConfig` with a Provider, tools, execution environment, conte
 | Environment failure | Operations return `Result`; `unwrap()` raises on a failed result. |
 | Provider failure | Adapters may retry transient errors within configured limits; Core routes overflow to recovery and other failures to a terminal result. |
 | Output token limit | Skip all tool calls in the truncated response and record associated error results. Three consecutive truncated responses end with an `output_limit` error; a complete response resets the counter. |
+| Non-final response | `AssistantMessage.continue_turn` requests another model response. Consecutive non-final responses without tools are separately bounded by `max_turns`; the limit returns `continuation_limit`. |
 | Tool budget | `max_tool_calls_per_turn` limits attempts within one outer turn. Execute only the remaining batch allowance; skipped calls each receive an associated error result. Follow-up turns receive a fresh allowance. |
 | Turn budget | `max_turns` bounds outer turns, including follow-ups; it is not a Provider request or monetary limit. |
 | Tool termination | Finish only when every result in the batch requests termination. |
@@ -57,6 +58,10 @@ it is not evidence of task success. Older results may have no diagnostics.
 ```
 
 `REQUEST_PREPARED` observes the final request projection after context transformations and budgeting. Estimates use the selected reducer; no estimator means unknown. Core records request statistics and Provider activity without storing complete request bodies. See [Session records](session/README.md) and [Provider waiting policy](../providers/PROVIDER_GUIDE.md#bound-waiting-and-retries).
+
+`StreamActivity` can also report a server-owned tool's name, ID and state. These
+facts remain Provider activity; Core never dispatches those tools locally or
+charges them to its host-tool counter. Actual billing remains service-specific.
 
 The loop keeps turn/tool budgets and termination decisions in one control flow. Request preparation commits hook changes, applies context stages, checks the reduction budget, and records the final projection before calling the Provider. Response recording persists the hook-adjusted assistant and receipt, updates cumulative usage, and then notifies observers. Cancellation after budgeting or request observation prevents the next Provider call.
 

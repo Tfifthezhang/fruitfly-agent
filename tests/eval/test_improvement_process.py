@@ -13,7 +13,7 @@ from eval.contracts import EvaluationRequest
 
 class EvalProcessTests(unittest.IsolatedAsyncioTestCase):
     def request(self, root):
-        return EvaluationRequest.from_dict({'schema_version': 2, 'runtime': {'working_directory': str(root)},
+        return EvaluationRequest.from_dict({'runtime': {'working_directory': str(root)},
             'benchmark': {'id': 'terminal-bench-4', 'variant': 'smoke'}})
 
     async def test_only_lifecycle_progress_is_forwarded_and_full_output_is_logged(self):

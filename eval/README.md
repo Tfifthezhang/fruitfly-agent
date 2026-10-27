@@ -38,7 +38,7 @@ docker compose version
 | Datasets | Terminal-Bench 2.1, Terminal-Bench 4.0.0, SWE-bench Verified; see [task selections](benchmarks/TASKS.md) |
 | Backend | Docker through Harbor `0.23.0` |
 | Selection | `smoke`, tasks without GPU requirements (`no_gpu`), or all tasks (`full`) |
-| Formats | Request/result/trial/report schema 2; preparation schema 3; catalog/host schema 1 |
+| Formats | Requests and host files have one format without version markers; results/reports and preparation receipts retain their record versions |
 | Output | `.fruitfly/eval/<evaluation-id>/` |
 
 Preflight checks Harbor/Docker availability and Engine/Compose access. It does
@@ -106,7 +106,7 @@ explicit immutable bindings or inputs already provided by the task. State create
 inside an attempt is discarded with its environment; Eval does not carry learning
 between tasks or optimize the Agent.
 
-Secrets come from the workspace `.fruitfly/secrets.env` (root `.env` fallback)
+Secrets come from the workspace `.fruitfly/secrets.env`
 and process environment; process values win. Model keys and enabled mechanisms'
 Catalog-declared credentials reach the Agent through environment variables.
 Values are absent from request JSON and runner arguments. See

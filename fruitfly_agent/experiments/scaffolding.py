@@ -35,7 +35,7 @@ def workspace_templates(*, source: str = 'files', benchmark: str | None = None,
         if variant not in {item.variant_id for item in descriptor.variants}:
             raise ValueError('benchmark does not declare variant: ' + variant)
         request = EvaluationRequest.from_dict({
-            'schema_version': 2,
+            
             'runtime': {'working_directory': '.'},
             'benchmark': {'id': benchmark, 'variant': variant},
             'execution': {'attempts': 1, 'concurrency': 1, 'timeout_seconds': 3600},
@@ -47,7 +47,7 @@ def workspace_templates(*, source: str = 'files', benchmark: str | None = None,
 
 def initialize_workspace(workspace: Path, *, source: str = 'files',
                          benchmark: str | None = None, variant: str = 'smoke') -> dict[str, Any]:
-    """Refuse config collisions, preserve an existing secret file, undo partial writes."""
+    """Reuse shared models/secrets, refuse config collisions, undo partial writes."""
     workspace = Path(workspace).resolve()
     if not workspace.is_dir():
         raise ValueError('create the workspace directory before init: ' + str(workspace))
@@ -55,6 +55,13 @@ def initialize_workspace(workspace: Path, *, source: str = 'files',
     directory = workspace / '.fruitfly'
     if directory.is_symlink() or (directory.exists() and not directory.is_dir()):
         raise ValueError('.fruitfly must be a real workspace directory')
+    preserved = []
+    models = directory / 'models.yaml'
+    if models.is_symlink() or (models.exists() and not models.is_file()):
+        raise ValueError('models.yaml must be a regular file')
+    if models.exists():
+        payloads.pop('models.yaml')
+        preserved.append(str(models))
     conflicts = [name for name in payloads if (directory / name).exists() or (directory / name).is_symlink()]
     if conflicts:
         raise ValueError('init will not overwrite existing configuration: ' + ', '.join(conflicts))
@@ -65,7 +72,6 @@ def initialize_workspace(workspace: Path, *, source: str = 'files',
                 raise ValueError('configuration parent must be a real directory: ' + str(parent))
             parent = parent.parent
     secret = directory / 'secrets.env'
-    preserved = []
     if secret.is_symlink() or (secret.exists() and not secret.is_file()):
         raise ValueError('secrets.env must be a regular file')
     if secret.exists():
@@ -114,7 +120,7 @@ def initialize_workspace(workspace: Path, *, source: str = 'files',
                 pass
         raise
     steps = [
-        'Edit .fruitfly/default-models.yaml, select H/S/I in default-config.yaml, then edit their component files.',
+        'Review the shared .fruitfly/models.yaml; select its model aliases and H/S/I in default-config.yaml, then edit their component files.',
         'Review experiment.yaml edit grants, comparison.yaml and the selected tasks file.',
         'Set DEEPSEEK_API_KEY privately in .fruitfly/secrets.env or the process environment.',
     ]

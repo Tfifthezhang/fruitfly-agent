@@ -53,8 +53,6 @@ Interactive recovery displays original saved conversation through the same histo
 | [profiles.py](profiles.py) | Configuration controller composed with candidate-backed prompt views |
 | [evolution.py](evolution.py) | Bind Application and storage operations to the evolution host |
 | [startup_versions.py](startup_versions.py) | Public startup-selection composition entry |
-| [migrate_improvement.py](migrate_improvement.py) | Explicit offline data/configuration migration; see [configuration](../../CONFIGURATION.md#relocate-improvement-data) |
-| [migrate_configuration.py](migrate_configuration.py) | Explicit migration function and CLI; see [commands and limits](../../CONFIGURATION.md#relocate-workspace-configuration) |
 
 Composition entries delegate to one owning implementation. Internal consumers import the owning module. Run consumes public [Catalog](../lab/catalog/README.md) and [Improvement](../lab/improvement/README.md) contracts; it does not implement search, scoring, or concrete algorithm branches.
 

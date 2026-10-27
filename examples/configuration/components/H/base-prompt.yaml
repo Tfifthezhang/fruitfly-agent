@@ -1,4 +1,3 @@
-schema_version: 1
 id: base_prompt
 role: H
 implementation: base_prompt

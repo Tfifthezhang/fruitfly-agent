@@ -39,7 +39,7 @@ class ResumeHistoryTest(unittest.IsolatedAsyncioTestCase):
             original["digest"] = digest_manifest(original)
             path.write_text("".join(json.dumps(record) + "\n" for record in records))
             before = path.read_bytes()
-            _write_catalog(root / "models.yaml", {"renamed-model": "new-model"})
+            _write_catalog(root / ".fruitfly/models.yaml", {"renamed-model": "new-model"})
             factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=registry,
                 permission_policy=PermissionPolicy(root, read_roots=(root, root.parent)))
             prompt = factory.artifact_store.put_text("Current prompt for continuation")

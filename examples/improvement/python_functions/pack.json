@@ -1,5 +1,4 @@
 {
-  "schema_version": 2,
   "id": "python-functions",
   "name": "Python Coding and Edge Case Fixes",
   "description": "Pure function implementations, edge cases, and exception semantics, scored with actual function-call tests.",

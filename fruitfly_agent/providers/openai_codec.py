@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import Callable
 
 from fruitfly_agent.core.data_model import (
     AgentMessage,
@@ -16,7 +17,7 @@ from fruitfly_agent.core.data_model import (
 )
 
 
-def convert_to_openai(messages: list[AgentMessage]) -> list[dict]:
+def convert_to_openai(messages: list[AgentMessage], *, replay: Callable | None = None) -> list[dict]:
     out: list[dict] = []
     for message in messages:
         if isinstance(message, UserMessage):
@@ -34,6 +35,10 @@ def convert_to_openai(messages: list[AgentMessage]) -> list[dict]:
                         })
                 out.append({"role": "user", "content": content})
         elif isinstance(message, AssistantMessage):
+            original = replay(message, out) if replay is not None else None
+            if original is not None:
+                out.extend(original)
+                continue
             texts = [b.text for b in message.content if isinstance(b, TextBlock)]
             if texts:
                 out.append({"role": "assistant", "content": "".join(texts)})
@@ -46,10 +51,13 @@ def convert_to_openai(messages: list[AgentMessage]) -> list[dict]:
                         "arguments": json.dumps(call.input),
                     })
         elif isinstance(message, ToolResultMessage):
+            output = [{'type': 'input_text', 'text': b.text} if isinstance(b, TextBlock) else
+                      {'type': 'input_image', 'image_url': f'data:{b.media_type};base64,{b.data}'}
+                      for b in message.content]
             out.append({
                 "type": "function_call_output",
                 "call_id": message.tool_call_id,
-                "output": message.text,
+                "output": output if any(isinstance(b, ImageBlock) for b in message.content) else message.text,
             })
         elif isinstance(message, CustomMessage):
             out.append({"role": "user", "content": message.text})

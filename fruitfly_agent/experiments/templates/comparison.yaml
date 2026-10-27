@@ -1,4 +1,3 @@
-schema_version: 1
 scope: task
 feedback: auto
 aggregation: collection-macro

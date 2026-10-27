@@ -7,6 +7,8 @@ Serialization contract: every message type round-trips through
 from __future__ import annotations
 
 import base64
+from copy import deepcopy
+import json
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -107,18 +109,26 @@ class Usage:
     output_tokens: int = 0
     cache_read_tokens: int = 0
     cache_creation_tokens: int = 0
+    reasoning_tokens: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.reasoning_tokens is not None and (type(self.reasoning_tokens) is not int or self.reasoning_tokens < 0):
+            raise ValueError('reasoning tokens must be a nonnegative integer or unknown')
 
     @property
     def total_tokens(self) -> int:
         return self.input_tokens + self.output_tokens
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result = {
             "inputTokens": self.input_tokens,
             "outputTokens": self.output_tokens,
             "cacheReadTokens": self.cache_read_tokens,
             "cacheCreationTokens": self.cache_creation_tokens,
         }
+        if self.reasoning_tokens is not None:
+            result['reasoningTokens'] = self.reasoning_tokens
+        return result
 
     @classmethod
     def from_dict(cls, d: dict[str, Any] | None) -> "Usage":
@@ -130,6 +140,7 @@ class Usage:
             cache_creation_tokens=int(
                 d.get("cacheCreationTokens") or d.get("cache_creation_tokens") or 0
             ),
+            reasoning_tokens=d.get('reasoningTokens', d.get('reasoning_tokens')),
         )
 
 
@@ -175,6 +186,20 @@ class AssistantMessage:
     usage: Usage | None = None
     timestamp: float = 0.0
     role: str = "assistant"
+    provider_state: dict[str, Any] | None = field(default=None, repr=False)
+    continue_turn: bool = False
+
+    def __post_init__(self) -> None:
+        if type(self.continue_turn) is not bool:
+            raise ValueError('continue_turn must be boolean')
+        if self.provider_state is not None:
+            if not isinstance(self.provider_state, dict):
+                raise ValueError('provider state must be a JSON mapping')
+            try:
+                json.dumps(self.provider_state, allow_nan=False)
+            except (ValueError, TypeError) as exc:
+                raise ValueError('provider state requires finite JSON values') from exc
+            object.__setattr__(self, 'provider_state', deepcopy(self.provider_state))
 
     @property
     def tool_calls(self) -> list[ToolCallBlock]:
@@ -185,13 +210,18 @@ class AssistantMessage:
         return "".join(b.text for b in self.content if isinstance(b, TextBlock))
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result = {
             "role": "assistant",
             "content": [b.to_dict() for b in self.content],
             "stopReason": self.stop_reason,
             "usage": self.usage.to_dict() if self.usage is not None else None,
             "timestamp": self.timestamp,
         }
+        if self.provider_state is not None:
+            result['providerState'] = deepcopy(self.provider_state)
+        if self.continue_turn:
+            result['continueTurn'] = True
+        return result
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "AssistantMessage":
@@ -208,6 +238,8 @@ class AssistantMessage:
             stop_reason=sr,  # type: ignore[arg-type]
             usage=Usage.from_dict(usage) if isinstance(usage, dict) else None,
             timestamp=float(d.get("timestamp") or 0),
+            provider_state=d.get('providerState'),
+            continue_turn=d.get('continueTurn', False),
         )
 
 

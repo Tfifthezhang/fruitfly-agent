@@ -54,7 +54,6 @@ cwd = Path.cwd()
 benchmark = os.environ['FRUITFLY_BENCHMARK']
 builtin_catalog().get(benchmark)
 request = EvaluationRequest.from_dict({
-    'schema_version': 2,
     'runtime': {'working_directory': str(cwd)},
     'benchmark': {'id': benchmark, 'variant': 'smoke'},
     'execution': {'attempts': 1, 'concurrency': 1, 'timeout_seconds': 3600},
@@ -91,20 +90,20 @@ The next command executes the model/container path and can incur charges:
 | `--output-root` | Override output location; use the same root to read reports |
 | `--host-config` | Machine YAML override for prepare/check/run; defaults to workspace `.fruitfly/eval-host.yaml` |
 | Exit codes | completed 0, failed 1, input/file error 2, blocked 3 |
-| Request validation | Requires schema 2; unknown fields and experiment inputs are rejected |
+| Request validation | One request format; unknown fields, version markers and experiment inputs are rejected |
 
 `check` exits 0 for matching preparation, 3 when unavailable and 2 for input errors.
 Verifier completeness/model connectivity remain explicitly unverified without
 a real smoke trial. `prepare` creates no evaluation score or report.
 Preparation schema 3 covers controller packages, selected/excluded tasks, Agent
 and independent verifier environments. A missing or incompatible preparation
-requires `prepare` again. Machine files remain schema 1. See
+requires `prepare` again. Machine files use one format without a version marker. See
 [environment preparation](harbor/README.md#prepare-check-and-run).
 
 For an experimental configuration, explicitly supply `runtime.config_path` and
 optionally `runtime.profile`. Relative paths resolve from `working_directory`.
 Explicit empty strings and unknown fields fail; defaults never fall back to daily
-configuration. Requests use schema 2 and one of `smoke`, `no_gpu` or `full`.
+configuration. Requests select one of `smoke`, `no_gpu` or `full`.
 
 The runner parses the selected profile through the shared runtime specification,
 preserves declared execution limits and tool scheduling, stages referenced main/auxiliary

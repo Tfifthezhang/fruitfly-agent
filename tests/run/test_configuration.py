@@ -29,7 +29,7 @@ class HarnessSelectionTest(unittest.TestCase):
 
     def test_parameter_edit_does_not_silently_repair_duplicate_selections(self) -> None:
         root = self.root
-        _write_catalog(root / "models.yaml", {"local": "model-a"})
+        _write_catalog(root / ".fruitfly/models.yaml", {"local": "model-a"})
         catalog = builtin_catalog()
         selection = self.selection(catalog=catalog)
         parameter = next(item for item in catalog.get("compaction").descriptor.parameters
@@ -47,7 +47,7 @@ class HarnessSelectionTest(unittest.TestCase):
 
     def test_selection_group_projects_and_applies_as_one_draft_operation(self) -> None:
         root = self.root
-        _write_catalog(root / "models.yaml", {"only": "model-a"})
+        _write_catalog(root / ".fruitfly/models.yaml", {"only": "model-a"})
         catalog = builtin_catalog()
         selected = self.selection(catalog=catalog, allow_incomplete=True)
         controller = RunConfigurationController(selected, catalog)
@@ -60,7 +60,7 @@ class HarnessSelectionTest(unittest.TestCase):
 
     def test_reduction_group_accepts_another_algorithm_without_frontend_changes(self) -> None:
         root = self.root
-        _write_catalog(root / "models.yaml", {"only": "model-a"})
+        _write_catalog(root / ".fruitfly/models.yaml", {"only": "model-a"})
         original = builtin_catalog()
         summarizing = original.get("compaction")
         alternative = replace(summarizing, descriptor=replace(
@@ -80,7 +80,7 @@ class HarnessSelectionTest(unittest.TestCase):
 
     def test_prompt_choice_is_staged_and_persisted_for_next_session(self) -> None:
         root = self.root
-        _write_catalog(root / "models.yaml", {"local": "model-a"})
+        _write_catalog(root / ".fruitfly/models.yaml", {"local": "model-a"})
         catalog = builtin_catalog()
         selection = self.selection(catalog=catalog)
         store = DataArtifactStore(root / ".fruitfly" / "artifacts")
@@ -100,7 +100,7 @@ class HarnessSelectionTest(unittest.TestCase):
 
     def test_compaction_effects_follow_the_selected_algorithm(self) -> None:
         root = self.root
-        _write_catalog(root / "models.yaml", {"local": "model-a"})
+        _write_catalog(root / ".fruitfly/models.yaml", {"local": "model-a"})
         catalog = builtin_catalog()
         selected = self.selection(catalog=catalog)
         controller = RunConfigurationController(selected, catalog)
@@ -117,14 +117,14 @@ class HarnessSelectionTest(unittest.TestCase):
 
     def test_sole_model_synthesizes_documented_catalog_defaults(self) -> None:
         root = self.root
-        model_path = root / "models.yaml"
+        model_path = root / ".fruitfly/models.yaml"
         _write_catalog(model_path, {"local": "model-a"})
 
         selected = self.selection(catalog=builtin_catalog())
 
         self.assertFalse(selected.persisted)
         self.assertEqual(selected.profile.model_profile, "local")
-        self.assertEqual(selected.profile.model_catalog, "../models.yaml")
+        self.assertEqual(selected.profile.model_catalog, "models.yaml")
         self.assertEqual(
             selected.config_path,
             (root / ".fruitfly" / "config.yaml").resolve(),
@@ -147,7 +147,7 @@ class HarnessSelectionTest(unittest.TestCase):
 
     def test_ambiguous_model_can_enter_provider_free_setup(self) -> None:
         root = self.root
-        _write_catalog(root / "models.yaml", {"a": "model-a", "b": "model-b"})
+        _write_catalog(root / ".fruitfly/models.yaml", {"a": "model-a", "b": "model-b"})
         selected = self.selection(catalog=builtin_catalog(), allow_incomplete=True)
 
         self.assertIsNone(selected.profile.model_profile)
@@ -156,15 +156,15 @@ class HarnessSelectionTest(unittest.TestCase):
         for value in (None, "", " \t "):
             environment = {} if value is None else {"FRUITFLY_MODEL_PROFILE": value}
             with self.subTest(value=value):
-                _write_catalog(self.root / "models.yaml", {"only": "model-a"})
+                _write_catalog(self.root / ".fruitfly/models.yaml", {"only": "model-a"})
                 self.assertEqual(self.selection(environment=environment).profile.model_profile, "only")
-                _write_catalog(self.root / "models.yaml", {"a": "model-a", "b": "model-b"})
+                _write_catalog(self.root / ".fruitfly/models.yaml", {"a": "model-a", "b": "model-b"})
                 self.assertIsNone(self.selection(environment=environment, allow_incomplete=True).profile.model_profile)
                 with self.assertRaisesRegex(ValueError, "ambiguous.*FRUITFLY_MODEL_PROFILE"):
                     self.selection(environment=environment)
 
     def test_explicit_initial_model_choice_is_validated_and_saved_choice_wins(self) -> None:
-        _write_catalog(self.root / "models.yaml", {"a": "model-a", "b": "model-b"})
+        _write_catalog(self.root / ".fruitfly/models.yaml", {"a": "model-a", "b": "model-b"})
         chosen = self.selection(environment={"FRUITFLY_MODEL_PROFILE": "b"})
         self.assertEqual(chosen.profile.model_profile, "b")
         for incomplete in (False, True):
@@ -175,7 +175,7 @@ class HarnessSelectionTest(unittest.TestCase):
 
     def test_controller_saves_profile_state_without_activating_it(self) -> None:
         root = self.root
-        _write_catalog(root / "models.yaml", {"a": "model-a", "b": "model-b"})
+        _write_catalog(root / ".fruitfly/models.yaml", {"a": "model-a", "b": "model-b"})
         catalog = builtin_catalog()
         selected = self.selection(catalog=catalog, allow_incomplete=True)
         controller = RunConfigurationController(selected, catalog)
@@ -208,7 +208,7 @@ class HarnessSelectionTest(unittest.TestCase):
 
     def test_synthesized_configuration_is_saved_to_the_hidden_default(self) -> None:
         root = self.root
-        _write_catalog(root / "models.yaml", {"only": "model-a"})
+        _write_catalog(root / ".fruitfly/models.yaml", {"only": "model-a"})
         catalog = builtin_catalog()
         selected = self.selection(catalog=catalog)
         controller = RunConfigurationController(selected, catalog)
@@ -221,12 +221,12 @@ class HarnessSelectionTest(unittest.TestCase):
 
         self.assertTrue(result.saved)
         self.assertEqual(persisted.select().model_profile, "only")
-        self.assertEqual(persisted.schema_version, 2)
-        self.assertEqual(persisted.select().model_catalog, "../models.yaml")
+        self.assertNotIn("schema_version", persisted.to_dict())
+        self.assertEqual(persisted.select().model_catalog, "models.yaml")
 
     def test_disabling_a_requirement_disables_dependent_mechanisms(self) -> None:
         root = self.root
-        _write_catalog(root / "models.yaml", {"only": "model-a"})
+        _write_catalog(root / ".fruitfly/models.yaml", {"only": "model-a"})
         catalog = builtin_catalog()
         selected = self.selection(catalog=catalog)
         controller = RunConfigurationController(selected, catalog)
@@ -268,7 +268,7 @@ class HarnessSelectionTest(unittest.TestCase):
         self,
     ) -> None:
         root = self.root
-        _write_catalog(root / "models.yaml", {"only": "model-a"})
+        _write_catalog(root / ".fruitfly/models.yaml", {"only": "model-a"})
         catalog = builtin_catalog()
         selected = self.selection(catalog=catalog)
         controller = RunConfigurationController(selected, catalog)
@@ -323,7 +323,7 @@ class HarnessSelectionTest(unittest.TestCase):
 
     def test_disabling_ipython_tool_disables_dependent_externalization(self) -> None:
         root = self.root
-        _write_catalog(root / "models.yaml", {"only": "model-a"})
+        _write_catalog(root / ".fruitfly/models.yaml", {"only": "model-a"})
         catalog = builtin_catalog()
         selected = self.selection(catalog=catalog)
         controller = RunConfigurationController(selected, catalog)
@@ -338,7 +338,7 @@ class HarnessSelectionTest(unittest.TestCase):
 
     def test_controller_snapshot_reloads_the_tracked_model_catalog(self) -> None:
         root = self.root
-        model_path = root / "models.yaml"
+        model_path = root / ".fruitfly/models.yaml"
         _write_catalog(model_path, {"first": "model-a"})
         catalog = builtin_catalog()
         selected = self.selection(catalog=catalog)
@@ -359,7 +359,7 @@ class HarnessSelectionTest(unittest.TestCase):
         import io
         from fruitfly_agent.interactive import TerminalConfigurationFrontend
         from tests.support.terminal import ScriptedLines
-        _write_catalog(self.root / 'models.yaml', {'only': 'model-a'})
+        _write_catalog(self.root / '.fruitfly/models.yaml', {'only': 'model-a'})
         controller = RunConfigurationController(self.selection(), builtin_catalog())
         controller.set_parameter('component-improvement', 'max_model_calls', '3')
         controller.save()

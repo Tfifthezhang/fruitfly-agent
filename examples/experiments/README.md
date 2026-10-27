@@ -5,7 +5,7 @@
 Use one small experiment file and referenced component/task/comparison documents.
 Read [the field guide](../../fruitfly_agent/experiments/CONFIGURATION.md) for the
 schema and [component syntax](../../fruitfly_agent/runtime_spec/COMPONENTS.md) for
-H/S/I files. Existing schema-1 files remain readable; these recipes use schema 2.
+H/S/I files. All recipes use the same format without version markers.
 
 | Recipe | Required material |
 |---|---|
@@ -28,7 +28,7 @@ an existing empty workspace:
 fruitfly-agent-lab init
 ```
 
-Edit `.fruitfly/default-models.yaml` for your account and place the key privately
+Edit `.fruitfly/models.yaml` for your account and place the key privately
 in `secrets.env` or the process environment. Model declarations contain key
 variable names only. Select aliases in `default-config.yaml`. Edit your task in
 `.fruitfly/tasks/native.yaml`, and component values under `.fruitfly/components/`.
@@ -44,8 +44,10 @@ fruitfly-agent-lab improvement report '<RUN_ID>' --json
 The native instruction recipe has behavioral feedback and no independent holdout.
 For measured search/RSI, install the [Python function pack](../improvement/python_functions/README.md#search-and-review)
 and select it in the task document. Native file trials do not inherit a shell,
-network tools or production files. Initialization preserves existing daily files
-and regular secrets, rejects config collisions and makes no external requests.
+network tools or production files. Initialization preserves existing daily files,
+regular model catalogs and secrets, rejects other config collisions and makes no
+external requests. When a catalog already exists, select its actual aliases in
+`default-config.yaml` before checking.
 
 ## Start a remote Linux benchmark experiment
 
@@ -74,7 +76,7 @@ Benchmark development reward alone cannot authorize persistent adoption.
 ```text
 .fruitfly/
 ├── default-config.yaml        # Select models and H/S/I documents
-├── default-models.yaml        # Model specifications
+├── models.yaml                # Shared daily and experiment model specifications
 ├── secrets.env
 ├── components/
 │   ├── H/                     # Prompt, execution, environment, tools, context
@@ -90,8 +92,9 @@ Benchmark development reward alone cannot authorize persistent adoption.
 Only selected components need files. Model roles live in config, rounds in I
 search, assessment in I feedback, tool limits in H execution, and permitted
 changes in experiment. Paths resolve from the file that declares each reference.
-Daily `.fruitfly/config.yaml` uses the same system schema and can choose different
-component documents. Copying values does not keep different workspaces in sync.
+Daily `.fruitfly/config.yaml` uses the same system schema and shared `models.yaml`.
+Daily and baseline configs select their own model aliases and component documents.
+Copying values does not keep different workspaces in sync.
 
 ## Read the complete reference
 
@@ -108,7 +111,7 @@ selected profile in `default-config.yaml`:
 
 ```yaml
 models:
-  catalog: default-models.yaml
+  catalog: models.yaml
   roles:
     executor: your-executor-profile
     editor: your-editor-profile

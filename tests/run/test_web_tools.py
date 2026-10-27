@@ -31,7 +31,7 @@ class WebAssemblyTests(unittest.IsolatedAsyncioTestCase):
     async def test_configuration_projects_service_credential_names_and_status_without_values(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            _write_catalog(root / "models.yaml", {"offline": "offline-model"})
+            _write_catalog(root / ".fruitfly/models.yaml", {"offline": "offline-model"})
             factory = RunApplicationFactory(cwd=root, environment={})
             configuration = factory.configuration
             configuration.set_mechanism("web-search-tool", enabled=True)
@@ -138,7 +138,7 @@ class WebAssemblyTests(unittest.IsolatedAsyncioTestCase):
     async def test_host_injects_credentials_without_recording_values(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            model_path = root / "models.yaml"
+            model_path = root / ".fruitfly/models.yaml"
             _write_catalog(model_path, {"offline": "offline-model"})
             registry = Mock()
             registry.create.return_value = FauxProvider()
@@ -169,7 +169,7 @@ class WebAssemblyTests(unittest.IsolatedAsyncioTestCase):
     async def test_application_search_then_fetch_and_recovery_uses_fresh_cache(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            _write_catalog(root / "models.yaml", {"offline": "offline-model"})
+            _write_catalog(root / ".fruitfly/models.yaml", {"offline": "offline-model"})
             provider, requests, clients = FauxProvider(), [], []
             registry = Mock()
             registry.create.return_value = provider
@@ -222,7 +222,7 @@ class WebAssemblyTests(unittest.IsolatedAsyncioTestCase):
         for failure in ("assembly", "startup"):
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
-                _write_catalog(root / "models.yaml", {"offline": "offline-model"})
+                _write_catalog(root / ".fruitfly/models.yaml", {"offline": "offline-model"})
                 registry = Mock()
                 registry.create.return_value = FauxProvider()
                 clients = []

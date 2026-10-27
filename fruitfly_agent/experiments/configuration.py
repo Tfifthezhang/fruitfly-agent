@@ -2,35 +2,11 @@
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any
-import yaml
-from fruitfly_agent.runtime_spec.documents import DocumentReader
+from fruitfly_agent.runtime_spec.documents import DocumentReader, mapping
 
 from fruitfly_agent.lab.improvement.configuration import ImprovementSettings, TaskSetImprovementSettings
 from fruitfly_agent.lab.rsi.configuration import EvolutionSettings
 from fruitfly_agent.lab.improvement.api import ProcessAssessmentSettings, ExplorationSettings, MultiTaskSettings
-
-
-class UniqueLoader(yaml.SafeLoader):
-    pass
-
-
-def unique_mapping(loader, node):
-    result = {}
-    for key_node, value_node in node.value:
-        key = loader.construct_object(key_node)
-        if not isinstance(key, str) or key in result:
-            raise ValueError('configuration keys must be distinct strings')
-        result[key] = loader.construct_object(value_node)
-    return result
-
-
-UniqueLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, unique_mapping)
-
-
-def mapping(value, allowed, label):
-    if not isinstance(value, dict) or set(value) - set(allowed):
-        raise ValueError(label + ' contains unknown fields or is not a mapping')
-    return value
 
 
 def settings(cls, value, label):
@@ -78,7 +54,7 @@ class ExperimentConfig:
             'multi_task': asdict(self.multi_task)}
 
 
-def load_configuration(workspace, path=None, *, overrides=None):
+def load_configuration(workspace, path=None, *, overrides=None, material_only=False):
     workspace = Path(workspace).resolve()
     target = Path(path).expanduser() if path is not None else workspace / '.fruitfly/experiment.yaml'
     if not target.is_absolute():
@@ -86,22 +62,20 @@ def load_configuration(workspace, path=None, *, overrides=None):
     target = target.resolve()
     if path is not None and not target.is_file():
         raise ValueError('experiment configuration not found: ' + str(target))
-    raw = {}
-    sources = {}
-    source_files: tuple = ()
+    reader = DocumentReader()
     if target.is_file():
-        reader = DocumentReader()
-        raw = reader.read(target)
-        if isinstance(raw, dict) and type(raw.get('schema_version')) is int and raw['schema_version'] == 2:
-            from .comparison import normalize_experiment
-            raw, source_files, _ = normalize_experiment(raw, target)
-        source_files = (*reader.sources.values(), *source_files)
-        mapping(raw, {'schema_version', 'task', 'runtime', 'models', 'improvement', 'rsi', 'stop',
-            'process_assessment', 'exploration', 'multi_task'}, 'experiment')
-        if type(raw.get('schema_version')) is not int or raw['schema_version'] != 1:
-            raise ValueError('experiment requires schema_version 1')
-        sources = {section + '.' + name: str(target) for section, value in raw.items()
-            if isinstance(value, dict) for name in value}
+        document = reader.read(target)
+    elif path is None and (overrides or {}).get('task'):
+        document = {'baseline': {'config': 'default-config.yaml'},
+            'tasks': {'inline': overrides['task']}, 'comparison': {'inline': {}},
+            'edit': {'base_prompt': {'fields': ['parameters.text']}}}
+    else:
+        raise ValueError('experiment configuration not found: ' + str(target) + '; initialize a workspace first')
+    from .comparison import normalize_experiment
+    raw, references, _ = normalize_experiment(document, target, material_only=material_only)
+    source_files = (*reader.sources.values(), *references)
+    sources = {section + '.' + name: str(target) for section, value in raw.items()
+        if isinstance(value, dict) for name in value}
     for section, values in (overrides or {}).items():
         raw[section] = {**raw.get(section, {}), **values}
         sources.update({section + '.' + name: 'command line' for name in values})

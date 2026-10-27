@@ -1,7 +1,7 @@
 """A detached file-task executor; other environments implement the TaskRunner port."""
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import asdict, replace
 import base64
 import time
 from uuid import uuid4
@@ -9,7 +9,7 @@ from uuid import uuid4
 from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.core.data_model import AgentToolResult, AssistantMessage, ImageBlock, TextBlock, UserMessage
 from fruitfly_agent.core.loop import run_agent_loop
-from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone
+from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone, StreamActivity
 from ..contracts.pipeline import ExecutionRecord, Resource, relative_path, canonical_json
 from .handles import ManagedExecution
 from .facts import attach_facts, loop_fact_values, receipt_facts
@@ -111,7 +111,15 @@ class FileTaskRunner:
             journal.publish('model-request', model=view.model, call=calls)
             self.services.record('task-model-request', task_id=task.task_id, harness_id=harness.snapshot_id)
             async def events():
-                message = await self.config.provider(view, signal=self.services.signal).result()
+                inner = self.config.provider(view, signal=self.services.signal)
+                try:
+                    async for event in inner:
+                        if isinstance(event, StreamActivity):
+                            journal.publish('provider-activity', **asdict(event))
+                        yield event
+                    message = await inner.result()
+                finally:
+                    await inner.aclose()
                 if message.text:
                     journal.publish('assistant-output', artifact_id=self.artifacts.put(message.text.encode('utf-8')),
                         media_type='text/plain; charset=utf-8')
@@ -146,7 +154,8 @@ class FileTaskRunner:
         self.services.check()
         answers = [m for m in result.messages if isinstance(m, AssistantMessage)]
         output = answers[-1].text if answers else ''
-        trajectory = canonical_json([m.to_dict() for m in result.messages]).encode('utf-8')
+        trajectory = canonical_json([(replace(m, provider_state=None) if isinstance(m, AssistantMessage)
+            else m).to_dict() for m in result.messages]).encode('utf-8')
         from fruitfly_agent.runtime_spec import effective_execution
         execution_reference = self.artifacts.put(canonical_json(effective_execution(config)).encode('utf-8'))
         artifacts = [Resource('runtime-execution.json', execution_reference, 'application/json', 'diagnostic'),

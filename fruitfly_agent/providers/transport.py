@@ -101,7 +101,8 @@ async def attempts(provider, view, signal):
         producer = provider._stream_once(view, signal, deadline=AttemptDeadline(policy, total_deadline))
         try:
             async for event in producer:
-                if not isinstance(event, (StreamActivity, StreamDone, StreamError)):
+                if (not isinstance(event, (StreamActivity, StreamDone, StreamError))
+                        or isinstance(event, StreamActivity) and bool(event.tool_name)):
                     delivered = True
                 yield event
             return

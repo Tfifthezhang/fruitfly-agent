@@ -99,10 +99,12 @@ experiment/default configuration files do not yet exist:
 .venv/bin/fruitfly-agent-lab init
 ```
 
-Review `.fruitfly/default-models.yaml`, put the selected model's key privately in
-`.fruitfly/secrets.env`, and edit the instruction in `.fruitfly/experiment.yaml`.
-Daily model settings are separate. Existing secrets are preserved; existing
-experiment/default destinations cause an error rather than being overwritten.
+Review the shared `.fruitfly/models.yaml`, select its aliases in
+`.fruitfly/default-config.yaml`, put the selected model's key privately in
+`.fruitfly/secrets.env`, and edit the instruction in `.fruitfly/tasks/native.yaml`.
+Daily interaction selects its own aliases in `.fruitfly/config.yaml`. Existing
+regular model catalogs and secrets are preserved; other existing experiment/default
+destinations cause an error rather than being overwritten.
 Initialization does not invoke models, install dependencies or start containers.
 
 ```bash

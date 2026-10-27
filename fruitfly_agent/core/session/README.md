@@ -9,6 +9,7 @@ Store and replay the canonical conversation in an append-only JSONL file.
 | Record | Contents |
 |---|---|
 | Messages | Valid user, assistant, and tool messages |
+| Assistant protocol continuation | Optional exact response items, internal format check, content/context binding and opaque signatures; keys/request bodies excluded |
 | Context decisions | Committed reduction decisions |
 | RuntimeManifest | Complete assembled environment snapshots written and validated by Run |
 | Metadata contextProjection | Atomic replacement of the model projection when restoring with changed mechanisms; canonical facts remain intact |
@@ -20,6 +21,12 @@ Store and replay the canonical conversation in an append-only JSONL file.
 Interrupted tool calls retain completed results and explicit unknown/not-executed outcomes. These records do not roll back effects or authorize replay. Input receipt values use the adapter's usage convention; cache fields and exact billing remain Provider-specific.
 
 Sessions do not copy every Provider request, token event, or tool event. Use frontend events or `/trace` for live observation; these do not provide exact persisted request replay.
+
+Provider continuation survives message/projection round trips. Its owner validates
+reuse at the next request; changing model, credentials or a signed prefix may
+require a new user turn or explicit restart of an active tool turn. Old messages
+without continuation cannot supply missing signatures. See
+[Provider replay](../../providers/PROVIDER_GUIDE.md#preserve-a-tool-conversation).
 
 ## Use and recover
 

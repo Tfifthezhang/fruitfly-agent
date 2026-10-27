@@ -124,6 +124,20 @@ class ProgrammaticContextExternalizerTest(unittest.TestCase):
 
 
 class ModelQueryBrokerTest(unittest.IsolatedAsyncioTestCase):
+    async def test_intermediate_answer_is_rejected_without_refunding_actual_usage(self):
+        from fruitfly_agent.core.data_model import AssistantMessage, TextBlock, Usage
+        with tempfile.TemporaryDirectory() as tmp:
+            provider = FauxProvider()
+            provider.respond(AssistantMessage([TextBlock('working')], stop_reason='stop',
+                usage=Usage(input_tokens=10, output_tokens=5, reasoning_tokens=3), continue_turn=True))
+            broker = ModelQueryBroker(provider, model='child', profile='child',
+                store=SessionArtifactStore(Path(tmp), max_artifact_bytes=10000), config=ModelQueryConfig())
+            with self.assertRaisesRegex(RuntimeError, 'intermediate response'):
+                await broker.handle('model.query', {'prompt': 'task'})
+            health = await broker.health()
+            self.assertEqual(health['calls'], 1)
+            self.assertEqual(health['estimated_or_actual_tokens'], 15)
+
     async def test_query_is_text_only_and_enforces_call_budget(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             provider = FauxProvider()

@@ -24,7 +24,7 @@ from tests.support.run import _write_catalog
 class McpApplicationTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.root = Path(self.enterContext(tempfile.TemporaryDirectory()))
-        _write_catalog(self.root / 'models.yaml', {'offline': 'offline-model'})
+        _write_catalog(self.root / '.fruitfly/models.yaml', {'offline': 'offline-model'})
         self.provider = FauxProvider()
         self.registry = Mock()
         self.registry.create.return_value = self.provider

@@ -1,4 +1,3 @@
-schema_version: 1
 id: bash-tool
 role: H
 implementation: bash-tool

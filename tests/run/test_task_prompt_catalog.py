@@ -25,7 +25,7 @@ class TaskPromptTests(unittest.TestCase):
     def test_each_task_keeps_latest_and_menu_filters_scope_and_object(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            _write_catalog(root / 'models.yaml', {'local': 'model-a'})
+            _write_catalog(root / '.fruitfly/models.yaml', {'local': 'model-a'})
             catalog = builtin_catalog()
             selection = resolve_harness_selection(cwd=root, config_path=None, profile_id=None,
                                                  environment={}, catalog=catalog)

@@ -20,6 +20,22 @@ controllers expose review only. No permission settings page is supplied.
 
 The host ConfigurationController owns choices and persistence. ModelSetupService owns validation and credential staging. Forms use explicitly supplied selection, rendering, reader, and staging operations; they do not access a menu owner's private methods. Credential values bypass readline/history and are absent from views and review text.
 
+Model review displays host-supplied `service`, `parameters` and `transport`
+defaults without additional input fields. ANSI review has Next/Previous pages so
+long mappings remain readable; numbered output prints the complete review.
+Confirmation stages the defaults through the host. Vendor presets stay in Providers.
+
+Model setup first groups host options by `ModelSetupOption.group`. A group with
+one option opens its preset directly; multiple options open a second selection
+menu. The supplied custom-service group exposes protocol choices there. Back
+returns to service selection, while quit or field cancellation leaves no staged
+model. The terminal does not classify vendors or protocols itself.
+
+SDK/protocol fields use host-supplied choices, refreshed through
+`ModelSetupService.field` after prior selections. Their IDs and number are not
+declared in this feature. An unavailable choice cancels rather than becoming a
+free-text SDK or protocol input.
+
 Optional `MechanismSetupService` supplies backend-neutral forms declared in
 Catalog. Enabling a mechanism opens its guided setup only when settings or
 credentials are missing. Complete saved or staged settings are reused directly;

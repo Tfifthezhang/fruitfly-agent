@@ -26,7 +26,7 @@ class EditorEvolutionTests(unittest.IsolatedAsyncioTestCase):
             path = root / '.fruitfly/config.yaml'
             document = yaml.safe_load(path.read_text())
             profile = document['profiles'][document['default_profile']]
-            profile['I']['improvement-editor'] = {'inline': {'schema_version': 1,
+            profile['I']['improvement-editor'] = {'inline': {
                 'id': 'improvement-editor', 'role': 'I', 'implementation': 'improvement-editor', 'parameters': {}}}
             path.write_text(yaml.safe_dump(document))
             factory.reload_configuration()

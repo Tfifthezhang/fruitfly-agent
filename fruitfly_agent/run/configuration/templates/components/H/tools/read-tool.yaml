@@ -1,4 +1,3 @@
-schema_version: 1
 id: read-tool
 role: H
 implementation: read-tool

@@ -10,7 +10,7 @@ error classification + retry. GLM-compatible-endpoint quirks handled here:
 from __future__ import annotations
 
 import asyncio
-from dataclasses import asdict
+from dataclasses import asdict, replace
 import json
 from typing import TYPE_CHECKING, Any, AsyncIterator, NotRequired, TypedDict, cast
 
@@ -31,6 +31,7 @@ from fruitfly_agent.core.model_stream import (
     StreamDone,
     StreamError,
     StreamEvent,
+    StreamActivity,
     TextDelta,
     ThinkingDelta,
     ToolCallDelta,
@@ -39,8 +40,15 @@ from fruitfly_agent.core.model_stream import (
 )
 
 from .anthropic_codec import convert_to_anthropic
+from .replay import ReplayBinding, wire_value
+from .request_options import validate_request_options
+from .services import service_definition
 from .error_classification import classify_provider_error
 from .transport import TransportPolicy, AttemptDeadline, attempts, close_transport, retry_details, validate_retries
+
+_SERVER_BLOCKS = frozenset({'server_tool_use', 'web_search_tool_result', 'web_fetch_tool_result',
+                           'code_execution_tool_result', 'bash_code_execution_tool_result',
+                           'text_editor_code_execution_tool_result'})
 
 _STOP_REASON_MAP = {
     "end_turn": "stop",
@@ -63,6 +71,8 @@ def classify_error(exc: Exception, *, status_code: int | None = None) -> TaggedE
 
 
 class AnthropicProvider:
+    protocol = 'messages'
+
     def __init__(
         self,
         *,
@@ -79,9 +89,15 @@ class AnthropicProvider:
         total_timeout: float = 900.0,
         cleanup_timeout: float = 5.0,
         retry_jitter: float = 0.2,
+        service: str = 'generic',
+        **request_options: Any,
     ) -> None:
         import anthropic  # SDK stays in this file.
 
+        request_options = validate_request_options(self.protocol, request_options)
+        service_definition(service, self.protocol).validate(self.protocol, model, request_options)
+        self.request_options = request_options
+        self._replay = ReplayBinding(self.protocol, service, base_url, api_key, namespace='anthropic')
         self._anthropic = anthropic
         validate_retries(retry_max, retry_base_delay)
         self._policy = TransportPolicy(connect_timeout, timeout, first_progress_timeout,
@@ -137,14 +153,21 @@ class AnthropicProvider:
     async def _stream_once(
         self, view: ProviderView, signal: asyncio.Event | None, *, deadline: AttemptDeadline
     ) -> AsyncIterator[StreamEvent]:
-        request: _MessageRequest = {
+        tools = [t.to_schema() for t in view.tools if not t.hide_from_model]
+        effective = replace(view, model=view.model or self.model)
+        service_definition(self._replay.service, self.protocol).validate(self.protocol, effective.model, self.request_options)
+        prefix = convert_to_anthropic(view.messages, replay=self._replay.reader(effective, tools))
+        request: dict[str, Any] = {
             "model": view.model or self.model,
             "system": view.system_prompt,
             # The codec owns serialization; this cast describes its SDK wire shape.
-            "messages": cast("list[MessageParam]", convert_to_anthropic(view.messages)),
+            "messages": prefix,
             "max_tokens": min(self.max_tokens, view.max_tokens) if view.max_tokens > 0 else self.max_tokens,
+            **self.request_options,
         }
-        tools = [t.to_schema() for t in view.tools if not t.hide_from_model]
+        budget = self.request_options.get('thinking', {}).get('budget_tokens')
+        if budget is not None and (type(budget) is not int or not 0 < budget < request['max_tokens']):
+            raise FatalError('thinking.budget_tokens must fit inside the request output allowance')
         if tools:
             request["tools"] = cast("list[ToolParam]", tools)
 
@@ -159,9 +182,12 @@ class AnthropicProvider:
                     event = await deadline.wait(iterator.__anext__(), signal)
                 except StopAsyncIteration:
                     break
+                if getattr(getattr(event, 'delta', None), 'type', None) == 'signature_delta':
+                    deadline.progress()
                 mapped = self._map_event(event)
                 if mapped is not None:
                     meaningful = (isinstance(mapped, ToolCallStart) or
+                                  isinstance(mapped, StreamActivity) and bool(mapped.tool_name) or
                                   bool(getattr(mapped, "text", "") or getattr(mapped, "thinking", "") or
                                        getattr(mapped, "json_delta", "")))
                     if meaningful:
@@ -176,7 +202,11 @@ class AnthropicProvider:
         finally:
             if entered:
                 await close_transport(manager.__aexit__(None, None, None), self._policy.cleanup_timeout)
-        yield StreamDone(result=self._assemble(final))
+        if final is None:
+            raise FatalError('Messages stream ended without a final message')
+        message = self._assemble(final)
+        items = [{'role': 'assistant', 'content': wire_value(final.content)}]
+        yield StreamDone(result=self._replay.attach(message, effective, tools, prefix, items))
 
     # -- event mapping -------------------------------------------------------
 
@@ -195,6 +225,10 @@ class AnthropicProvider:
             return None
         if event_type == "content_block_start":
             block = event.content_block
+            if getattr(block, 'type', None) in _SERVER_BLOCKS:
+                return StreamActivity('server_tool', tool_name=str(getattr(block, 'name', block.type)),
+                    tool_call_id=str(getattr(block, 'id', getattr(block, 'tool_use_id', ''))),
+                    tool_status='started' if block.type == 'server_tool_use' else 'completed')
             if getattr(block, "type", None) == "tool_use":
                 # GLM quirk: the full input may arrive here.
                 return ToolCallStart(
@@ -226,6 +260,8 @@ class AnthropicProvider:
                 blocks.append(
                     ToolCallBlock(id=block.id, name=block.name, input=dict(input_raw or {}))
                 )
+            elif block_type not in _SERVER_BLOCKS | {'redacted_thinking'}:
+                raise FatalError('Unsupported Messages content block: ' + str(block_type))
         stop = str(getattr(final, "stop_reason", None) or "end_turn")
         stop_reason = _STOP_REASON_MAP.get(stop, "stop")
         usage = getattr(final, "usage", None)
@@ -241,6 +277,7 @@ class AnthropicProvider:
             content=blocks,
             stop_reason=stop_reason,  # type: ignore[arg-type]
             usage=usage_obj,
+            continue_turn=stop == 'pause_turn',
         )
 
 

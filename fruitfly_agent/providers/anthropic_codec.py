@@ -8,6 +8,7 @@ stripped from their assistant message. The first message is always user-role
 """
 
 from __future__ import annotations
+from typing import Callable
 
 from fruitfly_agent.core.data_model import (
     AgentMessage,
@@ -32,7 +33,7 @@ def _custom_to_text(message: CustomMessage) -> str:
     return message.text
 
 
-def convert_to_anthropic(messages: list[AgentMessage]) -> list[dict]:
+def convert_to_anthropic(messages: list[AgentMessage], *, replay: Callable | None = None) -> list[dict]:
     """Convert AgentMessage[] to provider-ready dict messages.
 
     Pairing normalization: a tool_result is kept only when an assistant
@@ -65,7 +66,10 @@ def convert_to_anthropic(messages: list[AgentMessage]) -> list[dict]:
                         {
                             "type": "tool_result",
                             "tool_use_id": result.tool_call_id,
-                            "content": result.text,
+                            "content": result.text if not any(isinstance(b, ImageBlock) for b in result.content) else [
+                                {'type': 'text', 'text': b.text} if isinstance(b, TextBlock) else
+                                {'type': 'image', 'source': {'type': 'base64', 'media_type': b.media_type, 'data': b.data}}
+                                for b in result.content],
                             "is_error": result.is_error,
                         }
                     )
@@ -98,6 +102,11 @@ def convert_to_anthropic(messages: list[AgentMessage]) -> list[dict]:
             continue
 
         if isinstance(message, AssistantMessage):
+            original = replay(message, out) if replay is not None else None
+            if original is not None:
+                out.extend(original)
+                i += 1
+                continue
             assistant_content: list[dict] = []
             for block in message.content:
                 if isinstance(block, TextBlock):
@@ -112,7 +121,8 @@ def convert_to_anthropic(messages: list[AgentMessage]) -> list[dict]:
                                 "input": block.input,
                             }
                         )
-                # ThinkingBlock: dropped at the API boundary (not replayable).
+                # Display text alone cannot reconstruct signed thinking. Exact
+                # blocks are supplied only through the validated replay callback.
             out.append({"role": "assistant", "content": assistant_content})
             i += 1
             continue

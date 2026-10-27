@@ -7,12 +7,13 @@ from fruitfly_agent.core.data_model import UserMessage
 
 
 def _write_catalog(path: Path, profiles: dict[str, str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     rows = ["models:"]
     for profile, model in profiles.items():
         rows.extend(
             (
                 f"  {profile}:",
-                "    provider: anthropic",
+                '    sdk: anthropic\n    protocol: messages',
                 f"    model: {model}",
                 "    api_key_env: TEST_API_KEY",
                 "    context_window: 4000",

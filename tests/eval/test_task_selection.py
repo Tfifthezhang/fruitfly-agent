@@ -7,7 +7,7 @@ from eval.task_selection import select_prepared_tasks
 
 class PreparedSelectionTests(unittest.TestCase):
     def test_legacy_request_roundtrip_and_explicit_names(self):
-        old = {'schema_version': 2, 'runtime': {'working_directory': '.', 'config_path': None, 'profile': None},
+        old = {'runtime': {'working_directory': '.', 'config_path': None, 'profile': None},
             'benchmark': {'id': 'terminal-bench-4', 'variant': 'full'},
             'execution': {'attempts': 1, 'concurrency': 1, 'timeout_seconds': 3600}}
         request = EvaluationRequest.from_dict(old)

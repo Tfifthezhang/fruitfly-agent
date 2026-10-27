@@ -54,7 +54,7 @@ def resolve_benchmark(config):
     model_calls = task.get('model_calls', 80)
     if type(model_calls) is not int or not 1 <= model_calls <= 10000:
         raise ValueError('task.model_calls must be an integer between 1 and 10000')
-    payload: dict[str, Any] = {'schema_version': 1, 'cache': str(host.cache),
+    payload: dict[str, Any] = {'cache': str(host.cache),
         'agent': {'python': host.python,
             'mounts': [{'source': str(m.source), 'target': m.target} for m in host.mounts],
             'library_paths': list(host.library_paths)},

@@ -14,12 +14,10 @@ import unicodedata
 from uuid import uuid4
 from typing import Iterator, NotRequired, Protocol, Sequence, TypedDict, cast
 
-from fruitfly_agent.lab.improvement.tasks.cases import TaskSuite, load_task_cases
 from fruitfly_agent.lab.improvement.tasks.models import TaskCase
 from fruitfly_agent.lab.improvement.tasks.scoring import TaskPolicy, builtin_task_policies, task_policy
 
 TASK_PACK_COMPONENT = "improvement-task-packs"
-LEGACY_PACK_ID = "configured-cases"
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 
 
@@ -30,7 +28,6 @@ class _Objective(TypedDict):
 
 class _TaskMaterial(TypedDict):
     """Validated metadata and policy-defined case mappings, never a raw JSON input."""
-    schema_version: int
     id: str
     name: str
     description: str
@@ -113,13 +110,11 @@ def _unique_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
 
 
 def _validate_manifest_fields(payload: object) -> dict:
-    required = {"schema_version", "id", "name", "description", "task_schema", "target_schema", "compatible_targets", "objective", "files"}
+    required = {"id", "name", "description", "task_schema", "target_schema", "compatible_targets", "objective", "files"}
     if not isinstance(payload, dict) or not required <= payload.keys() or payload.keys() - required - {"default_direction"}:
-        raise ValueError("invalid task package fields; schema 1 needs explicit migration")
-    if type(payload["schema_version"]) is not int or payload["schema_version"] != 2:
-        raise ValueError("unsupported task package schema_version; migrate to schema 2")
-    if not isinstance(payload["id"], str) or not _ID.fullmatch(payload["id"]) or payload["id"] == LEGACY_PACK_ID:
-        raise ValueError("invalid or reserved task package id")
+        raise ValueError("invalid task package fields")
+    if not isinstance(payload["id"], str) or not _ID.fullmatch(payload["id"]):
+        raise ValueError("invalid task package id")
     for key, limit in (("name", 120), ("description", 500), ("default_direction", 500)):
         value = payload.get(key, "")
         if not isinstance(value, str) or len(value) > limit or key in {"name", "description"} and not value.strip():
@@ -271,13 +266,12 @@ class LoadedTaskPack:
 
 
 def load_pack(workspace: Path, path: Path, *, policies: Sequence[TaskPolicy] | None = None) -> LoadedTaskPack:
-    """Read a consistent, bounded v2 package. No model or code execution."""
+    """Read a consistent, bounded task package. No model or code execution."""
     workspace, path = Path(workspace).resolve(), Path(path)
     manifest_bytes = read_bytes(workspace, path)
     manifest = json.loads(manifest_bytes.decode("utf-8"), object_pairs_hook=_unique_keys)
     # Validate references before opening any declared file.
-    if not isinstance(manifest, dict) or manifest.get("schema_version") != 2:
-        raise ValueError("unsupported task package schema_version; migrate to schema 2")
+    _validate_manifest_fields(manifest)
     files = manifest.get("files")
     if not isinstance(files, dict) or "cases" not in files or files.keys() - {"cases", "holdout"}:
         raise ValueError("invalid task file references")
@@ -341,8 +335,6 @@ class FrozenTaskSuite:
 
 class TaskSource(Protocol):
     """Projects authorized material to immutable single-turn cases."""
-    @property
-    def default_pack_id(self) -> str | None: ...
     def freeze(self, pack_id: str, target_id: str) -> FrozenTaskSuite: ...
 
 
@@ -350,33 +342,12 @@ class TaskPackCatalog:
     """Workspace catalog; no models, no runtime configuration or adoption rights."""
     def __init__(
         self, workspace: Path, registrations: Sequence[TaskPackRegistration] = (), *,
-        legacy_path: str | None = None, policies: Sequence[TaskPolicy] | None = None,
+        policies: Sequence[TaskPolicy] | None = None,
     ) -> None:
         self.workspace = Path(workspace).resolve()
         self.root = self.workspace / ".fruitfly/improvement/task-packs"
         self.registrations = tuple(registrations)
-        self.legacy_path = legacy_path
         self.policies = tuple(builtin_task_policies() if policies is None else policies)
-
-    @property
-    def default_pack_id(self) -> str | None:
-        """Optional configured default; consumers do not inspect source formats."""
-        configured = self._configured_package()
-        if configured is not None and self.legacy_path is not None:
-            return load_pack(self.workspace, Path(self.legacy_path), policies=self.policies).material["id"]
-        return LEGACY_PACK_ID if self.legacy_path else None
-
-    def with_legacy(self, path: str | None) -> TaskPackCatalog:
-        return type(self)(self.workspace, self.registrations, legacy_path=path, policies=self.policies)
-
-    def _configured_package(self) -> dict | None:
-        if not self.legacy_path:
-            return None
-        try:
-            payload = json.loads(read_bytes(self.workspace, Path(self.legacy_path)).decode("utf-8"), object_pairs_hook=_unique_keys)
-        except (OSError, ValueError):
-            return None
-        return payload if isinstance(payload, dict) and "schema_version" in payload else None
 
     def _sources(self) -> list[tuple[Path, bool]]:
         sources = []
@@ -397,10 +368,6 @@ class TaskPackCatalog:
                     sources.append((source, registration.writable))
                     if len(sources) > 100:
                         raise ValueError("task package catalog exceeds 100 sources")
-        if self._configured_package() is not None and self.legacy_path is not None:
-            configured = safe_path(self.workspace, Path(self.legacy_path))
-            if all(path != configured for path, _ in sources):
-                sources.append((configured, False))
         if len(sources) > 100:
             raise ValueError("task package catalog exceeds 100 sources")
         # A repeated registration of the same file is an error, not a privilege upgrade.
@@ -411,16 +378,6 @@ class TaskPackCatalog:
     def _read(self, path: Path) -> tuple[_TaskMaterial, str]:
         loaded = load_pack(self.workspace, path, policies=self.policies)
         return loaded.material, loaded.source_hash
-
-    def _missing_optional_legacy_source(self) -> bool:
-        """The conventional legacy file is optional for package-based interaction."""
-        if not self.legacy_path:
-            return False
-        try:
-            path = safe_path(self.workspace, Path(self.legacy_path))
-            return path.resolve() == self.workspace / ".fruitfly/improvement/cases.json" and not path.exists()
-        except (OSError, ValueError):
-            return False
 
     def summaries(self, target_id: str | None = None) -> tuple[TaskPackSummary, ...]:
         summaries = []
@@ -438,14 +395,6 @@ class TaskPackCatalog:
                 summaries.append(TaskPackSummary("invalid-" + digest(str(path).encode())[7:19], path.parent.name, error=str(exc)))
         ids = [s.pack_id for s in summaries]
         summaries = [TaskPackSummary(**{**s.__dict__, "error": "duplicate task package id"}) if ids.count(s.pack_id) > 1 else s for s in summaries]
-        if self.legacy_path and self._configured_package() is None and not self._missing_optional_legacy_source():
-            try:
-                suite = load_task_cases(self.workspace, self.legacy_path)
-                # Keep legacy digest identity and include no holdout material.
-                summaries.append(TaskPackSummary(LEGACY_PACK_ID, "Configured task cases", suite.digest,
-                    "Read-only legacy train/validation JSON", len(suite.train), len(suite.validation)))
-            except (OSError, ValueError) as exc:
-                summaries.append(TaskPackSummary(LEGACY_PACK_ID, "Configured task cases", error=str(exc)))
         return tuple(sorted(summaries, key=lambda s: (bool(s.error), s.name, s.pack_id)))
 
     def _locate(self, pack_id: str) -> tuple[Path, bool, _TaskMaterial, str]:
@@ -462,17 +411,9 @@ class TaskPackCatalog:
         return found[0]
 
     def source_hash(self, pack_id: str) -> str:
-        if pack_id == LEGACY_PACK_ID:
-            if not self.legacy_path:
-                raise ValueError("no configured task source")
-            return load_task_cases(self.workspace, self.legacy_path).digest
         return self._locate(pack_id)[3]
 
     def freeze(self, pack_id: str, target_id: str) -> FrozenTaskSuite:
-        if pack_id == LEGACY_PACK_ID:
-            suite = self._legacy_cases()
-            return FrozenTaskSuite(suite.train, suite.validation, suite.digest, pack_id,
-                                   "Configured task cases", suite.digest, target_id)
         path, _, payload, identity = self._locate(pack_id)
         loaded = load_pack(self.workspace, path, policies=self.policies)
         if loaded.source_hash != identity:
@@ -492,16 +433,12 @@ class TaskPackCatalog:
             payload['objective']['direction'])
 
     def holdout(self, pack_id: str) -> tuple[TaskCase, ...]:
-        if pack_id == LEGACY_PACK_ID:
-            return ()
         payload = self._locate(pack_id)[2]
         policy = task_policy(payload["objective"]["policy_id"], policies=self.policies)
         return tuple(policy.project(c) for c in payload.get("holdout", []))
 
     def case_groups(self, pack_id: str) -> dict[str, str]:
         """Public grouping metadata without exposing acceptance fields."""
-        if pack_id == LEGACY_PACK_ID:
-            return {}
         payload = self._locate(pack_id)[2]
         policy = task_policy(payload['objective']['policy_id'], policies=self.policies)
         return {policy.project(c).case_id: c.get('group_id', '')
@@ -587,15 +524,7 @@ class TaskPackCatalog:
             raise ValueError("invalid task input")
         with self._writer():
             if pack_id:
-                if pack_id == LEGACY_PACK_ID:
-                    suite = self._legacy_cases()
-                    payload = self._new(name or "Imported task cases", target_id)
-                    payload["train"] = [{"id": "train-" + str(i), "input": c.input, "expected": c.expected} for i,c in enumerate(suite.train)]
-                    payload["validation"] = [{"id": "validation-" + str(i), "input": c.input, "expected": c.expected} for i,c in enumerate(suite.validation)]
-                    identity, writable = suite.digest, False
-                    path = self.root / payload["id"] / "pack.json"
-                else:
-                    path, writable, payload, identity = self._locate(pack_id)
+                path, writable, payload, identity = self._locate(pack_id)
                 if not expected_hash or expected_hash != identity:
                     raise ValueError("task package changed; reload before saving")
                 if target_id not in payload["compatible_targets"]:
@@ -641,13 +570,9 @@ class TaskPackCatalog:
 
     @staticmethod
     def _new(name: str, target_id: str) -> _TaskMaterial:
-        return {"schema_version": 2, "description": "Human-corrected regression tasks", "files": {"cases": "cases.json"}, "id": "task-" + uuid4().hex[:12], "name": name,
+        return {"description": "Human-corrected regression tasks", "files": {"cases": "cases.json"}, "id": "task-" + uuid4().hex[:12], "name": name,
             "task_schema": "single-turn-text-v1", "target_schema": "text-v1", "compatible_targets": [target_id],
             "objective": {"policy_id": "normalized-exact-v1", "direction": "max"}, "train": [], "validation": []}
-
-    def _legacy_cases(self) -> TaskSuite:
-        # The legacy loader owns path validation, including rejection of a missing source.
-        return load_task_cases(self.workspace, cast(str, self.legacy_path))
 
 
 class TaskSnapshotStore:

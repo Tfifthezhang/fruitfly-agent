@@ -84,13 +84,20 @@ class WorkspaceSession:
             services.reserve('model')
             services.record('editor-request', model=view.model, stage=mission[:80])
             async def events():
+                inner = None
                 try:
-                    message = await self.config.provider(view, signal=services.signal).result()
+                    inner = self.config.provider(view, signal=services.signal)
+                    async for event in inner:
+                        yield event
+                    message = await inner.result()
                     services.record('editor-response', status='completed', text=message.text)
                     yield StreamDone(message)
                 except BaseException:
                     services.record('editor-response', status='interrupted')
                     raise
+                finally:
+                    if inner is not None:
+                        await inner.aclose()
             return AssistantMessageEventStream(events())
         config = AgentLoopConfig(provider=provider, model=self.config.model,
             max_tokens=self.config.max_tokens, context_window=self.config.context_window,

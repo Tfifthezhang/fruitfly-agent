@@ -49,8 +49,8 @@ def freeze(context, experiment_id, target_id):
     if len(data) > 16000:
         raise ValueError('experiment manifest exceeds 16 KB')
     value = json.loads(data.decode('utf-8'), object_pairs_hook=_unique)
-    if (not isinstance(value, dict) or set(value) != {'schema_version', 'id', 'name', 'development', 'verification', 'max_verifications'}
-            or type(value['schema_version']) is not int or value['schema_version'] != 1 or value['id'] != experiment_id):
+    if (not isinstance(value, dict) or set(value) != {'id', 'name', 'development', 'verification', 'max_verifications'}
+            or value['id'] != experiment_id):
         raise ValueError('invalid experiment manifest schema or identity')
     if not isinstance(value['name'], str) or not 1 <= len(value['name'].strip()) <= 120:
         raise ValueError('experiment name must contain 1–120 characters')

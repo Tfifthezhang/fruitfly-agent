@@ -57,13 +57,13 @@ mkdir -p "$FRUITFLY_EXPERIMENT"
 "$FRUITFLY_LAB" --cwd "$FRUITFLY_EXPERIMENT" init --source task-set --benchmark terminal-bench-4
 ```
 
-Initialization writes files only. Existing configuration causes an error; it does
+Initialization writes files only. Existing regular `models.yaml` and secret files
+are preserved; other existing configuration destinations cause an error. It does
 not overwrite defaults, reuse old candidate results or start Docker/model work.
-An existing regular workspace secret file is preserved.
 
 | Generated file under `.fruitfly/` | Review before execution |
 |---|---|
-| `default-models.yaml` | Model ID, protocol, endpoint, capabilities, token limits and key variable name |
+| `models.yaml` | Shared daily/experiment model ID, protocol, endpoint, capabilities, token limits and key variable name |
 | `default-config.yaml` | Executor profile, enabled mechanisms and tool-call limit, initially 64 per turn |
 | `components/H/`, `components/I/` | Execution/tool values, editor instructions, feedback and search settings |
 | `tasks/tb4-smoke.yaml`, `comparison.yaml` | Task material and fixed comparison rules |
@@ -79,7 +79,7 @@ used through `fruitfly-agent-lab --cwd`. Omitted runtime config/profile inherits
 
 All three model roles initially use the catalog entry `deepseek-flash-openai`.
 Change `models.roles.executor/editor/assessor` in `default-config.yaml` to select
-different case-sensitive aliases from `default-models.yaml`. The
+different case-sensitive aliases from `models.yaml`. The
 template's remote model compatibility is not established by offline checks.
 
 Set `DEEPSEEK_API_KEY` privately. Keep `FRUITFLY_EVAL_PYTHON_ROOT` and

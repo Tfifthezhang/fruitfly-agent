@@ -59,8 +59,6 @@ class RunApplicationFactory:
         tool_service_startup_approval: ToolServiceStartupApproval | None = None,
     ) -> None:
         self.cwd = cwd.resolve()
-        if (self.cwd / '.fruitfly' / 'optimization').exists():
-            raise ValueError('legacy improvement data requires explicit migration: python -m fruitfly_agent.run.migrate_improvement --apply')
         self.permission_policy = permission_policy
         self.improvement_bindings = improvement_bindings
         self.tool_service_startup_approval = tool_service_startup_approval
@@ -128,6 +126,7 @@ class RunApplicationFactory:
         self._configuration.model_setup = RunModelSetup(
             config_path=self._configuration.config_path, current_profile=self._configuration.profile,
             stage_profile=self._configuration.stage_profile, workspace=self.cwd, environment=self.environment,
+            registry=self.provider_registry,
         )
         self._configuration.mechanism_setup = RunMechanismSetup(
             catalog=self.catalog, current_profile=self._configuration.profile,

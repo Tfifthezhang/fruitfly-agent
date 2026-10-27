@@ -35,6 +35,7 @@ class ReductionSafetyTests(unittest.IsolatedAsyncioTestCase):
         responses = (
             AssistantMessage([TextBlock("   \n")], stop_reason="stop"),
             AssistantMessage([TextBlock("summary")], stop_reason="length"),
+            AssistantMessage([TextBlock("intermediate")], stop_reason="stop", continue_turn=True),
             AssistantMessage([TextBlock("summary")], stop_reason="error"),
             AssistantMessage([TextBlock("summary"), ToolCallBlock("c", "write", {})], stop_reason="stop"),
         )

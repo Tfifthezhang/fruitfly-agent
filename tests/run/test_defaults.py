@@ -1,4 +1,5 @@
 """Default harness restoration is a reversible daily-configuration draft edit."""
+from tests.support.configuration import profile_document, component_document
 import io
 from dataclasses import replace
 from pathlib import Path
@@ -16,14 +17,13 @@ from tests.support.terminal import MenuScriptedLines
 def write_workspace(root):
     state = root / ".fruitfly"
     state.mkdir()
-    model = {"provider": "openai", "model": "fixture", "context_window": 32768,
+    model = {'sdk': 'openai', 'protocol': 'responses', "model": "fixture", "context_window": 32768,
              "max_output_tokens": 1024, "api_key_env": "SHARED_MODEL_KEY"}
+    (state / "models.yaml").write_text(yaml.safe_dump({"models": {"fake": model}}))
     for prefix, name in (("", "daily"), ("default-", "baseline")):
-        (state / (prefix + "models.yaml")).write_text(yaml.safe_dump({"models": {"fake": model}}))
         ids = ("local-env", "read-tool") if prefix else ("local-env", "read-tool", "bash-tool", "write-tool", "skill-catalog")
-        profile = {"model": {"catalog": prefix + "models.yaml", "profile": "fake"},
-                   "mechanisms": [{"id": n} for n in ids]}
-        (state / (prefix + "config.yaml")).write_text(yaml.safe_dump({"schema_version": 1,
+        profile = profile_document(catalog="models.yaml", executor="fake", mechanisms=[{"id": n} for n in ids])
+        (state / (prefix + "config.yaml")).write_text(yaml.safe_dump({
             "default_profile": name, "profiles": {name: profile}}))
 
 
@@ -128,8 +128,11 @@ class DefaultConfigurationTests(unittest.TestCase):
         controller.reset()
         path = self.root / ".fruitfly/default-config.yaml"
         config = yaml.safe_load(path.read_text())
-        config["profiles"]["baseline"]["mechanisms"] = [{"id": "local-env"}, {"id": "write-tool"}]
-        config["profiles"]["baseline"]["execution"] = {"max_tool_calls_per_turn": 96}
+        config['profiles']['baseline']['H'] = {
+            name: component_document(name) for name in ('local-env', 'write-tool')}
+        config['profiles']['baseline']['H']['execution-policy'] = {'inline': {
+            'id': 'execution-policy', 'implementation': 'execution-policy', 'role': 'H',
+            'parameters': {'max_tool_calls_per_turn': 96}}}
         path.write_text(yaml.safe_dump(config))
         controller.restore_defaults()
         self.assertEqual({m.mechanism_id for m in controller.profile().mechanisms}, {"local-env", "write-tool"})
@@ -151,10 +154,10 @@ class DefaultConfigurationTests(unittest.TestCase):
     def test_component_defaults_restore_exact_inline_prompt_and_i_settings_into_daily_config(self):
         path = self.root / '.fruitfly/default-config.yaml'
         def component(name, role, parameters):
-            return {'inline': {'schema_version': 1, 'id': name, 'role': role,
+            return {'inline': {'id': name, 'role': role,
                 'implementation': name, 'parameters': parameters}}
-        path.write_text(yaml.safe_dump({'schema_version': 2, 'default_profile': 'baseline',
-            'profiles': {'baseline': {'models': {'catalog': 'default-models.yaml', 'roles': {'executor': 'fake'}},
+        path.write_text(yaml.safe_dump({'default_profile': 'baseline',
+            'profiles': {'baseline': {'models': {'catalog': 'models.yaml', 'roles': {'executor': 'fake'}},
                 'H': {'base_prompt': component('base_prompt', 'H', {'text': 'Exact restored prompt.\n'})},
                 'I': {'improvement-search': component('improvement-search', 'I', {'rounds': 2})}}}}))
         original = path.read_bytes()
@@ -162,7 +165,7 @@ class DefaultConfigurationTests(unittest.TestCase):
         controller.restore_defaults()
         controller.save()
         config = load_harness_config(self.root / '.fruitfly/config.yaml')
-        self.assertEqual(config.schema_version, 2)
+        self.assertNotIn("schema_version", config.to_dict())
         profile = config.select()
         self.assertEqual(profile.component_settings['search']['rounds'], 2)
         self.assertEqual(profile.artifact_contents[profile.prompt], 'Exact restored prompt.\n')
@@ -174,8 +177,8 @@ class DefaultConfigurationTests(unittest.TestCase):
         original = controller.profile()
         path = self.root / ".fruitfly/default-config.yaml"
         config = yaml.safe_load(path.read_text())
-        config["profiles"]["baseline"]["mechanisms"].append({"id": "component-improvement",
-            "parameters": {"editor_profile": "editor"}})
+        config['profiles']['baseline']['models']['roles']['editor'] = 'editor'
+        config['profiles']['baseline']['I']['component-improvement'] = component_document('component-improvement')
         path.write_text(yaml.safe_dump(config))
         with self.assertRaisesRegex(ValueError, "editor"):
             controller.restore_defaults()

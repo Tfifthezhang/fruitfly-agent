@@ -95,9 +95,7 @@ class HostConfig:
         except yaml.YAMLError:
             raise ValueError("invalid Eval host YAML") from None
         data = fields(loaded,
-                      {"schema_version", "cache", "agent", "environment", "dependencies", "task_directory", "task_patches"}, "Eval host")
-        if type(data.get("schema_version")) is not int or data["schema_version"] != 1:
-            raise ValueError("Eval host configuration requires schema_version 1")
+                      {"cache", "agent", "environment", "dependencies", "task_directory", "task_patches"}, "Eval host")
         base = path.parent
         agent = fields(data.get("agent", {}), {"python", "mounts", "library_paths"}, "agent runtime")
         python = container_path(agent.get("python"), "agent.python")

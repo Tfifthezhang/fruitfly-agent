@@ -4,24 +4,54 @@
 # POSIX server directory with SFTP, python3 and /bin/bash available.
 # Starting this profile connects to the configured SSH server; model tasks also
 # contact the selected model service and may incur charges.
-schema_version: 1
 default_profile: remote
 profiles:
   remote:
-    model:
+    models:
       catalog: models.yaml
-      profile: deepseek-flash-openai
-    mechanisms:
-      - id: ssh-env
-        enabled: true
-        parameters:
-          host: server.example
-          port: 2222
-          cwd: /srv/workspace
-          username_env: FRUITFLY_SSH_USERNAME
-          password_env: FRUITFLY_SSH_PASSWORD
-          known_hosts: ~/.ssh/known_hosts
-      - id: read-tool
-      - id: write-tool
-      - id: edit-tool
-      - id: bash-tool
+      roles:
+        executor: deepseek-flash-openai
+    H:
+      ssh-env:
+        inline:
+          id: ssh-env
+          implementation: ssh-env
+          role: H
+          enabled: true
+          parameters:
+            host: server.example
+            port: 2222
+            cwd: /srv/workspace
+            username_env: FRUITFLY_SSH_USERNAME
+            password_env: FRUITFLY_SSH_PASSWORD
+            known_hosts: ~/.ssh/known_hosts
+      read-tool:
+        inline:
+          id: read-tool
+          implementation: read-tool
+          role: H
+          enabled: true
+          parameters: {}
+      write-tool:
+        inline:
+          id: write-tool
+          implementation: write-tool
+          role: H
+          enabled: true
+          parameters: {}
+      edit-tool:
+        inline:
+          id: edit-tool
+          implementation: edit-tool
+          role: H
+          enabled: true
+          parameters: {}
+      bash-tool:
+        inline:
+          id: bash-tool
+          implementation: bash-tool
+          role: H
+          enabled: true
+          parameters: {}
+    S: {}
+    I: {}

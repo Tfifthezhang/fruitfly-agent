@@ -12,7 +12,6 @@ with `fields: [parameters.steps]` permits alternatives. Construction and discove
 make no model calls. See the [component format](../../runtime_spec/COMPONENTS.md).
 
 ```yaml
-schema_version: 1
 id: execution-workflow
 role: H
 implementation: execution-workflow

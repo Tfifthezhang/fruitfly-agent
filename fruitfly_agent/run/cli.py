@@ -32,8 +32,6 @@ async def run_cli(args: argparse.Namespace) -> int:
         if unrestricted and (not args.task or args.resume or args.approve_tools):
             raise ValueError("--unrestricted requires a fresh non-interactive task and conflicts with --approve-tools")
         paths = WorkspacePaths(cwd)
-        for notice in paths.notices():
-            print(f"notice: {notice}", file=sys.stderr)
         environment = {**load_env(paths.secret_file()), **os.environ}
         raw_limit = getattr(args, 'max_model_calls', None)
         if raw_limit is None:

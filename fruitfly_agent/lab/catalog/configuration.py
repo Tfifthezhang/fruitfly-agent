@@ -70,6 +70,8 @@ def configure_profile(profile, catalog):
         definition = catalog.get(document.implementation)
         if document.id != document.implementation or document.role != definition.configuration_role:
             raise ValueError('component does not match its registered ID/role: ' + document.id)
+        if set(document.parameters) & set(definition.model_role_parameters.values()):
+            raise ValueError('bind component model aliases through system models.roles: ' + document.id)
         if definition.validate_parameters:
             definition.validate_parameters(document.parameters)
         definition.descriptor.normalize_parameters(document.parameters)
@@ -338,8 +340,8 @@ def materialize_system(profile, destination, *, catalog=None, artifact_reader=No
             with model_path.open('xb') as stream:
                 stream.write(data)
         projected = replace(projected, model_catalog='models.yaml')
-    data = {'schema_version': 2, 'default_profile': profile.profile_id,
-            'profiles': {profile.profile_id: projected.to_component_dict(references=False)}}
+    data = {'default_profile': profile.profile_id,
+            'profiles': {profile.profile_id: projected.to_dict(references=False)}}
     with destination.open('x', encoding='utf-8') as stream:
         yaml.safe_dump(data, stream, allow_unicode=True, sort_keys=False)
     snapshot = {'schema_version': 1, 'profile': profile.profile_id,

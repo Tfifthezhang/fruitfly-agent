@@ -22,26 +22,25 @@ Configuration overview (this page)
 | Start from installed templates | [Configuration examples](examples/configuration/README.md) and [experiment recipes](examples/experiments/README.md) |
 | Inspect or export an existing system | [Run configuration](fruitfly_agent/run/configuration/README.md) |
 
-New system files use schema 2. `config.yaml`, `default-config.yaml` and generated
+System files use one component format without a configuration version marker. `config.yaml`, `default-config.yaml` and generated
 candidate configs use the same protocol. Each profile selects model aliases and
 referenced H/S/I documents. H contains execution instructions/mechanisms, S
 retained content, and I editor/feedback/search settings. Short text uses YAML
 block scalars; no separate prompt text file is required. Registered definitions
 own defaults and legal fields; experiment grants own modification permission.
-Schema-1 profiles remain readable through the same runtime assembly path.
+Unknown fields and obsolete flat profile fields are rejected.
 
 ## Files and precedence
 
 | Source | Default location | Contents |
 |---|---|---|
 | Model template | [models.example.yaml](examples/configuration/models.example.yaml) | DeepSeek Flash profiles for Responses and Messages APIs in one file; configure a key before use |
-| Model catalog | `.fruitfly/models.yaml` in the working directory | API protocol, model ID, endpoint, capabilities, limits, and key variable name |
+| Shared model catalog | `.fruitfly/models.yaml` in the working directory | Daily and experiment model definitions: SDK, API protocol, model ID, endpoint, capabilities, limits, and key variable name |
 | Secrets | `.fruitfly/secrets.env` or process environment | API keys and SSH account/password values |
 | Harness configuration | `.fruitfly/config.yaml` | Profiles, model roles and selected H/S/I component documents |
 | Component documents | `.fruitfly/components/H/`, `S/`, `I/` | Registered implementations, enabled state, text and parameters |
 | Optional MCP services | `.fruitfly/mcp.yaml` | Local stdio commands, selected tool names, limits and secret-variable references |
 | Default configuration | `.fruitfly/default-config.yaml` | Independent baseline; editable manually, read-only in terminal configuration |
-| Default model catalog | `.fruitfly/default-models.yaml` | Baseline model settings; may reference the same key variable as daily models |
 | Eval host settings | `.fruitfly/eval-host.yaml` | Machine-local runtime mounts, task source and dependency/cache preparation; see [Harbor settings](eval/harbor/README.md) |
 | Experiment settings | `.fruitfly/experiment.yaml` | Baseline, referenced tasks/comparison, edit grants, root/trial limits and explicit RSI settings |
 | Comparison and task documents | `.fruitfly/comparison.yaml`, `tasks/` | Fixed comparison conditions and task sources/materials |
@@ -51,7 +50,13 @@ Schema-1 profiles remain readable through the same runtime assembly path.
 
 The Agent CLI reads `.fruitfly/secrets.env` from the selected workspace, including when using `--cwd`. Process environment values take precedence over that file, including explicit empty values. It does not fall back to another workspace's secret file.
 
-Model discovery prefers `.fruitfly/models.yaml` and accepts root `models.yaml` when the new catalog is absent. A saved or explicitly selected catalog path always takes precedence. Secrets use `.fruitfly/secrets.env`, falling back to root `.env` only when the new file is absent. Files are never merged. The CLI reports when both old and new files exist. Existing workspace-local catalogs and credential files keep their selected locations when edited through the wizard.
+Model discovery uses `.fruitfly/models.yaml`. An explicitly selected catalog path takes precedence. Secrets use `.fruitfly/secrets.env` and the process environment; root `.env` and root `models.yaml` are not implicit inputs. Explicit custom catalog paths remain supported.
+
+Daily and experiment configs reference the shared `models.yaml`. Each profile's
+`models.roles` independently selects executor, editor and assessor aliases. To use
+different parameters for the same API model, define distinct aliases in the shared
+catalog. Editing an entry affects subsequent loads of every config selecting that
+alias; an active runtime and frozen experiment inputs retain their loaded values.
 
 ## Restore default configuration
 
@@ -69,7 +74,7 @@ leave the draft unchanged; declared auxiliary models must exist in the daily
 catalog. Each restoration reloads the file so manual edits are available immediately.
 
 Initialize the complete tree, or copy [default-config.example.yaml](examples/configuration/default-config.example.yaml),
-[default-models.example.yaml](examples/configuration/default-models.example.yaml) and their
+[models.example.yaml](examples/configuration/models.example.yaml) and their
 referenced component files only when absent. The template enables local execution, basic
 read/Bash/edit/write tools and explicitly parameterized compaction. Default files
 are edited manually. Explicit `--config .fruitfly/default-config.yaml` selections
@@ -77,17 +82,19 @@ have a read-only terminal controller.
 
 Alternatively, `fruitfly-agent-lab init` generates these defaults plus a minimal
 experiment and an empty-key secret file in the selected workspace. Existing
-secrets are preserved, and existing configuration destinations are rejected.
+regular model catalogs and secrets are reused unchanged; other existing
+configuration destinations are rejected. When reusing a catalog, select its
+actual aliases in `default-config.yaml` before checking the experiment.
 `init --source task-set --benchmark terminal-bench-4` also generates a request and
 host template with explicit Linux runtime path variables. Initialization reads no
 private project settings and performs no model, Docker or installation work.
 See [experiment setup](examples/experiments/README.md).
 
-[Eval](eval/README.md) uses the complete default profile, including its independent
-model catalog, unless the request explicitly selects another configuration. The
-two catalogs may reference the same key variable, such as `DEEPSEEK_API_KEY`.
-Use distinct `api_key_env` names only for different credentials; updating a shared
-key affects subsequent use of both catalogs. Keep values in the secret environment.
+[Eval](eval/README.md) uses the complete default profile and its selected aliases
+from the shared model catalog, unless the request explicitly selects another
+configuration. Use distinct `api_key_env` names for different credentials;
+updating a shared key affects subsequent use of every model referencing it.
+Keep values in the secret environment.
 Agent configuration does not select an execution-permission policy.
 
 ## Apply settings to the current conversation
@@ -114,17 +121,6 @@ remembered approval grants are not transferred. Persisted learning state follows
 the selected component's own recovery contract. This changes configuration, not
 Python source loaded into the process. Manually edited secret files still require
 a process restart to reload; the built-in secret forms update the host after save.
-
-## Relocate workspace configuration
-
-Startup does not move existing files. Preview the explicit offline operation, then apply it if the listed paths are correct:
-
-```bash
-.venv/bin/python -m fruitfly_agent.run.migrate_configuration --cwd /path/to/workspace
-.venv/bin/python -m fruitfly_agent.run.migrate_configuration --cwd /path/to/workspace --apply
-```
-
-Use `--config path/to/custom.yaml` to update a custom harness file. The operation moves root `models.yaml` and the entire root `.env` into `.fruitfly/`, removes their originals after successful writes, and updates every matching catalog reference in the selected harness file. Other harness files need separate path updates before relocation. Model and secret file contents remain unchanged; harness comments and unrelated settings remain. Existing destinations and symlinks are rejected. Ordinary failures attempt rollback; concurrent writers and process crashes are not covered. Stop other configuration writers before applying, then restart the CLI to reload secrets. Session recovery still verifies artifacts and the complete manifest.
 
 ## Connect MCP tools
 
@@ -153,24 +149,32 @@ MCP server are not implemented.
 
 Run the interactive CLI. **Add model** opens when no models are available; otherwise use **Configure → model → Add model…**. Choose a supported service, enter the model ID and documented token limits, and enter the key with hidden input. Custom services need a base URL. Review and stage the settings; **Start new session**, **Save and apply to this conversation**, or **Save only** persists them.
 
-| Service option | Use when |
+| Service group | Preset or next step |
 |---|---|
-| OpenAI official · Responses API | You use an OpenAI account and key; a blank address uses the SDK's official endpoint. |
-| Anthropic official · Messages API | You use an Anthropic account and key; a blank address uses the SDK's official endpoint. |
-| Custom · Responses API | Your gateway or self-hosted server supports Responses; enter its API address and key. |
-| Custom · Messages API | Your gateway or self-hosted server supports Messages; enter its API address and key. |
+| OpenAI | Responses preset; an OpenAI key, with the SDK's official default address. |
+| Anthropic | Messages preset; an Anthropic key, with the SDK's official default address. |
+| DeepSeek | Responses preset; editable Flash defaults and `DEEPSEEK_API_KEY`. |
+| Qwen | Chat preset; Qianwen AI Beijing endpoint, editable Qwen3.8-Flash defaults and `DASHSCOPE_API_KEY`. |
+| Zhipu BigModel | Chat preset; BigModel China endpoint, editable GLM-4.5-Air defaults and `ZAI_API_KEY`. |
+| Custom service… | Open a submenu for Responses, Messages or Chat Completions; enter the gateway/server's address and key. Back returns to service selection. |
 
-The protocol determines request, streaming, and tool-call formats. Choose what your service actually supports; the model name alone does not establish compatibility. See [protocol differences](fruitfly_agent/providers/PROVIDER_GUIDE.md#protocol-differences).
+Named services open their preset directly. Groups and options come from Provider
+metadata rather than a terminal-owned vendor list. The protocol determines
+request, streaming, and tool-call formats. Choose what your service actually
+supports; the model name alone does not establish compatibility. See
+[protocol configuration](fruitfly_agent/providers/PROVIDER_GUIDE.md#choose-the-protocol-and-service).
 
-After service selection, each field has its own screen with the selected service and step count. `models.<name>` is the catalog entry name shown in menus; `model` is the service model ID. Press Enter to accept a displayed default. API key input is hidden; review shows only that it was entered or reused. No connection test runs during setup.
+After service selection, each field has its own screen with the selected service and step count. `models.<name>` is the catalog entry name shown in menus; `model` is the service model ID. Press Enter to accept a displayed default. API key input is hidden; review shows only that it was entered or reused. The final review displays generated `service`, `parameters` and all `transport` defaults. Confirm to save them without typing those mappings. No connection test runs during setup.
 
 An interactive first run without saved harness configuration or a workspace catalog starts a draft targeting the selected workspace's `.fruitfly/models.yaml`.
 
 | Wizard behavior | Contract |
 |---|---|
-| Supported services | Official or custom Responses and Messages APIs; streaming and tool calls required. Chat Completions-only endpoints are unsupported. |
-| Limits | User-supplied positive integers; output limit smaller than context window. No automatic model-limit inference. |
-| Capabilities | Checkbox page: `tools` and `streaming` default true and are required; `parallel_tool_calls`, `vision`, and `reasoning` default false and can be toggled. Only declare verified service support. Reasoning selection does not enable request parameters or lossless replay. |
+| Supported services | Official or custom Responses/Messages, custom Chat Completions, and explicit Qwen, BigModel and DeepSeek presets; streaming and tool calls required. |
+| Limits | Positive integers; output smaller than context. Presets supply editable working budgets for their named model; changing the model ID requires checking its limits and capabilities. No network discovery. |
+| Capabilities | Checkbox page: `tools` and `streaming` are required. Generic choices default other flags false; named presets supply declared support. These flags describe support; the named presets also generate thinking parameters from the reasoning selection. |
+| Request defaults | DeepSeek high/none; Qwen medium thinking or disabled; BigModel dynamic thinking enabled/disabled. Official OpenAI/Anthropic and custom choices use `{}` (server defaults); selecting reasoning there does not invent model-specific parameters. Edit YAML for advanced settings. |
+| Transport defaults | All choices display and save the same bounded waiting/retry defaults used by adapters; no manual input. |
 | Credentials | Hidden input bypasses readline history. Blank input reuses the named environment variable. Blank variable name generates `FRUITFLY_MODEL_<LABEL>_API_KEY`, replacing label punctuation with underscores. |
 | Existing key | The Model menu shows only set/missing status. **Set API key…** supplies a missing key; an already-set different value is rejected. |
 | Saving | Append a unique model label to the selected workspace-local catalog, update only supplied credential entries, and save harness selection. `.fruitfly/secrets.env` writes use owner-only permissions. Existing comments/models and unrelated environment lines remain. |
@@ -185,13 +189,16 @@ For manual setup, create `.fruitfly/`, then copy `examples/configuration/models.
 | Field | What to enter |
 |---|---|
 | Key under `models` | Your profile name, selected in the terminal or via `FRUITFLY_MODEL_PROFILE` |
-| `provider` | `openai` for Responses API, or `anthropic` for Messages API; this identifies the protocol, not the vendor |
+| `sdk` | Required client library ID, such as `openai` or `anthropic`; selected independently from the API format |
+| `protocol` | Required API format: built-in pairs are `openai` + `responses`, `openai` + `chat-completions`, and `anthropic` + `messages` |
+| `service` | Registered endpoint rules: `generic` (default), `openai`, `anthropic`, `deepseek`, `qwen`, or `bigmodel`; never inferred from the URL |
 | `model` | Exact model ID accepted by the service |
 | `base_url` | Service URL for that protocol; omit to use the adapter SDK's default endpoint |
 | `api_key_env` | Environment variable name; the template uses `DEEPSEEK_API_KEY`, whose value belongs in `.fruitfly/secrets.env` |
 | `context_window`, `max_output_tokens` | Actual model limits; template numbers are examples |
 | `capabilities` | Actual model and endpoint support, including tools and streaming |
-| `parameters` | Optional adapter/request options, including validated waiting deadlines and retry settings; see the [Provider guide](fruitfly_agent/providers/PROVIDER_GUIDE.md#bound-waiting-and-retries) |
+| `parameters` | Protocol-native API options, including thinking and structured output; see the [Provider guide](fruitfly_agent/providers/PROVIDER_GUIDE.md#select-thinking-and-structured-output) |
+| `transport` | Client waiting deadlines and retry settings; see [waiting policy](fruitfly_agent/providers/PROVIDER_GUIDE.md#bound-waiting-and-retries) |
 
 Keep only usable profiles. For different credentials, assign distinct `api_key_env` names and add their values to `.fruitfly/secrets.env`. Offline parsing validates the catalog structure; it does not verify remote API compatibility, model access, or declared limits. Requests use the network and may incur charges.
 
@@ -207,18 +214,19 @@ Keep only usable profiles. For different credentials, assign distinct `api_key_e
 
 Mechanism and algorithm menus use readable registered names. Stable IDs remain in
 YAML. Model forms retain their documented field names. The table below describes
-the resolved profile and accepted schema-1 representation; schema-2 authored
-values live in the selected component documents and `models.roles`.
+the current authored component format. Effective runtime values are available
+through offline inspection.
 
 | Menu / form name | Stored location |
 |---|---|
 | `models.<name>` | Entry key under `models` in the model catalog |
-| `provider`, `model`, `base_url`, `context_window`, `max_output_tokens`, `api_key_env` | Fields of that catalog entry; `provider` follows service selection |
+| `sdk`, `protocol`, `service`, `model`, `base_url`, `context_window`, `max_output_tokens`, `api_key_env` | Fields of that catalog entry; SDK/protocol options come from the adapter registry |
 | `capabilities` checkbox names | Boolean fields under the entry's `capabilities` mapping |
-| `model` / `model.profile` | Harness profile's `model.profile` selection |
-| `prompt` | Harness profile's `prompt` reference |
-| Context / Tools / Environment | Visual category of the harness `mechanisms` list; categories are not extra YAML fields |
-| Readable mechanism / algorithm name | `mechanisms[].id`; group names such as `reduction` organize alternatives, with the chosen algorithm ID stored |
+| Request and transport defaults in model review | Entry's `parameters` and `transport` mappings, generated by Providers and saved as shown |
+| Executor model | Harness profile's `models.roles.executor` selection |
+| Base prompt | Selected H `base_prompt` component's `parameters.text` |
+| Context / Tools / Environment | Visual category of registered H components; categories are not extra YAML fields |
+| Readable mechanism / algorithm name | Registered component ID under H/S/I; the component declares its implementation |
 
 The capability page uses arrows and Space/Enter to toggle, then **Continue** to confirm. Numbered fallback toggles the selected row and offers a numbered Continue action. Checked means `true`; unchecked means `false`. Required rows remain checked. Esc, `back`, q, or EOF cancels without staging.
 
@@ -259,7 +267,6 @@ Set the limit in the Agent configuration selected for execution, usually
 Edit the referenced `components/H/execution-policy.yaml`:
 
 ```yaml
-schema_version: 1
 id: execution-policy
 role: H
 implementation: execution-policy
@@ -293,8 +300,7 @@ Provider and authorization objects cannot be supplied in this mapping. Runtime
 manifest schema 7 records the final effective execution values and configured
 component inventory; old manifests retain their original identities.
 
-Use experiment `edit` grants to select component fields and bounds. The accepted
-schema-1 reader retains `improvement.components/component_options` semantics. The [execution policy component](fruitfly_agent/lab/execution_policy/README.md)
+Use experiment `edit` grants to select component fields and bounds. The [execution policy component](fruitfly_agent/lab/execution_policy/README.md)
 provides the parameter adapter. Enabled mechanisms determine available components;
 backend capabilities and experiment permissions further restrict them. Absent
 state owners do not expose editable S components. Invalid explicit selections fail.
@@ -305,15 +311,15 @@ offline before real execution.
 
 | Field | Meaning |
 |---|---|
-| `prompt` | Built-in prompt ID or `sha256:…` text artifact; omission selects `assistant-default`. |
-| `artifact_bindings` | Named slots such as `skill-catalog.guidance`, `tool-guidance.<name>`, `execution-workflow`, `skill-document` and `learned-memory`, mapped to text artifact IDs. |
+| H `base_prompt.parameters.text` | Exact prompt text; omission of the component uses the registered default. |
+| Component `artifacts` | Exported exact text in owner-declared slots, with content identities derived during assembly. |
 | `RuntimeManifest` | Actual model, normalized mechanisms, implementation identities, prompt hash, and consumed artifacts. |
 
-Create custom text with `DataArtifactStore.put_text`; see the [Run example](fruitfly_agent/run/README.md#text-artifacts). Artifacts are plaintext model instructions. Unknown or unused bindings are rejected; recovery verifies the original contents and manifest. Keep secrets out of artifacts, configuration, sessions, and reports.
+Authored text belongs in component parameters. Typed Python hosts can create immutable text with `DataArtifactStore.put_text`; see the [Run example](fruitfly_agent/run/README.md#text-artifacts). Runtime prompt/artifact bindings are internal projections of the same component configuration. Unknown or unused bindings are rejected; recovery verifies the original contents and manifest. Keep secrets out of artifacts, configuration, sessions, and reports.
 
 `tool-guidance.<name>` replaces an enabled tool description with its owner-validated text. Experiment files select one or more editable components. A joint candidate expands into ordinary prompt/artifact bindings; tool schemas, execution and permissions retain their existing contracts. Preview is offline; execution may incur model and external-runner costs.
 
-`execution-workflow` validates bounded stage instructions. `skill-document` and `learned-memory` are retained S documents; adopted artifacts override initial text. `improvement-editor` is a six-field I instruction artifact. The registered editor-comparison execution can modify `invariant`, `domain` and `compose`; `system`, `select` and `reflect` stay fixed during an experiment. Persistent publication requires independent verification and explicit adoption.
+`execution-workflow` validates bounded stage instructions. `skill-document` and `learned-memory` are retained S documents; adopted artifacts override initial text. `improvement-editor` has seven stage instruction fields. The registered editor-comparison execution can modify granted `propose`, `invariant`, `domain` and `compose` fields; `system`, `select` and `reflect` stay fixed during an experiment. Persistent publication requires independent verification and explicit adoption.
 
 ## Environment variables
 
@@ -404,7 +410,6 @@ file workspace does not inherit Bash, network tools, containers or live Session.
 Configure the selected `components/I/improvement-feedback.yaml`:
 
 ```yaml
-schema_version: 1
 id: improvement-feedback
 role: I
 implementation: improvement-feedback
@@ -436,28 +441,6 @@ and independent verification retain their own rules. Process preference alone
 does not publish or adopt a candidate. See the [assessment guide](fruitfly_agent/lab/improvement/assessment/README.md)
 and [complete experiment reference](examples/experiments/benchmark.example.yaml).
 
-## Relocate improvement data
-
-Use the explicit offline entry to preview, then apply the namespace migration:
-
-```bash
-.venv/bin/python -m fruitfly_agent.run.migrate_improvement --workspace /path/to/workspace
-.venv/bin/python -m fruitfly_agent.run.migrate_improvement --workspace /path/to/workspace --apply
-```
-
-`/path/to/workspace` is a placeholder. The operation makes no network or model
-requests. It rejects conflicting data roots and symlinks, preserves original
-configuration and data under `.fruitfly/migration-backups/`, and updates only
-supported legacy parameter names and paths. User comments remain intact.
-Immutable journals, task snapshots, source snapshots and content-addressed
-artifacts retain their original bytes and hashes. Migrated candidate evidence
-paths point to the relocated files; pending candidates become stale and need
-fresh evaluation before adoption. Historical Session manifests remain unchanged.
-The runtime uses only the new namespace and rejects an unmigrated data root.
-Custom legacy targets require explicit role classification before migration.
-Run one migration coordinator while the Agent is stopped; there is no
-cross-process transaction. Repeating a completed migration makes no changes.
-
 ## Choose a candidate generator
 
 The [experiment CLI](fruitfly_agent/experiments/README.md) composes a system config,
@@ -472,16 +455,13 @@ It uses the built-in Agent editor; embeddings can replace generation through
 `WorkflowRequest` freezes each job. Discovery and previews make no model requests.
 Retired algorithm selections are rejected, including disabled YAML entries. Remove
 them explicitly; there is no automatic equivalence to the new generator contract.
-Legacy namespace migration preserves historical data and does not translate those
-retired algorithms into the new workflow.
 
 ## Configure the component editor
 
 Select editor/assessor aliases in the system config's `models.roles`. Configure
 editor instructions and its tool allowance in the I editor component, feedback
 in I feedback, and scheduling in I search. The [component grammar](fruitfly_agent/runtime_spec/COMPONENTS.md)
-owns these fields. The accepted schema-1 `component-improvement` mechanism retains
-its existing model aliases and allocation defaults. Experiment budgets and trial
+owns these fields. Typed embedding APIs expose job allocation defaults separately. Experiment budgets and trial
 allowances remain fixed outside candidate editing. Registration and previews make
 no model requests; `/improvement` keeps a small explicit-material flow.
 

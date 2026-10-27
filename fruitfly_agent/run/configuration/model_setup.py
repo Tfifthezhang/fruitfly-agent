@@ -8,8 +8,8 @@ import yaml
 
 from fruitfly_agent.interactive.contracts.configuration import ConfigurationActionResult, ConfigurationParameter
 from fruitfly_agent.interactive.contracts.model_setup import ModelSetupOption
-from fruitfly_agent.providers.model_setup import CAPABILITY_OPTIONS, SERVICES, model_entry
-from fruitfly_agent.providers.registry import load_model_specs
+from fruitfly_agent.providers.model_setup import CAPABILITY_OPTIONS, SERVICES, model_entry, setup_defaults, setup_selection
+from fruitfly_agent.providers.registry import load_model_specs, ProviderRegistry, default_registry
 from fruitfly_agent.providers.specs import ModelCapabilities, ModelSpec
 
 from .resolution import model_catalog_path
@@ -19,7 +19,8 @@ from .credentials import CredentialDraft
 
 class RunModelSetup:
     def __init__(self, *, config_path: Path, current_profile, stage_profile,
-                 workspace: Path, environment: dict[str, str], credentials: CredentialDraft | None = None) -> None:
+                 workspace: Path, environment: dict[str, str], credentials: CredentialDraft | None = None,
+                 registry: ProviderRegistry | None = None) -> None:
         self.config_path = config_path
         self.current_profile = current_profile
         self.stage_profile = stage_profile
@@ -27,6 +28,7 @@ class RunModelSetup:
         self.environment = environment
         self.entries: dict[Path, dict[str, dict]] = {}
         self.credentials = credentials or CredentialDraft(self.workspace, environment)
+        self.registry = registry or default_registry()
 
     def options(self) -> tuple[ModelSetupOption, ...]:
         fields = (
@@ -41,19 +43,23 @@ class RunModelSetup:
         fields += tuple(ConfigurationParameter(f"capabilities.{name}", name, description, "bool",
             getattr(defaults, name), choices=(True,) if required else (False, True))
             for name, description, required in CAPABILITY_OPTIONS)
-        descriptions = (
-            "OpenAI account and API key. Uses the official address by default.",
-            "Anthropic account and API key. Uses the official address by default.",
-            "Gateway or self-hosted server supporting Responses API. Requires your service's API address and key.",
-            "Gateway or self-hosted server supporting Messages API. Requires your service's API address and key.",
-        )
-        return tuple(ModelSetupOption(item[0], item[1], description,
-                     (ConfigurationParameter("provider", "provider", "Selected API protocol adapter", "constant", item[2]),) + tuple(
-            replace(field, description=(
+        return tuple(ModelSetupOption(item.id, item.label, item.description, tuple(
+            replace(field, value=item.initial.get(field.name, field.value), description=(
                 "Required: enter your service's base URL for this API protocol, not a chat webpage."
-                if item[3] else "Optional: press Enter to use the official service's API address."
-            )) if field.name == "base_url" else field for field in fields))
-                     for item, description in zip(SERVICES, descriptions))
+                if item.custom else "Optional: press Enter to use the displayed or SDK default API address."
+            ) if field.name == "base_url" else field.description) for field in fields if field.kind != 'bool') +
+            tuple(self.field(item.id, name, {}) for name in ('sdk', 'protocol')) +
+            tuple(replace(field, value=item.initial.get(field.name, field.value)) for field in fields if field.kind == 'bool'), group=item.group)
+                     for item in SERVICES if setup_selection(item.id, 'sdk', {}, self.registry.registered_pairs())[1])
+
+    def field(self, option_id, name, values) -> ConfigurationParameter:
+        value, choices = setup_selection(option_id, name, values, self.registry.registered_pairs())
+        description = ('Client library used to send requests; options come from registered adapters.' if name == 'sdk' else
+                       'API message, response and tool format; filtered by the selected SDK and service.')
+        return ConfigurationParameter(name, name, description, 'choice', value, choices=choices)
+
+    def defaults(self, option_id, values) -> dict:
+        return setup_defaults(option_id, values)
 
     def models(self, profile) -> dict[str, ModelSpec]:
         path = model_catalog_path(profile, self.config_path)
@@ -63,6 +69,7 @@ class RunModelSetup:
 
     def stage(self, option_id, values, secret) -> ConfigurationActionResult:
         name, entry = model_entry(option_id, values)
+        self.registry.validate(ModelSpec.from_dict(name, entry))
         profile = self.current_profile()
         path = model_catalog_path(profile, self.config_path)
         if not path.is_relative_to(self.workspace):

@@ -26,13 +26,16 @@ Start with [configuration responsibilities](../../CONFIGURATION.md). The guide t
 
 Run and Catalog use the same profile and selection types. Run's loader delegates
 registered projection to Catalog; the pure specification loader constructs no
-clients or artifacts. Schema-1 profiles remain readable; new H/S/I documents use
-system schema 2. There is one runtime assembler.
+clients or artifacts. All system files use one H/S/I component format without a
+version marker. There is one runtime assembler.
 
 ## Configure execution
 
 ```yaml
-execution:
+id: execution-policy
+role: H
+implementation: execution-policy
+parameters:
   max_tool_calls_per_turn: 256
   max_turns: 32
   max_context_recovery_attempts: 6
@@ -45,7 +48,7 @@ Defaults come from the existing Core dataclasses. Turn/tool limits accept
 nonnegative integers; recovery attempts and parallelism require positive integers.
 The tool mode is `parallel` or `sequential`. Unknown fields, booleans, fractional
 limits and duplicate JSON candidate fields fail. Configured values and effective
-values remain distinct; serialization does not add invented values to old records.
+values remain distinct; configuration does not replace recorded execution facts.
 
 Models and token limits stay in the model catalog. Prompt and mechanism bindings
 retain their own owners. Callbacks, permission objects, credentials and live state

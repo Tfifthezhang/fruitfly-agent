@@ -50,6 +50,7 @@ Based on Zhang et al., [Recursive Language Models](https://arxiv.org/abs/2512.24
 | Output | JSONL transport occurs before truncation; large lines may exceed transport limits. |
 | Cancellation | Hard-cancel and host-request task cleanup are not unified. |
 | Query timeout | Does not include semaphore queue time. |
+| Non-final query response | Rejected; call and available usage stay charged, with no hidden continuation requests. |
 | Token budget | Estimate/reservation with actual-usage reconciliation. |
 | Reduction composition | Summarizing preserves externalized projections and references; new reducers must verify source mappings. |
 

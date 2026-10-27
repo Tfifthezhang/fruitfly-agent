@@ -46,6 +46,11 @@ Its declaration supports H/S only. External environments require a registered
 runner with truthful capabilities, state isolation and attributable receipts.
 Registration is not an OS sandbox or permission to deploy code.
 
+Native execution forwards Provider activity while preserving exact continuation
+inside its bounded Agent loop. Each non-final response spends another model-call
+reservation. Editor-facing `trajectory.json` omits opaque Provider continuation;
+protocol signatures are not editing evidence or portable task outputs.
+
 ## Check offline
 
 ```bash

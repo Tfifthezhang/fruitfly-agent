@@ -16,7 +16,7 @@ from tests.support.terminal import MenuScriptedLines
 class MechanismSetupTests(unittest.TestCase):
     def setUp(self):
         self.root = Path(self.enterContext(tempfile.TemporaryDirectory())).resolve()
-        _write_catalog(self.root / 'models.yaml', {'offline': 'offline-model'})
+        _write_catalog(self.root / '.fruitfly/models.yaml', {'offline': 'offline-model'})
         self.factory = RunApplicationFactory(cwd=self.root, environment={'TEST_API_KEY': 'fixture-model-key'})
         self.configuration = self.factory.configuration
         self.service = self.configuration.mechanism_setup

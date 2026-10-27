@@ -56,7 +56,7 @@ class PreparationTests(unittest.TestCase):
         location = self.root / ".fruitfly"
         location.mkdir()
         config = location / "eval-host.yaml"
-        config.write_text(yaml.safe_dump({"schema_version": 1, "cache": "../cache", "agent": {
+        config.write_text(yaml.safe_dump({"cache": "../cache", "agent": {
             "python": "/opt/runtime/bin/python", "mounts": [{"source": "${RUNTIME_LOCATION}", "target": "/opt/runtime"}]}}))
         link = self.root / "runtime-link"
         link.symlink_to(self.root / "runtime", target_is_directory=True)

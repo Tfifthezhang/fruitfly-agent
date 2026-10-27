@@ -454,6 +454,8 @@ def _format_activity_label(event: RunActivityChanged) -> str:
         label = f"Retrying after {status}; attempt {event.attempt + 1}/{event.max_attempts} in {event.delay_seconds:.1f}s"
     elif event.phase == "provider_timeout":
         label = f"Provider waiting deadline exceeded ({event.error_kind})"
+    elif event.phase == 'server_tool':
+        label = f'Provider tool {subject}'
     elif event.phase == "receiving_thinking":
         label = "Receiving model reasoning"
     elif event.phase == "receiving_answer":

@@ -5,14 +5,18 @@
 Store runtime selections independently of model specifications and mechanism definitions. Manage configuration drafts and resolve model choices without constructing Providers or running algorithms. Candidate-backed menus are supplied through presentation callbacks.
 
 Daily `.fruitfly/config.yaml` and experiment `.fruitfly/default-config.yaml` use
-system schema 2. Write model roles and H/S/I references using the
-[component guide](../../runtime_spec/COMPONENTS.md). Schema-1 profiles remain
-readable and use the same runtime assembly. The public profile types are shared;
+one component format. Write model roles and H/S/I references using the
+[component guide](../../runtime_spec/COMPONENTS.md). Unknown fields and version
+markers are rejected. The public profile types are shared;
 Run's loader additionally applies registered Catalog projections.
 
-| Field / API | Meaning |
+The following are resolved Python runtime values and APIs. Authored YAML uses
+the component grammar linked above; it has no flat `prompt`, `execution`,
+`mechanisms` or `artifact_bindings` profile fields.
+
+| Runtime value / API | Meaning |
 |---|---|
-| `HarnessConfig` | Schema version, default profile, and profile mapping |
+| `HarnessConfig` | Default profile and profile mapping |
 | `HarnessProfile` | Model catalog/profile, prompt, execution limits, artifact bindings, and mechanism selections |
 | `execution` | Declared turn/tool/recovery limits and nested tool scheduling; see [shared fields](../../runtime_spec/README.md#configure-execution) |
 | `execution.max_tool_calls_per_turn` | Nonnegative integer, default 64; per outer turn, including detached task trials; 0 prevents tool attempts |
@@ -24,7 +28,11 @@ Run's loader additionally applies registered Catalog projections.
 
 The example uses `.fruitfly/models.yaml`, resolved relative to `.fruitfly/config.yaml`. Explicit catalog paths keep precedence over workspace discovery. See the [file selection rules](../../../CONFIGURATION.md#files-and-precedence).
 
-Unknown fields and unsupported schema versions raise `ValueError`. Catalog validates mechanism IDs and parameters. Store key variable names in model specifications and key values in the environment; keep secret values outside YAML. Short prompt text is supported in component block scalars.
+Daily and baseline configs share this model catalog and select aliases separately
+through `models.roles`. Installed initialization creates the catalog only when
+absent and preserves an existing regular catalog unchanged.
+
+Unknown fields raise `ValueError`. Catalog validates mechanism IDs and parameters. Store key variable names in model specifications and key values in the environment; keep secret values outside YAML. Short prompt text is supported in component block scalars.
 
 ## Files and ownership
 
@@ -45,7 +53,7 @@ limits are rejected. Model-call and editor budgets are separate settings.
 |---|---|
 | [profile.py](profile.py) | Shared profile types and registered loading/saving |
 | [inspection.py](inspection.py) | Offline effective values, model aliases and source documents |
-| [conversion.py](conversion.py) | Explicit selected-profile export to a new complete schema-2 bundle |
+| [export.py](export.py) | Explicit selected-profile export to a new complete component bundle |
 | [scaffolding.py](scaffolding.py) | Shared installed H/S/I templates for daily and experiment setup |
 | [controller.py](controller.py) | Draft selection, edits, save/reset, and public profile operations |
 | [operations.py](operations.py) | Narrow binding/profile edit contracts for host consumers |
@@ -55,9 +63,16 @@ limits are rejected. Model-call and editor budgets are separate settings.
 | [mechanism_setup.py](mechanism_setup.py) | Project registered forms, check setup readiness, stage parameters and enable selections |
 | [credentials.py](credentials.py) | Shared secret draft, variable validation and comment-preserving secret-file payloads |
 | [persistence.py](persistence.py) | Atomic byte writes for configuration operations |
-| [migration.py](migration.py) | Explicit offline configuration relocation |
 
 `profile()`, `stage_profile()`, and `changed` expose draft operations without allowing other services to access private fields. Model setup receives these callbacks and a configuration path. It writes only on save, preserves unrelated content, rolls back ordinary failures, and updates the secret environment after success. No model requests occur during configuration.
+
+`RunModelSetup.options()` projects Provider-owned service groups and preset fields;
+`defaults(option_id, values)` projects non-secret request/transport defaults for
+review. `stage()` uses the same Provider builder, so confirmation and saved values
+agree. Vendor rules and presets stay in Providers; this host owns persistence.
+The injected Provider registry supplies SDK/protocol choices through `field()`
+and validates the selected pair before staging. Registering another pair updates
+those choices without a terminal change or a model request.
 
 Mechanism setup consumes generic Catalog metadata and profile/enable callbacks;
 it contains no backend-specific branches. It checks required settings and named
@@ -93,9 +108,9 @@ The public `RunConfigurationController` in [Run](../README.md) composes this con
 ```bash
 .venv/bin/python -m fruitfly_agent.run.configuration.inspection --config .fruitfly/default-config.yaml
 # Preview only; replace paths with your own source and an absent output directory.
-.venv/bin/python -m fruitfly_agent.run.configuration.conversion --config .fruitfly/config.yaml --output /tmp/fruitfly-config-export
+.venv/bin/python -m fruitfly_agent.run.configuration.export --config .fruitfly/config.yaml --output /tmp/fruitfly-config-export
 # Write the reviewed selected profile and frozen model/component content.
-.venv/bin/python -m fruitfly_agent.run.configuration.conversion --config .fruitfly/config.yaml --output /tmp/fruitfly-config-export --apply
+.venv/bin/python -m fruitfly_agent.run.configuration.export --config .fruitfly/config.yaml --output /tmp/fruitfly-config-export --apply
 ```
 
 These operations create no Providers or Sessions and make no requests. Inspection
@@ -116,8 +131,7 @@ Follow [the configuration tree](../../../CONFIGURATION.md#navigate-the-configura
 for syntax, registration and experiment grants; this guide owns persistence and
 application behavior.
 
-First-run daily configuration saves schema 2 through the same component exporter.
-Existing schema-1 files retain their version until explicit conversion. Saving
+Daily configuration saves through the same component exporter. Saving
 round-trips built-in prompt identity and derived default tool guidance; disabling
 a tool removes its active guidance binding. No generated default override changes
 the behavior identity of an unchanged component.

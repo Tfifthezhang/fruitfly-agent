@@ -7,7 +7,7 @@ import uuid
 from typing import Any, Mapping
 from .benchmarks.base import ProgressSink
 from .catalog import BenchmarkCatalog, builtin_catalog
-from .contracts import EvaluationRequest, TrialRecord, SCHEMA_VERSION
+from .contracts import EvaluationRequest, TrialRecord, RESULT_SCHEMA_VERSION
 from .report import EvaluationReport, report_from_runner_result
 from .storage import EvaluationStore
 
@@ -46,7 +46,7 @@ def execute_request(
         else:
             adapter.run(request_path=request_path, result_path=result_path, variant=variant, progress=progress)
             loaded = json.loads(result_path.read_text(encoding="utf-8"))
-            if not isinstance(loaded, Mapping) or loaded.get("schema_version") != SCHEMA_VERSION:
+            if not isinstance(loaded, Mapping) or loaded.get("schema_version") != RESULT_SCHEMA_VERSION:
                 raise ValueError("unsupported runner result schema_version")
             trials = loaded.get("trials", [])
             if not isinstance(trials, list):

@@ -1,7 +1,6 @@
 # Machine-local paths; set these variables in the host process environment.
 # The Python installation and venv must be Linux-compatible and complete.
 # Match the host paths inside the container to preserve absolute Python links.
-schema_version: 1
 cache: eval-cache
 agent:
   python: ${FRUITFLY_EVAL_VENV}/bin/python

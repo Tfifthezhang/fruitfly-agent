@@ -1,4 +1,5 @@
 """Benchmark collections pass single selected tasks through existing Eval lifecycle."""
+from tests.support.configuration import profile_document
 import hashlib
 import json
 from pathlib import Path
@@ -24,11 +25,10 @@ class EvalCollectionTests(unittest.IsolatedAsyncioTestCase):
             root = Path(directory)
             state = root / '.fruitfly'; state.mkdir()
             config = state / 'default-config.yaml'
-            config.write_text(yaml.safe_dump({'schema_version': 1, 'default_profile': 'baseline', 'profiles': {'baseline': {
-                'model': {'catalog': 'models.yaml', 'profile': 'fake'}}}}))
+            config.write_text(yaml.safe_dump({'default_profile': 'baseline', 'profiles': {'baseline': profile_document(catalog='models.yaml', executor='fake')}}))
             (state / 'models.yaml').write_text('models: {}\n')
             request = root / 'request.json'
-            request.write_text(json.dumps({'schema_version': 2, 'runtime': {'working_directory': str(root)},
+            request.write_text(json.dumps({'runtime': {'working_directory': str(root)},
                 'benchmark': {'id': 'terminal-bench-4', 'variant': 'full'}}))
             host = root / 'host.yaml'; host.write_text('fixture host')
             tasks = []

@@ -119,3 +119,24 @@ class AlgorithmConfiguration(MockConfiguration):
         self.changed = True
         return ConfigurationActionResult('parameter', changed=True)
 
+from fruitfly_agent.lab.catalog import builtin_catalog, component_profile
+from fruitfly_agent.runtime_spec import HarnessProfile, MechanismSelection
+
+
+def component_document(name, *, parameters=None, enabled=True, catalog=None):
+    catalog = catalog or builtin_catalog()
+    definition = catalog.get(name)
+    return {'inline': {'id': name, 'implementation': name,
+        'role': definition.configuration_role, 'enabled': enabled,
+        'parameters': parameters or {}}}
+
+
+def profile_document(*, catalog='models.yaml', executor=None, mechanisms=(),
+                     prompt='assistant-default', execution=None, artifact_bindings=None,
+                     artifact_reader=None, lab=None):
+    lab = lab or builtin_catalog()
+    selections = tuple(MechanismSelection(item['id'], item.get('enabled', True), item.get('parameters', {}))
+                       for item in mechanisms)
+    profile = HarnessProfile('fixture', catalog, executor, selections, prompt,
+        artifact_bindings or {}, execution or {})
+    return component_profile(profile, lab, artifact_reader=artifact_reader).to_dict(references=False)

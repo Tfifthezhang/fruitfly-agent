@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 import math
 from typing import Any, Mapping
-from .contracts import EvaluationRequest, SCHEMA_VERSION
+from .contracts import EvaluationRequest, RESULT_SCHEMA_VERSION
 
 
 @dataclass(frozen=True)
@@ -42,7 +42,7 @@ class EvaluationReport:
     readiness: Mapping[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        return {"schema_version": SCHEMA_VERSION, **asdict(self)}
+        return {"schema_version": RESULT_SCHEMA_VERSION, **asdict(self)}
 
     def render_markdown(self) -> str:
         resolved = self.runtime.get("resolved", self.runtime)

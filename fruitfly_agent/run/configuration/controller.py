@@ -92,8 +92,6 @@ class RunConfigurationController:
             artifact_contents=baseline.artifact_contents, component_settings=baseline.component_settings,
             component_documents=tuple(replace(d, reference={}) for d in baseline.component_documents),
             configured=baseline.configured))
-        if defaults.schema_version == 2:
-            self._draft = replace(self._draft, schema_version=2)
         return _changed("restored default harness settings in the draft; model settings and credentials retained; save, then apply or start a session")
 
     @property
@@ -465,7 +463,6 @@ class RunConfigurationController:
         candidate = HarnessConfig(
             default_profile=self._selected,
             profiles=self._draft.profiles,
-            schema_version=self._draft.schema_version,
         )
         for profile in candidate.profiles.values():
             self._catalog.resolve(profile.mechanisms)
@@ -512,7 +509,6 @@ class RunConfigurationController:
         self._draft = HarnessConfig(
             default_profile=self._draft.default_profile,
             profiles=profiles,
-            schema_version=self._draft.schema_version,
         )
 
     def _assert_editable(self) -> None:

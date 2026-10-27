@@ -13,7 +13,7 @@ from typing import Any, Mapping
 
 from fruitfly_agent.providers.config import load_env
 from fruitfly_agent.providers.workspace import WorkspacePaths
-from eval.contracts import EvaluationRequest, SCHEMA_VERSION
+from eval.contracts import EvaluationRequest, RESULT_SCHEMA_VERSION
 from dataclasses import asdict
 
 from .base import BenchmarkDescriptor, BenchmarkVariant, PreflightResult, ProgressSink
@@ -185,8 +185,6 @@ class HarborBenchmarkAdapter:
         write_json(job_root / "preparation.json", preparation)
         write_json(job_root / "readiness.json", readiness)
         paths = WorkspacePaths(Path(request.runtime.working_directory))
-        for notice in paths.notices():
-            print(f"notice: {notice}", file=sys.stderr)
         environment = {**load_env(paths.secret_file()), **os.environ}
         config_path, model_catalog, secret_names = prepare_runtime(runtime=runtime, output_dir=job_root, environment=environment)
         selected_profile = request.runtime.profile
@@ -226,7 +224,7 @@ class HarborBenchmarkAdapter:
         except ValueError as exc:
             errors["coverage"] = str(exc)
             metrics = []  # Partial samples cannot establish a full selection score.
-        payload: dict[str, Any] = {"schema_version": SCHEMA_VERSION, "status": "failed" if errors else "completed", "metrics": metrics,
+        payload: dict[str, Any] = {"schema_version": RESULT_SCHEMA_VERSION, "status": "failed" if errors else "completed", "metrics": metrics,
             "errors": errors, "trials": trials,
             "artifacts": [{"kind": "harbor_job", "path": str(job_result_path.parent)},
                           {"kind": "harbor_log", "path": str(job_root / "harbor.log")},

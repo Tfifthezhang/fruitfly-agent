@@ -1,9 +1,8 @@
-schema_version: 2
 default_profile: baseline
 profiles:
   baseline:
     models:
-      catalog: default-models.yaml
+      catalog: models.yaml
       roles:
         executor: deepseek-flash-openai
         editor: deepseek-flash-openai

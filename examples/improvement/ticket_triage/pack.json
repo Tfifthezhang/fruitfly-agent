@@ -1,5 +1,4 @@
 {
-  "schema_version": 2,
   "id": "ticket-triage",
   "name": "SaaS Ticket Triage",
   "description": "Regression cases for current problems, mixed requests, and output labels.",

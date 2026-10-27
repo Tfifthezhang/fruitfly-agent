@@ -28,9 +28,8 @@ edit:
       parameters.max_tool_calls_per_turn: {minimum: 64, maximum: 256}
 ```
 
-Schema-2 experiments require explicit fields. Nested fields use dotted paths such
-as `parameters.tool_execution.max_parallel`. The embedding adapter and schema-1
-reader retain their existing default grants; enabled mechanism owners exclude
+Experiments require explicit fields. Nested fields use dotted paths such
+as `parameters.tool_execution.max_parallel`. Typed embedding requests may use the adapter defaults; enabled mechanism owners exclude
 fields they control. Options for unselected, absent or unsupported
 components fail. A fixed field cannot change, and every proposal must also satisfy
 the base parameter schema. The initial value must fit the declared bounds.

@@ -83,7 +83,7 @@ def experiment_factory(root, *, uses=2):
         install(root, value)
     path = root / '.fruitfly/improvement/experiments/editor/experiment.json'
     path.parent.mkdir(parents=True)
-    path.write_text(json.dumps(dict(schema_version=1, id='editor', name='Synthetic editor comparison',
+    path.write_text(json.dumps(dict(id='editor', name='Synthetic editor comparison',
         development=['development'], verification=['independent'], max_verifications=uses)))
     provider = ProceduralProvider()
     providers = Mock()

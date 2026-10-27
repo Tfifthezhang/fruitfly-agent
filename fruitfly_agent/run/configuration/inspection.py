@@ -25,7 +25,11 @@ def inspect_configuration(path, *, profile_id=None, catalog=None):
             raise ValueError('unknown model catalog profile: ' + alias)
     artifact_root = path.parent / 'artifacts' if path.parent.name == '.fruitfly' else path.parent / '.fruitfly/artifacts'
     return {'configuration': str(path), 'profile': profile.profile_id,
-            'models': {role: {'alias': alias, 'model': models[alias].model} for role, alias in roles.items()},
+            'models': {role: {'alias': alias, 'model': models[alias].model,
+                'sdk': models[alias].provider.sdk, 'protocol': models[alias].provider.protocol,
+                'service': models[alias].service,
+                'parameters': dict(models[alias].parameters), 'transport': dict(models[alias].transport)}
+                for role, alias in roles.items()},
             'components': configuration_inventory(profile, catalog,
                 artifact_reader=lambda reference: (artifact_root / reference[7:]).read_text(encoding='utf-8')),
             'sources': [{'path': source.path, 'sha256': source.digest} for source in profile.source_files],

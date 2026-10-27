@@ -70,7 +70,7 @@ class CompletedAssessmentService:
                 await stream.aclose()
         result = await self.services.operation(asyncio.wait_for(
             request(), self.settings.timeout_seconds))
-        if result.stop_reason != 'stop' or result.tool_calls:
+        if result.stop_reason != 'stop' or result.tool_calls or result.continue_turn:
             raise ValueError('completed assessor needs a tool-free final result')
         return json.loads(result.text)
 

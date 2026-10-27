@@ -156,6 +156,7 @@ async def _run(
     turn_count = 0
     tool_call_count = 0
     truncated_responses = 0
+    continuation_responses = 0
     termination_reason = 'turn_budget_exhausted'
 
     # Outer loop: turns (steering + follow-up can extend a turn).
@@ -258,7 +259,16 @@ async def _run(
 
             tool_calls = assistant.tool_calls
             if not tool_calls:
+                if assistant.continue_turn:
+                    continuation_responses += 1
+                    if continuation_responses >= config.max_turns:
+                        return await _finish(config, ctx, hooks, 'error', turn_count, tool_call_count,
+                            is_error=True, error_details={'kind': 'continuation_limit',
+                                'error': 'consecutive non-final response limit reached'})
+                    continue
                 break  # inner loop done; poll follow-up
+
+            continuation_responses = 0
 
             remaining = max(0, config.max_tool_calls_per_turn - turn_tool_call_count)
             batch_results, terminate = await execute_tool_batch(
@@ -419,6 +429,9 @@ async def _record_response(
         output_tokens=ctx.usage.output_tokens + (assistant.usage.output_tokens if assistant.usage else 0),
         cache_read_tokens=ctx.usage.cache_read_tokens + (assistant.usage.cache_read_tokens if assistant.usage else 0),
         cache_creation_tokens=ctx.usage.cache_creation_tokens + (assistant.usage.cache_creation_tokens if assistant.usage else 0),
+        reasoning_tokens=(assistant.usage.reasoning_tokens if ctx.provider_attempt_count == 1 and assistant.usage else
+            ctx.usage.reasoning_tokens + assistant.usage.reasoning_tokens
+            if assistant.usage and ctx.usage.reasoning_tokens is not None and assistant.usage.reasoning_tokens is not None else None),
     )
     await hooks.emit(AFTER_RESPONSE, response_event)
 

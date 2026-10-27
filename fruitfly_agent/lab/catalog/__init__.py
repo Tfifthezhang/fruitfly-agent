@@ -31,12 +31,10 @@ from .models import (
     ResolvedMechanism,
 )
 
-from fruitfly_agent.lab.improvement.migration import migrate_legacy_improvement_config_text, migrate_legacy_improvement_candidate
 
 __all__ = [
     "PreparedToolProvider", "ToolProviderContext", "ToolServiceInfo", "ToolServiceStart", "ProviderToolAuthorizer",
     "ComponentSpec", "ResolvedHarness", "resolve_harness", "verify_runtime",
-    "migrate_legacy_improvement_config_text", "migrate_legacy_improvement_candidate",
     "PermissionPolicy", "apply_permission_policy",
     "EXECUTION_ENVIRONMENT_COMPONENT", "ExecutionEnvironmentDescription",
     "ActivationScope",

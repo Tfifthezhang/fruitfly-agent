@@ -20,10 +20,10 @@ classifiers = [
 ]
 dependencies = [
     "httpx>=0.27",
-    "anthropic>=0.40",
+    "anthropic>=1.12.0",
     "ipython>=8.18",
     "markdown-it-py>=3.0",
-    "openai>=1.66.0",
+    "openai>=3.26.0",
     "Pygments>=2.17",
     "PyYAML>=6.0",
 ]
@@ -114,7 +114,6 @@ files = [
     "fruitfly_agent/run/evolution.py",
     "fruitfly_agent/run/improvement/evolution.py",
     "fruitfly_agent/run/improvement/pipeline.py",
-    "fruitfly_agent/run/migrate_improvement.py",
     "fruitfly_agent/interactive/terminal/io/live.py",
     "fruitfly_agent/interactive/terminal/io/display.py",
     "fruitfly_agent/interactive/terminal/io/editor.py",

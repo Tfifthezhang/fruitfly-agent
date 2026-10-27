@@ -67,7 +67,11 @@ Syntax belongs to Runtime specification, registration to Catalog, experiment
 fields to Experiments and operational examples to Examples. Cross-link the owning
 guide instead of copying its field table into each module.
 
-The ignore rule for local `models.yaml` does not remove an already tracked file. When preparing a source repository for publication, check that only public templates under `examples/configuration/` are tracked; local catalogs must stay outside the published source. VCS operations require workspace authorization under [Project rules](AGENTS.md).
+The ignore rule for local `models.yaml` does not remove an already tracked file.
+Publish model templates only under `examples/configuration/` and the installed
+`fruitfly_agent/run/configuration/templates/` tree. Local catalogs stay outside
+published source. VCS operations require workspace authorization under
+[Project rules](AGENTS.md).
 
 ## Push source changes to GitHub
 
@@ -93,7 +97,7 @@ remain in [AGENTS.md](AGENTS.md).
 |---|---|
 | Source contents | Root guides and licenses, packaging files, public model examples, runtime, Eval, examples, tests, and workflows |
 | Exclusions | Local keys, runtime data, virtual environments, assistant settings, caches, and build artifacts |
-| Distribution contents | Source archive retains `assets/logo.svg`, `examples/configuration/models.example.yaml`, `examples/configuration/.env.example`, and license notices; local `models.yaml` and other `.env.*` files excluded |
+| Distribution contents | Source archive retains the logo, public examples and licenses. Both distributions retain `fruitfly_agent/run/configuration/templates/models.yaml`; all other `models.yaml`, secrets and private environment files are excluded. |
 | Installed wheel | CLI, default prompt, registered extension, function worker, IPython subprocess, and Eval installation material preparation work outside the checkout |
 | Model configuration | Wheel users provide a catalog in their workspace or configure its path. |
 

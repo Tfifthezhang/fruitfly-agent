@@ -4,6 +4,17 @@
 
 Define the data and capabilities shared by hosts, Application, Session, and frontends. This package contains protocols and immutable views; it does not construct Providers, manage resources, or implement algorithms.
 
+`ModelSetupService.defaults(option_id, values)` supplies non-secret JSON mappings
+for model review, including `service`, `parameters` and `transport`. Hosts use the
+same defaults when staging. Frontends display them without vendor dispatch or
+request execution; credential values are never included.
+Each `ModelSetupOption.group` names its service menu group. Options sharing a
+group appear in a submenu; a single-option group opens its fields directly.
+The grouping is presentation metadata and does not select runtime adapters.
+`ModelSetupService.field(option_id, name, values)` supplies refreshed selection
+metadata. Hosts derive SDK/protocol choices from their adapter registry; frontends
+do not enumerate IDs or construct SDK clients.
+
 | File | Public entries / responsibility |
 |---|---|
 | [runtime.py](runtime.py) | RuntimeFactory, RuntimeSession, RuntimeAuthorization, and the RuntimeHandle protocol |

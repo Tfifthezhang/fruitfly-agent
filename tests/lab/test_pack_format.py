@@ -1,4 +1,4 @@
-"""V2 file boundaries, migration, offline validation and atomic training edits."""
+"""Task package boundaries, offline validation and atomic training edits."""
 import asyncio
 import contextlib
 import io
@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import patch
 
 from fruitfly_agent.lab.improvement.tasks import TaskPackCatalog, load_pack
-from fruitfly_agent.lab.improvement.tasks.verification import main, migrate_pack, score_answer
+from fruitfly_agent.lab.improvement.tasks.verification import main, score_answer
 from tests.support.task_packs import install, package
 from tests.support.task_packs import coding_pack
 
@@ -81,24 +81,21 @@ class UnifiedPackTests(unittest.IsolatedAsyncioTestCase):
             self.catalog.save_training('project','new','answer',expected_hash=identity)
         self.assertEqual(cases,(self.path.parent/'cases.json').read_bytes())
 
-    def test_migration_is_explicit_preserves_source_and_coding_references(self):
-        old = coding_pack()
-        old.pop('files'); old['schema_version']=1
-        old['train'][0]['expected']='def add_one(x): return x+1'
-        source = self.root/'old-pack.json'
-        source.write_text(json.dumps(old))
-        before = source.read_bytes()
-        with self.assertRaisesRegex(ValueError,'migrate'):
-            load_pack(self.root, source)
-        new = migrate_pack(self.root, source, self.root/'converted')
-        self.assertEqual(before, source.read_bytes())
-        self.assertEqual('coding',new.material['id'])
-        self.assertNotIn('expected',new.material['train'][0])
-        refs=json.loads((self.root/'converted/references.json').read_text())
-        self.assertEqual(old['train'][0]['expected'],refs['train-add'])
-        with self.assertRaisesRegex(ValueError,'exists'):
-            migrate_pack(self.root,source,self.root/'converted')
-        self.assertEqual(before, source.read_bytes())
+    def test_version_markers_and_inline_cases_are_rejected_without_migration(self):
+        payload = json.loads(self.path.read_text())
+        original = self.path.read_bytes()
+        for marker in (1, 2, True):
+            with self.subTest(marker=marker):
+                self.path.write_text(json.dumps({**payload, 'schema_version': marker}))
+                with self.assertRaisesRegex(ValueError, 'invalid task package fields'):
+                    load_pack(self.root, self.path)
+        self.path.write_bytes(original)
+        with patch('pathlib.Path.cwd', return_value=self.root), contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit) as failure:
+                awaitable = main(['migrate', str(self.path)])
+                asyncio.run(awaitable)
+            self.assertEqual(failure.exception.code, 2)
+        self.assertEqual(self.path.read_bytes(), original)
 
     async def test_one_public_validator_scores_text_and_coding(self):
         result=await score_answer(self.root,self.path,'train-1','a')

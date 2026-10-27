@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 from fruitfly_agent.lab.improvement.tasks import (
-    TaskPackCatalog, TaskPackRegistration, TaskSnapshotStore, validate_pack, LEGACY_PACK_ID,
+    TaskPackCatalog, TaskPackRegistration, TaskSnapshotStore, validate_pack,
     package_documents, load_pack,
 )
 from tests.support.task_packs import package, install, validate_material
@@ -63,8 +63,8 @@ class TaskPackageTests(unittest.TestCase):
 
     def test_validator_reports_named_document_and_case_rules(self):
         mutations = (
-            ("unknown manifest field", lambda p: p.update(unknown=True), "invalid task package fields; schema 1 needs explicit migration"),
-            ("boolean version", lambda p: p.update(schema_version=True), "unsupported task package schema_version; migrate to schema 2"),
+            ("unknown manifest field", lambda p: p.update(unknown=True), "invalid task package fields"),
+            ("boolean version", lambda p: p.update(schema_version=True), "invalid task package fields"),
             ("escaping file", lambda p: p["files"].update(cases="../cases.json"), "task file must be a local JSON filename"),
             ("same file", lambda p: p["files"].update(holdout="cases.json"), "task file references must be distinct"),
             ("unknown acceptance", lambda p: p["train"][0].update(extra=True), "invalid acceptance for single-turn-text-v1"),
@@ -83,7 +83,7 @@ class TaskPackageTests(unittest.TestCase):
         payload = package()
         payload.update(schema_version=True)
         payload["files"]["cases"] = "../cases.json"
-        with self.assertRaisesRegex(ValueError, "unsupported task package schema_version"):
+        with self.assertRaisesRegex(ValueError, "invalid task package fields"):
             validate_material(payload)
         payload = package()
         payload["validation"][0].update(id="train-1", expected="")
@@ -170,14 +170,14 @@ class TaskPackageTests(unittest.TestCase):
         self.assertEqual(original, source.read_bytes())
         self.assertEqual(2, len(catalog.freeze(copied, "base_prompt").train))
 
-    def test_legacy_source_can_be_copied_without_editing_original(self):
-        path = self.root / "old.json"
-        path.write_text(json.dumps({k: [{a: c[a] for a in ("input", "expected")} for c in package()[k]] for k in ("train", "validation")}))
-        catalog = TaskPackCatalog(self.root, legacy_path="old.json")
+    def test_loose_cases_are_rejected_as_a_package_and_left_unchanged(self):
+        path = self.root / "loose-cases.json"
+        path.write_text(json.dumps({'train': [{'input': 'old train', 'expected': 'A'}],
+            'validation': [{'input': 'old validation', 'expected': 'B'}]}))
         before = path.read_bytes()
-        pack_id = catalog.save_training(LEGACY_PACK_ID, "new", "answer", expected_hash=catalog.source_hash(LEGACY_PACK_ID), copy=True)
-        self.assertEqual(before, path.read_bytes())
-        self.assertEqual(2, len(catalog.freeze(pack_id, "base_prompt").train))
+        with self.assertRaisesRegex(ValueError, 'invalid task package fields'):
+            load_pack(self.root, path)
+        self.assertEqual(path.read_bytes(), before)
 
     def test_duplicate_package_ids_and_incompatible_target_are_errors(self):
         other = self.path.parent.parent / "duplicate/pack.json"
@@ -242,20 +242,10 @@ class TaskPackageTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "corrupted"):
             store.freeze({"tasks": ["one"]})
 
-    def test_optional_default_legacy_source_is_absent_from_package_choices(self):
-        for path in (".fruitfly/improvement/cases.json", str(self.root / ".fruitfly/improvement/cases.json")):
-            catalog = TaskPackCatalog(self.root, legacy_path=path)
-            with self.subTest(path=path):
-                self.assertEqual(["project"], [s.pack_id for s in catalog.summaries("base_prompt")])
-                self.assertEqual(1, len(catalog.freeze("project", "base_prompt").train))
-        # Explicit custom paths and broken existing files must retain actionable errors.
-        custom = TaskPackCatalog(self.root, legacy_path="my-missing-cases.json")
-        self.assertTrue(next(s for s in custom.summaries() if s.pack_id == LEGACY_PACK_ID).error)
-        source = self.root / ".fruitfly/improvement/cases.json"
-        source.write_text("broken json")
-        default = TaskPackCatalog(self.root, legacy_path=str(source))
-        self.assertTrue(next(s for s in default.summaries() if s.pack_id == LEGACY_PACK_ID).error)
-        source.write_text(json.dumps({"train":[{"input":"old train","expected":"A"}],"validation":[{"input":"old validation","expected":"B"}]}))
-        legacy = next(s for s in default.summaries() if s.pack_id == LEGACY_PACK_ID)
-        self.assertEqual("", legacy.error)
-        self.assertEqual(1, legacy.train_count)
+    def test_unregistered_cases_are_ignored_and_explicit_invalid_packages_are_reported(self):
+        source = self.root / '.fruitfly/improvement/cases.json'
+        source.write_text(json.dumps({'train': [], 'validation': []}))
+        self.assertEqual(['project'], [entry.pack_id for entry in self.catalog.summaries()])
+        catalog = TaskPackCatalog(self.root, (TaskPackRegistration(source),))
+        errors = [entry.error for entry in catalog.summaries() if entry.error]
+        self.assertEqual(errors, ['invalid task package fields'])

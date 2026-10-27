@@ -26,7 +26,8 @@ class HarnessValidationTests(unittest.TestCase):
             workspace(root)
             path = root / '.fruitfly/default-config.yaml'
             data = yaml.safe_load(path.read_text())
-            data['profiles']['baseline']['mechanisms'] = [{'id': 'learned-memory'}]
+            data['profiles']['baseline']['S']['learned-memory'] = {'inline': {
+                'id': 'learned-memory', 'implementation': 'learned-memory', 'role': 'S', 'parameters': {}}}
             path.write_text(yaml.safe_dump(data))
             summary = prepare_experiment(load_configuration(root), 'improvement').summary()
             memory = next(c for c in summary['harness']['editable_components'] if c['id'] == 'learned-memory')

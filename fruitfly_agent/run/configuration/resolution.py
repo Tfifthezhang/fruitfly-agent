@@ -89,14 +89,13 @@ def resolve_harness_selection(
         model_profile=selected_model,
         mechanisms=catalog.default_selections(),
     )
-    config = HarnessConfig(default_profile="default", profiles={"default": profile}, schema_version=2)
+    config = HarnessConfig(default_profile="default", profiles={"default": profile})
     return HarnessSelection(config, profile, target, False)
 
 
 def default_model_catalog_path(cwd: Path) -> Path | None:
     candidates = (
         WorkspacePaths(cwd).model_catalog(),
-        Path(__file__).resolve().parents[3] / "models.yaml",
     )
     seen: set[Path] = set()
     for candidate in candidates:
@@ -161,7 +160,7 @@ def _incomplete_selection(
         model_profile=None,
         mechanisms=catalog.default_selections(),
     )
-    config = HarnessConfig(default_profile="default", profiles={"default": profile}, schema_version=2)
+    config = HarnessConfig(default_profile="default", profiles={"default": profile})
     return HarnessSelection(config, profile, target, False)
 
 

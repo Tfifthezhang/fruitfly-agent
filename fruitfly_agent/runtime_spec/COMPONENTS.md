@@ -2,14 +2,13 @@
 
 [Up: Runtime specification](README.md)
 
-Use system schema 2 to select H/S/I component documents. Daily and default files
+Select H/S/I component documents using the single system configuration format. Daily and default files
 use the same schema. A component is configurable only when its implementation is
 registered. Configuration does not grant experiment modification or adoption.
 
 ## Select documents
 
 ```yaml
-schema_version: 2
 default_profile: baseline
 profiles:
   baseline:
@@ -29,7 +28,6 @@ model catalog. The API model ID belongs inside that entry. Aliases are case-sens
 ## Write a component
 
 ```yaml
-schema_version: 1
 id: execution-policy
 role: H
 implementation: execution-policy
@@ -62,8 +60,8 @@ projects values for runtime assembly. Run's public loader uses this registered
 path. Neither loader constructs Providers or writes artifacts.
 
 See [Run configuration](../run/configuration/README.md) for application and
-[Experiments](../experiments/README.md) for modification authorization. Historical
-schema-1 files remain readable through the same runtime path.
+[Experiments](../experiments/README.md) for modification authorization. Configuration
+has no version marker or alternative flat profile reader.
 
 ## Bind models once
 
@@ -120,7 +118,7 @@ map public component fields to the corresponding owner-validated payloads.
 ```
 
 The command reads local declarations without model requests. Run the experiment
-check separately to validate a selected backend and modification grant. A schema-2
+check separately to validate a selected backend and modification grant. A
 component file being valid does not imply every runner can execute or edit it.
 Use [Catalog registration](../lab/catalog/CONFIGURATION.md) to add a component,
 not a special case in the parser. See [configuration examples](../../examples/configuration/README.md)
@@ -130,6 +128,6 @@ Exports include `snapshot.json` with source document hashes, normalized system
 identity, declared implementation IDs, component content hashes and the model
 catalog hash. These IDs do not snapshot implementation source or prove model
 quality. Owner-declared initial resource files are copied to `resources/`, with
-workspace-relative paths recorded in the snapshot. Explicit conversion previews
+workspace-relative paths recorded in the snapshot. Explicit export previews
 those files before writing. Keep that working-directory layout for resource-backed
 components; services and runtime-specific dependencies still need preparation.

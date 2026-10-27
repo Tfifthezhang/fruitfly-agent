@@ -21,8 +21,7 @@ REQUEST_V1 = '''{
   "benchmark": {"id": "swe-bench", "variant": "smoke"}, "comparison": null,
   "execution": {"attempts": 2, "concurrency": 1, "seed": 7, "timeout_seconds": 3600}
 }'''
-REQUEST_V2 = '''{
-  "schema_version": 2,
+REQUEST = '''{
   "runtime": {"config_path": "/tmp/config.yaml", "profile": "test", "working_directory": "/tmp/workspace"},
   "benchmark": {"id": "swe-bench", "variant": "smoke"},
   "execution": {"attempts": 2, "concurrency": 1, "timeout_seconds": 3600}
@@ -45,11 +44,11 @@ class PersistenceContractTests(unittest.TestCase):
                 self.assertEqual([UserMessage(content='hello')], session.messages())
                 self.assertEqual([1], [entry.id for entry in session.read_all()])
 
-    def test_fixed_request_v2_round_trip_and_old_experiment_rejection(self):
-        for payload in (json.loads(REQUEST_V2), request_payload()):
+    def test_current_request_round_trip_and_obsolete_fields_are_rejected(self):
+        for payload in (json.loads(REQUEST), request_payload()):
             with self.subTest(source=payload):
                 self.assertEqual(payload, EvaluationRequest.from_dict(payload).to_dict())
-        for payload in (json.loads(REQUEST_V1), {**json.loads(REQUEST_V2), "schema_version": 999}):
+        for payload in (json.loads(REQUEST_V1), {**json.loads(REQUEST), "schema_version": 999}):
             with self.subTest(version=payload["schema_version"]), self.assertRaisesRegex(ValueError, "schema_version"):
                 EvaluationRequest.from_dict(payload)
 

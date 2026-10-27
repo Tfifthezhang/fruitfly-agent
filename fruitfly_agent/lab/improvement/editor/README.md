@@ -12,8 +12,8 @@ artifact adapter. Editing I requires an improver-comparison runner. The file-tas
 [editor experiment](../improver/README.md) executes it through a separate comparison
 runner. Candidate validation freezes `system`, `select` and `reflect`; only
 `propose`, `invariant`, `domain` and `compose` can change. New instruction snapshots
-use schema `editor-instructions-v2`; exact legacy six-field texts remain readable
-as v1 with a default generic proposal mission.
+use the `editor-instructions-v2` target contract. Every snapshot must contain all
+registered stage fields; missing fields are rejected.
 
 The simple strategy uses `propose`; Harness² distinguishes invariant and domain missions.
 The composer can retain, revise or reject edits. Every changed component needs a

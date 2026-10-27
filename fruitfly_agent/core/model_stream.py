@@ -22,7 +22,7 @@ class StreamStart:
 
 @dataclass(frozen=True)
 class StreamActivity:
-    """Transport activity without vendor data or assistant content."""
+    """Transport or server-tool activity without request bodies or assistant content."""
 
     phase: str
     attempt: int = 1
@@ -30,6 +30,9 @@ class StreamActivity:
     delay_seconds: float = 0.0
     error_kind: str = ""
     status_code: int | None = None
+    tool_name: str = ''
+    tool_call_id: str = ''
+    tool_status: str = ''
 
 
 @dataclass(frozen=True)

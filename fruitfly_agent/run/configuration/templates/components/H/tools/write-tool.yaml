@@ -1,4 +1,3 @@
-schema_version: 1
 id: write-tool
 role: H
 implementation: write-tool

@@ -118,8 +118,7 @@ class CodingTaskTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp).resolve()
             path = install(root, coding_pack())
-            catalog = TaskPackCatalog(root, legacy_path=str(path.relative_to(root)))
-            self.assertEqual("coding", catalog.default_pack_id)
+            catalog = TaskPackCatalog(root)
             self.assertEqual(1, len(catalog.summaries()))
             suite = catalog.freeze("coding", "base_prompt")
             self.assertEqual("python-function-tests-v1", suite.policy_id)

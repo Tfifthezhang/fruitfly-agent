@@ -24,10 +24,10 @@ class BenchmarkEntryTests(unittest.TestCase):
         self.root = Path(self.enterContext(tempfile.TemporaryDirectory())).resolve()
         self.config_path = workspace(self.root, task={'source': 'eval', 'request': '../request.json', 'host': '../host.yaml'})
         self.request = self.root / 'request.json'
-        self.request.write_text(json.dumps({'schema_version': 2, 'runtime': {'working_directory': str(self.root)},
+        self.request.write_text(json.dumps({'runtime': {'working_directory': str(self.root)},
             'benchmark': {'id': 'terminal-bench-4', 'variant': 'smoke'}}))
         self.host = self.root / 'host.yaml'
-        self.host.write_text(yaml.safe_dump({'schema_version': 1, 'cache': 'cache',
+        self.host.write_text(yaml.safe_dump({'cache': 'cache',
             'agent': {'python': '/opt/runtime/bin/python', 'mounts': [{'source': 'runtime', 'target': '/opt/runtime'}]},
             'environment': {'agent': {'LANG': 'C.UTF-8'}}}))
 
@@ -56,18 +56,21 @@ class BenchmarkEntryTests(unittest.TestCase):
         self.assertTrue(prepare.call_args.kwargs['tasks_only'])
         self.assertIn('experiments/prepared', str(prepare.call_args.kwargs['host_config_path']))
 
-    def test_eval_uses_conventional_request_and_host_without_experiment_file(self):
+    def test_explicit_request_supports_material_preparation_without_experiment_file(self):
         self.config_path.unlink()
         (self.root / '.fruitfly/eval-request.json').write_bytes(self.request.read_bytes())
         (self.root / '.fruitfly/eval-host.yaml').write_bytes(self.host.read_bytes())
         with patch('eval.api.prepare_evaluation', return_value={'task_count': 1}) as prepare, redirect_stdout(io.StringIO()):
-            self.assertEqual(main(['--cwd', str(self.root), 'eval', 'prepare', '--tasks-only']), 0)
+            self.assertEqual(main(['--cwd', str(self.root), '--request', str(self.request), 'eval', 'prepare', '--tasks-only']), 0)
         self.assertEqual(prepare.call_args.args[0].benchmark.benchmark_id, 'terminal-bench-4')
 
     def test_eval_ignores_editor_model_selection_and_never_calls_search(self):
         data = yaml.safe_load(self.config_path.read_text())
-        data['models'] = {'editor': 'unknown-editor'}
-        data['improvement'] = {'scope': 'persistent'}
+        data['comparison']['inline']['scope'] = 'persistent'
+        system_path = self.root / '.fruitfly/default-config.yaml'
+        system = yaml.safe_load(system_path.read_text())
+        system['profiles']['baseline']['models']['roles']['editor'] = 'editor'
+        system_path.write_text(yaml.safe_dump(system))
         self.config_path.write_text(yaml.safe_dump(data))
         config = load_configuration(self.root)
         resolve_benchmark(config).stage_host()
@@ -100,7 +103,7 @@ class BenchmarkEntryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'independent verifier'):
             prepare_experiment(load_configuration(self.root), 'rsi', require_prepared=False)
         data = yaml.safe_load(self.config_path.read_text())
-        data['improvement'] = {'max_model_calls': 80}
+        data['budget'] = {'max_model_calls': 80}
         self.config_path.write_text(yaml.safe_dump(data))
         with self.assertRaisesRegex(ValueError, 'baseline, candidate'):
             prepare_experiment(load_configuration(self.root), 'improvement', require_prepared=False)

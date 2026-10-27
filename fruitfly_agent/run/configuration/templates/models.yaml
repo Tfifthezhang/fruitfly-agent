@@ -1,0 +1,68 @@
+# Copy this file to .fruitfly/models.yaml and edit it before starting a live session.
+# Both entries use DeepSeek Flash through different API protocols.
+# Live tasks require a DeepSeek key, use the network, and may incur charges.
+# Store key values in .fruitfly/secrets.env or the process environment, never in this file.
+models:
+  deepseek-flash-openai:
+    # Uses DeepSeek's OpenAI Responses-compatible endpoint, not Chat Completions.
+    sdk: openai
+    protocol: responses
+    service: deepseek
+    model: deepseek-flash
+    api_key_env: DEEPSEEK_API_KEY
+    base_url: https://api.deepseek.com
+    # Conservative working budget within the documented 1M context.
+    # Output including thinking is capped at 32768 for this example, not the service maximum.
+    context_window: 1000000
+    max_output_tokens: 32768
+    # Capabilities describe support; parameters explicitly select thinking behavior.
+    capabilities:
+      tools: true
+      parallel_tool_calls: false
+      vision: false
+      reasoning: true
+      streaming: true
+    parameters:
+      reasoning:
+        effort: high
+    transport:
+      # Adapter waiting/retry policy; these values do not change model capacity.
+      connect_timeout: 10.0
+      timeout: 600.0
+      first_progress_timeout: 180.0
+      stall_timeout: 180.0
+      total_timeout: 900.0
+      cleanup_timeout: 5.0
+      retry_jitter: 0.2
+      retry_max: 3
+      retry_base_delay: 1.0
+  deepseek-flash-anthropic:
+    # Uses DeepSeek's Anthropic Messages-compatible endpoint.
+    # Messages uses its native thinking and effort fields.
+    sdk: anthropic
+    protocol: messages
+    service: deepseek
+    model: deepseek-flash
+    api_key_env: DEEPSEEK_API_KEY
+    base_url: https://api.deepseek.com/anthropic
+    context_window: 1000000
+    max_output_tokens: 32768
+    capabilities:
+      tools: true
+      parallel_tool_calls: false
+      vision: false
+      reasoning: true
+      streaming: true
+    parameters:
+      thinking: {type: enabled}
+      output_config: {effort: high}
+    transport:
+      connect_timeout: 10.0
+      timeout: 600.0
+      first_progress_timeout: 180.0
+      stall_timeout: 180.0
+      total_timeout: 900.0
+      cleanup_timeout: 5.0
+      retry_jitter: 0.2
+      retry_max: 3
+      retry_base_delay: 1.0

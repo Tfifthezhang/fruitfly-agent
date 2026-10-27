@@ -120,6 +120,8 @@ class ModelQueryBroker:
             actual = usage.total_tokens
             async with self._lock:
                 self._tokens += actual - estimated
+        if assistant.continue_turn:
+            raise RuntimeError('model.query requires a final single-response result; the model returned an intermediate response')
         text = assistant.text
         result: dict[str, Any] = {
             "call_id": call_id,

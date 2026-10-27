@@ -92,21 +92,22 @@ Create the remote directory before transferring files. **Local computer:** repla
 ```bash
 scp .fruitfly/secrets.env \
     .fruitfly/default-config.yaml \
-    .fruitfly/default-models.yaml \
+    .fruitfly/models.yaml \
     USER@SERVER:/ABSOLUTE/PROJECT/.fruitfly/
 ```
 
 | File | Required content |
 |---|---|
 | `.fruitfly/default-config.yaml` | Selected evaluation harness profile using local task execution |
-| `.fruitfly/default-models.yaml` | Model/protocol/endpoint settings and credential variable names |
+| `.fruitfly/models.yaml` | Model/protocol/endpoint settings and credential variable names |
 | `.fruitfly/secrets.env` | Actual model and enabled-tool credential values |
 | `.fruitfly/eval-host.yaml` | Server-specific paths, mounts and dependency preparation |
 | `.fruitfly/eval-smoke.json`, `.fruitfly/eval-selected.json` | Dataset selection and execution budgets |
 
-Transfer `.fruitfly/config.yaml` and `.fruitfly/models.yaml` only for optional daily
-interaction. Eval defaults to the independent default configuration and never
-falls back to daily settings. Copy exact `.fruitfly/artifacts/<hash>` files if the
+Transfer `.fruitfly/config.yaml` only for optional daily interaction; daily and
+Eval configs can select different aliases from the same `.fruitfly/models.yaml`.
+Eval defaults to the independent default configuration and never falls back to
+daily settings. Transfer its referenced component files too. Copy exact `.fruitfly/artifacts/<hash>` files if the
 profile references immutable `sha256:` bindings. Arbitrary memory, Skills and host
 workspace files are not copied into tasks.
 
@@ -319,7 +320,6 @@ from eval.contracts import EvaluationRequest
 benchmark = os.environ['FRUITFLY_BENCHMARK']
 builtin_catalog().get(benchmark)
 request = EvaluationRequest.from_dict({
-    'schema_version': 2,
     'runtime': {'working_directory': str(Path.cwd().resolve())},
     'benchmark': {'id': benchmark, 'variant': 'smoke'},
     'execution': {'attempts': 1, 'concurrency': 1, 'timeout_seconds': 36000},

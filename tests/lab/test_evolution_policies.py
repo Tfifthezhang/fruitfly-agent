@@ -18,6 +18,22 @@ from tests.support.pipeline import fixture, version
 
 
 class EvolutionPolicyTests(unittest.IsolatedAsyncioTestCase):
+    async def test_online_judge_rejects_an_intermediate_json_answer(self):
+        from fruitfly_agent.core.data_model import AssistantMessage, TextBlock
+        from fruitfly_agent.lab.improvement.api import ExecutionEvent
+        provider = FauxProvider()
+        provider.respond(AssistantMessage([TextBlock('{"metrics":[]}')], stop_reason='stop', continue_turn=True))
+        services = WorkflowServices(RunPlan('judge-intermediate', version(), ('prompt',)))
+        judge = ModelAssessor('judge', config=AgentLoopConfig(provider=provider), services=services,
+            instruction='Assess.', render=lambda event: event.kind)
+        _, baseline = fixture()
+        try:
+            with self.assertRaisesRegex(ValueError, 'tool-free judgment'):
+                await judge.assess(ExecutionEvent(EvidencePosition('run', baseline.snapshot_id, 'initial', 1), 'finished'))
+            self.assertEqual(services.used['model'], 1)
+        finally:
+            await services.close()
+
     async def test_rejected_candidates_continue_and_configured_patience_stops(self):
         start = AgentVersion('task:0', 'editor:0')
         seen = []

@@ -54,6 +54,16 @@ def judge_response(view, signal=None):
 
 
 class CompletedImprovementTests(unittest.IsolatedAsyncioTestCase):
+    async def test_intermediate_response_cannot_be_used_as_completed_judgment(self):
+        _, _, _, services, assessment, _, _, provider = self.prepare()
+        provider.script = []
+        provider.respond(AssistantMessage([TextBlock('{"metrics": []}')], stop_reason='stop', continue_turn=True))
+        try:
+            with self.assertRaisesRegex(ValueError, 'final result'):
+                await assessment.complete('Assess.', {})
+            self.assertEqual(services.used['model'], 1)
+        finally:
+            await services.close()
     def prepare(self, *, required=False, calls=16, invalid=False, root_calls=64, rounds=2, stop=None):
         components, baseline = fixture()
         artifacts = MemoryArtifacts()

@@ -74,21 +74,23 @@ async def run_demo():
     # All configuration/session files are isolated and removed on exit.
     with tempfile.TemporaryDirectory(prefix='fruitfly-example-') as directory:
         workspace = Path(directory)
-        (workspace / 'models.yaml').write_text(
-            'models:\n  offline:\n    provider: offline\n    model: offline-example\n'
+        (workspace / '.fruitfly').mkdir()
+        (workspace / '.fruitfly/models.yaml').write_text(
+            'models:\n  offline:\n    sdk: offline\n    protocol: offline\n    model: offline-example\n'
             '    api_key_env: OFFLINE_KEY\n    context_window: 4096\n', encoding='utf-8'
         )
+        catalog = builtin_catalog().extended((example_definition(),))
         save_harness_config(workspace / '.fruitfly/config.yaml', HarnessConfig(
             default_profile='default', profiles={'default': HarnessProfile(
-                'default', model_catalog='../models.yaml', model_profile='offline',
+                'default', model_catalog='models.yaml', model_profile='offline',
                 mechanisms=(MechanismSelection('example-guidance'),),
             )},
-        ))
+        ), catalog=catalog)
         registry = ProviderRegistry()
-        registry.register('offline', lambda spec, key: OfflineProvider())
+        registry.register('offline', 'offline', lambda spec, key: OfflineProvider())
         factory = RunApplicationFactory(
             cwd=workspace, environment={'OFFLINE_KEY': 'offline-placeholder'},
-            catalog=builtin_catalog().extended((example_definition(),)),
+            catalog=catalog,
             provider_registry=registry,
         )
         application = AgentApplication(factory)

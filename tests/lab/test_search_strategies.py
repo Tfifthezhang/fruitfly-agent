@@ -8,18 +8,17 @@ from tests.support.pipeline import build_pipeline
 
 
 class SearchStrategyTests(unittest.IsolatedAsyncioTestCase):
-    def test_legacy_instruction_schema_is_readable_but_cannot_silently_change(self):
+    def test_editor_instructions_require_all_current_fields(self):
         import json
         from fruitfly_agent.lab.improvement.api import EditorInstructions, EditorInstructionTarget
-        value = json.loads(EditorInstructions().serialize())
+        current = EditorInstructions()
+        target = EditorInstructionTarget(current)
+        self.assertEqual(target.snapshot().schema, 'editor-instructions-v2')
+        target.validate(current.serialize())
+        value = json.loads(current.serialize())
         value.pop('propose')
-        text = json.dumps(value)
-        instructions = EditorInstructions.parse(text)
-        target = EditorInstructionTarget(instructions, text=text)
-        self.assertEqual(target.snapshot().schema, 'editor-instructions-v1')
-        target.validate(text)
-        with self.assertRaisesRegex(ValueError, 'schema'):
-            target.validate(instructions.serialize())
+        with self.assertRaisesRegex(ValueError, 'exactly the registered stage fields'):
+            EditorInstructions.parse(json.dumps(value))
 
     async def test_simple_runs_one_reference_and_one_candidate_without_composition_or_reflection(self):
         flow, plan, baseline, runner = build_pipeline()

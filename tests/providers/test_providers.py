@@ -25,17 +25,21 @@ class ProviderTests(unittest.TestCase):
     def test_public_model_template_loads_without_live_credentials(self) -> None:
         specs = load_model_specs(Path(__file__).resolve().parents[2] / "examples/configuration/models.example.yaml")
         self.assertEqual({"deepseek-flash-openai", "deepseek-flash-anthropic"}, set(specs))
-        self.assertEqual("openai", specs["deepseek-flash-openai"].provider.type)
-        self.assertEqual("anthropic", specs["deepseek-flash-anthropic"].provider.type)
+        self.assertEqual(("openai", "responses"), (specs["deepseek-flash-openai"].provider.sdk, specs["deepseek-flash-openai"].provider.protocol))
+        self.assertEqual(("anthropic", "messages"), (specs["deepseek-flash-anthropic"].provider.sdk, specs["deepseek-flash-anthropic"].provider.protocol))
         self.assertEqual("https://api.deepseek.com", specs["deepseek-flash-openai"].provider.base_url)
         self.assertEqual("https://api.deepseek.com/anthropic", specs["deepseek-flash-anthropic"].provider.base_url)
-        transport = {"first_progress_timeout": 180, "stall_timeout": 180, "total_timeout": 900, "retry_max": 3}
-        self.assertEqual({**transport, "reasoning": {"effort": "none"}}, specs["deepseek-flash-openai"].parameters)
-        self.assertEqual(transport, specs["deepseek-flash-anthropic"].parameters)
+        transport = {"connect_timeout": 10.0, "timeout": 600.0, "first_progress_timeout": 180.0,
+                     "stall_timeout": 180.0, "total_timeout": 900.0, "cleanup_timeout": 5.0,
+                     "retry_jitter": 0.2, "retry_max": 3, "retry_base_delay": 1.0}
+        self.assertEqual({"reasoning": {"effort": "high"}}, specs["deepseek-flash-openai"].parameters)
+        self.assertEqual({'thinking': {'type': 'enabled'}, 'output_config': {'effort': 'high'}}, specs["deepseek-flash-anthropic"].parameters)
         for spec in specs.values():
             with self.subTest(profile=spec.id):
                 self.assertEqual("DEEPSEEK_API_KEY", spec.provider.api_key_env)
                 self.assertEqual("deepseek-flash", spec.model)
+                self.assertEqual('deepseek', spec.service)
+                self.assertEqual(transport, spec.transport)
                 spec.require(tools=True, streaming=True)
                 registry = ProviderRegistry()
                 captured = []
@@ -43,7 +47,7 @@ class ProviderTests(unittest.TestCase):
                 def construct(model, key):
                     captured.append((model, key))
                     return marker
-                registry.register(spec.provider.type, construct)
+                registry.register(spec.provider.sdk, spec.provider.protocol, construct)
                 self.assertIs(marker, registry.create(spec, {"DEEPSEEK_API_KEY": "offline-placeholder"}))
                 self.assertEqual([(spec, "offline-placeholder")], captured)
         # Exercise the real factories and constructor parameters with SDK clients mocked.
@@ -53,6 +57,16 @@ class ProviderTests(unittest.TestCase):
                 registry.create(spec, {"DEEPSEEK_API_KEY": "offline-placeholder"})
             self.assertEqual("https://api.deepseek.com", responses.call_args.kwargs["base_url"])
             self.assertEqual("https://api.deepseek.com/anthropic", messages.call_args.kwargs["base_url"])
+
+    def test_installed_model_template_matches_the_public_catalog_and_runtime_defaults(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        public = load_model_specs(root / 'examples/configuration/models.example.yaml')
+        installed = load_model_specs(root / 'fruitfly_agent/run/configuration/templates/models.yaml')
+        self.assertEqual(public, installed)
+        with patch('openai.AsyncOpenAI'), patch('anthropic.AsyncAnthropic'):
+            for spec in public.values():
+                provider = default_registry().create(spec, {'DEEPSEEK_API_KEY': 'offline-placeholder'})
+                self.assertEqual(provider.transport_parameters, {**spec.transport, 'transport_version': 'bounded-v1'})
 
     def test_compatible_endpoint_overflow_messages_are_normalized(self) -> None:
         messages = (
@@ -135,14 +149,14 @@ class ProviderTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "models.yaml"
             path.write_text(
-                "models:\n  test:\n    provider: fake\n    model: exact-id\n"
+                'models:\n  test:\n    sdk: fake\n    protocol: fake\n    model: exact-id\n'
                 "    context_window: 1234\n    api_key_env: FAKE_KEY\n",
                 encoding="utf-8",
             )
             spec = load_model_specs(path)["test"]
         registry = ProviderRegistry()
         marker = object()
-        registry.register("fake", lambda model, key: marker)
+        registry.register("fake", "fake", lambda model, key: marker)
         self.assertIs(marker, registry.create(spec, {"FAKE_KEY": "secret"}))
         self.assertEqual("exact-id", spec.model)
         self.assertEqual(1234, spec.context_window)
@@ -152,7 +166,7 @@ class ProviderTests(unittest.TestCase):
 
         spec = ModelSpec(
             "text-only",
-            ProviderSpec("fake", "FAKE_KEY"),
+            ProviderSpec("fake", "fake", "FAKE_KEY"),
             "model",
             1000,
             capabilities=ModelCapabilities(tools=False),

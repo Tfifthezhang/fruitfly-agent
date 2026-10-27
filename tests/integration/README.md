@@ -16,4 +16,7 @@ Copy and customize the [model template](../../examples/configuration/models.exam
 | API key | Read from the environment variable named by `api_key_env`. |
 | Output | Local smoke result; keep private runtime data out of source releases. |
 
+Smoke outcomes report `sdk` and `protocol` separately, using the selected model
+specification. Reading help or parsing a catalog does not run these paid scenarios.
+
 See [Configuration](../../CONFIGURATION.md) and [Providers](../../fruitfly_agent/providers/README.md). Do not run this as an automatic documentation check.

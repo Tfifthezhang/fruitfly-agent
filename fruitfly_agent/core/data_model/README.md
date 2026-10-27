@@ -19,6 +19,9 @@ Shared message, context, and runtime values. This module performs no I/O and imp
 | Algorithm state | Owned by its Lab implementation or explicit artifacts. |
 | `LoopDiagnostics` | Optional immutable terminal facts on `AgentLoopResult`; counts and termination, not quality or verification |
 | `AgentToolResult.is_error` | Defaults false; `.error(...)` sets true and Core preserves it |
+| `AssistantMessage.provider_state` | Optional finite JSON continuation; Core stores it, Providers validate and interpret it; omitted from repr and text summaries |
+| `AssistantMessage.continue_turn` | Explicit non-final response; Core requests continuation within its bounded policy |
+| `Usage.reasoning_tokens` | Optional output-token subset; never added again to total_tokens; missing means unknown |
 
 No module-specific environment variables or installation steps.
 

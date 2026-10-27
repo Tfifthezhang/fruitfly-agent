@@ -4,7 +4,7 @@
 
 FruitFlyAgent separates the Agent loop, model adapters, Application lifecycle, and replaceable algorithms. Run assembles them into an interactive runtime.
 
-System configuration selects H/S/I component documents through one versioned
+System configuration selects H/S/I component documents through one shared
 [runtime specification](runtime_spec/COMPONENTS.md). Daily config, experiment
 baseline and generated candidate use the same loader/projection and runtime
 assembly. [Catalog declarations](lab/catalog/CONFIGURATION.md) own supported

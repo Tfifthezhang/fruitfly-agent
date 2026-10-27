@@ -33,7 +33,6 @@ Guidance does not change scoring. To measure brevity or reliability, the policy 
 
 ```json
 {
-  "schema_version": 2,
   "id": "ticket-triage",
   "name": "SaaS ticket triage",
   "description": "Classify current incidents and mixed support requests.",
@@ -67,7 +66,6 @@ Omit the holdout file and declaration when none is available. These cases illust
 
 | Field / concern | Contract |
 |---|---|
-| `schema_version` | 2 |
 | `id` | Stable unique ID; letters, numbers, dots, hyphens, and underscores |
 | `name` / `description` | Required; at most 120 / 500 characters |
 | `default_direction` | Optional descriptive guidance; at most 500 characters |

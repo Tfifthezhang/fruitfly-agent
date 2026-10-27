@@ -53,7 +53,6 @@ Create `.fruitfly/improvement/experiments/editor-study/experiment.json`:
 
 ```json
 {
-  "schema_version": 1,
   "id": "editor-study",
   "name": "Editor procedure comparison",
   "development": ["development-pack"],

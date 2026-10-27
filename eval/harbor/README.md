@@ -16,7 +16,6 @@ URLs and keep key values in the existing secret environment.
 
 | Field | Meaning |
 |---|---|
-| `schema_version` | Required integer `1` |
 | `cache` | Host directory for frozen material, probes and package caches |
 | `agent.python` | Absolute Python executable path inside the container |
 | `agent.mounts` | Required read-only `source`/optional `target` binds; target defaults to source |

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import asdict
+from dataclasses import asdict, replace
 import json
 from typing import Any, AsyncIterator
 
@@ -11,6 +11,7 @@ from fruitfly_agent.core.data_model import (
     AssistantMessage,
     ProviderView,
     TextBlock,
+    ThinkingBlock,
     ToolCallBlock,
     Usage,
 )
@@ -20,14 +21,20 @@ from fruitfly_agent.core.model_stream import (
     StreamDone,
     StreamError,
     StreamEvent,
+    StreamActivity,
     TextDelta,
     ThinkingDelta,
     ToolCallDelta,
     ToolCallStart,
 )
 from .openai_codec import convert_to_openai
+from .replay import ReplayBinding, wire_value
+from .request_options import validate_request_options
+from .services import service_definition
 from .error_classification import classify_provider_error
 from .transport import TransportPolicy, AttemptDeadline, attempts, close_transport, retry_details, validate_retries
+
+_SERVER_ITEMS = frozenset({'web_search_call', 'file_search_call', 'code_interpreter_call'})
 
 
 def classify_error(exc: Exception, *, status_code: int | None = None) -> TaggedError:
@@ -36,6 +43,9 @@ def classify_error(exc: Exception, *, status_code: int | None = None) -> TaggedE
 
 class OpenAIProvider:
     """Map OpenAI streaming events to FruitFlyAgent's provider-neutral stream."""
+
+    protocol = 'responses'
+    continuation_namespace = 'openai'
 
     def __init__(
         self,
@@ -55,10 +65,17 @@ class OpenAIProvider:
         retry_jitter: float = 0.2,
         store: bool = False,
         parallel_tool_calls: bool = True,
+        service: str = 'generic',
         **request_options: Any,
     ) -> None:
         import openai  # SDK stays inside the adapter.
 
+        request_options = validate_request_options(self.protocol, request_options)
+        self._service = service_definition(service, self.protocol)
+        self._service.validate(self.protocol, model, request_options)
+        self.service = service
+        self._replay = ReplayBinding(self.protocol, service, base_url, api_key,
+                                    namespace=self.continuation_namespace)
         validate_retries(retry_max, retry_base_delay)
         self._policy = TransportPolicy(connect_timeout, timeout, first_progress_timeout,
                                        stall_timeout, total_timeout, cleanup_timeout, retry_jitter)
@@ -108,7 +125,6 @@ class OpenAIProvider:
         request: dict[str, Any] = {
             "model": view.model or self.model,
             "instructions": view.system_prompt,
-            "input": convert_to_openai(view.messages),
             "max_output_tokens": min(self.max_output_tokens, view.max_tokens) if view.max_tokens > 0 else self.max_output_tokens,
             "store": self.store,
             "parallel_tool_calls": self.parallel_tool_calls,
@@ -127,8 +143,18 @@ class OpenAIProvider:
         ]
         if tools:
             request["tools"] = tools
+        if not self._service.parallel_control:
+            request.pop('parallel_tool_calls')
+        if not self._service.responses_store:
+            request.pop('store')
+        effective = replace(view, model=view.model or self.model)
+        self._service.validate(self.protocol, effective.model, self.request_options)
+        prefix = convert_to_openai(view.messages, replay=self._replay.reader(effective, tools))
+        request['input'] = prefix
 
         text_parts: list[str] = []
+        thoughts: list[str] = []
+        done_items: dict[int, dict[str, Any]] = {}
         calls: dict[str, dict[str, str]] = {}
         completed: Any = None
         stream = None
@@ -152,10 +178,21 @@ class OpenAIProvider:
                 elif event_type in {"response.reasoning_text.delta", "response.reasoning_summary_text.delta"}:
                     delta = str(getattr(event, "delta", ""))
                     if delta:
+                        thoughts.append(delta)
                         deadline.progress()
                         yield ThinkingDelta(thinking=delta)
+                elif event_type == 'response.output_item.done':
+                    done_items[int(getattr(event, 'output_index', len(done_items)))] = wire_value(event.item)
+                    deadline.progress()
+                    if getattr(event.item, 'type', '') in _SERVER_ITEMS:
+                        yield StreamActivity('server_tool', tool_name=event.item.type,
+                            tool_call_id=str(getattr(event.item, 'id', '')), tool_status='completed')
                 elif event_type == "response.output_item.added":
                     item = getattr(event, "item", None)
+                    if getattr(item, 'type', '') in _SERVER_ITEMS:
+                        deadline.progress()
+                        yield StreamActivity('server_tool', tool_name=str(getattr(item, 'type', '')),
+                            tool_call_id=str(getattr(item, 'id', '')), tool_status='started')
                     if getattr(item, "type", "") == "function_call":
                         call_id = str(getattr(item, "call_id", None) or getattr(item, "id", ""))
                         item_id = str(getattr(item, "id", "") or call_id)
@@ -205,16 +242,58 @@ class OpenAIProvider:
             if stream is not None:
                 await close_transport(stream.close(), self._policy.cleanup_timeout)
         # StreamDone ends consumption; close the transport before emitting it.
-        yield StreamDone(result=self._assemble(completed, text_parts, calls))
+        if completed is None:
+            raise FatalError('Responses stream ended without a terminal response')
+        output = getattr(completed, 'output', None)
+        if output is None and done_items:
+            output = [done_items[key] for key in sorted(done_items)]
+        message = self._assemble(completed, text_parts, calls, output=output)
+        if output is None:
+            if thoughts:
+                message = replace(message, content=[ThinkingBlock(''.join(thoughts)), *message.content])
+            output = convert_to_openai([message])
+            if thoughts:
+                output.insert(0, {'type': 'reasoning', 'content': [{'type': 'reasoning_text', 'text': ''.join(thoughts)}]})
+        message = self._replay.attach(message, effective, tools, prefix, wire_value(output))
+        yield StreamDone(result=message)
 
     @staticmethod
     def _assemble(
-        response: Any, text_parts: list[str], calls: dict[str, dict[str, str]]
+        response: Any, text_parts: list[str], calls: dict[str, dict[str, str]], *, output: Any = None,
     ) -> AssistantMessage:
-        blocks: list[TextBlock | ToolCallBlock] = []
-        if text_parts:
+        blocks: list[TextBlock | ThinkingBlock | ToolCallBlock] = []
+        if output is None:
+            output = getattr(response, 'output', None)
+        if output is not None:
+            for item in wire_value(output):
+                kind = item.get('type')
+                if kind == 'message':
+                    for part in item.get('content', []):
+                        if part.get('type') == 'output_text':
+                            blocks.append(TextBlock(part.get('text', '')))
+                        elif part.get('type') == 'refusal':
+                            blocks.append(TextBlock(part.get('refusal', '')))
+                        else:
+                            raise FatalError('Unsupported Responses message content: ' + str(part.get('type')))
+                elif kind == 'reasoning':
+                    for part in item.get('content', []) or item.get('summary', []):
+                        text = part.get('text', '')
+                        if text:
+                            blocks.append(ThinkingBlock(text))
+                elif kind == 'function_call':
+                    try:
+                        arguments = json.loads(item.get('arguments') or '{}')
+                    except (json.JSONDecodeError, TypeError):
+                        arguments = {}
+                    blocks.append(ToolCallBlock(item.get('call_id', ''), item.get('name', ''),
+                                                arguments if isinstance(arguments, dict) else {}))
+                elif kind in _SERVER_ITEMS:
+                    continue
+                else:
+                    raise FatalError('Unsupported Responses output item: ' + str(kind))
+        elif text_parts:
             blocks.append(TextBlock(text="".join(text_parts)))
-        for item_id, call in calls.items():
+        for item_id, call in (calls.items() if output is None else ()):
             try:
                 arguments = json.loads(call["arguments"] or "{}")
             except (json.JSONDecodeError, TypeError):
@@ -226,11 +305,14 @@ class OpenAIProvider:
             input_tokens=int(getattr(usage, "input_tokens", 0) or 0),
             output_tokens=int(getattr(usage, "output_tokens", 0) or 0),
             cache_read_tokens=int(getattr(input_details, "cached_tokens", 0) or 0),
+            reasoning_tokens=getattr(getattr(usage, 'output_tokens_details', None), 'reasoning_tokens', None),
         )
         incomplete = getattr(response, "incomplete_details", None)
         reason = getattr(incomplete, "reason", None)
-        stop_reason = "toolUse" if calls else ("length" if reason == "max_output_tokens" else "stop")
-        return AssistantMessage(content=blocks, stop_reason=stop_reason, usage=usage_obj)  # type: ignore[arg-type]
+        stop_reason = 'length' if reason == 'max_output_tokens' else 'toolUse' if any(isinstance(b, ToolCallBlock) for b in blocks) else 'stop'
+        phases = [item.get('phase') for item in wire_value(output or []) if item.get('type') == 'message']
+        return AssistantMessage(content=blocks, stop_reason=stop_reason, usage=usage_obj,  # type: ignore[arg-type]
+            continue_turn=bool(phases and phases[-1] == 'commentary' and stop_reason == 'stop'))
 
 
 __all__ = ["OpenAIProvider", "classify_error"]

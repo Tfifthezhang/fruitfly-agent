@@ -32,6 +32,13 @@ The input budget subtracts `max(main output limit, min(reserve_tokens, window / 
 
 Summary input includes public message content, tool arguments/results, and prior summaries. It omits image bytes and private thinking; oversized content keeps marked head/tail excerpts. Model requests may incur charges. Heuristic budgets and protocol checks do not establish summary fidelity.
 
+A response marked as non-final cannot become a summary, even with normal `stop`.
+
+Opaque Provider continuation is also excluded from summary input. Retained
+messages keep their exact state. A changed signed prefix can invalidate that
+state; Providers reject incompatible active tool continuation rather than send a
+fabricated signature. See [Provider context boundaries](../../../providers/PROVIDER_GUIDE.md#preserve-a-tool-conversation).
+
 ## Files and extension
 
 | File | Responsibility |

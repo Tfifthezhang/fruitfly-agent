@@ -14,12 +14,13 @@ fruitfly-agent-lab init
 fruitfly-agent-lab --cwd /path/to/workspace init --source task-set --benchmark terminal-bench-4
 ```
 
-The workspace must already exist. Initialization creates a schema-2
+The workspace must already exist. Initialization creates a
 `default-config.yaml`, referenced `components/H/` and `components/I/` documents,
-`default-models.yaml`, `experiment.yaml`, `comparison.yaml`, a task document and an
+`models.yaml`, `experiment.yaml`, `comparison.yaml`, a task document and an
 empty-key `secrets.env` under `.fruitfly/`. Benchmark recipes add request/host
-files. No empty S documents are created. Existing destinations cause an error;
-existing daily files and regular secret files stay untouched. New files use 0600
+files. No empty S documents are created. Existing regular `models.yaml` and
+secret files are reused unchanged; other existing destinations cause an error.
+The daily config stays untouched. New files use 0600
 and new directories use 0700. Ordinary write failures clean up only new files.
 
 Edit model specifications and credentials before checking. Native initialization
@@ -36,8 +37,8 @@ The configuration guide tree is:
 
 `--cwd` selects a workspace. `--config` selects an experiment file. Paths resolve
 from their declaring documents. Explicit missing files, unknown fields and
-duplicate YAML keys fail. Schema-1 experiments remain readable through the same
-execution path; new templates use schema 2.
+duplicate YAML keys fail. Only the baseline/tasks/comparison/edit format is accepted; obsolete flat
+experiment sections and configuration version markers are rejected.
 
 ## Choose operation and source
 
@@ -66,6 +67,7 @@ Start from the generated tree and edit the responsible file:
 
 | Change | File |
 |---|---|
+| Available model definitions and Provider parameters | Shared `models.yaml` |
 | Model roles or selected components | `default-config.yaml` |
 | Prompt/tool/workflow/execution values | Referenced H component |
 | Retained memory or Skill | Referenced S component |
@@ -142,7 +144,7 @@ interruption; these are not quality certificates.
 
 | Files | Responsibility |
 |---|---|
-| `configuration.py`, `comparison.py` | Versioned experiment parsing and fixed condition resolution |
+| `configuration.py`, `comparison.py` | Strict experiment parsing and fixed condition resolution |
 | `sources.py`, `task_sets.py`, `policies.py` | Public task, batch and stopping composition |
 | `composition.py`, `validation.py` | Shared runtime staging, backend checks and grants |
 | `scaffolding.py`, `templates/` | Experiment-specific inputs; shared system templates belong to Run |

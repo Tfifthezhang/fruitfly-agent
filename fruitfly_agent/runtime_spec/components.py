@@ -29,7 +29,7 @@ class ComponentConfiguration:
         if self.role not in {'H', 'S', 'I'} or type(self.enabled) is not bool:
             raise ValueError('component needs H/S/I role and boolean enabled')
         if not isinstance(self.parameters, Mapping):
-            raise ValueError('component parameters must be a mapping')
+            raise ValueError('component ' + self.id + ' parameters must be a mapping')
         # Reject opaque Python/YAML objects and nonfinite numbers before hashing.
         try:
             json.dumps(dict(self.parameters), allow_nan=False)
@@ -42,7 +42,7 @@ class ComponentConfiguration:
         object.__setattr__(self, 'artifacts', dict(self.artifacts))
 
     def to_dict(self):
-        result = {'schema_version': 1, 'id': self.id, 'role': self.role,
+        result = {'id': self.id, 'role': self.role,
                 'implementation': self.implementation, 'enabled': self.enabled,
                 'parameters': dict(self.parameters)}
         if self.artifacts:
@@ -51,9 +51,7 @@ class ComponentConfiguration:
 
     @classmethod
     def from_dict(cls, value, *, source='', reference=None):
-        mapping(value, {'schema_version', 'id', 'role', 'implementation', 'enabled', 'parameters', 'artifacts'}, 'component')
-        if type(value.get('schema_version')) is not int or value['schema_version'] != 1:
-            raise ValueError('component requires schema_version 1')
+        mapping(value, {'id', 'role', 'implementation', 'enabled', 'parameters', 'artifacts'}, 'component')
         try:
             return cls(value['id'], value['role'], value['implementation'], value.get('parameters', {}),
                        value.get('enabled', True), source, reference or {}, value.get('artifacts', {}))

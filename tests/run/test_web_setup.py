@@ -18,7 +18,7 @@ from tests.support.terminal import MenuScriptedLines
 class WebSetupTests(unittest.TestCase):
     def setUp(self):
         self.root = Path(self.enterContext(tempfile.TemporaryDirectory())).resolve()
-        _write_catalog(self.root / 'models.yaml', {'offline': 'offline-model'})
+        _write_catalog(self.root / '.fruitfly/models.yaml', {'offline': 'offline-model'})
         self.provider = FauxProvider()
         registry = Mock()
         registry.create.return_value = self.provider

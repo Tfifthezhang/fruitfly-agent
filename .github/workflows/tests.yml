@@ -93,8 +93,10 @@ jobs:
                   assert not set(parts) & {'.fruitfly', '.venv', '.claude', '.codex', '.agents', '__pycache__'}, name
                   assert not any(part.startswith('.env') and part != '.env.example' for part in parts), name
                   assert not name.endswith(('.pyc', '.DS_Store')), name
-                  assert Path(name).name != 'models.yaml', name
+                  if Path(name).name == 'models.yaml':
+                      assert name.endswith('fruitfly_agent/run/configuration/templates/models.yaml'), name
                   assert Path(name).name != 'secrets.env', name
+              assert any(name.endswith('fruitfly_agent/run/configuration/templates/models.yaml') for name in names)
               assert any(name.endswith('/LICENSE') for name in names)
               assert any(name.endswith('/THIRD_PARTY_NOTICES.md') for name in names)
               print(archive.name, 'contents verified')

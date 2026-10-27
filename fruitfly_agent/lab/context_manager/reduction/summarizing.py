@@ -283,7 +283,7 @@ class SummarizingCompactor(Algorithm):
                     async for _ in stream:  # noqa: B007
                         pass
                     final = await stream.result()
-                if final.stop_reason != "stop" or final.tool_calls:
+                if final.stop_reason != "stop" or final.tool_calls or final.continue_turn:
                     return None
                 return final.text.strip() or None
             except Exception as exc:  # noqa: BLE001

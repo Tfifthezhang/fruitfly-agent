@@ -1,4 +1,3 @@
-schema_version: 1
 id: execution-policy
 role: H
 implementation: execution-policy

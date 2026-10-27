@@ -13,6 +13,27 @@ from fruitfly_agent.lab.catalog.configuration import configuration_surfaces
 
 
 class ComponentAdmissionTests(unittest.TestCase):
+    def test_authored_templates_have_no_configuration_version_markers_or_migration_entries(self):
+        root = Path(__file__).resolve().parents[2]
+        directories = ('fruitfly_agent/run/configuration/templates', 'fruitfly_agent/experiments/templates',
+                       'examples/configuration', 'examples/experiments')
+        def check(value):
+            if isinstance(value, dict):
+                self.assertNotIn('schema_version', value)
+                for item in value.values():
+                    check(item)
+            elif isinstance(value, list):
+                for item in value:
+                    check(item)
+        for directory in directories:
+            for path in (root / directory).rglob('*.yaml'):
+                with self.subTest(path=str(path.relative_to(root))):
+                    check(yaml.safe_load(path.read_text()))
+        for name in ('fruitfly_agent/run/migrate_configuration.py', 'fruitfly_agent/run/migrate_improvement.py',
+                     'fruitfly_agent/run/configuration/migration.py', 'fruitfly_agent/lab/improvement/migration.py',
+                     'fruitfly_agent/lab/improvement/tasks/cases.py'):
+            self.assertFalse((root / name).exists(), name)
+
     def test_builtin_declarations_have_unique_configuration_positions_and_documented_owners(self):
         catalog = builtin_catalog()
         surfaces = configuration_surfaces(catalog)
@@ -38,9 +59,9 @@ class ComponentAdmissionTests(unittest.TestCase):
         catalog = catalog.extended((definition,))
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'config.yaml'
-            path.write_text(yaml.safe_dump({'schema_version': 2, 'default_profile': 'test',
+            path.write_text(yaml.safe_dump({'default_profile': 'test',
                 'profiles': {'test': {'models': {'catalog': 'models.yaml', 'roles': {'executor': 'fake'}},
-                    'H': {'custom-owner': {'inline': {'schema_version': 1, 'id': 'custom-owner',
+                    'H': {'custom-owner': {'inline': {'id': 'custom-owner',
                         'implementation': 'custom-owner', 'role': 'H', 'parameters': {'capacity': 7}}}}}}}))
             with patch('fruitfly_agent.providers.registry.ProviderRegistry.create', side_effect=AssertionError('Provider')):
                 profile = load_system_config(path, catalog=catalog).select()

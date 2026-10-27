@@ -58,7 +58,7 @@ class MultiTaskExperimentTests(unittest.IsolatedAsyncioTestCase):
             root = Path(directory); install(root)
             workspace(root, task={'source': 'task-set', 'collections': [{'id': 'daily', 'source': 'files', 'pack': 'project'}]},
                 multi_task={'execution': {'candidate_concurrency': 2}})
-            with self.assertRaisesRegex(ValueError, 'candidate concurrency'):
+            with self.assertRaisesRegex(ValueError, 'trial contains unknown fields'):
                 load_configuration(root)
 
     def test_joint_check_preserves_material_and_supports_explicit_large_finite_budgets(self):

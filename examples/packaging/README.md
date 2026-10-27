@@ -7,6 +7,8 @@
 It also initializes native and benchmark experiment workspaces from packaged
 templates and checks the native configuration offline. This guards against an
 initializer that works only while `examples/` is present in the working directory.
+The wizard accepts its registered SDK/protocol selections and persists the two
+fields separately, without constructing a model client.
 
 Build and install a wheel following [Contributing](../../CONTRIBUTING.md#build-and-publish). Run the script with the wheel environment's Python from a directory outside the checkout:
 

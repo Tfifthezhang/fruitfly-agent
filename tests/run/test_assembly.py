@@ -466,7 +466,7 @@ class RuntimePermissionWorkflowTests(unittest.IsolatedAsyncioTestCase):
             root = Path(directory).resolve()
             workspace = root / 'workspace'
             workspace.mkdir()
-            _write_catalog(workspace / 'models.yaml', {'offline': 'offline-model'})
+            _write_catalog(workspace / '.fruitfly/models.yaml', {'offline': 'offline-model'})
             provider = FauxProvider()
             registry = Mock()
             registry.create.return_value = provider

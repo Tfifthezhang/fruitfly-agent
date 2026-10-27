@@ -65,7 +65,7 @@ class RunStartupVersions:
                     label, action, identity, current = choices[-1]
                     choices[-1] = (f'{pending.task_pack_name or pending.task_pack_id} · {label}', action, identity, current)
             for label, action, candidate_id, current in choices:
-                data = (scope, profile.to_dict(), target, kind, key, action, candidate_id)
+                data = (scope, profile.to_runtime_dict(), target, kind, key, action, candidate_id)
                 token = hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
                 self._receipts[token] = (profile, kind, key, action, candidate_id)
                 detail = f'{snapshot.config_path} · {profile.profile_id} · {target}'

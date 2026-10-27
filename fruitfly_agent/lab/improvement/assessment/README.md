@@ -52,6 +52,10 @@ With `required: true`, unavailable assessment/comparison ends search with
 `assessment_unavailable` and cannot publish a persistent candidate. Root exhaustion
 and cancellation propagate. No retry or repair loop conceals failed model output.
 
+Completed and online judges require a final tool-free response. An intermediate
+response is unavailable evidence even if its text happens to parse as valid JSON;
+the model-call reservation remains charged.
+
 Completed assessments supply editor evidence and final metrics to search stopping.
 [Exploration](../strategies/README.md#choose-the-next-editing-seed) can consume them
 without changing official measurements, final selection or independent assurance.

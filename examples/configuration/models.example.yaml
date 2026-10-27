@@ -5,47 +5,64 @@
 models:
   deepseek-flash-openai:
     # Uses DeepSeek's OpenAI Responses-compatible endpoint, not Chat Completions.
-    provider: openai
+    sdk: openai
+    protocol: responses
+    service: deepseek
     model: deepseek-flash
     api_key_env: DEEPSEEK_API_KEY
     base_url: https://api.deepseek.com
     # Conservative working budget within the documented 1M context.
-    # Output is capped at 4096 for this example, not the service maximum.
+    # Output including thinking is capped at 32768 for this example, not the service maximum.
     context_window: 1000000
-    max_output_tokens: 4096
-    # Text-focused defaults; false flags do not disable server-side thinking.
+    max_output_tokens: 32768
+    # Capabilities describe support; parameters explicitly select thinking behavior.
     capabilities:
       tools: true
       parallel_tool_calls: false
       vision: false
-      reasoning: false
+      reasoning: true
       streaming: true
-    # Disable thinking for the Responses example; the capability flag alone does not.
     parameters:
-      # Adapter waiting/retry policy; these values do not change model capacity.
-      first_progress_timeout: 180
-      stall_timeout: 180
-      total_timeout: 900
-      retry_max: 3
       reasoning:
-        effort: none
+        effort: high
+    transport:
+      # Adapter waiting/retry policy; these values do not change model capacity.
+      connect_timeout: 10.0
+      timeout: 600.0
+      first_progress_timeout: 180.0
+      stall_timeout: 180.0
+      total_timeout: 900.0
+      cleanup_timeout: 5.0
+      retry_jitter: 0.2
+      retry_max: 3
+      retry_base_delay: 1.0
   deepseek-flash-anthropic:
     # Uses DeepSeek's Anthropic Messages-compatible endpoint.
-    # Thinking follows the server default; this adapter cannot configure it.
-    provider: anthropic
+    # Messages uses its native thinking and effort fields.
+    sdk: anthropic
+    protocol: messages
+    service: deepseek
     model: deepseek-flash
     api_key_env: DEEPSEEK_API_KEY
     base_url: https://api.deepseek.com/anthropic
     context_window: 1000000
-    max_output_tokens: 4096
+    max_output_tokens: 32768
     capabilities:
       tools: true
       parallel_tool_calls: false
       vision: false
-      reasoning: false
+      reasoning: true
       streaming: true
     parameters:
-      first_progress_timeout: 180
-      stall_timeout: 180
-      total_timeout: 900
+      thinking: {type: enabled}
+      output_config: {effort: high}
+    transport:
+      connect_timeout: 10.0
+      timeout: 600.0
+      first_progress_timeout: 180.0
+      stall_timeout: 180.0
+      total_timeout: 900.0
+      cleanup_timeout: 5.0
+      retry_jitter: 0.2
       retry_max: 3
+      retry_base_delay: 1.0

@@ -1,4 +1,4 @@
-"""Export a selected system as a complete schema-2 bundle, with explicit writes."""
+"""Export a selected system as a complete component bundle, with explicit writes."""
 import argparse
 from pathlib import Path
 import shutil
@@ -7,7 +7,7 @@ from fruitfly_agent.lab.catalog import load_system_config, materialize_system, c
 from .inspection import inspect_configuration
 
 
-def convert_configuration(source, destination, *, profile_id=None, workspace=None, apply=False):
+def export_configuration(source, destination, *, profile_id=None, workspace=None, apply=False):
     source, destination = Path(source).resolve(), Path(destination).absolute()
     inspect_configuration(source, profile_id=profile_id)
     profile = load_system_config(source).select(profile_id)
@@ -22,7 +22,7 @@ def convert_configuration(source, destination, *, profile_id=None, workspace=Non
     def read(reference):
         return (root / '.fruitfly/artifacts' / reference[7:]).read_text(encoding='utf-8')
     result = {'source': str(source), 'profile': profile.profile_id, 'destination': str(destination),
-              'status': 'preview', 'schema_version': 2,
+              'status': 'preview',
               'resources': [{'path': entry.path, 'content_hash': entry.digest} for entry in resources]}
     if apply:
         destination.mkdir(parents=True)
@@ -48,7 +48,7 @@ def main():
     parser.add_argument('--apply', action='store_true')
     args = parser.parse_args()
     try:
-        print(json.dumps(convert_configuration(args.config, args.output, profile_id=args.profile,
+        print(json.dumps(export_configuration(args.config, args.output, profile_id=args.profile,
             workspace=args.cwd, apply=args.apply), indent=2))
     except (ValueError, OSError) as exc:
         parser.exit(2, 'error: ' + str(exc) + '\n')

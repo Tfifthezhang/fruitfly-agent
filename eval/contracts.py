@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
-SCHEMA_VERSION = 2
+RESULT_SCHEMA_VERSION = 2
 
 
 def _text(value: object, name: str) -> str:
@@ -81,23 +81,20 @@ class ExecutionOptions:
 
 @dataclass(frozen=True)
 class EvaluationRequest:
-    schema_version: int
     runtime: RuntimeReference
     benchmark: BenchmarkSelection
     execution: ExecutionOptions = field(default_factory=ExecutionOptions)
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> EvaluationRequest:
-        if type(data.get("schema_version")) is not int or data.get("schema_version") != SCHEMA_VERSION:
-            raise ValueError("evaluation requests require schema_version 2; experimental requests are unsupported")
-        _fields(data, {"schema_version", "runtime", "benchmark", "execution"}, "request")
+        _fields(data, {"runtime", "benchmark", "execution"}, "request")
         values = {}
         for key in ("runtime", "benchmark", "execution"):
             value = data.get(key, {} if key in {"execution", "runtime"} else None)
             if not isinstance(value, Mapping):
                 raise ValueError(f"{key} must be an object")
             values[key] = value
-        return cls(SCHEMA_VERSION, RuntimeReference.from_dict(values["runtime"]),
+        return cls(RuntimeReference.from_dict(values["runtime"]),
                    BenchmarkSelection.from_dict(values["benchmark"]), ExecutionOptions.from_dict(values["execution"]))
 
     @classmethod
@@ -108,7 +105,7 @@ class EvaluationRequest:
         return cls.from_dict(data)
 
     def to_dict(self) -> dict[str, Any]:
-        return {"schema_version": self.schema_version, "runtime": asdict(self.runtime),
+        return {"runtime": asdict(self.runtime),
                 "benchmark": self.benchmark.to_dict(), "execution": asdict(self.execution)}
 
 
@@ -140,4 +137,4 @@ class TrialRecord:
         return asdict(self)
 
 
-__all__ = ["SCHEMA_VERSION", "BenchmarkSelection", "EvaluationRequest", "ExecutionOptions", "RuntimeReference", "TrialRecord"]
+__all__ = ["RESULT_SCHEMA_VERSION", "BenchmarkSelection", "EvaluationRequest", "ExecutionOptions", "RuntimeReference", "TrialRecord"]

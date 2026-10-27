@@ -80,7 +80,8 @@ class _ObservableProvider:
                     if isinstance(event, StreamActivity):
                         await self._emit(RunActivityChanged(
                             run_id="", phase=event.phase, request_index=request_index,
-                            subject=model, activity_id=f"model-request-{request_index}",
+                            subject=(f'{event.tool_name} ({event.tool_status})' if event.tool_name else model),
+                            activity_id=event.tool_call_id or f"model-request-{request_index}",
                             attempt=event.attempt, max_attempts=event.max_attempts,
                             delay_seconds=event.delay_seconds, error_kind=event.error_kind,
                             status_code=event.status_code,

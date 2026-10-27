@@ -10,9 +10,23 @@ from fruitfly_agent.run.runtime.limits import BudgetedProviderRegistry, ModelCal
 from fruitfly_agent.core.errors import FatalError
 from fruitfly_agent.core.data_model import ProviderView
 from tests.support.faux_provider import FauxProvider
+from fruitfly_agent.providers import ProviderRegistry, ModelSpec
 
 
 class ModelBudgetTests(unittest.IsolatedAsyncioTestCase):
+    def test_registry_choices_and_validation_do_not_charge_the_model_budget(self):
+        registry = ProviderRegistry()
+        constructed = Mock()
+        registry.register('fixture-sdk', 'fixture-api', constructed)
+        budget = ModelCallBudget(2)
+        wrapped = BudgetedProviderRegistry(registry, budget)
+        spec = ModelSpec.from_dict('fixture', {'sdk': 'fixture-sdk', 'protocol': 'fixture-api',
+            'model': 'offline', 'context_window': 8192, 'api_key_env': 'OFFLINE_KEY'})
+        self.assertEqual(wrapped.registered_pairs(), (('fixture-sdk', 'fixture-api'),))
+        wrapped.validate(spec)
+        self.assertEqual(budget.used, 0)
+        constructed.assert_not_called()
+
     async def test_main_and_auxiliary_share_enforced_counter_and_receipt(self):
         with tempfile.TemporaryDirectory() as directory:
             receipt = Path(directory) / 'usage.json'

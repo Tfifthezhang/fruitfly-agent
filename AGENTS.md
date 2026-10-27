@@ -11,7 +11,7 @@
 | Understand the task | Read the user's current request; keep changes within its scope. |
 | Understand the project | Read this file, [Runtime architecture](fruitfly_agent/README.md), and affected module READMEs. |
 | Prepare an edit | Read the affected source and tests in full; preserve unrelated user content. |
-| Check project identity | Keep version `0.1`; protocol and data schema versions are independent. |
+| Check project identity | Keep version `0.1`; configuration has one format; persisted records and external protocols may retain necessary version checks. |
 
 ## Communicate
 
@@ -38,6 +38,7 @@ Follow the dependency table in [Runtime architecture](fruitfly_agent/README.md#m
 | Bypass boundaries with hidden imports, dynamic imports, or copied code | Use the owning module's public interface. |
 | Add selectable behavior without a configuration position | Declare its H/S/I identity, strict parameters/defaults, dependencies, lifecycle/state and edit/trial/activation support through [Catalog configuration](fruitfly_agent/lab/catalog/CONFIGURATION.md). Daily, experiment and candidate execution must consume the shared configuration and assembly path. |
 | Restore a session using configuration alone | Validate history and required artifacts, use current configuration, and record its environment through [Run recovery](fruitfly_agent/run/README.md#recovery). |
+| Add configuration versions or fallback readers | Keep one current configuration grammar; reject unknown fields and update callers, fixtures and guides together. |
 | Leave shadow packages after a directory move | Update imports, examples, and tests; add compatibility only when explicitly chosen. |
 
 ## Protect the workspace

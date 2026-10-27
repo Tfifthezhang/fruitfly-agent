@@ -31,7 +31,6 @@ Its ID is selectable in a component document without another parser branch.
 Improvement declares I.
 
 ```yaml
-schema_version: 1
 id: example-note
 role: H
 implementation: example-note

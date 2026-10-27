@@ -1,4 +1,5 @@
 """Optional benchmark adapters use real stage contracts without Docker or models."""
+from tests.support.configuration import profile_document
 import asyncio
 from dataclasses import replace
 import hashlib
@@ -25,11 +26,11 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
         artifacts = MemoryArtifacts()
         components = ComponentRegistry((TextComponentAdapter(BasePromptTarget('baseline'), 'system-prompt'),))
         (root / '.fruitfly').mkdir()
-        (root / '.fruitfly/config.yaml').write_text(yaml.safe_dump({'schema_version': 1, 'default_profile': 'default',
-            'profiles': {'default': {'model': {'catalog': 'models.yaml', 'profile': 'test'}, 'mechanisms': []}}}))
+        (root / '.fruitfly/config.yaml').write_text(yaml.safe_dump({'default_profile': 'default',
+            'profiles': {'default': profile_document(catalog='models.yaml', executor='test', mechanisms=[])}}))
         (root / '.fruitfly/models.yaml').write_text('models: {}\n')
         request = root / 'request.json'
-        request.write_text(json.dumps({'schema_version': 2, 'runtime': {'working_directory': str(root),
+        request.write_text(json.dumps({'runtime': {'working_directory': str(root),
             'config_path': '.fruitfly/config.yaml'}, 'benchmark': {'id': 'terminal-bench-4', 'variant': 'smoke'},
             'execution': {'attempts': 1, 'concurrency': 1, 'timeout_seconds': 300}}))
         host = root / 'host.yaml'; host.write_text('prepared host identity')

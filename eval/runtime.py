@@ -22,20 +22,18 @@ def prepare_runtime(
     workspace = Path(runtime.get("working_directory") or ".").resolve()
     original_config = (workspace / (runtime.get("config_path") or ".fruitfly/default-config.yaml")).resolve()
     config_bytes = original_config.read_bytes()
-    system = load_harness_config(original_config)
+    catalog = builtin_catalog()
+    system = load_harness_config(original_config, catalog=catalog)
     selected = system.select(runtime.get("profile"))
     profile_id = selected.profile_id
-    profile = selected.to_dict()
     prompt, bindings = selected.prompt, selected.artifact_bindings
-    model = profile["model"]
-    source_catalog = Path(str(model.get("catalog", "models.yaml")))
+    source_catalog = Path(selected.model_catalog)
     if not source_catalog.is_absolute():
         source_catalog = original_config.parent / source_catalog
     source_catalog = source_catalog.resolve()
     if not source_catalog.is_file():
         raise FileNotFoundError(f"model catalog not found: {source_catalog}")
     selections = selected.mechanisms
-    catalog = builtin_catalog()
     resolved = catalog.resolve(selections)
     normalized = {item.definition.descriptor.mechanism_id: dict(item.parameters) for item in resolved}
     # A remote environment would execute outside the benchmark task container.
@@ -46,7 +44,7 @@ def prepare_runtime(
         source_models = load_model_specs(source_catalog)
     except (KeyError, TypeError, AttributeError) as exc:
         raise ValueError("invalid model catalog; verify provider, model and token limits") from exc
-    selected_model = model.get("profile")
+    selected_model = selected.model_profile
     if selected_model is None:
         if len(source_models) != 1:
             raise ValueError("select one model profile for evaluation")
@@ -62,12 +60,7 @@ def prepare_runtime(
         if name in required_models:
             spec.require(tools=any(c.family == "tools" for item in resolved for c in item.definition.descriptor.contributions), streaming=True)
             secret_names.add(spec.provider.api_key_env)
-        staged_models[name] = {"provider": spec.provider.type, "model": spec.model,
-            "api_key_env": spec.provider.api_key_env, "base_url": spec.provider.base_url,
-            "context_window": spec.context_window, "max_output_tokens": spec.max_output_tokens,
-            "capabilities": {key: getattr(spec.capabilities, key) for key in
-                             ("tools", "parallel_tool_calls", "vision", "reasoning", "streaming")},
-            "parameters": dict(spec.parameters)}
+        staged_models[name] = spec.to_dict()
     if any(not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) for name in secret_names):
         raise ValueError("credential references must name environment variables")
     if environment is not None:
@@ -75,30 +68,21 @@ def prepare_runtime(
         if missing:
             raise ValueError("missing evaluation credentials: " + ", ".join(missing))
     remote_catalog = "/installed-agent/fruitfly/runtime/models.yaml"
-    adjusted_profile = dict(profile)
-    adjusted_model = dict(model)
-    adjusted_model["catalog"] = remote_catalog
-    adjusted_model["profile"] = selected_model
-    adjusted_profile["model"] = adjusted_model
-    adjusted_profile["mechanisms"] = [{**item.to_dict(), "parameters": normalized.get(item.mechanism_id, dict(item.parameters))}
-                                       for item in selections]
-    adjusted = {
-        "schema_version": system.schema_version,
-        "default_profile": profile_id,
-        "profiles": {profile_id: adjusted_profile},
-    }
-    if system.schema_version == 2:
-        def read_artifact(reference):
-            source = workspace / ".fruitfly/artifacts" / reference[7:]
-            if source.is_symlink():
-                raise ValueError("runtime artifact must not be a symlink")
-            body = source.read_bytes()
-            if "sha256:" + hashlib.sha256(body).hexdigest() != reference:
-                raise ValueError("runtime artifact content differs from its reference")
-            return body.decode("utf-8")
-        projected = component_profile(replace(selected, model_catalog=remote_catalog,
-            model_profile=selected_model), catalog, artifact_reader=read_artifact)
-        adjusted["profiles"] = {profile_id: projected.to_component_dict(references=False)}
+    def read_artifact(reference):
+        source = workspace / ".fruitfly/artifacts" / reference[7:]
+        if source.is_symlink():
+            raise ValueError("runtime artifact must not be a symlink")
+        body = source.read_bytes()
+        if "sha256:" + hashlib.sha256(body).hexdigest() != reference:
+            raise ValueError("runtime artifact content differs from its reference")
+        return body.decode("utf-8")
+    from fruitfly_agent.runtime_spec import MechanismSelection
+    projected = component_profile(replace(selected, model_catalog=remote_catalog,
+        model_profile=selected_model, mechanisms=tuple(MechanismSelection(item.mechanism_id,
+            item.enabled, normalized.get(item.mechanism_id, dict(item.parameters))) for item in selections)),
+        catalog, artifact_reader=read_artifact)
+    adjusted = {"default_profile": profile_id,
+                "profiles": {profile_id: projected.to_dict(references=False)}}
     config_path = output_dir / "config.yaml"
     model_path = output_dir / "models.yaml"
     config_path.write_text(

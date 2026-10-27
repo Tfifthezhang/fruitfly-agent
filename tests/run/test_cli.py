@@ -92,7 +92,7 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
         for approved in (False, True):
             with self.subTest(approved=approved), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
-                _write_catalog(root / "models.yaml", {"offline": "offline-model"})
+                _write_catalog(root / ".fruitfly/models.yaml", {"offline": "offline-model"})
                 provider = FauxProvider()
                 provider.respond_tool_call("bash", {"command": "printf verified > output.txt"})
                 provider.respond_text("done")
@@ -111,7 +111,7 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
     async def test_automatic_approval_keeps_protected_file_checks(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            _write_catalog(root / "models.yaml", {"offline": "offline-model"})
+            _write_catalog(root / ".fruitfly/models.yaml", {"offline": "offline-model"})
             (root / ".env").write_text("FIXTURE_ONLY=placeholder\n")
             provider = FauxProvider()
             provider.respond_tool_call("read", {"path": ".env"})
@@ -134,7 +134,8 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
     async def test_cwd_selects_env_file_and_process_values_take_precedence(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            (root / ".env").write_text("TEST_SETTING=file\nFILE_ONLY=present\n", encoding="utf-8")
+            (root / ".fruitfly").mkdir()
+            (root / ".fruitfly/secrets.env").write_text("TEST_SETTING=file\nFILE_ONLY=present\n", encoding="utf-8")
             launch = root / "launch"
             launch.mkdir()
             (launch / ".env").write_text("TEST_SETTING=wrong-workspace\nFILE_ONLY=wrong\n", encoding="utf-8")
@@ -154,7 +155,7 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
     async def test_resume_uses_current_bindings_instead_of_historical_guidance(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            _write_catalog(root / "models.yaml", {"offline": "offline-model"})
+            _write_catalog(root / ".fruitfly/models.yaml", {"offline": "offline-model"})
             store = DataArtifactStore(root / ".fruitfly" / "artifacts")
             ref = store.put_text("Pinned skill catalog guidance")
             session_path = root / "candidate-session.jsonl"
@@ -223,7 +224,7 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
     async def test_incomplete_first_run_exits_without_creating_session(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            _write_catalog(root / "models.yaml", {"a": "model-a", "b": "model-b"})
+            _write_catalog(root / ".fruitfly/models.yaml", {"a": "model-a", "b": "model-b"})
             setup = Mock()
             setup.run.return_value = ConfigurationLaunchResult(start=False)
             with patch.object(cli, "load_env", return_value={}), patch.object(
@@ -237,7 +238,7 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
     async def test_complete_interactive_run_still_uses_startup_before_session(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            _write_catalog(root / "models.yaml", {"only": "model-a"})
+            _write_catalog(root / ".fruitfly/models.yaml", {"only": "model-a"})
             setup = Mock()
             setup.run.return_value = ConfigurationLaunchResult(start=False)
             with patch.object(cli, "load_env", return_value={}), patch.object(
@@ -254,7 +255,7 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
         provider.respond_text("visible answer")
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            _write_catalog(root / "models.yaml", {"offline": "offline-model"})
+            _write_catalog(root / ".fruitfly/models.yaml", {"offline": "offline-model"})
             session_path = root / "session.jsonl"
             event_path = root / "live-events.jsonl"
             output = io.StringIO()
@@ -301,7 +302,7 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             path = root / "session.jsonl"
-            model_path = root / "models.yaml"
+            model_path = root / ".fruitfly/models.yaml"
             _write_catalog(model_path, {"offline": "model-old"})
             first = FauxProvider()
             first.respond_text("saved")
@@ -347,7 +348,7 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             path = root / "session.jsonl"
-            _write_catalog(root / "models.yaml", {"offline": "offline-model"})
+            _write_catalog(root / ".fruitfly/models.yaml", {"offline": "offline-model"})
             provider = FauxProvider()
             provider.respond_text("saved")
             registry = Mock()

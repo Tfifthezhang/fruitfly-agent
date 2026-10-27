@@ -24,7 +24,7 @@ from tests.support.ssh import SftpFixture
 class SshRunTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.root = Path(self.enterContext(tempfile.TemporaryDirectory()))
-        _write_catalog(self.root / 'models.yaml', {'offline': 'offline-model'})
+        _write_catalog(self.root / '.fruitfly/models.yaml', {'offline': 'offline-model'})
         self.registry = Mock()
         self.registry.create.return_value = FauxProvider()
         self.secrets = {'FRUITFLY_SSH_USERNAME': 'fixture-private-account',
@@ -121,7 +121,7 @@ class SshRunTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual([], self.registry.create.return_value.calls)
 
     async def test_assembly_is_offline_and_secret_rotation_does_not_serialize_credentials(self):
-        profile = HarnessProfile('remote', str(self.root / 'models.yaml'), 'offline', (
+        profile = HarnessProfile('remote', str(self.root / '.fruitfly/models.yaml'), 'offline', (
             MechanismSelection('ssh-env', parameters={'host': 'server.example', 'port': 2222}),
             MechanismSelection('read-tool'), MechanismSelection('bash-tool')))
         digests = []

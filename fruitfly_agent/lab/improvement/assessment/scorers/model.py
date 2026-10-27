@@ -16,7 +16,7 @@ class ModelAssessor:
         view = ProviderView(self.instruction, [UserMessage(content=self.render(event))], [],
             self.config.model, self.config.max_tokens)
         result = await self.services.operation(self.config.provider(view, signal=self.services.signal).result())
-        if result.stop_reason != 'stop' or result.tool_calls:
+        if result.stop_reason != 'stop' or result.tool_calls or result.continue_turn:
             raise ValueError('assessor did not finish a tool-free judgment')
         value = json.loads(result.text)
         if not isinstance(value, dict) or set(value) != {'metrics'} or not isinstance(value['metrics'], list):
