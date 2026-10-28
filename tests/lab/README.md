@@ -19,6 +19,8 @@ Verify algorithms and components through Core contracts and Catalog assembly.
 | `test_task_packs.py / test_pack_format.py / test_coding_tasks.py` | Task material, catalog discovery and dangling-link rejection, policy, and restricted scoring |
 | `test_rsi.py / test_rlm.py` | Host-driven evolution and local IPython/artifact behavior |
 | `test_improvement_pipeline.py / test_improver.py` | Stage contracts, result retention, stopping, hierarchical budgets and frozen editor fields |
+| `test_improvement_kernel.py` | Synchronous faults, invalid results, hook isolation, missing evidence, research wiring and bounded long sequences |
+| `test_improvement_delivery.py` | Declared outputs, missing sidecars, clean-directory validation and unsupported backend admission |
 | `test_task_sets.py / test_task_set_search.py` | Frozen task identity, deterministic coverage, common full-set selection and incomplete candidates |
 | `test_batch_scheduler.py / test_joint_assessment.py` | Bounded task parallelism, cancellation, explicit objective aggregation and missing-result rejection |
 | `test_completed_improvement.py` | Zero-reward official selection versus exploration seed, granted facts, independent judgments, failure fallback and stopping |
@@ -43,3 +45,17 @@ limit rejection and conservative handling of unknown paid phases after restart.
 `test_improvement_configuration.py` verifies configured I search rounds in real
 fake-Provider episodes, exact returned evidence pages, independent assessor
 guidance and immutable local allowances. These are wiring tests, not quality gains.
+
+
+Improvement fault injection is covered by `test_improvement_reliability.py`;
+`test_parameter_candidates.py` checks actual isolated parameter application and
+`test_managed_commands.py` checks polling, capacity and cancellation.
+
+`test_working_memory.py` covers incremental coverage, failed updates, bounded
+memory, checkpoint persistence and corrupt/missing recovery artifacts.
+`test_context_measurement.py` checks precision, image/schema/framing accounting,
+Provider scope calibration, exact-count fallback and auxiliary preflight.
+`test_context_history.py` checks session-scoped retrieval and pagination.
+`test_long_context.py` completes 80 tool batches with repeated reduction and
+valid measured requests. These fake episodes establish covered runtime behavior,
+not model quality or benchmark gains.

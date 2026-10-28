@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 from dataclasses import replace
 import logging
 from typing import Sequence
@@ -11,7 +12,7 @@ from ..data_model import ContextDecision, ContextSnapshot
 from ..data_model.runtime import AgentLoopContext
 from .models import (
     ContextFrame, ContextPipelineProfile, ContextProvenance, ContextReducer,
-    ContextStage, ContextTransform,
+    ContextStage, ContextTransform, ContextTransformer,
 )
 
 logger = logging.getLogger(__name__)
@@ -42,8 +43,10 @@ class ContextPipeline:
         )
         for stage in self.prepare_stages:
             try:
-                candidate = stage.mechanism.transform(frame)
-                if hasattr(candidate, "__await__"):
+                mechanism = stage.mechanism
+                assert isinstance(mechanism, ContextTransformer)
+                candidate = mechanism.transform(frame)
+                if inspect.isawaitable(candidate):
                     candidate = await candidate
                 if candidate is None:
                     continue

@@ -3,11 +3,11 @@ from dataclasses import asdict, replace
 import asyncio
 from uuid import uuid4
 
-from ..contracts.live import Assessment
-from ..contracts.pipeline import ExecutionRecord, Resource
-from ..contracts.versions import canonical_json
-from ..execution.handles import CompletionOnlyRunner
-from ..workflow.budget import AllocationExhausted
+from fruitfly_agent.improvement.contracts.live import Assessment
+from fruitfly_agent.improvement.contracts.pipeline import ExecutionRecord, Resource
+from fruitfly_agent.improvement.contracts.versions import canonical_json
+from fruitfly_agent.improvement.execution.handles import CompletionOnlyRunner
+from fruitfly_agent.improvement.workflow.budget import AllocationExhausted
 
 
 class AssessedRunner:

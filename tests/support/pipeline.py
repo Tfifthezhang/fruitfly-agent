@@ -3,7 +3,7 @@ from dataclasses import replace
 from fruitfly_agent.lab.improvement.api import (ComponentDocument, ComponentFile, HarnessSnapshot,
     ComponentRegistry, FileComponentAdapter, CandidateBundle, EditReason, ProposalResult,
     ExecutionRecord, SelectionDecision, GeneratorRegistry, ComponentWorkflow, RunPlan)
-from fruitfly_agent.lab.improvement.contracts.versions import SystemVersion, content_hash
+from fruitfly_agent.improvement.contracts.versions import SystemVersion, content_hash
 
 
 def version():

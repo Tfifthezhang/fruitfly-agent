@@ -8,7 +8,7 @@ from fruitfly_agent.lab.improvement.api import (AllOf, AnyOf, AssessorRegistry, 
     Metric, ModelAssessor, NoImprovement, Objective, ResourceLimit, RunPlan, ScoreAtLeast, SearchState,
     StopDecision, TaskMaterial, WeightedSum, WorkflowServices, content_hash)
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
-from fruitfly_agent.lab.improvement.workflow.budget import BudgetScope
+from fruitfly_agent.improvement.workflow.budget import BudgetScope
 from fruitfly_agent.lab.rsi import AgentVersion, Candidate, EvolutionBudget, EvolutionDriver, Verification
 from fruitfly_agent.lab.rsi.persistent import PersistentEvolutionDriver
 from fruitfly_agent.lab.algorithms.evolution import VerificationEvidence, AdoptionResult

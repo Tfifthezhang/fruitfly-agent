@@ -299,6 +299,9 @@ class CatalogTest(unittest.TestCase):
                 "knowledge-files",
                 "live-http",
                 "compaction",
+                "context-history",
+                "context-measurement",
+                "working-memory-reduction",
                 "rlm-ipython",
                 "execution-workflow",
                 "skill-document",
@@ -351,13 +354,13 @@ class CatalogTest(unittest.TestCase):
         self.assertNotIn("profile", {p.name for p in descriptor.parameters})
         self.assertTrue(descriptor.effects.uses_provider)
         self.assertTrue(descriptor.effects.uses_network)
-        self.assertEqual("summarizing-v2", definition.implementation_id)
+        self.assertEqual("summarizing-v3", definition.implementation_id)
 
     def test_compaction_rejects_profile_parameter_even_when_disabled(self):
         for name in ("unregistered-profile", "summarizing"):
             for enabled in (True, False):
                 with self.subTest(name=name, enabled=enabled):
-                    with self.assertRaisesRegex(ValueError, "profile is unsupported; remove profile"):
+                    with self.assertRaisesRegex(ValueError, "unknown context policy parameter: profile"):
                         builtin_catalog().resolve((MechanismSelection(
                             "compaction", enabled=enabled, parameters={"profile": name}
                         ),))
@@ -431,6 +434,7 @@ class CatalogTest(unittest.TestCase):
                     AgentLoopConfig(provider=FauxProvider()),
                     catalog=catalog,
                     selections=(
+                        MechanismSelection("context-history"),
                         MechanismSelection(
                             "compaction",
                             parameters={},
@@ -438,14 +442,14 @@ class CatalogTest(unittest.TestCase):
                     ),
                     context=AssemblyContext(
                         Path(tmp),
-                        object(),
+                        None,
                         "main-model",
                         resolve,
                     ),
                 )
 
                 self.assertIsNotNone(result.context_pipeline)
-                self.assertEqual(("compaction",), result.mechanism_ids)
+                self.assertEqual(("context-history", "compaction"), result.mechanism_ids)
                 self.assertEqual(expected_provider_calls, len(calls))
 
     def test_assembly_is_stable_and_rejects_non_state_installers(self) -> None:

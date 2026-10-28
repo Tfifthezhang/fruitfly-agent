@@ -13,8 +13,8 @@ class SearchStrategyTests(unittest.IsolatedAsyncioTestCase):
         from fruitfly_agent.lab.improvement.api import EditorInstructions, EditorInstructionTarget
         current = EditorInstructions()
         target = EditorInstructionTarget(current)
-        self.assertEqual(target.snapshot().schema, 'editor-instructions-v2')
-        target.validate(current.serialize())
+        self.assertEqual(target.snapshot().schema, 'editor-instructions-v3')
+        target.validate(target.snapshot().text)
         value = json.loads(current.serialize())
         value.pop('propose')
         with self.assertRaisesRegex(ValueError, 'exactly the registered stage fields'):

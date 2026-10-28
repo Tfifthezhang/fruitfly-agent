@@ -4,7 +4,7 @@ from pathlib import Path
 
 from fruitfly_agent.core.mechanisms import MechanismContribution, MechanismDescriptor, MechanismEffects, ParameterDescriptor
 from fruitfly_agent.lab.catalog.models import MechanismDefinition, MechanismSetup, SetupCredential
-from fruitfly_agent.lab.improvement.contracts.versions import EXPERIMENT_BLOCKERS_COMPONENT
+from fruitfly_agent.improvement.contracts.versions import EXPERIMENT_BLOCKERS_COMPONENT
 from fruitfly_agent.lab.environment.description import EXECUTION_ENVIRONMENT_COMPONENT, ExecutionEnvironmentDescription
 from .config import SshConfig
 from .environment import SshEnv

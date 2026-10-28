@@ -3,8 +3,8 @@ from dataclasses import dataclass
 import time
 from typing import Protocol
 
-from ..improvement.contracts.stopping import SearchState, StopPolicy, stop_reason
-from ..improvement.contracts.assessment import Measurement
+from fruitfly_agent.improvement.contracts.stopping import SearchState, StopPolicy, stop_reason
+from fruitfly_agent.improvement.contracts.assessment import Measurement
 
 
 class AllocationView(Protocol):

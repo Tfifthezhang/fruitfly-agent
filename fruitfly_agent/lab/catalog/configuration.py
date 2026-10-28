@@ -372,3 +372,18 @@ def materialize_system(profile, destination, *, catalog=None, artifact_reader=No
     with (destination.parent / 'snapshot.json').open('x', encoding='utf-8') as stream:
         json.dump(snapshot, stream, indent=2, ensure_ascii=False)
     return destination
+
+
+def normalize_configuration_binding(key, text, catalog):
+    """Normalize a configuration binding for the exact assembled execution identity."""
+    from fruitfly_agent.runtime_spec.execution import parse_execution
+    if key == 'execution':
+        values = parse_execution(text)
+    elif key.startswith('component.'):
+        definition = catalog.get(key.removeprefix('component.'))
+        values = definition.descriptor.normalize_parameters(json.loads(text))
+        if definition.validate_parameters:
+            definition.validate_parameters(values)
+    else:
+        raise ValueError('unsupported configuration binding')
+    return json.dumps(values, sort_keys=True, ensure_ascii=False, separators=(',', ':'), allow_nan=False)

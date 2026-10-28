@@ -3,7 +3,7 @@ from dataclasses import dataclass, replace
 
 from fruitfly_agent.core.context import ContextTransform
 from .targets import TargetBinding, TargetSnapshot, validate_text, state_artifact_path
-from fruitfly_agent.lab.improvement.contracts.versions import SnapshotFile, StateSnapshot
+from fruitfly_agent.improvement.contracts.versions import SnapshotFile, StateSnapshot
 
 
 def configuration_edit(fields, bounds):

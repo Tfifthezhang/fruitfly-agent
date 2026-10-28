@@ -4,9 +4,9 @@ import json
 from pathlib import Path
 import unicodedata
 
-from ..contracts.experiments import MaterialOption
-from ..contracts.pipeline import canonical_json, identifier
-from ..contracts.versions import content_hash
+from fruitfly_agent.improvement.contracts.experiments import MaterialOption, EpisodeMaterial
+from fruitfly_agent.improvement.contracts.pipeline import canonical_json, identifier
+from fruitfly_agent.improvement.contracts.versions import content_hash
 from ..tasks import read_bytes, FrozenTaskSuite
 from ..tasks.models import TaskCase
 
@@ -18,6 +18,11 @@ class FrozenEpisode:
     holdout: tuple[TaskCase, ...]
 
     @property
+    def adaptation(self):
+        from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
+        return TaskMaterial('adaptation', self.suite.train[0].input, environment_id='file-workspace-v1')
+
+    @property
     def evaluations(self):
         return (*self.suite.train, *self.suite.validation, *self.holdout)
 
@@ -26,8 +31,8 @@ class FrozenEpisode:
 class FrozenMaterials:
     experiment_id: str
     name: str
-    development: tuple[FrozenEpisode, ...]
-    verification: tuple[FrozenEpisode, ...]
+    development: tuple[EpisodeMaterial, ...]
+    verification: tuple[EpisodeMaterial, ...]
     source_id: str
     verification_key: str
     max_verifications: int

@@ -33,7 +33,7 @@ def definition():
 
 def _snapshot(parameters, workspace):
     from pathlib import Path
-    from fruitfly_agent.lab.improvement.contracts.versions import StateSnapshot
+    from fruitfly_agent.improvement.contracts.versions import StateSnapshot
     if not parameters['source_path']:
         return StateSnapshot()
     path = Path(parameters['source_path'])

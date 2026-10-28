@@ -6,6 +6,9 @@ import sys
 
 
 class EvalProcess:
+    def __init__(self):
+        self.result_root = None
+
     async def retire(self, process):
         if process.returncode is not None:
             return
@@ -15,14 +18,17 @@ class EvalProcess:
             await process.wait()
             return
         try:
-            await asyncio.wait_for(process.wait(), timeout=30)
+            await asyncio.wait_for(process.wait(), timeout=5)
         except TimeoutError:
             try:
                 process.kill()
             except ProcessLookupError:
                 pass
-            await process.wait()
-            raise RuntimeError('Eval cleanup did not confirm before controller termination')
+            try:
+                await asyncio.wait_for(process.wait(), timeout=3)
+            except TimeoutError as exc:
+                from fruitfly_agent.improvement.contracts.failures import CleanupError
+                raise CleanupError('Eval process termination was not confirmed') from exc
 
     async def __call__(self, request, host_path, *, directory, output_root, emit):
         directory = Path(directory)
@@ -48,7 +54,11 @@ class EvalProcess:
                     log.write(line); log.flush()
                     try: event = json.loads(line)
                     except (ValueError, UnicodeDecodeError): continue
-                    if event.get('type') == 'started': evaluation_id = event['evaluation_id']
+                    if event.get('type') == 'started':
+                        evaluation_id = event['evaluation_id']
+                        if not isinstance(evaluation_id, str) or evaluation_id in {'.', '..', ''} or Path(evaluation_id).name != evaluation_id:
+                            raise ValueError('Eval returned an invalid evaluation identity')
+                        self.result_root = Path(output_root) / evaluation_id
                     # Model text and private verifier output stay in their original logs.
                     if event.get('type') in {'started', 'preflight', 'job_started', 'job_finished', 'report_written'}:
                         emit('benchmark-progress', event_type=event['type'])

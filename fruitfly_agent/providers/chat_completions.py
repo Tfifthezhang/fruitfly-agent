@@ -19,8 +19,7 @@ class ChatCompletionsProvider(OpenAIProvider):
     protocol = 'chat-completions'
     continuation_namespace = 'openai-chat'
 
-    async def _stream_once(self, view: ProviderView, signal: asyncio.Event | None,
-                           *, deadline: AttemptDeadline) -> AsyncIterator[StreamEvent]:
+    def _prepare_payload(self, view: ProviderView) -> tuple[dict[str, Any], ProviderView, list[dict[str, Any]], list[dict[str, Any]]]:
         effective = replace(view, model=view.model or self.model)
         self._service.validate(self.protocol, effective.model, self.request_options)
         tools = [{'type': 'function', 'function': {'name': t.name, 'description': t.description,
@@ -36,6 +35,11 @@ class ChatCompletionsProvider(OpenAIProvider):
             request['tools'] = tools
             if self._service.parallel_control:
                 request['parallel_tool_calls'] = self.parallel_tool_calls
+        return request, effective, tools, prefix
+
+    async def _stream_once(self, view: ProviderView, signal: asyncio.Event | None,
+                           *, deadline: AttemptDeadline) -> AsyncIterator[StreamEvent]:
+        request, effective, tools, prefix = self._prepare_payload(view)
         text: list[str] = []
         thinking: list[str] = []
         refusal: list[str] = []

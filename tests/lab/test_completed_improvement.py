@@ -13,7 +13,7 @@ from fruitfly_agent.lab.improvement.api import (CandidateBundle, ComponentFile, 
     builtin_explorations, ensure_facts, read_facts, receipt_facts, attach_facts, Resource, ArtifactFact,
     MetricThreshold, FailureLimit, CompletedAssessorRegistry, CompletedAssessorDefinition,
     ExplorationRegistry, ExplorationDefinition)
-from fruitfly_agent.lab.improvement.contracts.versions import content_hash
+from fruitfly_agent.improvement.contracts.versions import content_hash
 from fruitfly_agent.lab.improvement.evidence import EvidenceWorkspace, MemoryArtifacts
 from tests.support.faux_provider import FauxProvider
 from tests.support.pipeline import fixture, version, Runner

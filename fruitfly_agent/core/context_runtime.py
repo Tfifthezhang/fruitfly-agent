@@ -8,6 +8,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import json
+from copy import deepcopy
+from .context.validation import valid_tool_links, can_rebase_context
+from .data_model.runtime import ProviderView
 from typing import Any
 
 from .data_model.context import ContextDecision, ContextItem, ContextSnapshot, ContextTrigger
@@ -55,6 +59,7 @@ def initialize_context_items(session: Any, messages: list[AgentMessage]) -> list
 def append_message(ctx: AgentLoopContext, message: AgentMessage) -> None:
     """Append one fact to both the active projection and canonical transcript."""
 
+    ctx.revision += 1
     ctx.messages.append(message)
     item_id = f"run:{len(ctx.canonical_items) + 1}"
     if ctx.session is not None:
@@ -82,6 +87,10 @@ def snapshot(ctx: AgentLoopContext, trigger: ContextTrigger) -> ContextSnapshot:
         last_input_tokens=ctx.last_input_tokens,
         overflow_attempt=ctx.overflow_attempt,
         signal=ctx.signal,
+        measurement=ctx.measurement,
+        context_state=deepcopy(ctx.context_state),
+        revision=ctx.revision,
+        rebase_allowed=can_rebase_context(ctx.provider, ctx.messages, []),
     )
 
 
@@ -168,64 +177,99 @@ async def _commit_decision(
     current: ContextSnapshot,
     decision: Any,
 ) -> bool:
-    if not isinstance(decision, ContextDecision) or decision.messages is None:
-        if decision is not None and not isinstance(decision, ContextDecision):
-            logger.warning(
-                "reducer returned %s; expected ContextDecision",
-                type(decision).__name__,
-            )
+    if not isinstance(decision, ContextDecision):
         return False
-    if not isinstance(decision.messages, tuple):
-        logger.warning("reducer returned an internally inconsistent ContextDecision")
+    if current.revision != ctx.revision:
+        return False
+    if decision.base_revision is not None and decision.base_revision != ctx.revision:
+        return False
+    if decision.messages is None and decision.state is None:
         return False
     message_types = (UserMessage, AssistantMessage, ToolResultMessage, CustomMessage)
-    if any(not isinstance(message, message_types) for message in decision.messages):
-        logger.warning("reducer proposed a projection containing a non-message value")
+    metadata = deepcopy(decision.metadata)
+    if not isinstance(metadata, dict):
         return False
-    try:
-        metadata = dict(decision.metadata)
-    except (TypeError, ValueError):
-        logger.warning("reducer proposed non-mapping metadata")
-        return False
-
-    event = BeforeCompactionEvent(
-        messages=list(decision.messages),
-        estimated_tokens=(
-            decision.estimated_tokens_before
-            if isinstance(decision.estimated_tokens_before, int)
-            else len(current.messages)
-        ),
-        trigger=current.trigger,
-        mechanism_id=str(decision.mechanism_id),
-        metadata=metadata,
-    )
-    event = await hooks.run(BEFORE_COMPACTION, event)
-    if (
-        event.cancel
-        or not isinstance(event.messages, list)
-        or any(not isinstance(message, message_types) for message in event.messages)
-        or not isinstance(event.metadata, dict)
-    ):
-        await hooks.emit(BEFORE_COMPACTION, event)
-        return False
+    state = deepcopy(decision.state)
+    if state is not None:
+        if not isinstance(state, dict) or not decision.mechanism_id:
+            return False
+        try:
+            if len(json.dumps(state, allow_nan=False).encode()) > 128000:
+                return False
+        except (TypeError, ValueError):
+            return False
+    projection = None
+    if decision.messages is not None:
+        if not isinstance(decision.messages, tuple) or any(not isinstance(m, message_types) for m in decision.messages):
+            return False
+        event = BeforeCompactionEvent(messages=list(decision.messages),
+            estimated_tokens=decision.estimated_tokens_before or 0, trigger=current.trigger,
+            mechanism_id=decision.mechanism_id, metadata=metadata)
+        event = await hooks.run(BEFORE_COMPACTION, event)
+        if (event.cancel or not isinstance(event.messages, list)
+                or any(not isinstance(m, message_types) for m in event.messages)
+                or not isinstance(event.metadata, dict)):
+            await hooks.emit(BEFORE_COMPACTION, event)
+            return False
+        projection = list(event.messages)
+        if not valid_tool_links(projection) or not can_rebase_context(ctx.provider, ctx.messages, projection):
+            return False
+        if ctx.context_meter is not None:
+            measurement = await ctx.context_meter.measure(ProviderView(ctx.system_prompt, projection,
+                ctx.tools, ctx.model, ctx.max_tokens), ctx.provider, signal=ctx.signal)
+            if not measurement.fits(ctx.context_window):
+                return False
+        if ctx.signal is not None and ctx.signal.is_set():
+            raise asyncio.CancelledError
+        if current.revision != ctx.revision or decision.base_revision is not None and decision.base_revision != ctx.revision:
+            return False
+        payload = {'messages': [m.to_dict() for m in projection],
+            'tokensBefore': event.estimated_tokens, 'mechanismId': decision.mechanism_id,
+            'trigger': current.trigger, 'metadata': event.metadata}
+        if state is not None:
+            payload['state'] = state
+        entry_type = 'compaction'
+    else:
+        payload = {'kind': 'context_state', 'mechanismId': decision.mechanism_id, 'state': state}
+        entry_type = 'meta'
+    if ctx.signal is not None and ctx.signal.is_set():
+        raise asyncio.CancelledError
     if ctx.session is not None:
         try:
-            ctx.session.append(
-                "compaction",
-                {
-                    "messages": [message.to_dict() for message in event.messages],
-                    "tokensBefore": event.estimated_tokens,
-                    "mechanismId": event.mechanism_id,
-                    "trigger": event.trigger,
-                    "metadata": event.metadata,
-                },
-                sync=True,
-            )
-        except Exception as exc:  # noqa: BLE001 — persistence is isolated
-            logger.warning("compaction persistence failed: %s", exc)
-    ctx.messages[:] = list(event.messages)
-    await hooks.emit(BEFORE_COMPACTION, event)
+            ctx.session.append(entry_type, payload, sync=True)
+        except Exception as exc:
+            # Do not append diagnostics to an uncertain writer with an unconfirmed next ID.
+            ctx.session = None
+            raise FatalError('context checkpoint persistence failed; reopen the Session before continuing',
+                details={'kind': 'context_commit_unconfirmed', 'error_type': type(exc).__name__}) from exc
+    if state is not None:
+        ctx.context_state[decision.mechanism_id] = state
+        ctx.revision += 1
+    if projection is not None:
+        ctx.messages[:] = projection
+        ctx.revision += 1
+        await hooks.emit(BEFORE_COMPACTION, event)
     return True
+
+
+def restore_context_state(session: Any) -> dict[str, Any]:
+    if session is None:
+        return {}
+    state = {}
+    for entry in session.read_all():
+        payload = entry.payload
+        if entry.type == 'compaction' or entry.type == 'meta' and payload.get('kind') == 'context_state':
+            if 'state' in payload:
+                if not isinstance(payload['state'], dict) or not isinstance(payload.get('mechanismId'), str):
+                    raise ValueError('invalid persisted context state')
+                state[payload['mechanismId']] = deepcopy(payload['state'])
+    return state
+
+
+async def measure_context(ctx: AgentLoopContext) -> None:
+    if ctx.context_meter is not None:
+        ctx.measurement = await ctx.context_meter.measure(ProviderView(ctx.system_prompt, list(ctx.messages),
+            list(ctx.tools), ctx.model, ctx.max_tokens), ctx.provider, signal=ctx.signal)
 
 
 async def _call_reducer(fn: Any, *args: Any, label: str, default: Any) -> Any:
@@ -237,6 +281,8 @@ async def _call_reducer(fn: Any, *args: Any, label: str, default: Any) -> Any:
     except asyncio.CancelledError:
         raise
     except Exception as exc:  # noqa: BLE001
+        if isinstance(exc, FatalError) and isinstance(exc.details, dict) and exc.details.get('kind') in {'model_budget_exhausted', 'unconfirmed_cancellation'}:
+            raise
         logger.warning("%s failed (isolated): %s", label, exc)
         return default
 

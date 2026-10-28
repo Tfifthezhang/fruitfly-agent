@@ -19,9 +19,10 @@ bounded changes. See the [configuration navigation tree](../CONFIGURATION.md#nav
 | [Core](core/README.md) | Messages, loop, tools, context contracts, and Session persistence | Core only |
 | [Providers](providers/README.md) | Model API requests, streaming, and error mapping | Core and Providers |
 | [Interactive](interactive/README.md) | Application lifecycle, multi-turn state, events, and terminal | Core and Interactive |
-| [Lab](lab/README.md) | Tools, environments, context strategies, improvement, and RSI | Core, Runtime specification and Lab |
+| [Improvement](improvement/README.md) | Reliable stage execution, budgets, receipts and stopping through injected ports | Core and Improvement |
+| [Lab](lab/README.md) | Tools, environments, context strategies, improvement implementations, and RSI | Core, Runtime specification, Improvement and Lab |
 | [Run](run/README.md) | Configuration, Provider construction, assembly, and CLI | All runtime layers |
-| [Eval](../eval/README.md) | Optional single-configuration benchmark execution and reports | Core, Runtime specification, Providers, Lab, and Eval |
+| [Eval](../eval/README.md) | Optional single-configuration benchmark execution and reports | Core, Runtime specification, Improvement, Providers, Lab, and Eval |
 | [Experiments](experiments/README.md) | Independent CLI, file defaults and public service composition | Run, Lab, Providers, Interactive and optional Eval; no reverse imports |
 
 Eval prepares and mounts a Linux Agent runtime, launches the native CLI inside
@@ -31,11 +32,17 @@ runtime interfaces. Shared and independent verifiers reuse the same Harbor
 integration; only Agent environments receive the Agent runtime and credentials.
 Removing Eval leaves normal Agent use and generic improvement intact.
 
-The [Improvement workflow](lab/improvement/README.md) separates candidate generation, execution, composition, selection, verification and reflection through public ports. Object-owned component adapters expose legal changes; Run and Application retain persistence and activation.
+The [Improvement runtime](improvement/README.md), with [Lab implementations](lab/improvement/README.md), separates candidate generation, execution, composition, selection, verification and reflection through public ports. Object-owned component adapters expose legal changes; Run and Application retain persistence and activation.
 
 [Instruction components](lab/algorithms/README.md#improve-multiple-instruction-components) retain separate H/S/I ownership. A candidate can modify multiple executable components; unregistered bindings and missing runner capabilities fail explicitly.
 
 Lab registrations own mechanism metadata. Improvement menus use generator, component, source and allocation contracts. Adding a generator does not add algorithm-specific branches to Run or the terminal.
+
+New selectable algorithms must be designed for Improvement from the start, with
+meaningful editable content and evidence that candidates affect actual execution.
+Major feature modules own their Improvement registration entry. Concrete methods
+belong in the owning module's `methods/`; shared contracts and services remain
+outside. See [Lab design rules](lab/README.md#design-for-improvement).
 
 [Execution workflows](lab/workflow/README.md) own bounded H execution. Retained Skill and memory documents belong to S. I editor instructions use a registered [fixed-depth comparison](lab/improvement/improver/README.md)
 that measures the downstream H/S changes produced by each editor.
@@ -144,3 +151,17 @@ Editing, [assessment](lab/improvement/assessment/README.md), execution and
 assessment consumes immutable event positions. Feedback/control is explicit;
 version switching requires an implemented backend boundary. Current managed
 handles support scoped stop; live code/state replacement is not implied.
+
+The Improvement [extension contract](improvement/extensions/README.md) supplies
+immutable lifecycle snapshots and bounded proposal context. Research state,
+progress analysis, soft reserves and task-output validation remain
+[replaceable Lab mechanisms](lab/improvement/research/README.md). They share
+ordinary and candidate configuration paths without adding a second Agent loop.
+
+Request measurement is a separate Lab capability from reduction. Core's generic
+measurement/commit contracts validate final projections, while Lab owns heuristic
+calibration, continuity summaries and incremental working memory. Concrete
+methods and editable prompts live under [reduction methods](lab/context_manager/reduction/README.md);
+shared evidence retrieval remains outside them. Measurement reports precision
+and uncertainty rather than presenting all counts as exact. See
+[request budgets](lab/context_manager/measurement/README.md).

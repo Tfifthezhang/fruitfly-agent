@@ -48,6 +48,8 @@ class HarnessProfileTest(unittest.TestCase):
                 "skill-catalog",
                 "information-context",
                 "memory-files",
+                "context-history",
+                "context-measurement",
                 "compaction",
                 "component-improvement",
             ),

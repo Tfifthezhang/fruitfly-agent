@@ -15,6 +15,6 @@ class ExperimentBoundaryTests(unittest.TestCase):
             self.assertTrue(boundary_violations('from fruitfly_agent.experiments import cli', 'fruitfly_agent.' + layer + '.example'))
 
     def test_common_workflow_contains_no_harness2_diagnostic_scopes(self):
-        source = (ROOT / 'fruitfly_agent/lab/improvement/workflow/controller.py').read_text()
+        source = (ROOT / 'fruitfly_agent/improvement/workflow/controller.py').read_text()
         self.assertNotIn("'invariant'", source)
         self.assertNotIn("'domain'", source)

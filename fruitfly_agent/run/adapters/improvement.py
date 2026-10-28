@@ -113,8 +113,12 @@ class RunImprovementService:
             try:
                 query = getattr(host, 'completion', None)
                 completion = query() if callable(query) else None
+                if status == 'completed' and completion is not None and (
+                        completion.report.stop_reason.startswith('stage_failed.')
+                        or completion.report.stop_reason in {'verification_failed', 'assessment_unavailable', 'reference_unavailable'}):
+                    status = 'failed'
                 stop, sections = result_sections(completion, records, error=error,
-                    stop_reason='interrupted' if status == 'cancelled' else 'error' if status == 'failed' else '')
+                    stop_reason='interrupted' if status == 'cancelled' else 'error' if status == 'failed' and error else '')
                 self._save_run(replace(view, status=status, finished_at=now(), stop_reason=stop,
                     candidate_ids=tuple(r.candidate_id for r in records), sections=(*sections, setup),
                     evidence=completion.evidence if completion is not None else ()), scope)

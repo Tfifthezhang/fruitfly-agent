@@ -34,7 +34,7 @@ def definition():
         component_validator=validate_component_options,
         model_profiles=lambda parameters: tuple(parameters[name] for name in ('editor_profile', 'assessor_profile') if parameters[name]),
         artifact_slots=frozenset({'improvement-editor', 'improvement-feedback', 'improvement-search'}), prepare_targets=_prepare_targets,
-        component_specs=lambda parameters, enabled: (ComponentSpec('improvement-editor', 'I', kind='improvement-instructions', schema='editor-instructions-v2',
+        component_specs=lambda parameters, enabled: (ComponentSpec('improvement-editor', 'I', kind='improvement-instructions', schema='editor-instructions-v3',
             required_capabilities=frozenset({'improver-comparison'})),),
         implementation_path='fruitfly_agent/lab/improvement/registration.py',
         documentation_path='fruitfly_agent/lab/improvement/README.md')
@@ -73,16 +73,18 @@ def _prepare_targets(state, context):
             settings[key] = target.parameters
             state = state.with_component(TEXT_TARGET_PREFIX + name, target)
     instructions = EditorInstructions(**context.component_settings.get('editor', {}).get('instructions', {}))
+    turns = context.component_settings.get('editor', {}).get('max_turns', 12)
+    calls = context.component_settings.get('editor', {}).get('max_tool_calls', 48)
     text = None
     reference = context.artifact_bindings.get('improvement-editor')
     if reference is not None:
         if context.artifact_reader is None:
             raise ValueError('editor instructions require an artifact reader')
         text = context.artifact_reader(reference)
-        instructions = EditorInstructions.parse(text)
+        instructions, calls, turns = EditorInstructionTarget.parse_document(text)
         if 'editor' in settings:
             from dataclasses import asdict
-            settings['editor'] = {**settings['editor'], 'instructions': asdict(instructions)}
+            settings['editor'] = {**settings['editor'], 'instructions': asdict(instructions), 'max_tool_calls': calls, 'max_turns': turns}
         if not any(a['key'] == 'improvement-editor' for a in state.data_artifacts):
             state = state.with_data_artifact({'key': 'improvement-editor', 'id': reference, 'role': 'I',
                 'media_type': 'application/json', 'size_bytes': len(text.encode('utf-8'))})
@@ -91,7 +93,7 @@ def _prepare_targets(state, context):
             state = state.with_component(key, _lazy_role_config(state.config, context, role))
     return (state.with_component(SYSTEM_SETTINGS, settings)
         .with_component(EDITOR_INSTRUCTIONS, instructions)
-        .with_component(TEXT_TARGET_PREFIX + 'improvement-editor', EditorInstructionTarget(instructions, text=text)))
+        .with_component(TEXT_TARGET_PREFIX + 'improvement-editor', EditorInstructionTarget(instructions, max_tool_calls=calls, max_turns=turns, text=text)))
 
 
 def _lazy_role_config(config, context, role):
@@ -103,6 +105,13 @@ def _lazy_role_config(config, context, role):
     metadata = context.model_metadata[alias]
     class LazyProvider:
         binding = None
+        def __getattr__(self, name):
+            if name not in {'input_count_supported', 'count_input', 'input_count_identity', 'can_rebase_context',
+                    'context_usage_tokens', 'effective_output_limit', 'input_measurement_scope'}:
+                raise AttributeError(name)
+            if self.binding is None:
+                self.binding = context.provider_resolver(alias, None)
+            return getattr(self.binding.provider, name)
         def __call__(self, view, *, signal=None):
             if self.binding is None:
                 self.binding = context.provider_resolver(alias, None)

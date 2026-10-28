@@ -37,6 +37,8 @@ Follow the dependency table in [Runtime architecture](fruitfly_agent/README.md#m
 | Let a benchmark dictate runtime, configuration, lifecycle, or algorithm interfaces | Extend [Eval](eval/DEVELOPER_GUIDE.md#add-a-benchmark) as a consumer. Normal interaction must work without Eval. |
 | Bypass boundaries with hidden imports, dynamic imports, or copied code | Use the owning module's public interface. |
 | Add selectable behavior without a configuration position | Declare its H/S/I identity, strict parameters/defaults, dependencies, lifecycle/state and edit/trial/activation support through [Catalog configuration](fruitfly_agent/lab/catalog/CONFIGURATION.md). Daily, experiment and candidate execution must consume the shared configuration and assembly path. |
+| Design an algorithm first and add optimization support later | FruitFlyAgent is designed for RSI. Every new selectable algorithm must expose meaningful prompts, parameters, policies or retained content to Improvement from its initial design. Declare mutable/protected fields, grants, validation, isolated trials, identity, state/reset/recovery and verified activation through its owner. Configuration visibility alone is insufficient; prove an authorized candidate changes actual execution. See [Lab development](fruitfly_agent/lab/README.md#design-for-improvement). |
+| Scatter concrete selectable mechanisms among shared modules | Put each selectable implementation under its owning module's `methods/<method_name>/`. Keep public contracts, shared services and module registration outside `methods/`. Major feature modules expose an Improvement registration entry, normally `improvement.py`, using existing Catalog/target contracts rather than a parallel registry or host dispatch. |
 | Restore a session using configuration alone | Validate history and required artifacts, use current configuration, and record its environment through [Run recovery](fruitfly_agent/run/README.md#recovery). |
 | Add configuration versions or fallback readers | Keep one current configuration grammar; reject unknown fields and update callers, fixtures and guides together. |
 | Leave shadow packages after a directory move | Update imports, examples, and tests; add compatibility only when explicitly chosen. |
@@ -98,7 +100,7 @@ Keep default tests offline, deterministic, isolated, and fast. Use [Tests](tests
 
 | Task | Read and apply |
 |---|---|
-| Add an algorithm | [Lab development](fruitfly_agent/lab/README.md#develop-an-algorithm): select the contract; declare state/reset/recovery, injected dependencies, budgets, and failure/cancellation behavior. |
+| Add an algorithm | [Lab development](fruitfly_agent/lab/README.md#develop-an-algorithm): select the contract; place the implementation in `methods/`; design its Improvement surface and prove candidate execution; declare state/reset/recovery, injected dependencies, budgets, and failure/cancellation behavior. |
 | Assemble resources | [Catalog assembly](fruitfly_agent/lab/catalog/README.md#assembly-contract): register ownership and test failed construction, startup, and cleanup. |
 | Search or evolve text | [Improvement](fruitfly_agent/lab/improvement/README.md) and [RSI](fruitfly_agent/lab/rsi/README.md): keep generation, verification, and activation responsibilities separate. |
 | Use learning state in comparisons | Record initial state, data splits, update/reset rules, and sharing across conditions. Keep evaluation answers out of learning data; change prompt/scorer only as a declared research variable. |

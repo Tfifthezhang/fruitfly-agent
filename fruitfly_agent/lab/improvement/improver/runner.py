@@ -2,13 +2,14 @@
 from dataclasses import asdict
 from uuid import uuid4
 
-from ..contracts.experiments import EpisodeRequest, TrialReport
-from ..contracts.pipeline import ExecutionRecord, Measurement, Resource, TaskMaterial, canonical_json
-from ..contracts.versions import content_hash
-from ..workflow.budget import AllocationExhausted
+from fruitfly_agent.improvement.contracts.experiments import EpisodeRequest, TrialReport
+from fruitfly_agent.improvement.contracts.pipeline import ExecutionRecord, Measurement, Resource, TaskMaterial, canonical_json
+from fruitfly_agent.improvement.contracts.versions import content_hash
+from fruitfly_agent.improvement.workflow.budget import AllocationExhausted
 from .episodes import NativeEpisodeExecutor
-from ..execution.facts import attach_facts, receipt_facts
-from ..contracts.facts import BudgetFact
+from fruitfly_agent.improvement.contracts.failures import IntegrityError
+from fruitfly_agent.improvement.execution.facts import attach_facts, receipt_facts
+from fruitfly_agent.improvement.contracts.facts import BudgetFact
 
 
 class ImproverTaskRunner:
@@ -50,7 +51,7 @@ class ImproverTaskRunner:
                     'model': params['inner_model_calls'] + evaluations * params['evaluation_model_calls'],
                     'execution': params['inner_executions'] + evaluations})
                 request = EpisodeRequest(identity, instructions, baseline, self.spec.inner_components,
-                    TaskMaterial('adaptation', episode.suite.train[0].input, environment_id='file-workspace-v1'), repeat,
+                    episode.adaptation, repeat,
                     improver=harness)
                 context.services.record('episode-start', episode_id=identity, partition=partition,
                     instructions_id=instructions_id, experiment_id=self.spec.conditions_id, repeat=repeat)
@@ -71,7 +72,7 @@ class ImproverTaskRunner:
                     evidence.append(ref)
                     context.services.record('episode-finished', episode_id=identity, evidence=ref,
                         model_calls=budget.used['model'], executions=budget.used['execution'])
-                except AllocationExhausted:
+                except (AllocationExhausted, IntegrityError):
                     raise
                 except (ValueError, RuntimeError, TimeoutError) as exc:
                     failures += 1

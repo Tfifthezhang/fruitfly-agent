@@ -1,10 +1,10 @@
 """Native task-pack collections preserve their declared private partitions."""
 import unicodedata
 
-from ..contracts.task_sets import CollectionBinding, ScoreSpec, TaskEntry, TaskSetSourceDefinition
-from ..contracts.tasks import TaskMaterial
-from ..contracts.versions import content_hash
-from ..contracts.experiments import ExecutionPorts
+from fruitfly_agent.improvement.contracts.task_sets import CollectionBinding, ScoreSpec, TaskEntry, TaskSetSourceDefinition
+from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
+from fruitfly_agent.improvement.contracts.versions import content_hash
+from fruitfly_agent.improvement.contracts.experiments import ExecutionPorts
 from ..execution.file_runner import FileTaskRunner
 from ..assessment.verification import CaseMeasurements
 

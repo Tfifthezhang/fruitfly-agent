@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from typing import Callable
 
-from ..contracts.validation import identifier
+from fruitfly_agent.improvement.contracts.validation import identifier
 
 
 @dataclass(frozen=True)

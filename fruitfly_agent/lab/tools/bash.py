@@ -1,6 +1,6 @@
 """Execute shell commands through the injected execution environment.
 
-No default timeout. Bound the output body to the last 2000 lines and 51200
+Commands use a configured finite default timeout. Bound the output body to the last 2000 lines and 51200
 UTF-8 bytes. On truncation, attempt to save the full output and report whether
 it was saved. Non-zero exits and backend aborts raise tool errors; user-signal cancellation propagates.
 Throttle live stdout updates to about 100ms.
@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import time
 import asyncio
+import math
+from dataclasses import replace
 
 from fruitfly_agent.core.data_model import AgentToolResult, TextBlock
 from fruitfly_agent.core.env import ExecOptions
@@ -20,14 +22,17 @@ from .truncate import DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, truncate_tail
 _BASH_SCHEMA: dict = {
     "type": "object",
     "properties": {
+        "action": {"type": "string", "enum": ["run", "start", "poll", "cancel"], "description": "run waits; start returns a managed handle; poll/cancel use handle."},
+        "handle": {"type": "string"},
+        "wait_seconds": {"type": "number", "description": "Wait 0–30 seconds for a managed command; default 0.2."},
         "command": {"type": "string", "description": "Bash command to execute"},
         "description": {"type": "string", "description": "Optional short purpose of this command for the user. Do not include secrets."},
         "timeout": {
             "type": "number",
-            "description": "Timeout in seconds (optional, no default timeout)",
+            "description": "Timeout in seconds; omission uses the configured finite default",
         },
     },
-    "required": ["command"],
+    "additionalProperties": False,
 }
 
 _UPDATE_THROTTLE_SECONDS = 0.1
@@ -39,7 +44,7 @@ async def _execute(ctx: ToolCallContext) -> AgentToolResult:
     command = ctx.args["command"]
     timeout = ctx.args.get("timeout")
 
-    if timeout is not None and (not isinstance(timeout, (int, float)) or timeout <= 0):
+    if timeout is not None and (isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout <= 0):
         raise RuntimeError("Invalid timeout: must be a positive number of seconds")
 
     last_update = 0.0
@@ -105,7 +110,33 @@ def _append_status(output: str, status: str) -> str:
     return f"{output}\n\n{status}" if output else status
 
 
-def create_bash_tool() -> AgentTool:
+def create_bash_tool(*, default_timeout_seconds=120, manager=None) -> AgentTool:
+    if (isinstance(default_timeout_seconds, bool) or not isinstance(default_timeout_seconds, (int, float))
+            or not math.isfinite(default_timeout_seconds) or default_timeout_seconds <= 0):
+        raise ValueError('Bash requires a positive finite default timeout')
+    async def execute(ctx):
+        action = ctx.args.get('action', 'run')
+        wait = ctx.args.get('wait_seconds', 0.2)
+        if type(wait) not in (int, float) or not math.isfinite(wait) or not 0 <= wait <= 30:
+            raise ValueError('wait_seconds must be finite and between 0 and 30')
+        if action in {'poll', 'cancel'}:
+            if manager is None:
+                raise ValueError('managed commands require a runtime-owned command manager')
+            handle = ctx.args.get('handle')
+            return await (manager.poll(handle, wait_seconds=wait) if action == 'poll' else manager.cancel(handle))
+        if action not in {'run', 'start'}:
+            raise ValueError('unknown Bash action')
+        if not isinstance(ctx.args.get('command'), str) or not ctx.args['command'].strip():
+            raise ValueError('run/start requires a nonempty command')
+        args = {**ctx.args, 'timeout': ctx.args.get('timeout', default_timeout_seconds)}
+        if args['timeout'] is None:
+            raise ValueError('timeout must be positive and finite')
+        context = replace(ctx, args=args)
+        if action == 'start':
+            if manager is None:
+                raise ValueError('managed commands require a runtime-owned command manager')
+            return await manager.start_command(_execute, context, wait_seconds=wait)
+        return await _execute(context)
     return AgentTool(
         permission=ToolPermission("execute", ()),
         name="bash",
@@ -119,8 +150,10 @@ def create_bash_tool() -> AgentTool:
             f"and stderr. Output is truncated to the last {DEFAULT_MAX_LINES} lines or "
             f"{DEFAULT_MAX_BYTES // 1024}KB (whichever is hit first). If truncated, the "
             "tool attempts to save the full output to a temp file and reports save failures. "
-            "Optionally provide a timeout in seconds."
+            f"Commands default to a {default_timeout_seconds:g} second timeout; provide a positive timeout to override. "
+            "For long work use action=start, then action=poll or action=cancel with the returned handle. "
+            "Managed polls wait at most 30 seconds and return bounded output. Completed old handles may be retired."
         ),
         parameters=_BASH_SCHEMA,
-        execute=_execute,
+        execute=execute,
     )

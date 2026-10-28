@@ -286,7 +286,7 @@ MODULE_EXPORTS = {
         "ContextTransformer",
         "ContextStage",
     },
-    "fruitfly_agent.lab.context_manager.reduction.summarizing": {
+    "fruitfly_agent.lab.context_manager.reduction.methods.summarizing.algorithm": {
         "SummarizingCompactor",
         "SummarizingCompactorConfig",
         "install",

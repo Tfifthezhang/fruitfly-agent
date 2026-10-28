@@ -1,8 +1,8 @@
 """Content-addressed file changes with explicit parent and ownership checks."""
 from dataclasses import dataclass
-from ..contracts.components import ComponentFile
-from ..contracts.validation import relative_path
-from ..contracts.versions import content_hash, require_hash
+from fruitfly_agent.improvement.contracts.components import ComponentFile
+from fruitfly_agent.improvement.contracts.validation import relative_path
+from fruitfly_agent.improvement.contracts.versions import content_hash, require_hash
 
 
 @dataclass(frozen=True)

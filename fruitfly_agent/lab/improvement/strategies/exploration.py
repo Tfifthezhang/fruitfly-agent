@@ -2,8 +2,8 @@
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from ..contracts.search import ExplorationDecision
-from ..contracts.assessment import AssessmentUnavailable
+from fruitfly_agent.improvement.contracts.search import ExplorationDecision
+from fruitfly_agent.improvement.contracts.assessment import AssessmentUnavailable
 
 
 @dataclass(frozen=True)
@@ -15,9 +15,7 @@ class ExplorationSettings:
             raise ValueError('exploration policy must be a registered ID')
 
 
-class IncumbentExploration:
-    async def choose(self, task, records, incumbent, assessment):
-        return ExplorationDecision(incumbent.run_id, 'Continue from the official incumbent.')
+from fruitfly_agent.lab.improvement.strategies.incumbent import IncumbentExploration
 
 
 class ProcessGuidedExploration:
@@ -47,7 +45,7 @@ class ExplorationRegistry:
             self.register(definition)
 
     def register(self, definition):
-        from ..contracts.validation import identifier
+        from fruitfly_agent.improvement.contracts.validation import identifier
         identifier(definition.policy_id)
         identifier(definition.implementation_id)
         if definition.policy_id in self.entries or not callable(definition.factory):

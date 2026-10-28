@@ -3,9 +3,9 @@ from dataclasses import replace
 import asyncio
 import time
 from .controller import EvolutionController
-from ..improvement.contracts.versions import canonical_json, content_hash
-from ..improvement.termination.composition import policy_spec
-from ..improvement.workflow.budget import AllocationExhausted
+from fruitfly_agent.improvement.contracts.versions import canonical_json, content_hash
+from fruitfly_agent.lab.improvement.termination.composition import policy_spec
+from fruitfly_agent.improvement.workflow.budget import AllocationExhausted
 from fruitfly_agent.lab.algorithms import Algorithm, AlgorithmSpec
 from fruitfly_agent.lab.algorithms.evolution import EvolutionHost, EvolutionJob
 

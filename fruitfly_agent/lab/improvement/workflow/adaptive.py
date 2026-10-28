@@ -1,9 +1,9 @@
 """Translate declared online stop conditions into scoped control requests."""
 from dataclasses import asdict
 from uuid import uuid4
-from ..contracts.live import ControlRequest
-from ..contracts.stopping import SearchState, stop_reason
-from ..contracts.versions import canonical_json
+from fruitfly_agent.improvement.contracts.live import ControlRequest
+from fruitfly_agent.improvement.contracts.stopping import SearchState, stop_reason
+from fruitfly_agent.improvement.contracts.versions import canonical_json
 
 
 class StopExecutionPolicy:

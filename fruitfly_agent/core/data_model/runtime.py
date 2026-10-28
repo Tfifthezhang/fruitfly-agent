@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
+from typing import Any
 
 from ..env.protocols import ExecutionEnv
 from ..session.protocol import SessionLike
@@ -34,6 +35,11 @@ class AgentLoopContext:
     max_context_recovery_attempts: int
     model: str
     max_tokens: int
+    context_meter: Any = None
+    provider: Any = None
+    measurement: Any = None
+    context_state: dict[str, Any] = field(default_factory=dict)
+    revision: int = 0
     usage: Usage = field(default_factory=Usage)
     canonical_items: list[ContextItem] = field(default_factory=list)
     last_input_tokens: int | None = None

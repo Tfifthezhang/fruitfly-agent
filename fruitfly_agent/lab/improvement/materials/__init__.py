@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from mimetypes import guess_type
 
-from ..contracts.pipeline import Resource, TaskMaterial, relative_path
+from fruitfly_agent.improvement.contracts.pipeline import Resource, TaskMaterial, relative_path
 
 
 class WorkspaceTaskSource:

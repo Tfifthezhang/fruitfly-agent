@@ -2,6 +2,10 @@
 
 [Up: Lab](../README.md)
 
+The independent [Improvement runtime](../../improvement/README.md) owns the reliable
+stage kernel. This package supplies concrete editors, algorithms, assessments,
+component adapters and native execution; Run supplies persistence and activation.
+
 Refine registered Agent components using task execution evidence. The public
 [API](api.py) separates candidate generation, execution, composition, selection,
 verification, reflection and activation. Run persists jobs; Application owns
@@ -205,9 +209,10 @@ There is no parallel method selector or legacy search engine.
 | [Task sets](task_sets/README.md) | Shared candidates, bounded task parallelism, sampling and joint selection |
 | [Search strategies](strategies/README.md) | Simple candidate comparison and optional Harness² schedules |
 | [Assessment](assessment/README.md) | Read-only completed/online judgments and independent verification |
+| [Research](research/README.md) | Task-local ledger, bounded retrieval, progress stopping and finalization reserves |
 | [Termination](termination/README.md) | Composable iteration, resource, score and process conditions |
 | [Editor experiments](improver/README.md) | Fixed-depth I comparison and private paired verification |
-| [Contracts](contracts/README.md) | Immutable values and public stage protocols |
+| [Contracts](../../improvement/contracts/README.md) | Immutable values and public stage protocols |
 | [Workflow](workflow/README.md) | Orchestration, accounting and native file execution |
 | [Editor](editor/README.md) | Tool workspace editing, output selection and reflection |
 | [Materials](materials/README.md) | Explicit workspace input freezing |

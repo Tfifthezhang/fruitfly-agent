@@ -5,9 +5,8 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any, Mapping
 
-from fruitfly_agent.lab.context_manager.reduction import (
-    SummarizingCompactor, SummarizingCompactorConfig,
-)
+from fruitfly_agent.lab.context_manager.reduction.registration import definitions as reduction_definitions
+from fruitfly_agent.lab.context_manager.measurement.registration import definition as measurement_definition
 from fruitfly_agent.core.context import ContextStage
 from fruitfly_agent.lab.environment import LocalEnv
 from fruitfly_agent.lab.environment.description import EXECUTION_ENVIRONMENT_COMPONENT, ExecutionEnvironmentDescription
@@ -39,10 +38,10 @@ from fruitfly_agent.lab.context_manager.augmentation.skills import (
 )
 from fruitfly_agent.lab.context_manager.augmentation.skills.target import SKILL_CATALOG_GUIDANCE_KEY, SkillGuidanceTarget
 from fruitfly_agent.lab.algorithms.targets import TEXT_TARGET_PREFIX
-from fruitfly_agent.lab.improvement.contracts.versions import STATE_SNAPSHOTS_COMPONENT
+from fruitfly_agent.improvement.contracts.versions import STATE_SNAPSHOTS_COMPONENT
 from fruitfly_agent.lab.context_manager.augmentation.information.file_memory.snapshots import FileMemorySnapshots
 from fruitfly_agent.lab.algorithms.snapshots import WorkspaceTextSnapshots
-from fruitfly_agent.lab.improvement.contracts.versions import EXPERIMENT_BLOCKERS_COMPONENT
+from fruitfly_agent.improvement.contracts.versions import EXPERIMENT_BLOCKERS_COMPONENT
 from fruitfly_agent.lab.base_prompt.target import BasePromptTarget, configuration_surface as prompt_surface
 from fruitfly_agent.lab.tools.guidance import prepare_guidance, guidance_key
 from fruitfly_agent.lab.tools import (
@@ -119,6 +118,10 @@ def builtin_catalog() -> LabCatalog:
             label="Run shell commands",
             description="Execute shell commands in the selected environment.",
             install=_install_bash_tool,
+            parameters=(ParameterDescriptor('default_timeout_seconds', 'number', 'Command timeout', 'Default seconds per shell command.', 120, minimum=1, maximum=28800),
+                ParameterDescriptor('max_active_commands', 'integer', 'Active commands', 'Runtime-owned managed shell jobs.', 2, minimum=1, maximum=16),
+                ParameterDescriptor('retained_commands', 'integer', 'Command handles', 'Maximum retained command handles.', 64, minimum=16, maximum=256),
+                ParameterDescriptor('output_characters', 'integer', 'Poll output', 'Maximum characters per managed poll.', 12000, minimum=100, maximum=24000)),
             implementation_path='fruitfly_agent/lab/tools/bash.py',
             documentation_path='fruitfly_agent/lab/tools/README.md',
             default=True,
@@ -268,30 +271,8 @@ def builtin_catalog() -> LabCatalog:
             ),
             effects=MechanismEffects(uses_network=True, cost_notice="The configured endpoint may have its own charges."),
         ),
-        _definition(
-            "compaction",
-            layer="online",
-            family="context",
-            context_phase="reduction",
-            label="Summarizing",
-            selection_group="reduction",
-            selection_group_label="Reduction",
-            description="Summarize history with validated, bounded overflow recovery.",
-            install=_install_compaction,
-            implementation_path='fruitfly_agent/lab/context_manager/reduction/summarizing.py',
-            documentation_path='fruitfly_agent/lab/context_manager/reduction/README.md',
-            default=True,
-            order=60,
-            exclusive_group="compaction",
-            parameters=_compaction_parameters(),
-            implementation_id="summarizing-v2",
-            validate_parameters=_validate_compaction_parameters,
-            effects=MechanismEffects(
-                uses_provider=True, uses_network=True, writes_files=True,
-                lifecycle_hooks=("before_compaction",),
-                cost_notice="Summarization requests may incur Provider charges.",
-            ),
-        ),
+        measurement_definition(),
+        *reduction_definitions(),
         _definition(
             "rlm-ipython",
             layer="online",
@@ -334,6 +315,19 @@ def builtin_catalog() -> LabCatalog:
         configuration_surfaces=(*d.configuration_surfaces,
             *(guidance_surface(name, tool_factory=tool_factories.get(name))
               for name in d.descriptor.effects.tools))) for d in definitions)
+    from fruitfly_agent.lab.improvement.components.parameters import editable_parameters
+    parameter_fields = {
+        'bash-tool': {'default_timeout_seconds', 'max_active_commands', 'retained_commands', 'output_characters'},
+        'ipython-tool': {'max_artifact_bytes', 'max_cell_output_chars', 'cell_timeout_seconds',
+            'max_query_calls', 'max_query_concurrent', 'max_query_input_chars', 'max_query_output_tokens',
+            'max_query_total_tokens', 'max_query_inline_result_chars', 'query_timeout_seconds'},
+        'web-search-tool': {'timeout_seconds', 'max_retries', 'max_response_bytes', 'cache_ttl_seconds',
+            'cache_entries', 'backend'},
+        'web-fetch-tool': {'timeout_seconds', 'max_retries', 'max_response_bytes', 'cache_ttl_seconds',
+            'cache_entries', 'max_redirects', 'backend'},
+    }
+    definitions = tuple(editable_parameters(d, parameter_fields[d.descriptor.mechanism_id])
+        if d.descriptor.mechanism_id in parameter_fields else d for d in definitions)
     return LabCatalog(definitions, bootstrap=lambda state, context: (
         state.with_component(TEXT_TARGET_PREFIX + "base_prompt", BasePromptTarget(state.config.system_prompt))
         .with_component(TASK_PACK_COMPONENT, TaskPackCatalog(context.workspace, context.task_pack_sources))
@@ -457,22 +451,6 @@ def _ipython_tool_parameters() -> tuple[ParameterDescriptor, ...]:
     return _integer_parameters(defaults, fields)
 
 
-def _compaction_parameters() -> tuple[ParameterDescriptor, ...]:
-    from dataclasses import fields
-    defaults = SummarizingCompactorConfig()
-    descriptors = []
-    for field in fields(defaults):
-        value = getattr(defaults, field.name)
-        kind = "boolean" if isinstance(value, bool) else "integer" if isinstance(value, int) else "number" if isinstance(value, float) else "string"
-        descriptors.append(ParameterDescriptor(
-            field.name, kind, field.name.replace("_", " ").capitalize(),
-            "Summarizing configuration; validated by the algorithm.", value,
-            minimum=(0 if field.name == "reserve_tokens" else 1) if kind == "integer" else None,
-            advanced=True,
-        ))
-    return tuple(descriptors)
-
-
 def _install_local_env(state: AssemblyState, context: AssemblyContext, parameters: Mapping[str, Any]) -> AssemblyState:
     backend = LocalEnv(str(context.workspace))
     return replace(
@@ -487,7 +465,10 @@ def _install_read_tool(state: AssemblyState, context: AssemblyContext, parameter
 
 
 def _install_bash_tool(state: AssemblyState, context: AssemblyContext, parameters: Mapping[str, Any]) -> AssemblyState:
-    return _append_tool(state, create_bash_tool())
+    from fruitfly_agent.lab.tools.commands import CommandManager
+    manager = context.own(CommandManager(max_active=parameters['max_active_commands'],
+        retained_commands=parameters['retained_commands'], output_characters=parameters['output_characters']))
+    return _append_tool(state, create_bash_tool(default_timeout_seconds=parameters['default_timeout_seconds'], manager=manager))
 
 
 def _install_edit_tool(state: AssemblyState, context: AssemblyContext, parameters: Mapping[str, Any]) -> AssemblyState:
@@ -583,23 +564,4 @@ def _install_live_http(state: AssemblyState, context: AssemblyContext, parameter
         (*state.components.get(EXPERIMENT_BLOCKERS_COMPONENT, ()), "Live HTTP context has no frozen response snapshot"))
 
 
-def _install_compaction(state: AssemblyState, context: AssemblyContext, parameters: Mapping[str, Any]) -> AssemblyState:
-    config = SummarizingCompactorConfig(**parameters)
-    binding = context.provider_resolver(None, config.summary_max_tokens)
-    reducer = SummarizingCompactor(
-        config, binding.provider, summary_model=binding.model,
-        summary_context_window=binding.context_window,
-        summary_output_limit=binding.max_output_tokens,
-    )
-    return replace(state, reducer=reducer)
-
-
 __all__ = ["builtin_catalog"]
-
-
-def _validate_compaction_parameters(parameters):
-    if "profile" in parameters:
-        raise ValueError(
-            "compaction.profile is unsupported; remove profile and configure "
-            "summarization through compaction parameters"
-        )

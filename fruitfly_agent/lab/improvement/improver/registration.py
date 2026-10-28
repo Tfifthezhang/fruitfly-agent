@@ -1,10 +1,10 @@
 """Register I execution through generic metadata, without host algorithm branches."""
 from dataclasses import asdict
 
-from ..contracts.experiments import (ExecutionDefinition, ExecutionParameter as P, ExecutionPorts,
+from fruitfly_agent.improvement.contracts.experiments import (ExecutionDefinition, ExecutionParameter as P, ExecutionPorts,
     ExperimentSpec, PreparedExecution)
-from ..contracts.pipeline import TaskMaterial, canonical_json
-from ..contracts.versions import content_hash
+from fruitfly_agent.improvement.contracts.pipeline import TaskMaterial, canonical_json
+from fruitfly_agent.improvement.contracts.versions import content_hash
 from .materials import freeze, materials
 from .runner import ImproverTaskRunner, TrialMeasurements
 from .verification import ImproverVerification
@@ -19,7 +19,7 @@ PARAMETERS = (
     P('inner_depth', 'Inner refinement depth', 'integer', 1, 1, 3),
     P('inner_model_calls', 'Model calls per inner search', 'integer', 12, 4, 1000),
     P('inner_executions', 'Task executions per inner search', 'integer', 4, 4, 100),
-    P('evaluation_model_calls', 'Model allowance per evaluation', 'integer', 1, 1, 32),
+    P('evaluation_model_calls', 'Model allowance per evaluation', 'integer', 1, 1, 10000),
     P('max_trials', 'Development trial limit', 'integer', 8, 1, 40),
     P('min_gain', 'Minimum paired gain', 'number', 0.0, 0, 1),
     P('max_regression', 'Maximum case regression', 'number', 0.0, 0, 1),
@@ -27,8 +27,8 @@ PARAMETERS = (
 )
 
 
-def prepare(context, request):
-    params = definition().normalize(request.parameters)
+def prepare(context, request, *, execution=None, freeze_materials=freeze, inner_capabilities=None, validate_materials=None):
+    params = (execution or definition()).normalize(request.parameters)
     from ..strategies import builtin_strategies
     builtin_strategies().get(params['inner_strategy'])
     if (not request.component_ids or any(context.components.snapshot().component(name).role != 'I'
@@ -38,28 +38,32 @@ def prepare(context, request):
         raise ValueError('editor comparison requires measured feedback')
     ids = tuple(params['inner_components'].split())
     baseline = context.components.snapshot()
+    capabilities = inner_capabilities(context) if callable(inner_capabilities) else inner_capabilities
     for name in ids:
         document = baseline.component(name)
         if document.role == 'I':
             raise ValueError('inner experiments cannot modify I')
         required: frozenset[str] = getattr(context.components.adapters[name], 'required_capabilities', frozenset())
         from ..execution.file_runner import FileTaskRunner
-        if required - FileTaskRunner.capabilities:
+        if required - (FileTaskRunner.capabilities if capabilities is None else capabilities):
             raise ValueError('inner file runner lacks component capabilities')
-    frozen = freeze(context, request.material_id, ids[0] if ids else 'base_prompt')
+    frozen = freeze_materials(context, request.material_id, ids[0] if ids else 'base_prompt')
     if (request.scope == 'persistent' and context.remaining_verification is not None and
             context.remaining_verification(frozen.verification_key, frozen.max_verifications) == 0):
         raise ValueError('independent verification use limit exhausted; provide new material')
-    for e in (*frozen.development, *frozen.verification):
-        for name in ids:
-            context.tasks.freeze(e.pack_id, name)
+    if validate_materials is not None:
+        validate_materials(context, frozen, ids)
+    else:
+        for e in (*frozen.development, *frozen.verification):
+            for name in ids:
+                context.tasks.freeze(e.pack_id, name)
     spec = ExperimentSpec(frozen.source_id, baseline.snapshot_id, context.plan.parent.state,
         content_hash(canonical_json({'plan': asdict(context.plan), 'source': frozen.source_id, 'parameters': params})), ids,
         params['repetitions'])
     task = TaskMaterial('editor-comparison',
         'Improve the granted I components using the supplied development trials. '
         'Preserve fixed fields, model bindings, budgets and the outer evaluation. '
-        'For editor instructions only propose, invariant, domain and compose may change. '
+        'Only granted mutable instructions, editor tool allowance and I policies may change. '
         'Judge changes by downstream improvement evidence, not wording or prompt length.',
         environment_id='improver-comparison-v1', origin='experiment:' + request.material_id)
     prepared = PreparedExecution(task, frozen.source_id,
@@ -67,7 +71,7 @@ def prepare(context, request):
          ('Repetitions', str(params['repetitions'])), ('Maximum depth', '2'),
          ('Frozen editor fields', 'system, select, reflect'), ('Experience', 'Frozen; no experiment writes'),
          ('Independent verification uses', str(frozen.max_verifications))),
-        lambda: freeze(context, request.material_id, ids[0]).source_id, (frozen, params, spec))
+        lambda: freeze_materials(context, request.material_id, ids[0]).source_id, (frozen, params, spec))
     def allocation(episodes):
         checks = sum(2 * len(e.evaluations) for e in episodes)
         return {'model': params['repetitions'] * (len(episodes) * params['inner_model_calls'] + checks * params['evaluation_model_calls']),
@@ -78,9 +82,9 @@ def prepare(context, request):
     return prepared
 
 
-def build(context, prepared):
+def build(context, prepared, *, episode_factory=None):
     frozen, params, spec = prepared.private
-    runner = context.services.own(ImproverTaskRunner(context, frozen, params, spec))
+    runner = context.services.own(ImproverTaskRunner(context, frozen, params, spec, **({'episode_factory': episode_factory} if episode_factory else {})))
     verifier = ImproverVerification(runner, context.claim_verification)
     allocation = runner.allocation('verification')
     reserve = {k: 2 * v for k, v in allocation.items()} if context.plan.purpose == 'persistent' else {'model': 0, 'execution': 0}
@@ -93,3 +97,18 @@ def definition():
         'Runs bounded nested improvement experiments and private comparisons. Calls may incur charges. '
         'Set a root budget large enough for repeated search and reserved final verification.',
         defaults=(('verification', 'scored'), ('scope', 'persistent'), ('max_model_calls', 512), ('max_executions', 256)))
+
+
+def comparison_definition(*, execution_id, freeze_materials, list_materials, episode_factory,
+                          inner_capabilities, validate_materials):
+    """Compose another fixed-I backend through explicit material and execution ports."""
+    from dataclasses import replace
+    execution = None
+    def preparing(context, request):
+        return prepare(context, request, execution=execution, freeze_materials=freeze_materials,
+            inner_capabilities=inner_capabilities, validate_materials=validate_materials)
+    def building(context, prepared):
+        return build(context, prepared, episode_factory=episode_factory)
+    execution = replace(definition(), execution_id=execution_id, implementation_id=execution_id + '-v1',
+        materials=list_materials, prepare=preparing, build=building)
+    return execution

@@ -1,18 +1,10 @@
 """Read-only output selection through an independently injected inspector."""
 import json
-from ..contracts.pipeline import HarnessSnapshot, ComponentDocument, SelectionDecision, canonical_json
+from fruitfly_agent.improvement.contracts.pipeline import HarnessSnapshot, ComponentDocument, SelectionDecision, canonical_json
 from ..evidence import EvidenceWorkspace
 
 
-def measured_selection(records, measurements, *, direction='max'):
-    """Stable task-objective selection. Process judgments cannot change these scores."""
-    selectable = tuple(r for r in records if r.status == 'completed')
-    measured = {m.run_id: m for m in measurements}
-    if not selectable or any(r.run_id not in measured for r in selectable):
-        return None
-    utility = -1 if direction == 'min' else 1
-    best = max(selectable, key=lambda r: utility * measured[r.run_id].score)
-    return SelectionDecision(best.run_id, 'Best measured development result; ties retain earlier result')
+from fruitfly_agent.lab.improvement.assessment.measured import measured_selection
 
 class AgentSelector:
     def __init__(self, editor, services):

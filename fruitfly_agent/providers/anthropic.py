@@ -127,6 +127,23 @@ class AnthropicProvider:
         """view: the ProviderView request shape."""
         return AssistantMessageEventStream(self._gen(view, signal))
 
+    input_count_supported = False
+
+    def input_measurement_scope(self) -> str:
+        import json
+        return json.dumps({'protocol': self.protocol, 'service': self._replay.service,
+            'model': self.model, 'options': self.request_options}, sort_keys=True)
+
+    def effective_output_limit(self, view: ProviderView) -> int:
+        return min(self.max_tokens, view.max_tokens) if view.max_tokens > 0 else self.max_tokens
+
+    def context_usage_tokens(self, usage: Usage) -> int:
+        return usage.input_tokens + usage.cache_read_tokens + usage.cache_creation_tokens
+
+    def can_rebase_context(self, before: Any, after: Any) -> bool:
+        from .token_counting import can_rebase
+        return can_rebase(self, before, after)
+
     # -- generator -----------------------------------------------------------
 
     async def _gen(

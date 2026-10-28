@@ -109,3 +109,24 @@ from its declared tool effects. Installing a description does not invoke the too
 or make a model request. Native component trials support read/write/edit guidance in their isolated file
 workspace. Bash, web and IPython guidance require a compatible registered runner;
 selecting those tools in the live runtime does not add them to native trials.
+
+
+## Bound and manage shell commands
+
+Bash defaults to a 120-second timeout. A positive finite `timeout` overrides it.
+For long work, call Bash with `action: start`, `command` and optional
+`wait_seconds` (default 0.2, range 0–30); it returns a runtime-owned handle.
+Use `action: poll` with `handle` for bounded output or `action: cancel` to retire
+that command. Omitted action runs synchronously. The initiating task cancellation signal and runtime closure both cancel managed
+jobs; closure requires backend cleanup confirmation. Handles are local to that runtime.
+
+The `bash-tool` component declares `default_timeout_seconds` (1–28800),
+`max_active_commands` (default 2, 1–16), `retained_commands` (default 64, 16–256)
+and `output_characters` (default 12000, 100–24000). Completed old handles can be
+retired when capacity is reached; active work is never evicted to start another.
+These H fields have owner-validated candidate grants on backends supporting
+configuration materialization. A larger command timeout never extends its parent
+operation or experiment deadline. Managed tasks are in-process capabilities, not
+persistent remote jobs or an OS sandbox. All actions retain execution permission.
+
+Offline checks: `tests.lab.test_managed_commands`, `tests.lab.test_parameter_candidates`.

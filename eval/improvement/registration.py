@@ -5,7 +5,7 @@ from pathlib import Path
 
 from fruitfly_agent.lab.improvement.api import (ExecutionDefinition, MaterialOption,
     PreparedExecution, ExecutionPorts, TaskMaterial, content_hash)
-from fruitfly_agent.lab.improvement.contracts.versions import canonical_json
+from fruitfly_agent.improvement.contracts.versions import canonical_json
 from eval.catalog import builtin_catalog
 from eval.contracts import EvaluationRequest
 from eval.harbor.host import HostConfig

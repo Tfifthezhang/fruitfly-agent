@@ -101,11 +101,11 @@ class RuntimeAssemblyTest(unittest.TestCase):
         with Session(root / "session.jsonl") as session:
             runtime = self.assemble(profile, session, catalog=catalog)
             component = next(c for c in runtime.manifest.components if c["id"] == "compaction")
-            self.assertEqual("summarizing-v2", component["implementation_id"])
+            self.assertEqual("summarizing-v3", component["implementation_id"])
             self.assertEqual(asdict(SummarizingCompactorConfig()), component["parameters"])
             record_session_manifest(session, runtime)
             changed_catalog = LabCatalog(tuple(
-                replace(d, implementation_id="summarizing-v3") if d.descriptor.mechanism_id == "compaction" else d
+                replace(d, implementation_id="test-summary-implementation") if d.descriptor.mechanism_id == "compaction" else d
                 for d in catalog.definitions()
             ))
             changed = self.assemble(profile, session, catalog=changed_catalog)
@@ -378,7 +378,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
 
         self.assertEqual(
             [tool.name for tool in runtime.config.tools],
-            ["read", "edit", "write"],
+            ["read", "edit", "write", "context_read", "context_search"],
         )
         self.assertNotIn("bash-tool", runtime.mechanism_ids)
 

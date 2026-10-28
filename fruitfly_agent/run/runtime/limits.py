@@ -4,6 +4,7 @@ import json
 import os
 import tempfile
 from fruitfly_agent.core.errors import FatalError
+from fruitfly_agent.core.context.budget import forward_context_capabilities
 from fruitfly_agent.providers.registry import ProviderRegistry
 
 
@@ -39,6 +40,7 @@ class BudgetedProvider:
     def __init__(self, provider, budget):
         self.provider, self.budget = provider, budget
         self.transport_parameters = getattr(provider, 'transport_parameters', None)
+        forward_context_capabilities(self, provider)
 
     def __call__(self, view, *, signal=None):
         self.budget.reserve()

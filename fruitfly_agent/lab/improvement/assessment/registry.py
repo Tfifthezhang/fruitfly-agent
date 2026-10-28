@@ -1,7 +1,7 @@
 """Independent assessor discovery; registration performs no model work."""
 from dataclasses import dataclass
 from typing import Any, Callable
-from ..contracts.validation import identifier
+from fruitfly_agent.improvement.contracts.validation import identifier
 
 
 class AssessorRegistry:

@@ -1,2 +1,2 @@
 """Compatible private acceptance-case import; contracts own immutable values."""
-from ..contracts.tasks import TaskCase
+from fruitfly_agent.improvement.contracts.tasks import TaskCase

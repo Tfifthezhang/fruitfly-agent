@@ -10,7 +10,7 @@ from fruitfly_agent.lab.improvement.api import (TaskSetSnapshot, TaskSetSourceRe
 from fruitfly_agent.lab.improvement.task_sets.files import definition as files_definition
 from fruitfly_agent.lab.improvement.tasks import TaskPackCatalog
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
-from fruitfly_agent.lab.improvement.contracts.validation import identifier
+from fruitfly_agent.improvement.contracts.validation import identifier
 from .sources import SourceBinding
 if TYPE_CHECKING:
     from .configuration import ExperimentConfig

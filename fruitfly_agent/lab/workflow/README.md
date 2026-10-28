@@ -32,7 +32,7 @@ The immutable target artifact uses JSON with the same `steps` array.
 
 An existing follow-up controller is a construction conflict. The configured turn limit must cover every step. Definitions contain instructions, not executable Python, conditions, parallel branches or model allocations. Model execution is stochastic; stage labels do not prove independent verification. Recovery reloads the artifact and normal conversation; interrupted model work is not automatically replayed. Calls may incur charges.
 
-The module's [public entry](./__init__.py) owns validation, execution, target and registration. No module-specific environment variables.
+The module's [public entry](__init__.py) owns validation, execution, target and registration. No module-specific environment variables.
 
 ```bash
 .venv/bin/python -m unittest tests.lab.test_retained_targets tests.workflows.test_improvement_pipeline

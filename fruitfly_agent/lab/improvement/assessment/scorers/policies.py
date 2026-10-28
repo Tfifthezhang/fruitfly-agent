@@ -13,7 +13,7 @@ import sys
 import tempfile
 from typing import Awaitable, Callable, Sequence
 
-from ...contracts.tasks import TaskCase
+from fruitfly_agent.improvement.contracts.tasks import TaskCase
 
 
 @dataclass(frozen=True)

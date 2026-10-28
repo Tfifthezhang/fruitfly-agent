@@ -141,3 +141,39 @@ I publication restores the settings identity through the registered surface adap
 Fresh activation verifies the resulting I settings and exact artifact bytes against
 the proven candidate, including after a saved-default restart. It does not reuse
 the currently active editor's settings as the prepared candidate's identity.
+
+
+## Inspect interrupted jobs
+
+The [runtime kernel](../../improvement/README.md) emits execution receipts,
+validated candidates and selection checkpoints as work completes. Run journals
+these immediately and materializes each validated candidate under the owning job.
+`checkpoint.json` is atomically replaced with the latest single-task state;
+`result.json` remains the final returned outcome. Batch trials retain their own
+immutable material/evaluation records. Interrupted benchmark runs also retain
+available Agent evidence after process retirement. Missing evidence and unknown
+usage remain explicit. A checkpoint does not authorize automatic resumption or
+adoption; independent verification and normal Application activation still apply.
+
+Recoverable stage failure returns the retained outcome and records a failed job
+with its specific stop reason; it does not raise an ordinary model/tool-stage
+exception through the Application. Cancellation and integrity failures still
+propagate. H parameter bindings update the owning component's normalized execution
+identity and are rechecked against the actually assembled candidate before activation.
+
+## Compose lifecycle extensions and delivery validation
+
+`WorkflowBindings.hooks(context)` registers job-local callbacks on
+`context.services.hooks`; the public [hook contract](../../improvement/extensions/README.md)
+passes immutable snapshots and accepts only bounded context contributions.
+[Lab assembly](../../lab/improvement/workflow/README.md#install-research-mechanisms-per-job)
+installs configured research/progress/finalization mechanisms through the same
+entry for normal jobs and fixed-I candidate trials. Run injects capabilities and
+owns durable research records; it does not branch on research algorithms.
+
+`WorkflowBindings.delivery_backend` explicitly supplies a task-output validation
+backend. File execution requires it when `delivery_manifest` names a frozen input.
+The default runtime does not enable a command executor. See [delivery admission](../../lab/improvement/execution/README.md#validate-declared-task-outputs)
+and [verification limits](../../lab/improvement/verification/README.md#validate-delivery-bundles).
+Backend and hook identities join frozen preview conditions. No hook or delivery
+result authorizes production activation.

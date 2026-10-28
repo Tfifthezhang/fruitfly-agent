@@ -137,3 +137,26 @@ explicit totals must fund initial probes and protected final selection.
 `check --json` lists task keys, coverage, effective values and capabilities.
 Use the actual keys for fixed sampling. Confirmation inputs remain private.
 Candidate concurrency is one. See [task-set contracts](../../fruitfly_agent/lab/improvement/task_sets/README.md).
+
+## Enable task-local research
+
+In the referenced `components/I/improvement-search.yaml`, this example enables a
+bounded ledger and retains existing root allowances:
+
+```yaml
+parameters:
+  research: {enabled: true, max_entries: 128, retrieve_entries: 8}
+  progress: {patience: 3, failure_patience: 2}
+  finalization: {reserve_model_calls: 4, reserve_executions: 1}
+```
+
+Merge these fields with the existing parameter mapping. Research is I behavior;
+ordinary H/S search consumes it without an I edit grant. To compare it as a
+candidate, select editor comparison and grant the [owner-supported fields](../../fruitfly_agent/experiments/CONFIGURATION.md#grant-component-changes).
+Actual runs call models; configuration checking remains offline. Reserves must
+fit the experiment allocation after protected verification holds.
+
+For command deliverables, an embedding must explicitly supply a delivery backend
+and a frozen `delivery_manifest` input. The ordinary CLI's in-memory file runner
+has no command backend. See [delivery admission](../../fruitfly_agent/lab/improvement/execution/README.md#validate-declared-task-outputs)
+for the manifest contract and [clean-directory limits](../../fruitfly_agent/lab/improvement/verification/README.md#validate-delivery-bundles).

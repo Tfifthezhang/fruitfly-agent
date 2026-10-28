@@ -75,11 +75,24 @@ in the owning module.
 
 ## Declare editing separately
 
-Configuration support does not imply candidate editing. A mechanism may provide
-`configuration_edit`; a separate surface may provide `edit_options`. Both resolve
+Configuration support does not imply candidate editing. Every new selectable
+algorithm must ship a meaningful Improvement surface through its owning module's
+public registration entry, normally `improvement.py`. Design this surface with the
+algorithm, rather than adding it after runtime implementation. See
+[Lab design rules](../README.md#design-for-improvement).
+
+A mechanism uses `configuration_edit`; a separate surface can use `edit_options`.
+Both resolve
 the [experiment's field grants](../../experiments/CONFIGURATION.md#grant-component-changes)
 through the owner. The corresponding target must validate each candidate and
 actually apply it in a supported runner.
+
+The owner declares mutable prompts/content and parameter fields, protected
+invariants, H/S/I identity, state isolation and the candidate lifecycle. Reuse
+`MechanismDefinition`, `ConfigurationSurface` and existing target/execution ports;
+the module entry is a composition boundary, not another global registry. Place
+selectable implementations under the owner's `methods/`, with module-level
+registration and shared services outside it.
 
 | Support | Required evidence |
 |---|---|
@@ -124,3 +137,21 @@ only when explicitly freezing/exporting resources.
 A surface may declare a pure `default` callback. Built-in file/shell tools use
 this to expose their actual default description during offline inspection and
 materialization, without creating a runtime or opening a service.
+
+
+## Expose parameter candidates
+
+[Parameter adapters](../improvement/components/README.md#edit-owner-parameters)
+reuse ordinary normalization and assembly. Built-in Bash, reduction, measurement, Web and
+IPython owners declare explicit editable parameter whitelists. Discovery still
+constructs no clients. Their targets require `configuration-materialization`;
+unsupported runners reject the edit. I editor tool allowance and feedback access
+policy use fixed-I comparison instead of ordinary task scores. Authorize fields
+and numeric bounds through the existing experiment grants; model bindings and
+secret values are not editable parameters.
+
+`normalize_configuration_binding` is the public pure projection used for H identity.
+It applies the owning descriptor's normalization before hashing, so a valid JSON
+number and its assembled numeric value cannot produce different candidate identities.
+Run injects this projection into version construction; activation still validates
+the actually assembled runtime.

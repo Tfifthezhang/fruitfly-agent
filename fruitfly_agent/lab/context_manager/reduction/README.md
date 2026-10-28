@@ -2,54 +2,58 @@
 
 [Up: Context Manager](../README.md)
 
-Summarize history to fit the model projection while preserving recent complete turns and canonical conversation facts. The built-in implementation is `SummarizingCompactor`.
+Enable `context-history` for shared evidence tools, then choose one reduction method in Catalog's `reduction` group. Canonical Session
+messages remain intact. Core validates and durably commits proposed projections
+and task-local checkpoints; a failed write preserves the previous projection and
+checkpoint and stops further requests until the Session is reopened and validated.
+This is independent of Improvement's orchestration kernel.
 
-## Behavior
+| Method | Configuration ID | Behavior |
+|---|---|---|
+| [Summarizing](methods/summarizing/README.md) | `compaction` | Summarize bounded evidence pages on demand; retain a complete recent tail. |
+| [Working memory](methods/working_memory/README.md) | `working-memory-reduction` | Update bounded task memory incrementally; reset only after complete source coverage. |
 
-| Method / case | Result |
-|---|---|
-| `estimate(snapshot)` | Estimate prompt, tools, schemas, and projected messages; not a real tokenizer. The optional `estimate_source` property labels built-in or injected estimators for request/status observation. |
-| `check_budget(snapshot)` | Propose a summary when over budget; avoid duplicate proactive reduction during overflow recovery. |
-| `react_to_overflow(snapshot, error)` | Reduce retained history within algorithm and Core retry limits. |
-| Valid summary | Normal `stop`, nonblank text, no tool calls, smaller projection, within estimated budget. |
-| Invalid summary or failed request | Return `None`; do not replace history with placeholders or another trimming strategy. |
-| Proactive no-op | Keep the projection and let Core request the main model. |
-| Failed overflow recovery | Core returns structured `context_overflow`. |
+[Measurement](../measurement/README.md) is selected separately and measures the
+final main request, including tools, framing, images and output reserve. Reduction
+uses its observation when present. A Provider overflow still has bounded reactive
+recovery. Heuristic estimates cannot establish exact occupancy or memory fidelity.
+Fixed instructions/tools or protected signed continuation can prevent any legal
+reduction; the loop then returns a structured failure instead of discarding them.
 
-The input budget subtracts `max(main output limit, min(reserve_tokens, window / 4))` from the context window. If fixed prompt/tools, recent turns, or invalid tool associations prevent a legal reduction, no summary request is made.
+## Retrieve original evidence
 
-## Configuration and state
+[SessionHistory](../history.py) supplies `context_search` and `context_read` to both
+methods. It searches public canonical messages by literal text and returns source
+IDs and character offsets. Read source IDs or `sha256:` artifacts with bounded
+pagination. Tools are session-scoped and require no IPython or arbitrary path
+access. Tool arguments and results are included; private thinking, opaque replay
+and image bytes are excluded. Image descriptions explicitly require original
+image inspection.
 
-| Concern | Behavior |
-|---|---|
-| Configuration | `SummarizingCompactorConfig`; Catalog expands effective defaults into the manifest. |
-| Attempts / timeout | `summary_attempts`; `summary_timeout_seconds=60.0` per auxiliary request |
-| Auxiliary model | Injected Provider, window, and output limit; directly constructed instances without a window only have character/output bounds. |
-| Cancellation | Pass the run signal; propagate task cancellation. |
-| Projection tail | Retain the current projection's complete turns, not reconstructed canonical content. |
-| External references | Append `context://sha256/…` and `sha256:…` references deterministically within the overall budget. |
-| State | No private persistent learning state or permanent retry suppression. |
+Run injects the artifact directory beside the Session:
+`SESSION.jsonl.artifacts/reduction`. Hash-verified immutable text objects are
+written before a checkpoint refers to them. Recovery rejects missing or modified
+required artifacts. In-memory direct construction has no cross-process recovery.
+Uncommitted objects can remain after failed commits; they are never active state.
+`context-history.max_artifact_bytes` defaults to 16 MB (validated within 1 KB–64 MB)
+per artifact and is an editable H parameter. Larger reductions fail
+without changing context. Store external source data through ordinary artifacts.
 
-Summary input includes public message content, tool arguments/results, and prior summaries. It omits image bytes and private thinking; oversized content keeps marked head/tail excerpts. Model requests may incur charges. Heuristic budgets and protocol checks do not establish summary fidelity.
+## Extend a method
 
-A response marked as non-final cannot become a summary, even with normal `stop`.
+Concrete implementations, defaults, prompts and method declarations live under
+`methods/<name>/`. Shared [inference](inference.py), [cuts](cut.py),
+[registration](registration.py) and [Improvement admission](improvement.py) remain
+outside. Methods do not depend on sibling implementations.
 
-Opaque Provider continuation is also excluded from summary input. Retained
-messages keep their exact state. A changed signed prefix can invalidate that
-state; Providers reject incompatible active tool continuation rather than send a
-fabricated signature. See [Provider context boundaries](../../../providers/PROVIDER_GUIDE.md#preserve-a-tool-conversation).
-
-## Files and extension
-
-| File | Responsibility |
-|---|---|
-| [config.py](config.py) | Typed defaults and validation |
-| [summarizing.py](summarizing.py) | Summary requests and reducer implementation |
-| [cut.py](cut.py) | Complete-turn cuts and tool associations |
-| [estimate.py](estimate.py) | Replaceable token estimation |
-
-Implement a new [ContextReducer](../../../core/context/models.py) and register it in [Catalog](../../catalog/README.md). One runtime has one reduction slot. Core validates, persists, and commits decisions. No module-specific environment variables.
+Every method exposes meaningful H policy parameters through the existing Catalog
+parameter target. Experiment grants authorize fields and bounds; candidates use
+shared configuration materialization and assembly. The backend must declare
+`configuration-materialization`; unsupported native file-only trials reject such
+changes. Policy identity includes exact prompt text. Coverage hashes, replay
+rules, artifact identities, host permissions and outer call allowances are fixed.
+Task memory is Session execution state, not an automatic S learning update.
 
 ```bash
-.venv/bin/python -m unittest tests.lab.test_summarizing_compaction tests.lab.test_reduction_safety tests.lab.test_compaction_cut -v
+.venv/bin/python -m unittest tests.lab.test_summarizing_compaction tests.lab.test_reduction_safety tests.lab.test_working_memory tests.lab.test_context_measurement -v
 ```

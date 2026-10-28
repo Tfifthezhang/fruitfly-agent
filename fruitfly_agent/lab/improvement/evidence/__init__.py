@@ -3,8 +3,9 @@ from __future__ import annotations
 
 from dataclasses import asdict, replace
 import hashlib
+from .access import EvidenceAccess
 
-from ..contracts.pipeline import (ComponentFile, HarnessSnapshot, relative_path,
+from fruitfly_agent.improvement.contracts.pipeline import (ComponentFile, HarnessSnapshot, relative_path,
                                  canonical_json, require_hash)
 
 
@@ -34,10 +35,11 @@ class EvidenceWorkspace:
     This is a tool capability boundary, not an OS sandbox for trusted Python.
     Large text is paginated; binary originals remain available as bytes.
     """
-    def __init__(self, *, baseline, files, writable_ids, record=None, max_bytes=2_000_000):
+    def __init__(self, *, baseline, files, writable_ids, record=None, max_bytes=2_000_000, access=None):
         self.baseline, self.files = baseline, dict(files)
         self.writable_ids = frozenset(writable_ids)
         self.max_bytes = max_bytes
+        self.access = access or EvidenceAccess(record=record)
         self.record = record or (lambda event, **fields: None)
         if self.writable_ids - {c.component_id for c in baseline.components}:
             raise ValueError('workspace scope contains an unregistered component')
@@ -53,7 +55,7 @@ class EvidenceWorkspace:
 
     @classmethod
     def build(cls, request, artifacts, *, record=None):
-        from ..contracts.editing import TaskSetProposalRequest
+        from fruitfly_agent.improvement.contracts.editing import TaskSetProposalRequest
         if isinstance(request, TaskSetProposalRequest):
             from .task_sets import build_workspace
             return build_workspace(request, artifacts, record=record)
@@ -61,15 +63,18 @@ class EvidenceWorkspace:
         files = {'context/task.md': task.instruction.encode('utf-8'),
                  'context/edit-grants.json': canonical_json({'component_ids': request.plan.component_ids,
                      'options': request.plan.component_options}).encode('utf-8')}
+        references = {}
+        for resource in getattr(request, 'context', ()):
+            references['context/extensions/' + resource.path] = resource.artifact_id
         for resource in task.inputs:
-            files['context/inputs/' + resource.path] = artifacts.read(resource.artifact_id)
+            references['context/inputs/' + resource.path] = resource.artifact_id
         rows = []
         for execution in request.records:
             # Measurement and verifier objects are deliberately not workspace inputs.
             rows.append(asdict(execution))
             files[f'context/executions/{execution.run_id}/output.txt'] = execution.output.encode('utf-8')
             for resource in execution.artifacts:
-                files[f'context/executions/{execution.run_id}/' + resource.path] = artifacts.read(resource.artifact_id)
+                references[f'context/executions/{execution.run_id}/' + resource.path] = resource.artifact_id
         files['context/executions.json'] = canonical_json(rows).encode('utf-8')
         for entry in request.experience:
             prefix = 'context/library/' + entry.entry_id
@@ -83,10 +88,25 @@ class EvidenceWorkspace:
                     files[f'context/candidates/{index}/{component.component_id}/{file.path}'] = file.text.encode('utf-8')
         if request.plan.feedback == 'scored' and getattr(request, 'feedback', ()):
             files['context/measurements.json'] = canonical_json([asdict(m) for m in request.feedback]).encode('utf-8')
-        files['INDEX.json'] = canonical_json({'files': sorted(files),
+        files['INDEX.json'] = canonical_json({'files': sorted((*files, *references)),
             'components': [asdict(c) for c in baseline.components],
             'writable_components': request.plan.component_ids}).encode('utf-8')
-        return cls(baseline=baseline, files=files, writable_ids=request.plan.component_ids, record=record)
+        from .resources import ReferenceWorkspace
+        return ReferenceWorkspace(artifacts=artifacts, references=references, baseline=baseline,
+            files=files, writable_ids=request.plan.component_ids, record=record,
+            access=EvidenceAccess((r.run_id for r in request.records), record=record))
+
+    def repair_view(self, response, reason, evidence_ids):
+        files = {'context/submission.txt': response.encode('utf-8')[:120000],
+                 'context/repair.json': canonical_json({'error': reason, 'evidence_ids': sorted(evidence_ids),
+                     'writable_components': sorted(self.writable_ids)}).encode('utf-8')}
+        if 'context/edit-grants.json' in self.files:
+            files['context/edit-grants.json'] = self.files['context/edit-grants.json']
+        repair = EvidenceWorkspace(baseline=self.baseline, files=files,
+            writable_ids=self.writable_ids, record=self.record, max_bytes=self.max_bytes, access=self.access)
+        repair.files = {p: data for p, data in repair.files.items() if not p.startswith('harness/')}
+        repair.files.update({p: data for p, data in self.files.items() if p.startswith('harness/')})
+        return repair
 
     def paths(self):
         return tuple(sorted(self.files))

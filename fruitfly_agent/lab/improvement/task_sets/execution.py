@@ -1,10 +1,10 @@
 """Registered task-set preparation, separate from source and search algorithms."""
-from ..contracts.task_sets import TaskSetSnapshot
-from ..contracts.experiments import ExecutionDefinition, MaterialOption, PreparedExecution, ExecutionPorts
+from fruitfly_agent.improvement.contracts.task_sets import TaskSetSnapshot
+from fruitfly_agent.improvement.contracts.experiments import ExecutionDefinition, MaterialOption, PreparedExecution, ExecutionPorts
 from ..workflow.task_sets import TaskSetProblem
 from .sampling import sample_batch
-from ..contracts.plans import TaskSetRunPlan
-from ..contracts.versions import content_hash, canonical_json
+from fruitfly_agent.improvement.contracts.plans import TaskSetRunPlan
+from fruitfly_agent.improvement.contracts.versions import content_hash, canonical_json
 from dataclasses import asdict, replace
 
 

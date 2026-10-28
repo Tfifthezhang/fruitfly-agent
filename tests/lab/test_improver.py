@@ -48,11 +48,11 @@ class BudgetTests(unittest.IsolatedAsyncioTestCase):
     def test_editor_candidate_cannot_change_fixed_fields(self):
         instructions = EditorInstructions()
         target = EditorInstructionTarget(instructions)
-        target.validate(replace(instructions, invariant='Use a different proposal procedure').serialize())
+        target.validate(EditorInstructionTarget(replace(instructions, invariant='Use a different proposal procedure')).snapshot().text)
         for field in ('system', 'select', 'reflect'):
             with self.subTest(field=field), self.assertRaisesRegex(ValueError, 'frozen'):
-                target.validate(replace(instructions, **{field: 'Mutated field'}).serialize())
-        formatted = json.dumps(json.loads(instructions.serialize()), indent=2)
+                target.validate(EditorInstructionTarget(replace(instructions, **{field: 'Mutated field'})).snapshot().text)
+        formatted = json.dumps(json.loads(target.snapshot().text), indent=2)
         self.assertEqual(EditorInstructionTarget(instructions, text=formatted).snapshot().text, formatted)
         with self.assertRaisesRegex(ValueError, 'duplicate'):
             EditorInstructions.parse(instructions.serialize().replace('{', '{"system":"duplicate",', 1))

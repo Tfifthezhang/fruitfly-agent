@@ -1,9 +1,9 @@
 """One fixed final comparison. Private episodes never return to proposal work."""
 from dataclasses import asdict
 
-from ..contracts.pipeline import SelectionDecision, canonical_json
-from ..contracts.versions import content_hash
-from ..contracts.experiments import TrialReport
+from fruitfly_agent.improvement.contracts.pipeline import SelectionDecision, canonical_json
+from fruitfly_agent.improvement.contracts.versions import content_hash
+from fruitfly_agent.improvement.contracts.experiments import TrialReport
 
 
 def combine(reports):

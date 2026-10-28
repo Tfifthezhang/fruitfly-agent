@@ -10,7 +10,7 @@ from fruitfly_agent.lab.improvement.api import (RunPlan, TaskMaterial, Component
     HarnessSnapshot, CandidateBundle, EditReason, ExecutionRecord, Measurement, SelectionDecision,
     ProposalResult, ComponentRegistry, FileComponentAdapter, GeneratorRegistry, WorkflowServices, ComponentWorkflow,
     AgentEditor, AgentSelector, AgentReflector, WorkspaceTaskSource)
-from fruitfly_agent.lab.improvement.contracts.versions import SystemVersion, content_hash
+from fruitfly_agent.improvement.contracts.versions import SystemVersion, content_hash
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts, EvidenceWorkspace
 from fruitfly_agent.core.config import AgentLoopConfig
 from tests.support.faux_provider import FauxProvider
@@ -90,8 +90,12 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(outcome.decision.assurance, 'selected')
         self.assertIsNotNone(outcome.selected)
         plan = replace(plan, component_ids=('prompt',), max_executions=8)
-        with self.assertRaisesRegex(ValueError, 'undeclared'):
-            await flow.run(plan, task, baseline, WorkflowServices(plan))
+        guarded = WorkflowServices(plan)
+        rejected = await flow.run(plan, task, baseline, guarded)
+        self.assertTrue(all(set(c.changed_ids) <= {'prompt'} for c in rejected.candidates))
+        self.assertTrue(all(r.harness_id in {baseline.snapshot_id, *(c.harness.snapshot_id for c in rejected.candidates)} for r in rejected.records))
+        self.assertTrue(any(event == 'stage-failed' and fields['stage'] == 'propose' for event, fields in guarded.events))
+
 
     async def test_cancellation_closes_running_operation(self):
         flow, plan, baseline, runner = self.build()
@@ -116,6 +120,7 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
         artifacts = MemoryArtifacts()
         provider = FauxProvider()
         provider.respond_tool_call('read_file', {'path': 'context/task.md'})
+        provider.respond_tool_call('read_file', {'path': 'context/executions.json'})
         provider.respond_tool_call('write_file', {'path': 'harness/prompt/instructions.txt', 'content': 'New task procedure'})
         provider.respond_text('{"reasons":[{"component_id":"prompt","explanation":"Observed omission","evidence_ids":["reference"]}]}')
         plan = RunPlan('job', version(), ('prompt',))
@@ -128,7 +133,7 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
         editor = AgentEditor(AgentLoopConfig(provider=provider), artifacts, registry)
         candidate = await editor.edit('propose', request, services)
         self.assertEqual(candidate.changed_ids, ('prompt',))
-        self.assertEqual(services.used['model'], 3)
+        self.assertEqual(services.used['model'], 4)
         self.assertEqual(baseline.component('prompt').files[0].text, 'prompt')
         self.assertTrue(any(event == 'editor-read' for event, _ in services.events))
 

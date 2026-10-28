@@ -75,7 +75,7 @@ def editor(config):
     material = task.get('material')
     if not isinstance(material, str) or not material:
         raise ValueError('editor experiments require task.material')
-    from fruitfly_agent.lab.improvement.contracts.validation import identifier
+    from fruitfly_agent.improvement.contracts.validation import identifier
     identifier(material)
     path = config.workspace / '.fruitfly/improvement/experiments' / material / 'experiment.json'
     if not path.is_file() or path.is_symlink():

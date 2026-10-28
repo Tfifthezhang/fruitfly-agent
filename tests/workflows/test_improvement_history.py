@@ -44,8 +44,15 @@ class ImprovementHistoryTests(unittest.IsolatedAsyncioTestCase):
                 for error, status in ((RuntimeError('offline failure'), 'failed'), (asyncio.CancelledError(), 'cancelled')):
                     preview = app.workflow_preview(factory.test_request)
                     with patch.object(factory._component_jobs.generators.factories['offline-rule'], 'propose', new=AsyncMock(side_effect=error)):
-                        with self.assertRaises(type(error)):
-                            await app.improve('', preview_token=preview.preview_token)
+                        if isinstance(error, asyncio.CancelledError):
+                            with self.assertRaises(asyncio.CancelledError):
+                                await app.improve('', preview_token=preview.preview_token)
+                        else:
+                            self.assertEqual(await app.improve('', preview_token=preview.preview_token), ())
+                            self.assertEqual(app.improvement_history()[0].stop_reason, 'stage_failed.propose')
+                            checkpoint = next((Path(tmp) / '.fruitfly/improvement/jobs').glob('*/checkpoint.json'))
+                            import json
+                            self.assertIsNotNone(json.loads(checkpoint.read_text())['selected'])
                     self.assertEqual(app.improvement_history()[0].status, status)
                     self.assertFalse(app.candidates())
                     await asyncio.sleep(0)

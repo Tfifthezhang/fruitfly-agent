@@ -1,7 +1,7 @@
 """Optional process-guided next seed, distinct from joint objective selection."""
 import asyncio
-from ..contracts.assessment import AssessmentUnavailable
-from ..workflow.budget import AllocationExhausted
+from fruitfly_agent.improvement.contracts.assessment import AssessmentUnavailable
+from fruitfly_agent.improvement.workflow.budget import AllocationExhausted
 from .completed import completed_input
 
 

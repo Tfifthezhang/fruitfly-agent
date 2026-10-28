@@ -1,6 +1,6 @@
 """Programmatic facts and independent model judgments; no candidate editing."""
-from ..contracts.live import Assessment, Metric
-from ..contracts.search import ExplorationDecision
+from fruitfly_agent.improvement.contracts.live import Assessment, Metric
+from fruitfly_agent.improvement.contracts.search import ExplorationDecision
 
 
 class CompletedFactsAssessor:

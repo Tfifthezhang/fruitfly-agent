@@ -10,10 +10,11 @@ from fruitfly_agent.run.runtime.manifest import execution_version_payload
 
 class RunVersions:
     def __init__(self, *, workspace, artifacts, manifest, improvement_identity, state_sources,
-                 restore_improvement_identity=None):
+                 restore_improvement_identity=None, normalize_configuration=None):
         self.workspace, self.artifacts = workspace, artifacts
         self.manifest, self.improvement_identity, self.state_sources = manifest, improvement_identity, state_sources
         self.restore_improvement_identity = restore_improvement_identity
+        self.normalize_configuration = normalize_configuration
         self.snapshots = SnapshotStore(artifacts)
         self.versions = VersionStore(artifacts)
 
@@ -102,9 +103,9 @@ class RunVersions:
         import json
         harness = json.loads(self.artifacts.read_text(parent.harness))
         if snapshot.binding.kind == 'configuration':
-            from fruitfly_agent.runtime_spec import HarnessProfile, apply_profile_binding
-            profile = apply_profile_binding(HarnessProfile('candidate'), snapshot.binding.kind, snapshot.binding.key, text)
-            harness['execution'] = dict(profile.execution)
+            from fruitfly_agent.runtime_spec.execution import apply_execution_payload_binding
+            value = self.normalize_configuration(snapshot.binding.key, text) if self.normalize_configuration is not None else text
+            harness = apply_execution_payload_binding(harness, snapshot.binding.kind, snapshot.binding.key, value)
         elif snapshot.binding.kind == "prompt":
             harness["base_prompt"] = {"content_hash": after}
         else:

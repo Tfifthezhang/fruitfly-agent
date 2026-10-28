@@ -16,6 +16,7 @@ Register external task execution with the independent Improvement framework.
 | `facts.py` | Translate terminal loop diagnostics, model allowance and artifact collection status |
 | `assessment.py` | Official development rewards without independent assurance |
 | `configuration.py` | Experiment request references and derived bounded host files |
+| `episodes.py` | Inject prepared benchmark episodes for fixed-I comparisons |
 | `task_sets.py` | Frozen benchmark collections and exact per-task execution through common task-set ports |
 
 ## Prepare and register
@@ -68,9 +69,7 @@ native-task entry; full experiments use the independent CLI or public API.
 One task, one attempt and concurrency one are supported per leaf execution.
 The [task-set adapter](../../fruitfly_agent/lab/improvement/task_sets/README.md)
 can expose many such leaves from a larger prepared selection. Editor instructions remain an I-comparison responsibility: this runner
-cannot establish I improvement from a direct task score. Custom I experiments can
-inject an `EpisodeExecutor` using the public experiment contracts. Automatic
-container-backed I material construction is not installed.
+cannot establish I improvement from a direct task score. Prepared benchmark studies use the explicit [I comparison composition](#compare-i-on-prepared-benchmarks).
 
 The request, host, preparation and source model/configuration bytes bind material
 identity. Candidate configurations never overwrite the source profile. Each
@@ -131,3 +130,56 @@ prepared inventory. Source changes invalidate execution. `eval prepare` on a
 task-set experiment prepares its Eval sources through derived bounded hosts;
 native collections need no Eval preparation. No additional benchmark adapter or
 package is installed by declaring a collection name.
+
+## Compare I on prepared benchmarks
+
+`benchmark_improver(development, verification, ...)` composes nonempty, disjoint
+sets of prepared one-task `benchmark_execution` definitions. It returns an
+execution definition for the ordinary Improvement registry. The adapter injects
+material construction and `EpisodeExecutor`; Lab imports no Eval implementation.
+Task execution alone does not install this comparison.
+
+For example, after preparing separate development and verification requests and
+bounded hosts, register the following with the same `executions` registry and
+factory shown above. These are placeholder paths; running the resulting study
+starts repeated model and container work and can incur substantial charges.
+
+```python
+from eval.improvement import benchmark_improver
+
+executions.register(benchmark_improver(
+    (benchmark_execution(workspace / 'development-request.json',
+                         workspace / 'development-host.yaml',
+                         model_calls=2, execution_id='development'),),
+    (benchmark_execution(workspace / 'verification-request.json',
+                         workspace / 'verification-host.yaml',
+                         model_calls=2, execution_id='independent'),),
+    max_verifications=1,
+))
+```
+
+Select `execution_id='benchmark-improver'`,
+`task_pack_id='benchmark-editor-study'`, I components and scored feedback in the
+ordinary `WorkflowRequest`. Set `evaluation_model_calls` at least as high as every
+prepared per-task allowance and fund `inner_model_calls` for both leaf executions
+and editing. Preparation computes the shared minimum, including protected paired
+verification for persistent jobs. Root limits remain hard comparison conditions.
+
+Each episode freezes candidate I while the inner workflow edits H/S, then measures
+before/after H/S through the benchmark's official score. Inner component capability
+checks remain mandatory. Development and verification inputs must be distinct;
+source changes invalidate the study. Input identity checks do not prove semantic
+independence across related tasks. Verification-use claims follow the ordinary
+I comparison policy. All nested model calls and executions charge the root once;
+uncertain external usage remains conservatively charged. Only independently
+verified I is eligible for explicit activation. Inner H/S is never activated by it.
+
+This composition is currently exposed through the public embedding API; the
+experiment file `source: editor` still selects native task-package episodes.
+Offline injected executors cover nested modification, scoring, partitioning,
+isolation and accounting in `tests.eval.test_improvement`.
+
+Interrupted collection retains available original evidence even when the last
+Session line or model-budget receipt was only partly written. Such counts remain
+unknown and consume the held maximum; incomplete files cannot grant a score or
+complete diagnostics. Completed receipts still require strict parsing.

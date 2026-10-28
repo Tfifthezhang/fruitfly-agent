@@ -7,9 +7,10 @@ of editing, scoring and execution backends.
 
 | Entry | Behavior |
 |---|---|
-| `registry.py` | Distinct ownership, complete snapshots, schema validation and nonconflicting exports |
+| [Runtime registry](../../../improvement/components/README.md) | Distinct ownership, complete snapshots, schema validation and nonconflicting exports |
 | `text.py` | Reuse object-owned H/S/I instruction adapters and prompt/artifact bindings |
 | `files.py` | Explicit multi-file component validation; no implied execution support |
+| `parameters.py` | Owner-declared mechanism parameter grants and shared configuration materialization |
 | `changes.py` | Add/replace/remove UTF-8 files with parent/content preconditions |
 
 `ChangeSet` consumes immutable artifacts and returns a new document. It does not
@@ -43,3 +44,25 @@ Bindings include `prompt`, `artifact` and `configuration`. Configuration binding
 name a supported declarative section; they cannot write arbitrary profile fields.
 [Execution policy](../../execution_policy/README.md) uses `configuration / execution`
 for isolated trials, Eval staging, H version identity and verified activation.
+
+
+## Edit owner parameters
+
+`editable_parameters` wraps an owning Catalog definition with an explicit field
+whitelist, strict complete JSON snapshot, numeric bounds and a configuration
+binding. Bash, compaction, Web search/fetch and IPython declare supported parameter
+fields. Credentials, model roles and undeclared fields remain fixed. Grants use
+`parameters.<field>`; enabling an owner does not authorize editing it.
+
+Changed values require `configuration-materialization`, supplied by Eval staging.
+The native file runner rejects these edits before model work. Candidate staging,
+ordinary assembly and verified activation consume the same component configuration.
+Unsupported backends fail explicitly. See [Catalog admission](../../catalog/CONFIGURATION.md).
+
+
+Web parameter adapters do not remove the live-service snapshot requirement.
+The ordinary Run host rejects an experiment when a selected live dependency has
+no frozen response source. Such a component needs an explicitly supplied
+reproducible service/backend before an end-to-end comparison can run; a visible
+adapter alone is not runnable support. Catalog reports backend capabilities
+separately from grants. Existing external-dependency guards remain enforced.

@@ -1,6 +1,6 @@
 """Deterministic collection-stratified cycles over a frozen development set."""
 import random
-from ..contracts.evaluation import EvaluationBatch
+from fruitfly_agent.improvement.contracts.evaluation import EvaluationBatch
 
 
 def sample_batch(snapshot, settings, round_index, *, attempts=1):

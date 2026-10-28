@@ -26,7 +26,8 @@ candidate I fixed while executing a fresh inner H/S search. Supported settings a
 listed in the [system grammar](../../../runtime_spec/COMPONENTS.md); grants and bounds
 are enforced by the component's adapter. Search rounds are capped by the fixed
 `inner_depth`; assessment and task work consume the same outer hard allowances.
-The task Agent's base prompt remains an inner H component. `propose`, `invariant`, `domain` and `compose` are editable. `system`, `select` and
+The task Agent's base prompt remains an inner H component. `propose`, `invariant`, `domain`, `compose`, `max_tool_calls` and `max_turns` are editable
+only with corresponding grants and bounds. `system`, `select` and
 `reflect` must equal their frozen parent values. Unknown fields and changes to
 component ownership fail. Loaded I snapshots preserve the exact bound source bytes,
 including valid JSON formatting, so saved-default reconciliation and recovery
@@ -91,7 +92,7 @@ requests remain available below.
 | `inner_depth` | 1 | Sequential inner search depth, 1–3 |
 | `inner_model_calls` | 12 | Shared model allowance per inner search, 4–1000 |
 | `inner_executions` | 4 | Leaf executions per inner search, 4–100 |
-| `evaluation_model_calls` | 1 | Reserved model allowance per private check, 1–32 |
+| `evaluation_model_calls` | 1 | Reserved model allowance per private check, 1–10000; must cover the selected backend |
 | `max_trials` | 8 | Outer development trial limit, 1–40 |
 | `min_gain` | 0 | Candidate paired mean gain must strictly exceed this value |
 | `max_regression` | 0 | Allowed per-case and paired regression |
@@ -183,6 +184,17 @@ integration experiments. No new secret environment variables are introduced.
 Embedding hosts can supply another `EpisodeExecutor` through
 `ImproverTaskRunner(..., episode_factory=...)` and register the enclosing execution
 definition. The public request/result contracts keep budgets, source identity and
-private comparison separate from the task backend. The bundled material catalog
-still uses task packages and the native file executor; automatic benchmark episode
-construction is not implied by registering an Eval task runner.
+private comparison separate from the task backend. The bundled native material catalog uses task packages. The optional
+[Eval episode composition](../../../../eval/improvement/README.md#compare-i-on-prepared-benchmarks)
+registers benchmark-backed comparisons through `comparison_definition`; Lab does
+not import Eval. A task runner alone does not install an episode study.
+
+## Execute candidate research settings
+
+The selected I search component can grant [research, progress and finalization
+parameters](../research/README.md#configure-and-compare-mechanisms). Each native
+or registered benchmark-backed episode installs fresh instances from candidate I.
+Research contributions reach the actual proposal workspace. The inner fixed budget
+and private evaluation inputs remain unchanged. Editing a reserve changes how
+existing quota is held, never the outer allocation. Adoption uses the same exact
+settings artifact and Catalog restoration path as other I fields.

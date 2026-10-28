@@ -8,10 +8,10 @@ from fruitfly_agent.lab.improvement.api import (AssessedRunner, Assessment, Cont
     EvidencePosition, ExecutionEvent, ExecutionRecord, FileTaskRunner, Metric, ProcessMetrics,
     RunPlan, TaskMaterial, WorkflowServices, ReadOnlyInspector, MetricThreshold, StopExecutionPolicy)
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
-from fruitfly_agent.lab.improvement.execution.control import ControlDispatcher
-from fruitfly_agent.lab.improvement.execution.events import EventJournal
-from fruitfly_agent.lab.improvement.execution.handles import ManagedExecution
-from fruitfly_agent.lab.improvement.workflow.budget import AllocationExhausted
+from fruitfly_agent.improvement.execution.control import ControlDispatcher
+from fruitfly_agent.improvement.execution.events import EventJournal
+from fruitfly_agent.improvement.execution.handles import ManagedExecution
+from fruitfly_agent.improvement.workflow.budget import AllocationExhausted
 from fruitfly_agent.core.config import AgentLoopConfig
 from tests.support.faux_provider import FauxProvider
 from tests.support.pipeline import fixture, version
@@ -153,7 +153,7 @@ class LiveExecutionTests(unittest.IsolatedAsyncioTestCase):
             def paths(self): return ()
             def read(self, path): return b''
         await inspector.session('compare', Workspace(), services)
-        self.assertEqual(set(provider.calls[0]['tools']), {'list_files', 'read_file'})
+        self.assertEqual(set(provider.calls[0]['tools']), {'list_files', 'read_file', 'search_file'})
         with self.assertRaises(ValueError):
             await inspector.session('edit', Workspace(), services, writable=True)
         await services.close()

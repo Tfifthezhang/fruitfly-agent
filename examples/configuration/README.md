@@ -125,3 +125,44 @@ Optional [web tools](../../fruitfly_agent/lab/tools/web/README.md) are disabled 
 ```bash
 .venv/bin/python -m unittest tests.providers.test_providers
 ```
+
+## Select reduction and measurement
+
+Keep [context-history](components/H/context-history.yaml) enabled for public
+source retrieval and [context-measurement](components/H/context-measurement.yaml)
+for final request budgets. The default profile selects
+[compaction](components/H/compaction.yaml). To use incremental task memory,
+replace that profile's `compaction` reference with:
+
+```yaml
+working-memory-reduction:
+  file: components/H/working-memory-reduction.yaml
+```
+
+Use the supplied [working memory component](components/H/working-memory-reduction.yaml).
+Keep one enabled reduction method. The terminal's Reduction selector uses the
+same Catalog definitions. Prompt and policy settings belong in their component
+files; [method behavior and limits](../../fruitfly_agent/lab/context_manager/reduction/README.md)
+have one owner.
+
+A materializing experiment can grant, for example:
+
+```yaml
+edit:
+  working-memory-reduction:
+    fields: [parameters.update_instructions, parameters.memory_tokens]
+    bounds:
+      parameters.memory_tokens: {minimum: 512, maximum: 4096}
+```
+
+The selected baseline must already enable that method and fit those bounds.
+Candidate prompt text, policy values and isolated execution use the ordinary
+component path. Native file-only trials cannot materialize mechanism changes;
+choose a compatible runner. Configuration inspection is offline. Auxiliary
+summary/memory calls and optional Provider input counting can contact services;
+live validation requires explicit invocation and may incur charges.
+
+Default measurement is heuristic with explicit uncertainty. Set `provider_count`
+to request a declared exact counter; `strict` rejects unsupported counters and
+never silently downgrades. DeepSeek/proxy protocols currently use conservative
+estimates and reported usage calibration, not an invented exact tokenizer.

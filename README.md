@@ -89,6 +89,7 @@ Chat uses native terminal scrollback; temporary menus restore it on return.
 
 | Capability | Current behavior | Guide |
 |---|---|---|
+| Improvement runtime | Independent stage kernel with injected algorithms, accounting, failure boundaries and evidence retention | [Runtime](fruitfly_agent/improvement/README.md) |
 | H/S improvement | Propose, execute and compare registered instructions, permitted execution parameters or retained documents; keep the baseline selectable | [Improvement](fruitfly_agent/lab/improvement/README.md) |
 | I experiments | Compare supported editor, feedback and search changes by downstream H/S behavior, then verify on separate task packages | [Editor experiments](fruitfly_agent/lab/improvement/improver/README.md) |
 | Persistent adoption | Publish verified text candidates for explicit review and activation | [Improvement host](fruitfly_agent/run/improvement/README.md) |

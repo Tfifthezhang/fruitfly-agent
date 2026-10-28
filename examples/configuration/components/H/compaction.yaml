@@ -11,8 +11,14 @@ parameters:
   summary_word_limit: 400
   summary_max_tokens: 2048
   history_char_limit: 120000
-  per_message_char_limit: 2000
+  per_message_char_limit: 120000
   summary_attempts: 2
   summary_timeout_seconds: 60.0
   token_estimator: heuristic_cjk
   prompt_version: continuity
+  summary_instructions: Preserve the original task, user corrections, constraints,
+    decisions, completed work, failures, unresolved work and the next action. Distinguish
+    verified results from guesses. Merge previous memory with this evidence page.
+    Add no invented information.
+  trigger_ratio: 0.9
+  max_pages: 64

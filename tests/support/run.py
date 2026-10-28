@@ -16,7 +16,7 @@ def _write_catalog(path: Path, profiles: dict[str, str]) -> None:
                 '    sdk: anthropic\n    protocol: messages',
                 f"    model: {model}",
                 "    api_key_env: TEST_API_KEY",
-                "    context_window: 4000",
+                "    context_window: 16000",
                 "    max_output_tokens: 4096",
             )
         )

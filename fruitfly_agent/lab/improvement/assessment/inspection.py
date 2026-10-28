@@ -1,6 +1,6 @@
 """An independently configured read-only model inspector."""
 from dataclasses import dataclass
-from ..evidence.session import WorkspaceSession
+from ..workspaces import WorkspaceSession
 
 
 @dataclass(frozen=True)

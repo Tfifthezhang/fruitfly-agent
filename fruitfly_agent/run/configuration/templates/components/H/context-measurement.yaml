@@ -1,0 +1,13 @@
+id: context-measurement
+role: H
+implementation: context-measurement
+enabled: true
+parameters:
+  token_estimator: heuristic_cjk
+  chars_per_token: 4.0
+  margin_tokens: 128
+  margin_ratio: 0.1
+  provider_count: false
+  strict: false
+  count_timeout_seconds: 10.0
+  calibration_samples: 32

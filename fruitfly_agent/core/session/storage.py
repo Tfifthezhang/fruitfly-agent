@@ -159,6 +159,7 @@ class Session(_SessionReader):
             ) from exc
         self._entries: list[SessionEntry] = []
         self._repair_newline = False
+        self._write_failed = False
         try:
             self._load()
         except BaseException:
@@ -275,6 +276,11 @@ class Session(_SessionReader):
 
     # -- append ---------------------------------------------------------------
 
+    def check_writable(self) -> None:
+        if self._write_failed:
+            raise SessionCorruptError('session writer failed; close and reopen to validate the durable prefix',
+                details={'kind': 'session_write_failed'})
+
     def append(
         self,
         type: str,
@@ -285,6 +291,7 @@ class Session(_SessionReader):
         sync: bool = False,
     ) -> SessionEntry:
         """Append an entry. Idempotent when entry_id is given and already exists."""
+        self.check_writable()
         if entry_id is not None:
             for existing in self._entries:
                 if existing.id == entry_id:
@@ -299,15 +306,20 @@ class Session(_SessionReader):
         )
         self._validate_entry(entry, len(self._entries) + 1)
         line = entry.to_json_line()
-        if self._repair_newline:
+        try:
+            if self._repair_newline:
+                with self.path.open("ab") as f:
+                    f.write(b"\n")
+                self._repair_newline = False
             with self.path.open("ab") as f:
-                f.write(b"\n")
-            self._repair_newline = False
-        with self.path.open("ab") as f:
-            f.write(line.encode("utf-8"))
-            f.flush()
-            if sync:
-                os.fsync(f.fileno())
+                f.write(line.encode("utf-8"))
+                f.flush()
+                if sync:
+                    os.fsync(f.fileno())
+        except BaseException:
+            # Some or all bytes may already exist. Never reuse the unconfirmed ID.
+            self._write_failed = True
+            raise
         self._entries.append(entry)
         return entry
 

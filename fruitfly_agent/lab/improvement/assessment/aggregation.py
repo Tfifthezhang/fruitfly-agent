@@ -1,6 +1,6 @@
 """Explicit weighted aggregation; no default notion of task quality."""
 import math
-from ..contracts.live import Metric
+from fruitfly_agent.improvement.contracts.live import Metric
 
 
 class WeightedSum:

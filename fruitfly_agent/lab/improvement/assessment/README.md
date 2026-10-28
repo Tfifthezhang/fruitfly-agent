@@ -17,6 +17,7 @@ separate configuration and read-only contexts. No assessor activates a candidate
 | `aggregation.py` | Explicit weighted metrics; missing inputs yield unknown utility |
 | `comparison.py` | Declared lexicographic objectives and required completeness |
 | `selection.py` | Anonymous selection of existing executed outputs |
+| `measured.py` | Injected selection policy, complete measured comparisons and incumbent ties |
 | `verification.py` | Fixed selection/holdout comparisons and bound proof |
 | `feedback.py` | Explicit development metric projection; private judgments stay private |
 | `online.py` | Bounded online scheduling and optional control policy |

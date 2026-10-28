@@ -1,7 +1,7 @@
 """Pure configurable conditions. None never means quality assurance."""
 from dataclasses import dataclass
 import math
-from ..contracts.stopping import StopDecision
+from fruitfly_agent.improvement.contracts.stopping import StopDecision
 
 
 def positive(value):

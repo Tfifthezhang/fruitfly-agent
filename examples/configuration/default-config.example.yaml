@@ -18,6 +18,10 @@ profiles:
         file: components/H/tools/edit-tool.yaml
       write-tool:
         file: components/H/tools/write-tool.yaml
+      context-history:
+        file: components/H/context-history.yaml
+      context-measurement:
+        file: components/H/context-measurement.yaml
       compaction:
         file: components/H/compaction.yaml
       base_prompt:

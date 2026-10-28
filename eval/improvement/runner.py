@@ -3,9 +3,11 @@ from dataclasses import replace
 from pathlib import Path
 from uuid import uuid4
 import json
+import asyncio
+from fruitfly_agent.improvement.contracts.failures import IntegrityError
 
 from fruitfly_agent.lab.improvement.api import ExecutionRecord
-from fruitfly_agent.lab.improvement.execution.handles import ManagedExecution
+from fruitfly_agent.improvement.execution.handles import ManagedExecution
 from .building import RuntimeConfigBuilder
 from .evidence import collect
 from .process import EvalProcess
@@ -13,7 +15,7 @@ from .facts import attach_benchmark_facts
 
 
 class EvalTaskRunner:
-    capabilities = frozenset({'benchmark-task', 'events', 'stop', 'execution-config'})
+    capabilities = frozenset({'benchmark-task', 'events', 'stop', 'execution-config', 'configuration-materialization'})
 
     def __init__(self, context, prepared, measurements, *, executor=None):
         self.context, self.prepared, self.measurements = context, prepared, measurements
@@ -37,8 +39,12 @@ class EvalTaskRunner:
 
     async def execute_trial(self, plan, task, harness, run_id, journal):
         context, frozen = self.context, self.prepared
-        if frozen.current_source() != frozen.source_id or task != frozen.task:
-            raise ValueError('benchmark material or execution conditions changed')
+        try:
+            source_id = frozen.current_source()
+        except Exception as exc:
+            raise IntegrityError('benchmark source cannot be validated') from exc
+        if source_id != frozen.source_id or task != frozen.task:
+            raise IntegrityError('benchmark material or execution conditions changed')
         directory = Path(context.workspace) / '.fruitfly/improvement/jobs' / plan.job_id / 'executions' / run_id
         directory.mkdir(parents=True, exist_ok=False)
         config = self.builder.build(harness, destination=directory / 'config.yaml')
@@ -52,7 +58,7 @@ class EvalTaskRunner:
                 output_root=Path(context.workspace) / '.fruitfly/eval', emit=journal.publish)
             artifacts, calls = collect(root, context.artifacts)
             if calls is not None and calls > cap:
-                raise ValueError('external runtime exceeded its reserved model allowance')
+                raise IntegrityError('external runtime exceeded its reserved model allowance')
             completed = report.get('status') == 'completed' and not report.get('errors')
             reward = next((m.get('value') for m in report.get('metrics', []) if m.get('name') == 'official_reward'), None)
             record = ExecutionRecord(run_id, task.task_id, task.material_id, harness.snapshot_id,
@@ -65,6 +71,21 @@ class EvalTaskRunner:
             context.services.record('benchmark-execution', run_id=run_id, evaluation_id=report['evaluation_id'],
                 report=str(Path(root) / 'report.json'), model_calls=calls)
             return record
+        except asyncio.CancelledError:
+            root = getattr(self.executor, 'result_root', None)
+            if root is not None:
+                try:
+                    artifacts, calls = collect(root, context.artifacts, interrupted=True)
+                    if calls is not None and calls > cap:
+                        raise ValueError('interrupted runtime exceeded its reserved allowance')
+                    record = ExecutionRecord(run_id, task.task_id, task.material_id, harness.snapshot_id,
+                        plan.parent.state, plan.conditions_id, 'cancelled',
+                        'Benchmark execution interrupted; partial evidence is not an official score.', artifacts, calls)
+                    record = attach_benchmark_facts(record, root, context.artifacts, model_limit=cap, interrupted=True)
+                    context.services.retain_execution(record)
+                except (OSError, ValueError, KeyError) as exc:
+                    context.services.record('interrupted-collection-failed', error=type(exc).__name__)
+            raise
         finally:
             charged = cap if calls is None else min(cap, calls)
             try:

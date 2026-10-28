@@ -112,7 +112,7 @@ class ReductionSafetyTests(unittest.IsolatedAsyncioTestCase):
         decision = await compactor(provider).check_budget(snapshot(messages))
         self.assertIsNotNone(decision)
         prompt = provider.calls[0]["messages"][0].content
-        for text in ("prior decisions", "important constraint", "image/png", "write", "important.txt", "error=True", "content omitted"):
+        for text in ("prior decisions", "important constraint", "image/png", "write", "important.txt", "error=True"):
             self.assertIn(text, prompt)
         self.assertNotIn("base64-secret", prompt)
 
@@ -130,14 +130,17 @@ class ReductionSafetyTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_auxiliary_input_and_output_have_separate_model_budget(self):
         provider = FauxProvider()
-        provider.respond_text("summary")
+        for _ in range(32): provider.respond_text("summary")
         reducer = SummarizingCompactor(SummarizingCompactorConfig(reserve_tokens=0, keep_recent_tokens=1), provider,
                                       summary_context_window=256, summary_output_limit=32)
         self.assertIsNotNone(await reducer.check_budget(snapshot()))
         call = provider.calls[0]
         self.assertEqual(32, call["max_tokens"])
         self.assertLessEqual(reducer.estimate_tokens(call["system_prompt"] + call["messages"][0].content) + 16 + 32, 256)
-        self.assertIn("content omitted", call["messages"][0].content)
+        evidence = "".join(c["messages"][0].content.split("<history>\n", 1)[1].split("\n</history>", 1)[0] for c in provider.calls)
+        self.assertIn("x" * 2000, evidence)
+        for c in provider.calls:
+            self.assertLessEqual(reducer.estimate_tokens(c["system_prompt"] + c["messages"][0].content) + 32 + 32, 256)
 
     async def test_invalid_or_pending_tool_links_are_not_compressed(self):
         for messages in (
@@ -155,3 +158,25 @@ class ReductionSafetyTests(unittest.IsolatedAsyncioTestCase):
         cut = find_cut_point(messages, 1, lambda _: 1)
         self.assertEqual(2, cut)
         self.assertTrue(valid_tool_links(messages[cut:]))
+
+    async def test_large_window_default_pages_cover_every_source_character(self):
+        from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone
+        class Provider:
+            def __init__(self): self.sizes = []
+            def __call__(self, view, *, signal=None):
+                prompt = view.messages[0].content
+                page = prompt.split('<history>\n', 1)[1].split('\n</history>', 1)[0]
+                self.sizes.append(len(page))
+                async def events(): yield StreamDone(AssistantMessage([TextBlock('continuity summary')], stop_reason='stop'))
+                return AssistantMessageEventStream(events())
+        provider = Provider()
+        reducer = SummarizingCompactor(SummarizingCompactorConfig(), provider, estimate_fn=lambda text: (len(text) + 3) // 4)
+        messages = [UserMessage('old task'), AssistantMessage([TextBlock('x' * 3_800_000)]), UserMessage('latest task')]
+        original = snapshot(messages, context_window=1_000_000, max_tokens=32768)
+        decision = await reducer.check_budget(original)
+        self.assertIsNotNone(decision)
+        self.assertEqual(len(reducer._serialize_history(messages[:decision.metadata['cut']], bounded=False)), sum(provider.sizes))
+        self.assertLessEqual(len(provider.sizes), reducer.config.max_pages)
+        self.assertGreater(len(provider.sizes), 16)
+        source = reducer.history.text(decision.metadata['source'])
+        self.assertIn('x' * 3_800_000, source)

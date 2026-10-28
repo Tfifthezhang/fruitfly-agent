@@ -1,6 +1,6 @@
 """Freeze declared memory contents; trial copies never share production writes."""
 from pathlib import Path
-from fruitfly_agent.lab.improvement.contracts.versions import SnapshotFile, StateSnapshot
+from fruitfly_agent.improvement.contracts.versions import SnapshotFile, StateSnapshot
 
 
 class FileMemorySnapshots:

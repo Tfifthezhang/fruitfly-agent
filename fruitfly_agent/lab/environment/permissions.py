@@ -165,6 +165,10 @@ class PermissionAuthorizer:
         try:
             if signal is not None and signal.is_set():
                 raise asyncio.CancelledError
+            if descriptor is not None and operation == 'context_read':
+                # The tool closes over a session-scoped reader, never a filesystem path.
+                yield AuthorizationDecision(True, 'read public context within this session')
+                return
             if descriptor is not None and operation == 'network_read':
                 allowed = self.policy.allow_network
                 reason = 'network reads allowed by host policy' if allowed else 'network reads disabled by host policy'

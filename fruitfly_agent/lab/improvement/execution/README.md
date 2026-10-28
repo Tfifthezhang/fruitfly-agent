@@ -17,7 +17,7 @@ metadata/materials without constructing Providers or starting model work.
 | [__init__.py](__init__.py): `ExecutionRegistry` | Explicit registration and lookup; duplicate IDs fail |
 | `ExecutionContext` | Borrowed task/model/component/artifact capabilities; no Application or Factory |
 | [files.py](files.py) | Native file materials and optional task-package verification |
-| [Experiment contracts](../contracts/experiments.py) | Requests, parameter declarations, prepared material and stage ports |
+| [Experiment contracts](../../../improvement/contracts/experiments.py) | Requests, parameter declarations, prepared material and stage ports |
 | [Editor experiments](../improver/README.md) | Registered fixed-depth I comparison |
 
 Preparation validates the exact component scope, typed parameters, source hashes
@@ -112,3 +112,21 @@ tool set. Standalone `FileTaskRunner` callers may explicitly pass `tool_names`;
 omission retains the detached runner's established three-tool default. All
 declared scalar execution settings reach Core; final values are saved as
 `runtime-execution.json`. Backend isolation and fixed root quotas remain active.
+
+## Validate declared task outputs
+
+`deliverables.py` defines `DeliverySpec` and `DeliveryBundle` for task-produced
+files. They are separate from `CandidateBundle`, which describes harness edits.
+File execution accepts `delivery_manifest`, naming a frozen JSON task input. The
+manifest declares an `entrypoint`, `dependencies`, allowed `inputs`, optional
+`arguments`, `timeout_seconds` (1–600, default 30) and `require_stdout` (default
+true). Paths must be distinct and relative; unknown or duplicate JSON keys fail.
+Declared output files must come from collected execution deliverables, and inputs
+must come from the frozen task. No ambient file becomes an implicit dependency.
+
+The default in-memory runner has no command execution capability. A manifest
+therefore requires an explicitly supplied `WorkflowBindings.delivery_backend`;
+preparation rejects unsupported execution before model work. Task packages without
+file inputs reject this parameter. [Delivery verification](../verification/README.md#validate-delivery-bundles)
+owns backend behavior, results and clean-directory limits. Existing executions
+without a manifest retain their declared behavior.

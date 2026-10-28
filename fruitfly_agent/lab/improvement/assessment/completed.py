@@ -5,13 +5,13 @@ import json
 from typing import Any
 
 from fruitfly_agent.core.data_model import ProviderView, UserMessage
-from ..contracts.live import Assessment, EvidencePosition, Metric
-from ..contracts.assessment import AssessmentUnavailable
-from ..contracts.search import ExplorationDecision
-from ..contracts.tasks import Resource
-from ..contracts.versions import canonical_json
-from ..execution.facts import FACTS_PATH, read_facts
-from ..workflow.budget import AllocationExhausted
+from fruitfly_agent.improvement.contracts.live import Assessment, EvidencePosition, Metric
+from fruitfly_agent.improvement.contracts.assessment import AssessmentUnavailable
+from fruitfly_agent.improvement.contracts.search import ExplorationDecision
+from fruitfly_agent.improvement.contracts.tasks import Resource
+from fruitfly_agent.improvement.contracts.versions import canonical_json
+from fruitfly_agent.improvement.execution.facts import FACTS_PATH, read_facts
+from fruitfly_agent.improvement.workflow.budget import AllocationExhausted
 from .feedback import FeedbackProjection
 
 

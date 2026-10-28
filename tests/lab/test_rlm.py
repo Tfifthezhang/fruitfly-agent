@@ -337,6 +337,7 @@ class RlmPipelineTest(unittest.IsolatedAsyncioTestCase):
                 ),
                 catalog=builtin_catalog(),
                 selections=(
+                    MechanismSelection("context-history"),
                     MechanismSelection(
                         "compaction",
                         parameters={},
@@ -349,7 +350,7 @@ class RlmPipelineTest(unittest.IsolatedAsyncioTestCase):
                 ),
                 context=AssemblyContext(
                     workspace=root,
-                    session=object(),
+                    session=None,
                     main_model="main-model",
                     provider_resolver=lambda *_: ProviderBinding(
                         child, "child-model", "child-profile"

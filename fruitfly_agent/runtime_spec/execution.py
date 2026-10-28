@@ -71,6 +71,39 @@ def flatten_execution(value):
 def apply_profile_binding(profile, kind, key, text):
     """Apply a validated declarative configuration binding, without artifact I/O."""
     from dataclasses import replace
+    if kind == 'configuration' and key.startswith('component.'):
+        name = key.removeprefix('component.')
+        def unique(pairs):
+            values = {}
+            for name, value in pairs:
+                if name in values:
+                    raise ValueError('duplicate component parameter')
+                values[name] = value
+            return values
+        parameters = json.loads(text, object_pairs_hook=unique)
+        if not isinstance(parameters, dict):
+            raise ValueError('component parameters must be an object')
+        if not any(m.mechanism_id == name and m.enabled for m in profile.mechanisms):
+            raise ValueError('parameter binding requires an existing enabled component')
+        return replace(profile,
+            mechanisms=tuple(replace(m, parameters=parameters) if m.mechanism_id == name else m for m in profile.mechanisms),
+            component_documents=tuple(replace(d, parameters=parameters) if d.id == name else d for d in profile.component_documents))
     if kind != 'configuration' or key != 'execution':
         raise ValueError('unsupported configuration binding')
     return replace(profile, execution=parse_execution(text))
+
+
+def apply_execution_payload_binding(payload, kind, key, text):
+    """Project a validated owner binding into the recorded execution identity."""
+    if kind != 'configuration':
+        raise ValueError('execution identity requires a configuration binding')
+    if key == 'execution':
+        return {**payload, 'execution': parse_execution(text)}
+    if key.startswith('component.'):
+        name = key.removeprefix('component.')
+        values = json.loads(text)
+        if not isinstance(values, dict) or not any(c['id'] == name for c in payload['components']):
+            raise ValueError('parameter identity requires an existing component')
+        return {**payload, 'components': [{**c, 'parameters': values} if c['id'] == name else c
+            for c in payload['components']]}
+    raise ValueError('unsupported configuration identity binding')

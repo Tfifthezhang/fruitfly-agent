@@ -24,3 +24,26 @@ Add implementations through [Lab Context manager](../../lab/context_manager/READ
 ```bash
 .venv/bin/python -m unittest tests.lab.test_context_pipeline tests.core.test_loop -v
 ```
+
+## Commit state and measure input
+
+[budget.py](budget.py) defines `InputMeasurement`, `ContextMeter`, request identity
+and transparent Provider capability forwarding. [history.py](history.py) defines
+the injected history reader; [validation.py](validation.py) checks complete tool
+pairing and optional Provider rebase constraints. [tasks.py](tasks.py) bounds
+external context work and cancellation cleanup. Core contains no estimator or
+summary prompt.
+
+A decision may carry JSON `state` without replacing messages. Projection and
+checkpoint commit only after final hooks, pairing/replay/budget checks, stale
+revision and cancellation checks, and successful synchronous persistence. A
+failed write preserves both previous active values and stops the run with
+`context_commit_unconfirmed`; durable outcome must be checked by reopening the
+Session. No main request follows an unconfirmed commit. State-only commits use `meta`
+`context_state` records; combined changes use one compaction entry. Checkpoints
+are restored by mechanism identity, separately from immutable canonical messages.
+
+`ContextSnapshot` includes measurement, checkpoint state, revision and a generic
+`rebase_allowed` capability. Lab methods control policy; Core revalidates actual
+final output. Preflight budget failures do not call the Provider. Heuristic
+measurements retain their uncertainty and cannot guarantee remote acceptance.

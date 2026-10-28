@@ -5,9 +5,9 @@ import json
 import re
 from typing import Literal, Protocol, runtime_checkable
 from fruitfly_agent.core.config import AgentLoopConfig
-from fruitfly_agent.lab.improvement.contracts.versions import (SystemVersion, StateSnapshot, SnapshotFile, STATE_SNAPSHOTS_COMPONENT, EXPERIMENT_BLOCKERS_COMPONENT,
+from fruitfly_agent.improvement.contracts.versions import (SystemVersion, StateSnapshot, SnapshotFile, STATE_SNAPSHOTS_COMPONENT, EXPERIMENT_BLOCKERS_COMPONENT,
                        canonical_json, content_hash)
-from fruitfly_agent.lab.improvement.contracts.candidates import VersionCandidate, TargetChange, TargetRegistry
+from fruitfly_agent.improvement.contracts.candidates import VersionCandidate, TargetChange, TargetRegistry
 
 TEXT_TARGET_PREFIX = 'text-target:'
 

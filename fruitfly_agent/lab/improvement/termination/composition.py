@@ -1,7 +1,7 @@
 """Deterministic composition and explicit policy registration."""
-from ..contracts.stopping import StopDecision, stop_reason
+from fruitfly_agent.improvement.contracts.stopping import StopDecision, stop_reason
 from dataclasses import asdict, is_dataclass
-from ..contracts.versions import canonical_json
+from fruitfly_agent.improvement.contracts.versions import canonical_json
 
 
 def policy_spec(policy):

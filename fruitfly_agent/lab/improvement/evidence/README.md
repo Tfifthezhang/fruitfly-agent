@@ -14,22 +14,22 @@ identities. Facts retain source references; the editor can inspect the original
 trajectory through the same workspace. No auxiliary extraction or summary stage
 is required. See [execution facts](../execution/README.md#record-execution-facts).
 
-[receipts.py](receipts.py) defines `TaskReference`, `TaskRunEvidence` and
+[receipts.py](../../../improvement/evidence/receipts.py) defines `TaskReference`, `TaskRunEvidence` and
 `EvidenceArtifact` for optional official executors. Runtime, conditions,
 environment, task material and invocation counts must match the authorized trial.
 Official reward fields remain private in behavior-based editing. Custom executors
 can consume these public values without defining the runtime workflow.
 
-[reporting.py](reporting.py) reads historical reports and validates their journal
+[reporting.py](../../../improvement/evidence/reporting.py) reads historical reports and validates their journal
 and task-snapshot references. Missing scores and usage stay unknown. Historical
 report readers do not restore the removed search engines or grant adoption.
 
 A tool workspace is a capability boundary, not an OS sandbox for trusted Python
-extensions. Entire evidence workspaces are bounded; text is paginated instead of
+extensions. Inline evidence and drafts are bounded; large originals stay referenced and text is paginated instead of
 silently truncated. Offline checks: `tests.lab.test_improvement_pipeline`,
 `tests.lab.test_search_reporting`, `tests.workflows.test_improvement_pipeline`.
 
-`session.py` supplies a shared bounded workspace-model transport. Editing and
+[Shared workspace transport](../workspaces.py) supplies a shared bounded workspace-model transport. Editing and
 read-only inspection provide their own policy and tools. Unknown external model
 usage remains separate from conservative quota charges in reports.
 
@@ -54,3 +54,22 @@ characters, truncation, projection implementation and returned page hash. Image
 and unavailable binary reads retain their status and size. Full originals remain
 in the ordinary artifact store. `context/edit-grants.json` gives the editor the
 same owner-normalized field permissions enforced during candidate validation.
+
+## Distinguish access from citation
+
+`access.py` tracks unaccessed grants, available bytes, supplied pages and access
+failures. Listing paths is not evidence supply. The editor may cite an execution
+only after its metadata or a page from its granted execution resources has been
+returned successfully. Empty search results and reads of candidate-written files
+do not authorize a citation. Missing references and unavailable binary renderers
+leave explicit failure receipts. Format repair preserves only already supplied
+citation eligibility; access recovery retains the original evidence grants.
+These checks establish provenance, not semantic understanding or task quality.
+
+`query.py` implements literal search with at most 500 query characters, 50 matches
+and 12000 excerpt characters. The kernel owns neither retrieval nor this policy.
+Optional lifecycle contributions appear under `context/extensions/`; reading a
+research summary does not satisfy the original execution-evidence requirement.
+
+Offline regression: `tests.lab.test_improvement_kernel` rejects a candidate that
+writes changes after repeatedly failing to read its cited execution resource.

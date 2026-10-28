@@ -24,7 +24,7 @@ and start preparation containers. Native collections require no Eval installatio
 | [sampling.py](sampling.py) | All, fixed and deterministic collection-stratified cycles |
 | [configuration.py](configuration.py) | Independent typed sampling, parallel, joint and promotion settings |
 | [execution.py](execution.py) | Public execution definition, frozen preview and shared `task_set_minimum_budget` calculation |
-| [Contracts](../contracts/README.md) | Task entries, snapshots, batch receipts and editing requests |
+| [Contracts](../../../improvement/contracts/README.md) | Task entries, snapshots, batch receipts and editing requests |
 | [Execution](../execution/README.md#schedule-task-batches) | One bounded queue and leaf allocations |
 | [Assessment](../assessment/README.md#compare-task-sets) | Declared utilities, promotion and process-guided exploration |
 | [Workflow](../workflow/README.md#share-one-search-loop) | One shared round engine |

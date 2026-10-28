@@ -3,7 +3,7 @@ from dataclasses import asdict, dataclass
 import json
 
 from fruitfly_agent.lab.algorithms.targets import TargetBinding, TargetSnapshot
-from ..contracts.pipeline import canonical_json, bounded
+from fruitfly_agent.improvement.contracts.pipeline import canonical_json, bounded
 
 
 @dataclass(frozen=True)
@@ -55,19 +55,41 @@ class EditorInstructionTarget:
     required_capabilities = frozenset({'improver-comparison'})
     adoption_roles = frozenset({'I'})
 
-    def __init__(self, instructions=None, *, text=None):
+    def __init__(self, instructions=None, *, max_tool_calls=48, max_turns=12, text=None):
         self.instructions = instructions or EditorInstructions()
-        self.text = self.instructions.serialize() if text is None else text
-        if EditorInstructions.parse(self.text) != self.instructions:
+        self.max_tool_calls, self.max_turns = max_tool_calls, max_turns
+        self.text = canonical_json({**asdict(self.instructions), 'max_tool_calls': max_tool_calls, 'max_turns': max_turns}) if text is None else text
+        parsed, calls, turns = self.parse_document(self.text)
+        if parsed != self.instructions or calls != max_tool_calls or turns != max_turns:
             raise ValueError('editor source text differs from the installed instructions')
 
     def snapshot(self):
         return TargetSnapshot('improvement-editor', self.text,
             TargetBinding('artifact', 'improvement-editor'),
-            'editor-instructions-v2', 'I')
+            'editor-instructions-v3', 'I')
+
+    @staticmethod
+    def parse_document(text):
+        def unique(pairs):
+            result = {}
+            for key, value in pairs:
+                if key in result:
+                    raise ValueError('duplicate editor candidate field')
+                result[key] = value
+            return result
+        value = json.loads(text, object_pairs_hook=unique)
+        if not isinstance(value, dict) or set(value) != {*EditorInstructions.__dataclass_fields__, 'max_tool_calls', 'max_turns'}:
+            raise ValueError('editor candidate requires all instruction fields and tool/turn allowances')
+        calls = value.pop('max_tool_calls')
+        turns = value.pop('max_turns')
+        if type(turns) is not int or not 1 <= turns <= 256:
+            raise ValueError('editor max_turns must be 1..256')
+        if type(calls) is not int or not 1 <= calls <= 256:
+            raise ValueError('editor max_tool_calls must be 1..256')
+        return EditorInstructions(**value), calls, turns
 
     def validate(self, text):
-        candidate = EditorInstructions.parse(text)
+        candidate, calls, turns = self.parse_document(text)
         if set(json.loads(text)) != set(json.loads(self.text)):
             raise ValueError('editor instruction schema cannot change within a candidate')
         for name in ('system', 'select', 'reflect'):
@@ -78,14 +100,30 @@ class EditorInstructionTarget:
         raise ValueError('editor instruction changes require an improver comparison runner')
 
     def validate_options(self, options):
-        if (not isinstance(options, dict) or set(options) != {'editable_fields'}
-                or not isinstance(options['editable_fields'], list) or not options['editable_fields']
-                or set(options['editable_fields']) - {'propose', 'invariant', 'domain', 'compose'}):
-            raise ValueError('editor options must select mutable instruction fields')
+        if (not isinstance(options, dict) or set(options) - {'editable_fields', 'bounds'}
+                or not isinstance(options.get('editable_fields'), list) or not options['editable_fields']
+                or len(set(options['editable_fields'])) != len(options['editable_fields'])
+                or set(options['editable_fields']) - {'propose', 'invariant', 'domain', 'compose', 'max_tool_calls', 'max_turns'}):
+            raise ValueError('editor options must select mutable instructions or tool/turn allowances')
+        bounds = options.get('bounds', {})
+        if not isinstance(bounds, dict) or set(bounds) - ({'max_tool_calls', 'max_turns'} & set(options['editable_fields'])):
+            raise ValueError('editor bounds require a granted tool/turn allowance field')
+        for limits in bounds.values():
+            if (not isinstance(limits, dict) or not limits or set(limits) - {'minimum', 'maximum'}
+                    or any(type(v) is not int for v in limits.values())
+                    or limits.get('minimum', 1) > limits.get('maximum', 256)):
+                raise ValueError('editor bounds must be ordered integer limits')
+        self.validate_change(self.text, options)
 
     def validate_change(self, text, options):
         self.validate(text)
-        value = EditorInstructions.parse(text)
+        value, calls, turns = self.parse_document(text)
         for field in self.instructions.__dataclass_fields__:
             if field not in options['editable_fields'] and getattr(value, field) != getattr(self.instructions, field):
                 raise ValueError('candidate changed a fixed editor instruction: ' + field)
+        for name, after, before in (('max_tool_calls', calls, self.max_tool_calls), ('max_turns', turns, self.max_turns)):
+            if name not in options['editable_fields'] and after != before:
+                raise ValueError('candidate changed the fixed editor allowance: ' + name)
+            limits = options.get('bounds', {}).get(name, {})
+            if not limits.get('minimum', 1) <= after <= limits.get('maximum', 256):
+                raise ValueError('editor allowance exceeds experiment bounds: ' + name)

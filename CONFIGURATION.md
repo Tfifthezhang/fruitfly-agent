@@ -236,7 +236,8 @@ The capability page uses arrows and Space/Enter to toggle, then **Continue** to 
 |---|---|---|
 | Base prompt | `assistant-default`; choose another prompt in **Configure → prompt** or `/config`. | [Base prompt](fruitfly_agent/lab/base_prompt/README.md) |
 | Skill catalog | Read `.skills/`; enable in **Context → Context augmentation → Skill catalog** (Space toggles; the phase is a section heading). | [Skills](fruitfly_agent/lab/context_manager/augmentation/skills/README.md) |
-| Reduction | Summarizing; inspect the mechanism in Context and edit tuning parameters in YAML. | [Reduction](fruitfly_agent/lab/context_manager/reduction/README.md) |
+| Reduction | Summarizing by default, or incremental working memory; select one method and keep `context-history` enabled. Edit prompts and policy in H component files. | [Reduction](fruitfly_agent/lab/context_manager/reduction/README.md) |
+| Context measurement | Enabled in defaults; reports precision, input/output reserves and uncertainty. Exact counting requires a declared Provider capability. | [Measurement](fruitfly_agent/lab/context_manager/measurement/README.md) |
 | Improvement | Edit I component files for strategy and feedback; experiment grants and conditions control edits, allocations, scope and stopping; `/improvement` keeps a small instruction/file flow. | [Improvement](fruitfly_agent/lab/improvement/README.md) |
 | Reusable skill document | Disabled; Context augmentation. Set `source_path` to one workspace-relative Skill or enter `initial_text`; `max_chars=16000`. | [Skill body](fruitfly_agent/lab/context_manager/augmentation/skills/README.md#optimize-a-skill-body) |
 | Learned environment memory | Disabled; Context augmentation. Enter `initial_text`; `max_chars=16000`. Updates require explicit Improvement and adoption. | [Learned memory](fruitfly_agent/lab/context_manager/augmentation/information/file_memory/README.md#learn-environment-memory) |
@@ -319,7 +320,7 @@ Authored text belongs in component parameters. Typed Python hosts can create imm
 
 `tool-guidance.<name>` replaces an enabled tool description with its owner-validated text. Experiment files select one or more editable components. A joint candidate expands into ordinary prompt/artifact bindings; tool schemas, execution and permissions retain their existing contracts. Preview is offline; execution may incur model and external-runner costs.
 
-`execution-workflow` validates bounded stage instructions. `skill-document` and `learned-memory` are retained S documents; adopted artifacts override initial text. `improvement-editor` has seven stage instruction fields. The registered editor-comparison execution can modify granted `propose`, `invariant`, `domain` and `compose` fields; `system`, `select` and `reflect` stay fixed during an experiment. Persistent publication requires independent verification and explicit adoption.
+`execution-workflow` validates bounded stage instructions. `skill-document` and `learned-memory` are retained S documents; adopted artifacts override initial text. `improvement-editor` has seven stage instruction fields. The registered editor-comparison execution can modify granted `propose`, `invariant`, `domain` and `compose` fields, plus granted `max_tool_calls` and `max_turns`; `system`, `select` and `reflect` stay fixed during an experiment. Persistent publication requires independent verification and explicit adoption.
 
 ## Environment variables
 
@@ -348,7 +349,7 @@ With no initial choice, a sole catalog entry is selected automatically. Multiple
 | Experiment history | `.fruitfly/improvement/runs/`; scoped run summaries, including empty, failed and cancelled jobs |
 | Candidates | `.fruitfly/improvement/candidates/`; latest complete result per configuration, profile, target, and task pack |
 | Text contents | `.fruitfly/artifacts/`; immutable content-addressed artifacts |
-| Workflow records | `.fruitfly/improvement/jobs/<job-id>/`; frozen plan, journal and result |
+| Workflow records | `.fruitfly/improvement/jobs/<job-id>/`; frozen plan, journal, immediate candidate snapshots, checkpoint and final result |
 | Experience | `.fruitfly/improvement/experience.json`; explicitly committed library included in S identity |
 | Pending lessons | `.fruitfly/improvement/experience-pending/`; review before commit/reject |
 | Editor experiments | `.fruitfly/improvement/experiments/<id>/experiment.json`; references disjoint task packages |

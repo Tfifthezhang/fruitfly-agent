@@ -29,10 +29,11 @@ from .context_runtime import (
     is_context_overflow,
     recover_from_overflow,
     snapshot,
+    measure_context, restore_context_state,
 )
 from .context import ContextPipeline, ContextReducer
 from .data_model.runtime import AgentLoopContext, ProviderView
-from .errors import FatalError, OverflowError, RetryableError
+from .errors import FatalError, OverflowError, RetryableError, TaggedError
 from .extensions.hooks import (
     AFTER_RESPONSE,
     BEFORE_REQUEST,
@@ -92,8 +93,13 @@ async def run_agent_loop(
         max_tokens=config.max_tokens,
         canonical_items=canonical_items,
         signal=signal,
+        context_meter=config.context_meter, provider=config.provider,
     )
     try:
+        check_writer = getattr(ctx.session, 'check_writable', None)
+        if callable(check_writer):
+            check_writer()
+        ctx.context_state = restore_context_state(config.session)
         return await _run(config, ctx, signal, context_pipeline)
     except asyncio.CancelledError:
         pending_calls = {}
@@ -131,6 +137,7 @@ async def run_agent_loop(
             usage=ctx.usage,
             is_error=True,
             error_details={
+                **(exc.details if isinstance(exc, TaggedError) and isinstance(exc.details, dict) else {}),
                 "error": f"{type(exc).__name__}: {exc}",
                 "traceback": traceback.format_exc(),
                 "model": ctx.model,
@@ -185,6 +192,7 @@ async def _run(
                         ctx.model = prepared.model
                     if prepared.provider is not None:
                         provider = prepared.provider
+                        ctx.provider = provider
 
             # Steering messages injected before the next assistant response
             # (the callback must drain — return each message once).
@@ -208,14 +216,21 @@ async def _run(
             if request_ctx is None:
                 return await _finish(config, ctx, hooks, "aborted", turn_count, tool_call_count)
 
-            ctx.provider_attempt_count += 1
-            assistant = await _stream_once(provider, request_ctx, signal, ctx)
+            assistant: AssistantMessage | TaggedFailure
+            preflight = ctx.measurement is not None and not ctx.measurement.fits(ctx.context_window)
+            if preflight:
+                assistant = TaggedFailure(OverflowError('request exceeds the measured context budget',
+                    details={'preflight': True, 'measurement': asdict(ctx.measurement)}))
+            else:
+                ctx.provider_attempt_count += 1
+                assistant = await _stream_once(provider, request_ctx, signal, ctx)
             if isinstance(assistant, TaggedFailure):
                 handled = await _handle_failure(assistant, ctx, hooks, context_pipeline)
-                ctx.provider_failure_count += 1
+                if not preflight:
+                    ctx.provider_failure_count += 1
                 _append_session_record(
                     ctx,
-                    "provider_attempt_failed",
+                    "context_preflight_failed" if preflight else "provider_attempt_failed",
                     {
                         "attempt": ctx.provider_attempt_count,
                         "model": ctx.model,
@@ -358,6 +373,9 @@ async def _prepare_request(
     signal: asyncio.Event | None,
 ) -> BeforeRequestEvent | None:
     """Commit request changes and observations; return no request after cancellation."""
+    check_writer = getattr(ctx.session, 'check_writable', None)
+    if callable(check_writer):
+        check_writer()
     # --- request preparation ---
     # Active changes are committed to ctx before budgeting so the
     # reducer and provider see the same prompt/messages/tools/model.
@@ -374,6 +392,8 @@ async def _prepare_request(
     # Lab transformations then prepare the final projection for budgeting.
     if isinstance(context_pipeline, ContextPipeline):
         await context_pipeline.prepare(ctx)
+
+    await measure_context(ctx)
 
     # --- reduction budget check before every Provider request ---
     await _check_budget(ctx, hooks, context_pipeline)
@@ -397,6 +417,10 @@ async def _prepare_request(
                 source = str(getattr(context_pipeline, "estimate_source", "context reducer"))
         except Exception:
             logger.warning("request context estimate unavailable", exc_info=True)
+    await measure_context(ctx)
+    if ctx.measurement is not None:
+        estimate, source = ctx.measurement.input_tokens, ctx.measurement.source
+        _append_session_record(ctx, 'input_measurement', asdict(ctx.measurement))
     prepared = RequestPreparedEvent(ctx.model, ctx.context_window, ctx.max_tokens,
                                     estimate, source, time.time())
     _append_session_record(ctx, "request_context", asdict(prepared))
@@ -404,6 +428,9 @@ async def _prepare_request(
     if _aborted(signal):
         return None
 
+    check_writer = getattr(ctx.session, 'check_writable', None)
+    if callable(check_writer):
+        check_writer()
     return request_ctx
 
 
@@ -418,6 +445,13 @@ async def _record_response(
     _append(ctx, assistant)
     ctx.tool_request_count += len(assistant.tool_calls)
     ctx.last_input_tokens = assistant.usage.input_tokens if assistant.usage else None
+    if ctx.measurement is not None and ctx.context_meter is not None:
+        observe = getattr(ctx.context_meter, 'observe', None)
+        if callable(observe):
+            try:
+                observe(ctx.measurement, assistant.usage, ctx.provider)
+            except Exception:
+                logger.warning('input measurement observation failed', exc_info=True)
     response_event.receipt_timestamp = time.time()
     _append_session_record(ctx, "request_receipt", {
         "model": ctx.model, "input_tokens": ctx.last_input_tokens,

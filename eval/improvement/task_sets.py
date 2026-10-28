@@ -6,7 +6,7 @@ import yaml
 
 from fruitfly_agent.lab.improvement.api import (TaskSetSourceDefinition, TaskEntry, TaskMaterial,
     ScoreSpec, CollectionBinding, ExecutionPorts, content_hash)
-from fruitfly_agent.lab.improvement.contracts.versions import canonical_json
+from fruitfly_agent.improvement.contracts.versions import canonical_json
 from eval.contracts import EvaluationRequest
 from eval.catalog import builtin_catalog
 from eval.harbor.host import HostConfig

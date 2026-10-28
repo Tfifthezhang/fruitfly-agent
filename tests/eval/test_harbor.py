@@ -550,7 +550,7 @@ class HarborAdapterTests(unittest.TestCase):
             models_path = root / "models.yaml"
             config_path.write_text(yaml.safe_dump({'default_profile': 'default', 'profiles': {
                 'default': profile_document(catalog='models.yaml', executor='test',
-                    mechanisms=[{'id': 'compaction', 'enabled': True, 'parameters': {}}])}}))
+                    mechanisms=[{'id': 'context-history'}, {'id': 'compaction', 'enabled': True, 'parameters': {}}])}}))
             models_path.write_text(
                 'models:\n  test:\n    sdk: openai\n    protocol: responses\n    api_key_env: TEST_API_KEY\n    model: test-model\n    context_window: 8192\n    max_output_tokens: 1024\n',
                 encoding="utf-8",
@@ -569,7 +569,7 @@ class HarborAdapterTests(unittest.TestCase):
                 profile.model_catalog,
                 "/installed-agent/fruitfly/runtime/models.yaml",
             )
-            self.assertEqual(enabled, {"compaction": True})
+            self.assertEqual(enabled, {"context-history": True, "compaction": True})
             copied = yaml.safe_load(copied_models.read_text())["models"]["test"]
             self.assertEqual(copied["model"], "test-model")
             self.assertEqual(copied["api_key_env"], "TEST_API_KEY")

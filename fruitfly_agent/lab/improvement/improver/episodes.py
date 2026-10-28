@@ -2,11 +2,12 @@
 from copy import deepcopy
 from dataclasses import asdict, replace
 from inspect import isawaitable
+from typing import Literal
 
 from ..components import ComponentRegistry, TextComponentAdapter
-from ..contracts.experiments import EpisodeResult
-from ..contracts.pipeline import RunPlan, TaskMaterial, canonical_json
-from ..contracts.versions import SystemVersion, content_hash
+from fruitfly_agent.improvement.contracts.experiments import EpisodeResult
+from fruitfly_agent.improvement.contracts.pipeline import RunPlan, TaskMaterial, canonical_json
+from fruitfly_agent.improvement.contracts.versions import SystemVersion, content_hash
 from ..editor import AgentEditor, model_completion
 from ..assessment.selection import AgentSelector
 from ..assessment.inspection import ReadOnlyInspector
@@ -17,6 +18,7 @@ from ..assessment.verification import CaseMeasurements
 
 
 class NativeEpisodeExecutor:
+    feedback: Literal['behavior', 'scored'] = 'behavior'
     def __init__(self, context, episode, parameters, *, generator_factory=AgentGenerator,
                  composer_factory=AgentComposer, runner_factory=FileTaskRunner):
         self.context, self.episode, self.parameters = context, episode, parameters
@@ -24,10 +26,10 @@ class NativeEpisodeExecutor:
 
     async def run(self, request, *, budget, signal):
         context, params = self.context, self.parameters
-        instructions = EditorInstructions.parse(request.instructions)
+        instructions, calls, turns = EditorInstructionTarget.parse_document(request.instructions)
         registry = deepcopy(context.components)
         registry.adapters['improvement-editor'] = TextComponentAdapter(
-            EditorInstructionTarget(instructions, text=request.instructions), 'improvement-instructions')
+            EditorInstructionTarget(instructions, max_tool_calls=calls, max_turns=turns, text=request.instructions), 'improvement-instructions')
         settings = deepcopy(context.system_settings or {})
         from ..components.configuration import ImprovementSettingsTarget
         for key in ('feedback', 'search'):
@@ -50,15 +52,17 @@ class NativeEpisodeExecutor:
         plan = RunPlan(request.episode_id, parent, request.component_ids,
             generator_id=self.generator_factory.generator_id, mode='sequential', depth=depth,
             max_model_calls=params['inner_model_calls'], max_executions=params['inner_executions'],
-            operation_timeout=context.plan.operation_timeout,
+            operation_timeout=context.plan.operation_timeout, feedback=self.feedback,
             strategy_id=search.get('strategy', params.get('inner_strategy', 'harness2')), retain_experience=False)
         selection = budget.child({'model': params['inner_model_calls'], 'execution': params['inner_executions']})
         services = WorkflowServices(plan, budget=selection,
             record=lambda event, **fields: context.services.record(event, episode_id=request.episode_id, **fields))
         try:
             editor = services.own(AgentEditor(context.editor_config, context.artifacts, registry, instructions=instructions,
-                max_tool_calls=settings.get('editor', {}).get('max_tool_calls', 48),
-                page_characters=feedback.get('evidence', {}).get('page_characters', 12000)))
+                max_tool_calls=calls, max_turns=turns,
+                page_characters=feedback.get('evidence', {}).get('page_characters', 12000),
+                projection=feedback.get('evidence', {}).get('projection', 'granted-full'),
+                    access_mode=feedback.get('evidence', {}).get('access_mode', 'search')))
             services.editor = editor.edit
             services.completer = model_completion(context.editor_config)
             runner = services.own(self.runner_factory(context.config, registry, context.artifacts, services))
@@ -81,9 +85,14 @@ class NativeEpisodeExecutor:
                 validate_process_configuration(completed.settings if completed is not None else ProcessAssessmentSettings(),
                     ExplorationSettings(search['exploration']), builtin_completed_assessors(), builtin_explorations())
                 exploration = builtin_explorations().create(search['exploration'], own=services.own)
-            flow = ImprovementWorkflow(generators=generators, components=registry, runner=runner,
+            from ..workflow.mechanisms import install_workflow_mechanisms
+            inner_context = replace(context, plan=plan, services=services, components=registry, system_settings=settings,
+                save_record=None)
+            stop_policy = install_workflow_mechanisms(inner_context)
+            flow = ImprovementWorkflow(stop_policy=stop_policy,generators=generators, components=registry, runner=runner,
                 artifacts=context.artifacts,
                 completed_assessment=completed, exploration=exploration,
+                measurements=getattr(runner, 'measurements', None),
                 composer=services.own(self.composer_factory()), selector=AgentSelector(
                     ReadOnlyInspector(context.assessor_config or context.editor_config, context.artifacts, instructions=instructions), services))
             baseline = registry.snapshot()
@@ -97,7 +106,7 @@ class NativeEpisodeExecutor:
         try:
             runner = evaluation_services.own(self.runner_factory(context.config, registry, context.artifacts, evaluation_services))
             for index, case in enumerate(self.episode.evaluations):
-                task = TaskMaterial(f'check-{index}', case.input, environment_id='file-workspace-v1')
+                task = self.evaluation_task(index, case)
                 values = []
                 for harness in (baseline, outcome.harness):
                     check_budget = budget.child({'model': params['evaluation_model_calls'], 'execution': 1})
@@ -111,12 +120,10 @@ class NativeEpisodeExecutor:
                             or record.harness_id != harness.snapshot_id or record.initial_state_id != parent.state
                             or record.conditions_id != plan.conditions_id):
                         raise ValueError('episode evaluation receipt is incomplete or mismatched')
-                    score = self.episode.suite.evaluation_policy.score(record.output, case)
-                    if isawaitable(score):
-                        score = await evaluation_services.operation(score)
-                    if not 0 <= score.score <= 1:
+                    score = await self.measure(runner, task, record, case, evaluation_services)
+                    if not 0 <= score <= 1:
                         raise ValueError('improver comparison requires normalized scores in [0, 1]')
-                    values.append(score.score)
+                    values.append(score)
                     ref = context.artifacts.put(canonical_json(asdict(record)).encode())
                     context.services.record('episode-evaluation', episode_id=request.episode_id, evidence=ref)
                 before.append(values[0])
@@ -124,3 +131,12 @@ class NativeEpisodeExecutor:
             return EpisodeResult(request.episode_id, outcome, budget.used['model'], budget.used['execution'], tuple(before), tuple(after))
         finally:
             await evaluation_services.close()
+
+    def evaluation_task(self, index, case):
+        return TaskMaterial(f'check-{index}', case.input, environment_id='file-workspace-v1')
+
+    async def measure(self, runner, task, record, case, services):
+        score = self.episode.suite.evaluation_policy.score(record.output, case)
+        if isawaitable(score):
+            score = await services.operation(score)
+        return score.score

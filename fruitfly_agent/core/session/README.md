@@ -10,7 +10,9 @@ Store and replay the canonical conversation in an append-only JSONL file.
 |---|---|
 | Messages | Valid user, assistant, and tool messages |
 | Assistant protocol continuation | Optional exact response items, internal format check, content/context binding and opaque signatures; keys/request bodies excluded |
-| Context decisions | Committed reduction decisions |
+| Context decisions | Committed reduction projections with optional atomic mechanism checkpoint |
+| Metadata context_state | State-only mechanism checkpoint with code-owned coverage and artifact identity |
+| Input measurement | Input count, precision, uncertainty, effective output reserve and request identity |
 | RuntimeManifest | Complete assembled environment snapshots written and validated by Run |
 | Metadata contextProjection | Atomic replacement of the model projection when restoring with changed mechanisms; canonical facts remain intact |
 | Run start/end | Model, counts, stop reason, usage, bounded errors and optional immutable loop diagnostics with termination cause and scoped limits |
@@ -54,3 +56,11 @@ Session files may contain prompts, responses, tool output, and error text. Treat
 ```
 
 Standard Run may append `meta` entries with `kind="authorization"`, call/tool identity, operation, allow/deny outcome, and reason. These are concise decisions, not replayable approvals. Runtime grant caches and full permission prompt command/code bodies are not stored in these audit entries. The owning Session writer remains privileged relative to model file tools.
+
+After a write, flush or synchronization failure, the writer rejects further
+appends, including diagnostic records. `check_writable()` reports this state;
+Core checks it before model requests. Close and reopen the Session to validate
+the actual durable prefix. This prevents duplicate IDs when bytes reached the
+file but synchronization failed before the in-memory cursor advanced. Validation
+errors before I/O do not poison the writer. Custom Session writers should expose
+the same optional preflight and must not reuse an unconfirmed sequence position.

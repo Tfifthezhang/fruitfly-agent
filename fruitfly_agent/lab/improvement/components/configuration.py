@@ -2,7 +2,7 @@
 import json
 
 from fruitfly_agent.lab.algorithms.targets import TargetBinding, TargetSnapshot
-from ..contracts.versions import canonical_json
+from fruitfly_agent.improvement.contracts.versions import canonical_json
 from ..system_configuration import feedback_parameters, search_parameters
 
 
@@ -26,9 +26,12 @@ class ImprovementSettingsTarget:
         self.key = key
         self.label = 'Improvement ' + key
         definitions = {
-            'feedback': (feedback_parameters, {'evidence.page_characters', 'judgment_guidance', 'comparison_guidance',
+            'feedback': (feedback_parameters, {'evidence.page_characters', 'evidence.access_mode', 'evidence.projection', 'judgment_guidance', 'comparison_guidance',
                                               'process_assessment.assessors'}),
-            'search': (search_parameters, {'strategy', 'rounds', 'exploration'})}
+            'search': (search_parameters, {'strategy', 'rounds', 'exploration',
+                'research.enabled', 'research.max_entries', 'research.retrieve_entries', 'research.guidance',
+                'progress.patience', 'progress.failure_patience',
+                'finalization.reserve_model_calls', 'finalization.reserve_executions'})}
         self.normalize, self.editable = definitions[key]
         self.parameters = self.normalize(parameters)
 

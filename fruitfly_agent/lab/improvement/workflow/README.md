@@ -5,7 +5,9 @@
 [__init__.py](__init__.py) exports the default `WorkflowController`,
 `GeneratorRegistry`, shared allocation and cancellation services. Generation,
 composition, execution, selection, optional verification and reflection use
-public ports. No stage activates a candidate.
+public ports. The [independent kernel](../../../improvement/workflow/README.md)
+owns transitions and accounting. `assembly.py` injects built-in Lab strategies.
+No stage activates a candidate.
 
 Parallel proposals share frozen references and prior history. Sequential rounds
 carry the declared exploration seed and accumulated execution evidence; the default
@@ -30,7 +32,8 @@ Offline checks: `tests.lab.test_improvement_pipeline`,
 Per-job factory products can implement `JobResource.aclose`. The Run host registers
 ownership immediately, deduplicates objects and closes in reverse order after
 success, failure or cancellation. Cleanup waits at most ten seconds per resource
-(or the smaller operation timeout) and records failures. Borrowed verifier and
+and records failures. All resources are attempted; failed or unconfirmed cleanup
+raises a fatal cleanup error. Borrowed verifier and
 measurement ports remain caller-owned. Embeddings use `async with WorkflowServices`
 or close their services explicitly after execution; generator factories must clean
 up partially failed construction.
@@ -49,7 +52,7 @@ stop are recorded separately from quality assurance. These rules are bounded
 search decisions, not a convergence proof. The host can inject another stop
 policy through `WorkflowBindings`.
 
-[budget.py](budget.py) supplies `BudgetScope`. Child quota is held rather than
+[budget.py](../../../improvement/workflow/budget.py) supplies `BudgetScope`. Child quota is held rather than
 spent; leaf reservations charge every ancestor once. Closing returns only unused
 quota. Deadline and cancellation inherit through nested operations. Final
 selection holds up to eight model requests when available; independent verification
@@ -59,10 +62,10 @@ charge their leaf executions; trial count is independently bounded.
 
 ## Responsibility boundaries
 
-`controller.py` owns the compatible single-task entry and validation; registered
+`fruitfly_agent.improvement.workflow.controller` owns the compatible single-task entry and validation; registered
 [strategies](../strategies/README.md) supply references, missions, rounds and optional
 composition counts. The controller contains no fixed invariant/domain pairing.
-`services.py` owns job operations and
+`fruitfly_agent.improvement.workflow.services` owns job operations and
 resources. Concrete file execution is in `execution/file_runner.py` under the
 [execution module](../execution/README.md); the old import forwards explicitly.
 Generator registration belongs to the editor. Pure stop implementations belong
@@ -87,8 +90,8 @@ search before independent publication.
 
 ## Share one search loop
 
-`engine.py` owns `SearchEngine`: round missions, sequential candidate probes,
-optional composition, selection, stopping and next-seed transitions. `problems.py`
+`fruitfly_agent.improvement.workflow.engine` owns `SearchEngine`: round missions, sequential candidate probes,
+optional composition, selection, stopping and next-seed transitions. `fruitfly_agent.improvement.workflow.problems`
 defines its explicit operation callbacks. Single tasks and task sets use this same
 engine and [execution queue](../execution/README.md#schedule-task-batches).
 
@@ -97,3 +100,17 @@ on identical sampled tasks, then promotes through a full common selection set.
 Its source, sampling, evaluator, aggregation and comparison dependencies remain
 replaceable. Formal selection, development exploration and independent assurance
 have distinct records. See [joint search](../task_sets/README.md).
+
+## Install research mechanisms per job
+
+`mechanisms.py` assembles [research context, progress conditions and finalization
+reserves](../research/README.md) from the selected I search component. Run and
+fixed-I episodes call the same installer with explicit context capabilities.
+`assembly.py` injects selection, incumbent exploration and soft stopping; those
+algorithms are not kernel defaults. `WorkflowBindings.hooks` can install another
+job-local mechanism through [immutable lifecycle events](../../../improvement/extensions/README.md).
+
+Optional hook errors are isolated; required hook errors stop search while keeping
+completed receipts. Private task-set selection/confirmation trials do not enter
+research callbacks. Hard quotas, original material identities and independent
+verification remain kernel/host invariants, rather than research-editable policy.

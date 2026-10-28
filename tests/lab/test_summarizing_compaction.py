@@ -74,47 +74,27 @@ class TestSummarizingCompactor(unittest.IsolatedAsyncioTestCase):
 
     async def test_summary_request_uses_exposed_limits_and_model(self):
         summarizer = FauxProvider()
-        summarizer.respond_text("summary")
-        compactor = SummarizingCompactor(
-            SummarizingCompactorConfig(
-                reserve_tokens=0, keep_recent_tokens=1,
-                summary_word_limit=123,
-                summary_max_tokens=456,
-                per_message_char_limit=20,
-                history_char_limit=80,
-            ),
-            summarizer,
-            summary_model="summary-model",
-        )
+        for _ in range(64): summarizer.respond_text("summary")
+        compactor = SummarizingCompactor(SummarizingCompactorConfig(
+            reserve_tokens=0, keep_recent_tokens=1, summary_word_limit=123,
+            summary_max_tokens=456, per_message_char_limit=80, history_char_limit=80),
+            summarizer, summary_model="summary-model")
         from fruitfly_agent.core.data_model import ContextItem, ContextSnapshot
-
-        messages = [
-            UserMessage(content="old " + "x" * 100),
-            AssistantMessage(content=[TextBlock(text="old answer")]),
-            UserMessage(content="recent"),
-        ]
-        snapshot = ContextSnapshot(
-            canonical_items=tuple(
-                ContextItem(str(index), message)
-                for index, message in enumerate(messages)
-            ),
-            messages=tuple(messages),
-            system_prompt="",
-            tools=(),
-            context_window=128,
-            model="main-model",
-            max_tokens=100,
-            trigger="budget",
-        )
-
+        messages = [UserMessage("old " + "x" * 400), AssistantMessage([TextBlock("old answer")]), UserMessage("recent")]
+        snapshot = ContextSnapshot(tuple(ContextItem(str(i), m) for i, m in enumerate(messages)),
+            tuple(messages), "", (), 128, "main-model", 32, "budget")
         decision = await compactor.check_budget(snapshot)
-
         self.assertIsNotNone(decision)
-        self.assertEqual("summary-model", summarizer.calls[0]["model"])
-        self.assertEqual(456, summarizer.calls[0]["max_tokens"])
-        prompt = summarizer.calls[0]["messages"][0].content
-        self.assertIn("Under 123 words", prompt)
-        self.assertNotIn("x" * 21, prompt)
+        evidence = []
+        for call in summarizer.calls:
+            self.assertEqual("summary-model", call["model"])
+            self.assertEqual(456, call["max_tokens"])
+            prompt = call["messages"][0].content
+            self.assertIn("Under 123 words", prompt)
+            page = prompt.split("<history>\n", 1)[1].split("\n</history>", 1)[0]
+            self.assertLessEqual(len(page), 80)
+            evidence.append(page)
+        self.assertIn("x" * 400, "".join(evidence))
 
     async def test_budget_layer_compacts_before_request(self):
         tool, calls = make_tool()

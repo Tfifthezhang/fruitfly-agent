@@ -1,5 +1,5 @@
 """Incremental process/resource measurements without task-specific quality weights."""
-from ..contracts.live import Assessment, Metric
+from fruitfly_agent.improvement.contracts.live import Assessment, Metric
 
 
 class ProcessMetrics:

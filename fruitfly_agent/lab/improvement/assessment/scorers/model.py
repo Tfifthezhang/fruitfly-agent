@@ -1,7 +1,7 @@
 """A separately configured, budgeted model judge without candidate-edit tools."""
 import json
 from fruitfly_agent.core.data_model import ProviderView, UserMessage
-from ...contracts.live import Assessment, Metric
+from fruitfly_agent.improvement.contracts.live import Assessment, Metric
 
 
 class ModelAssessor:

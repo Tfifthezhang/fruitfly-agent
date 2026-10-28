@@ -13,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Awaitable, Callable, Sequence
 
+from .context.budget import ContextMeter
 from .data_model.messages import AgentMessage, AgentToolResult, ToolResultMessage
 from .data_model.runtime import AgentLoopContext, BeforeToolCallResult
 from .env.protocols import ExecutionEnv
@@ -77,6 +78,8 @@ class AgentLoopConfig:
         ]
         | None
     ) = None
+
+    context_meter: ContextMeter | None = None
 
     # --- subsystems ---
     tool_authorizer: ToolAuthorizer | None = None

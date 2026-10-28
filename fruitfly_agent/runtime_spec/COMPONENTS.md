@@ -81,13 +81,14 @@ consume the owning job's budget. Model roles are outside ordinary edit grants.
 | `tool-guidance.<tool>` (H) | `text`; enabled tool must exist | [Tools](../lab/tools/README.md) |
 | `execution-workflow` (H) | `steps`, 1–6 bounded instructions | [Workflow](../lab/workflow/README.md) |
 | `learned-memory`, `skill-document` (S) | `initial_text`, `max_chars`; Skill may declare `source_path` | [Retained targets](../lab/algorithms/README.md) |
-| `improvement-editor` (I) | `model_role: editor`, `max_tool_calls`, `instructions` | [Editor](../lab/improvement/editor/README.md) |
+| `improvement-editor` (I) | `model_role: editor`, `max_tool_calls`, `max_turns`, `instructions` | [Editor](../lab/improvement/editor/README.md) |
 | `improvement-feedback` (I) | `evidence`, `process_assessment`, judgment/comparison guidance | [Assessment](../lab/improvement/assessment/README.md) |
-| `improvement-search` (I) | Strategy/generator/rounds/mode/width, exploration, retention; optional sampling/promotion frequency | [Search](../lab/improvement/strategies/README.md) |
+| `improvement-search` (I) | Strategy/generator/rounds/mode/width, exploration, retention; research/progress/finalization; optional sampling/promotion frequency | [Search](../lab/improvement/strategies/README.md) |
 
 I search supports registered `simple` and `harness2` settings. Simple uses width 1
 and parallel mode; task sets currently require simple/scored/task operation.
-I feedback currently exposes `granted-full` evidence with bounded character pages;
+I feedback exposes `granted-full` evidence with bounded character pages and
+`evidence.access_mode: search` (default) or `paged`;
 that view never grants private verification material. Facts collection is an
 execution contract, independent of which optional assessor is enabled.
 
@@ -131,3 +132,12 @@ quality. Owner-declared initial resource files are copied to `resources/`, with
 workspace-relative paths recorded in the snapshot. Explicit export previews
 those files before writing. Keep that working-directory layout for resource-backed
 components; services and runtime-specific dependencies still need preparation.
+
+## Configure outer-loop research
+
+The I `improvement-search.parameters` mapping also accepts `research`, `progress`
+and `finalization`. Their strict fields, defaults and runtime effects belong to
+[Lab research](../lab/improvement/research/README.md#configure-and-compare-mechanisms).
+They use the same component loader, grants, candidate trial and restoration path
+as other I settings. None changes the kernel's hard quotas or grants access to
+private evaluation material. Unknown nested fields are rejected.

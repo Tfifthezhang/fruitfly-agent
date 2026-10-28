@@ -7,7 +7,7 @@ import json
 from fruitfly_agent.core.mechanisms import MechanismContribution, MechanismDescriptor, MechanismEffects, ParameterDescriptor
 from fruitfly_agent.lab.catalog.models import MechanismDefinition
 from fruitfly_agent.lab.catalog.tool_providers import PreparedToolProvider, ToolServiceStart
-from fruitfly_agent.lab.improvement.contracts.versions import EXPERIMENT_BLOCKERS_COMPONENT
+from fruitfly_agent.improvement.contracts.versions import EXPERIMENT_BLOCKERS_COMPONENT
 from .config import load_config
 
 

@@ -1,5 +1,5 @@
 """Replaceable generation and composition registration."""
-from ..contracts.pipeline import ProposalResult, GeneratorDefinition, identifier
+from fruitfly_agent.improvement.contracts.pipeline import ProposalResult, GeneratorDefinition, identifier
 
 class AgentGenerator:
     generator_id = 'agent-editor-v1'
@@ -7,7 +7,7 @@ class AgentGenerator:
     supports_task_sets = True
 
     async def propose(self, request, services):
-        from ..contracts.pipeline import ProposalResult
+        from fruitfly_agent.improvement.contracts.pipeline import ProposalResult
         candidate = await services.edit('propose', request)
         return ProposalResult((candidate,))
 
@@ -24,7 +24,7 @@ class GeneratorRegistry:
         self.metadata = {}
 
     def register(self, generator_id, factory, *, implementation_id=None, label=None, required_capabilities=None, supports_task_sets=None):
-        from ..contracts.pipeline import identifier, GeneratorDefinition
+        from fruitfly_agent.improvement.contracts.pipeline import identifier, GeneratorDefinition
         identifier(generator_id)
         if generator_id in self.factories or not callable(factory):
             raise ValueError('invalid or duplicate generator registration')

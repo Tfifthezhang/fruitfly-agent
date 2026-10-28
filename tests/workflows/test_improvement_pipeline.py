@@ -40,6 +40,33 @@ class NoEntry:
 
 
 class ApplicationPipelineTests(unittest.IsolatedAsyncioTestCase):
+    async def test_host_installs_research_and_custom_hooks_and_persists_entries(self):
+        import json
+        from tests.support.improvers import offline_factory
+        observed = []
+        def install_hooks(context):
+            context.services.hooks.register('before_run_end', lambda event: observed.append(event.job_id))
+        install_hooks.configuration = {'observer': 'offline-test'}
+        with tempfile.TemporaryDirectory() as directory:
+            factory = offline_factory(Path(directory))
+            jobs = factory._component_jobs
+            settings = jobs.system_settings
+            jobs.system_settings = lambda: {**settings(), 'search': {'research': {'enabled': True}}}
+            jobs.hooks_factory = install_hooks
+            app = AgentApplication(factory)
+            await app.start()
+            try:
+                preview = app.workflow_preview(factory.test_request)
+                await app.improve('', preview_token=preview.preview_token)
+                self.assertEqual(observed, [jobs.outcome.plan.job_id])
+                records = list((Path(directory) / '.fruitfly/improvement/jobs' / observed[0] / 'research').glob('*.json'))
+                self.assertTrue(records)
+                kinds = {json.loads(path.read_text())['kind'] for path in records}
+                self.assertIn('observation', kinds)
+                self.assertIn('hypothesis', kinds)
+            finally:
+                await app.close()
+
     async def test_persistent_candidate_verifies_adopts_and_recovers_exact_version(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

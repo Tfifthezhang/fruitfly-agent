@@ -119,9 +119,7 @@ class OpenAIProvider:
         except asyncio.TimeoutError:
             pass
 
-    async def _stream_once(
-        self, view: ProviderView, signal: asyncio.Event | None, *, deadline: AttemptDeadline
-    ) -> AsyncIterator[StreamEvent]:
+    def _prepare_payload(self, view: ProviderView) -> tuple[dict[str, Any], ProviderView, list[dict[str, Any]], list[dict[str, Any]]]:
         request: dict[str, Any] = {
             "model": view.model or self.model,
             "instructions": view.system_prompt,
@@ -151,6 +149,55 @@ class OpenAIProvider:
         self._service.validate(self.protocol, effective.model, self.request_options)
         prefix = convert_to_openai(view.messages, replay=self._replay.reader(effective, tools))
         request['input'] = prefix
+
+        return request, effective, tools, prefix
+
+    @property
+    def input_count_supported(self) -> bool:
+        from .token_counting import supports_count
+        return supports_count(self)
+
+    def effective_output_limit(self, view: ProviderView) -> int:
+        return min(self.max_output_tokens, view.max_tokens) if view.max_tokens > 0 else self.max_output_tokens
+
+    def context_usage_tokens(self, usage: Usage) -> int:
+        return usage.input_tokens
+
+    def can_rebase_context(self, before: Any, after: Any) -> bool:
+        from .token_counting import can_rebase
+        return can_rebase(self, before, after)
+
+    def input_count_identity(self, view: ProviderView) -> str:
+        import hashlib
+        import json
+        request, _, _, _ = self._prepare_payload(view)
+        return hashlib.sha256(json.dumps(request, sort_keys=True, default=str).encode()).hexdigest()
+
+    def input_measurement_scope(self) -> str:
+        import json
+        return json.dumps({'protocol': self.protocol, 'service': self.service,
+            'model': self.model, 'options': self.request_options}, sort_keys=True)
+
+    async def count_input(self, view: ProviderView, *, signal: asyncio.Event | None = None) -> int:
+        if not self.input_count_supported:
+            raise ValueError('input counting is not declared for this service/protocol')
+        if signal is not None and signal.is_set():
+            raise asyncio.CancelledError
+        from .token_counting import OPENAI_COUNT_FIELDS
+        request, _, _, _ = self._prepare_payload(view)
+        payload = {key: value for key, value in request.items() if key in OPENAI_COUNT_FIELDS}
+        result = await self._client.responses.input_tokens.count(**payload)
+        if signal is not None and signal.is_set():
+            raise asyncio.CancelledError
+        value = result.input_tokens
+        if type(value) is not int or value < 0:
+            raise ValueError('invalid input token count')
+        return value
+
+    async def _stream_once(
+        self, view: ProviderView, signal: asyncio.Event | None, *, deadline: AttemptDeadline
+    ) -> AsyncIterator[StreamEvent]:
+        request, effective, tools, prefix = self._prepare_payload(view)
 
         text_parts: list[str] = []
         thoughts: list[str] = []

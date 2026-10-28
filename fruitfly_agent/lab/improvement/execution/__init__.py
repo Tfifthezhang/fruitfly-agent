@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from typing import Any
 
-from ..contracts.experiments import ExecutionDefinition
+from fruitfly_agent.improvement.contracts.experiments import ExecutionDefinition
 
 
 @dataclass
@@ -28,6 +28,8 @@ class ExecutionContext:
     component_ids: tuple[str, ...] = ()
     generator_definitions: tuple = ()
     system_settings: Any = None
+    hooks_factory: Any = None
+    delivery_backend: Any = None
 
 
 class ExecutionRegistry:

@@ -1,7 +1,7 @@
 """Owned component adapters and validation."""
-from ..contracts.components import ComponentDocument, ComponentFile, HarnessSnapshot
-from .registry import ComponentRegistry
-from ..contracts.components import ComponentBinding
+from fruitfly_agent.improvement.contracts.components import ComponentDocument, ComponentFile, HarnessSnapshot
+from fruitfly_agent.improvement.components.registry import ComponentRegistry
+from fruitfly_agent.improvement.contracts.components import ComponentBinding
 
 
 class TextComponentAdapter:
@@ -66,7 +66,7 @@ def bundle_target(targets):
 
 
 def bundle_text(target, harness):
-    from ..contracts.versions import canonical_json
+    from fruitfly_agent.improvement.contracts.versions import canonical_json
     return canonical_json({t.snapshot().target_id:
         TextComponentAdapter(t, getattr(t, 'component_kind', 'instructions')).to_text(harness.component(t.snapshot().target_id))
         for t in target.targets})

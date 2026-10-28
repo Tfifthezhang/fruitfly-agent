@@ -1,6 +1,6 @@
 """Read-only artifact references avoid copying all task logs into editor memory."""
 from . import EvidenceWorkspace
-from ..contracts.validation import relative_path
+from fruitfly_agent.improvement.contracts.validation import relative_path
 
 
 class ReferenceWorkspace(EvidenceWorkspace):

@@ -1,5 +1,5 @@
 """Compare candidates only on an identical declared batch and conditions."""
-from ..contracts.evaluation import CandidateComparison
+from fruitfly_agent.improvement.contracts.evaluation import CandidateComparison
 
 
 def compare_candidates(before, after, settings):

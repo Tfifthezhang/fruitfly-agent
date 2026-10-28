@@ -1,7 +1,8 @@
 """Project only granted development tasks, facts and results for joint editing."""
 from dataclasses import asdict
 from .resources import ReferenceWorkspace
-from ..contracts.versions import canonical_json
+from .access import EvidenceAccess
+from fruitfly_agent.improvement.contracts.versions import canonical_json
 
 
 def build_workspace(request, artifacts, *, record=None):
@@ -37,6 +38,8 @@ def build_workspace(request, artifacts, *, record=None):
                 'policy_id': trial.measurement.policy_id if trial.measurement else None, 'error': trial.error})
         evaluations.append({'evaluation_id': evaluation.evaluation_id, 'harness_id': evaluation.harness_id,
             'batch': asdict(evaluation.batch), 'assessment': asdict(evaluation.assessment), 'trials': trials})
+    for resource in getattr(request, 'context', ()):
+        references['context/extensions/' + resource.path] = resource.artifact_id
     files['context/evaluations.json'] = canonical_json(evaluations).encode()
     files['context/task-set.json'] = canonical_json({'task_set_id': request.task_set_id,
         'development_tasks': sorted(allowed)}).encode()
@@ -45,4 +48,5 @@ def build_workspace(request, artifacts, *, record=None):
     files['INDEX.json'] = canonical_json({'files': sorted((*files, *references)),
         'writable_components': request.plan.component_ids}).encode()
     return ReferenceWorkspace(artifacts=artifacts, references=references, baseline=request.baseline,
-        files=files, writable_ids=request.plan.component_ids, record=record)
+        files=files, writable_ids=request.plan.component_ids, record=record,
+        access=EvidenceAccess((r.run_id for r in request.records), record=record))

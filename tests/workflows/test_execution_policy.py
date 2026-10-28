@@ -122,3 +122,47 @@ class ExecutionPolicyTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(config.max_tool_calls_per_turn, 256)
         finally:
             await services.close()
+
+    async def test_parameter_candidate_activates_with_exact_recorded_h_identity(self):
+        class Generator:
+            generator_id = 'parameter-rule'
+            required_capabilities = frozenset()
+            async def propose(self, request, services):
+                document = request.baseline.component('bash-tool')
+                value = json.loads(document.files[0].text); value['default_timeout_seconds'] = 17
+                changed = replace(document, files=(ComponentFile('instructions.txt', json.dumps(value)),))
+                harness = HarnessSnapshot(tuple(changed if c.component_id == changed.component_id else c
+                    for c in request.baseline.components))
+                return ProposalResult((CandidateBundle(request.plan.parent, request.baseline, harness, self.generator_id,
+                    (EditReason('bash-tool', 'Synthetic timeout comparison.', (request.records[0].run_id,)),)),))
+        class ParameterRunner(OfflineRunner):
+            capabilities = OfflineRunner.capabilities | {'configuration-materialization'}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); _write_models(root)
+            providers = Mock(); providers.create.return_value = FauxProvider()
+            generators = GeneratorRegistry(); generators.register('parameter-rule', Generator)
+            def runner(*args): return ParameterRunner()
+            runner.capabilities = ParameterRunner.capabilities
+            factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=providers,
+                improvement_bindings=WorkflowBindings(generators=generators, runner=runner,
+                    selector=lambda *args: FirstSelector(), verifier=SyntheticVerification(),
+                    component_options={'bash-tool': {'editable_fields': ['default_timeout_seconds'],
+                        'bounds': {'default_timeout_seconds': {'minimum': 1, 'maximum': 120}}}}))
+            factory.configuration.save(); factory.reload_configuration()
+            app = AgentApplication(factory); await app.start()
+            try:
+                before = factory.system_version()
+                request = WorkflowRequest('Synthetic task.', component_ids=('bash-tool',), generator_id='parameter-rule',
+                    strategy_id='simple', depth=1, scope='persistent', retain_experience=False)
+                preview = app.workflow_preview(request)
+                candidates = await app.improve('', preview_token=preview.preview_token)
+                self.assertEqual(len(candidates), 1)
+                self.assertEqual(factory.system_version(), before)
+                await app.adopt_candidate(candidates[0].candidate_id)
+                after = factory.system_version()
+                self.assertNotEqual(after.harness, before.harness)
+                self.assertEqual((after.improver, after.state), (before.improver, before.state))
+                component = next(c for c in app.runtime_manifest['components'] if c['id'] == 'bash-tool')
+                self.assertEqual(component['parameters']['default_timeout_seconds'], 17)
+                self.assertEqual(providers.create.return_value.calls, [])
+            finally: await app.close()

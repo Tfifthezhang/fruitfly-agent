@@ -24,5 +24,9 @@ Interactive checks reject private cross-module access in helpers/feature handler
 ```
 
 `test_improvement_boundaries.py` protects separate editing/assessment ownership,
-independent Improvement/RSI direction and the optional Eval boundary. Existing
-module dependency allowances are unchanged.
+independent Improvement/RSI direction and the optional Eval boundary. The top-level
+Improvement kernel accepts only its own contracts, Core and the standard library;
+a blocked-import check verifies it without Lab, Run, Providers, Interactive or Eval.
+Lab, Run, Experiments and Eval consume the new public kernel in one direction.
+Concrete selection, exploration, soft termination, retrieval, research and delivery
+policies must retain Lab source ownership rather than growing into kernel modules.

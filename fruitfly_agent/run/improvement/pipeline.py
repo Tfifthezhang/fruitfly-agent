@@ -4,6 +4,8 @@ from __future__ import annotations
 from dataclasses import asdict, replace
 import json
 from pathlib import Path
+import asyncio
+from fruitfly_agent.improvement.contracts.candidates import CandidateBundle
 from typing import Callable
 from uuid import uuid4
 from contextlib import contextmanager
@@ -14,7 +16,7 @@ from fruitfly_agent.lab.improvement.api import (RunPlan, ComponentWorkflow, Work
     model_completion, EvidenceInspector, ExecutionContext, ExecutionRequest, builtin_executions,
     HarnessSnapshot, bundle_target, bundle_text, ReadOnlyInspector, policy_spec, AllocationExhausted, builtin_strategies,
     ProcessAssessmentSettings, ExplorationSettings, builtin_completed_assessors, builtin_explorations,
-    validate_process_configuration, CompletedAssessmentService, relative_path, process_settings_values)
+    validate_process_configuration, CompletedAssessmentService, relative_path, process_settings_values, install_workflow_mechanisms, extension_spec)
 from fruitfly_agent.lab.algorithms.targets import SystemVersion, content_hash
 from fruitfly_agent.lab.algorithms.evolution import VerificationEvidence
 from fruitfly_agent.interactive.contracts.improvement import (WorkflowConfiguration,
@@ -41,7 +43,7 @@ class RunComponentJobs:
                  targets, generators=None, runner=None, composer=None, selector=None,
                  reflector=None, verifier=None, measurements=None, workflow_factory=None,
                  tasks=None, publish=None, editor=None, inspector=None, components=None, executions=None, stop_policy=None, strategies=None,
-                 process_assessment=None, exploration=None, completed_assessors=None, explorations=None, component_options=None):
+                 process_assessment=None, exploration=None, completed_assessors=None, explorations=None, component_options=None, hooks=None, delivery_backend=None):
         self.component_options = json.loads(json.dumps(component_options or {}, allow_nan=False))
         self.workspace, self.artifacts = Path(workspace), ArtifactPort(artifacts)
         self.experience, self.manifest, self.version = experience, manifest, version
@@ -65,6 +67,8 @@ class RunComponentJobs:
         self.tasks, self.publish = tasks, publish
         self.executions = executions or builtin_executions()
         self.stop_policy = stop_policy
+        self.hooks_factory = hooks
+        self.delivery_backend = delivery_backend
         self.process_settings = process_assessment or ProcessAssessmentSettings()
         self.exploration_settings = exploration or ExplorationSettings()
         self.process_from_system = process_assessment is None
@@ -116,6 +120,8 @@ class RunComponentJobs:
                     ('reflect', self.reflector_factory, 'agent-reflector-v1'),
                     ('workflow', self.controller_factory, 'component-search-v1'))},
                 'stop_policy': policy_spec(self.stop_policy),
+                'hooks': extension_spec(self.hooks_factory),
+                'delivery_backend': extension_spec(self.delivery_backend),
                 'component_options': self.component_options,
                 'process_assessment': asdict(process),
                 'completed_assessors': [(d.assessor_id, d.implementation_id) for d in self.completed_assessors.definitions()],
@@ -146,7 +152,7 @@ class RunComponentJobs:
             remaining_verification=self.verification_uses.remaining,
             assessor_config=self.assessor_configuration() if self.assessor_configuration else self.editor_configuration(),
             completed_assessment_factory=self.completed_assessment, exploration_factory=self.exploration_policy,
-            generator_definitions=self.generators.definitions(), system_settings=self.system_settings())
+            generator_definitions=self.generators.definitions(), system_settings=self.system_settings(), hooks_factory=self.hooks_factory, delivery_backend=self.delivery_backend)
 
     def workflow_configuration(self):
         context = self.context()
@@ -255,10 +261,26 @@ class RunComponentJobs:
             'execution': {'id': definition.execution_id, 'implementation': definition.implementation_id,
                           'source_id': prepared.source_id, 'details': prepared.details,
                           'request': asdict(execution_request)}}, ensure_ascii=False), encoding='utf-8')
+        materialize = self.prepare_materialization(root) if self.prepare_materialization else None
+        materialized = set()
         stream = (root / 'events.jsonl').open('x', encoding='utf-8')
         def record(event, **fields):
             stream.write(json.dumps({'event': event, **fields}, ensure_ascii=False) + '\n')
             stream.flush()
+            if event == 'workflow-checkpoint':
+                path = root / 'checkpoint.json'
+                temporary = root / 'checkpoint.tmp'
+                temporary.write_text(json.dumps(fields['outcome'], ensure_ascii=False, allow_nan=False), encoding='utf-8')
+                temporary.replace(path)
+            elif event == 'candidate-validated' and materialize is not None:
+                candidate = CandidateBundle.from_dict(fields['candidate'])
+                if candidate.candidate_id not in materialized:
+                    destination = root / 'candidates' / candidate.candidate_id.removeprefix('sha256:')
+                    path = materialize(candidate, registry, destination)
+                    materialized.add(candidate.candidate_id)
+                    stream.write(json.dumps({'event': 'candidate-configuration', 'candidate_id': candidate.candidate_id,
+                        'config': str(path.relative_to(self.workspace)), 'conditions_id': plan.conditions_id}) + '\n')
+                    stream.flush()
         scope = None
         if self.shared_budget is not None:
             try:
@@ -272,13 +294,15 @@ class RunComponentJobs:
         self._completion = None
         stop = 'error'
         try:
-            materialize = self.prepare_materialization(root) if self.prepare_materialization else None
             services.completer = model_completion(self.editor_configuration())
             if self.editor_factory is AgentEditor:
                 editor = self.editor_factory(self.editor_configuration(), self.artifacts, registry,
                     instructions=self.editor_instructions(),
+                    max_turns=self.system_settings().get('editor', {}).get('max_turns', 12),
                     max_tool_calls=self.system_settings().get('editor', {}).get('max_tool_calls', 48),
-                    page_characters=self.system_settings().get('feedback', {}).get('evidence', {}).get('page_characters', 12000))
+                    page_characters=self.system_settings().get('feedback', {}).get('evidence', {}).get('page_characters', 12000),
+                    projection=self.system_settings().get('feedback', {}).get('evidence', {}).get('projection', 'granted-full'),
+                    access_mode=self.system_settings().get('feedback', {}).get('evidence', {}).get('access_mode', 'search'))
             else:
                 editor = self.editor_factory(self.editor_configuration(), self.artifacts, registry)
             services.own(editor)
@@ -311,6 +335,7 @@ class RunComponentJobs:
             runner = services.own(ports.runner)
             if plan.purpose == 'persistent' and any(ports.verification_reserve.values()):
                 services.protect_verification(ports.verification_reserve)
+            stop_policy = install_workflow_mechanisms(context, stop_policy=self.stop_policy)
             composer = self.composer_factory(plan, services) if self.composer_factory else AgentComposer()
             services.own(composer)
             selector = self.selector_factory(plan, services) if self.selector_factory else ports.selector or AgentSelector(inspector, services)
@@ -326,7 +351,7 @@ class RunComponentJobs:
                 exploration=self.exploration_policy(services),
                 **({'problem': ports.search_problem} if ports.search_problem is not None else {}),
                 **({"strategies": self.strategies} if self.controller_factory is ComponentWorkflow else {}),
-                **({"stop_policy": self.stop_policy} if self.stop_policy is not None else {}))
+                **({"stop_policy": stop_policy} if self.controller_factory is ComponentWorkflow or self.stop_policy is not None else {}))
             services.own(workflow)
             outcome = await workflow.run(plan, task, baseline, services, experience=experience)
             services.check()
@@ -343,6 +368,8 @@ class RunComponentJobs:
             self.outcome = outcome
             if materialize is not None:
                 for candidate in {c.candidate_id: c for c in outcome.candidates}.values():
+                    if candidate.candidate_id in materialized:
+                        continue
                     destination = root / 'candidates' / candidate.candidate_id.removeprefix('sha256:')
                     path = materialize(candidate, registry, destination)
                     record('candidate-configuration', candidate_id=candidate.candidate_id,
@@ -359,11 +386,21 @@ class RunComponentJobs:
                     and outcome.decision.assurance == 'verified'):
                 return self.publish(outcome, baseline, tuple(registry.adapters.values()))
             return ()
+        except asyncio.CancelledError:
+            stop = 'cancelled'
+            services.record('workflow-interrupted', stop_reason=stop)
+            raise
+        except Exception as exc:
+            services.record('workflow-interrupted', stop_reason=stop, error=type(exc).__name__)
+            raise
         finally:
-            await services.close()
+            try:
+                await services.close()
+            finally:
+                self.running_improver, self.services = None, None
+                stream.close()
             view = result_view(self.outcome)
-            uncertain = sum(fields['charged_allowance'] for event, fields in services.events
-                if event == 'external-budget-settled' and fields.get('observed_calls') is None)
+            uncertain = services.uncertain_model_allowance
             self._completion = SearchCompletion(SearchReport(stop_reason=stop,
                 model_calls=services.used['model'] - uncertain, model_limit=plan.max_model_calls,
                 uncertain_model_allowance=uncertain,

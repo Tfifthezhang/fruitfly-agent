@@ -4,16 +4,18 @@ from __future__ import annotations
 from dataclasses import asdict, replace
 import base64
 import time
+import asyncio
+from typing import Any, Literal
 from uuid import uuid4
 
 from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.core.data_model import AgentToolResult, AssistantMessage, ImageBlock, TextBlock, UserMessage
 from fruitfly_agent.core.loop import run_agent_loop
 from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone, StreamActivity
-from ..contracts.pipeline import ExecutionRecord, Resource, relative_path, canonical_json
-from .handles import ManagedExecution
-from .facts import attach_facts, loop_fact_values, receipt_facts
-from ..contracts.facts import BudgetFact
+from fruitfly_agent.improvement.contracts.pipeline import ExecutionRecord, Resource, relative_path, canonical_json
+from fruitfly_agent.improvement.execution.handles import ManagedExecution
+from fruitfly_agent.improvement.execution.facts import attach_facts, loop_fact_values, receipt_facts
+from fruitfly_agent.improvement.contracts.facts import BudgetFact
 
 
 class FileTaskRunner:
@@ -53,6 +55,8 @@ class FileTaskRunner:
         originals = dict(files)
         calls = 0
         model_limit_hit = False
+        partial_messages = [UserMessage(content=task.instruction)]
+        completed_tools = 0
         def read_path(path):
             relative_path(path)
             if path not in files:
@@ -104,7 +108,7 @@ class FileTaskRunner:
             nonlocal calls, model_limit_hit
             if self.model_limit is not None and calls >= self.model_limit:
                 model_limit_hit = True
-                from ..workflow.budget import AllocationExhausted
+                from fruitfly_agent.improvement.workflow.budget import AllocationExhausted
                 raise AllocationExhausted('task model-call limit exhausted')
             self.services.reserve('model')
             calls += 1
@@ -120,6 +124,7 @@ class FileTaskRunner:
                     message = await inner.result()
                 finally:
                     await inner.aclose()
+                partial_messages.append(replace(message, provider_state=None))
                 if message.text:
                     journal.publish('assistant-output', artifact_id=self.artifacts.put(message.text.encode('utf-8')),
                         media_type='text/plain; charset=utf-8')
@@ -129,10 +134,16 @@ class FileTaskRunner:
                     usage_reported=message.usage is not None and message.usage.total_tokens > 0)
                 yield StreamDone(message)
             return AssistantMessageEventStream(events())
+        from fruitfly_agent.core.context.budget import forward_context_capabilities
+        forward_context_capabilities(provider, self.config.provider)
         async def observed(name, message, cancelled):
+            nonlocal completed_tools
+            completed_tools += 1
+            partial_messages.append(message)
             journal.publish('tool-finished', tool_call_id=message.tool_call_id,
                 tool_name=name, is_error=message.is_error, cancelled=cancelled)
         config = AgentLoopConfig(provider=provider, model=self.config.model,
+            context_meter=self.config.context_meter,
             max_tokens=self.config.max_tokens, context_window=self.config.context_window,
             system_prompt=self.config.system_prompt, tools=tools, max_turns=self.config.max_turns,
             max_tool_calls_per_turn=self.config.max_tool_calls_per_turn,
@@ -150,30 +161,40 @@ class FileTaskRunner:
                 config = adapter.prepare_trial(config, document)
             elif document != adapter.snapshot():
                 raise ValueError('the file-task runner cannot install this component')
-        result = await run_agent_loop(config, [UserMessage(content=task.instruction)], signal=self.services.signal)
-        self.services.check()
-        answers = [m for m in result.messages if isinstance(m, AssistantMessage)]
-        output = answers[-1].text if answers else ''
-        trajectory = canonical_json([(replace(m, provider_state=None) if isinstance(m, AssistantMessage)
-            else m).to_dict() for m in result.messages]).encode('utf-8')
-        from fruitfly_agent.runtime_spec import effective_execution
-        execution_reference = self.artifacts.put(canonical_json(effective_execution(config)).encode('utf-8'))
-        artifacts = [Resource('runtime-execution.json', execution_reference, 'application/json', 'diagnostic'),
-                     Resource('trajectory.json', self.artifacts.put(trajectory), 'application/json', 'trajectory')]
-        for path, content in files.items():
-            if content != originals.get(path):
-                artifacts.append(Resource('deliverables/' + path, self.artifacts.put(content),
-                                          'application/octet-stream', 'deliverable'))
-        status = 'completed' if not result.is_error and result.stop_reason == 'stop' else 'error'
-        record = ExecutionRecord(run_id, task.task_id, task.material_id, harness.snapshot_id,
-            plan.parent.state, plan.conditions_id, 'completed' if status == 'completed' else 'error', output, tuple(artifacts), calls)
-        values = loop_fact_values(result.diagnostics)
-        if model_limit_hit:
-            values['termination_reason'] = 'model_budget_exhausted'
-        values['budgets'] = (*values.get('budgets', ()), BudgetFact('model_calls', 'execution', calls, self.model_limit,
-            source='budgeted file-task Provider'))
-        facts = receipt_facts(record, self.artifacts, elapsed_seconds=time.monotonic() - started, **values)
-        return attach_facts(record, facts, self.artifacts)
+        def finish(result=None):
+            messages = result.messages if result is not None else partial_messages
+            answers = [m for m in messages if isinstance(m, AssistantMessage)]
+            output = answers[-1].text if answers else ''
+            trajectory = canonical_json([(replace(m, provider_state=None) if isinstance(m, AssistantMessage)
+                else m).to_dict() for m in messages]).encode('utf-8')
+            from fruitfly_agent.runtime_spec import effective_execution
+            execution_reference = self.artifacts.put(canonical_json(effective_execution(config)).encode('utf-8'))
+            artifacts = [Resource('runtime-execution.json', execution_reference, 'application/json', 'diagnostic'),
+                         Resource('trajectory.json', self.artifacts.put(trajectory), 'application/json', 'trajectory')]
+            for path, content in files.items():
+                if content != originals.get(path):
+                    artifacts.append(Resource('deliverables/' + path, self.artifacts.put(content),
+                                              'application/octet-stream', 'deliverable'))
+            status: Literal['completed', 'error', 'cancelled', 'budget_exhausted'] = ('completed' if not result.is_error and result.stop_reason == 'stop' else 'error') if result is not None else 'cancelled'
+            record = ExecutionRecord(run_id, task.task_id, task.material_id, harness.snapshot_id,
+                plan.parent.state, plan.conditions_id, status, output, tuple(artifacts), calls)
+            values: dict[str, Any] = loop_fact_values(result.diagnostics) if result is not None else {
+                'termination_reason': 'execution_interrupted', 'diagnosable': completed_tools > 0,
+                'counters': (('tool_completed', completed_tools),)}
+            if model_limit_hit:
+                values['termination_reason'] = 'model_budget_exhausted'
+            values['budgets'] = (*values.get('budgets', ()), BudgetFact('model_calls', 'execution', calls, self.model_limit,
+                source='budgeted file-task Provider'))
+            facts = receipt_facts(record, self.artifacts, elapsed_seconds=time.monotonic() - started, **values)
+            return attach_facts(record, facts, self.artifacts)
+        try:
+            result = await run_agent_loop(config, [UserMessage(content=task.instruction)], signal=self.services.signal)
+            self.services.check()
+        except asyncio.CancelledError:
+            self.services.retain_execution(finish())
+            raise
+        return finish(result)
+
 
 
 __all__ = ['FileTaskRunner']

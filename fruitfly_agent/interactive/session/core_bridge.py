@@ -10,6 +10,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from fruitfly_agent.core.config import AgentLoopConfig
+from fruitfly_agent.core.context.budget import forward_context_capabilities
 from fruitfly_agent.core.data_model import AssistantMessage, CustomMessage, ToolResultMessage, UserMessage
 from fruitfly_agent.core.extensions.hooks import (
     BEFORE_REQUEST,
@@ -51,6 +52,7 @@ class _ObservableProvider:
         self._provider = provider
         self._dispatcher = dispatcher
         self._request_index = 0
+        forward_context_capabilities(self, provider)
 
     def begin_run(self) -> None:
         self._request_index = 0

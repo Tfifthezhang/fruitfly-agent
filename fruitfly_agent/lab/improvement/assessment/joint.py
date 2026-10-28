@@ -1,6 +1,6 @@
 """Explicit joint development utility; raw task scores retain their own policies."""
 from statistics import mean
-from ..contracts.evaluation import JointAssessment
+from fruitfly_agent.improvement.contracts.evaluation import JointAssessment
 
 
 def assess_batch(snapshot, batch, trials, settings):

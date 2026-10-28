@@ -68,7 +68,9 @@ from .permissions import PermissionPolicy, apply_permission_policy
 from .components import ComponentSpec, ResolvedHarness, resolve_harness, verify_runtime
 from .configuration import (ConfigurationSurface, configure_profile, load_system_config,
                             component_profile, materialize_system, edit_grants, bind_component_changes,
-                            configuration_inventory, configuration_resources, restore_component_settings)
+                            configuration_inventory, configuration_resources, restore_component_settings, normalize_configuration_binding)
 __all__ += ['ConfigurationSurface', 'configure_profile', 'load_system_config', 'component_profile', 'materialize_system', 'edit_grants', 'bind_component_changes', 'configuration_inventory']
 __all__ += ['configuration_resources']
 __all__ += ['restore_component_settings']
+
+__all__ += ['normalize_configuration_binding']

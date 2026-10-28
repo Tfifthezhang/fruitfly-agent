@@ -53,7 +53,7 @@ class HarnessSelectionTest(unittest.TestCase):
         controller = RunConfigurationController(selected, catalog)
         reduction = next(item for item in controller.snapshot().selection_groups
                          if item.group_id == "reduction")
-        self.assertEqual(reduction.option_ids, ("compaction",))
+        self.assertEqual(reduction.option_ids, ("compaction", "working-memory-reduction"))
         self.assertEqual(reduction.selected_id, "compaction")
         self.assertEqual(reduction.label, "Reduction")
         self.assertNotIn('text-improver', {g.group_id for g in controller.snapshot().selection_groups})
@@ -73,7 +73,7 @@ class HarnessSelectionTest(unittest.TestCase):
         controller.select_algorithm("reduction", "alternative-reducer")
         group = next(item for item in controller.snapshot().selection_groups
                      if item.group_id == "reduction")
-        self.assertEqual(set(group.option_ids), {"compaction", "alternative-reducer"})
+        self.assertEqual(set(group.option_ids), {"compaction", "alternative-reducer", "working-memory-reduction"})
         self.assertEqual(group.selected_id, "alternative-reducer")
         self.assertFalse(next(item for item in controller.snapshot().mechanisms
                               if item.mechanism_id == "compaction").enabled)
@@ -140,6 +140,8 @@ class HarnessSelectionTest(unittest.TestCase):
                 "skill-catalog",
                 "information-context",
                 "memory-files",
+                "context-history",
+                "context-measurement",
                 "compaction",
                 "component-improvement",
             },
@@ -303,11 +305,11 @@ class HarnessSelectionTest(unittest.TestCase):
         self.assertEqual("context", before.family)
         self.assertEqual("externalization", before.context_phase)
         self.assertEqual(
-            ["augmentation", "augmentation", "augmentation", "augmentation", "augmentation", "augmentation", "externalization", "reduction"],
+            ["augmentation"] * 8 + ["externalization", "reduction", "reduction"],
             [item.display_section for item in context_items],
         )
         self.assertEqual(
-            {"skill-catalog", "memory-files", "knowledge-files", "live-http", "skill-document", "learned-memory"},
+            {"skill-catalog", "memory-files", "knowledge-files", "live-http", "skill-document", "learned-memory", "context-history", "context-measurement"},
             {
                 item.mechanism_id
                 for item in context_items

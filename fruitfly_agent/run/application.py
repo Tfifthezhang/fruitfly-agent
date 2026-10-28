@@ -135,11 +135,13 @@ class RunApplicationFactory:
         )
 
     def _compose_improvement(self):
+        from fruitfly_agent.lab.catalog import normalize_configuration_binding
         self._experience_store = ExperienceStore(self.cwd / '.fruitfly/improvement/experience.json')
         self._versions = RunVersions(
             workspace=self.cwd, artifacts=self.artifact_store, manifest=self.system_manifest,
             improvement_identity=self.improvement_identity,
             restore_improvement_identity=self.restore_improvement_identity,
+            normalize_configuration=lambda key, text: normalize_configuration_binding(key, text, self.catalog),
             state_sources=lambda: (*self._current_components.get(STATE_SNAPSHOTS_COMPONENT, ()), self._experience_store),
         )
         self._candidate_service = RunCandidates(

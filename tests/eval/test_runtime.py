@@ -44,7 +44,7 @@ class RuntimeStagingTests(unittest.TestCase):
     def fixture(self, root):
         state = root / ".fruitfly"
         state.mkdir()
-        profile = profile_document(catalog="models.yaml", executor="main", mechanisms=[{"id": n} for n in ("local-env", "read-tool", "bash-tool", "compaction")])
+        profile = profile_document(catalog="models.yaml", executor="main", mechanisms=[{"id": n} for n in ("local-env", "read-tool", "bash-tool", "context-history", "compaction")])
         (state / "default-config.yaml").write_text(yaml.safe_dump({
             "default_profile": "baseline", "profiles": {"baseline": profile}}))
         spec = {'sdk': 'openai', 'protocol': 'responses', "model": "fixture", "context_window": 32768,

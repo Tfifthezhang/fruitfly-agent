@@ -155,3 +155,119 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIn('execution limits or facts', definition.materials(context)[0].error)
                 self.assertEqual(context.services.used, {'model': 0, 'execution': 0})
             await context.services.close()
+
+    async def test_fixed_i_benchmark_episodes_measure_downstream_changes_with_shared_budget(self):
+        from copy import deepcopy
+        from fruitfly_agent.core.config import AgentLoopConfig
+        from fruitfly_agent.lab.improvement.editor.instructions import EditorInstructionTarget, EditorInstructions
+        from tests.support.self_improver import ProceduralProvider
+        from eval.improvement import benchmark_improver
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            context, request, host, receipt = self.fixture(root)
+            context.components.register(TextComponentAdapter(EditorInstructionTarget(), 'improvement-instructions'))
+            plan = replace(context.plan, component_ids=('improvement-editor',), max_model_calls=512, max_executions=128)
+            context.plan = plan
+            context.services = WorkflowServices(plan)
+            provider = ProceduralProvider()
+            context.config = context.editor_config = AgentLoopConfig(provider=provider)
+            independent_task = root / 'independent'; independent_task.mkdir()
+            (independent_task / 'instruction.md').write_text('Independent external task.')
+            independent_receipt = deepcopy(receipt)
+            independent_receipt['tasks'][0]['path'] = str(independent_task)
+            independent_receipt['tasks'][0]['id'] = 'independent/task'
+            second_host = root / 'independent-host.yaml'; second_host.write_text('independent host identity')
+            receipts = {str(host.resolve()): receipt, str(second_host.resolve()): independent_receipt}
+            calls = []
+            async def executor(evaluation, host_path, *, directory, output_root, emit):
+                from fruitfly_agent.lab.catalog import load_system_config
+                selected = load_system_config(evaluation.runtime.config_path).select()
+                changed = selected.artifact_contents[selected.prompt] != 'baseline'
+                calls.append((str(host_path), changed))
+                path = output_root / ('nested-' + str(len(calls)))
+                agent = path / 'artifacts/harbor/job/trial/agent'; agent.mkdir(parents=True)
+                (agent / 'session.jsonl').write_text('{}\n')
+                (agent / 'model-budget.json').write_text('{"schema_version":1,"limit":2,"used":1}')
+                return {'evaluation_id': path.name, 'status': 'completed', 'errors': {},
+                    'metrics': [{'name': 'official_reward', 'value': float(changed)}]}, path
+            development = benchmark_execution(request, host, model_calls=2, execution_id='development')
+            independent = benchmark_execution(request, second_host, model_calls=2, execution_id='independent')
+            study = benchmark_improver((development,), (independent,), executor=executor)
+            supplied = (('inner_strategy', 'harness2'), ('inner_model_calls', 32),
+                ('inner_executions', 8), ('evaluation_model_calls', 2))
+            with patch('eval.improvement.registration.HostConfig.read', side_effect=lambda workspace, path:
+                    SimpleNamespace(agent_env={'FRUITFLY_MAX_MODEL_CALLS': '2'}, receipt=receipts[str(Path(path).resolve())])), patch(
+                    'eval.improvement.registration.load_preparation', side_effect=lambda host, *args: host.receipt):
+                prepared = study.prepare(context, ExecutionRequest('', (), ('improvement-editor',),
+                    'benchmark-editor-study', 'task', 'scored', supplied))
+                self.assertFalse(calls)
+                ports = study.build(context, prepared)
+                baseline = context.components.snapshot()
+                document = baseline.component('improvement-editor')
+                values = json.loads(document.files[0].text); values['invariant'] += ' STEP'
+                changed = replace(document, files=(ComponentFile('instructions.txt', json.dumps(values)),))
+                candidate = HarnessSnapshot(tuple(changed if d.component_id == changed.component_id else d for d in baseline.components))
+                before = await ports.runner.trial(baseline, 'development')
+                after = await ports.runner.trial(candidate, 'development')
+                confirmation = await ports.runner.trial(candidate, 'verification')
+                self.assertEqual((before.failures, after.failures, confirmation.failures), (0, 0, 0))
+                self.assertEqual((before.mean_gain, after.mean_gain, confirmation.mean_gain), (0, 1, 1))
+                self.assertTrue(any(Path(path).resolve() == second_host.resolve() for path, _ in calls))
+                self.assertEqual(context.services.used['execution'], len(calls))
+                self.assertEqual(context.services.used['model'], len(calls) + len(provider.calls))
+                self.assertEqual(context.services.budget.held, {'model': 0, 'execution': 0})
+                self.assertEqual(context.components.snapshot(), baseline)
+            await context.services.close()
+
+    async def test_timeout_collects_partial_evidence_and_observed_usage(self):
+        from fruitfly_agent.improvement.workflow.operations import run_stage
+        from fruitfly_agent.improvement.contracts.failures import StageFailure
+        from fruitfly_agent.improvement.execution.facts import read_facts
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); context, request, host, receipt = self.fixture(root)
+            class Interrupted:
+                result_root = root / 'partial'
+                async def __call__(self, *args, **kwargs):
+                    agent = self.result_root / 'artifacts/harbor/job/trial/agent'; agent.mkdir(parents=True)
+                    (agent / 'model-budget.json').write_text('{"schema_version":1,"limit":2,"used":1}')
+                    (agent / 'session.jsonl').write_text('{"type":"message","message":{"role":"toolResult","content":[]}}\n')
+                    await asyncio.Event().wait()
+            definition, host_patch, receipt_patch = self.freeze(context, request, host, receipt, Interrupted())
+            context.plan = replace(context.plan, operation_timeout=.01)
+            context.services = WorkflowServices(context.plan)
+            with host_patch, receipt_patch:
+                prepared = definition.prepare(context, ExecutionRequest('', (), ('base_prompt',), 'benchmark-task', 'task', 'scored'))
+                runner = definition.build(context, prepared).runner
+                with self.assertRaises(StageFailure) as caught:
+                    await run_stage(context.services, 'execute', runner.execute(context.plan, prepared.task, context.components.snapshot()))
+                record = caught.exception.record
+                self.assertIsNotNone(record)
+                self.assertEqual(record.model_calls, 1)
+                self.assertEqual(record.status, 'cancelled')
+                self.assertTrue(read_facts(record, context.artifacts).diagnosable)
+                self.assertEqual(context.services.used['model'], 1)
+            await context.services.close()
+
+    async def test_interrupted_partial_json_does_not_discard_original_evidence_or_invent_usage(self):
+        from eval.improvement.evidence import collect
+        from eval.improvement.facts import attach_benchmark_facts
+        from fruitfly_agent.improvement.execution.facts import read_facts
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            agent = root / 'artifacts/harbor/job/trial/agent'; agent.mkdir(parents=True)
+            (agent / 'session.jsonl').write_bytes(b'{"message":{"role":"toolResult"}}\n{"message":')
+            (agent / 'model-budget.json').write_text('{"schema_version":1,"used":')
+            artifacts = MemoryArtifacts()
+            resources, calls = collect(root, artifacts, interrupted=True)
+            self.assertIsNone(calls)
+            self.assertTrue(any(r.path.endswith('session.jsonl') for r in resources))
+            task = TaskMaterial('task', 'Work')
+            plan = RunPlan('partial', version(), ('base_prompt',))
+            from fruitfly_agent.lab.improvement.api import ExecutionRecord
+            record = ExecutionRecord('run', task.task_id, task.material_id, plan.parent.harness,
+                plan.parent.state, plan.conditions_id, 'cancelled', '', resources, calls)
+            record = attach_benchmark_facts(record, root, artifacts, model_limit=2, interrupted=True)
+            facts = read_facts(record, artifacts)
+            self.assertTrue(facts.diagnosable)
+            self.assertFalse(facts.complete)
+            with self.assertRaises(ValueError): collect(root, artifacts)

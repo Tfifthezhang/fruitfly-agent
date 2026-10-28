@@ -4,7 +4,7 @@ from __future__ import annotations
 from inspect import isawaitable
 from dataclasses import asdict
 
-from ..contracts.pipeline import Measurement, SelectionDecision, canonical_json
+from fruitfly_agent.improvement.contracts.pipeline import Measurement, SelectionDecision, canonical_json
 
 
 class CaseMeasurements:

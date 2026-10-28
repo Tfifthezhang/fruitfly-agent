@@ -5,7 +5,7 @@ from functools import partial
 
 from fruitfly_agent.core.mechanisms import MechanismContribution, MechanismDescriptor, MechanismEffects, ParameterDescriptor
 from fruitfly_agent.lab.catalog.models import MechanismDefinition, MechanismSetup, SetupCredential
-from fruitfly_agent.lab.improvement.contracts.versions import EXPERIMENT_BLOCKERS_COMPONENT
+from fruitfly_agent.improvement.contracts.versions import EXPERIMENT_BLOCKERS_COMPONENT
 from .client import WebClient, WebConfig
 from .registry import WebServiceRegistry, default_service_registry
 from .fetch import create_web_fetch_tool

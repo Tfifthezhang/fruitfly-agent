@@ -51,6 +51,10 @@ def normalize_experiment(raw, target, *, material_only=False):
     options = {} if material_only else edit_grants(profile, grants, catalog)
     search = dict(profile.component_settings.get('search', {})) if profile is not None else {}
     search.pop('exploration', None)
+    # These I mechanisms are assembled from the original shared system settings.
+    # They are not a second set of experiment allocation fields.
+    for name in ('research', 'progress', 'finalization'):
+        search.pop(name, None)
     sampling = search.pop('sampling', {})
     promotion_interval = search.pop('promotion_every_rounds', None)
     budget = mapping(raw.get('budget', {}), {'max_model_calls', 'max_executions', 'timeout_seconds'}, 'budget')

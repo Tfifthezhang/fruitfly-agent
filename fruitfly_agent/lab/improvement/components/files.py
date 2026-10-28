@@ -1,5 +1,5 @@
 """Owned component adapters and validation."""
-from ..contracts.components import ComponentDocument, ComponentFile, HarnessSnapshot
+from fruitfly_agent.improvement.contracts.components import ComponentDocument, ComponentFile, HarnessSnapshot
 
 
 class FileComponentAdapter:

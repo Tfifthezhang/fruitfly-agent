@@ -41,6 +41,10 @@ class ContextSnapshot:
     last_input_tokens: int | None = None
     overflow_attempt: int = 0
     signal: asyncio.Event | None = field(default=None, repr=False, compare=False)
+    measurement: Any = None
+    context_state: dict[str, Any] = field(default_factory=dict)
+    revision: int = 0
+    rebase_allowed: bool = True
 
 
 @dataclass(frozen=True)
@@ -57,6 +61,8 @@ class ContextDecision:
     mechanism_id: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
     estimated_tokens_before: int | None = None
+    state: dict[str, Any] | None = None
+    base_revision: int | None = None
 
 
 __all__ = ["ContextTrigger", "ContextItem", "ContextSnapshot", "ContextDecision"]

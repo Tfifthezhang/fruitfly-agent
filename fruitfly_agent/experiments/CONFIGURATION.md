@@ -73,13 +73,14 @@ enforces those grants again on every candidate.
 | `execution-policy` | Declared scalar `parameters.*` fields and integer bounds |
 | `execution-workflow` | `parameters.steps` |
 | `learned-memory`, `skill-document` | `parameters.initial_text` |
-| `improvement-editor` | `parameters.instructions.propose`, `invariant`, `domain`, `compose` |
-| `improvement-feedback` | `parameters.evidence.page_characters`, `judgment_guidance`, `comparison_guidance`, `process_assessment.assessors` |
-| `improvement-search` | `parameters.strategy`, `rounds`, `exploration` |
+| `improvement-editor` | `parameters.instructions.propose`, `invariant`, `domain`, `compose`; `parameters.max_tool_calls`, `parameters.max_turns` |
+| `improvement-feedback` | `parameters.evidence.page_characters`, `evidence.access_mode`, `evidence.projection`, `judgment_guidance`, `comparison_guidance`, `process_assessment.assessors` |
+| Enabled Bash, reduction, measurement, Web and IPython owners | Owner-declared `parameters.<field>` whitelist; numeric bounds; compatible materializing backend required |
+| `improvement-search` | `parameters.strategy`, `rounds`, `exploration`; `research.enabled`, `research.max_entries`, `research.retrieve_entries`, `research.guidance`; `progress.patience`, `progress.failure_patience`; `finalization.reserve_model_calls`, `finalization.reserve_executions` |
 
-The I editor field names in the table share the `parameters.instructions.` prefix;
-feedback/search names share `parameters.`. Numeric bounds apply only to supported
-integer fields. Protected fields, models, root budgets, owners and roles cannot
+Instruction field names share the `parameters.instructions.` prefix; editor
+allowances and feedback/search fields share `parameters.`. Editor allowances
+accept integer bounds; mechanism adapters accept the declared numeric field types. Protected fields, models, root budgets, owners and roles cannot
 be changed by these grants. General mechanism parameters are configurable;
 candidate editing requires an explicitly registered adapter.
 
@@ -188,3 +189,27 @@ The source baseline is not overwritten. Reused trials remain the same sample.
 There is one experiment format and one runtime assembler. Unknown fields and
 configuration version markers fail validation. See [Run configuration](../run/configuration/README.md)
 for offline system inspection and explicit config export.
+
+Research, progress and finalization fields share the `parameters.` prefix. Their
+[owner](../lab/improvement/research/README.md#configure-and-compare-mechanisms) defines
+strict defaults and runtime effects. Select I comparison execution to edit them;
+ordinary H/S search may use the configured mechanisms but cannot edit its own I.
+Integer fields support narrowing experiment bounds. Fixed root budgets and
+verification rules are outside these grants.
+
+## Optimize context policy
+
+Enabled `compaction`, `working-memory-reduction` and `context-measurement`
+components expose owner-validated H parameters. The two reduction methods expose
+prompt text from their initial implementation. Grant fields explicitly through
+`parameters.<field>` and optional numeric bounds; use an execution backend with
+`configuration-materialization`. See [reduction ownership](../lab/context_manager/reduction/README.md)
+and [measurement precision](../lab/context_manager/measurement/README.md) for the
+mutable and protected fields. [Configuration examples](../../examples/configuration/README.md#select-reduction-and-measurement)
+show method selection and a bounded memory-policy grant.
+
+Stateful task memory is reset in each isolated trial. A same-Session policy
+change reprocesses canonical evidence with the new policy identity. Coverage,
+artifact hashes, Provider continuation, permissions and root budgets cannot be
+edited. Method selection is an ordinary configuration choice; parameter grants
+do not authorize changing component identity or silently enabling another method.

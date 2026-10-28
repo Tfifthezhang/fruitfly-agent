@@ -2,14 +2,34 @@
 from uuid import uuid4
 from dataclasses import asdict
 
-from ..contracts.experiments import ExecutionDefinition, ExecutionParameter, MaterialOption, PreparedExecution, ExecutionPorts
-from ..contracts.pipeline import TaskMaterial, canonical_json
-from ..contracts.versions import content_hash
+from fruitfly_agent.improvement.contracts.experiments import ExecutionDefinition, ExecutionParameter, MaterialOption, PreparedExecution, ExecutionPorts
+from fruitfly_agent.improvement.contracts.pipeline import TaskMaterial, canonical_json
+from fruitfly_agent.improvement.contracts.versions import content_hash
 from ..materials import WorkspaceTaskSource
 from ..execution.file_runner import FileTaskRunner
 from ..assessment.verification import CaseMeasurements, HoldoutVerification
 from ..assessment.online import AssessedRunner
 from ..assessment.metrics import ProcessMetrics
+from .deliverables import DeliverySpec
+from ..verification.delivery import DeliveryValidationRunner, validate_delivery_backend
+
+
+def delivery_spec(context, task, parameters):
+    path = parameters['delivery_manifest']
+    if not path:
+        return None
+    from fruitfly_agent.improvement.contracts.validation import relative_path
+    relative_path(path)
+    if context.delivery_backend is None:
+        raise ValueError('delivery validation requires an explicitly supplied clean execution backend')
+    validate_delivery_backend(context.delivery_backend)
+    resource = next((r for r in task.inputs if r.path == path), None)
+    if resource is None:
+        raise ValueError('delivery manifest must be a frozen task input')
+    spec = DeliverySpec.parse(context.artifacts.read(resource.artifact_id))
+    if set(spec.inputs) - {r.path for r in task.inputs}:
+        raise ValueError('delivery inputs must be frozen task inputs')
+    return spec
 
 
 def materials(context):
@@ -23,6 +43,8 @@ def prepare(context, request):
     if request.feedback == 'scored' and not request.material_id and context.measurements is None:
         raise ValueError('measured feedback requires a task package or registered measurement source')
     if request.material_id:
+        if parameters['delivery_manifest']:
+            raise ValueError('task-package execution has no file delivery manifest; use a file source')
         if context.tasks is None:
             raise ValueError('task packages are unavailable')
         suite = context.tasks.freeze(request.material_id, request.component_ids[0])
@@ -50,6 +72,7 @@ def prepare(context, request):
         raise ValueError('select a task package with independent verification material')
     task = WorkspaceTaskSource(context.workspace, context.artifacts).freeze('task-' + uuid4().hex,
         request.instruction, paths=request.input_paths, environment_id='file-workspace-v1')
+    delivery_spec(context, task, parameters)
     return PreparedExecution(task, task.material_id, (), lambda: task.material_id,
                              (None, (), parameters))
 
@@ -64,6 +87,9 @@ def build(context, prepared):
     if parameters['assessment_interval']:
         runner = AssessedRunner(runner, artifacts=context.artifacts, services=services,
             assessors=(ProcessMetrics,), interval=parameters['assessment_interval'])
+    spec = delivery_spec(context, prepared.task, parameters)
+    if spec is not None:
+        runner = DeliveryValidationRunner(runner, spec, context.delivery_backend, context.artifacts, services)
     measurements, verifier = context.measurements, context.verifier
     reserve = {'model': 0, 'execution': 0}
     if suite is not None:
@@ -97,7 +123,8 @@ def build(context, prepared):
 def definition():
     return ExecutionDefinition('file-task', 'Agent task execution', 'file-task-v3', frozenset({'H', 'S'}),
         FileTaskRunner.capabilities, materials, prepare, build,
-        parameters=(ExecutionParameter('assessment_interval', 'Online assessment interval', 'integer', 0, 0, 1000,
+        parameters=(ExecutionParameter('delivery_manifest', 'Delivery manifest input', 'string', '', description='Frozen JSON input declaring the output entrypoint, dependencies and permitted inputs; requires an injected backend.'),
+            ExecutionParameter('assessment_interval', 'Online assessment interval', 'integer', 0, 0, 1000,
             'Events per assessment; 0 disables online process/resource assessment.'),
             ExecutionParameter('model_calls', 'Task model allowance', 'integer', 0, 0, 10000,
                 'Maximum task Provider calls; 0 uses the root allowance only.')), accepts_runner_override=True)

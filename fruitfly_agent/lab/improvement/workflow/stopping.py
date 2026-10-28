@@ -1,3 +1,3 @@
 """Compatible search-policy imports; pure termination policies own decisions."""
-from ..contracts.stopping import SearchState, StopPolicy
-from ..termination.policies import BoundedStopPolicy
+from fruitfly_agent.improvement.contracts.stopping import SearchState, StopPolicy
+from fruitfly_agent.lab.improvement.termination.policies import BoundedStopPolicy

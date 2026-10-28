@@ -83,3 +83,14 @@ Custom adapters register with `register(sdk, protocol, factory)`. The same regis
 supplies SDK/protocol form choices through the injected host, so the terminal has
 no SDK or protocol enumeration. Internal continuation records retain their stable
 namespace and version independently of configuration field names.
+
+## Expose input measurement
+
+[token_counting.py](token_counting.py) contains count-field and continuation
+constraints. `input_count_supported`, `count_input`, `input_count_identity`,
+`input_measurement_scope`, `effective_output_limit`, `context_usage_tokens` and
+`can_rebase_context` are
+optional public capabilities. Transparent wrappers must preserve them using
+Core's forwarding helper. Responses counting reuses the actual prepared payload;
+unsupported service/protocol combinations do not guess a remote endpoint.
+See [measurement precision and limits](../lab/context_manager/measurement/README.md).
