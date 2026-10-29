@@ -39,7 +39,7 @@ Improvement registers one shared workflow configuration. Per-job generator facto
 
 | Concern | Contract |
 |---|---|
-| Installer | Synchronous `(state, context, parameters) -> AssemblyState`; run only when enabled. |
+| Installer | Registration checks a synchronous callable accepting `(state, context, parameters)`; assembly checks its `AssemblyState` result. Run only when enabled. |
 | Validation | Disabled selections still validate ID and parameters; dependencies are not automatically enabled. |
 | Unknown mechanism | Raise `ValueError` with available IDs; remove the selection or [register a mechanism](#register-a-mechanism). |
 | Compaction parameters | Configure summarization directly; `compaction.profile` is unsupported even when the selection is disabled. Remove that field. |
@@ -50,11 +50,15 @@ Improvement registers one shared workflow configuration. Per-job generator facto
 | Hooks and callbacks | Clone registries before adding hooks; callback wrappers preserve existing behavior and define merge order. |
 | Owned resources | Call `context.own(resource)` immediately after construction; borrowed resources remain with their owner. |
 | Returned components | Transfer ownership on return, including when later contract validation fails. |
-| Lifecycle | Application deduplicates by identity, starts components, and closes owned objects in reverse order. |
+| Lifecycle | Assembly rejects non-callable declared startup, close and recovery methods. Application deduplicates by identity, starts components, and closes owned objects in reverse order. |
 | External effects | Declare effects accurately; declarations do not create isolation, hot reload, or rollback. |
 | Implementation identity | Explicit `implementation_id` enters the manifest; it is not an automatic source hash. |
 
 `AssemblyContext` supplies workspace, Session, main model, `provider_resolver(profile, max_output_tokens)`, and optional artifact readers/bindings. Installers must not run research jobs or call models during assembly. Failed assembly prevents activation but does not roll back arbitrary file writes.
+
+Component owners must test startup, failure cleanup and recovery/replacement
+before exposing a selectable implementation. Catalog and assembly checks apply to
+all hosts; opening a menu does not construct algorithms or run admission tests.
 
 ## Prepare external tools
 

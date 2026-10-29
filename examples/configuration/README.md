@@ -21,7 +21,7 @@ container starts during initialization.
 | Template | Workspace destination | Contents |
 |---|---|---|
 | [models.example.yaml](models.example.yaml) | `.fruitfly/models.yaml` | Both DeepSeek Flash protocol profiles in one file |
-| [additional-models.example.yaml](additional-models.example.yaml) | Merge into `.fruitfly/models.yaml` | Qwen3.8-Flash and GLM-4.5-Air; keep existing aliases and model roles |
+| [additional-models.example.yaml](additional-models.example.yaml) | Merge into `.fruitfly/models.yaml` | Explicit Qwen3.8-Flash examples in three protocols; keep existing aliases and roles |
 | [.env.example](.env.example) | `.fruitfly/secrets.env` | Empty model/search keys and optional SSH account/password variables |
 | [ssh.example.yaml](ssh.example.yaml) | `.fruitfly/config.yaml` | Minimal remote profile; addresses are placeholders, credentials stay in the secret file |
 | [mcp.example.yaml](mcp.example.yaml) | `.fruitfly/mcp.yaml` | Optional local stdio servers, explicit selected tools and limits; edit placeholders before enabling `mcp-tools` |
@@ -31,7 +31,7 @@ container starts during initialization.
 Copy the default configuration and referenced `components/` tree only when their
 destinations are absent. Reuse `.fruitfly/models.yaml`, or create it from the model
 template if missing. Select aliases separately in daily and baseline
-`models.roles`. **Configure → Restore default configuration** stages the
+`models.roles`. **/config → Restore default configuration** stages the
 default harness settings while retaining the daily model and credentials. Save
 for a new session or discard the draft. Eval uses the complete default profile
 unless explicitly overridden, using its aliases from the shared model catalog.
@@ -56,7 +56,7 @@ transfer, Linux runtime installation and machine/request file generation in orde
 | `deepseek-flash-openai` | `openai` | `responses` | `deepseek-flash` | `https://api.deepseek.com` |
 | `deepseek-flash-anthropic` | `anthropic` | `messages` | `deepseek-flash` | `https://api.deepseek.com/anthropic` |
 
-Both profiles access DeepSeek, with a DeepSeek key. `sdk` selects the client library and `protocol` selects the API format; neither selects OpenAI or Anthropic's own models. The wizard's **DeepSeek** preset generates Responses with explicit thinking parameters. Author the Messages entry using the template. DeepSeek documents these endpoints in [model details](https://api-docs.deepseek.com/quick_start/pricing/), [Responses](https://api-docs.deepseek.com/api/create-response/), and [Messages compatibility](https://api-docs.deepseek.com/guides/anthropic_api/).
+Both profiles access DeepSeek, with a DeepSeek key. `sdk` selects the client library and `protocol` selects the API format; neither selects OpenAI or Anthropic's own models. In the wizard choose **DeepSeek**, then Responses, Messages or Chat Completions; SDK follows automatically. The parameters editor defaults effort to `medium`; these authored templates explicitly select `high`. DeepSeek documents these endpoints in [model details](https://api-docs.deepseek.com/quick_start/pricing/), [Responses](https://api-docs.deepseek.com/api/create-response/), and [Messages compatibility](https://api-docs.deepseek.com/guides/anthropic_api/).
 
 Create `.fruitfly/` and copy templates only if the destinations are absent. Set `DEEPSEEK_API_KEY` in the secret file or process environment. Select one profile in the terminal, or set `FRUITFLY_MODEL_PROFILE` before first one-shot startup. Keep both profiles in the same catalog or remove the one you do not need.
 
@@ -73,42 +73,45 @@ All nine transport fields are written explicitly, including default values, in
 both the public example and the installed initialization template.
 See [transport settings](../../fruitfly_agent/providers/PROVIDER_GUIDE.md#bound-waiting-and-retries).
 Silent reasoning may need a larger first-progress limit. Protocol/API options stay
-under `parameters`; the loader rejects mixed placement and ignored DeepSeek options.
+under `parameters`; the loader checks protocol shapes and rejects mixed placement. Model-specific or ignored options are left to the endpoint.
 
 Copying, parsing, and offline construction do not make requests. Live tasks contact DeepSeek and may incur charges. The examples have not been validated with live requests. Keep keys out of the catalog and repository.
 
-## Add Qwen or GLM
+## Add Qwen
 
-Use the named wizard preset, or merge the entries in
-[additional-models.example.yaml](additional-models.example.yaml) under your existing
-`models` mapping. Do not replace an existing catalog. Add the matching empty
-variable from [.env.example](.env.example) to `.fruitfly/secrets.env` and fill its
-value locally. Restart after editing that secret file. Adding aliases does not
-change the daily executor or any experiment's roles; select the desired alias in
-the daily model menu or the relevant config's `models.roles`.
+Choose Qwen, then the protocol before entering model fields. SDK is automatic;
+model ID, limits and optional capabilities are explicit user declarations. The
+protocol page warns that some models may not support the selected protocol. New
+wizard entries offer medium reasoning effort in an editable parameters JSON field.
+Blank accepts the displayed mapping; `{}` selects server defaults explicitly.
 
-| Alias / API model ID | API / service | Key variable | Working context / output |
+For explicit authored examples, merge selected entries from
+[additional-models.example.yaml](additional-models.example.yaml) into the existing
+`models` mapping. Keep existing aliases and roles. Set `DASHSCOPE_API_KEY` in
+`.fruitfly/secrets.env` or the process environment. The key and endpoint must match
+your account and region. Select the new alias in the daily model menu or relevant
+config's `models.roles`.
+
+| Alias | Protocol | API model ID | Working context / output |
 |---|---|---|---|
-| `Qwen3.8-Flash` / `qwen3.8-flash` | Chat Completions / `qwen` | `DASHSCOPE_API_KEY` | 1,000,000 / 32,768 |
-| `GLM-4.5-Air` / `glm-4.5-air` | Chat Completions / `bigmodel` | `ZAI_API_KEY` | 131,072 / 32,768 |
+| `Qwen3.8-Flash` | Chat Completions | `qwen3.8-flash` | 1,000,000 / 32,768 |
+| `Qwen3.8-Flash-Responses` | Responses | `qwen3.8-flash` | 1,000,000 / 32,768 |
+| `Qwen3.8-Flash-Messages` | Messages | `qwen3.8-flash` | 1,000,000 / 32,768 |
 
-Qwen uses the Beijing address published on the
-[official model page](https://www.qianwenai.com/models/qwen3.8-flash).
-The key must match that account and region; edit the endpoint for a different
-region. It supports text/image input, tools, streaming and thinking. The preset
-enables thinking with `medium` effort, a balanced working choice rather than the
-service's `xhigh` default, and preserves reasoning across tool conversations.
-Its published maximum output is 131,072; the preset uses a smaller shared
-thinking/answer allowance. See the [model guide](https://platform.qianwenai.com/docs/developer-guides/getting-started/latest-model)
-and [Chat API reference](https://platform.qianwenai.com/docs/api-reference/chat/openai-chat).
+These examples include explicit model-specific API options and conservative
+working budgets. They are not wizard defaults or local compatibility rules.
+Review them against the [model reference](https://www.qianwenai.com/models/qwen3.8-flash)
+and the [Chat](https://platform.qianwenai.com/docs/api-reference/chat/openai-chat),
+[Responses](https://platform.qianwenai.com/docs/api-reference/chat/openai-responses)
+or [Messages](https://platform.qianwenai.com/docs/api-reference/chat/anthropic)
+reference before live use. All examples remain offline declarations; live tasks
+use the network and may incur charges.
 
-GLM uses the China BigModel endpoint, not a Coding Plan or international endpoint.
-It supports text input, tools, streaming and dynamic thinking; vision is false.
-The published context/output limits are 128K/96K. The preset enables thinking
-without the `reasoning_effort` parameter restricted to newer GLM models. See
-[GLM-4.5 models](https://docs.bigmodel.cn/cn/guide/models/text/glm-4.5)
-and [OpenAI-compatible setup](https://docs.bigmodel.cn/cn/guide/develop/openai/introduction).
-All entries remain offline declarations until an explicitly requested live task.
+For another service, use the existing custom entry, supply its supported protocol
+and API base URL, and author its model options explicitly. The packaged
+[service table](../../fruitfly_agent/providers/services.yaml) owns the four built-in
+service definitions; it contains no model-specific policies. See the
+[Provider guide](../../fruitfly_agent/providers/PROVIDER_GUIDE.md#choose-the-protocol-and-service).
 
 ## Configure other services
 

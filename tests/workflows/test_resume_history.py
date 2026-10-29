@@ -216,7 +216,7 @@ class ResumeHistoryTest(unittest.IsolatedAsyncioTestCase):
             ), contextlib.redirect_stdout(output):
                 code = await cli.run_cli(_args(cwd=tmp, session=str(path), resume=True))
             self.assertEqual(code, 0)
-            setup.run.assert_called_once_with(editable=False)
+            setup.run.assert_called_once_with(configure=False)
             self.assertEqual(len(provider.calls), 2)
             context = provider.calls[1]["messages"]
             self.assertEqual([m.role for m in context], ["user", "assistant", "user"])

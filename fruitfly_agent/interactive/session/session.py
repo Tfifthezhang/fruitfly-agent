@@ -10,7 +10,8 @@ from pathlib import Path
 from typing import Callable
 
 from fruitfly_agent.core.config import AgentLoopConfig
-from fruitfly_agent.core.data_model import AgentLoopResult, AgentMessage, UserMessage
+from fruitfly_agent.core.data_model import AgentLoopResult, AgentMessage, UserMessage, ImageBlock, TextBlock
+from fruitfly_agent.core.data_model.media import UserContent, normalize_input, input_label, image_bytes
 from fruitfly_agent.core.context import ContextPipeline
 from fruitfly_agent.core.extensions.protocols import SessionLike
 from fruitfly_agent.core.loop import run_agent_loop
@@ -56,8 +57,14 @@ class InteractiveSession:
         event_sink: EventSink | None = None,
         run_loop: RunLoop = run_agent_loop,
         trace_capacity: int = 200,
+        load_attachment: Callable[[str], ImageBlock] | None = None,
+        register_media: Callable[[bytes, str, str], str] | None = None,
+        vision: bool | None = None,
     ) -> None:
         self._messages = list(messages)
+        self._load_attachment = load_attachment
+        self._register_media = register_media
+        self._vision = vision
         self._run_loop = run_loop
         self._working_directory = str(Path(working_directory).resolve())
         self._session_path = str(session_path)
@@ -140,21 +147,46 @@ class InteractiveSession:
             self._cancel_handle = asyncio.get_running_loop().call_later(0.05, interrupt)
         return True
 
-    def steer(self, prompt: str) -> bool:
+    def validate_input(self, prompt: UserContent) -> UserContent:
+        prompt = normalize_input(prompt, vision=self._vision)
+        validate = getattr(self._config.provider, 'validate_input', None)
+        if callable(validate):
+            validate(prompt)
+        return prompt
+
+    @property
+    def attachments_available(self) -> bool:
+        return self._load_attachment is not None
+
+    def load_attachment(self, path: str) -> ImageBlock:
+        if self._load_attachment is None:
+            raise ValueError('this host does not provide a local attachment reader')
+        image = self._load_attachment(path)
+        self.validate_input([image])
+        return image
+
+    def _user_message(self, prompt: UserContent) -> UserMessage:
+        if self._register_media is not None and isinstance(prompt, list):
+            blocks: list[TextBlock | ImageBlock] = []
+            for block in prompt:
+                blocks.append(block)
+                if isinstance(block, ImageBlock):
+                    resource = self._register_media(image_bytes(block), block.media_type, 'user-attachment')
+                    blocks.append(TextBlock(f'Media resource: {resource}'))
+            return UserMessage(content=blocks)
+        return UserMessage(content=prompt)
+
+    def steer(self, prompt: UserContent) -> bool:
         """Inject one user message before the next Provider request."""
 
-        prompt = prompt.strip()
-        if not prompt:
-            raise ValueError("steering prompt must not be empty")
+        prompt = self.validate_input(prompt)
         if self._active_signal is None or not self._accepting_steering:
             return False
         self._steering.append(UserMessage(content=prompt))
         return True
 
-    async def submit(self, prompt: str) -> AgentLoopResult:
-        prompt = prompt.strip()
-        if not prompt:
-            raise ValueError("prompt must not be empty")
+    async def submit(self, prompt: UserContent) -> AgentLoopResult:
+        prompt = self.validate_input(prompt)
         async with self._run_lock:
             signal = asyncio.Event()
             self._active_signal = signal
@@ -162,13 +194,13 @@ class InteractiveSession:
             self._dispatcher.begin_run()
             self._bridge.begin_run()
             try:
-                user_message = UserMessage(content=prompt)
+                user_message = self._user_message(prompt)
                 self._append_user_message(user_message)
                 self._messages.append(user_message)
                 await self._dispatcher.emit(
                     RunStarted(
                         run_id="",
-                        prompt=prompt,
+                        prompt=input_label(prompt),
                         model=self._config.model,
                         message_count=self._message_count(),
                     )
@@ -240,7 +272,7 @@ class InteractiveSession:
                     result = await result
                 messages.extend(result)
             while self._steering:
-                messages.append(self._steering.popleft())
+                messages.append(self._user_message(self._steering.popleft().content))
             return messages
 
         async def follow_up(context) -> list[AgentMessage]:
@@ -253,7 +285,7 @@ class InteractiveSession:
             # Input received during the final model response still belongs to
             # this run. A follow-up causes Core to make another request.
             while self._steering:
-                messages.append(self._steering.popleft())
+                messages.append(self._user_message(self._steering.popleft().content))
             if not messages:
                 self._accepting_steering = False
             return messages

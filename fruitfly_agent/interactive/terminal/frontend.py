@@ -15,6 +15,7 @@ from fruitfly_agent.interactive.terminal.bindings import TerminalBindings, Termi
 from fruitfly_agent.interactive.terminal.commands import TerminalCommandRegistry, TerminalCommandHandler, effective_commands, complete_command
 from fruitfly_agent.interactive.contracts.commands import CommandDescription, CommandResult, format_command_help
 from fruitfly_agent.interactive.terminal.features.assembly import bind_commands
+from fruitfly_agent.interactive.terminal.features.attachments import AttachmentDraft
 from fruitfly_agent.interactive.terminal.notifications import ImprovementNotifications
 
 from fruitfly_agent.interactive.contracts.configuration import ConfigurationController
@@ -78,6 +79,12 @@ class TerminalFrontend:
         self._reading_authorization = False
         self.session.set_event_sink(self._render_event)
         self.commands = TerminalCommandRegistry()
+        self._attachments = AttachmentDraft(self.bindings.load_attachment)
+        self._attachment_session: str | None = None
+        if self.bindings.load_attachment is not None:
+            self.commands.register('attach', self._attachments.attach, summary='attach a local image to the next message', usage='/attach "PATH"')
+            self.commands.register('attachments', self._attachments.show, summary='show pending attachments')
+            self.commands.register('detach', self._attachments.detach, summary='remove pending attachments', usage='/detach N | /detach all')
         bind_commands(
             self.commands, bindings=self.bindings, configuration=lambda: self.configuration,
             status=lambda: self.session.status, cancel=self.bindings.cancel,
@@ -140,6 +147,12 @@ class TerminalFrontend:
     async def _run_loop(self) -> int:
         while True:
             await asyncio.sleep(0)
+            current_session = self.session.status.session_path
+            if current_session != self._attachment_session:
+                if self._attachments.pending:
+                    self.renderer.write_system('Session changed; pending attachments and unsent draft cleared.\n')
+                self._attachments.clear()
+                self._attachment_session = current_session
             self._notifications.show()
             if self._interrupt_exit:
                 return 0
@@ -164,27 +177,42 @@ class TerminalFrontend:
             self._last_interrupt = 0.0
             submitted = line.rstrip("\r\n")
             text = submitted.strip()
-            if not text:
+            if not text and not self._attachments.pending:
                 continue
             if self._inline_display is not None:
                 self.renderer.write_user_input(submitted)
             command = parse_command(text)
             if command is None:
-                if self.session.running and self.session.steer(text):
-                    self.renderer.write_system("message added to current run\n")
+                try:
+                    content = self._attachments.prepare(text)
+                    validate = self.bindings.validate_input
+                    if validate is not None:
+                        validate(content)
+                    if self.session.running and self.session.steer(content):
+                        self._attachments.clear()
+                        self.renderer.write_system("message added to current run\n")
+                        continue
+                except (OSError, RuntimeError, TypeError, ValueError) as exc:
+                    self.renderer.write_system(f'cannot submit: {exc}. Draft retained; /attachments shows it; Enter retries.\n')
                     continue
                 enqueue = self.bindings.enqueue
                 if enqueue is None:
-                    task = asyncio.create_task(self.session.submit(text))
+                    task = asyncio.create_task(self.session.submit(content))
                     self.renderer.write_system("running; Ctrl+C cancels in an interactive terminal\n")
-                    await task
+                    try:
+                        await task
+                    except (OSError, RuntimeError, TypeError, ValueError) as exc:
+                        self.renderer.write_system(f'cannot submit: {exc}. Draft retained.\n')
+                        continue
+                    self._attachments.clear()
                 else:
                     was_running = self.session.running
                     try:
-                        position = enqueue(text)
+                        position = enqueue(content)
                     except (RuntimeError, ValueError) as exc:
                         self.renderer.write_system(f"cannot submit: {exc}\n")
                         continue
+                    self._attachments.clear()
                     if was_running or position > 1:
                         self.renderer.write_system(
                             f"queued prompt ({position} pending)\n"

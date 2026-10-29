@@ -86,11 +86,6 @@ class ModelConfigurationTests(unittest.TestCase):
             {'parameters': {'extra_body': {'max_output_tokens': 999999}}},
             {'parameters': {'extra_body': {'tools': []}}},
             {'parameters': {'extra_headers': {'Authorization': 'offline-placeholder'}}},
-            {'parameters': {'reasoning': {'effort': 'medium'}}},
-            {'parameters': {'temperature': 0.2}}, {'parameters': {'top_p': 0.5}},
-            {'parameters': {'include': ['reasoning.encrypted_content']}},
-            {'parameters': {'text': {'verbosity': 'high'}}},
-            {'parameters': {'reasoning': {'summary': 'auto'}}},
             {'parameters': {'reasoning_effort': 'high'}},
             {'parameters': {'temperature': float('nan')}},
             {'service': 'missing-service'}, {'service': 'anthropic'},
@@ -108,8 +103,24 @@ class ModelConfigurationTests(unittest.TestCase):
             'extra_body': {'thinking': {'type': 'enabled'}}})
         for options in ({'thinking': {'type': 'adaptive'}}, {'thinking': {'type': 'enabled', 'budget_tokens': 1024}},
                         {'output_config': {'effort': 'invalid'}}):
-            with self.subTest(options=options), self.assertRaises(ValueError):
-                self.spec(sdk='anthropic', protocol='messages', parameters=options)
+            with self.subTest(options=options):
+                self.assertEqual(self.spec(sdk='anthropic', protocol='messages', parameters=options).parameters, options)
+
+    def test_deepseek_ignored_options_are_preserved_in_configuration_and_requests(self):
+        options_by_protocol = {
+            'responses': {'reasoning': {'effort': 'medium', 'summary': 'auto'}, 'temperature': .2,
+                'top_p': .5, 'include': ['reasoning.encrypted_content'], 'text': {'verbosity': 'high'}},
+            'messages': {'thinking': {'type': 'adaptive'}, 'temperature': .2, 'top_k': 10},
+            'chat-completions': {'reasoning_effort': 'medium', 'temperature': .2, 'presence_penalty': .1,
+                'frequency_penalty': .1, 'extra_body': {'thinking': {'type': 'enabled'}, 'future_feature': True}},
+        }
+        for protocol, parameters in options_by_protocol.items():
+            with self.subTest(protocol=protocol):
+                spec = self.spec(protocol=protocol, sdk='anthropic' if protocol == 'messages' else 'openai', parameters=parameters)
+                with patch('openai.AsyncOpenAI'), patch('anthropic.AsyncAnthropic'):
+                    provider = default_registry().create(spec, {'OFFLINE_KEY': 'offline-placeholder'})
+                self.assertEqual(spec.parameters, parameters)
+                self.assertEqual(provider.request_options, parameters)
 
     def test_generic_extension_does_not_infer_vendor_from_url_or_model(self):
         spec = self.spec(service='generic', parameters={'reasoning': {'effort': 'medium'},

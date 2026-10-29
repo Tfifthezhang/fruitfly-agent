@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.core.data_model import AgentToolResult, AssistantMessage, ImageBlock, TextBlock, UserMessage
+from fruitfly_agent.core.data_model.media import image_type, validate_image, decode_text_file
 from fruitfly_agent.core.loop import run_agent_loop
 from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone, StreamActivity
 from fruitfly_agent.improvement.contracts.pipeline import ExecutionRecord, Resource, relative_path, canonical_json
@@ -61,14 +62,15 @@ class FileTaskRunner:
             relative_path(path)
             if path not in files:
                 raise ValueError('file is not in the isolated task workspace')
-            return files[path].decode('utf-8')
+            return decode_text_file(files[path])
         async def read(ctx):
             path = ctx.args['path']
             relative_path(path)
             data = files.get(path, b'')
-            if data.startswith(b'\x89PNG\r\n\x1a\n') or data.startswith(b'\xff\xd8\xff'):
+            if image_type(data) is not None:
+                mime = validate_image(data)
                 return AgentToolResult(content=[ImageBlock(data=base64.b64encode(data).decode('ascii'),
-                    media_type='image/png' if data.startswith(b'\x89PNG') else 'image/jpeg')])
+                    media_type=mime)])
             text = read_path(ctx.args['path'])
             offset, limit = ctx.args.get('offset', 1), ctx.args.get('limit', 200)
             if type(offset) is not int or offset < 1 or type(limit) is not int or not 1 <= limit <= 500:

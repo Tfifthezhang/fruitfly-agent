@@ -30,7 +30,8 @@ inspectable mechanisms and controlled comparisons. Its runtime is adapted from
 |---|---|
 | Version | 0.1 |
 | Runtime | Python 3.11+, macOS or Linux (POSIX) |
-| Model APIs | Responses, Chat Completions and Anthropic Messages, with explicit SDK/protocol selection |
+| Model APIs | Responses, Chat Completions and Messages; service then protocol setup with automatic SDK selection |
+| Image input | Local attachments, image tool results and optional resource saving; requires a declared vision model. See [Run](fruitfly_agent/run/README.md#submit-images). |
 | License | [MIT](LICENSE) · [Third-party notices](THIRD_PARTY_NOTICES.md) |
 
 ## Quickstart
@@ -44,7 +45,9 @@ python3 -m venv .venv
 ```
 
 With no configured models, **Add model** collects service settings and a hidden
-API key. Review and choose **Start new session** to save. Setup validates locally;
+API key. Review, stage, then choose **Save and start**. With complete settings,
+the CLI enters the welcome and chat directly. Use `/config` during chat or
+`fruitfly-agent --configure` before startup to edit settings. Setup validates locally;
 submitted tasks contact the service and may incur charges. Local shell tools run
 with your user permissions. See [Getting started](GETTING_STARTED.md) for setup,
 permissions and session recovery.

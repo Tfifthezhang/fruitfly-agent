@@ -8,9 +8,9 @@ Use FruitFlyAgent through stdin/stdout, menus, and live events. Application owns
 
 | Need | Action |
 |---|---|
-| Start | Run `python -m fruitfly_agent`; choose **Start new session**. |
-| Configure | `/config`; save and apply to this conversation, or save only. |
-| Select a prompt | **Configure → prompt** or `/config`; preview and confirm. |
+| Start | Run `python -m fruitfly_agent`; complete configuration opens welcome and chat directly. |
+| Configure | `/config`; apply the draft to this conversation, continue configuring, or discard changes. |
+| Select a prompt | **/config → prompt** or `/config`; preview and confirm. |
 | Complete a command | Type `/` or a prefix, use ↑↓ to select and Tab to fill it; Enter submits the current text, Esc hides suggestions. |
 | Copy text | Use native terminal selection and its copy shortcut. |
 | Browse earlier chat | Scroll with the terminal's mouse wheel, touchpad or scrollback controls. |
@@ -46,6 +46,23 @@ input, copy mode and configuration/secret fields take priority. Redirected and
 non-ANSI input keep their existing line behavior. Completion makes no model,
 filesystem or command-handler requests.
 
+## Attach local images
+
+Use `/attach "LOCAL_IMAGE_PATH"` to freeze an image for the next submission.
+Attachment commands appear only when the host supplies a local attachment reader.
+Relative paths resolve from the local workspace, including when file tools use
+SSH. `/attachments` lists pending images and retained rejected text. `/detach N`
+removes one image; `/detach all` clears images and the unsent draft. Enter submits
+pending images without text. A successfully submitted/queued/steered message clears
+its draft; preflight failure retains it and Enter retries. A Session path change
+clears pending input with a notice. `/cancel` stops submitted work; it does not
+silently discard pending attachments.
+
+The host reads files and checks the active model's vision declaration. Limits:
+eight images, 10 MiB each, 32 MiB combined; PNG, JPEG, GIF and WebP. Clipboard
+binary images, automatic path detection and audio/video input are not implemented.
+See [Run image input](../../run/README.md#submit-images) for CLI use.
+
 ## Restore a conversation
 
 After successful `/resume` or interactive startup with `--resume`, the terminal appends the original conversation in chronological order, followed by an end marker and the normal input prompt. User and assistant text is complete; ANSI terminals format assistant Markdown. Use native terminal scrollback to review earlier turns. Menus restore the main screen without replaying runtime events. Linear fallback remains available for other streams.
@@ -56,11 +73,13 @@ Cancelled or failed restoration keeps the current session and does not display t
 
 ## Configure
 
-The home menu retains Start new session, Configure and Exit. **Restore default
-configuration** appears immediately before Back in Configure and `/config`. It
+Use `/config` in chat or `--configure` before startup. Missing required inputs
+open their setup flow automatically; complete configuration needs no startup menu.
+Standalone edits offer **Save and start**, Continue or Discard. **Restore default
+configuration** appears immediately before Back in configuration. It
 stages the default prompt, mechanisms and bindings while preserving the current
-model and credentials. Review and apply the saved draft to this conversation,
-save only, or discard the changes.
+model and credentials. Review and apply the draft to this conversation,
+continue configuring, or discard the changes.
 Default files are edited manually. No permission configuration page is supplied.
 
 | Menu | Behavior |
@@ -69,13 +88,20 @@ Default files are edited manually. No permission configuration page is supplied.
 | Add model… | Collect host-provided service fields, hidden API key, and review; stage until configuration save. Opens on first startup when no models exist. |
 | Set API key… | Stage a missing credential for the selected model; the menu shows only set/missing status. |
 | Tools → Set up… | Select a web service and optional key variable, enter a hidden API key, and stage until configuration save. Direct fetch skips key input. |
-| Context, Tools, Environment | One readable row per mechanism; Enter expands algorithm choices and descriptions, Details reveals paths/configuration locations, Space enables/disables. |
+| Context, Tools, Environment | One row per mechanism; focused descriptions appear in a fixed bottom area. Enter opens settings or algorithm choices; Space on a mechanism row enables/disables. |
 | Context sections | Augmentation groups Skills, Memory, Knowledge and HTTP; externalization and reduction remain separate sections on the same page. |
-| Algorithm selector | Multiple implementations use inline radio choices; sole implementations expose a description with expandable Details. |
-| User inputs | Edit declared paths, initial text and endpoints with visible input; tune internal parameters in the displayed YAML location. |
+| Algorithm selector | Multiple implementations use inline radio choices. A sole implementation opens settings directly when declared; no redundant selector or Details row. |
+| User inputs | Edit declared paths, initial text and endpoints with visible input; tune internal parameters in YAML; see the [configuration guide](../../../CONFIGURATION.md). |
 | Prompt results | Current configuration/profile's latest task-scoped prompt candidates, plus built-ins and current selection |
 
-Expanding a prompt group does not change configuration. Choosing a prompt opens a full preview and confirmation. Saving alone retains the active runtime. **Save and apply to this conversation** rebuilds it through recovery while retaining the Session file and messages. Failure retains the incumbent; saved files remain saved. Approval grants and transient component state are recreated. See [Configuration](../../../CONFIGURATION.md#apply-settings-to-the-current-conversation).
+Expanding a prompt group does not change configuration. Choosing a prompt opens a
+full preview and confirmation. **Save and apply to this conversation** submits the
+draft to the host, which starts a replacement before committing files and
+switching. It retains the Session file and messages. Failure retains the incumbent
+and draft, restoring files written by a failed commit. Success prints a short
+confirmation and keeps the chat display. Approval grants and transient component
+state are recreated. See
+[Configuration](../../../CONFIGURATION.md#apply-settings-to-the-current-conversation).
 
 Selecting a service replaces the choice menu with one field per screen. Each field shows the selected service, step count, its purpose, and any default. Field prompts use the field name; conversation input uses `❯`. Official and custom services have separate address instructions. `models.<name>` is the menu name; `model` is the service's exact identifier. Other fields use their YAML keys.
 

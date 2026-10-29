@@ -13,8 +13,16 @@ Assemble resources and prepare new or recovered runtime handles. Application own
 | [recovery.py](recovery.py) | Session discovery, recorded bindings, manifest checks, and session paths |
 | [permissions.py](permissions.py) | Host permission policy and minimal process environment |
 | [tool_providers.py](tool_providers.py) | Drive enabled Catalog preparations and own resources before synchronous assembly |
+| [media.py](media.py) | Bounded explicit local attachment reads and tool-result media registration through the shared rewrite port |
 
 Preparation receives configuration selections, separate improvement/candidate/task material services, and explicit construction/presentation capabilities. It does not inspect a Factory, candidate store, improver implementation, or configuration draft. `PreparedRuntime` reports actual bindings to the composition root only when activation occurs. Successful activation commits the environment snapshot; changed mechanisms also commit a rebuilt model projection.
+
+`build_runtime(model_specs=...)` optionally consumes frozen model specifications
+instead of reading a catalog. `RuntimePreparer.open` accepts those specifications
+and an isolated environment for draft application, using the same assembly and
+recovery path as normal startup. Configuration owns the draft; preparation sees
+only resolved inputs. Activation appends within the Session's synchronous
+transaction so a failed host activation cannot publish an uncommitted environment.
 
 An injected execution-description adapter supplies Session's optional execution
 view independently of the local workspace path. Application exposes it after

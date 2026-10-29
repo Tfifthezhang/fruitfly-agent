@@ -41,20 +41,19 @@ class DefaultConfigurationTests(unittest.TestCase):
         return TerminalConfigurationFrontend(controller, output_stream=output,
             line_editor=MenuScriptedLines(output, *lines)), output
 
-    def test_home_is_clean_and_restore_is_last_config_action_before_back(self):
+    def test_standalone_configuration_has_restore_before_back_and_no_home(self):
         factory = self.factory()
-        frontend, _ = self.frontend(factory.configuration, "@Configure", "@Restore default configuration", "@Back", "@Start new session")
+        frontend, _ = self.frontend(factory.configuration, "@Restore default configuration", "@Back", "@Save and start")
         frames = []
         render = frontend.renderer.render
         def capture(**frame):
             frames.append(frame)
             render(**frame)
         frontend.renderer.render = capture
-        result = frontend.run()
+        result = frontend.run(configure=True)
         self.assertTrue(result.start)
         self.assertTrue(result.saved)
-        home = next(f for f in frames if f["title"] == "FruitFlyAgent")
-        self.assertEqual([r.label for r in home["rows"]], ["Start new session", "Configure", "Exit"])
+        self.assertFalse(any(f["title"] == "FruitFlyAgent" for f in frames))
         for frame in (f for f in frames if f["title"] == "Configuration"):
             self.assertEqual([r.label for r in frame["rows"]][-2:], ["Restore default configuration", "Back"])
             self.assertFalse(any(r.label == "Permissions" for r in frame["rows"]))
@@ -92,20 +91,23 @@ class DefaultConfigurationTests(unittest.TestCase):
         self.assertEqual(controller.model_setup.credentials.values, {})
 
     def test_active_restore_uses_discard_and_save_apply_flow(self):
-        for decision, saved in (("@Discard changes", False), ("@Save and apply to this conversation", True)):
+        for decision, apply in (("@Discard changes", False), ("@Save and apply to this conversation", True)):
             with self.subTest(decision=decision):
                 factory = self.factory()
                 original = factory.configuration.profile()
                 before_default = (self.root / ".fruitfly/default-config.yaml").read_bytes()
                 frontend, _ = self.frontend(factory.configuration, "@Restore default configuration", "@Back", decision)
                 result = frontend.run_for_active_session()
-                self.assertEqual(result.start, saved)
-                self.assertEqual(result.saved, saved)
+                self.assertEqual(result.start, apply)
+                self.assertFalse(result.saved)
                 actual = load_harness_config(self.root / ".fruitfly/config.yaml").select()
-                if saved:
-                    self.assertEqual(actual.mechanisms, load_harness_config(self.root / ".fruitfly/default-config.yaml").select().mechanisms)
+                self.assertEqual(actual, original)
+                if apply:
+                    self.assertEqual(factory.configuration.profile().mechanisms,
+                        load_harness_config(self.root / ".fruitfly/default-config.yaml").select().mechanisms)
+                    self.assertTrue(factory.configuration.changed)
                 else:
-                    self.assertEqual(actual, original)
+                    self.assertFalse(factory.configuration.changed)
                 self.assertEqual((self.root / ".fruitfly/default-config.yaml").read_bytes(), before_default)
 
     def test_missing_or_invalid_defaults_leave_the_daily_draft_unchanged(self):

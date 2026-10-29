@@ -41,6 +41,14 @@ class MenuInput(Protocol):
 
 
 @dataclass(frozen=True)
+class MenuHelp:
+    """Plain explanation supplied by a menu owner, independent of layout."""
+
+    title: str
+    text: str
+
+
+@dataclass(frozen=True)
 class MenuRow:
     label: str
     detail: str = ""
@@ -50,6 +58,7 @@ class MenuRow:
     state: str = ""
     changed: bool = False
     references: tuple[tuple[str, str], ...] = ()
+    help: MenuHelp | None = None
 
 
 class RawTerminalMenuInput:
@@ -192,20 +201,24 @@ class TerminalMenuRenderer:
         instructions: str = "↑↓ move · Enter select · Space toggle · Esc back · q quit",
         field: str = '',
         reference_page: int = 0,
+        help_panel: bool = False,
     ) -> None:
         if not field:
             self._last_frame = dict(title=title, subtitle=subtitle, rows=rows, selected=selected,
-                notice=notice, instructions=instructions, reference_page=reference_page)
+                notice=notice, instructions=instructions, reference_page=reference_page, help_panel=help_panel)
         try:
             size = os.get_terminal_size(self.output.fileno())
         except (AttributeError, OSError, ValueError):
             size = shutil.get_terminal_size(fallback=(80, 24))
         columns, height = max(8, size.columns), max(10, size.lines)
+        selected = min(max(0, selected), len(rows) - 1) if rows else 0
+        parts: list[str] = []
+        write = parts.append
         numbered = not self.ansi if self.numbered is None else self.numbered
         if self.ansi:
-            self.output.write("\x1b[2J\x1b[H")
+            write("\x1b[2J\x1b[H")
         elif self._rendered:
-            self.output.write("\n")
+            write("\n")
         self._rendered = True
         def styled(value: str, style: str) -> str:
             return f'\x1b[{style}m{value}\x1b[0m' if self.color else value
@@ -213,18 +226,23 @@ class TerminalMenuRenderer:
         def plain(value: str) -> str:
             return safe_terminal_text(value).replace('\n', ' ').replace('\t', ' ')
 
+        help_slots = (4 if height >= 18 else 3) if help_panel else 0
+        compact = help_panel and self.ansi and height < 18
         field_lines = safe_terminal_text(field).splitlines()
         if self.ansi:
-            field_lines = [truncate_cells(line, columns - 1) for line in field_lines[:max(4, height // 2)]]
+            field_limit = max(1, height - help_slots - 9) if help_panel else max(4, height // 2)
+            field_lines = [truncate_cells(line, columns - 1) for line in field_lines[:field_limit]]
 
         subtitle_lines = [part for line in safe_terminal_text(subtitle).splitlines()
             for part in (textwrap.wrap(line, max(16, columns - 2)) or [''])]
         if self.ansi:
-            subtitle_lines = subtitle_lines[:1 if field else max(2, height - 12)]
-        self.output.write(styled(plain(title), '1') + '\n\n')
+            subtitle_limit = (0 if height < 18 or field else 2) if help_panel else (1 if field else max(2, height - 12))
+            subtitle_lines = subtitle_lines[:subtitle_limit]
+        write(styled(truncate_cells(plain(title), columns - 1) if self.ansi else plain(title), '1') + ('\n' if compact else '\n\n'))
         if subtitle_lines:
-            self.output.write(styled('\n'.join(subtitle_lines), '2') + '\n')
-        self.output.write('\n')
+            write(styled('\n'.join(subtitle_lines), '2') + '\n')
+        if not compact:
+            write('\n')
         start, end = 0, len(rows)
         self.reference_page = 0
         def reference_lines(row: MenuRow) -> list[str]:
@@ -232,7 +250,7 @@ class TerminalMenuRenderer:
             lines = [part for label, path in row.references
                     for part in textwrap.wrap(plain(label) + ': ' + plain(path), width,
                                               break_on_hyphens=False)]
-            limit = max(1, height - len(subtitle_lines) - len(field_lines) - bool(field) - 13)
+            limit = max(1, height - len(subtitle_lines) - len(field_lines) - bool(field) - 13 - help_slots)
             if self.ansi and not numbered and len(lines) > limit:
                 pages = (len(lines) + limit - 1) // limit
                 page = min(max(0, reference_page), pages - 1) if row is rows[selected] else 0
@@ -243,7 +261,12 @@ class TerminalMenuRenderer:
         if self.ansi and not numbered and rows:
             # Titles are decorations on actionable rows, so they never consume
             # selection indices. Repeat the current section after scrolling.
-            budget = max(2, height - len(subtitle_lines) - len(field_lines) - bool(field) - 10)
+            if help_panel:
+                budget = max(2, height - (1 if compact else 3) - len(subtitle_lines) - help_slots
+                    - (len(field_lines) + 1 if field_lines else 0) - (2 if notice else 0)
+                    - (2 if compact else 4))
+            else:
+                budget = max(2, height - len(subtitle_lines) - len(field_lines) - bool(field) - 10)
             def cost(first: int, last: int) -> int:
                 return sum(1 + bool(r.detail) + len(reference_lines(r)) + bool(r.section and
                     (i == first or r.section != rows[i - 1].section))
@@ -254,13 +277,13 @@ class TerminalMenuRenderer:
             end = selected + 1
             while end < len(rows) and cost(start, end + 1) <= budget:
                 end += 1
-            if start:
-                self.output.write(styled('  ↑ More above\n', '2'))
+            if start and not compact:
+                write(styled('  ↑ More above\n', '2'))
         previous_section = ''
         for index in range(start, end):
             row = rows[index]
             if row.section and row.section != previous_section:
-                self.output.write(styled('  ' + plain(row.section), '1;34') + '\n')
+                write(styled('  ' + plain(row.section), '1;34') + '\n')
             previous_section = row.section
             cursor = ('>' if numbered else '❯') if index == selected else ' '
             indent = '  ' * max(0, row.depth)
@@ -285,25 +308,67 @@ class TerminalMenuRenderer:
                 line += '\x1b[0m'
             else:
                 line = prefix + (marker + ' ' if marker else '') + label + suffix
-            self.output.write(line + '\n')
+            write(line + '\n')
             if row.detail:
                 detail = plain(row.detail)
                 if self.ansi:
                     detail = truncate_cells(detail, max(1, columns - len(indent) - 5))
-                self.output.write(styled('     ' + indent + detail, '2') + '\n')
+                write(styled('     ' + indent + detail, '2') + '\n')
             for reference in reference_lines(row):
-                self.output.write(styled('     ' + indent + reference, '2') + '\n')
-        if self.ansi and end < len(rows):
-            self.output.write(styled('  ↓ More below\n', '2'))
+                write(styled('     ' + indent + reference, '2') + '\n')
+        if self.ansi and end < len(rows) and not compact:
+            write(styled('  ↓ More below\n', '2'))
+        if help_panel:
+            explanation = rows[selected].help if rows else None
+            # Reserve a stable footer even on Back or rows with no explanation.
+            footer = [styled('─' * (columns - 1), '2')]
+            footer.append(styled(truncate_cells(plain(explanation.title), columns - 1), '1') if explanation else '')
+            body = _wrap_help(plain(explanation.text), columns - 1) if explanation else []
+            if self.ansi and not numbered:
+                body = body[:help_slots - 2]
+                if explanation and len(_wrap_help(plain(explanation.text), columns - 1)) > len(body):
+                    body[-1] = truncate_cells(body[-1], columns - 3).rstrip('…') + ' …'
+            footer.extend(styled(line, '2') for line in body)
+            footer.extend([''] * max(0, help_slots - len(footer)))
+            if self.ansi and not numbered:
+                used = ''.join(parts).count('\n')
+                tail = (2 if notice else 0) + (len(field_lines) + 1 if field_lines else 0) + 2
+                write('\n' * max(0, height - help_slots - tail - used))
+            write('\n'.join(footer) + '\n')
         if notice:
             error = notice.startswith(('Invalid', 'Cannot', 'Could not', 'Error', 'Experiment preview unavailable'))
             visible_notice = truncate_cells(plain(notice), columns - 1) if self.ansi else safe_terminal_text(notice)
-            self.output.write('\n' + styled(visible_notice, '31' if error else '33') + '\n')
+            write('\n' + styled(visible_notice, '31' if error else '33') + '\n')
         if field_lines:
-            self.output.write('\n' + styled(field_lines[0], '1;36') + '\n')
-            self.output.write('\n'.join(field_lines[1:]) + '\n')
-        self.output.write('\n' + styled(truncate_cells(instructions, columns - 1) if self.ansi else instructions, '2') + '\n')
+            write('\n' + styled(field_lines[0], '1;36') + '\n')
+            if len(field_lines) > 1:
+                write('\n'.join(field_lines[1:]) + '\n')
+        ending = '' if help_panel and self.ansi and not numbered else '\n'
+        write('\n' + styled(truncate_cells(instructions, columns - 1) if self.ansi else instructions, '2') + ending)
+        self.output.write(''.join(parts))
         self.output.flush()
+
+
+def _wrap_help(text: str, width: int) -> list[str]:
+    """Wrap words and long tokens using terminal cells rather than code points."""
+    lines: list[str] = []
+    line = ''
+    for word in text.split():
+        candidate = line + (' ' if line else '') + word
+        if cell_width(candidate) <= width:
+            line = candidate
+            continue
+        if line:
+            lines.append(line)
+        line = ''
+        for char in word:
+            if line and cell_width(line + char) > width:
+                lines.append(line)
+                line = ''
+            line += char
+    if line:
+        lines.append(line)
+    return lines
 
 
 def create_menu_input(
@@ -330,6 +395,7 @@ __all__ = [
     "MenuEvent",
     "MenuInput",
     "MenuRow",
+    "MenuHelp",
     "RawTerminalMenuInput",
     "TerminalMenuRenderer",
     "create_menu_input",

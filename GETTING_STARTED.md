@@ -31,9 +31,9 @@ Editable installation keeps source changes visible without reinstalling. To inst
 | 2 | Enter a menu label, model ID, and the token limits documented by your service. Official services may leave the API address blank; custom services require it. |
 | 3 | Leave the existing-key-variable field blank to create a variable for this model, then enter the API key with hidden input. To reuse a key, enter its environment variable name and leave the key input blank. |
 | 4 | On **capabilities**, toggle verified optional support; keep required rows checked and choose Continue. |
-| 5 | Review the non-secret settings and choose **Stage model**, then **Start new session** to save. Cancellation writes no model or credential files. |
+| 5 | Review the non-secret settings and choose **Stage model**, then **Save and start** to save. Cancellation writes no model or credential files. |
 
-For additional models, use **Configure → model → Add model…**. **Set API key…** supplies a missing key for the selected model. The wizard performs offline checks only; it does not test credentials, model access, or remote API compatibility. Enter `/cancel` at a field to return. Starting a session does not send a model request until you submit a task.
+For additional models, use **/config → model → Add model…**, or run `fruitfly-agent --configure`. **Set API key…** supplies a missing key for the selected model. The wizard performs offline checks only; it does not test credentials, model access, or remote API compatibility. Enter `/cancel` at a field to return. Starting a session does not send a model request until you submit a task.
 
 The [model template](examples/configuration/models.example.yaml) provides `deepseek-flash-openai` (Responses API) and `deepseek-flash-anthropic` (Messages API) in one file. Both use `deepseek-flash` and a `DEEPSEEK_API_KEY`; the Provider name selects the protocol. See the [example setup and limits](examples/configuration/README.md). A Chat Completions-only endpoint cannot use the Responses adapter. Keep only profiles you need; rename them if desired. Use separate `api_key_env` names if profiles need different keys.
 
@@ -47,9 +47,9 @@ The standard host allows ordinary workspace file operations, protects known cred
 
 ## Run and resume
 
-Use **Configure → Restore default configuration** to stage the default tools,
+Use **/config → Restore default configuration** to stage the default tools,
 environment, algorithms and prompt. The action retains your model and credentials;
-review and apply the saved draft to this conversation, save only, or discard it. Prepare the
+review and apply the draft to this conversation or discard it. Prepare the
 [default templates](examples/configuration/README.md) before restoring. Default
 files are edited manually. Eval uses their complete profile inside task containers.
 
@@ -62,13 +62,14 @@ After initial configuration:
 
 | Action | Behavior |
 |---|---|
-| Start without a task | Open the terminal interface. |
+| Start without a task | Enter welcome and chat directly when configuration is complete. |
+| Use `--configure` | Edit configuration before startup; Save and start or discard. |
 | Supply a task | Run a single task. |
 | Use `--resume` | Restore the latest non-empty session after validation and display saved chat in interactive mode. |
 | Use `--resume --session PATH` | Restore a specific session at startup. |
 | Enter `/resume` | Choose a compatible session from the idle terminal and display saved chat. |
 | Supply a task with `--resume` | Continue saved context for one task without printing old chat; model requests may incur charges. |
-| Change configuration | Save and apply to this conversation while idle, or save only. |
+| Change configuration | Use `/config` while idle to save and apply to this conversation. |
 
 See [Terminal](fruitfly_agent/interactive/terminal/README.md) for daily controls and [Run](fruitfly_agent/run/README.md) for startup and recovery contracts.
 

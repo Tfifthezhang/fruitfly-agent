@@ -14,10 +14,10 @@ Use arrows and Enter, or numbered choices in line-based menus. Extension registr
 supply their own choices without terminal changes; unsupported YAML values fail
 validation.
 
-In **Configure → Tools**, expand **Search the web** or **Fetch web pages** and
+In **/config → Tools**, open the settings for **Search the web** or **Fetch web pages** and
 choose **Set up…**. Select the service, optionally enter an API key variable name,
-then enter the key with hidden input. Choose **Stage settings**, return to startup,
-and save/start a new session. Enabling a tool with missing credentials also opens
+then enter the key with hidden input. Choose **Stage settings**, then save and apply through `/config`,
+or choose **Save and start** when using `--configure`. Enabling a tool with missing credentials also opens
 setup. Configured tools can be toggled without re-entering their key.
 
 The form resolves credentials from the service and variable selected in that same

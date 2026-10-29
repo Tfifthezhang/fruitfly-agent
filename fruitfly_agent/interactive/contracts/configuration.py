@@ -93,8 +93,9 @@ class ConfigurationActionResult:
 class ConfigurationLaunchResult:
     """Provider-free view result: start the requested new or replacement runtime.
 
-    Active-session callers interpret ``start`` as applying saved settings through
-    recovery; startup callers use it to launch a session. Saving alone is false.
+    Active-session callers interpret ``start`` as requesting draft application
+    through the host, without saving in the frontend. Startup callers use it to
+    launch a session after any required save.
     """
 
     start: bool

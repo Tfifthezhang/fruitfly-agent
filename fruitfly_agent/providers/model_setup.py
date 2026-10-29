@@ -1,20 +1,23 @@
 """Offline validation and form descriptions for the supported API protocols."""
 
 import re
+import json
+from copy import deepcopy
 from dataclasses import asdict, dataclass, field
-from typing import Any
 from urllib.parse import urlsplit
 
-from .specs import ModelCapabilities, ModelSpec
+from .specs import ModelCapabilities, ModelSpec, ordered_model_entry
+from .request_options import validate_request_options
 from .transport import TransportPolicy
-from .services import service_definition
+from .services import builtin_services, service_definition
+from .registry import ProviderRegistry, default_registry
 
 
 CAPABILITY_OPTIONS = (
     ("tools", "Model tool calls; required by this harness", True),
     ("parallel_tool_calls", "Multiple tool calls in a single model response", False),
     ("vision", "Image input supported by the model and endpoint", False),
-    ("reasoning", "Reasoning capability; review the selected service's request defaults before saving", False),
+    ("reasoning", "Reasoning capability; this declaration does not enable or disable model thinking", False),
     ("streaming", "Streaming responses; required by this harness", True),
 )
 
@@ -23,89 +26,81 @@ CAPABILITY_OPTIONS = (
 class SetupService:
     id: str
     label: str
-    sdk: str
     protocol: str
     service: str
     description: str
-    group: str
     custom: bool = False
     initial: dict = field(default_factory=dict)
 
 
-# Explicit choices supply editable defaults; URLs and model names never select services.
-SERVICES = (
-    SetupService("openai", "OpenAI official · Responses API", "openai", "responses", "openai", "OpenAI account and API key. Uses the official address by default.", group="OpenAI"),
-    SetupService("anthropic", "Anthropic official · Messages API", "anthropic", "messages", "anthropic", "Anthropic account and API key. Uses the official address by default.", group="Anthropic"),
-    SetupService("deepseek", "DeepSeek · Responses API", "openai", "responses", "deepseek", "DeepSeek official API key. Flash defaults with high reasoning effort.", group="DeepSeek", initial={
-        "profile": "DeepSeek-Flash", "model": "deepseek-flash", "base_url": "https://api.deepseek.com",
-        "context_window": "1048576", "max_output_tokens": "32768", "api_key_env": "DEEPSEEK_API_KEY",
-        "capabilities.parallel_tool_calls": True, "capabilities.vision": True, "capabilities.reasoning": True}),
-    SetupService("qwen", "Qwen · Chat Completions API", "openai", "chat-completions", "qwen", "Qianwen AI Beijing endpoint. Qwen3.8-Flash defaults; confirm against your account and region.", group="Qwen", initial={
-        "profile": "Qwen3.8-Flash", "model": "qwen3.8-flash",
-        "base_url": "https://cn-beijing.maas.qianwenaiapi.com/compatible-mode/v1",
-        "context_window": "1000000", "max_output_tokens": "32768", "api_key_env": "DASHSCOPE_API_KEY",
-        "capabilities.parallel_tool_calls": True, "capabilities.vision": True, "capabilities.reasoning": True}),
-    SetupService("bigmodel", "Zhipu BigModel · Chat Completions API", "openai", "chat-completions", "bigmodel", "BigModel China API key. GLM-4.5-Air text-only defaults; confirm against your selected model.", group="Zhipu BigModel", initial={
-        "profile": "GLM-4.5-Air", "model": "glm-4.5-air",
-        "base_url": "https://open.bigmodel.cn/api/paas/v4",
-        "context_window": "131072", "max_output_tokens": "32768", "api_key_env": "ZAI_API_KEY",
-        "capabilities.reasoning": True}),
-    SetupService("custom-responses", "Responses API", "openai", "responses", "generic", "Gateway or self-hosted Responses API. Requires its API address and key.", group="Custom service…", custom=True),
-    SetupService("custom-messages", "Messages API", "anthropic", "messages", "generic", "Gateway or self-hosted Messages API. Requires its API address and key.", group="Custom service…", custom=True),
-    SetupService("custom-chat", "Chat Completions API", "openai", "chat-completions", "generic", "Gateway or self-hosted Chat Completions. Requires its API address and key.", group="Custom service…", custom=True),
-)
+# Services and addresses have one owner; no model names or limits are inferred.
+SERVICES = tuple(SetupService(
+    'custom' if definition.id == 'generic' else definition.id,
+    definition.label, definition.default_protocol, definition.id,
+    'Choose a protocol, then enter the model ID and documented limits. Confirm endpoint and account access.',
+    custom=definition.id == 'generic', initial={'api_key_env': definition.api_key_env},
+) for definition in builtin_services())
 
 
-def setup_selection(option_id: str, field: str, values, pairs: tuple[tuple[str, str], ...]) -> tuple[str, tuple[str, ...]]:
+def setup_service(option_id: str) -> SetupService:
     selected = next((item for item in SERVICES if item.id == option_id), None)
-    if selected is None or field not in {'sdk', 'protocol'}:
-        raise ValueError('unsupported model setup selection')
+    if selected is None:
+        raise ValueError('unsupported API service')
+    return selected
+
+
+def setup_selection(option_id: str, values, pairs: tuple[tuple[str, str], ...]) -> tuple[str, tuple[str, ...]]:
+    selected = setup_service(option_id)
     definition = service_definition(selected.service, selected.protocol)
-    pairs = tuple((sdk, protocol) for sdk, protocol in pairs
-                  if (selected.service == 'generic' or protocol in definition.protocols)
-                  and (selected.custom or protocol == selected.protocol))
-    sdks = tuple(dict.fromkeys(sdk for sdk, protocol in pairs))
-    sdk = values.get('sdk', selected.sdk)
-    if field == 'sdk':
-        return sdk if sdk in sdks else next(iter(sdks), ''), sdks
-    choices = tuple(protocol for client, protocol in pairs if client == sdk)
+    registered = tuple(dict.fromkeys(protocol for _, protocol in pairs))
+    order = ('responses', 'messages', 'chat-completions', *registered)
+    choices = tuple(dict.fromkeys(protocol for protocol in order if protocol in registered
+        and (selected.custom or protocol in definition.protocols)))
     value = values.get('protocol', selected.protocol)
     return value if value in choices else next(iter(choices), ''), choices
 
 
+def setup_initial(option_id: str, protocol: str) -> dict:
+    selected = setup_service(option_id)
+    definition = service_definition(selected.service, protocol)
+    return {**selected.initial, 'base_url': definition.base_url or ''}
+
+
+def default_parameters(protocol: str) -> dict:
+    """Editable protocol defaults, independent of vendor, model and capability flags."""
+    defaults: dict[str, dict] = {
+        'responses': {'reasoning': {'effort': 'medium'}},
+        'messages': {'output_config': {'effort': 'medium'}},
+        'chat-completions': {'reasoning_effort': 'medium'},
+    }
+    return deepcopy(defaults.get(protocol, {}))
+
+
 def setup_defaults(option_id: str, values) -> dict:
-    selected = next((item for item in SERVICES if item.id == option_id), None)
-    if selected is None:
-        raise ValueError("unsupported API service")
-    reasoning = values.get("capabilities.reasoning", str(selected.initial.get("capabilities.reasoning", False)).lower()) == "true"
-    parameters: dict[str, Any] = {}
+    selected = setup_service(option_id)
     protocol = values.get('protocol', selected.protocol)
-    if selected.service == "deepseek":
-        if protocol == 'responses':
-            parameters = {"reasoning": {"effort": "high" if reasoning else "none"}}
-        elif protocol == 'messages':
-            parameters = {'thinking': {'type': 'enabled' if reasoning else 'disabled'}}
-            if reasoning:
-                parameters['output_config'] = {'effort': 'high'}
-        elif protocol == 'chat-completions':
-            parameters = {'extra_body': {'thinking': {'type': 'enabled' if reasoning else 'disabled'}}}
-            if reasoning:
-                parameters['reasoning_effort'] = 'high'
-    elif selected.service == "qwen":
-        extra: dict[str, Any] = {"enable_thinking": reasoning, "preserve_thinking": reasoning}
-        if reasoning:
-            extra["reasoning_effort"] = "medium"
-        parameters = {"extra_body": extra}
-    elif selected.service == "bigmodel":
-        parameters = {"extra_body": {"thinking": {"type": "enabled" if reasoning else "disabled"}}}
+    parameters = default_parameters(protocol)
+    if values.get('parameters', '') != '':
+        try:
+            parameters = json.loads(values['parameters'])
+        except (TypeError, ValueError) as exc:
+            raise ValueError('parameters must be a JSON object; use {} for server defaults') from exc
+    parameters = validate_request_options(protocol, parameters)
     return {"service": selected.service, "parameters": parameters,
             "transport": {**asdict(TransportPolicy()), "retry_max": 3, "retry_base_delay": 1.0}}
 
 
-def model_entry(option_id: str, values) -> tuple[str, dict]:
-    service = next((item for item in SERVICES if item.id == option_id), None)
-    if service is None:
-        raise ValueError("unsupported API service")
+def model_entry(option_id: str, values, *, registry: ProviderRegistry | None = None) -> tuple[str, dict]:
+    service = setup_service(option_id)
+    registry = registry or default_registry()
+    protocol = values.get('protocol', service.protocol)
+    _, choices = setup_selection(option_id, values, registry.registered_pairs())
+    if protocol not in choices:
+        raise ValueError('unavailable service/protocol combination: ' + service.service + '/' + protocol)
+    sdk = registry.sdk_for(protocol)
+    if 'sdk' in values and values['sdk'] != sdk:
+        raise ValueError('SDK is automatic for this protocol; expected ' + sdk)
+    initial = setup_initial(option_id, protocol)
     profile = values.get("profile", "").strip()
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,79}", profile):
         raise ValueError("models.<name> must use 1–80 letters, digits, dots, underscores, or hyphens")
@@ -113,7 +108,7 @@ def model_entry(option_id: str, values) -> tuple[str, dict]:
     if not model or any(ord(char) < 32 for char in model):
         raise ValueError("model must be non-empty text")
     url = values.get("base_url", "").strip()
-    url = url or str(service.initial.get("base_url", ""))
+    url = url or str(initial.get("base_url", ""))
     if service.custom and not url:
         raise ValueError("Custom services require base_url (API base URL)")
     if url:
@@ -133,14 +128,14 @@ def model_entry(option_id: str, values) -> tuple[str, dict]:
     defaults = ModelCapabilities()
     capabilities = {}
     for name, description, required in CAPABILITY_OPTIONS:
-        value = values.get(f"capabilities.{name}", str(service.initial.get(f"capabilities.{name}", getattr(defaults, name))).lower())
+        value = values.get(f"capabilities.{name}", str(initial.get(f"capabilities.{name}", getattr(defaults, name))).lower())
         if value not in ("true", "false"):
             raise ValueError(f"capabilities.{name} must be true or false")
         capabilities[name] = value == "true"
-    entry = dict(sdk=values.get('sdk', service.sdk), protocol=values.get('protocol', service.protocol), model=model, api_key_env=key_env,
+    entry = dict(sdk=sdk, protocol=protocol, model=model, api_key_env=key_env,
                  context_window=context, max_output_tokens=output,
                  capabilities=capabilities, **setup_defaults(option_id, values))
     if url:
         entry["base_url"] = url
     ModelSpec.from_dict(profile, entry).require(tools=True, streaming=True)
-    return profile, entry
+    return profile, ordered_model_entry(entry)

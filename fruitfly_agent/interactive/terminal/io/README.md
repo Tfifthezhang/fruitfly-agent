@@ -22,6 +22,18 @@ TerminalFrontend owns the active input loop. Features borrow the supplied reader
 
 `MenuRow` carries section titles, indentation, state markers, draft-change flags and labeled path `references`. References wrap without ellipsis, use reduced emphasis, consume no selection indices and count toward viewport scrolling. Large reference blocks use `reference_page`; the renderer reports its clamped `reference_page` so owners can route PageUp/PageDown through their existing input loop. Numbered fallback shows complete references. Section titles consume no input indices. Raw-key ANSI menus use a `❯` focus without row numbers; line-based input retains numbered actions, including on ANSI output. Long menus scroll to the focused row and repeat the current section title. `TerminalMenuRenderer.begin_input` retains the menu and focuses the edited field while showing input rules.
 
+`MenuRow.help` optionally carries a `MenuHelp(title, text)` explanation. Pages
+explicitly opt in with `help_panel=True`; otherwise existing inline `detail` and
+reference behavior stays unchanged. The fixed bottom area follows focus rather
+than selection and reserves space even on rows without help. Ordinary screens
+show at most two wrapped body lines; short screens use one and reduce padding.
+Long explanations indicate clipping. Numbered fallback prints the full focused
+explanation. Wrapping counts terminal cells. The list viewport reserves the
+panel, notices, field input and navigation space. ANSI rendering leaves the last
+line without a trailing newline to avoid scrolling the title off screen.
+`begin_input` retains the page's help policy. Owners supply text and opt-in;
+rendering does not inspect component metadata or invoke actions.
+
 Focus uses cyan emphasis and the neutral `input_styles` background; enabled/selected markers use green, Modified/warnings use yellow, and errors use red. Group headings use blue/bold; option labels use bold. Descriptions, references, page subtitles and navigation hints use reduced emphasis. Font size follows terminal settings; the renderer does not resize individual rows. Symbols and text preserve all states without color. Existing light/dark, basic/256/true-color and `NO_COLOR` fallbacks apply. `NO_COLOR` emits no SGR styling.
 
 `field_prompt` and `parse_field_value` interpret generic field metadata; host validation remains authoritative. `read_field_line(editor, label)` borrows the existing reader with a visible display and separate field history while chat is suspended. Submission, EOF, Esc and interruption restore display, history and terminal mode. Typing/cursor edits remain visible with terminal echo disabled. `q`, spaces and digits are literal text during input. Readline/stream readers retain labeled fallback; `/cancel` belongs to the form. Secret fields retain their separate echo-suppressed reader.

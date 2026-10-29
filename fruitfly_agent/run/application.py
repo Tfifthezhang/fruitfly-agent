@@ -289,6 +289,24 @@ class RunApplicationFactory:
             profile_override=profile_override,
         )
 
+    async def prepare_configuration(self, *, session_path: Path) -> RuntimeHandle:
+        """Prepare the draft through normal assembly; publish only on activation."""
+        prepared = self.configuration.prepare_application(self.environment)
+        handle = await self._preparer.open(
+            selection=prepared.selection, improvement_service=self._improvement_service,
+            candidate_service=self._candidate_adapter, task_pack_service=self._task_pack_service,
+            activated=self._activated, resume=True, session_path=session_path,
+            model_specs=prepared.models, environment=prepared.environment,
+        )
+        activate = handle.activate_callback
+
+        def commit():
+            prepared.commit(activate or (lambda: None))
+            self._selection = prepared.selection
+
+        handle.activate_callback = commit
+        return handle
+
     async def _prepare_profile(self, profile):
         return await self.open(resume=False, session_path=self.new_session_path(), profile_override=profile)
 

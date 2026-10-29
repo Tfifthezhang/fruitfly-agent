@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from contextlib import nullcontext
 import json
 import os
 from pathlib import Path
@@ -19,6 +20,8 @@ from fruitfly_agent.run.application import RunApplicationFactory, resolve_sessio
 from fruitfly_agent.lab.catalog import PermissionPolicy
 from fruitfly_agent.providers.registry import default_registry
 from fruitfly_agent.run.runtime.limits import ModelCallBudget, BudgetedProviderRegistry
+from fruitfly_agent.core.data_model import TextBlock
+from fruitfly_agent.core.data_model.media import UserContent
 from fruitfly_agent.interactive.terminal.features.tool_services.approval import approve_start
 
 
@@ -26,10 +29,15 @@ async def run_cli(args: argparse.Namespace) -> int:
     cwd = Path(args.cwd).resolve() if args.cwd else Path.cwd().resolve()
     application: AgentApplication | None = None
     try:
-        if args.approve_tools and (not args.task or args.resume):
+        images = getattr(args, 'image', None) or []
+        single_task = bool(args.task or images)
+        configure = getattr(args, 'configure', False)
+        if configure and single_task:
+            raise ValueError('--configure requires interactive mode; omit the task and --image')
+        if args.approve_tools and (not single_task or args.resume):
             raise ValueError("--approve-tools requires a new non-interactive task")
         unrestricted = getattr(args, "unrestricted", False)
-        if unrestricted and (not args.task or args.resume or args.approve_tools):
+        if unrestricted and (not single_task or args.resume or args.approve_tools):
             raise ValueError("--unrestricted requires a fresh non-interactive task and conflicts with --approve-tools")
         paths = WorkspacePaths(cwd)
         environment = {**load_env(paths.secret_file()), **os.environ}
@@ -38,20 +46,22 @@ async def run_cli(args: argparse.Namespace) -> int:
             raw_limit = environment.get('FRUITFLY_MAX_MODEL_CALLS')
         registry = None
         if raw_limit is not None:
-            if not args.task or args.resume:
+            if not single_task or args.resume:
                 raise ValueError('model request allowance requires a fresh non-interactive task')
             budget = ModelCallBudget(int(raw_limit), receipt=environment.get('FRUITFLY_MODEL_USAGE_PATH'))
             registry = BudgetedProviderRegistry(default_registry(), budget)
         factory = RunApplicationFactory(
             cwd=cwd, environment=environment, config_path=args.config,
-            profile_id=args.profile, allow_incomplete=not bool(args.task),
+            profile_id=args.profile, allow_incomplete=not single_task,
             permission_policy=PermissionPolicy.unrestricted(cwd) if unrestricted else None,
             provider_registry=registry,
             tool_service_startup_approval=approve_start,
         )
-        if not args.task:
-            with transient_screen(sys.stdin, sys.stdout):
-                launch = TerminalConfigurationFrontend(factory.configuration).run(editable=not args.resume)
+        if not single_task:
+            needs_menu = configure or not factory.configuration.snapshot().ready
+            scope = transient_screen(sys.stdin, sys.stdout) if needs_menu else nullcontext()
+            with scope:
+                launch = TerminalConfigurationFrontend(factory.configuration).run(configure=configure)
             if not launch.start:
                 return 0
             if launch.saved:
@@ -67,12 +77,17 @@ async def run_cli(args: argparse.Namespace) -> int:
             resume=bool(args.resume),
             session_path=session_path,
         )
-        if args.resume and args.task:
+        if args.resume and single_task:
             print(
                 f"[resumed {application.status.message_count} messages "
                 f"from {session_path}]"
             )
-        if args.task:
+        if single_task:
+            content: UserContent = args.task
+            if images:
+                content = [TextBlock(args.task)] if args.task else []
+                content.extend(application.load_attachment(path) for path in images)
+            application.validate_input(content)
             renderer = TerminalRenderer(sys.stdout)
             event_stream = None
             event_stream_path = os.environ.get("FRUITFLY_EVENT_STREAM_PATH")
@@ -92,7 +107,7 @@ async def run_cli(args: argparse.Namespace) -> int:
 
             application.set_event_sink(render_and_forward)
             try:
-                result = await application.submit(args.task)
+                result = await application.submit(content)
                 return 1 if result.is_error else 0
             finally:
                 await renderer.close()
@@ -130,13 +145,15 @@ def create_parser() -> argparse.ArgumentParser:
         "task",
         nargs="?",
         default="",
-        help="task to run; omit it to enter interactive mode",
+        help="task to run; omit task and --image to enter interactive mode",
     )
     parser.add_argument(
         "--resume",
         action="store_true",
         help="resume the latest non-empty session, or select a path with --session",
     )
+    parser.add_argument('--configure', action='store_true',
+                        help='edit configuration before entering interactive chat')
     parser.add_argument("--approve-tools", action="store_true",
                         help="approve tool confirmation requests for a new task in a trusted isolated environment")
     parser.add_argument("--unrestricted", action="store_true",
@@ -144,6 +161,8 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument("--cwd", default=None, help="working directory")
     parser.add_argument('--max-model-calls', type=int, default=None,
                         help='shared main/auxiliary Provider request allowance for a fresh task')
+    parser.add_argument('--image', action='append', default=[], metavar='PATH',
+                        help='attach a local PNG/JPEG/GIF/WebP image; repeat for multiple images; paths resolve from --cwd')
     parser.add_argument(
         "--session",
         default=None,

@@ -50,6 +50,7 @@ from fruitfly_agent.lab.tools import (
     create_read_tool,
     create_write_tool,
 )
+from fruitfly_agent.lab.tools.media import create_save_media_tool
 
 from .assembly import AssemblyContext, AssemblyState, require_workspace_path
 from .catalog import LabCatalog
@@ -156,6 +157,15 @@ def builtin_catalog() -> LabCatalog:
             order=23,
             requires_capabilities=frozenset({"execution-env"}),
             effects=MechanismEffects(tools=("write",)),
+        ),
+        _definition(
+            'save-media-tool', layer='capability', family='tools', label='Save media resources',
+            description='Save a session media resource to a local or SSH file.',
+            install=_install_save_media_tool,
+            implementation_path='fruitfly_agent/lab/tools/media.py',
+            documentation_path='fruitfly_agent/lab/tools/README.md',
+            default=False, order=24, requires_capabilities=frozenset({'execution-env'}),
+            effects=MechanismEffects(tools=('save_media',)),
         ),
         _definition(
             "ipython-tool",
@@ -309,7 +319,7 @@ def builtin_catalog() -> LabCatalog:
     )
     from fruitfly_agent.lab.tools.guidance import configuration_surface as guidance_surface
     tool_factories = {'read': create_read_tool, 'bash': create_bash_tool,
-                      'write': create_write_tool, 'edit': create_edit_tool}
+                      'write': create_write_tool, 'edit': create_edit_tool, 'save_media': create_save_media_tool}
     definitions = tuple(replace(d, artifact_slots=d.artifact_slots | frozenset(
         guidance_key(name) for name in d.descriptor.effects.tools),
         configuration_surfaces=(*d.configuration_surfaces,
@@ -461,7 +471,13 @@ def _install_local_env(state: AssemblyState, context: AssemblyContext, parameter
 
 
 def _install_read_tool(state: AssemblyState, context: AssemblyContext, parameters: Mapping[str, Any]) -> AssemblyState:
-    return _append_tool(state, create_read_tool())
+    return _append_tool(state, create_read_tool(context.media_writer))
+
+
+def _install_save_media_tool(state: AssemblyState, context: AssemblyContext, parameters: Mapping[str, Any]) -> AssemblyState:
+    if context.media_reader is None:
+        raise ValueError('save-media-tool requires a host media resource reader')
+    return _append_tool(state, create_save_media_tool(context.media_reader))
 
 
 def _install_bash_tool(state: AssemblyState, context: AssemblyContext, parameters: Mapping[str, Any]) -> AssemblyState:

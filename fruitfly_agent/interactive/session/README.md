@@ -30,6 +30,12 @@ Durable message storage belongs to [Core Session](../../core/session/README.md).
 
 No new environment variables or model training. Submission invokes the injected Core loop/Provider and can have model/tool effects; offline checks use substitutes.
 
+`submit` and `steer` accept `UserContent` (text or a list of text/image blocks).
+Preflight copies and validates fresh inputs before persistence. Run can inject
+`vision`, `load_attachment` and `register_media`; Session owns no filesystem
+attachment reader. Registration occurs as a user message is committed. Restored
+images remain ordinary canonical facts; Provider projections own compatibility.
+
 ```bash
 .venv/bin/python -m unittest tests.interactive.test_session tests.interactive.test_conversation tests.interactive.test_context_status tests.interactive.test_extensions -v
 ```

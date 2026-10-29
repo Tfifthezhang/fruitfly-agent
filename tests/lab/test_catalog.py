@@ -72,6 +72,31 @@ def _definition(
 
 
 class DescriptorTest(unittest.TestCase):
+    def test_registration_rejects_invalid_installer_contract_before_discovery(self):
+        async def asynchronous(state, context, parameters):
+            return state
+        for install, message in ((asynchronous, 'synchronous'),
+                (lambda state: state, 'accept'),
+                (lambda state, context, parameters, required: state, 'accept')):
+            with self.subTest(install=install), self.assertRaisesRegex(TypeError, message):
+                _definition('invalid-installer', install=install)
+
+    def test_assembly_rejects_broken_lifecycle_before_application_start(self):
+        class Resource:
+            start = 'invalid'
+            def close(self):
+                pass
+        resource = Resource()
+        owned = []
+        definition = _definition('broken-lifecycle',
+            install=lambda state, context, parameters: state.with_component('resource', resource))
+        context = AssemblyContext(Path.cwd(), object(), 'offline',
+            lambda *_: ProviderBinding(FauxProvider(), 'offline', 'offline'), resource_sink=owned)
+        with self.assertRaisesRegex(TypeError, 'component start must be callable'):
+            assemble_lab(AgentLoopConfig(provider=FauxProvider()), catalog=LabCatalog((definition,)),
+                selections=(MechanismSelection('broken-lifecycle'),), context=context)
+        self.assertIn(resource, owned)
+
     def test_descriptor_serializes_multiple_contributions_without_a_version(self) -> None:
         descriptor = MechanismDescriptor(
             mechanism_id="programmatic-context",
@@ -289,6 +314,7 @@ class CatalogTest(unittest.TestCase):
                 "bash-tool",
                 "edit-tool",
                 "write-tool",
+                "save-media-tool",
                 "ipython-tool",
                 "web-search-tool",
                 "web-fetch-tool",

@@ -8,6 +8,7 @@ Persist immutable text, candidate records, and readable outputs. Storage validat
 |---|---|
 | [sessions.py](sessions.py): `SessionLeases` | Share one exclusive Session writer during serialized runtime replacement |
 | [artifacts.py](artifacts.py): `DataArtifactStore` | Store and verify immutable text and binary bytes under SHA-256 identities |
+| [media.py](media.py): `SessionMedia` | Session-granted media resources, recorded origin/size/type and recovery hash validation |
 | [prompts.py](prompts.py): `resolve_base_prompt` | Resolve built-in or stored prompt contents without assembly |
 | [candidates.py](candidates.py): `CandidateRecord`, `CandidateStore` | Create, read, update, replace, and delete records |
 | [improvement_runs.py](improvement_runs.py): `ImprovementRunStore` | Atomic experiment summaries and verified journal reads, scoped to configuration/profile |
@@ -22,7 +23,7 @@ Persist immutable text, candidate records, and readable outputs. Storage validat
 
 | Data | Location |
 |---|---|
-| Immutable text | `.fruitfly/artifacts/` |
+| Immutable text and media | `.fruitfly/artifacts/` |
 | Candidates | `.fruitfly/improvement/candidates/` |
 | Experiment summaries | `.fruitfly/improvement/runs/`; all submitted outcomes, including no candidate |
 | Readable results | `.fruitfly/improvement/task-results/` |

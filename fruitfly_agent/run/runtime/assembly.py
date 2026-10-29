@@ -23,11 +23,14 @@ from fruitfly_agent.lab.catalog import (
 )
 from fruitfly_agent.run.configuration import HarnessProfile
 from fruitfly_agent.providers.registry import ProviderRegistry, default_registry
+from fruitfly_agent.providers.specs import ModelSpec
 
 from fruitfly_agent.run.configuration.resolution import resolve_profile_models
 from fruitfly_agent.run.storage.artifacts import DataArtifactStore
+from fruitfly_agent.run.storage.media import SessionMedia
 from fruitfly_agent.run.storage.prompts import resolve_base_prompt
 from .manifest import RuntimeManifest, digest_manifest as _digest
+from .media import retain_tool_media
 from fruitfly_agent.lab.catalog import resolve_harness, verify_runtime, configure_profile
 from fruitfly_agent.lab.algorithms.targets import TEXT_TARGET_PREFIX
 
@@ -59,6 +62,7 @@ def build_runtime(
     task_pack_sources: tuple = (),
     permission_policy: PermissionPolicy | None = None,
     tool_providers: Mapping[str, Any] | None = None,
+    model_specs: Mapping[str, ModelSpec] | None = None,
 ) -> RuntimeAssembly:
     """Build a fresh runtime; no result is applied until all installers succeed."""
 
@@ -72,6 +76,7 @@ def build_runtime(
         if item.definition.tool_provider is not None and item.definition.descriptor.mechanism_id not in prepared:
             raise ValueError('tool provider requires asynchronous preparation: ' + item.definition.descriptor.mechanism_id)
     store = artifact_store or DataArtifactStore(cwd / ".fruitfly" / "artifacts")
+    media = SessionMedia(store, session)
     for reference, text in profile.artifact_contents.items():
         if store.put_text(text).artifact_id != reference:
             raise ValueError('configured artifact content identity differs')
@@ -79,6 +84,7 @@ def build_runtime(
     models, selected_model_profile, main_spec = resolve_profile_models(
         profile,
         config_path,
+        model_specs=model_specs,
     )
     policy = permission_policy or default_permission_policy(cwd, config_path)
     if policy.workspace != cwd.resolve():
@@ -175,10 +181,12 @@ def build_runtime(
             model_roles=profile.model_roles,
             model_metadata={name: {'model': spec.model, 'context_window': spec.context_window,
                                    'max_tokens': spec.max_output_tokens} for name, spec in models.items()},
+            media_writer=media.put,
+            media_reader=media.read,
         ),
     )
     # Apply host policy after all installers, so an installer cannot accidentally omit it.
-    secured = apply_permission_policy(assembled.config,
+    secured = apply_permission_policy(retain_tool_media(assembled.config, media),
         replace(policy, readonly_paths=(*policy.readonly_paths, session.path.resolve())),
         confirm=approvals.confirm, audit=audit, process_environment=process_environment)
     permission_identity = getattr(secured.tool_authorizer, 'identity', policy.identity)()
@@ -268,7 +276,7 @@ def build_runtime(
         context_pipeline=assembled.context_pipeline,
         mechanism_ids=optional_ids,
         component_ids=assembled.mechanism_ids,
-        components={**providers, **assembled.components,
+        components={**providers, **assembled.components, 'media-resources': media,
                     **{f"owned:{i}": value for i, value in enumerate(resource_sink or ())}},
         model_profile=selected_model_profile,
         manifest=manifest,

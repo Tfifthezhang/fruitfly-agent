@@ -8,55 +8,86 @@ system config selects its own `models.roles` aliases. Keep actual keys in
 
 ## Choose the protocol and service
 
-| `sdk` | `protocol` | API | Tool messages | Image tool results |
-|---|---|---|---|---|
-| `openai` | `responses` | Responses | `function_call` / `function_call_output` | Supported |
-| `anthropic` | `messages` | Messages | `tool_use` / `tool_result` | Supported |
-| `openai` | `chat-completions` | Chat Completions | assistant `tool_calls` / `tool` | Rejected explicitly |
+| `sdk` | `protocol` | Tool messages | Image tool results |
+|---|---|---|---|
+| `openai` | `responses` | `function_call` / `function_call_output` | Native image content |
+| `anthropic` | `messages` | `tool_use` / `tool_result` | Native image content |
+| `openai` | `chat-completions` | assistant `tool_calls` / `tool` | Attributed image observation after the complete tool-result batch |
 
-`sdk` identifies the client library; `protocol` identifies the API format.
-Both fields are required. The adapter registry selects a factory by the pair and
-rejects unregistered combinations before constructing SDK clients. `service` selects registered endpoint
-rules: `generic` (default), `openai`, `anthropic`, `deepseek`, `qwen`, or `bigmodel`. Neither is inferred
-from the URL or model name. The `generic` rules validate protocol fields without
-claiming vendor-specific support. An explicit custom base URL must be HTTP(S)
-without embedded credentials, query or fragment. Omit it for the SDK default.
+`sdk` identifies the client library; `protocol` identifies the wire format. Both
+remain required catalog fields. The registry dispatches on this pair and rejects
+unregistered pairs before constructing a client. The wizard derives SDK from the
+selected protocol; multiple adapters require an explicit default registration.
 
-The model wizard offers official Responses/Messages, custom
-Responses/Messages/Chat Completions, and explicit Qwen, BigModel and DeepSeek
-presets. Official/preset choices set their service; custom choices use `generic`.
-The first menu lists service groups. Named services open their preset directly;
-custom services open a separate protocol menu. Back returns to service selection.
-SDK and protocol fields are selections read from `ProviderRegistry.registered_pairs()`;
-protocol choices are filtered by the selected SDK, service and named preset.
-Named presets retain their declared endpoint/protocol pairing; custom services
-expose all pairs registered for their selected SDK. Setup does not
-construct clients to discover choices. Register a pair to expose it in the same
-generic form, without adding a terminal branch.
-The final review displays generated request parameters and all transport defaults;
-confirmation saves exactly those values. Named presets follow the reasoning
-checkbox; OpenAI/Anthropic/custom choices use empty request parameters (server
-defaults), since thinking controls depend on the chosen model. Other parameters
-remain editable in YAML. Adding a model never submits a request.
+[services.yaml](services.yaml) is the single built-in service/protocol table used
+by both setup and runtime endpoint resolution. It contains four named services
+and the existing custom entry:
 
-The package requires `openai>=3.26.0` and `anthropic>=1.12.0`, the SDK baselines
-used for the request fields and response preservation checked here. Install the
-project dependencies before using the templates; no older SDK fallback rewrites
-request parameters.
+| Service | Responses | Messages | Chat Completions |
+|---|---|---|---|
+| OpenAI | Supported | Not offered | Supported |
+| Anthropic | Not offered | Supported | Supported |
+| DeepSeek | Supported | Supported | Supported |
+| Qwen | Supported | Supported | Supported |
+| Custom (`generic`) | Registered adapters | Registered adapters | Registered adapters |
+
+The table declares each service's label, default protocol, credential variable
+name and protocol mappings. Each protocol mapping supplies an API base URL and
+optional client controls: `prefix_bound`, `responses_store`, `parallel_control`,
+`chat_token_field`, `chat_stream_usage` and `input_count`. Optional `description` is display text.
+The loader rejects unknown fields and invalid values. Restart after changing the
+packaged table; it is not a second model-catalog format or a live configuration API.
+
+The table contains no model IDs, model allowlists, account restrictions, thinking
+rules or parameter policies. Some models may not support the selected protocol;
+the protocol page displays this notice above the choices. Check model, region,
+account and parameter support with the service. Offline validation does not prove
+remote compatibility. Remote errors retain the normal Provider error mapping.
+
+The wizard selects service, then protocol, then model fields. Enter model ID and
+token limits explicitly; it does not infer model capabilities or force thinking.
+Capabilities are support declarations and do not change parameter choices.
+After capabilities, the parameters editor offers a complete editable JSON object
+with medium reasoning effort: Responses uses `reasoning.effort`, Messages uses
+`output_config.effort`, and Chat uses `reasoning_effort`. These are protocol defaults,
+not model policies. Unsupported custom protocols default to `{}`. Enter `{}` to use
+server defaults explicitly; blank accepts the displayed mapping. Invalid JSON or
+protocol options retry before credential input. Model/service compatibility remains
+the caller's responsibility. Existing explicitly authored options are preserved.
+
+Back from text fields returns to protocols; Back there returns to services.
+Switching protocols refreshes addresses and keeps separate drafts. SDK appears
+read-only in final review along with parameters and transport defaults. Discovery,
+review and saving make no model requests.
+
+Model fields serialize in the same order as setup: `service`, `protocol`, `sdk`,
+`model`, `base_url`, `context_window`, `max_output_tokens`, `api_key_env`,
+`capabilities`, `parameters`, `transport`. The alias is the mapping key; secret key
+input is never stored there. Saving an addition also normalizes existing entries'
+field order while preserving their values and comments.
+
+`service` is explicit and is never inferred from model name or URL. Omitted
+`base_url` uses the table address for that service/protocol; `generic` retains the
+SDK default. Explicit URLs take precedence and must be HTTP(S) without embedded
+credentials, query or fragment. Messages SDKs append `/v1/messages`, so configure
+an API base URL rather than a complete request path.
+
+The package requires `openai>=3.26.0` and `anthropic>=1.12.0`. SDK and protocol
+compatibility do not imply identical model behavior or support for every feature.
 
 ## Write a model entry
 
 ```yaml
 models:
   deepseek-high:
-    sdk: openai
-    protocol: responses
     service: deepseek
+    protocol: responses
+    sdk: openai
     model: deepseek-flash
     base_url: https://api.deepseek.com
-    api_key_env: DEEPSEEK_API_KEY
     context_window: 1000000
     max_output_tokens: 32768
+    api_key_env: DEEPSEEK_API_KEY
     capabilities:
       tools: true
       parallel_tool_calls: true
@@ -91,56 +122,67 @@ waiting/retry options. There is one format and no fallback parser.
 
 ## Select thinking and structured output
 
-| Protocol/service | `parameters` excerpt |
+Write API options explicitly under `parameters`. The following are examples to
+check against the selected model's current documentation, not built-in policies:
+
+| Protocol | Example options |
 |---|---|
-| DeepSeek Responses | `reasoning: {effort: high}`; use `none`, `low`, `high`, or `max` |
-| DeepSeek Messages | `thinking: {type: enabled}`, `output_config: {effort: high}`; `disabled` turns thinking off |
-| DeepSeek Chat Completions | `reasoning_effort: high`, `extra_body: {thinking: {type: enabled}}` |
-| Qwen Chat Completions | `extra_body: {enable_thinking: true, preserve_thinking: true, reasoning_effort: medium}` |
-| BigModel GLM-4.5-Air Chat Completions | `extra_body: {thinking: {type: enabled}}`; use `disabled` to turn it off |
-| Anthropic Messages manual thinking | `thinking: {type: enabled, budget_tokens: 2048}`; budget must be at least 1024 |
-| Anthropic Messages adaptive thinking | `thinking: {type: adaptive}`; select supported model-specific `output_config` values |
-| Responses structured output | `text: {format: {type: json_object}}` or a `json_schema` format |
-| Chat Completions structured output | `response_format: {type: json_object}` or a `json_schema` format |
+| Responses | `reasoning: {effort: high}` |
+| Messages | `thinking: {type: enabled, budget_tokens: 2048}` |
+| Chat Completions | `reasoning_effort: high` or an explicit `extra_body` extension |
+| Responses structured output | `text: {format: {type: json_object}}` |
+| Chat structured output | `response_format: {type: json_object}` |
 
-Choose fields supported by the actual model. Service validation covers known
-endpoint constraints; it does not enumerate every remote model's capabilities.
-DeepSeek rules reject known ignored options, such as temperature while thinking,
-Responses reasoning summaries/verbosity, Messages thinking budgets and top_k.
-Flash top_p must be 0.95–1 while thinking and 1 otherwise. Pro ignores top_p while
-thinking. DeepSeek parallel-call controls are omitted because the endpoint ignores
-them; H tool scheduling still governs actual local execution.
+Built-in services share protocol-level shape validation. They do not reject,
+strip or translate parameters because a model may ignore them. For example,
+DeepSeek temperature, penalty and effort options remain as authored even when the
+remote service ignores them. Changing `capabilities.reasoning` does not change
+`parameters`. Model-specific validity is decided by the remote endpoint.
 
-Qwen3.8 Chat accepts `low`, `medium`, or `xhigh` effort under `extra_body`,
-or a positive `thinking_budget`, but not both. The preset uses `medium` for a
-balanced daily workload; the remote default is `xhigh`. It explicitly preserves
-historical reasoning; replay sends it as `reasoning_content`, never visible answer
-text. Thinking cannot force a particular tool. The Qwen preset uses the Chat API
-shown on its official model page; image user inputs work, while image tool results
-retain this adapter's explicit rejection above. Video/audio have no runtime adapter.
+Unknown top-level protocol options fail; use `extra_body` for explicit finite JSON
+extensions. It cannot overwrite runtime-owned model, messages, tools, streaming,
+output limits, transport controls or duplicate parameters. `extra_headers` accepts
+non-secret feature headers; authentication/cookie headers are rejected. Common
+numeric/JSON shapes, structured-output shapes and thinking budgets fitting the
+output allowance remain validated independently of vendor or model name.
 
-BigModel GLM-4.5-Air uses dynamic thinking and text input. It does not accept the
-newer GLM `reasoning_effort` or `tool_stream` options. BigModel requests omit
-undocumented `parallel_tool_calls` and `stream_options` controls. Available usage
-chunks are still recorded; missing receipts remain unknown. Service validation
-also rejects forced tool selection and JSON Schema output unsupported by this API.
-These rules belong to Providers, not Run or the frontend.
+The [additional model examples](../../examples/configuration/additional-models.example.yaml)
+show explicit Qwen configurations in three protocols. They are authored examples,
+not wizard presets or local capability rules. See [setup instructions](../../examples/configuration/README.md#add-qwen).
 
-The [additional model catalog](../../examples/configuration/additional-models.example.yaml)
-contains Qwen3.8-Flash and GLM-4.5-Air entries with empty-key references and
-working budgets. See [setup and official sources](../../examples/configuration/README.md#add-qwen-or-glm).
+Protocol references: [OpenAI Responses](https://developers.openai.com/api/docs/guides/migrate-to-responses),
+[Messages thinking](https://platform.claude.com/docs/en/build-with-claude/thinking),
+[DeepSeek thinking](https://api-docs.deepseek.com/zh-cn/guides/thinking_mode/),
+[Qwen Chat](https://platform.qianwenai.com/docs/api-reference/chat/openai-chat),
+[Qwen Responses](https://platform.qianwenai.com/docs/api-reference/chat/openai-responses),
+[Qwen Messages](https://platform.qianwenai.com/docs/api-reference/chat/anthropic).
 
-Unknown protocol request options fail. `extra_body` provides an explicit finite
-JSON extension for compatible endpoints; its remote semantics are unverified by
-`generic`. It cannot overwrite runtime-owned model, messages, tools, streaming,
-output allowances, transport settings or duplicate parameters. DeepSeek only
-permits its documented Chat `thinking` extension. `extra_headers` accepts
-non-secret feature headers; authentication and cookie headers are rejected.
+## Send images
 
-Sources: [DeepSeek thinking](https://api-docs.deepseek.com/zh-cn/guides/thinking_mode/),
-[Responses compatibility](https://api-docs.deepseek.com/zh-cn/guides/responses_api/),
-[Messages compatibility](https://api-docs.deepseek.com/zh-cn/guides/anthropic_api/),
-[Claude thinking](https://platform.claude.com/docs/en/build-with-claude/thinking).
+Catalog-created Providers use `capabilities.vision`. Fresh image submissions to a
+nonvision model fail before message persistence. Existing historical images and
+image tool results are projected as explicit unavailable-image notices for a
+nonvision model; original Session facts remain intact. Direct adapter construction
+can pass `vision=True` or `False`; omission retains the caller-owned declaration.
+
+Responses and Messages preserve native image tool-result structures. Chat keeps
+each `tool_call_id` and text result, then appends a multimodal user-role observation
+after all results in the batch. The observation names its tool source and preserves
+text/image order. It is a wire representation of tool output, not a new human
+message or Session record. No vendor/model-name branch or silent API switch is
+used. Exact reasoning/continuation items remain replayed. Remote endpoints may
+still differ; offline encoding does not establish remote compatibility.
+
+The public submission limits are eight PNG/JPEG/GIF/WebP images, 10 MiB each and
+32 MiB combined. Formats accepted by an individual endpoint may be narrower.
+Unsupported formats are rejected rather than implicitly converted. Request
+identity/counting uses the encoded request where available; heuristic image and
+protocol-framing measurements remain uncertain.
+
+Malformed, unsupported or over-limit images in existing tool/history messages
+become explicit unavailable-image observations for declared adapters, without
+changing the original message. Fresh input validation still rejects these before
+persistence. This avoids repeatedly sending the same invalid media on later turns.
 
 ## Preserve a tool conversation
 
@@ -213,12 +255,16 @@ For an existing supported service, add another catalog alias. To implement an
 endpoint difference, register a distinct `ServiceDefinition` through
 `providers.services.register_service` before loading the catalog. Declare supported
 protocols, pure parameter validation, prefix-binding requirements and request-control
-support. Keep vendor logic inside Providers. Definitions must be installed code;
+support. `protocol_overrides` supplies protocol-specific addresses, descriptions
+and request/replay controls through the same service resolver used by setup and
+adapters. Keep vendor logic inside Providers. Definitions must be installed code;
 YAML does not import Python classes.
 
 A new client/protocol pair supplies a Provider factory through
 `ProviderRegistry.register(sdk, protocol, factory)`, its own codec, request
-validation and offline fixtures. `registered_pairs()` exposes those registrations
+validation and offline fixtures. Use `register(..., default=True)` to designate
+the setup SDK when several adapters implement that protocol. Manual YAML can
+still select another registered SDK explicitly. `registered_pairs()` exposes those registrations
 to setup without invoking factories. Inject an extended registry into
 `RunApplicationFactory` to use its runtime factories and menu choices.
 Custom protocol factories

@@ -4,20 +4,29 @@
 
 Define the data and capabilities shared by hosts, Application, Session, and frontends. This package contains protocols and immutable views; it does not construct Providers, manage resources, or implement algorithms.
 
+`RuntimeFactory.prepare_configuration(session_path=...)` prepares a replacement
+from the host's draft for the same conversation. Its handle's activation callback
+owns persistence; preparation/startup failure must retain the draft and saved
+configuration. `ConfigurationLaunchResult.start` requests that operation in an
+active session without frontend saving. Startup retains save-before-start intent.
+
 `ModelSetupService.defaults(option_id, values)` supplies non-secret JSON mappings
 for model review, including `service`, `parameters` and `transport`. Hosts use the
 same defaults when staging. Frontends display them without vendor dispatch or
 request execution; credential values are never included.
-Each `ModelSetupOption.group` names its service menu group. Options sharing a
-group appear in a submenu; a single-option group opens its fields directly.
-The grouping is presentation metadata and does not select runtime adapters.
-`ModelSetupService.field(option_id, name, values)` supplies refreshed selection
-metadata. Hosts derive SDK/protocol choices from their adapter registry; frontends
-do not enumerate IDs or construct SDK clients.
+The host validates a pending `parameters` JSON field through `defaults()` before
+secret input, returning the same parsed mapping later used by `stage()`.
+Each `ModelSetupOption` describes one service; `group` supplies its presentation
+group metadata. `ModelSetupService.field(option_id, name, values)` supplies
+refreshed protocol choices, constant SDK, endpoint/credential defaults and
+harness-required capabilities. Frontends select service, then protocol, then fields. Hosts derive
+protocols and automatic SDK from their adapter registry; frontends do not enumerate
+IDs, map protocols to SDKs or construct SDK clients.
 
 | File | Public entries / responsibility |
 |---|---|
 | [runtime.py](runtime.py) | RuntimeFactory, RuntimeSession, RuntimeAuthorization, and the RuntimeHandle protocol |
+| [inputs.py](inputs.py) | `UserContent`, `ImageAttachment`, bounded input normalization and image-message construction for frontends |
 | [commands.py](commands.py) | CommandDescription and help formatting, InteractiveCommand, CommandResult, optional read-only panels, CommandContext and CommandHandler |
 | [events.py](events.py), [models.py](models.py) | Event envelopes, EventSink, status, history, and session views |
 | [configuration.py](configuration.py), [model_setup.py](model_setup.py) | Configuration choices, optional default-restoration capability, model forms and staging |

@@ -6,6 +6,7 @@ Exercise actual Application, Run assembly, and terminal paths with offline model
 
 | Files | Protects |
 |---|---|
+| [test_multimodal.py](test_multimodal.py) | Attachment submission, queue/steering copies, resource saving, nonvision preflight, CLI, terminal and recovery hash checks |
 | `test_execution_policy.py` | Isolated configuration candidates, effective native limits and verified H-only activation |
 | `test_terminal_reflow.py` | Actual TTY resize retains completed table output and redraws drafts without another model request |
 | `test_terminal_scrollback.py` | Multi-turn long answers and output received during an asynchronous menu remain in native scrollback after return and exit |

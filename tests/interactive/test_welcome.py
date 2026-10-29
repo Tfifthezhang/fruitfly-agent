@@ -42,9 +42,9 @@ class WelcomeRenderingTest(unittest.TestCase):
         self.assertIn("████ ███  █  █ ████", rendered)
         self.assertIn("AGENT", rendered)
         self.assertIn("The model organism for agent research.", rendered)
-        self.assertIn("2 mechanisms · 3 tools", rendered)
+        self.assertNotIn("2 mechanisms · 3 tools", rendered)
         self.assertIn(
-            "Tip: /help for commands · /status for status · /lab for mechanisms",
+            "/config settings · /resume history · /help commands",
             rendered,
         )
         self.assertNotIn("View commands", rendered)
@@ -90,7 +90,8 @@ class WelcomeRenderingTest(unittest.TestCase):
         wide = self._render(120)
         compact = self._render(44)
         self.assertIn("Assistant default", wide)
-        self.assertIn("sha256:12345678", wide)
+        self.assertNotIn("sha256:", wide)
+        self.assertNotIn("(active)", compact)
         self.assertIn("prompt:", compact)
         self._assert_fits(compact, 43)
 
@@ -114,7 +115,7 @@ class WelcomeRenderingTest(unittest.TestCase):
             "FruitFlyAgent interactive · offline-model-with-a-deliberately-long-suffix\n"
             "  workspace: /Users/example/research/FruitFlyAgent\n"
             "  execution: Unavailable\n"
-            "Type a task, or /help for commands.\n",
+            "Type a task, or /config for settings and /help for commands.\n",
         )
         self.assertNotIn("\x1b", rendered)
 

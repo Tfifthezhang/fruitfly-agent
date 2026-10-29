@@ -3,10 +3,11 @@
 [Up: Execution Environments](../README.md)
 
 `SshEnv` implements Core's `ExecutionEnv` using SSH command channels and SFTP.
-In **Configure → Environment**, use Space to enable **Remote environment**, or expand it
+In **/config → Environment**, use Space to enable **Remote environment**, or open its settings
 and choose **Set up…**. The guided form asks for the server address, port, remote
 directory, local host-key file, hidden account and hidden password, then shows
-a review. Choose **Stage settings**, return to startup and save/start a new session.
+a review. Choose **Stage settings**, then save and apply through `/config`, or choose
+**Save and start** when using `--configure`.
 Selection disables the local environment, local IPython and file memory only
 after staging. Cancelling the form preserves the previous environment.
 Configuration and construction are offline; Application startup opens the

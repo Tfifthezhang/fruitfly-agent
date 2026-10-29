@@ -1,0 +1,55 @@
+# Service-level protocol support and client controls only.
+# Model IDs, model parameters and account restrictions are intentionally not maintained here.
+services:
+  openai:
+    label: OpenAI
+    default_protocol: responses
+    api_key_env: OPENAI_API_KEY
+    protocols:
+      responses:
+        base_url: https://api.openai.com/v1
+        input_count: true
+      chat-completions:
+        base_url: https://api.openai.com/v1
+        chat_token_field: max_completion_tokens
+  anthropic:
+    label: Anthropic
+    default_protocol: messages
+    api_key_env: ANTHROPIC_API_KEY
+    protocols:
+      messages:
+        base_url: https://api.anthropic.com
+        prefix_bound: true
+      chat-completions:
+        base_url: https://api.anthropic.com/v1
+  deepseek:
+    label: DeepSeek
+    default_protocol: responses
+    api_key_env: DEEPSEEK_API_KEY
+    protocols:
+      responses:
+        base_url: https://api.deepseek.com
+      messages:
+        base_url: https://api.deepseek.com/anthropic
+      chat-completions:
+        base_url: https://api.deepseek.com
+  qwen:
+    label: Qwen
+    default_protocol: chat-completions
+    api_key_env: DASHSCOPE_API_KEY
+    protocols:
+      responses:
+        base_url: https://cn-beijing.maas.qianwenaiapi.com/compatible-mode/v1
+      messages:
+        base_url: https://maas.qianwenaiapi.com/apps/anthropic
+      chat-completions:
+        base_url: https://cn-beijing.maas.qianwenaiapi.com/compatible-mode/v1
+  generic:
+    label: Custom service…
+    default_protocol: responses
+    api_key_env: ''
+    protocols:
+      responses: {}
+      messages:
+        prefix_bound: true
+      chat-completions: {}

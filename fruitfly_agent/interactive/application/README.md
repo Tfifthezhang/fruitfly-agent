@@ -14,9 +14,26 @@ Construct AgentApplication with a [RuntimeFactory](../contracts/runtime.py). App
 
 The Application submission lock and state checks authorize work. ImprovementJob uses injected execution/completion callbacks and cannot activate a runtime. Optional host submission receipts persist intent before scheduling and finish a run cancelled before execution. Application exposes optional history/log queries independently of candidate publication. Its method query returns `None` when an embedding has no method catalog, and an empty tuple when the catalog has no compatible method; only the former permits the configured-host fallback. Correction operations delegate to [Session materials](../session/README.md) after Application permission checks. Failed preparation/startup retains the incumbent; failed retirement is recorded after a successful switch. Shutdown waits are bounded and retain resources still in use.
 
-`apply_configuration()` accepts idle applications with no queued work. It opens the current path with `resume=True`, validates history through the injected Factory, starts the replacement, then retires the old handle. It retains conversation identity without copying or replaying messages. `rebuild()` retains its fresh-session default. Frontends call the injected operation rather than inspecting runtime or Session internals. See [configuration behavior](../../../CONFIGURATION.md#apply-settings-to-the-current-conversation).
+`apply_configuration()` accepts idle applications with no queued work. It calls
+the injected Factory's `prepare_configuration(session_path=...)` with the current
+path, starts the replacement and invokes its activation callback, then retires
+the old handle. The host owns draft resolution and transactional persistence;
+Application knows only the prepared handle. The Factory must retain the draft
+and old configuration on failed preparation or activation. It retains conversation
+identity without copying or replaying messages. `rebuild()` retains its
+fresh-session default and reloads saved configuration. Frontends call the injected
+operation rather than inspecting runtime or Session internals. See
+[configuration behavior](../../../CONFIGURATION.md#apply-settings-to-the-current-conversation).
 
-Configuration and external effects are owned by injected services and do not automatically roll back. No source reload, model training, or new environment variables. Lifecycle limits and authorization behavior are described by the parent guide.
+Configuration rollback belongs to the injected host; Application does not edit
+files. External service effects do not automatically roll back. No source reload,
+model training, or new environment variables. Lifecycle limits and authorization
+behavior are described by the parent guide.
+
+`submit`, `enqueue` and `steer` accept text or text/image block lists. Preflight
+copies inputs and checks declared support before queueing. `load_attachment`
+delegates explicitly selected local files to the runtime Session's injected host
+reader. Cancellation clears queued content without committing it to history.
 
 ```bash
 .venv/bin/python -m unittest tests.interactive.test_application tests.interactive.test_run_control tests.interactive.test_extensions -v

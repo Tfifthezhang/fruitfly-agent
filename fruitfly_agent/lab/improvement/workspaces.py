@@ -6,6 +6,7 @@ import json
 from fruitfly_agent.lab.improvement.evidence.query import search_text
 from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.core.data_model import AgentToolResult, AssistantMessage, ImageBlock, TextBlock, UserMessage
+from fruitfly_agent.core.data_model.media import image_type, validate_image, decode_text_file
 from fruitfly_agent.core.loop import run_agent_loop
 from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone
 from fruitfly_agent.core.tool_runtime import AgentTool
@@ -55,15 +56,15 @@ class WorkspaceSession:
                 access.failed(path)
                 raise
             access.available(path)
-            if data.startswith(b'\x89PNG\r\n\x1a\n') or data.startswith(b'\xff\xd8\xff'):
-                mime = 'image/png' if data.startswith(b'\x89PNG') else 'image/jpeg'
+            if image_type(data) is not None:
+                mime = validate_image(data)
                 services.record('editor-evidence-page', path=path, artifact_id='sha256:' + hashlib.sha256(data).hexdigest(),
                                 status='image', bytes=len(data), truncated=False)
                 access.provided(path, data)
                 return AgentToolResult(content=[ImageBlock(data=base64.b64encode(data).decode('ascii'), media_type=mime)])
             try:
-                text = data.decode('utf-8')
-            except UnicodeDecodeError:
+                text = decode_text_file(data)
+            except ValueError:
                 access.failed(path)
                 services.record('editor-evidence-page', path=path, artifact_id='sha256:' + hashlib.sha256(data).hexdigest(),
                                 status='binary-unavailable', bytes=len(data), truncated=False)
@@ -119,7 +120,7 @@ class WorkspaceSession:
         path_schema = {'type': 'object', 'properties': {'path': {'type': 'string'}}, 'required': ['path']}
         tools = [AgentTool(name='list_files', label='List evidence files', description='List all granted evidence and candidate paths.',
                           parameters={'type': 'object', 'properties': {}}, execute=listing),
-                 AgentTool(name='read_file', label='Read evidence', description='Read a granted file. Text uses character offset/limit pagination; PNG/JPEG images are returned visually.',
+                 AgentTool(name='read_file', label='Read evidence', description='Read a granted file. Text uses character offset/limit pagination; PNG/JPEG/GIF/WebP images up to 10 MiB are returned visually.',
                     parameters={'type': 'object', 'properties': {'path': {'type': 'string'}, 'offset': {'type': 'integer'},
                                  'limit': {'type': 'integer'}}, 'required': ['path']}, execute=read)]
         if writable:

@@ -7,6 +7,7 @@ Reusable substitutes and temporary materials. This module contains no TestCases 
 | File | Provides |
 |---|---|
 | [provider_streams.py](provider_streams.py) | Offline SDK streams, requests, and patched adapter construction |
+| [media.py](media.py) | Original tiny PNG containers, image blocks and offline vision model declarations |
 | [ssh.py](ssh.py) | Fake SFTP filesystem and local subprocess-backed SSH command channels |
 | [mcp.py](mcp.py) | Optional dependency detection, local peer path, temporary server configuration and in-memory artifacts |
 | [terminal_process.py](terminal_process.py) | Bounded real POSIX terminal child processes without network/model access |

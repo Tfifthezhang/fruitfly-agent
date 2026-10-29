@@ -1,148 +1,113 @@
-"""Explicit service policies layered over protocol adapters; no endpoint guessing."""
+"""Service/protocol metadata from one packaged table; no built-in model policies."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
+from importlib.resources import files
 from typing import Any, Callable
+from urllib.parse import urlsplit
 import re
+
+import yaml
+
+from .request_options import json_mapping
+
+
+def _accept_options(protocol: str, model: str, options: dict[str, Any]) -> None:
+    """Remote services decide which model-specific options they support."""
+
+
+_CONTROLS = frozenset({'prefix_bound', 'responses_store', 'parallel_control', 'input_count',
+    'chat_token_field', 'chat_stream_usage', 'base_url', 'description'})
+_BOOLEANS = frozenset({'prefix_bound', 'responses_store', 'parallel_control', 'chat_stream_usage', 'input_count'})
+
+
+def _validate_controls(values: dict[str, Any]) -> None:
+    if values.keys() - _CONTROLS:
+        raise ValueError('unsupported service protocol controls')
+    if any(type(values[name]) is not bool for name in _BOOLEANS & values.keys()):
+        raise ValueError('service control flags must be booleans')
+    if values.get('chat_token_field', 'max_tokens') not in {'max_tokens', 'max_completion_tokens'}:
+        raise ValueError('unsupported Chat output-limit parameter')
+    url = values.get('base_url')
+    if url is not None:
+        if not isinstance(url, str):
+            raise ValueError('service base_url must be HTTP(S) or null')
+        parsed = urlsplit(url)
+        if parsed.scheme not in {'http', 'https'} or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
+            raise ValueError('service base_url must be HTTP(S) without credentials, query or fragment')
+    if not isinstance(values.get('description', ''), str):
+        raise ValueError('service description must be text')
 
 
 @dataclass(frozen=True)
 class ServiceDefinition:
     id: str
     protocols: frozenset[str]
-    validate: Callable[[str, str, dict[str, Any]], None]
+    validate: Callable[[str, str, dict[str, Any]], None] = _accept_options
     prefix_bound: bool = False
     responses_store: bool = True
     parallel_control: bool = True
     chat_token_field: str = 'max_tokens'
     chat_stream_usage: bool = True
+    base_url: str | None = None
+    description: str = ''
+    protocol_overrides: dict[str, dict[str, Any]] = field(default_factory=dict)
+    label: str = ''
+    default_protocol: str = ''
+    api_key_env: str = ''
+    input_count: bool = False
 
     def __post_init__(self) -> None:
         if not isinstance(self.id, str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*', self.id):
             raise ValueError('service needs a stable ID')
         if not self.protocols or any(not isinstance(p, str) or not p for p in self.protocols) or not callable(self.validate):
             raise ValueError('service needs protocols and a pure validator')
-        if any(type(v) is not bool for v in (self.prefix_bound, self.responses_store, self.parallel_control, self.chat_stream_usage)):
-            raise ValueError('service control flags must be booleans')
-        if self.chat_token_field not in {'max_tokens', 'max_completion_tokens'}:
-            raise ValueError('unsupported Chat output-limit parameter')
         object.__setattr__(self, 'protocols', frozenset(self.protocols))
+        _validate_controls({name: getattr(self, name) for name in _CONTROLS})
+        overrides = json_mapping(self.protocol_overrides, 'service protocol controls')
+        if overrides.keys() - self.protocols:
+            raise ValueError('unsupported service protocol override')
+        for values in overrides.values():
+            _validate_controls(json_mapping(values, 'service protocol controls'))
+        object.__setattr__(self, 'protocol_overrides', overrides)
+        if not isinstance(self.label, str) or not isinstance(self.default_protocol, str):
+            raise ValueError('service setup metadata must be text')
+        if self.default_protocol and self.default_protocol not in self.protocols:
+            raise ValueError('service default_protocol must be supported')
+        if not isinstance(self.api_key_env, str) or (self.api_key_env and not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', self.api_key_env)):
+            raise ValueError('service api_key_env must name an environment variable')
 
 
-def _generic(protocol: str, model: str, options: dict[str, Any]) -> None:
-    pass
+def parse_service_table(text: str) -> tuple[ServiceDefinition, ...]:
+    """Read one data-only table. Model names and parameter policies are not fields."""
+    try:
+        root = json_mapping(yaml.safe_load(text), 'service table')
+    except yaml.YAMLError as exc:
+        raise ValueError('invalid service table YAML') from exc
+    if root.keys() != {'services'}:
+        raise ValueError('service table requires only services')
+    rows = json_mapping(root['services'], 'services')
+    result = []
+    for identity, raw in rows.items():
+        row = json_mapping(raw, 'service entry')
+        if row.keys() != {'label', 'default_protocol', 'api_key_env', 'protocols'}:
+            raise ValueError('service entry requires label, default_protocol, api_key_env and protocols')
+        protocols = json_mapping(row.pop('protocols'), 'service protocols')
+        result.append(ServiceDefinition(identity, frozenset(protocols), protocol_overrides=protocols, **row))
+    return tuple(result)
 
 
-def _anthropic(protocol: str, model: str, options: dict[str, Any]) -> None:
-    thinking = options.get('thinking', {})
-    if thinking.get('type') == 'enabled':
-        budget = thinking.get('budget_tokens')
-        if type(budget) is not int or budget < 1024:
-            raise ValueError('Anthropic manual thinking requires budget_tokens >= 1024')
-    elif 'budget_tokens' in thinking:
-        raise ValueError('budget_tokens requires manual enabled thinking')
-    if 'display' in thinking and thinking['display'] not in {'summarized', 'omitted', 'updates'}:
-        raise ValueError('unsupported thinking.display')
+_BUILTINS = parse_service_table(files(__package__).joinpath('services.yaml').read_text(encoding='utf-8'))
+_SERVICES = {item.id: item for item in _BUILTINS}
 
 
-def _deepseek(protocol: str, model: str, options: dict[str, Any]) -> None:
-    ignored = {'include', 'service_tier', 'prompt_cache_key', 'prompt_cache_retention'} & options.keys()
-    if ignored:
-        raise ValueError('DeepSeek does not support: ' + ', '.join(sorted(ignored)))
-    if protocol == 'responses':
-        reasoning = options.get('reasoning', {})
-        if reasoning.keys() - {'effort'}:
-            raise ValueError('DeepSeek Responses supports only reasoning.effort')
-        effort = reasoning.get('effort', 'high')
-        if effort not in {'none', 'low', 'high', 'max'}:
-            raise ValueError('DeepSeek reasoning.effort must be none, low, high or max')
-        thinking = effort != 'none'
-        if 'verbosity' in options.get('text', {}):
-            raise ValueError('DeepSeek ignores text.verbosity')
-    elif protocol == 'messages':
-        config = options.get('thinking', {})
-        if config.keys() - {'type'} or config.get('type', 'enabled') not in {'enabled', 'disabled'}:
-            raise ValueError('DeepSeek thinking supports enabled/disabled without budget_tokens')
-        if options.get('output_config', {}).keys() - {'effort'}:
-            raise ValueError('DeepSeek output_config supports only effort')
-        if options.get('output_config', {}).get('effort', 'high') not in {'low', 'high', 'max'}:
-            raise ValueError('DeepSeek output_config.effort must be low, high or max')
-        if 'top_k' in options:
-            raise ValueError('DeepSeek ignores top_k')
-        thinking = config.get('type', 'enabled') != 'disabled'
-    else:
-        extra = options.get('extra_body', {})
-        if extra.keys() - {'thinking'}:
-            raise ValueError('DeepSeek Chat extra_body supports only thinking')
-        config = extra.get('thinking', {})
-        if not isinstance(config, dict) or config.keys() - {'type'} or config.get('type', 'enabled') not in {'enabled', 'disabled'}:
-            raise ValueError('DeepSeek Chat thinking requires enabled/disabled')
-        if options.get('reasoning_effort', 'high') not in {'low', 'high', 'max'}:
-            raise ValueError('DeepSeek reasoning_effort must be low, high or max')
-        thinking = config.get('type', 'enabled') != 'disabled'
-    if thinking and {'temperature', 'presence_penalty', 'frequency_penalty'} & options.keys():
-        raise ValueError('DeepSeek ignores temperature and penalty parameters while thinking')
-    if 'top_p' in options:
-        value = options['top_p']
-        if model == 'deepseek-flash' and ((thinking and value < .95) or (not thinking and value != 1)):
-            raise ValueError('DeepSeek Flash top_p requires 0.95–1 while thinking; otherwise 1')
-        if model == 'deepseek-v4-pro' and thinking:
-            raise ValueError('DeepSeek Pro ignores top_p while thinking')
-    if protocol != 'chat-completions' and options.get('extra_body'):
-        raise ValueError('DeepSeek parameters must use the declared protocol fields')
-
-
-def _qwen(protocol: str, model: str, options: dict[str, Any]) -> None:
-    extra = options.get('extra_body', {})
-    for name in ('enable_thinking', 'preserve_thinking', 'tool_stream'):
-        if name in extra and type(extra[name]) is not bool:
-            raise ValueError('Qwen ' + name + ' must be boolean')
-    if 'reasoning_effort' in options:
-        raise ValueError('Qwen Chat reasoning_effort belongs in extra_body')
-    if 'thinking_budget' in extra:
-        budget = extra['thinking_budget']
-        if type(budget) is not int or budget <= 0:
-            raise ValueError('Qwen thinking_budget must be a positive integer')
-    if model.startswith('qwen3.8-'):
-        if 'reasoning_effort' in extra and extra['reasoning_effort'] not in {'low', 'medium', 'xhigh'}:
-            raise ValueError('Qwen3.8 Chat reasoning_effort must be low, medium or xhigh')
-        if {'reasoning_effort', 'thinking_budget'} <= extra.keys():
-            raise ValueError('Qwen3.8 cannot combine reasoning_effort and thinking_budget')
-    if extra.get('enable_thinking', True) and options.get('tool_choice', 'auto') not in ('auto', 'none'):
-        raise ValueError('Qwen thinking does not support forced tool_choice')
-
-
-def _bigmodel(protocol: str, model: str, options: dict[str, Any]) -> None:
-    extra = options.get('extra_body', {})
-    thinking = extra.get('thinking', {})
-    if not isinstance(thinking, dict) or thinking.keys() - {'type'} or thinking.get('type', 'enabled') not in {'enabled', 'disabled'}:
-        raise ValueError('BigModel thinking supports enabled/disabled without a token budget')
-    if model.startswith('glm-4.5') and ('reasoning_effort' in options or 'reasoning_effort' in extra):
-        raise ValueError('GLM-4.5 does not support reasoning_effort; use extra_body.thinking.type')
-    if model.startswith('glm-4.5') and 'tool_stream' in extra:
-        raise ValueError('GLM-4.5 does not support tool_stream')
-    if options.get('temperature', 0) > 1 or options.get('top_p', 1) < .01:
-        raise ValueError('BigModel requires temperature <= 1 and top_p >= 0.01')
-    if options.get('tool_choice', 'auto') != 'auto':
-        raise ValueError('BigModel supports only tool_choice auto')
-    if options.get('response_format', {}).get('type') == 'json_schema':
-        raise ValueError('BigModel supports text or json_object response_format')
-
-
-_SERVICES = {item.id: item for item in (
-    ServiceDefinition('generic', frozenset({'responses', 'messages', 'chat-completions'}), _generic),
-    ServiceDefinition('openai', frozenset({'responses', 'chat-completions'}), _generic, chat_token_field='max_completion_tokens'),
-    ServiceDefinition('anthropic', frozenset({'messages'}), _anthropic, prefix_bound=True),
-    ServiceDefinition('deepseek', frozenset({'responses', 'messages', 'chat-completions'}), _deepseek,
-                      responses_store=False, parallel_control=False),
-    ServiceDefinition('qwen', frozenset({'chat-completions'}), _qwen),
-    ServiceDefinition('bigmodel', frozenset({'chat-completions'}), _bigmodel,
-                      parallel_control=False, chat_stream_usage=False),
-)}
+def builtin_services() -> tuple[ServiceDefinition, ...]:
+    """Setup metadata from the same table used to resolve runtime endpoints."""
+    return _BUILTINS
 
 
 def register_service(definition: ServiceDefinition) -> None:
-    if not definition.id or definition.id in _SERVICES:
+    if definition.id in _SERVICES:
         raise ValueError('service ID must be nonempty and distinct')
     _SERVICES[definition.id] = definition
 
@@ -154,7 +119,8 @@ def service_definition(service: str, protocol: str) -> ServiceDefinition:
         raise ValueError('unknown model service: ' + service) from exc
     if protocol not in definition.protocols and service != 'generic':
         raise ValueError('model service does not support protocol: ' + protocol)
-    return definition
+    overrides = definition.protocol_overrides.get(protocol)
+    return replace(definition, **overrides) if overrides else definition
 
 
-__all__ = ['ServiceDefinition', 'register_service', 'service_definition']
+__all__ = ['ServiceDefinition', 'builtin_services', 'parse_service_table', 'register_service', 'service_definition']

@@ -11,7 +11,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Mapping
 
-from fruitfly_agent.core.data_model import AgentLoopResult
+from fruitfly_agent.core.data_model import AgentLoopResult, ImageBlock
+from fruitfly_agent.core.data_model.media import UserContent, normalize_input
 
 from fruitfly_agent.interactive.contracts.configuration import ConfigurationController
 from fruitfly_agent.interactive.contracts.events import EventSink
@@ -57,7 +58,7 @@ class AgentApplication:
         self._handle: RuntimeHandle | None = None
         self._state = ApplicationState.CLOSED
         self._submission_lock = asyncio.Lock()
-        self._pending: deque[str] = deque()
+        self._pending: deque[UserContent] = deque()
         self._worker: asyncio.Task[None] | None = None
         self._event_sink: EventSink | None = None
         self._authorization_enabled = False
@@ -198,7 +199,23 @@ class AgentApplication:
         if self._state not in {ApplicationState.IDLE, ApplicationState.RUNNING}:
             raise RuntimeError(f"cannot {operation} while application is {self._state}")
 
-    async def submit(self, prompt: str) -> AgentLoopResult:
+    def validate_input(self, prompt: UserContent) -> UserContent:
+        content = normalize_input(prompt)
+        validate = getattr(self._require_handle().session, 'validate_input', None)
+        if callable(validate):
+            validate(content)
+        return content
+
+    @property
+    def attachments_available(self) -> bool:
+        session = self._require_handle().session
+        return bool(getattr(session, 'attachments_available', callable(getattr(session, 'load_attachment', None))))
+
+    def load_attachment(self, path: str) -> ImageBlock:
+        return self._require_handle().session.load_attachment(path)
+
+    async def submit(self, prompt: UserContent) -> AgentLoopResult:
+        prompt = self.validate_input(prompt)
         async with self._submission_lock:
             self._check_submission_state("submit")
             self._state = ApplicationState.RUNNING
@@ -210,17 +227,15 @@ class AgentApplication:
                 if self._state == ApplicationState.RUNNING:
                     self._state = ApplicationState.IDLE
 
-    def enqueue(self, prompt: str) -> int:
-        prompt = prompt.strip()
-        if not prompt:
-            raise ValueError("prompt must not be empty")
+    def enqueue(self, prompt: UserContent) -> int:
+        prompt = self.validate_input(prompt)
         self._check_submission_state("queue")
         self._pending.append(prompt)
         if self._worker is None or self._worker.done():
             self._worker = asyncio.create_task(self._drain_queue())
         return len(self._pending)
 
-    def steer(self, prompt: str) -> bool:
+    def steer(self, prompt: UserContent) -> bool:
         return self._require_handle().session.steer(prompt)
 
     def cancel(self) -> bool:
@@ -429,12 +444,33 @@ class AgentApplication:
             raise error from exc
 
     async def apply_configuration(self) -> None:
-        """Rebuild an idle runtime using saved settings and the same conversation."""
+        """Apply the host's draft through assembly without changing conversation identity."""
         if self._handle is None:
             raise RuntimeError("application is not started")
         if self._state != ApplicationState.IDLE or self._pending:
             raise RuntimeError("finish or cancel active work before applying configuration")
-        await self.rebuild(preserve_session=True)
+        async with self._submission_lock:
+            if self._state != ApplicationState.IDLE or self._pending:
+                raise RuntimeError("finish or cancel active work before applying configuration")
+            previous = self._handle
+            self._state = ApplicationState.REBUILDING
+            candidate: RuntimeHandle | None = None
+            try:
+                candidate = await self._factory.prepare_configuration(
+                    session_path=Path(previous.session.status.session_path))
+                await self._prepare_handle(candidate)
+            except BaseException:
+                try:
+                    if candidate is not None:
+                        await candidate.close()
+                finally:
+                    self._state = ApplicationState.IDLE
+                raise
+            self._handle = candidate
+            self._last_result = None
+            self._last_error = None
+            await self._close_previous(previous)
+            self._state = ApplicationState.IDLE
 
     async def rebuild(self, *, preserve_session: bool = False) -> None:
         """Replace the runtime; recover its Session only when explicitly selected."""

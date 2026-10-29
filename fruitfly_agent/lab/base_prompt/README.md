@@ -12,7 +12,7 @@ Own the built-in system instructions and the adapter that makes them an improvem
 | `get_builtin(id)` | Return the definition or raise `ValueError`. |
 | Profile selection | `prompt` defaults to `assistant-default`; may reference a content-addressed text artifact. |
 
-Choose **Configure → prompt**, preview the text, confirm, and start a new session. The menu shows built-ins, the current selection, and current configuration/profile task results. Resuming a session keeps its original manifest. Task labels do not imply general improvement or automatic prompt routing.
+Choose **/config → prompt**, preview the text, confirm, then save and apply. The menu shows built-ins, the current selection, and current configuration/profile task results. Recovery validates saved history and records the current runtime environment. Task labels do not imply general improvement or automatic prompt routing.
 
 ## Default instructions
 

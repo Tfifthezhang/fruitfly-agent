@@ -15,6 +15,8 @@ import fcntl
 import json
 import os
 import time
+from contextlib import contextmanager
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -280,6 +282,33 @@ class Session(_SessionReader):
         if self._write_failed:
             raise SessionCorruptError('session writer failed; close and reopen to validate the durable prefix',
                 details={'kind': 'session_write_failed'})
+
+    @contextmanager
+    def transaction(self) -> Iterator[None]:
+        """Commit synchronous appends together under the existing writer lease.
+
+        The owner must serialize all work and must not await inside this scope.
+        Failed rollback leaves the writer poisoned, as with an ordinary append.
+        """
+        self.check_writable()
+        size = self.path.stat().st_size if self.path.exists() else None
+        count = len(self._entries)
+        repair = self._repair_newline
+        try:
+            yield
+        except BaseException:
+            self._write_failed = True
+            if size is None:
+                self.path.unlink(missing_ok=True)
+            else:
+                with self.path.open('r+b') as stream:
+                    stream.truncate(size)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+            del self._entries[count:]
+            self._repair_newline = repair
+            self._write_failed = False
+            raise
 
     def append(
         self,

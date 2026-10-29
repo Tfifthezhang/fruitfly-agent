@@ -2,19 +2,23 @@
 
 from dataclasses import replace
 from pathlib import Path
+import json
 import textwrap
 
 import yaml
 
 from fruitfly_agent.interactive.contracts.configuration import ConfigurationActionResult, ConfigurationParameter
 from fruitfly_agent.interactive.contracts.model_setup import ModelSetupOption
-from fruitfly_agent.providers.model_setup import CAPABILITY_OPTIONS, SERVICES, model_entry, setup_defaults, setup_selection
+from fruitfly_agent.providers.model_setup import (CAPABILITY_OPTIONS, SERVICES, model_entry, setup_defaults,
+    setup_selection, setup_initial, setup_service, default_parameters)
 from fruitfly_agent.providers.registry import load_model_specs, ProviderRegistry, default_registry
-from fruitfly_agent.providers.specs import ModelCapabilities, ModelSpec
+from fruitfly_agent.providers.services import service_definition
+from fruitfly_agent.providers.specs import ModelCapabilities, ModelSpec, ordered_model_entry
 
 from .resolution import model_catalog_path
 from .persistence import write_bytes
 from .credentials import CredentialDraft
+from .model_catalog import order_model_catalog
 
 
 class RunModelSetup:
@@ -30,7 +34,7 @@ class RunModelSetup:
         self.credentials = credentials or CredentialDraft(self.workspace, environment)
         self.registry = registry or default_registry()
 
-    def options(self) -> tuple[ModelSetupOption, ...]:
+    def _fields(self) -> tuple[ConfigurationParameter, ...]:
         fields = (
             ConfigurationParameter("profile", "models.<name>", "A name for this model in menus, such as work-model. This is not the model ID.", "text", "my-model"),
             ConfigurationParameter("model", "model", "Copy the exact model ID from your service's documentation or model list.", "text", ""),
@@ -43,20 +47,39 @@ class RunModelSetup:
         fields += tuple(ConfigurationParameter(f"capabilities.{name}", name, description, "bool",
             getattr(defaults, name), choices=(True,) if required else (False, True))
             for name, description, required in CAPABILITY_OPTIONS)
-        return tuple(ModelSetupOption(item.id, item.label, item.description, tuple(
-            replace(field, value=item.initial.get(field.name, field.value), description=(
-                "Required: enter your service's base URL for this API protocol, not a chat webpage."
-                if item.custom else "Optional: press Enter to use the displayed or SDK default API address."
-            ) if field.name == "base_url" else field.description) for field in fields if field.kind != 'bool') +
-            tuple(self.field(item.id, name, {}) for name in ('sdk', 'protocol')) +
-            tuple(replace(field, value=item.initial.get(field.name, field.value)) for field in fields if field.kind == 'bool'), group=item.group)
-                     for item in SERVICES if setup_selection(item.id, 'sdk', {}, self.registry.registered_pairs())[1])
+        return fields + (ConfigurationParameter('parameters', 'parameters',
+            'Edit the complete API options as one JSON object. Reasoning effort defaults to medium; '
+            'use {} for server defaults. Confirm parameter support with your model service.', 'json', ''),)
+
+    def options(self) -> tuple[ModelSetupOption, ...]:
+        return tuple(ModelSetupOption(item.id, item.label, item.description,
+            (self.field(item.id, 'protocol', {}),
+             ConfigurationParameter('sdk', 'sdk', 'Automatically selected client library', 'constant', '')) + self._fields(),
+            group=item.label) for item in SERVICES
+            if setup_selection(item.id, {}, self.registry.registered_pairs())[1])
 
     def field(self, option_id, name, values) -> ConfigurationParameter:
-        value, choices = setup_selection(option_id, name, values, self.registry.registered_pairs())
-        description = ('Client library used to send requests; options come from registered adapters.' if name == 'sdk' else
-                       'API message, response and tool format; filtered by the selected SDK and service.')
-        return ConfigurationParameter(name, name, description, 'choice', value, choices=choices)
+        protocol, choices = setup_selection(option_id, values, self.registry.registered_pairs())
+        selected = setup_service(option_id)
+        if name == 'protocol':
+            details = []
+            for choice in choices:
+                definition = service_definition(selected.service, choice)
+                details.append(f'{choice}: {definition.base_url or "your API base URL"}. {definition.description}')
+            return ConfigurationParameter(name, name, 'Some models may not support the selected protocol. Confirm support with your service.\n' +
+                '\n'.join(details), 'choice', protocol, choices=choices)
+        if name == 'sdk':
+            return ConfigurationParameter(name, name, 'Automatically selected from registered adapters',
+                'constant', self.registry.sdk_for(protocol))
+        field = next((item for item in self._fields() if item.name == name), None)
+        if field is None:
+            raise ValueError('unsupported model setup field: ' + name)
+        if name == 'parameters':
+            return replace(field, value=json.dumps(default_parameters(protocol), ensure_ascii=False))
+        initial = setup_initial(option_id, protocol)
+        description = ('Enter the API base URL for this protocol; confirm region and account access.'
+                       if name == 'base_url' else field.description)
+        return replace(field, value=initial.get(name, field.value), description=description)
 
     def defaults(self, option_id, values) -> dict:
         return setup_defaults(option_id, values)
@@ -68,7 +91,7 @@ class RunModelSetup:
         return result
 
     def stage(self, option_id, values, secret) -> ConfigurationActionResult:
-        name, entry = model_entry(option_id, values)
+        name, entry = model_entry(option_id, values, registry=self.registry)
         self.registry.validate(ModelSpec.from_dict(name, entry))
         profile = self.current_profile()
         path = model_catalog_path(profile, self.config_path)
@@ -114,12 +137,17 @@ class RunModelSetup:
         self.entries.clear()
         self.credentials.values.clear()
 
-    def persist(self, save_harness) -> None:
+    def payloads(self) -> dict[Path, str]:
+        """Prepare file contents without publishing models or credentials."""
         payloads = {}
         for path, entries in self.entries.items():
             text = path.read_text(encoding="utf-8") if path.is_file() else ""
             payloads[path] = _append_models(text, entries)
         payloads.update(self.credentials.payloads())
+        return payloads
+
+    def persist(self, save_harness) -> None:
+        payloads = self.payloads()
         originals = {path: path.read_bytes() if path.is_file() else None for path in payloads}
         written = []
         try:
@@ -140,8 +168,10 @@ class RunModelSetup:
 
 
 def _append_models(text: str, entries: dict) -> str:
+    entries = {name: ordered_model_entry(raw) for name, raw in entries.items()}
     if not text.strip():
         return yaml.safe_dump({"models": entries}, sort_keys=False, allow_unicode=True)
+    text = order_model_catalog(text)
     root = yaml.compose(text)
     if not isinstance(root, yaml.MappingNode):
         raise ValueError("Model catalog must be a YAML mapping")

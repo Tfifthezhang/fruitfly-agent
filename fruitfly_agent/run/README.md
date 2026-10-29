@@ -11,15 +11,25 @@ Assemble the default runtime from configuration, Providers, Lab, and Interactive
 .venv/bin/python -m fruitfly_agent
 .venv/bin/python -m fruitfly_agent "Summarize the Python files in this directory."
 .venv/bin/python -m fruitfly_agent --resume
+.venv/bin/python -m fruitfly_agent --configure
 ```
 
 Real tasks call the configured model service and may incur charges. See [Getting started](../../GETTING_STARTED.md) for installation and [Terminal](../interactive/terminal/README.md) for interaction.
 
-The home menu retains Start new session, Configure and Exit. Configure ends with
-**Restore default configuration**, which stages default harness settings while
-preserving the daily model and credentials. Save persists the draft; Application
-can apply it to the current conversation while idle. Default files are edited manually; Eval uses their complete profile.
-See [restoration](../../CONFIGURATION.md#restore-default-configuration).
+Complete interactive configuration enters the welcome and chat directly; no
+startup chooser or alternate-screen menu is shown. Run reads the controller's
+readiness snapshot before lending input. Missing model selection, credentials or
+enabled mechanism settings use the same host-supplied setup forms as `/config`.
+Cancellation creates no Session. Startup saves a synthesized complete baseline;
+user edits and repairs use **Save and start**, Continue or Discard. Save failure
+prevents runtime startup. Invalid configuration reports its path without overwrite.
+
+`--configure` opens configuration before chat and can precede `--resume`.
+It rejects task text and image-only task input. Existing task arguments remain
+unchanged. **Restore default configuration** stages default harness settings while
+preserving the daily model and credentials. Application can apply changes to the
+current conversation while idle. Default files are edited manually; Eval uses
+their complete profile. See [restoration](../../CONFIGURATION.md#restore-default-configuration).
 
 | Resume entry | Behavior |
 |---|---|
@@ -29,6 +39,37 @@ See [restoration](../../CONFIGURATION.md#restore-default-configuration).
 | `"TASK" --resume [--session PATH]` | Execute one new task with saved context; historical chat is not printed. Model requests may incur charges. |
 
 Interactive recovery displays original saved conversation through the same history component for both entry points. Startup selects the latest available non-empty session in the workspace. The picker shows unavailable files with reasons. Both paths use the selected current configuration and continue the original file without tool/model replay.
+
+## Submit images
+
+The selected model must declare `capabilities.vision: true`. Image submission
+invokes the configured model and may incur charges. These commands use placeholder
+paths to existing PNG/JPEG/GIF/WebP files:
+
+```bash
+fruitfly-agent --image ./chart.png "Explain this chart"
+fruitfly-agent --image ./before.png --image ./after.png "Compare these images"
+fruitfly-agent --image ./chart.png
+```
+
+`--image` can repeat and works with an optional task or resumed conversation.
+Image-only input is a single task, not interactive startup. Paths resolve from
+`--cwd` on the local host, independent of SSH tool execution. Each image is read
+with a 10 MiB bound and container checks; full pixel decoding is not performed.
+PNG dimensions are limited to 40 megapixels. At most eight images and 32 MiB may
+be submitted together. BMP, audio/video and implicit format conversion are not
+supported. In chat use [attachment commands](../interactive/terminal/README.md#attach-local-images).
+
+Run stores selected images and image tool outputs as immutable resources in
+`.fruitfly/artifacts/`, with Session grants recording their IDs, origin, type and
+size. Original inline image messages remain readable. Recovery validates granted
+resource hashes before startup. Optional `save-media-tool` saves a resource ID
+to the selected local or SSH environment through normal file-write permissions;
+enable it in `/config`. See [Tools](../lab/tools/README.md#save-a-media-resource).
+
+Embeddings use `application.load_attachment(path)` and submit a list containing
+Core `TextBlock` and `ImageBlock` values. Queueing freezes the list; files are not
+read again at execution. No service capability is inferred from the model name.
 
 ## Modules and ownership
 

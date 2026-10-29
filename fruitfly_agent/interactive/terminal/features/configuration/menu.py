@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sys
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from typing import Any, Callable, Mapping, TextIO
 
 from fruitfly_agent.interactive.contracts.configuration import (
@@ -11,7 +11,6 @@ from fruitfly_agent.interactive.contracts.configuration import (
     ConfigurationActionResult,
     ConfigurationLaunchResult,
     ConfigurationMechanism,
-    ConfigurationParameter,
     ConfigurationSnapshot,
 )
 from fruitfly_agent.interactive.terminal.io.input import LineEditor, create_line_editor, read_field_line, field_prompt, parse_field_value
@@ -21,12 +20,14 @@ from fruitfly_agent.interactive.terminal.features.configuration.model_setup impo
     run_model_setup,
 )
 from .mechanism_setup import run_mechanism_setup
+from .presentation import category_rows, has_settings, settings_rows
 from .forms import FormIO, CANCELLED as _CANCELLED, choose_value, select_field
 from fruitfly_agent.interactive.terminal.io.menu import (
     MenuAction,
     MenuInput,
     LineMenuInput,
     MenuRow,
+    MenuHelp,
     TerminalMenuRenderer,
     create_menu_input,
     navigate_menu,
@@ -44,7 +45,6 @@ class TerminalConfigurationFrontend:
         output_stream: TextIO | None = None,
         line_editor: LineEditor | None = None,
         menu_input: MenuInput | None = None,
-        active_prompt_label: str | None = None,
     ) -> None:
         self.configuration = configuration
         self.input = input_stream or sys.stdin
@@ -59,13 +59,88 @@ class TerminalConfigurationFrontend:
         self.renderer.numbered = isinstance(self.menu_input, LineMenuInput)
         self.notice = ""
         self._inside_active_session = False
-        self.active_prompt_label = active_prompt_label
 
-    def run(self, *, editable: bool = True) -> ConfigurationLaunchResult:
-        return self._new_session_loop() if editable else self._resume_loop()
+    def run(self, *, configure: bool = False) -> ConfigurationLaunchResult:
+        """Start directly when ready; lend input only for requested edits or repair."""
+        snapshot = self.configuration.snapshot()
+        if getattr(self.configuration, 'read_only', False):
+            if configure or not snapshot.ready:
+                if self._review_loop(snapshot):
+                    return ConfigurationLaunchResult(start=False)
+            return ConfigurationLaunchResult(start=snapshot.ready)
+        if configure:
+            return self._configure_startup_loop()
+        if not self._repair_startup():
+            if self.notice:
+                return self._configure_startup_loop()
+            self.configuration.reset()
+            return ConfigurationLaunchResult(start=False)
+        repaired = self.configuration.snapshot()
+        if not snapshot.ready and repaired.ready and repaired.changed:
+            decision = self._confirm_application(startup=True)
+            if decision == 'discard':
+                self.configuration.reset()
+                return ConfigurationLaunchResult(start=False)
+            if decision == 'continue':
+                return self._configure_startup_loop()
+        result = self._start(repaired)
+        if result is None and snapshot.ready:
+            raise ValueError(self.notice)
+        return result if result is not None else self._configure_startup_loop()
+
+    def _repair_startup(self) -> bool:
+        """Use host-supplied forms for missing model and enabled-component inputs."""
+        setup = getattr(self.configuration, 'model_setup', None)
+        snapshot = self.configuration.snapshot()
+        if setup is not None and not snapshot.model_profiles:
+            run_model_setup(self._model_form(), setup)
+            snapshot = self.configuration.snapshot()
+            if not snapshot.model_profiles:
+                return False
+        if snapshot.model_profiles and snapshot.model_profile not in snapshot.model_profiles:
+            if self._choose_model(snapshot):
+                return False
+            snapshot = self.configuration.snapshot()
+            if snapshot.model_profile not in snapshot.model_profiles:
+                return False
+        if setup is not None and snapshot.model_profile is not None:
+            if setup.credential_status(snapshot.model_profile) == 'API key missing':
+                configure_credential(self._model_form(), setup, snapshot.model_profile)
+                if setup.credential_status(snapshot.model_profile) == 'API key missing':
+                    return False
+        service = getattr(self.configuration, 'mechanism_setup', None)
+        if service is not None:
+            for mechanism in self.configuration.snapshot().mechanisms:
+                if mechanism.enabled and mechanism.setup_available and not service.ready(mechanism.mechanism_id):
+                    if not run_mechanism_setup(self._model_form(), service, mechanism.mechanism_id):
+                        return False
+        return True
+
+    def _configure_startup_loop(self) -> ConfigurationLaunchResult:
+        while True:
+            if self._configure_loop(back_detail='Review settings before starting'):
+                self.configuration.reset()
+                return ConfigurationLaunchResult(start=False)
+            if not self._repair_startup():
+                self.configuration.reset()
+                return ConfigurationLaunchResult(start=False)
+            snapshot = self.configuration.snapshot()
+            if not snapshot.ready:
+                self.notice = _warnings(snapshot) or 'Configuration needs attention.'
+                continue
+            if snapshot.changed:
+                decision = self._confirm_application(startup=True)
+                if decision == 'continue':
+                    continue
+                if decision == 'discard':
+                    self.configuration.reset()
+                    return ConfigurationLaunchResult(start=False)
+            result = self._start(snapshot)
+            if result is not None:
+                return result
 
     def run_for_active_session(self) -> ConfigurationLaunchResult:
-        """Edit saved choices and optionally apply them to this conversation."""
+        """Return draft application intent; the host owns saving and assembly."""
         self._inside_active_session = True
         try:
             if getattr(self.configuration, "read_only", False):
@@ -76,7 +151,7 @@ class TerminalConfigurationFrontend:
                 snapshot = self.configuration.snapshot()
                 if not snapshot.changed:
                     return ConfigurationLaunchResult(start=False)
-                decision = self._confirm_application(snapshot)
+                decision = self._confirm_application()
                 if decision == "continue":
                     continue
                 if decision == "discard":
@@ -86,51 +161,9 @@ class TerminalConfigurationFrontend:
                         self.notice = f"Could not discard configuration: {exc}"
                         continue
                     return ConfigurationLaunchResult(start=False)
-                result = self._start(snapshot)
-                if result is not None:
-                    return replace(result, start=decision == "apply")
+                return ConfigurationLaunchResult(start=True)
         finally:
             self._inside_active_session = False
-
-    def _new_session_loop(self) -> ConfigurationLaunchResult:
-        setup = getattr(self.configuration, "model_setup", None)
-        if setup is not None and not self.configuration.snapshot().model_profiles:
-            run_model_setup(self._model_form(), setup)
-        selected = 0
-        while True:
-            snapshot = self.configuration.snapshot()
-            enabled = sum(item.enabled for item in snapshot.mechanisms if item.visible)
-            rows = (
-                MenuRow("Start new session", _session_summary(snapshot, enabled)),
-                MenuRow("Configure", "Choose the model and runtime components"),
-                MenuRow("Exit", "Leave without creating a session"),
-            )
-            self._render(title="FruitFlyAgent",
-                         subtitle="Ready to start. Open configuration only when needed.",
-                         rows=rows, selected=selected)
-            event = self.menu_input.read_event()
-            selected, handled = navigate_menu(event, selected, len(rows))
-            if handled:
-                continue
-            if event.action == MenuAction.QUIT:
-                if setup is not None:
-                    self.configuration.reset()
-                return ConfigurationLaunchResult(start=False)
-            if event.action != MenuAction.ACTIVATE:
-                continue
-            if selected == 0:
-                result = self._start(snapshot)
-                if result is not None:
-                    return result
-            elif selected == 1:
-                if self._configure_loop():
-                    if setup is not None:
-                        self.configuration.reset()
-                    return ConfigurationLaunchResult(start=False)
-            else:
-                if setup is not None:
-                    self.configuration.reset()
-                return ConfigurationLaunchResult(start=False)
 
     def _preview_prompt(self, label: str, content_hash: str, content: str) -> tuple[bool, object]:
         """Preview complete prompt text before staging a configuration choice."""
@@ -144,7 +177,7 @@ class TerminalConfigurationFrontend:
                 subtitle=f'{label} · {content_hash}\nReview prompt ({page + 1}/{max(1, (len(lines) + size - 1)//size)})\n'
                          + '\n'.join(lines[page*size:(page+1)*size])
                          + '\nPageUp/PageDown: text pages',
-                rows=tuple(MenuRow(value) for value in values), selected=selected)
+                rows=tuple(MenuRow(value) for value in values), selected=selected, help_panel=False)
             event = self.menu_input.read_event()
             selected, handled = navigate_menu(event, selected, len(values))
             if handled:
@@ -163,7 +196,7 @@ class TerminalConfigurationFrontend:
     def _configure_loop(
         self,
         *,
-        back_detail: str = "Return to startup",
+        back_detail: str = "Review settings before starting",
     ) -> bool:
         if getattr(self.configuration, "read_only", False):
             self._review_loop(self.configuration.snapshot())
@@ -173,20 +206,23 @@ class TerminalConfigurationFrontend:
             snapshot = self.configuration.snapshot()
             categories = _group_mechanisms(snapshot)
             rows = [
-                MenuRow("model", snapshot.model_profile or "Select a model"),
-                MenuRow("prompt", f"{snapshot.prompt_label} · draft"),
+                MenuRow("model", snapshot.model_profile or "Select a model",
+                    help=MenuHelp('Model', 'Select a model or configure its connection.')),
+                MenuRow("prompt", f"{snapshot.prompt_label} · draft",
+                    help=MenuHelp('Prompt', 'Preview an instruction before selecting it.')),
             ]
             rows.extend(
                 MenuRow(
                     _category_label(category),
                     _category_summary(mechanisms),
+                    help=MenuHelp(_category_label(category), 'Choose components and their settings.'),
                 )
                 for category, mechanisms in categories
             )
             restore = getattr(self.configuration, "restore_defaults", None)
             if restore is not None:
-                rows.append(MenuRow("Restore default configuration", "Stage default harness settings; keep model and credentials"))
-            rows.append(MenuRow("Back", back_detail))
+                rows.append(MenuRow("Restore default configuration", help=MenuHelp("Restore default configuration", "Stage default harness settings; keep model and credentials")))
+            rows.append(MenuRow("Back", help=MenuHelp("Back", back_detail)))
             selected = min(selected, len(rows) - 1)
             self._render(
                 title="Configuration",
@@ -220,30 +256,20 @@ class TerminalConfigurationFrontend:
             elif restore is not None:
                 self._call(restore)
 
-    def _confirm_application(
-        self,
-        snapshot: ConfigurationSnapshot,
-    ) -> str:
+    def _confirm_application(self, *, startup: bool = False) -> str:
         selected = 0
         rows = (
-            MenuRow(
-                "Save and apply to this conversation",
-                f"prompt: {self.active_prompt_label or 'current'} → {snapshot.prompt_label}",
-            ),
-            MenuRow("Save only", "Keep the active runtime; use saved settings on a later start or recovery"),
-            MenuRow("Continue configuring", "Return to the configuration menu"),
+            MenuRow("Save and start" if startup else "Save and apply to this conversation"),
+            MenuRow("Continue configuring", help=MenuHelp("Continue configuring", "Return to the configuration menu")),
             MenuRow(
                 "Discard changes",
-                "Keep using the current session and its existing configuration",
+                help=MenuHelp("Discard changes", "Exit without saving" if startup else "Keep using the current session and its existing configuration"),
             ),
         )
         while True:
             self._render(
-                title="Apply configuration",
-                subtitle=(
-                    "Applying rebuilds the runtime and retains this conversation. "
-                    "Unavailable recovery requirements leave the active runtime unchanged."
-                ),
+                title="Start session" if startup else "Apply configuration",
+                subtitle="Save the selected settings and start chatting." if startup else "Apply the selected settings and continue this conversation.",
                 rows=rows,
                 selected=selected,
             )
@@ -257,48 +283,7 @@ class TerminalConfigurationFrontend:
                 return "discard"
             if event.action != MenuAction.ACTIVATE:
                 continue
-            return ("apply", "save", "continue", "discard")[selected]
-
-    def _resume_loop(self) -> ConfigurationLaunchResult:
-        selected = 0
-        while True:
-            snapshot = self.configuration.snapshot()
-            enabled = sum(item.enabled for item in snapshot.mechanisms if item.visible)
-            rows = (
-                MenuRow(
-                    "Resume session",
-                    _session_summary(snapshot, enabled),
-                ),
-                MenuRow(
-                    "Review configuration",
-                    "Read-only model and component summary",
-                ),
-                MenuRow("Exit", "Leave without opening the session"),
-            )
-            self._render(
-                title="FruitFlyAgent · resume",
-                subtitle="The existing session configuration cannot be changed.",
-                rows=rows,
-                selected=selected,
-            )
-            event = self.menu_input.read_event()
-            selected, handled = navigate_menu(event, selected, len(rows))
-            if handled:
-                continue
-            if event.action == MenuAction.QUIT:
-                return ConfigurationLaunchResult(start=False)
-            if event.action != MenuAction.ACTIVATE:
-                continue
-            if selected == 0:
-                if not snapshot.ready:
-                    self.notice = _warnings(snapshot)
-                    continue
-                return ConfigurationLaunchResult(start=True)
-            if selected == 1:
-                if self._review_loop(snapshot):
-                    return ConfigurationLaunchResult(start=False)
-            else:
-                return ConfigurationLaunchResult(start=False)
+            return ("apply", "continue", "discard")[selected]
 
     def _model_form(self) -> FormIO:
         return FormIO(
@@ -355,9 +340,9 @@ class TerminalConfigurationFrontend:
                         continue
                 for reference in references:
                     rows.append(MenuRow(("  " if collapsible else "") + labels.get(reference, reference),
-                                        "Preview before applying", marker="✓" if reference == snapshot.prompt_reference else " "))
+                                        help=MenuHelp(labels.get(reference, reference), "Preview before applying"), marker="✓" if reference == snapshot.prompt_reference else " "))
                     actions.append(("prompt", reference))
-            rows.append(MenuRow("Back", "Return to configuration"))
+            rows.append(MenuRow("Back", help=MenuHelp("Back", "Return to configuration")))
             actions.append(("back", ""))
             selected = min(selected, len(rows) - 1)
             self._render(title="prompt · draft",
@@ -398,26 +383,24 @@ class TerminalConfigurationFrontend:
         selected = 0
         expanded: str | None = None
         remembered: dict[str, str] = {}
-        details: set[str] = set()
-        reference_page = 0
         original = self.configuration.snapshot()
         focus: tuple[str, str, str] | None = None
         while True:
             snapshot = self.configuration.snapshot()
-            rows, actions = _category_rows(snapshot, category, expanded, remembered, original=original, details=details)
+            rows, actions = category_rows(snapshot, category, expanded, original=original)
+            for action in actions:
+                if action.kind == 'expand' and action.active is not None:
+                    remembered[action.key] = action.active
             identities = [action.identity for action in actions]
             selected = identities.index(focus) if focus in identities else min(selected, len(rows) - 1)
+            focused_action = actions[selected]
+            activate = 'select'
+            if focused_action.kind == 'expand':
+                activate = 'expand' if len(focused_action.options) > 1 else 'settings'
             self._render(title=_category_label(category),
-                         subtitle='Enter expands algorithms; Space enables/disables. Review and save before applying changes.'
-                             + (' Unsaved changes.' if snapshot.changed else '')
-                             + f'\nConfiguration: {snapshot.config_path} · Profile: {snapshot.selected_profile}',
-                         rows=tuple(rows), selected=selected, toggle=True, reference_page=reference_page)
-            reference_page = self.renderer.reference_page
+                         subtitle='Choose runtime components.' + (' Unsaved changes.' if snapshot.changed else ''),
+                         rows=tuple(rows), selected=selected, toggle=focused_action.kind == 'expand', activate=activate)
             event = self.menu_input.read_event()
-            if event.action in {MenuAction.PAGE_UP, MenuAction.PAGE_DOWN} and rows[selected].references:
-                reference_page = max(0, reference_page + (1 if event.action == MenuAction.PAGE_DOWN else -1))
-                continue
-            reference_page = 0
             selected, handled = navigate_menu(event, selected, len(rows))
             focus = actions[selected].identity
             if handled:
@@ -425,9 +408,6 @@ class TerminalConfigurationFrontend:
             if event.action == MenuAction.QUIT:
                 return True
             if event.action == MenuAction.BACK:
-                if details:
-                    details.clear()
-                    continue
                 if expanded is not None:
                     focus = ('expand', expanded, '')
                     expanded = None
@@ -435,22 +415,70 @@ class TerminalConfigurationFrontend:
                 return False
             if event.action not in {MenuAction.ACTIVATE, MenuAction.TOGGLE}:
                 continue
-            if selected == len(rows) - 1:
+            if selected == len(rows) - 1 and event.action == MenuAction.ACTIVATE:
                 return False
             action = actions[selected]
-            if action.kind == 'details':
-                if event.action == MenuAction.ACTIVATE:
-                    if action.active in details:
-                        details.remove(action.active)
-                    elif action.active is not None:
-                        details.add(action.active)
+            if event.action == MenuAction.ACTIVATE and action.kind == 'expand':
+                if len(action.options) > 1:
+                    expanded = None if expanded == action.key else action.key
+                else:
+                    item = next(item for item in snapshot.mechanisms if item.mechanism_id == action.options[0])
+                    if has_settings(item) and self._settings_loop(item.mechanism_id, original):
+                        return True
                 continue
+            if event.action == MenuAction.ACTIVATE and action.kind == 'settings':
+                if self._settings_loop(action.active, original):
+                    return True
+                continue
+            if event.action == MenuAction.TOGGLE and action.kind != 'expand':
+                continue
+            active = next(a.active for a in actions if a.kind == 'expand' and a.key == action.key)
+            if event.action == MenuAction.TOGGLE:
+                if active is not None and not action.allow_disabled:
+                    self.notice = "This module cannot be disabled."
+                    continue
+                option = None if active is not None else remembered.get(action.key, action.options[0])
+            else:
+                option = action.active
+            service = getattr(self.configuration, 'mechanism_setup', None)
+            chosen = next((item for item in snapshot.mechanisms if item.mechanism_id == option), None)
+            if (option is not None and service is not None and chosen is not None
+                    and chosen.setup_available and not service.ready(option)):
+                run_mechanism_setup(self._model_form(), service, option)
+                focus = ('expand', action.key, '')
+                continue
+            if action.declared:
+                self._call(self.configuration.select_algorithm, action.key, option)
+            else:
+                self._call(self.configuration.set_mechanism, action.key, enabled=option is not None)
+            focus = action.identity
+
+    def _settings_loop(self, mechanism_id: str | None, original: ConfigurationSnapshot) -> bool:
+        selected = 0
+        focus: tuple[str, str, str] | None = None
+        while True:
+            snapshot = self.configuration.snapshot()
+            current = next((item for item in snapshot.mechanisms if item.mechanism_id == mechanism_id), None)
+            if current is None:
+                return False
+            rows, actions = settings_rows(current, original=original)
+            identities = [action.identity for action in actions]
+            selected = identities.index(focus) if focus in identities else min(selected, len(rows) - 1)
+            self._render(title=current.label, subtitle='', rows=tuple(rows), selected=selected)
+            event = self.menu_input.read_event()
+            selected, handled = navigate_menu(event, selected, len(rows))
+            focus = actions[selected].identity
+            if handled:
+                continue
+            if event.action == MenuAction.QUIT:
+                return True
+            if event.action == MenuAction.BACK:
+                return False
+            if event.action != MenuAction.ACTIVATE:
+                continue
+            action = actions[selected]
             if action.kind == 'back':
                 return False
-            if event.action == MenuAction.ACTIVATE and action.kind == 'expand':
-                details.clear()
-                expanded = None if expanded == action.key else action.key
-                continue
             if event.action == MenuAction.ACTIVATE and action.kind == 'parameter':
                 spec = action.parameter
                 assert spec is not None
@@ -477,29 +505,6 @@ class TerminalConfigurationFrontend:
                 if service is not None and action.active is not None:
                     run_mechanism_setup(self._model_form(), service, action.active)
                 continue
-            if action.kind == 'info':
-                self.notice = rows[selected].detail
-                continue
-            active = next(a.active for a in actions if a.kind == 'expand' and a.key == action.key)
-            if event.action == MenuAction.TOGGLE:
-                if active is not None and not action.allow_disabled:
-                    self.notice = "This module cannot be disabled."
-                    continue
-                option = None if active is not None else remembered.get(action.key, action.options[0])
-            else:
-                option = action.active
-            service = getattr(self.configuration, 'mechanism_setup', None)
-            chosen = next((item for item in snapshot.mechanisms if item.mechanism_id == option), None)
-            if (option is not None and service is not None and chosen is not None
-                    and chosen.setup_available and not service.ready(option)):
-                run_mechanism_setup(self._model_form(), service, option)
-                focus = ('expand', action.key, '')
-                continue
-            if action.declared:
-                self._call(self.configuration.select_algorithm, action.key, option)
-            else:
-                self._call(self.configuration.set_mechanism, action.key, enabled=option is not None)
-            focus = ('expand', action.key, '')
 
     def _choose_value(
         self,
@@ -526,7 +531,7 @@ class TerminalConfigurationFrontend:
             MenuRow(_category_label(category), _category_summary(mechanisms))
             for category, mechanisms in categories
         )
-        rows.append(MenuRow("Back", "Return to resume"))
+        rows.append(MenuRow("Back", help=MenuHelp("Back", "Return from configuration review")))
         while True:
             self._render(
                 title="Configuration summary",
@@ -547,14 +552,6 @@ class TerminalConfigurationFrontend:
         self,
         snapshot: ConfigurationSnapshot,
     ) -> ConfigurationLaunchResult | None:
-        service = getattr(self.configuration, 'mechanism_setup', None)
-        if service is not None:
-            for mechanism in snapshot.mechanisms:
-                if mechanism.enabled and mechanism.setup_available and not service.ready(mechanism.mechanism_id):
-                    if not run_mechanism_setup(self._model_form(), service, mechanism.mechanism_id):
-                        self.notice = 'Setup is incomplete. Complete Set up… before starting a session.'
-                        return None
-            snapshot = self.configuration.snapshot()
         if not snapshot.ready:
             self.notice = _warnings(snapshot) or "Configuration needs attention."
             return None
@@ -593,10 +590,11 @@ class TerminalConfigurationFrontend:
         rows: tuple[MenuRow, ...],
         selected: int,
         toggle: bool = False,
-        reference_page: int = 0,
+        activate: str = 'select',
+        help_panel: bool = True,
     ) -> None:
         if self.renderer.ansi and not self.renderer.numbered:
-            instructions = "↑↓ move · Enter select"
+            instructions = f"↑↓ move · Enter {activate}"
             if toggle:
                 instructions += " · Space toggle"
             instructions += (
@@ -620,99 +618,12 @@ class TerminalConfigurationFrontend:
             selected=selected,
             notice=self.notice,
             instructions=instructions,
-            reference_page=reference_page,
+            help_panel=help_panel,
         )
         self.notice = ""
 
 
 
-
-@dataclass(frozen=True)
-class _CategoryAction:
-    kind: str
-    key: str = ''
-    options: tuple[str, ...] = ()
-    active: str | None = None
-    allow_disabled: bool = True
-    declared: bool = False
-    parameter: ConfigurationParameter | None = None
-
-    @property
-    def identity(self) -> tuple[str, str, str]:
-        return (self.kind, self.key, self.parameter.name if self.parameter is not None else
-                self.active or '' if self.kind in {'choose', 'details'} else '')
-
-
-def _category_rows(
-    snapshot: ConfigurationSnapshot, category: str, expanded: str | None,
-    remembered: dict[str, str],
-    *, original: ConfigurationSnapshot | None = None,
-    details: set[str] | None = None,
-) -> tuple[list[MenuRow], list[_CategoryAction]]:
-    """Project declared selectors and independent capabilities into menu actions."""
-    mechanisms = tuple(item for item in snapshot.mechanisms
-                       if item.category == category and item.visible)
-    by_id = {item.mechanism_id: item for item in mechanisms}
-    groups = [group for group in snapshot.selection_groups
-              if group.category == category and all(option in by_id for option in group.option_ids)]
-    grouped_ids = {option for group in groups for option in group.option_ids}
-    entries = [(group.group_id, group.label, group.option_ids, group.selected_id,
-                group.allow_disabled, True, group.section) for group in groups]
-    entries += [(item.mechanism_id, item.label, (item.mechanism_id,),
-                 item.mechanism_id if item.enabled else None, True, False,
-                 item.display_section or item.context_phase)
-                for item in mechanisms if item.mechanism_id not in grouped_ids]
-    order = {'augmentation': 0, 'externalization': 1, 'reduction': 2}
-    entries.sort(key=lambda entry: order.get(entry[6] or '', 3))
-    before = {item.mechanism_id: item for item in original.mechanisms} if original is not None else {}
-    rows = []
-    actions: list[_CategoryAction] = []
-    details = details or set()
-    def references(item: ConfigurationMechanism) -> tuple[tuple[str, str], ...]:
-        return tuple((label, path) for label, path in (
-            ('Implementation', item.implementation_path), ('Guide', item.documentation_path),
-            ('Configuration', snapshot.config_path),
-            ('Parameters', f'profiles.{snapshot.selected_profile}.mechanisms · id: {item.mechanism_id} · parameters')) if path)
-    for key, label, options, active, allow_disabled, declared, section in entries:
-        if active is not None:
-            remembered[key] = active
-        current = by_id[active] if active else by_id[options[0]]
-        changed = bool(before) and any(before.get(option) != by_id[option] for option in options)
-        heading = 'Context ' + section if section in order else (section or '')
-        summary = by_id[active].label if active and declared else 'Enabled' if active else 'Disabled'
-        rows.append(MenuRow(f'{label} · {summary} {"▴" if expanded == key else "▾"}',
-            marker='[✓]' if active else '[ ]', section=heading, state='enabled' if active else '', changed=changed))
-        actions.append(_CategoryAction('expand', key, options, active, allow_disabled, declared))
-        if expanded == key:
-            if len(options) > 1:
-                for option in options:
-                    item = by_id[option]
-                    rows.append(MenuRow(item.label, item.description, '●' if option == active else '○',
-                        depth=1, section=heading, state='selected' if option == active else ''))
-                    actions.append(_CategoryAction('choose', key, options, option, allow_disabled, declared))
-                    rows.append(MenuRow(f'Details · {item.label} {"▴" if option in details else "▾"}',
-                        depth=2, section=heading, references=references(item) if option in details else ()))
-                    actions.append(_CategoryAction('details', key, active=option))
-            else:
-                rows.append(MenuRow('Details · ' + current.label + (' ▴' if current.mechanism_id in details else ' ▾'),
-                    current.description, depth=1, section=heading,
-                    references=references(current) if current.mechanism_id in details else ()))
-                actions.append(_CategoryAction('details', key, active=current.mechanism_id))
-            if current.setup_available:
-                rows.append(MenuRow('Set up…', current.setup_status, depth=1, section=heading))
-                actions.append(_CategoryAction('setup', key, options, current.mechanism_id))
-            if active:
-                for parameter in current.parameters:
-                    if parameter.name not in current.input_parameters:
-                        continue
-                    prior = before.get(active)
-                    old = next((p for p in prior.parameters if p.name == parameter.name), None) if prior else None
-                    rows.append(MenuRow(f'{parameter.label} · {parameter.value}', parameter.description,
-                        depth=1, section=heading, changed=bool(old and old.value != parameter.value)))
-                    actions.append(_CategoryAction('parameter', key, options, active, allow_disabled, declared, parameter))
-    rows.append(MenuRow("Back", "Return to configuration"))
-    actions.append(_CategoryAction('back'))
-    return rows, actions
 
 
 def _group_mechanisms(
@@ -734,12 +645,6 @@ def _category_label(category: str) -> str:
 def _category_summary(mechanisms: tuple[ConfigurationMechanism, ...]) -> str:
     enabled = sum(item.enabled for item in mechanisms)
     return f"{enabled} of {len(mechanisms)} enabled"
-
-
-def _session_summary(snapshot: ConfigurationSnapshot, enabled: int) -> str:
-    model = snapshot.model_profile or "model not selected"
-    state = "unsaved changes" if snapshot.changed else "saved configuration"
-    return f"{model} · {snapshot.prompt_label} (next) · {enabled} components · {state}"
 
 
 def _warnings(snapshot: ConfigurationSnapshot) -> str:

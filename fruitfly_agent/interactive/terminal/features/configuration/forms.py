@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, TextIO
 from fruitfly_agent.interactive.terminal.io.input import LineEditor
-from fruitfly_agent.interactive.terminal.io.menu import MenuInput, TerminalMenuRenderer, MenuRow, MenuAction, navigate_menu
+from fruitfly_agent.interactive.terminal.io.menu import MenuInput, TerminalMenuRenderer, MenuRow, MenuHelp, MenuAction, navigate_menu
 
 CANCELLED = object()
 
@@ -33,10 +33,10 @@ def choose_value(menu_input: MenuInput, renderer: TerminalMenuRenderer, *, title
         selected = 0
     while True:
         rows = tuple(MenuRow((labels or {}).get(value, str(value)),
-            detail=(details or {}).get(value, ''), marker='✓' if value == current else ' ')
+            help=MenuHelp((labels or {}).get(value, str(value)), (details or {}).get(value, '')), marker='✓' if value == current else ' ')
             for value in values)
         renderer.render(title=title, subtitle=subtitle, rows=rows, selected=selected,
-            notice=notice,
+            notice=notice, help_panel=bool(details),
             instructions=('↑↓ move · Enter select · Esc / q cancel' if not renderer.numbered
                 else 'Enter a number to select; blank keeps the highlighted choice. back / q cancels.'))
         notice = ''

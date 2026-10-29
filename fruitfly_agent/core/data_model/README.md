@@ -7,6 +7,7 @@ Shared message, context, and runtime values. This module performs no I/O and imp
 | File | Defines |
 |---|---|
 | [messages.py](messages.py) | User, assistant, and tool messages; content blocks; usage; loop results |
+| [media.py](media.py) | `UserContent`, bounded submission validation, image container checks, byte decoding and safe display labels |
 | [context.py](context.py) | `ContextSnapshot`, `ContextDecision`, and `ContextItem` |
 | [runtime.py](runtime.py) | Loop context, Provider request views, and callback results |
 | [__init__.py](__init__.py) | Public exports |

@@ -33,6 +33,7 @@ class CliSurfaceTest(unittest.TestCase):
         self.assertEqual(args.task, "do work")
         self.assertEqual(args.profile, "research")
         self.assertFalse(args.resume)
+        self.assertFalse(args.configure)
         self.assertFalse(args.approve_tools)
         self.assertFalse(
             any(
@@ -40,6 +41,9 @@ class CliSurfaceTest(unittest.TestCase):
                 for name in ("provider", "model", "memory_profile", "models_file")
             )
         )
+
+    def test_parser_supports_configuring_before_interactive_chat(self):
+        self.assertTrue(create_parser().parse_args(['--configure']).configure)
 
     def test_feature_specific_legacy_flag_is_rejected(self) -> None:
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
@@ -235,20 +239,88 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(code, 0)
         application_type.assert_not_called()
 
-    async def test_complete_interactive_run_still_uses_startup_before_session(self) -> None:
+    async def test_complete_interactive_run_enters_welcome_without_a_menu_or_model_request(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            _write_catalog(root / ".fruitfly/models.yaml", {"only": "model-a"})
+            _write_catalog(root / '.fruitfly/models.yaml', {'only': 'model-a'})
+            provider = FauxProvider()
+            registry = Mock()
+            registry.create.return_value = provider
+            output = io.StringIO()
+            with patch.dict(os.environ, {}, clear=True), patch.object(cli, 'load_env', return_value={'TEST_API_KEY': 'offline-fixture'}), patch(
+                    'fruitfly_agent.run.runtime.assembly.default_registry', return_value=registry), patch.object(
+                    cli, 'transient_screen', side_effect=AssertionError('ready startup opened a menu screen')), patch(
+                    'sys.stdin', io.StringIO('/exit\n')), contextlib.redirect_stdout(output):
+                self.assertEqual(await cli.run_cli(_args(cwd=tmp)), 0)
+            self.assertIn('FruitFlyAgent interactive · model-a', output.getvalue())
+            self.assertIn('/config', output.getvalue())
+            for obsolete in ('Start new session', 'unsaved changes', 'Configure', '(next)'):
+                self.assertNotIn(obsolete, output.getvalue())
+            self.assertTrue((root / '.fruitfly/config.yaml').is_file())
+            self.assertEqual(provider.calls, [])
+
+    async def test_configure_flag_opens_configuration_before_creating_a_session(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _write_catalog(Path(tmp) / '.fruitfly/models.yaml', {'only': 'model-a'})
             setup = Mock()
             setup.run.return_value = ConfigurationLaunchResult(start=False)
-            with patch.object(cli, "load_env", return_value={}), patch.object(
-                cli, "TerminalConfigurationFrontend", return_value=setup
-            ), patch.object(cli, "AgentApplication") as application_type:
-                code = await cli.run_cli(_args(cwd=tmp))
+            with patch.object(cli, 'load_env', return_value={}), patch.object(
+                    cli, 'TerminalConfigurationFrontend', return_value=setup), patch.object(
+                    cli, 'AgentApplication') as application:
+                self.assertEqual(await cli.run_cli(_args(cwd=tmp, configure=True)), 0)
+            setup.run.assert_called_once_with(configure=True)
+            application.assert_not_called()
 
-        self.assertEqual(code, 0)
-        setup.run.assert_called_once_with(editable=True)
-        application_type.assert_not_called()
+    async def test_configure_rejects_noninteractive_inputs_before_factory_creation(self):
+        for values in ({'task': 'do work'}, {'image': ['image.png']}):
+            with self.subTest(values=values), patch.object(cli, 'RunApplicationFactory') as factory, contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(await cli.run_cli(_args(configure=True, **values)), 2)
+                factory.assert_not_called()
+
+    async def test_missing_model_key_opens_repair_and_cancellation_creates_no_session(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_catalog(root / '.fruitfly/models.yaml', {'only': 'model-a'})
+            output = io.StringIO()
+            with patch.dict(os.environ, {}, clear=True), patch.object(cli, 'load_env', return_value={}), patch(
+                    'sys.stdin', io.StringIO('/cancel\n')), patch.object(cli, 'AgentApplication') as application, contextlib.redirect_stdout(output):
+                self.assertEqual(await cli.run_cli(_args(cwd=tmp)), 0)
+            self.assertIn('Set API key', output.getvalue())
+            application.assert_not_called()
+            self.assertFalse((root / '.fruitfly/config.yaml').exists())
+            self.assertFalse((root / '.fruitfly/secrets.env').exists())
+            self.assertFalse((root / '.fruitfly/sessions').exists())
+
+    async def test_invalid_configuration_reports_its_path_without_overwriting_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / '.fruitfly/config.yaml'
+            path.parent.mkdir()
+            body = 'unexpected: true\n'
+            path.write_text(body)
+            errors = io.StringIO()
+            with patch.object(cli, 'AgentApplication') as application, patch.object(cli, 'TerminalConfigurationFrontend') as frontend, contextlib.redirect_stderr(errors):
+                self.assertEqual(await cli.run_cli(_args(cwd=tmp)), 2)
+            self.assertIn(str(path), errors.getvalue())
+            self.assertEqual(path.read_text(), body)
+            application.assert_not_called()
+            frontend.assert_not_called()
+
+    async def test_ready_startup_save_failure_does_not_open_a_menu_or_create_a_session(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_catalog(root / '.fruitfly/models.yaml', {'only': 'model-a'})
+            factory = RunApplicationFactory(cwd=root, environment={'TEST_API_KEY': 'offline-fixture'}, allow_incomplete=True)
+            errors = io.StringIO()
+            with patch.object(cli, 'RunApplicationFactory', return_value=factory), patch.object(
+                    factory.configuration, 'save', side_effect=OSError('fixture write failed')), patch.object(
+                    cli, 'AgentApplication') as application, patch.object(
+                    cli, 'transient_screen', side_effect=AssertionError('save failure opened menu')), contextlib.redirect_stderr(errors):
+                self.assertEqual(await cli.run_cli(_args(cwd=tmp)), 2)
+            self.assertIn('fixture write failed', errors.getvalue())
+            self.assertTrue(factory.configuration.changed)
+            application.assert_not_called()
+            self.assertFalse((root / '.fruitfly/sessions').exists())
 
     async def test_one_shot_persists_a_complete_turn(self) -> None:
         provider = FauxProvider()
@@ -376,7 +448,7 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
                 )
 
         self.assertEqual(code, 0)
-        startup.run.assert_called_once_with(editable=False)
+        startup.run.assert_called_once_with(configure=False)
         self.assertEqual(captured[0][0], 2)
         self.assertIsInstance(captured[0][1], RunConfigurationController)
 

@@ -12,8 +12,10 @@ Adapt model APIs to Core's Provider protocol. Run resolves model specifications 
 | `ModelSpec`, `ProviderSpec`, `ModelCapabilities` | Exact model/API identity, limits, parameters, and capabilities |
 | `ProviderRegistry`, `default_registry` | Construction using environment keys named by `api_key_env` |
 | `ProviderRegistry.registered_pairs()` | Read-only registered SDK/protocol choices for setup; no factory invocation |
+| `ProviderRegistry.sdk_for(protocol)` | Automatic setup SDK; unique registration or explicit default adapter |
 | `load_env` | Prepare the secret environment |
-| `ServiceDefinition`, `register_service` in [services.py](services.py) | Pure endpoint rules, request controls and continuation constraints |
+| `ServiceDefinition`, `register_service` in [services.py](services.py) | Service metadata, client controls and explicit custom extension hooks |
+| [services.yaml](services.yaml) | Single built-in service/protocol/address table; no model or parameter policies |
 
 See [Configuration](../../CONFIGURATION.md) for file locations and [Provider guide](PROVIDER_GUIDE.md) for protocol differences and parameter examples.
 
@@ -41,12 +43,13 @@ Harness call budgets do not count individual adapter retry attempts or guarantee
 | File | Responsibility |
 |---|---|
 | [specs.py](specs.py) | Model and Provider specifications |
-| [request_options.py](request_options.py), [services.py](services.py) | Shared offline parameter validation and explicit service rules |
+| [request_options.py](request_options.py), [services.py](services.py), [services.yaml](services.yaml) | Protocol shape validation and data-only service metadata |
 | [model_setup.py](model_setup.py) | Supported service descriptions and offline validation of new model entries |
 | [registry.py](registry.py), [config.py](config.py) | Registration, construction, and environment loading |
 | [anthropic.py](anthropic.py), [anthropic_codec.py](anthropic_codec.py) | Messages requests and codec |
 | [openai.py](openai.py), [openai_codec.py](openai_codec.py) | Responses requests and codec |
 | [chat_completions.py](chat_completions.py), [chat_codec.py](chat_codec.py) | Chat Completions requests and codec |
+| [media.py](media.py) | Fresh-input validation and explicit nonvision history/tool projections |
 | [replay.py](replay.py) | Exact ordered continuation, response/context binding and safe rebuild boundaries |
 | [error_classification.py](error_classification.py) | Shared error categories |
 | [transport.py](transport.py) | Validated deadlines, signal-aware waits, retry hints/jitter, and cleanup |
@@ -65,22 +68,33 @@ Real network checks use the explicit [integration smoke](../../tests/integration
 
 The model wizard offers the exact `capabilities` names from the model catalog. Optional selections are declarations of service support, not connection tests. The Run harness requires `tools` and `streaming`; invalid boolean selections fail before staging.
 
-Explicit Qwen, BigModel and DeepSeek presets supply editable model/endpoint/limit
-defaults. Providers generate request settings from the reasoning selection and
-provide full transport defaults for the final review; staging persists the same
-values. Custom services retain empty API options rather than guessing from a URL.
+Four named services and the custom entry select protocol before model fields.
+The packaged service table and registered adapters supply choices; the registry
+resolves SDK automatically. Setup and adapters share the table's addresses and
+client controls. Model ID, limits and optional capabilities are entered explicitly.
+The protocol page warns that some models may not support the selected protocol.
+The parameters editor offers medium reasoning effort in protocol-native fields
+and accepts a complete JSON object or `{}` for server defaults. Custom protocols
+use empty defaults. Capability declarations do not change these choices. Built-ins do not validate or
+rewrite model-specific options, including options a remote service may ignore.
 See [additional examples](../../examples/configuration/additional-models.example.yaml).
 
+`MODEL_FIELD_ORDER` and `ordered_model_entry` in `specs.py` define setup/serialization
+order. Service and protocol precede automatic SDK; `parameters` follows capabilities
+and `transport` is always last. Field order changes no model identity or values.
+
 `parameters` contains API options; `transport` contains client deadlines/retries.
-`service` explicitly selects endpoint rules without URL guessing. Daily and
+`service` explicitly selects endpoint metadata without URL guessing. Daily and
 experiment aliases use the same validated specification. See the
 [Provider guide](PROVIDER_GUIDE.md) for exact replay, signed-context restrictions,
 server-tool observations, supported formats and extension limits.
 
 Model entries require separate `sdk` and `protocol` fields. Registry construction
 uses both IDs; the combined `provider` configuration field is rejected.
-Custom adapters register with `register(sdk, protocol, factory)`. The same registry
-supplies SDK/protocol form choices through the injected host, so the terminal has
+Custom adapters register with `register(sdk, protocol, factory, default=True)`
+when designating the setup default. Without a default, SDK resolution requires
+exactly one adapter per protocol. Manual YAML retains explicit pair selection.
+The same registry supplies protocol choices and the read-only SDK through the injected host, so the terminal has
 no SDK or protocol enumeration. Internal continuation records retain their stable
 namespace and version independently of configuration field names.
 

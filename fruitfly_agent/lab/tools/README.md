@@ -17,6 +17,7 @@ incompatible with the SSH selection.
 | [bash.py](bash.py) | `create_bash_tool`: commands and live output |
 | [edit.py](edit.py) | `create_edit_tool`: unique, non-overlapping text replacement |
 | [write.py](write.py) | `create_write_tool`: file writes |
+| [media.py](media.py) | `create_save_media_tool` using host-granted resources and the shared Core media limits |
 | [ipython.py](ipython.py) | `create_ipython_tool`: explicit Python workspace integration |
 | [guidance.py](guidance.py) | `ToolGuidanceTarget`: validate, trial and bind instruction text independently of tool implementations |
 | [Web tools](web/README.md) | `web_search` through Brave/Tavily/DeepSeek; `web_fetch` directly or through DeepSeek; disabled by default |
@@ -39,7 +40,28 @@ Inject `builtin_tools()` into `AgentLoopConfig.tools`. IPython is added explicit
 | Bash log persistence | Attempt to save truncated output; report save failures without advertising a complete log. |
 | Truncation API | Nonnegative integer budgets; zero gives an empty body; negative, boolean, or noninteger budgets raise `ValueError`. |
 
-Reads still load entire files. Images and other tool errors lack shared size budgets. Path locks coordinate only this process. See [Known limitations](../ALGORITHM_AUDIT.md).
+Reads still load entire files. Image results are limited to 10 MiB and validated
+as PNG/JPEG/GIF/WebP containers; PNG dimensions are bounded to 40 megapixels.
+Container checks do not fully decode pixels. Unsupported binary files and invalid
+UTF-8 fail explicitly. BMP is rejected instead of being passed to an incompatible
+image API. Path locks coordinate only this process. See [Known limitations](../ALGORITHM_AUDIT.md).
+
+## Save a media resource
+
+Enable optional `save-media-tool` through ordinary configuration. It installs
+`save_media(resource_id, path)`, separate from text-only `write(path, content)`.
+Run grants IDs from user attachments and image tool results. The tool reads only
+granted resources, verifies content hashes, then writes original bytes (up to
+10 MiB) through `ctx.env.write_file`, the normal write permission and mutation
+queue. SSH destinations stay remote; resource storage stays local. IDs are not
+arbitrary artifact paths. The tool does not generate or convert media.
+
+The owner exposes H `tool-guidance.save_media` with ordinary validation, trial and
+binding rules. Configuration/candidate materialization uses the shared Catalog
+path. Trials need a runner declaring `tool:save_media`; the native in-memory
+read/write/edit runner does not acquire this capability implicitly. Media grants
+are Session-owned and restored only after hash checks; no cross-Session grant
+sharing or automatic resource collection is added.
 
 ## Add a tool
 

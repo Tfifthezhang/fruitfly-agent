@@ -4,17 +4,17 @@
 # Store key values in .fruitfly/secrets.env or the process environment, never in this file.
 models:
   deepseek-flash-openai:
+    service: deepseek
+    protocol: responses
     # Uses DeepSeek's OpenAI Responses-compatible endpoint, not Chat Completions.
     sdk: openai
-    protocol: responses
-    service: deepseek
     model: deepseek-flash
-    api_key_env: DEEPSEEK_API_KEY
     base_url: https://api.deepseek.com
     # Conservative working budget within the documented 1M context.
     # Output including thinking is capped at 32768 for this example, not the service maximum.
     context_window: 1000000
     max_output_tokens: 32768
+    api_key_env: DEEPSEEK_API_KEY
     # Capabilities describe support; parameters explicitly select thinking behavior.
     capabilities:
       tools: true
@@ -37,16 +37,16 @@ models:
       retry_max: 3
       retry_base_delay: 1.0
   deepseek-flash-anthropic:
+    service: deepseek
+    protocol: messages
     # Uses DeepSeek's Anthropic Messages-compatible endpoint.
     # Messages uses its native thinking and effort fields.
     sdk: anthropic
-    protocol: messages
-    service: deepseek
     model: deepseek-flash
-    api_key_env: DEEPSEEK_API_KEY
     base_url: https://api.deepseek.com/anthropic
     context_window: 1000000
     max_output_tokens: 32768
+    api_key_env: DEEPSEEK_API_KEY
     capabilities:
       tools: true
       parallel_tool_calls: false

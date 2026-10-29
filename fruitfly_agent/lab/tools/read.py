@@ -7,30 +7,14 @@ Images: binary sniff → sent to the model as an image block.
 from __future__ import annotations
 
 import base64
+from typing import Callable
 
 from fruitfly_agent.core.data_model import AgentToolResult, ImageBlock, TextBlock
 from fruitfly_agent.core.tool_runtime import AgentTool, ToolCallContext
 from fruitfly_agent.core.tool_runtime.authorization import ToolPermission
 from .path_utils import resolve_read_path
 from .truncate import DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, truncate_head
-
-_IMAGE_MAGIC: dict[bytes, str] = {
-    b"\xff\xd8\xff": "image/jpeg",
-    b"\x89PNG\r\n\x1a\n": "image/png",
-    b"GIF87a": "image/gif",
-    b"GIF89a": "image/gif",
-    b"BM": "image/bmp",
-}
-
-
-def _sniff_image(data: bytes) -> str | None:
-    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
-        return "image/webp"
-    for magic, mime in _IMAGE_MAGIC.items():
-        if data.startswith(magic):
-            return mime
-    return None
-
+from fruitfly_agent.core.data_model.media import image_type, validate_image, decode_text_file
 
 _READ_SCHEMA: dict = {
     "type": "object",
@@ -46,7 +30,7 @@ _READ_SCHEMA: dict = {
 }
 
 
-async def _execute(ctx: ToolCallContext) -> AgentToolResult:
+async def _execute(ctx: ToolCallContext, register: Callable[[bytes, str, str], str] | None = None) -> AgentToolResult:
     if ctx.env is None:
         raise RuntimeError("read requires an ExecutionEnv")
     path = ctx.args["path"]
@@ -59,16 +43,19 @@ async def _execute(ctx: ToolCallContext) -> AgentToolResult:
         raise RuntimeError(f"Could not read file: {path}. {data.error}")
 
     bytes_data = data.unwrap()
-    mime = _sniff_image(bytes_data)
+    mime = image_type(bytes_data)
     if mime is not None:
+        mime = validate_image(bytes_data)
+        resource = register(bytes_data, mime, 'tool:read') if register is not None else None
         return AgentToolResult(
             content=[
                 TextBlock(text=f"Read image file [{mime}]"),
                 ImageBlock(data=base64.b64encode(bytes_data).decode("ascii"), media_type=mime),
+                *([TextBlock(text=f'Media resource: {resource}')] if resource else []),
             ]
         )
 
-    text = bytes_data.decode("utf-8", errors="replace")
+    text = decode_text_file(bytes_data)
     all_lines = text.split("\n")
     total_lines = len(all_lines)
     start = max(0, (offset - 1) if offset else 0)
@@ -97,7 +84,10 @@ async def _execute(ctx: ToolCallContext) -> AgentToolResult:
     return AgentToolResult(content=[TextBlock(text=output)])
 
 
-def create_read_tool() -> AgentTool:
+def create_read_tool(register_media: Callable[[bytes, str, str], str] | None = None) -> AgentTool:
+    async def execute(ctx: ToolCallContext) -> AgentToolResult:
+        return await _execute(ctx, register_media)
+
     return AgentTool(
         permission=ToolPermission("read", ("path",)),
         name="read",
@@ -106,10 +96,10 @@ def create_read_tool() -> AgentTool:
             "Read a file in the selected execution environment (local or SSH). "
             "Use for inspecting source code, configuration, logs and saved artifacts. "
             "Supports text files and images "
-            f"(jpg, png, gif, webp, bmp). Text output is truncated to {DEFAULT_MAX_LINES} "
+            f"(jpg, png, gif, webp; up to 10 MiB per image). Unsupported binary files are rejected. Text output is truncated to {DEFAULT_MAX_LINES} "
             f"lines or {DEFAULT_MAX_BYTES // 1024}KB (whichever is hit first). "
             "Use offset/limit for large files."
         ),
         parameters=_READ_SCHEMA,
-        execute=_execute,
+        execute=execute,
     )

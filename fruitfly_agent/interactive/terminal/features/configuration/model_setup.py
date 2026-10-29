@@ -1,6 +1,7 @@
 """Generic model form and secret input; the injected host owns persistence."""
 
 import json
+from dataclasses import replace
 import os
 import shutil
 import textwrap
@@ -10,83 +11,130 @@ from fruitfly_agent.interactive.terminal.io.input import LineEditor
 from .forms import FormIO, CANCELLED, select_field
 from fruitfly_agent.interactive.terminal.io.secret import read_secret
 from fruitfly_agent.interactive.contracts.model_setup import ModelSetupOption, ModelSetupService
+from fruitfly_agent.interactive.contracts.configuration import ConfigurationActionResult
 from fruitfly_agent.interactive.terminal.io.input import read_field_line
-from fruitfly_agent.interactive.terminal.io.menu import MenuAction, MenuRow, navigate_menu
+from fruitfly_agent.interactive.terminal.io.menu import MenuAction, MenuRow, MenuHelp, navigate_menu
 
 
 def run_model_setup(form: FormIO, service: ModelSetupService) -> None:
-    option = _choose_service(form, service.options())
-    if option is None:
-        return
-    values = {field.name: str(field.value) for field in option.fields if field.kind == "constant"}
-    text_fields = tuple(field for field in option.fields if field.kind not in ("bool", "constant"))
-    bool_fields = tuple(field for field in option.fields if field.kind == "bool")
-    total = len(text_fields) + bool(bool_fields) + 1
+    drafts = {}
+    while True:
+        option = _choose_service(form, service.options())
+        if option is None:
+            return
+        previous = {}
+        while True:
+            field = service.field(option.option_id, 'protocol', previous)
+            quit_requested, protocol = form.choose_value(
+                title=f'Add model · {option.label} · Choose API protocol',
+                subtitle=field.description + '\nBack returns to service selection.',
+                values=field.choices, current=field.value)
+            if quit_requested:
+                return
+            if protocol is CANCELLED:
+                break
+            key = (option.option_id, protocol)
+            values = drafts.setdefault(key, {'protocol': str(protocol)})
+            if previous and previous.get('protocol') != protocol:
+                for name in ('profile', 'model', 'context_window', 'max_output_tokens', 'api_key_env'):
+                    old = service.field(option.option_id, name, previous)
+                    if name not in values and name in previous and previous[name] != str(old.value or ''):
+                        values[name] = previous[name]
+            try:
+                values['sdk'] = str(service.field(option.option_id, 'sdk', values).value)
+            except ValueError as exc:
+                form.apply(lambda: ConfigurationActionResult(f'Configuration error: {exc}'))
+                return
+            status = _fill_model(form, service, option, values)
+            if status != 'back':
+                return
+            previous = values
+
+
+def _fill_model(form: FormIO, service: ModelSetupService, option: ModelSetupOption, values: dict) -> str:
+    fields = tuple(service.field(option.option_id, field.name, values) for field in option.fields)
+    text_fields = tuple(field for field in fields if field.kind not in ('bool', 'constant', 'json') and field.name != 'protocol')
+    bool_fields = tuple(field for field in fields if field.kind == 'bool')
+    json_fields = tuple(field for field in fields if field.kind == 'json')
+    total = len(text_fields) + bool(bool_fields) + len(json_fields) + 1
     for step, field in enumerate(text_fields, 1):
-        if field.kind == 'choice':
-            field = service.field(option.option_id, field.name, values)
-        default = str(field.value or "")
-        _render_field(form, option.label, step, total, field.label, field.description,
+        default = values.get(field.name, str(field.value or ''))
+        _render_field(form, option.label, step, total, field.label, field.description + '\nType back to choose a protocol.',
                       f"Press Enter to use: {default}" if default else "")
         if field.kind == 'choice' or field.choices:
             choice = select_field(form, title=f'Add model · {field.label}', description=field.description,
                 choices=field.choices, current=field.value)
             if choice is CANCELLED:
-                return
+                return 'back'
             values[field.name] = str(choice)
             continue
         line = read_field_line(form.line_editor, field.label)
         if line is None or line.strip() == "/cancel":
-            return
+            return 'cancel'
+        if line.strip() == 'back':
+            return 'back'
         values[field.name] = line.strip() or default
     if bool_fields:
-        selected = _capabilities(form, option.label, bool_fields, len(text_fields) + 1, total)
+        bool_fields = tuple(service.field(option.option_id, field.name, values) for field in bool_fields)
+        selected = _capabilities(form, option.label,
+            tuple(replace(field, value=field.value if len(field.choices) == 1 else
+                values.get(field.name, str(field.value).lower()) == 'true') for field in bool_fields),
+            len(text_fields) + 1, total)
         if selected is None:
-            return
+            return 'cancel'
         values.update(selected)
+    for step, field in enumerate(json_fields, len(text_fields) + bool(bool_fields) + 1):
+        status = _edit_json(form, service, option, values, field, step, total)
+        if status != 'done':
+            return status
     _render_field(form, option.label, total, total, "API key",
                   "Enter your service's API key. Input is hidden and excluded from history.",
                   "Leave blank only when reusing an existing key.")
     secret = read_secret(form.input, form.output)
     if secret is None or secret == "/cancel":
-        return
+        return 'cancel'
     defaults = json.dumps(service.defaults(option.option_id, values), ensure_ascii=False, indent=2)
-    action = _review(form, f"Service: {option.label}\n" + "\n".join(f"{field.name if field.kind == 'bool' else field.label}: {values[field.name] or '(default)'}" for field in option.fields)
+    action = _review(form, f"Service: {option.label}\n" + "\n".join(f"{field.name if field.kind == 'bool' else field.label}: {values[field.name] or '(default)'}" for field in fields)
             + "\nRequest and transport defaults (confirm to save):\n" + defaults
             + "\nEmpty parameters use service defaults; capabilities alone do not enable thinking."
             + "\nAPI key: entered or reused (value hidden)\nOffline checks only; changes remain staged until saved.",
     )
     if action == "Stage model":
         form.apply(service.stage, option.option_id, values, secret)
+    return 'done'
+
+
+def _edit_json(form, service, option, values, field, step, total):
+    default = values.get(field.name, str(field.value))
+    notice = ''
+    while True:
+        _render_field(form, option.label, step, total, field.label, field.description +
+            '\nType back to choose a protocol.' + ('\n' + notice if notice else ''),
+            f'Press Enter to use: {default}')
+        line = read_field_line(form.line_editor, field.label)
+        if line is None or line.strip() == '/cancel':
+            return 'cancel'
+        if line.strip() == 'back':
+            return 'back'
+        candidate = {**values, field.name: line.strip() or default}
+        try:
+            service.defaults(option.option_id, candidate)
+        except (TypeError, ValueError) as exc:
+            notice = f'Configuration error: {exc}'
+            continue
+        values.update(candidate)
+        return 'done'
 
 
 def _choose_service(form: FormIO, options: tuple[ModelSetupOption, ...]) -> ModelSetupOption | None:
-    groups: dict[str, list[ModelSetupOption]] = {}
-    for option in options:
-        groups.setdefault(option.group, []).append(option)
-    while True:
-        quit_requested, group = form.choose_value(title="Add model · Choose a service",
-            subtitle="Select the service your API key belongs to.\n"
-                     "Presets supply API defaults; custom services open protocol choices.",
-            values=tuple(groups), current=None,
-            details={name: items[0].description if len(items) == 1 else
-                     "Choose the API protocol supported by your gateway or server."
-                     for name, items in groups.items()})
-        if quit_requested or group is CANCELLED:
-            return None
-        items = groups[group]
-        if len(items) == 1:
-            return items[0]
-        quit_requested, chosen = form.choose_value(title=f"Add model · {group} · Choose API protocol",
-            subtitle="Use the protocol documented by your service. Streaming and tool calls are required.\n"
-                     "Back returns to service selection.",
-            values=tuple(item.option_id for item in items), current=None,
-            labels={item.option_id: item.label for item in items},
-            details={item.option_id: item.description for item in items})
-        if quit_requested:
-            return None
-        if chosen is not CANCELLED:
-            return next(item for item in items if item.option_id == chosen)
+    quit_requested, chosen = form.choose_value(title='Add model · Choose a service',
+        subtitle='Select the service your API key belongs to, then choose its API protocol.',
+        values=tuple(item.option_id for item in options), current=None,
+        labels={item.option_id: item.label for item in options},
+        details={item.option_id: item.description for item in options})
+    if quit_requested or chosen is CANCELLED:
+        return None
+    return next(item for item in options if item.option_id == chosen)
 
 
 def _review(form: FormIO, text: str):
@@ -131,11 +179,11 @@ def _capabilities(form, service_label, fields, step, total):
     selected = len(fields)
     notice = ""
     while True:
-        rows = tuple(MenuRow(field.label, field.description + (" · required" if len(field.choices) == 1 else ""),
+        rows = tuple(MenuRow(field.label, help=MenuHelp(field.label, field.description + (" · required" if len(field.choices) == 1 else "")),
                              marker="✓" if values[field.name] else " ") for field in fields)
         form.renderer.render(title=f"Add model · Step {step} of {total} · capabilities",
             subtitle=f"Service: {service_label}\nChecked = true; unchecked = false. Choose capabilities your service supports.",
-            rows=rows + (MenuRow("Continue", "Keep these capabilities"),), selected=selected, notice=notice,
+            rows=rows + (MenuRow("Continue", help=MenuHelp("Continue", "Keep these capabilities")),), selected=selected, notice=notice, help_panel=True,
             instructions=("↑↓ move · Space / Enter toggle · Continue to confirm · Esc / q cancel"
                           if form.renderer.ansi else f"Enter a number to toggle; choose {len(fields) + 1} to continue (blank selects highlighted). 'back' / q cancels."))
         event = form.menu_input.read_event()

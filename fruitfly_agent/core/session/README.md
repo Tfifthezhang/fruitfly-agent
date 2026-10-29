@@ -19,6 +19,7 @@ Store and replay the canonical conversation in an append-only JSONL file.
 | Provider failure | Error category, harness request count, and recovered or terminal disposition |
 | Request context / receipt | Final projection estimate/source, configured limits, model, timestamp, and available input receipt; never cumulative occupancy |
 | Provider activity | Adapter waiting/retrying/timeout phase, attempt limits, delay, and sanitized category/status |
+| Metadata `mediaResource` | Run-owned immutable media identity, size, type and origin; original images remain in message blocks |
 
 Interrupted tool calls retain completed results and explicit unknown/not-executed outcomes. These records do not roll back effects or authorize replay. Input receipt values use the adapter's usage convention; cache fields and exact billing remain Provider-specific.
 
@@ -36,6 +37,7 @@ without continuation cannot supply missing signatures. See
 |---|---|
 | Default persistence | Construct `Session` with a JSONL path. |
 | Read-only discovery | `Session.inspect(path)` returns a validated snapshot and writer-lock status without creating files or repairing a torn tail. |
+| Synchronous commit | `Session.transaction()` restores appended bytes and the in-memory cursor on failure under the existing writer lease. The owner must serialize work and must not await inside it. |
 | Custom persistence | Implement `SessionLike` and inject it into `AgentLoopConfig`. |
 | Resume an application | Follow [Run recovery](../../run/README.md#recovery). |
 
@@ -64,3 +66,8 @@ the actual durable prefix. This prevents duplicate IDs when bytes reached the
 file but synchronization failed before the in-memory cursor advanced. Validation
 errors before I/O do not poison the writer. Custom Session writers should expose
 the same optional preflight and must not reuse an unconfirmed sequence position.
+
+Within `Session.transaction()`, successful rollback restores the confirmed prefix
+and permits further appends. A rollback failure keeps the writer poisoned. This
+scope does not roll back tools or other external effects and does not provide
+crash atomicity across Session and configuration files.

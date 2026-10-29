@@ -7,7 +7,7 @@ Current implementation limits. Offline tests verify covered behavior; they do no
 | Area | Verified behavior | Remaining limit |
 |---|---|---|
 | [Providers](../providers/README.md) | Request output limits, adapter retries, cancellation, and stream cleanup | Harness call budgets do not count individual HTTP retries or guarantee monetary cost. |
-| [Tools](tools/README.md) | UTF-8 truncation, bounded read/bash bodies, edit span validation, and Core per-turn batch allowances | Reads load whole files; images and other errors lack a shared size budget; hints are outside body limits. |
+| [Tools](tools/README.md) | UTF-8 truncation, bounded read/bash bodies, image container/size checks, edit span validation, and Core per-turn batch allowances | Reads load whole files; image container validation does not fully decode pixels; hints are outside body limits. |
 | [Environment](environment/README.md) | Working directory, prompt process return, chunked decoding, and live callbacks | File I/O is synchronous; complete stdout/stderr remain in memory; broad exception conversion can obscure programming errors. |
 | [SSH environment](environment/ssh/README.md) | Fake-transport file operations, verified-key configuration, credential separation, process-group cancellation and lifecycle cleanup | No real-server verification; synchronous SFTP; network partitions and detached jobs can leave remote work running; no remote snapshot or sandbox. |
 | [Skills](context_manager/augmentation/skills/README.md) | Bounded scan, skipped descendant symlinks, per-file decoding diagnostics | Synchronous I/O and concurrent edits; over-limit enumeration may choose different entries across filesystems. |

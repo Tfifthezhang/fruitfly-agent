@@ -1,7 +1,7 @@
 """Anthropic provider adapter — the ONLY file that touches the SDK.
 
 Maps the SDK stream onto our AssistantMessageEventStream protocol and hosts
-error classification + retry. GLM-compatible-endpoint quirks handled here:
+error classification + retry. Compatible Messages stream behavior handled here:
 - full tool_use.input may arrive in content_block_start (no input_json_delta);
 - non-standard stop_reason values are normalized to "stop";
 - errors are classified as overflow (→ compaction ladder) / retryable / fatal.
@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
 from fruitfly_agent.core.data_model import (
     AssistantMessage,
+    AgentMessage,
     ProviderView,
     TextBlock,
     ThinkingBlock,
@@ -40,6 +41,7 @@ from fruitfly_agent.core.model_stream import (
 )
 
 from .anthropic_codec import convert_to_anthropic
+from .media import MediaInput, project_images
 from .replay import ReplayBinding, wire_value
 from .request_options import validate_request_options
 from .services import service_definition
@@ -70,7 +72,7 @@ def classify_error(exc: Exception, *, status_code: int | None = None) -> TaggedE
     return classify_provider_error(exc, status_code=status_code)
 
 
-class AnthropicProvider:
+class AnthropicProvider(MediaInput):
     protocol = 'messages'
 
     def __init__(
@@ -90,13 +92,16 @@ class AnthropicProvider:
         cleanup_timeout: float = 5.0,
         retry_jitter: float = 0.2,
         service: str = 'generic',
+        vision: bool | None = None,
         **request_options: Any,
     ) -> None:
         import anthropic  # SDK stays in this file.
 
         request_options = validate_request_options(self.protocol, request_options)
-        service_definition(service, self.protocol).validate(self.protocol, model, request_options)
+        definition = service_definition(service, self.protocol)
+        definition.validate(self.protocol, model, request_options)
         self.request_options = request_options
+        self.vision = vision
         self._replay = ReplayBinding(self.protocol, service, base_url, api_key, namespace='anthropic')
         self._anthropic = anthropic
         validate_retries(retry_max, retry_base_delay)
@@ -104,7 +109,7 @@ class AnthropicProvider:
                                        stall_timeout, total_timeout, cleanup_timeout, retry_jitter)
         self.transport_parameters = {**asdict(self._policy), "retry_max": retry_max,
                                      "retry_base_delay": retry_base_delay, "transport_version": "bounded-v1"}
-        self._client = anthropic.AsyncAnthropic(api_key=api_key, base_url=base_url, max_retries=0,
+        self._client = anthropic.AsyncAnthropic(api_key=api_key, base_url=base_url or definition.base_url, max_retries=0,
                                            timeout=anthropic.Timeout(timeout, connect=connect_timeout))
         self.model = model
         self.max_tokens = max_tokens
@@ -129,10 +134,14 @@ class AnthropicProvider:
 
     input_count_supported = False
 
+    def input_estimation_messages(self, view: ProviderView) -> list[AgentMessage]:
+        return project_images(view.messages, self.vision)
+
     def input_measurement_scope(self) -> str:
         import json
         return json.dumps({'protocol': self.protocol, 'service': self._replay.service,
-            'model': self.model, 'options': self.request_options}, sort_keys=True)
+            'model': self.model, 'options': self.request_options,
+            'vision': self.vision, 'media_encoding': 'images-v1'}, sort_keys=True)
 
     def effective_output_limit(self, view: ProviderView) -> int:
         return min(self.max_tokens, view.max_tokens) if view.max_tokens > 0 else self.max_tokens
@@ -173,7 +182,7 @@ class AnthropicProvider:
         tools = [t.to_schema() for t in view.tools if not t.hide_from_model]
         effective = replace(view, model=view.model or self.model)
         service_definition(self._replay.service, self.protocol).validate(self.protocol, effective.model, self.request_options)
-        prefix = convert_to_anthropic(view.messages, replay=self._replay.reader(effective, tools))
+        prefix = convert_to_anthropic(project_images(view.messages, self.vision), replay=self._replay.reader(effective, tools))
         request: dict[str, Any] = {
             "model": view.model or self.model,
             "system": view.system_prompt,
@@ -247,7 +256,7 @@ class AnthropicProvider:
                     tool_call_id=str(getattr(block, 'id', getattr(block, 'tool_use_id', ''))),
                     tool_status='started' if block.type == 'server_tool_use' else 'completed')
             if getattr(block, "type", None) == "tool_use":
-                # GLM quirk: the full input may arrive here.
+                # Compatible streams may deliver the complete input in this event.
                 return ToolCallStart(
                     id=block.id,
                     name=block.name,

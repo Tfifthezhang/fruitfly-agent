@@ -60,14 +60,15 @@ alias; an active runtime and frozen experiment inputs retain their loaded values
 
 ## Restore default configuration
 
-The home menu has **Start new session**, **Configure**, and **Exit**. In Configure
-or `/config`, **Restore default configuration** is the final action before Back.
+The CLI opens chat directly when configuration is complete. Use `/config` or
+`fruitfly-agent --configure` to edit settings. **Restore default configuration**
+is the final action before Back.
 It reads `.fruitfly/default-config.yaml` and stages its prompt, mechanisms,
 parameters, execution limits and artifact bindings in the selected daily profile. Existing model
 selection, catalog, credentials and other profiles remain unchanged. Experiment
 bindings absent from the defaults are removed from the draft.
 
-Review or adjust the draft, then save and apply to this conversation or save only.
+Review or adjust the draft, then apply it to this conversation or discard it.
 Discard restores the previous saved choices. Staging and saving alone leave the
 active runtime unchanged. Missing/invalid defaults
 leave the draft unchanged; declared auxiliary models must exist in the daily
@@ -103,17 +104,22 @@ While idle, `/config` offers these choices after changes:
 
 | Choice | Effect |
 |---|---|
-| Save and apply to this conversation | Save files, then rebuild using the current Session's recovery path. Keep its path and original messages. |
-| Save only | Save files without changing the active runtime. A later start or recovery uses them. |
+| Save and apply to this conversation | Prepare and start the draft, then commit its files and runtime using the current Session. Keep its path and original messages. |
 | Continue configuring | Keep editing the draft. |
 | Discard changes | Restore saved choices without changing the active runtime. |
 
-Application constructs and starts the candidate before replacing the incumbent.
+The menu submits draft intent without saving files or constructing algorithms.
+Component registration and assembly own interface, dependency and lifecycle
+contracts. Application uses the host's `prepare_configuration(session_path=...)`
+operation to construct and start the candidate before replacing the incumbent.
 Recovery validates recorded history and required artifacts. Changed context
-mechanisms rebuild their model projection from canonical messages. Missing
-artifacts, invalid settings or startup failures leave the old runtime usable;
-configuration files already saved remain saved. No model or tool work is replayed.
-The next submitted turn uses the applied model, prompt and components.
+mechanisms rebuild their model projection from canonical messages. Preparation,
+startup or commit failure retains the old runtime, restores files written by the
+commit, and keeps the draft for editing or retry through `/config`. New model
+entries and hidden credentials share this boundary. No model or tool work is
+replayed. External service effects and process crashes are not file transactions.
+The next submitted turn uses the applied model, prompt and components. Successful
+application adds a short confirmation without printing another welcome page.
 
 Application requires no active/queued task or improvement job. Rebuilding creates
 fresh runtime resources and approval services; transient algorithm state and
@@ -147,37 +153,37 @@ MCP server are not implemented.
 
 ## Configure a model
 
-Run the interactive CLI. **Add model** opens when no models are available; otherwise use **Configure → model → Add model…**. Choose a supported service, enter the model ID and documented token limits, and enter the key with hidden input. Custom services need a base URL. Review and stage the settings; **Start new session**, **Save and apply to this conversation**, or **Save only** persists them.
+Run the interactive CLI. **Add model** opens when no models are available; otherwise use **/config → model → Add model…**, or start with `--configure`. Choose a service, choose its protocol, then enter the model ID, documented token limits and hidden API key. The SDK is automatic and appears read-only in review. Custom services need a base URL. Review and stage the settings; **Save and start** saves them before startup, while **Save and apply to this conversation** commits them after candidate startup succeeds.
 
-| Service group | Preset or next step |
+| Service | Protocol choices |
 |---|---|
-| OpenAI | Responses preset; an OpenAI key, with the SDK's official default address. |
-| Anthropic | Messages preset; an Anthropic key, with the SDK's official default address. |
-| DeepSeek | Responses preset; editable Flash defaults and `DEEPSEEK_API_KEY`. |
-| Qwen | Chat preset; Qianwen AI Beijing endpoint, editable Qwen3.8-Flash defaults and `DASHSCOPE_API_KEY`. |
-| Zhipu BigModel | Chat preset; BigModel China endpoint, editable GLM-4.5-Air defaults and `ZAI_API_KEY`. |
-| Custom service… | Open a submenu for Responses, Messages or Chat Completions; enter the gateway/server's address and key. Back returns to service selection. |
+| OpenAI | Responses or Chat Completions |
+| Anthropic | Native Messages or Chat Completions compatibility |
+| DeepSeek | Responses, Messages or Chat Completions |
+| Qwen | Responses, Messages or Chat Completions |
+| Custom service… | Registered protocols; supply the gateway/server's address and key |
 
-Named services open their preset directly. Groups and options come from Provider
-metadata rather than a terminal-owned vendor list. The protocol determines
+Every service opens a protocol selection before its form. Choices come from
+Provider service rules intersected with registered adapters. The protocol determines
 request, streaming, and tool-call formats. Choose what your service actually
 supports; the model name alone does not establish compatibility. See
 [protocol configuration](fruitfly_agent/providers/PROVIDER_GUIDE.md#choose-the-protocol-and-service).
 
-After service selection, each field has its own screen with the selected service and step count. `models.<name>` is the catalog entry name shown in menus; `model` is the service model ID. Press Enter to accept a displayed default. API key input is hidden; review shows only that it was entered or reused. The final review displays generated `service`, `parameters` and all `transport` defaults. Confirm to save them without typing those mappings. No connection test runs during setup.
+After protocol selection, each field has its own screen with the selected service and step count. `models.<name>` is the catalog entry name shown in menus; `model` is the service model ID. Press Enter to accept a displayed default. After capabilities, edit the complete `parameters` JSON object or accept medium reasoning effort. Enter `{}` for server defaults. Invalid parameter input retries before reading the hidden API key. `back` returns to protocol selection; Back there returns to services. Per-protocol drafts retain edits. The final review displays the exact parameters and transport defaults that will be saved. No connection test runs during setup.
 
 An interactive first run without saved harness configuration or a workspace catalog starts a draft targeting the selected workspace's `.fruitfly/models.yaml`.
 
 | Wizard behavior | Contract |
 |---|---|
-| Supported services | Official or custom Responses/Messages, custom Chat Completions, and explicit Qwen, BigModel and DeepSeek presets; streaming and tool calls required. |
-| Limits | Positive integers; output smaller than context. Presets supply editable working budgets for their named model; changing the model ID requires checking its limits and capabilities. No network discovery. |
-| Capabilities | Checkbox page: `tools` and `streaming` are required. Generic choices default other flags false; named presets supply declared support. These flags describe support; the named presets also generate thinking parameters from the reasoning selection. |
-| Request defaults | DeepSeek high/none; Qwen medium thinking or disabled; BigModel dynamic thinking enabled/disabled. Official OpenAI/Anthropic and custom choices use `{}` (server defaults); selecting reasoning there does not invent model-specific parameters. Edit YAML for advanced settings. |
+| Supported services | Four named services and the existing custom entry, declared in the [service table](fruitfly_agent/providers/services.yaml); the protocol page warns that some models may not support the selected protocol. |
+| Limits | Enter model ID and documented limits explicitly. Positive integers; output smaller than context. No model-specific defaults or network discovery. |
+| Capabilities | Checkbox page: only `tools` and `streaming` are required. Other flags default false and describe declared support; they do not generate or change API options. |
+| Request defaults | Editable JSON object: Responses `reasoning.effort`, Messages `output_config.effort`, Chat `reasoning_effort`, all default `medium`. `{}` explicitly uses server defaults. Custom protocols default to `{}`. No vendor/model-specific policy. |
 | Transport defaults | All choices display and save the same bounded waiting/retry defaults used by adapters; no manual input. |
 | Credentials | Hidden input bypasses readline history. Blank input reuses the named environment variable. Blank variable name generates `FRUITFLY_MODEL_<LABEL>_API_KEY`, replacing label punctuation with underscores. |
 | Existing key | The Model menu shows only set/missing status. **Set API key…** supplies a missing key; an already-set different value is rejected. |
 | Saving | Append a unique model label to the selected workspace-local catalog, update only supplied credential entries, and save harness selection. `.fruitfly/secrets.env` writes use owner-only permissions. Existing comments/models and unrelated environment lines remain. |
+| Field order | All model entries follow service, protocol, automatic SDK, model, base URL, context/output limits, credential variable, capabilities, parameters and transport. Saving reorders existing entries without changing their values or comments; transport is last. |
 | Cancellation | `/cancel`, EOF, review cancellation, or configuration discard leaves the corresponding draft unsaved. Exiting startup discards pending changes. |
 | Failures | Ordinary save failures attempt to restore model/credential files and retain the draft for retry; no cross-process or crash transaction. |
 | Validation | Offline format/required-field checks only; no automatic network requests or connection tests. |
@@ -189,11 +195,11 @@ For manual setup, create `.fruitfly/`, then copy `examples/configuration/models.
 | Field | What to enter |
 |---|---|
 | Key under `models` | Your profile name, selected in the terminal or via `FRUITFLY_MODEL_PROFILE` |
-| `sdk` | Required client library ID, such as `openai` or `anthropic`; selected independently from the API format |
+| `sdk` | Required client library ID; automatically resolved for the chosen protocol in the wizard, still explicitly stored in YAML |
 | `protocol` | Required API format: built-in pairs are `openai` + `responses`, `openai` + `chat-completions`, and `anthropic` + `messages` |
-| `service` | Registered endpoint rules: `generic` (default), `openai`, `anthropic`, `deepseek`, `qwen`, or `bigmodel`; never inferred from the URL |
+| `service` | Registered endpoint rules: `generic` (default), `openai`, `anthropic`, `deepseek`, or `qwen`; never inferred from the URL |
 | `model` | Exact model ID accepted by the service |
-| `base_url` | Service URL for that protocol; omit to use the adapter SDK's default endpoint |
+| `base_url` | Service URL for that protocol; omission uses the registered service/protocol address, or the SDK default for generic services |
 | `api_key_env` | Environment variable name; the template uses `DEEPSEEK_API_KEY`, whose value belongs in `.fruitfly/secrets.env` |
 | `context_window`, `max_output_tokens` | Actual model limits; template numbers are examples |
 | `capabilities` | Actual model and endpoint support, including tools and streaming |
@@ -220,7 +226,7 @@ through offline inspection.
 | Menu / form name | Stored location |
 |---|---|
 | `models.<name>` | Entry key under `models` in the model catalog |
-| `sdk`, `protocol`, `service`, `model`, `base_url`, `context_window`, `max_output_tokens`, `api_key_env` | Fields of that catalog entry; SDK/protocol options come from the adapter registry |
+| `sdk`, `protocol`, `service`, `model`, `base_url`, `context_window`, `max_output_tokens`, `api_key_env` | Existing catalog fields; the wizard selects protocol first and derives SDK from the registry |
 | `capabilities` checkbox names | Boolean fields under the entry's `capabilities` mapping |
 | Request and transport defaults in model review | Entry's `parameters` and `transport` mappings, generated by Providers and saved as shown |
 | Executor model | Harness profile's `models.roles.executor` selection |
@@ -234,7 +240,7 @@ The capability page uses arrows and Space/Enter to toggle, then **Continue** to 
 
 | Selection | Default / behavior | Reference |
 |---|---|---|
-| Base prompt | `assistant-default`; choose another prompt in **Configure → prompt** or `/config`. | [Base prompt](fruitfly_agent/lab/base_prompt/README.md) |
+| Base prompt | `assistant-default`; choose another prompt in **/config → prompt** or `/config`. | [Base prompt](fruitfly_agent/lab/base_prompt/README.md) |
 | Skill catalog | Read `.skills/`; enable in **Context → Context augmentation → Skill catalog** (Space toggles; the phase is a section heading). | [Skills](fruitfly_agent/lab/context_manager/augmentation/skills/README.md) |
 | Reduction | Summarizing by default, or incremental working memory; select one method and keep `context-history` enabled. Edit prompts and policy in H component files. | [Reduction](fruitfly_agent/lab/context_manager/reduction/README.md) |
 | Context measurement | Enabled in defaults; reports precision, input/output reserves and uncertainty. Exact counting requires a declared Provider capability. | [Measurement](fruitfly_agent/lab/context_manager/measurement/README.md) |

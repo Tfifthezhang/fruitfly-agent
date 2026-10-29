@@ -54,6 +54,7 @@ where = ["."]
 include = ["fruitfly_agent*", "eval*"]
 
 [tool.setuptools.package-data]
+"fruitfly_agent.providers" = ["services.yaml"]
 "fruitfly_agent.experiments" = ["templates/*.yaml", "templates/tasks/*.yaml"]
 "fruitfly_agent.run.configuration" = ["templates/*.yaml", "templates/components/H/*.yaml", "templates/components/H/tools/*.yaml", "templates/components/S/*.yaml", "templates/components/I/*.yaml"]
 

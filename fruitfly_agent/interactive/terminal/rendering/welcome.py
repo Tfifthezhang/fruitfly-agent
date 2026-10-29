@@ -37,7 +37,7 @@ def render_welcome(
     width = max(4, columns - 1)
     if not terminal_ui:
         lines = [f"FruitFlyAgent interactive · {status.model}",
-                 *_environment_lines(status), "Type a task, or /help for commands."]
+                 *_environment_lines(status), "Type a task, or /config for settings and /help for commands."]
         return "\n".join(lines) + "\n"
 
     if width >= _SIDE_BY_SIDE_MIN_WIDTH:
@@ -101,10 +101,10 @@ def _compact_lines(
         truncate_cells(f"{status.model} · {session}", width),
     ]
     if status.prompt_label:
-        lines.append(truncate_cells(f"prompt: {status.prompt_label} · {status.prompt_hash[:15]}… (active)", width))
+        lines.append(truncate_cells(f"prompt: {status.prompt_label}", width))
     lines.extend([
         *_environment_lines(status, width),
-        truncate_cells("Tip: /help commands · /lab mechanisms", width),
+        *wrap_cells("/config settings · /resume history · /help commands", width),
         "",
     ])
     return lines
@@ -127,22 +127,14 @@ def _status_lines(status: InteractiveStatus, width: int) -> list[str]:
         if status.message_count
         else "new · 0 messages"
     )
-    mechanism_count = len(status.mechanisms)
-    mechanisms = (
-        f"{mechanism_count} mechanism{'s' if mechanism_count != 1 else ''}"
-        if mechanism_count
-        else "baseline"
-    )
-    lab = f"{mechanisms} · {len(status.tool_names)} tools"
     lines = [
         _labeled_line("model", status.model, width),
     ]
     if status.prompt_label:
-        lines.append(_labeled_line("prompt", f"{status.prompt_label} · {status.prompt_hash[:15]}… (active)", width))
+        lines.append(_labeled_line("prompt", status.prompt_label, width))
     lines.extend([
         *_environment_lines(status, width),
         _labeled_line("session", session, width),
-        _labeled_line("lab", lab, width),
     ])
     return lines
 
@@ -161,14 +153,11 @@ def _environment_lines(status: InteractiveStatus, width: int | None = None) -> l
 
 def _labeled_line(label: str, value: str, width: int) -> str:
     prefix = f"  {label:<8}"
-    return prefix + truncate_cells(value, max(0, width - cell_width(prefix)))
+    return "\n".join(wrap_cells(prefix + safe_terminal_text(value), width))
 
 
 def _tip_line(width: int) -> str:
-    return truncate_cells(
-        "  Tip: /help for commands · /status for status · /lab for mechanisms",
-        width,
-    )
+    return "\n".join(wrap_cells("  /config settings · /resume history · /help commands", width))
 
 
 def _colorize(lines: list[str]) -> list[str]:

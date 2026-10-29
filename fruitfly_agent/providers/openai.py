@@ -9,6 +9,7 @@ from typing import Any, AsyncIterator
 
 from fruitfly_agent.core.data_model import (
     AssistantMessage,
+    AgentMessage,
     ProviderView,
     TextBlock,
     ThinkingBlock,
@@ -28,6 +29,7 @@ from fruitfly_agent.core.model_stream import (
     ToolCallStart,
 )
 from .openai_codec import convert_to_openai
+from .media import MediaInput, project_images
 from .replay import ReplayBinding, wire_value
 from .request_options import validate_request_options
 from .services import service_definition
@@ -41,7 +43,7 @@ def classify_error(exc: Exception, *, status_code: int | None = None) -> TaggedE
     return classify_provider_error(exc, status_code=status_code)
 
 
-class OpenAIProvider:
+class OpenAIProvider(MediaInput):
     """Map OpenAI streaming events to FruitFlyAgent's provider-neutral stream."""
 
     protocol = 'responses'
@@ -66,6 +68,7 @@ class OpenAIProvider:
         store: bool = False,
         parallel_tool_calls: bool = True,
         service: str = 'generic',
+        vision: bool | None = None,
         **request_options: Any,
     ) -> None:
         import openai  # SDK stays inside the adapter.
@@ -74,6 +77,7 @@ class OpenAIProvider:
         self._service = service_definition(service, self.protocol)
         self._service.validate(self.protocol, model, request_options)
         self.service = service
+        self.vision = vision
         self._replay = ReplayBinding(self.protocol, service, base_url, api_key,
                                     namespace=self.continuation_namespace)
         validate_retries(retry_max, retry_base_delay)
@@ -81,7 +85,7 @@ class OpenAIProvider:
                                        stall_timeout, total_timeout, cleanup_timeout, retry_jitter)
         self.transport_parameters = {**asdict(self._policy), "retry_max": retry_max,
                                      "retry_base_delay": retry_base_delay, "transport_version": "bounded-v1"}
-        self._client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url, max_retries=0,
+        self._client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url or self._service.base_url, max_retries=0,
                                            timeout=openai.Timeout(timeout, connect=connect_timeout))
         self.model = model
         self.max_output_tokens = max_output_tokens
@@ -147,7 +151,7 @@ class OpenAIProvider:
             request.pop('store')
         effective = replace(view, model=view.model or self.model)
         self._service.validate(self.protocol, effective.model, self.request_options)
-        prefix = convert_to_openai(view.messages, replay=self._replay.reader(effective, tools))
+        prefix = convert_to_openai(project_images(view.messages, self.vision), replay=self._replay.reader(effective, tools))
         request['input'] = prefix
 
         return request, effective, tools, prefix
@@ -156,6 +160,9 @@ class OpenAIProvider:
     def input_count_supported(self) -> bool:
         from .token_counting import supports_count
         return supports_count(self)
+
+    def input_estimation_messages(self, view: ProviderView) -> list[AgentMessage]:
+        return project_images(view.messages, self.vision)
 
     def effective_output_limit(self, view: ProviderView) -> int:
         return min(self.max_output_tokens, view.max_tokens) if view.max_tokens > 0 else self.max_output_tokens
@@ -176,7 +183,8 @@ class OpenAIProvider:
     def input_measurement_scope(self) -> str:
         import json
         return json.dumps({'protocol': self.protocol, 'service': self.service,
-            'model': self.model, 'options': self.request_options}, sort_keys=True)
+            'model': self.model, 'options': self.request_options,
+            'vision': self.vision, 'media_encoding': 'images-v1'}, sort_keys=True)
 
     async def count_input(self, view: ProviderView, *, signal: asyncio.Event | None = None) -> int:
         if not self.input_count_supported:

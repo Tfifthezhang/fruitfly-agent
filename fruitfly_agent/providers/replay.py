@@ -34,7 +34,7 @@ class ReplayBinding:
     def __init__(self, protocol: str, service: str, endpoint: str | None, api_key: str, *, namespace: str) -> None:
         # Persisted v1 continuation namespaces are independent of YAML field names.
         self.namespace, self.service = namespace, service
-        self.prefix_bound = service_definition(service, protocol).prefix_bound or (service == 'generic' and protocol == 'messages')
+        self.prefix_bound = service_definition(service, protocol).prefix_bound
         identity = json.dumps([namespace, service, endpoint], separators=(',', ':')).encode()
         # A nonreversible keyed identity detects credential changes without storing keys.
         self.identity = hmac.new(api_key.encode(), identity, hashlib.sha256).hexdigest()

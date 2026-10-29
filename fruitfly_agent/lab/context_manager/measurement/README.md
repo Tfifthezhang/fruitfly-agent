@@ -21,6 +21,12 @@ allowance is capped by the actual Provider; hidden tools do not consume input.
 Tool-result images count just like user images. Replay state is included in
 request identity and marked uncertain in heuristic results.
 
+Providers may expose `input_estimation_messages(view)` for the actual portable
+media projection. Chat encoding and measurement share the same attributed image
+observation projection, including its extra text and framing. Transparent budget
+wrappers forward this port. Estimates remain heuristic; image token counts are
+model-specific and protocol overhead remains uncertain.
+
 `provider_count=false` is the offline default. When enabled, native OpenAI
 Responses with explicit `service: openai` shares the request encoder with
 `responses.input_tokens.count`. Generic proxies and Chat Completions do not

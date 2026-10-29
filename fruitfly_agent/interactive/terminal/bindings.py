@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Protocol
+from fruitfly_agent.interactive.contracts.inputs import ImageAttachment, UserContent
 
 from fruitfly_agent.interactive.contracts.events import EventSink
 from fruitfly_agent.interactive.contracts.models import InteractiveStatus
@@ -18,16 +19,16 @@ class TerminalSession(Protocol):
     @property
     def running(self) -> bool: ...
     def set_event_sink(self, sink: EventSink | None) -> None: ...
-    def steer(self, prompt: str) -> bool: ...
+    def steer(self, prompt: UserContent) -> bool: ...
     def cancel(self) -> bool: ...
-    async def submit(self, prompt: str): ...
+    async def submit(self, prompt: UserContent): ...
 
 
 @dataclass(frozen=True)
 class TerminalBindings:
     """Explicit optional operations; readers follow runtime replacement."""
     cancel: Callable[[], bool]
-    enqueue: Callable[[str], int] | None
+    enqueue: Callable[[UserContent], int] | None
     wait: Callable[[], Awaitable[None]] | None
     rebuild: Callable[[], Awaitable[None]] | None
     resume: Callable[..., Awaitable[None]] | None
@@ -41,6 +42,8 @@ class TerminalBindings:
     candidate_notice: Callable | None
     acknowledge_notice: Callable | None
     apply_configuration: Callable[[], Awaitable[None]] | None = None
+    load_attachment: Callable[[str], ImageAttachment] | None = None
+    validate_input: Callable[[UserContent], UserContent] | None = None
 
     @classmethod
     def from_session(cls, session: Any) -> TerminalBindings:
@@ -62,6 +65,9 @@ class TerminalBindings:
             candidate_notice=getattr(session, "candidate_notice", None),
             acknowledge_notice=getattr(session, "acknowledge_candidate_notice", None),
             apply_configuration=getattr(session, "apply_configuration", None),
+            load_attachment=(getattr(session, 'load_attachment', None)
+                             if getattr(session, 'attachments_available', True) else None),
+            validate_input=getattr(session, 'validate_input', None),
         )
 
 

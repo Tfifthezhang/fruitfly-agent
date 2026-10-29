@@ -107,7 +107,8 @@ def _lazy_role_config(config, context, role):
         binding = None
         def __getattr__(self, name):
             if name not in {'input_count_supported', 'count_input', 'input_count_identity', 'can_rebase_context',
-                    'context_usage_tokens', 'effective_output_limit', 'input_measurement_scope'}:
+                    'context_usage_tokens', 'effective_output_limit', 'input_measurement_scope',
+                    'input_estimation_messages', 'validate_input', 'vision'}:
                 raise AttributeError(name)
             if self.binding is None:
                 self.binding = context.provider_resolver(alias, None)

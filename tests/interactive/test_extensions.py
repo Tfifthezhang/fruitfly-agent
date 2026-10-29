@@ -186,19 +186,21 @@ class ExtensionTests(unittest.IsolatedAsyncioTestCase):
         from tests.support.configuration import MockConfiguration
         controller = MockConfiguration(model="offline")
         handler = configuration_handler(
-            configuration=lambda: controller, status=lambda: offline_session().status,
+            configuration=lambda: controller,
             busy=lambda: False, apply_configuration=fail, menu_scope=scope,
             input_stream=io.StringIO(), output_stream=io.StringIO(),
             line_editor=lambda: ScriptedLines("3", "space", "back", "back", "1"),
-            write=lambda text: None, welcome=lambda status: None,
+            write=lambda text: None,
         )
         result = await handler(InteractiveCommand("config"))
-        self.assertIn("saved but not applied", result.text)
+        self.assertIn("configuration not applied", result.text)
+        self.assertIn("draft retained", result.text)
         self.assertIn("replacement failed", result.text)
-        self.assertTrue(controller.saved)
+        self.assertFalse(controller.saved)
+        self.assertTrue(controller.changed)
         self.assertEqual(["lend", "restore"], lifecycle)
 
-    async def test_configuration_save_only_does_not_apply_or_exit_the_conversation(self):
+    async def test_configuration_apply_only_submits_intent_and_does_not_repeat_welcome(self):
         from tests.support.configuration import MockConfiguration
         app, provider = await self.app()
         apply_settings = AsyncMock()
@@ -206,11 +208,12 @@ class ExtensionTests(unittest.IsolatedAsyncioTestCase):
         controller = MockConfiguration(model='offline')
         output = io.StringIO()
         frontend = TerminalFrontend(app, bindings=bindings, configuration=controller,
-            output_stream=output, line_editor=ScriptedLines('/config', '3', 'space', 'back', 'back', '2', '/status', '/exit'))
+            output_stream=output, line_editor=ScriptedLines('/config', '3', 'space', 'back', 'back', '1', '/status', '/exit'))
         await frontend.run()
-        apply_settings.assert_not_awaited()
-        self.assertTrue(controller.saved)
-        self.assertIn('configuration saved; active runtime unchanged', output.getvalue())
+        apply_settings.assert_awaited_once()
+        self.assertFalse(controller.saved)
+        self.assertIn('configuration applied; conversation retained', output.getvalue())
+        self.assertEqual(output.getvalue().count('FruitFlyAgent interactive'), 1)
         self.assertIn('state: idle', output.getvalue())
         self.assertEqual([], provider.calls)
 

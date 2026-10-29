@@ -36,7 +36,10 @@ def resolve_harness_selection(
 
     target = _resolve_config_path(cwd, config_path)
     if target.is_file():
-        config = load_harness_config(target, catalog=catalog)
+        try:
+            config = load_harness_config(target, catalog=catalog)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f'invalid harness configuration {target}: {exc}') from exc
         profile = config.select(profile_id)
         return HarnessSelection(config, profile, target, True)
     if config_path is not None and not allow_incomplete:
@@ -120,9 +123,11 @@ def model_catalog_path(profile: HarnessProfile, config_path: Path) -> Path:
 def resolve_profile_models(
     profile: HarnessProfile,
     config_path: Path,
+    *,
+    model_specs: Mapping[str, ModelSpec] | None = None,
 ) -> tuple[dict[str, ModelSpec], str, ModelSpec]:
-    path = model_catalog_path(profile, config_path)
-    models = load_model_specs(path)
+    models = (dict(model_specs) if model_specs is not None
+              else load_model_specs(model_catalog_path(profile, config_path)))
     selected = profile.model_profile
     if selected is None:
         if len(models) != 1:

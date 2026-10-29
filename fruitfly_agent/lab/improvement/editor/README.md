@@ -32,7 +32,8 @@ and stage `instructions`. `max_turns` defaults to 12 (range 1–256) and uses Co
 job's shared model allocation. The I feedback component sets default text page size
 (12000 characters, range 1–24000). Experiment grants may narrow mutable instruction
 fields; the editor sees those exact grants in `context/edit-grants.json`. Text pages and the complete evidence workspace are
-bounded. PNG/JPEG are visual; other binary originals require an explicit renderer.
+bounded. PNG/JPEG/GIF/WebP use shared image container checks and a 10 MiB limit;
+other binary originals require an explicit renderer.
 Requests use injected model configuration and may incur cost only during a job.
 
 Offline checks: `tests.lab.test_improvement_pipeline`.

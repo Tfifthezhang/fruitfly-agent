@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from typing import Any
+from .services import service_definition
 
 
 OPENAI_COUNT_FIELDS = frozenset({'model', 'input', 'instructions', 'tools', 'parallel_tool_calls',
@@ -9,7 +10,7 @@ OPENAI_COUNT_FIELDS = frozenset({'model', 'input', 'instructions', 'tools', 'par
 
 
 def supports_count(provider: Any) -> bool:
-    return provider.protocol == 'responses' and provider.service == 'openai'
+    return provider.protocol == 'responses' and service_definition(provider.service, provider.protocol).input_count
 
 
 def can_rebase(provider: Any, before: Any, after: Any) -> bool:

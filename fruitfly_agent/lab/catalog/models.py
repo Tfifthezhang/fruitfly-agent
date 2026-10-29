@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
+from inspect import iscoroutinefunction, signature
 import re
 from typing import Any, Callable, Mapping, TYPE_CHECKING
 
@@ -124,6 +125,12 @@ class MechanismDefinition:
             raise TypeError("model_profiles must be callable")
         if not callable(self.install):
             raise TypeError("mechanism installer must be callable")
+        if iscoroutinefunction(self.install):
+            raise TypeError('mechanism installer must be synchronous')
+        try:
+            signature(self.install).bind(None, None, {})
+        except (TypeError, ValueError) as exc:
+            raise TypeError('mechanism installer must accept (state, context, parameters)') from exc
         if self.selection_group is not None and not _ID.fullmatch(self.selection_group):
             raise ValueError("selection_group must be a stable identifier")
         if self.selection_group_label is not None and (

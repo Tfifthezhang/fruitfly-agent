@@ -34,6 +34,11 @@ absent and preserves an existing regular catalog unchanged.
 
 Unknown fields raise `ValueError`. Catalog validates mechanism IDs and parameters. Store key variable names in model specifications and key values in the environment; keep secret values outside YAML. Short prompt text is supported in component block scalars.
 
+`snapshot().ready` includes main model credentials, including staged credentials,
+and registered mechanism requirements. It remains an offline view; Run uses it to
+choose direct chat or setup without asking the terminal to inspect Providers or
+Catalog. Malformed harness files report their source path and remain untouched.
+
 ## Files and ownership
 
 **Restore default configuration** stages default harness settings in the current
@@ -44,6 +49,16 @@ injected workspace path, validated before staging and never edited by this opera
 Missing or invalid defaults leave the draft unchanged. Explicitly selected default
 files retain a read-only controller. See the
 [configuration reference](../../../CONFIGURATION.md#restore-default-configuration).
+
+For an active conversation, `prepare_application(environment)` freezes assembly
+inputs and returns a `PreparedConfiguration` with the selected profile, model
+specifications, private environment and commit callback. It writes nothing.
+The host prepares a runtime from those inputs and invokes commit only after
+startup succeeds. Commit guards prepared files against concurrent changes,
+restores ordinary failed writes and activation failures, and accepts the draft
+only after success. Pending models and credentials use the same boundary; failed
+application retains them for retry. The terminal does not call `save()` in this
+flow. Startup and explicit offline callers retain the standalone `save()` API.
 
 Restoration also stages execution limits. These file settings do not add a
 terminal parameter form. Unknown execution fields, booleans and negative/fractional
@@ -60,19 +75,31 @@ limits are rejected. Model-call and editor budgets are separate settings.
 | [resolution.py](resolution.py) | Workspace/profile discovery and model catalog resolution |
 | [views.py](views.py) | Mechanism and prompt menu projections |
 | [model_setup.py](model_setup.py) | Stage models and credentials through profile callbacks |
+| [model_catalog.py](model_catalog.py) | Preserve catalog text and values while ordering model fields like setup, with transport last |
 | [mechanism_setup.py](mechanism_setup.py) | Project registered forms, check setup readiness, stage parameters and enable selections |
 | [credentials.py](credentials.py) | Shared secret draft, variable validation and comment-preserving secret-file payloads |
 | [persistence.py](persistence.py) | Atomic byte writes for configuration operations |
 
 `profile()`, `stage_profile()`, and `changed` expose draft operations without allowing other services to access private fields. Model setup receives these callbacks and a configuration path. It writes only on save, preserves unrelated content, rolls back ordinary failures, and updates the secret environment after success. No model requests occur during configuration.
 
-`RunModelSetup.options()` projects Provider-owned service groups and preset fields;
+`RunModelSetup.options()` projects the Provider-owned service table and generic fields;
 `defaults(option_id, values)` projects non-secret request/transport defaults for
 review. `stage()` uses the same Provider builder, so confirmation and saved values
-agree. Vendor rules and presets stay in Providers; this host owns persistence.
-The injected Provider registry supplies SDK/protocol choices through `field()`
-and validates the selected pair before staging. Registering another pair updates
-those choices without a terminal change or a model request.
+agree. Endpoint metadata stays in Providers; this host owns persistence.
+The injected Provider registry intersects registered protocols with service rules
+through `field()`. Setup selects service, then protocol, then model fields; SDK is
+resolved automatically and shown read-only. `field()` refreshes addresses and
+credential variable defaults. Only harness-required capabilities are fixed.
+The parameters JSON field offers protocol-native medium effort and validates edits
+before credentials; `{}` explicitly selects server defaults. Stage validates
+the pair before any write. Registering another protocol updates custom choices
+without a terminal change or a model request. Multiple SDKs require an explicit
+default registration. The stored YAML fields remain unchanged.
+
+Model fields use Providers' shared setup order. Saving an addition reorders old
+and new entries with transport last, preserving authored values, comments and
+unrelated root content. Reordering checks YAML semantic equality before writes;
+ordinary save failure restores the exact original bytes and retains the draft.
 
 Mechanism setup consumes generic Catalog metadata and profile/enable callbacks;
 it contains no backend-specific branches. It checks required settings and named

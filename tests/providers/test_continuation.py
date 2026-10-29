@@ -78,12 +78,12 @@ class ContinuationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(request.call_args.kwargs['input'][4]['type'], 'function_call_output')
         self.assertNotIn('offline-placeholder', str(message.to_dict()))
 
-    async def test_deepseek_replays_plain_reasoning_and_omits_ignored_request_switches(self):
+    async def test_deepseek_replays_plain_reasoning_and_retains_protocol_controls(self):
         items = [{'type': 'reasoning', 'content': [{'type': 'reasoning_text', 'text': 'Plan.'}]},
                  {'type': 'message', 'role': 'assistant', 'content': [{'type': 'output_text', 'text': 'Done.'}]}]
         message, _, request = await self.response(items, service='deepseek')
-        self.assertNotIn('store', request.call_args.kwargs)
-        self.assertNotIn('parallel_tool_calls', request.call_args.kwargs)
+        self.assertFalse(request.call_args.kwargs['store'])
+        self.assertTrue(request.call_args.kwargs['parallel_tool_calls'])
         self.assertEqual(message.content[0].thinking, 'Plan.')
         self.assertEqual(message.provider_state['items'], items)
 

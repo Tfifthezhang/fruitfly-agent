@@ -17,6 +17,7 @@ from fruitfly_agent.interactive.terminal.io.menu import (
     MenuInput,
     LineMenuInput,
     MenuRow,
+    MenuHelp,
     TerminalMenuRenderer,
     navigate_menu,
 )
@@ -175,10 +176,10 @@ class TerminalImprovementFrontend:
             if (page + 1) * 10 < len(runs):
                 rows.append(MenuRow('Next page'))
                 actions.append(('page', page + 1))
-            rows.append(MenuRow('Saved candidates', 'Includes candidates created before experiment history was available'))
+            rows.append(MenuRow('Saved candidates', help=MenuHelp('Saved candidates', 'Includes candidates created before experiment history was available')))
             actions.append(('candidates', None))
             if self.clients.experience is not None:
-                rows.append(MenuRow('Pending experience', 'Review lessons before they affect later tasks'))
+                rows.append(MenuRow('Pending experience', help=MenuHelp('Pending experience', 'Review lessons before they affect later tasks')))
                 actions.append(('experience', None))
             choice = self.choose_row('Results and history', tuple(rows),
                 subtitle='Every submitted experiment is recorded, including empty, failed and cancelled runs.', key=('history', page))
@@ -339,7 +340,9 @@ class TerminalImprovementFrontend:
         columns, height = shutil.get_terminal_size(fallback=(80, 24))
         lines = [part for line in subtitle.splitlines() for part in
                  (textwrap.wrap(line, width=max(20, columns - 4), replace_whitespace=False) or [''])]
-        size = max(3, min(12, height - sum(1 + bool(row.detail) for row in rows) - 8))
+        help_panel = any(row.help for row in rows)
+        size = max(1, min(2 if help_panel else 12,
+            height - sum(1 + bool(row.detail) for row in rows) - 8 - (4 if help_panel else 0)))
         page, pages = 0, max(1, (len(lines) + size - 1) // size)
         if pages > 1:
             instructions = (instructions or '↑↓ move · Enter select · Esc back · q quit') + ' · PageUp/PageDown details'
@@ -350,7 +353,7 @@ class TerminalImprovementFrontend:
             if pages > 1:
                 detail += f'\nDetails page {page + 1}/{pages}'
             self.menu_renderer.render(title=title, subtitle=detail, rows=rows,
-                                      selected=selected, notice=self.notice, reference_page=reference_page, **options)
+                                      selected=selected, notice=self.notice, reference_page=reference_page, help_panel=help_panel, **options)
             reference_page = getattr(self.menu_renderer, 'reference_page', 0)
             self.notice = ""
             event = self.menu_input.read_event()

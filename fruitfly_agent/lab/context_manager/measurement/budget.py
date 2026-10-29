@@ -102,7 +102,11 @@ class MeasurementService:
                     raise FatalError('strict input count unavailable', details={'kind': 'input_count_unavailable', 'error_type': type(exc).__name__}) from exc
         elif self.config.strict:
             raise FatalError('strict input counting is unsupported', details={'kind': 'input_count_unavailable'})
-        raw = self.estimate(view)
+        estimation_view = view
+        projection = getattr(provider, 'input_estimation_messages', None)
+        if callable(projection):
+            estimation_view = replace(view, messages=projection(view))
+        raw = self.estimate(estimation_view)
         key = (id(provider), view.model, scope, tuple((t.name, t.description, json.dumps(t.parameters, sort_keys=True))
                for t in view.tools if not t.hide_from_model),
                any(getattr(m, 'provider_state', None) for m in view.messages))

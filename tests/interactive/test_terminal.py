@@ -471,7 +471,7 @@ class TerminalFrontendTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn("cleared\n", output.getvalue())
         self.assertEqual(provider.calls, [])
 
-    async def test_embedded_session_reports_that_host_must_apply_saved_config(self) -> None:
+    async def test_embedded_session_keeps_draft_when_host_cannot_apply_config(self) -> None:
         app = offline_session()
         controller = MockConfiguration(model="offline")
         output = io.StringIO()
@@ -491,9 +491,10 @@ class TerminalFrontendTest(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(await frontend.run(), 0)
-        self.assertTrue(controller.saved)
+        self.assertFalse(controller.saved)
+        self.assertTrue(controller.changed)
         self.assertIn("Apply configuration", output.getvalue())
-        self.assertIn("this host cannot apply settings to the current conversation", output.getvalue())
+        self.assertIn("this host cannot apply configuration; draft retained", output.getvalue())
 
     async def test_config_menu_returns_to_current_session_when_unchanged(self) -> None:
         app = offline_session()

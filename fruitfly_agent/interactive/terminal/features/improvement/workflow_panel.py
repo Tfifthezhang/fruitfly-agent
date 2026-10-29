@@ -3,7 +3,7 @@ from dataclasses import replace
 import shlex
 
 from fruitfly_agent.interactive.contracts.improvement import WorkflowRequest
-from fruitfly_agent.interactive.terminal.io.menu import MenuRow
+from fruitfly_agent.interactive.terminal.io.menu import MenuRow, MenuHelp
 
 
 class WorkflowPanel:
@@ -22,7 +22,7 @@ class WorkflowPanel:
             value = self.request
             rows = (MenuRow("Task", value.task_pack_id or value.instruction or "Choose explicit task material"),
                 MenuRow("Input files", ", ".join(value.input_paths) or "No files selected"),
-                MenuRow("Start improvement", "One candidate comparison; preview before model calls"),
+                MenuRow("Start improvement", help=MenuHelp("Start improvement", "One candidate comparison; preview before model calls")),
                 MenuRow("Results and history"))
             selected = self.choose("Component improvement", rows,
                 subtitle="For experiment settings and RSI use fruitfly-agent-lab and experiment.yaml", key="component-workflow")
@@ -51,7 +51,7 @@ class WorkflowPanel:
 
     async def task_material(self):
         materials = self.configuration.materials
-        index = self.choose("Task material", tuple(MenuRow(c.label, c.reason or c.detail) for c in materials), key="workflow-material")
+        index = self.choose("Task material", tuple(MenuRow(c.label, help=MenuHelp(c.label, c.reason or c.detail)) for c in materials), key="workflow-material")
         if index is None:
             return
         choice = materials[index]

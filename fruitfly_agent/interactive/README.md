@@ -11,14 +11,22 @@ Run multi-turn sessions through a frontend-independent Application. Inject a Run
 | `start` / `close` | Start owned runtime resources; cancel and drain active work before cleanup. `shutdown_timeout=10` bounds quiescence; an uncooperative runtime is retained with an explicit error. |
 | `submit` | Execute one input. |
 | `enqueue` | Process queued inputs in order. |
-| `steer` | Add text to the active run. |
+| `steer` | Add text or image content to the active run. |
+| `load_attachment` | Ask the host to read and validate an explicitly selected local image. |
 | `cancel` | Set the cooperative signal and interrupt owned work after a 50 ms grace; clear pending Application input. User cancellation returns `aborted`; external task cancellation still propagates after end delivery. |
-| `apply_configuration` | While idle, recover the current Session with saved settings; start a replacement before switching. |
+| `apply_configuration` | While idle, prepare the host's draft for the current Session; start a replacement before committing and switching. |
 | `rebuild` / `resume` | Open a fresh session or recover another Session; prepare and start a replacement before switching. |
 | `conversation` | Read an immutable snapshot of original user, assistant, and tool messages, independent of model context reduction. |
 | `activate_runtime` | Validate the expected parent and activate a prepared candidate. |
 
 The [offline example](../../examples/extensions/README.md) demonstrates `start → submit → close`. For terminal operations, see [Terminal](terminal/README.md).
+
+`submit`, `enqueue` and `steer` accept strings or lists of Core `TextBlock` and
+`ImageBlock` values (`UserContent`). Submission copies the list and validates
+declared image support before queueing/persistence. Image-only inputs are valid.
+`validate_input` performs this preflight without model requests. Host resource
+registration happens when input becomes a message; cancelled queued input is
+not committed. Events and history use media-type markers, never Base64 data.
 
 ## State and events
 

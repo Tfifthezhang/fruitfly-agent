@@ -6,6 +6,7 @@ Verify messages, loop, hooks, tool dispatch, Session, failure isolation, and can
 
 | Files | Protects |
 |---|---|
+| [test_media.py](test_media.py) | Frozen inputs, media formats, container checks, declared MIME, image count and byte limits |
 | `test_authorization.py` | Final arguments, fail-closed decisions, and cancellation before execution |
 | `test_tool_observation.py` | Isolated result callbacks, success-hook compatibility, unknown tools and budget rejection |
 | `test_execution_facts.py` | Termination causes, attempted/started/skipped tools, declared tool errors and unchanged result status |

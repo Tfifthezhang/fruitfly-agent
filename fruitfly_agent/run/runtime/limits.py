@@ -57,11 +57,14 @@ class BudgetedProviderRegistry(ProviderRegistry):
         super().__init__()
         self.registry, self.budget = registry, budget
 
-    def register(self, sdk, protocol, factory):
-        self.registry.register(sdk, protocol, factory)
+    def register(self, sdk, protocol, factory, *, default=False):
+        self.registry.register(sdk, protocol, factory, default=default)
 
     def registered_pairs(self):
         return self.registry.registered_pairs()
+
+    def sdk_for(self, protocol):
+        return self.registry.sdk_for(protocol)
 
     def validate(self, spec):
         self.registry.validate(spec)

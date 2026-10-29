@@ -33,6 +33,9 @@ class _Factory:
     def reload_configuration(self) -> None:
         self.reloads += 1
 
+    async def prepare_configuration(self, *, session_path: Path):
+        return await self.open(resume=True, session_path=session_path)
+
     def new_session_path(self) -> Path:
         return Path(f"session-{len(self.opened) + 1}.jsonl")
 

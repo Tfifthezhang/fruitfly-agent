@@ -10,6 +10,17 @@ from urllib.parse import urlsplit
 from .request_options import json_mapping, validate_request_options, validate_transport
 from .services import service_definition
 
+MODEL_FIELD_ORDER = ('service', 'protocol', 'sdk', 'model', 'base_url', 'context_window',
+    'max_output_tokens', 'api_key_env', 'capabilities', 'parameters', 'transport')
+
+
+def ordered_model_entry(value: dict[str, Any]) -> dict[str, Any]:
+    """Serialize model fields in setup order, with transport last."""
+    unknown = value.keys() - set(MODEL_FIELD_ORDER)
+    if unknown:
+        raise ValueError('unknown model fields: ' + ', '.join(sorted(unknown)))
+    return {name: value[name] for name in MODEL_FIELD_ORDER if name in value}
+
 
 @dataclass(frozen=True)
 class ModelCapabilities:
@@ -73,11 +84,11 @@ class ModelSpec:
         object.__setattr__(self, 'transport', validate_transport(self.transport))
 
     def to_dict(self) -> dict[str, Any]:
-        return {'sdk': self.provider.sdk, 'protocol': self.provider.protocol, 'service': self.service, 'model': self.model,
+        return ordered_model_entry({'sdk': self.provider.sdk, 'protocol': self.provider.protocol, 'service': self.service, 'model': self.model,
             'api_key_env': self.provider.api_key_env, 'base_url': self.provider.base_url,
             'context_window': self.context_window, 'max_output_tokens': self.max_output_tokens,
             'capabilities': vars(self.capabilities).copy(), 'parameters': dict(self.parameters),
-            'transport': dict(self.transport)}
+            'transport': dict(self.transport)})
 
     def require(
         self, *, tools: bool = False, vision: bool = False, streaming: bool = True
@@ -122,4 +133,4 @@ def _default_key_env(sdk: str) -> str:
     return sdk.upper().replace('-', '_').replace('.', '_') + '_API_KEY'
 
 
-__all__ = ["ModelCapabilities", "ProviderSpec", "ModelSpec"]
+__all__ = ["ModelCapabilities", "ProviderSpec", "ModelSpec", "MODEL_FIELD_ORDER", "ordered_model_entry"]

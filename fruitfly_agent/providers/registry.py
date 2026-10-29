@@ -18,11 +18,23 @@ ProviderFactory = Callable[[ModelSpec, str], Provider]
 class ProviderRegistry:
     def __init__(self) -> None:
         self._factories: dict[tuple[str, str], ProviderFactory] = {}
+        self._default_sdks: dict[str, str] = {}
 
-    def register(self, sdk: str, protocol: str, factory: ProviderFactory) -> None:
+    def register(self, sdk: str, protocol: str, factory: ProviderFactory, *, default: bool = False) -> None:
         if not sdk or not protocol or not callable(factory):
             raise ValueError('registration requires SDK, protocol and a factory')
         self._factories[sdk, protocol] = factory
+        if default:
+            self._default_sdks[protocol] = sdk
+
+    def sdk_for(self, protocol: str) -> str:
+        """Resolve setup's SDK without constructing a client or guessing between adapters."""
+        if protocol in self._default_sdks:
+            return self._default_sdks[protocol]
+        choices = tuple(sdk for sdk, api in self._factories if api == protocol)
+        if len(choices) != 1:
+            raise ValueError(f'protocol {protocol!r} requires one registered SDK or an explicit default adapter')
+        return choices[0]
 
     def registered_pairs(self) -> tuple[tuple[str, str], ...]:
         """Read-only setup metadata; never invokes factories or SDK clients."""
@@ -93,9 +105,11 @@ def default_registry() -> ProviderRegistry:
             base_url=spec.provider.base_url,
             max_tokens=spec.max_output_tokens,
             service=spec.service,
+            vision=spec.capabilities.vision,
             **spec.transport,
             **spec.parameters,
         ),
+        default=True,
     )
     registry.register(
         "openai", "responses",
@@ -106,15 +120,18 @@ def default_registry() -> ProviderRegistry:
             max_output_tokens=spec.max_output_tokens,
             parallel_tool_calls=spec.capabilities.parallel_tool_calls,
             service=spec.service,
+            vision=spec.capabilities.vision,
             **spec.transport,
             **spec.parameters,
         ),
+        default=True,
     )
     registry.register('openai', 'chat-completions', lambda spec, key: ChatCompletionsProvider(
         api_key=key, model=spec.model, base_url=spec.provider.base_url,
         max_output_tokens=spec.max_output_tokens, service=spec.service,
+        vision=spec.capabilities.vision,
         parallel_tool_calls=spec.capabilities.parallel_tool_calls,
-        **spec.transport, **spec.parameters))
+        **spec.transport, **spec.parameters), default=True)
     return registry
 
 

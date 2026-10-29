@@ -45,6 +45,8 @@ class AssemblyContext:
     component_settings: Mapping[str, Any] = field(default_factory=dict)
     model_roles: Mapping[str, str] = field(default_factory=dict)
     model_metadata: Mapping[str, Any] = field(default_factory=dict)
+    media_writer: Callable[[bytes, str, str], str] | None = None
+    media_reader: Callable[[str], bytes] | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "workspace", self.workspace.resolve())
@@ -243,10 +245,15 @@ def assemble_lab(
 
 
 def _own_state(state: AssemblyState, context: AssemblyContext) -> None:
-    for component in state.components.values():
+    components = (*state.components.values(), *((state.config.env,) if state.config.env is not None else ()))
+    # Transfer all ownership before rejecting a malformed component.
+    for component in components:
         context.own(component)
-    if state.config.env is not None:
-        context.own(state.config.env)
+    for component in components:
+        for method in ('start', 'close', 'validate_recovery'):
+            callback = getattr(component, method, None)
+            if callback is not None and not callable(callback):
+                raise TypeError(f'component {method} must be callable')
 
 
 def _prepare_object_targets(state, context, catalog):

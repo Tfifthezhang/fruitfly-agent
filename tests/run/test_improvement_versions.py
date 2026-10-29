@@ -230,34 +230,21 @@ class StartupVersionsTests(unittest.IsolatedAsyncioTestCase):
 
             finally: await app.close()
 
-    def test_startup_has_only_start_configure_exit(self):
-        snapshot = SimpleNamespace(mechanisms=(), changed=False, ready=True,
-            model_profile='local', prompt_label='Python adapted', selected_profile='default')
-        for choice, starts in (('1', True), ('3', False)):
+    def test_ready_startup_has_no_menu_or_version_choice(self):
+        from tests.support.configuration import MockConfiguration
+        for read_only in (False, True):
+            controller = MockConfiguration(model='offline')
+            controller.read_only = read_only
             output = io.StringIO()
-            frontend = TerminalConfigurationFrontend(SimpleNamespace(snapshot=lambda: snapshot),
-                input_stream=io.StringIO(choice + '\n'), output_stream=output)
+            reader = Mock(side_effect=AssertionError('ready startup read menu input'))
+            frontend = TerminalConfigurationFrontend(controller, input_stream=io.StringIO(), output_stream=output,
+                menu_input=SimpleNamespace(read_event=reader))
             result = frontend.run()
-            self.assertEqual(starts, result.start)
+            self.assertTrue(result.start)
             self.assertEqual((), result.version_tokens)
-            self.assertIn('2. Configure', output.getvalue())
-            self.assertIn('3. Exit', output.getvalue())
-            self.assertNotIn('▾', output.getvalue())
-            self.assertNotIn('4. ', output.getvalue())
-
-    def test_startup_ansi_exit_and_resume_do_not_save(self):
-        snapshot = SimpleNamespace(mechanisms=(), changed=False, ready=True,
-            model_profile='local', prompt_label='Default', selected_profile='default', warnings=())
-        configuration = SimpleNamespace(snapshot=lambda: snapshot, save=Mock())
-        sequence = iter((b'\x1b[B', b'\x1b[B', b'\r'))
-        frontend = TerminalConfigurationFrontend(configuration, input_stream=io.StringIO(), output_stream=io.StringIO(),
-            menu_input=SimpleNamespace(read_event=lambda: RawTerminalMenuInput.decode(next(sequence))))
-        frontend.renderer.ansi = True
-        self.assertFalse(frontend.run().start)
-        configuration.save.assert_not_called()
-        frontend.menu_input = SimpleNamespace(read_event=lambda: RawTerminalMenuInput.decode(b'\r'))
-        self.assertTrue(frontend.run(editable=False).start)
-        configuration.save.assert_not_called()
+            self.assertFalse(controller.saved)
+            reader.assert_not_called()
+            self.assertEqual('', output.getvalue())
 
     def test_prompt_preview_paginates_and_requires_explicit_choice(self):
         sequence = iter((b'\x1b[6~', b'\x1b[A', b'\r'))

@@ -8,12 +8,74 @@ import re
 import unittest
 from unittest.mock import patch
 
-from fruitfly_agent.interactive.terminal.io.menu import LineMenuInput, MenuAction, MenuEvent, MenuRow, RawTerminalMenuInput, TerminalMenuRenderer, navigate_menu
+from fruitfly_agent.interactive.terminal.io.menu import LineMenuInput, MenuAction, MenuEvent, MenuRow, MenuHelp, RawTerminalMenuInput, TerminalMenuRenderer, navigate_menu
 from fruitfly_agent.interactive.terminal.io.screen import transient_screen
 from tests.support.terminal import ScriptedLines, TtyStringIO
 
 
 class MenuInputTest(unittest.TestCase):
+    def test_help_follows_focus_and_reserves_a_stable_footer_on_empty_rows(self):
+        with patch.dict(os.environ, {'TERM': 'xterm-256color', 'NO_COLOR': '1'}, clear=True), patch(
+                'os.get_terminal_size', return_value=os.terminal_size((60, 24))):
+            output = TtyStringIO()
+            renderer = TerminalMenuRenderer(output)
+            rows = (MenuRow('First', marker='●', help=MenuHelp('First', 'First explanation.')),
+                    MenuRow('Second', marker='○', help=MenuHelp('Second', 'Second explanation.')),
+                    MenuRow('Back'))
+            frames = []
+            for selected in range(3):
+                offset = len(output.getvalue())
+                renderer.render(title='Choices', subtitle='', rows=rows, selected=selected, help_panel=True)
+                frames.append(output.getvalue()[offset:])
+            self.assertIn('First explanation.', frames[0])
+            self.assertNotIn('Second explanation.', frames[0])
+            self.assertIn('Second explanation.', frames[1])
+            self.assertNotIn('First explanation.', frames[1])
+            self.assertIn('● First', frames[1])  # Browsing does not change selection.
+            self.assertEqual([len(f.splitlines()) for f in frames], [24, 24, 24])
+            self.assertEqual(len({next(i for i, line in enumerate(f.splitlines()) if line.startswith('─'))
+                                  for f in frames}), 1)
+
+    def test_help_is_opt_in_and_numbered_fallback_keeps_complete_explanations(self):
+        explanation = 'Inspect this choice before making a decision. ' * 12
+        rows = (MenuRow('Choice', help=MenuHelp('Choice', explanation)), MenuRow('Back'))
+        output = io.StringIO()
+        renderer = TerminalMenuRenderer(output)
+        renderer.render(title='Choices', subtitle='', rows=rows, selected=0)
+        self.assertNotIn('Inspect this', output.getvalue())
+        offset = len(output.getvalue())
+        renderer.render(title='Choices', subtitle='', rows=rows, selected=0, help_panel=True)
+        frame = output.getvalue()[offset:]
+        self.assertIn('> 1. Choice', frame)
+        self.assertIn('2. Back', frame)
+        self.assertIn(' '.join(explanation.split()), ' '.join(frame.split()))
+
+    def test_small_help_menu_keeps_focus_notice_and_field_within_the_screen(self):
+        from fruitfly_agent.interactive.terminal.io.text import cell_width
+        for columns, height in ((38, 18), (60, 24), (24, 12)):
+            for no_color in (False, True):
+                with self.subTest(columns=columns, height=height, no_color=no_color), patch.dict(os.environ,
+                        {'TERM': 'xterm-256color', **({'NO_COLOR': '1'} if no_color else {})}, clear=True), patch(
+                        'os.get_terminal_size', return_value=os.terminal_size((columns, height))):
+                    output = TtyStringIO()
+                    renderer = TerminalMenuRenderer(output)
+                    rows = tuple(MenuRow(f'Field {i}', section='Settings',
+                        help=MenuHelp(f'Field {i}', 'Fullwidth ＡＢＣＤＥＦ and a long explanation. ' * 4)) for i in range(30))
+                    renderer.render(title='Settings', subtitle='Choose a value', rows=rows,
+                        selected=25, notice='Invalid value', help_panel=True)
+                    offset = len(output.getvalue())
+                    renderer.begin_input('Field 25\nCurrent: 2\nType: integer\nRange: 1–20')
+                    frame = output.getvalue()[offset:]
+                    plain = re.sub(r'\x1b\[[0-9;]*[mHJK]', '', frame)
+                    self.assertIn('❯ Field 25', plain)
+                    self.assertIn('Field 25', plain.split('─' * (columns - 1))[1])
+                    self.assertLessEqual(len(plain.splitlines()), height)
+                    self.assertTrue(all(cell_width(line) <= columns - 1 for line in plain.splitlines()))
+                    if no_color:
+                        self.assertNotRegex(frame, r'\x1b\[[0-9;]*m')
+                    else:
+                        self.assertIn('\x1b[2m', frame)
+
     def test_labels_stand_out_from_descriptions_references_and_navigation(self):
         with patch.dict(os.environ, {'TERM': 'xterm-256color'}, clear=True):
             output = TtyStringIO()

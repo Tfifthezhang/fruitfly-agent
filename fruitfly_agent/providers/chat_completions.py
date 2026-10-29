@@ -6,11 +6,12 @@ import json
 from typing import Any, AsyncIterator
 import asyncio
 
-from fruitfly_agent.core.data_model import AssistantMessage, ProviderView, TextBlock, ThinkingBlock, ToolCallBlock, Usage
+from fruitfly_agent.core.data_model import AgentMessage, AssistantMessage, ProviderView, TextBlock, ThinkingBlock, ToolCallBlock, Usage
 from fruitfly_agent.core.errors import FatalError, TaggedError
 from fruitfly_agent.core.model_stream import StreamEvent, StreamDone, TextDelta, ThinkingDelta, ToolCallStart, ToolCallDelta
 from .openai import OpenAIProvider, classify_error
-from .chat_codec import convert_to_chat
+from .chat_codec import convert_to_chat, chat_input_messages
+from .media import project_images
 from .replay import wire_value
 from .transport import AttemptDeadline, close_transport, retry_details
 
@@ -19,12 +20,15 @@ class ChatCompletionsProvider(OpenAIProvider):
     protocol = 'chat-completions'
     continuation_namespace = 'openai-chat'
 
+    def input_estimation_messages(self, view: ProviderView) -> list[AgentMessage]:
+        return chat_input_messages(project_images(view.messages, self.vision))
+
     def _prepare_payload(self, view: ProviderView) -> tuple[dict[str, Any], ProviderView, list[dict[str, Any]], list[dict[str, Any]]]:
         effective = replace(view, model=view.model or self.model)
         self._service.validate(self.protocol, effective.model, self.request_options)
         tools = [{'type': 'function', 'function': {'name': t.name, 'description': t.description,
                   'parameters': t.parameters}} for t in view.tools if not t.hide_from_model]
-        prefix = convert_to_chat(view.messages, replay=self._replay.reader(effective, tools))
+        prefix = convert_to_chat(project_images(view.messages, self.vision), replay=self._replay.reader(effective, tools))
         token_field = self._service.chat_token_field
         request: dict[str, Any] = {**self.request_options, 'model': effective.model,
             'messages': [{'role': 'system', 'content': view.system_prompt}, *prefix],

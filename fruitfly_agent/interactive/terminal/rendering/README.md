@@ -71,3 +71,9 @@ its caller supplies width and display capabilities. Local workspace, execution
 label, optional server and execution directory appear in every layout and in
 plain output. Locations wrap without ellipsis. Short screens use native terminal
 scrollback in the built-in frontend.
+
+Welcome shows the activated model, prompt label, execution locations and session
+state, with `/config`, `/resume` and `/help` hints. It omits Prompt hashes, component
+counts and configuration drafts. Detailed runtime identity stays in `/status` and
+`/lab`. Long model labels and hints wrap to the supplied width. Welcome never
+opens setup or reads configuration files.

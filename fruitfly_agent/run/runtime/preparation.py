@@ -15,6 +15,7 @@ from .assembly import RuntimeAssembly
 from .tool_providers import prepare_tool_providers
 from .recovery import (new_session_path, check_session_manifest, record_session_manifest,
                        session_manifests)
+from .media import load_image
 
 
 @dataclass(frozen=True)
@@ -55,9 +56,12 @@ class RuntimePreparer:
         resume: bool,
         session_path: Path | None,
         profile_override=None,
+        model_specs=None,
+        environment=None,
     ) -> RuntimeHandle:
         selection = selection if profile_override is None else replace(selection, profile=profile_override)
-        resolve_profile_models(selection.profile, selection.config_path)
+        resolve_profile_models(selection.profile, selection.config_path, model_specs=model_specs)
+        environment = self.environment if environment is None else environment
         path = session_path or new_session_path(self.cwd)
         lease = self.sessions.acquire(path, resume=resume)
         session = lease.session
@@ -76,13 +80,13 @@ class RuntimePreparer:
             artifact_bindings = {**selection.profile.artifact_bindings, **self.data_artifact_bindings}
             profile = selection.profile
             prepared_tools = await prepare_tool_providers(profile, self.catalog,
-                workspace=self.cwd, environment=self.environment, approve_start=self.approve_start,
+                workspace=self.cwd, environment=environment, approve_start=self.approve_start,
                 resources=resources, artifacts=self.artifact_store)
             runtime = self.build(
                 profile,
                 config_path=selection.config_path,
                 catalog=self.catalog,
-                environment=self.environment,
+                environment=environment,
                 session=session,
                 cwd=self.cwd,
                 provider_registry=self.provider_registry,
@@ -92,6 +96,7 @@ class RuntimePreparer:
                 task_pack_sources=self.task_pack_sources,
                 permission_policy=self.permission_policy,
                 tool_providers=prepared_tools,
+                model_specs=model_specs,
             )
             check_session_manifest(session, runtime, resume=resume)
             saved = session_manifests(session)
@@ -119,6 +124,9 @@ class RuntimePreparer:
                 tool_categories=tool_categories,
                 execution_environment=self.describe_environment(runtime),
                 tool_services=(lambda: self.describe_services(runtime)) if self.describe_services is not None else None,
+                load_attachment=lambda path: load_image(path, workspace=self.cwd),
+                register_media=runtime.components['media-resources'].put,
+                vision=runtime.manifest.models['main']['capabilities']['vision'],
             )
             approvals = runtime.components["authorization"]
             approvals.emit = interaction.emit_frontend_event
@@ -139,8 +147,9 @@ class RuntimePreparer:
                 raise TypeError("named text targets must implement TextTarget")
 
             def activate():
-                record_session_manifest(session, runtime, messages=messages if reset_projection else None)
-                activated(PreparedRuntime(runtime, profile, targets, resume))
+                with session.transaction():
+                    record_session_manifest(session, runtime, messages=messages if reset_projection else None)
+                    activated(PreparedRuntime(runtime, profile, targets, resume))
             handle.activate_callback = activate
             return handle
         except BaseException:

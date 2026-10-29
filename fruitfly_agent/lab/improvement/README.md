@@ -97,8 +97,10 @@ unsupported. No empty placeholder implementations are installed.
 `TaskMaterial` contains an instruction, resource references, environment identity
 and origin. An `ExecutionRecord` contains status, output, trajectory/deliverable
 references and available invocation counts. Neither requires a score. Original
-binary inputs are preserved. Text evidence is paginated; PNG/JPEG can be read
-visually. Other binary formats need an explicit reader.
+binary inputs are preserved. Text evidence is paginated; PNG/JPEG/GIF/WebP can be
+read visually, using shared container checks and a 10 MiB image limit. Other
+binary formats need an explicit reader. Native task and editor readers do not
+decode unsupported binary containers as text.
 
 Every hosted execution also carries `execution-facts.json` as an immutable
 diagnostic resource: identities, termination cause, scoped budgets, counters,

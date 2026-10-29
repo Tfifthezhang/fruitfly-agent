@@ -81,6 +81,13 @@ inspection in the terminal.
 
 The Session keeps canonical conversation facts. The model projection is the context sent to the Provider; it may contain additional information, external references, or summaries.
 
+User attachments and image tool results share Core image blocks. Providers encode
+them for the chosen protocol, including attributed Chat image observations after
+the complete tool-result batch. Run freezes local attachments and retains granted
+media resources; file tools use the selected local or SSH environment. See
+[image submission](run/README.md#submit-images). Audio/video input, native media
+output generation and realtime media are not implemented.
+
 Task packages are explicit inputs. Hosts can save human corrections through the [task-material API](lab/improvement/tasks/README.md#maintain-training-acceptance). Ordinary conversations do not create training material. Improvement lessons enter S only after explicit review; Core owns neither scoring nor adoption.
 
 [Web tools](lab/tools/web/README.md#extend-and-verify-offline) consume separate

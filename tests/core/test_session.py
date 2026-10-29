@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from fruitfly_agent.core.errors import SessionCorruptError
 from fruitfly_agent.core.session import Session
@@ -28,6 +29,46 @@ class TestSession(unittest.TestCase):
 
     def tearDown(self):
         self.tmp.cleanup()
+
+    def test_transaction_rolls_back_appends_and_keeps_writer_usable(self):
+        with Session(self.path) as session:
+            session.append('message', _msg_entry(UserMessage(content='retained')))
+            before = self.path.read_bytes()
+            with self.assertRaisesRegex(RuntimeError, 'commit failed'):
+                with session.transaction():
+                    session.append('meta', {'kind': 'uncommitted'}, sync=True)
+                    raise RuntimeError('commit failed')
+            self.assertEqual(self.path.read_bytes(), before)
+            self.assertEqual(len(session.read_all()), 1)
+            self.assertEqual(session.append('meta', {'kind': 'committed'}).id, 2)
+
+    def test_transaction_recovers_a_failed_sync_but_failed_rollback_poison_stays(self):
+        with Session(self.path) as session:
+            session.append('meta', {'kind': 'original'})
+            before = self.path.read_bytes()
+            with patch('fruitfly_agent.core.session.storage.os.fsync',
+                    side_effect=[OSError('sync failed'), None]):
+                with self.assertRaisesRegex(OSError, 'sync failed'):
+                    with session.transaction():
+                        session.append('meta', {'kind': 'candidate'}, sync=True)
+            self.assertEqual(self.path.read_bytes(), before)
+            self.assertEqual(session.append('meta', {}).id, 2)
+            with patch('fruitfly_agent.core.session.storage.os.fsync', side_effect=OSError('disk unavailable')):
+                with self.assertRaisesRegex(OSError, 'disk unavailable'):
+                    with session.transaction():
+                        session.append('meta', {}, sync=True)
+            with self.assertRaisesRegex(SessionCorruptError, 'writer failed'):
+                session.check_writable()
+
+    def test_transaction_failure_removes_only_a_new_uncommitted_file(self):
+        with Session(self.path) as session:
+            with self.assertRaises(RuntimeError):
+                with session.transaction():
+                    session.append('meta', {})
+                    raise RuntimeError()
+            self.assertFalse(self.path.exists())
+            self.assertTrue(self.path.with_suffix('.jsonl.lock').exists())
+            self.assertEqual(session.append('meta', {}).id, 1)
 
     def test_append_replay_round_trip(self):
         with Session(self.path) as s:

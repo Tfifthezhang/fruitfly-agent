@@ -79,17 +79,19 @@ class WebSetupTests(unittest.TestCase):
         self.factory.environment.update(BRAVE_SEARCH_API_KEY='fixture-brave', TAVILY_API_KEY='fixture-tavily')
         self.configuration.set_mechanism('web-search-tool', enabled=True)
         frontend = self.frontend('@Tools', '@Search the web', '@Search service', '@tavily',
-            'back', 'back', 'back', '@Save only', secrets='')
-        self.assertTrue(frontend.run_for_active_session().saved)
+            'back', 'back', 'back', '@Save and apply to this conversation', secrets='')
+        result = frontend.run_for_active_session()
+        self.assertTrue(result.start)
+        self.assertFalse(result.saved)
         selection = next(m for m in self.configuration.profile().mechanisms if m.mechanism_id == 'web-search-tool')
         self.assertEqual('tavily', selection.parameters['backend'])
         self.assertTrue(selection.enabled)
         self.assertFalse((self.root / '.fruitfly/secrets.env').exists())
 
     def test_interactive_search_selects_new_service_and_saves_hidden_key(self):
-        frontend = self.frontend('@Configure', '@Tools', '@Search the web', 'space',
-            '@deepseek', '', '@Stage settings', 'back', 'back', 'back', '@Start new session')
-        result = frontend.run()
+        frontend = self.frontend('@Tools', '@Search the web', '@Set up…',
+            '@deepseek', '', '@Stage settings', 'back', 'back', 'back', '@Save and start')
+        result = frontend.run(configure=True)
         self.assertTrue(result.start)
         self.assertTrue(result.saved)
         path = self.root / '.fruitfly/secrets.env'
@@ -113,10 +115,10 @@ class WebSetupTests(unittest.TestCase):
         self.assertEqual([], self.provider.calls)
 
     def test_interactive_fetch_switches_from_direct_and_saves_separate_key(self):
-        frontend = self.frontend('@Configure', '@Tools', '@Fetch web pages', '@Set up…',
-            '@deepseek', '', '@Stage settings', 'back', 'back', 'back', '@Start new session',
+        frontend = self.frontend('@Tools', '@Fetch web pages', '@Set up…',
+            '@deepseek', '', '@Stage settings', 'back', 'back', 'back', '@Save and start',
             secrets='fixture-fetch-secret\n')
-        self.assertTrue(frontend.run().saved)
+        self.assertTrue(frontend.run(configure=True).saved)
         values = load_env(self.root / '.fruitfly/secrets.env')
         self.assertEqual({'DEEPSEEK_FETCH_API_KEY': 'fixture-fetch-secret'}, values)
         self.assertIn('Step 3 of 3', self.output.getvalue())

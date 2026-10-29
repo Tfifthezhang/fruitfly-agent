@@ -3,15 +3,15 @@
 # API keys belong in .fruitfly/secrets.env, never in this catalog.
 models:
   Qwen3.8-Flash:
-    sdk: openai
-    protocol: chat-completions
     service: qwen
+    protocol: chat-completions
+    sdk: openai
     model: qwen3.8-flash
     base_url: https://cn-beijing.maas.qianwenaiapi.com/compatible-mode/v1
-    api_key_env: DASHSCOPE_API_KEY
     context_window: 1000000
     # Working output allowance, including thinking; service maximum is 131072.
     max_output_tokens: 32768
+    api_key_env: DASHSCOPE_API_KEY
     capabilities:
       tools: true
       parallel_tool_calls: true
@@ -34,26 +34,55 @@ models:
       retry_jitter: 0.2
       retry_max: 3
       retry_base_delay: 1.0
-  GLM-4.5-Air:
+# Alternate protocols use their own addresses and request parameters.
+  Qwen3.8-Flash-Responses:
+    service: qwen
+    protocol: responses
     sdk: openai
-    protocol: chat-completions
-    service: bigmodel
-    model: glm-4.5-air
-    base_url: https://open.bigmodel.cn/api/paas/v4
-    api_key_env: ZAI_API_KEY
-    context_window: 131072
-    # Working output allowance, including thinking; service maximum is 98304.
+    model: qwen3.8-flash
+    base_url: https://cn-beijing.maas.qianwenaiapi.com/compatible-mode/v1
+    context_window: 1000000
     max_output_tokens: 32768
+    api_key_env: DASHSCOPE_API_KEY
     capabilities:
       tools: true
-      parallel_tool_calls: false
-      vision: false
+      parallel_tool_calls: true
+      vision: true
       reasoning: true
       streaming: true
     parameters:
-      extra_body:
-        thinking:
-          type: enabled
+      reasoning:
+        effort: medium
+    transport:
+      connect_timeout: 10.0
+      timeout: 600.0
+      first_progress_timeout: 180.0
+      stall_timeout: 180.0
+      total_timeout: 900.0
+      cleanup_timeout: 5.0
+      retry_jitter: 0.2
+      retry_max: 3
+      retry_base_delay: 1.0
+  Qwen3.8-Flash-Messages:
+    service: qwen
+    protocol: messages
+    sdk: anthropic
+    model: qwen3.8-flash
+    base_url: https://maas.qianwenaiapi.com/apps/anthropic
+    context_window: 1000000
+    max_output_tokens: 32768
+    api_key_env: DASHSCOPE_API_KEY
+    capabilities:
+      tools: true
+      parallel_tool_calls: true
+      vision: true
+      reasoning: true
+      streaming: true
+    parameters:
+      thinking:
+        type: enabled
+      output_config:
+        effort: medium
     transport:
       connect_timeout: 10.0
       timeout: 600.0

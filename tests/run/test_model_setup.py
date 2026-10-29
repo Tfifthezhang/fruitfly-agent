@@ -11,8 +11,10 @@ from types import SimpleNamespace
 from fruitfly_agent.interactive import TerminalConfigurationFrontend
 from fruitfly_agent.interactive.terminal.io.input import ReadlineLineEditor
 from fruitfly_agent.interactive.terminal.io.menu import RawTerminalMenuInput
-from fruitfly_agent.interactive.terminal.features.configuration.model_setup import _capabilities, _review
+from fruitfly_agent.interactive.terminal.features.configuration.model_setup import _capabilities, _review, run_model_setup
 from fruitfly_agent.providers import ProviderRegistry
+from fruitfly_agent.providers.model_setup import default_parameters
+from fruitfly_agent.providers.specs import MODEL_FIELD_ORDER
 from fruitfly_agent.providers.config import load_env
 from fruitfly_agent.providers.registry import load_model_specs, default_registry
 from fruitfly_agent.run import RunApplicationFactory
@@ -34,31 +36,44 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
     def stage(self, **changes):
         return self.setup.stage("openai", {**self.values, **changes}, "offline-placeholder")
 
+    def test_readiness_includes_main_credentials_and_staged_keys_without_writes(self):
+        _write_catalog(self.root / '.fruitfly/models.yaml', {'existing': 'offline-model'})
+        missing = self.controller.snapshot()
+        self.assertFalse(missing.ready)
+        self.assertIn('missing model credential: TEST_API_KEY', missing.warnings)
+        self.setup.stage_credential('existing', 'offline-placeholder')
+        self.assertTrue(self.controller.snapshot().ready)
+        self.assertNotIn('offline-placeholder', repr(self.controller.snapshot()))
+        self.assertFalse((self.root / '.fruitfly/secrets.env').exists())
+        self.controller.reset()
+        self.assertFalse(self.controller.snapshot().ready)
+
     def frontend(self, *lines, secret="offline-placeholder"):
         self.output = io.StringIO()
         return TerminalConfigurationFrontend(self.controller, input_stream=io.StringIO(secret + "\n"),
             output_stream=self.output, line_editor=ScriptedLines(*lines))
 
     async def test_first_run_wizard_saves_then_assembles_without_restarting_process(self):
-        frontend = self.frontend("1", "local", "offline-model", "", "8192", "1024", "", "", "", "", "2", "1")
+        frontend = self.frontend("1", "", "local", "offline-model", "", "8192", "1024", "", "", "", "2", "1")
         result = frontend.run()
         self.assertTrue(result.start)
         self.assertTrue(result.saved)
         self.assertNotIn("offline-placeholder", self.output.getvalue())
-        self.assertIn("Add model · Step 1 of 10", self.output.getvalue())
-        self.assertIn("Service: OpenAI official · Responses API", self.output.getvalue())
+        self.assertIn("Add model · Step 1 of 9", self.output.getvalue())
+        self.assertIn("Service: OpenAI", self.output.getvalue())
+        self.assertIn('OpenAI · Choose API protocol', self.output.getvalue())
         self.assertIn("Press Enter to use: my-model", self.output.getvalue())
         self.assertIn("This is not the model ID", self.output.getvalue())
         self.assertIn('Request and transport defaults (confirm to save)', self.output.getvalue())
-        self.assertIn('"parameters": {}', self.output.getvalue())
+        self.assertIn('"effort": "medium"', self.output.getvalue())
         self.assertIn('"first_progress_timeout": 180.0', self.output.getvalue())
         spec = load_model_specs(self.root / ".fruitfly/models.yaml")["local"]
-        self.assertEqual(spec.parameters, {})
+        self.assertEqual(spec.parameters, default_parameters(spec.provider.protocol))
         self.assertEqual(spec.transport, self.setup.defaults('openai', self.values)['transport'])
         self.assertNotIn("offline-placeholder", (self.root / ".fruitfly/models.yaml").read_text())
         self.assertNotIn("offline-placeholder", (self.root / ".fruitfly/config.yaml").read_text())
         self.assertEqual((self.root / ".fruitfly/secrets.env").stat().st_mode & 0o777, 0o600)
-        self.assertEqual(load_env(self.root / ".fruitfly/secrets.env")["FRUITFLY_MODEL_LOCAL_API_KEY"], "offline-placeholder")
+        self.assertEqual(load_env(self.root / ".fruitfly/secrets.env")["OPENAI_API_KEY"], "offline-placeholder")
         self.factory.reload_configuration()
         provider = FauxProvider()
         provider.respond_text("configured")
@@ -76,7 +91,7 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
     def test_field_screen_replaces_service_menu_and_labels_the_input_frame(self):
         output = io.StringIO()
         screens = []
-        lines = iter(("1", "/cancel", "3"))
+        lines = iter(("1", "", "/cancel", "3"))
         def reader(_prompt):
             output.write(_prompt)
             screens.append(output.getvalue().rsplit("\x1b[2J\x1b[H", 1)[-1])
@@ -85,9 +100,9 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
             output_stream=output, line_editor=ReadlineLineEditor(output, reader=reader))
         frontend.renderer.ansi = True
         self.assertFalse(frontend.run().start)
-        field_screen = screens[1]
-        self.assertIn("Step 1 of 10", field_screen)
-        self.assertIn("Service: OpenAI official", field_screen)
+        field_screen = screens[2]
+        self.assertIn("Step 1 of 9", field_screen)
+        self.assertIn("Service: OpenAI", field_screen)
         self.assertIn("models.<name>> ", field_screen)
         self.assertNotIn("╭", field_screen)
         self.assertNotIn("╭─ prompt ", field_screen)
@@ -96,8 +111,8 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.setup.changed)
 
     def test_capabilities_checkboxes_persist_booleans_and_yaml_field_names(self):
-        frontend = self.frontend("1", "local", "offline-model", "", "8192", "1024", "",
-                                 "", "", "1", "5", "2", "3", "4", "2", "6", "2", "1")
+        frontend = self.frontend("1", "", "local", "offline-model", "", "8192", "1024", "",
+                                 "1", "5", "2", "3", "4", "2", "6", "", "2", "1")
         self.assertTrue(frontend.run().saved)
         spec = load_model_specs(self.root / ".fruitfly/models.yaml")["local"]
         self.assertTrue(spec.capabilities.tools)
@@ -124,7 +139,7 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(values["capabilities.streaming"], "true")
         self.assertEqual(values["capabilities.reasoning"], "true")
         self.assertFalse(self.setup.changed)
-        frontend = self.frontend("1", "local", "offline-model", "", "8192", "1024", "", "", "", "3", "back", "3")
+        frontend = self.frontend("1", "", "local", "offline-model", "", "8192", "1024", "", "3", "back", "3")
         self.assertFalse(frontend.run().start)
         self.assertFalse(self.setup.changed)
         self.assertFalse((self.root / ".fruitfly/models.yaml").exists())
@@ -136,9 +151,9 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(self.setup.changed)
 
     def test_cancel_and_exit_write_nothing(self):
-        for lines in (("back", "3"), ("1", "/cancel", "3"),
-                      ("1", "local", "offline-model", "", "8192", "1024", "", "", "", "", "1", "3"),
-                      ("1", "local", "offline-model", "", "8192", "1024", "", "", "", "", "2", "3")):
+        for lines in (("back", "3"), ("1", "", "/cancel", "3"),
+                      ("1", "", "local", "offline-model", "", "8192", "1024", "", "", "", "1", "3"),
+                      ("1", "", "local", "offline-model", "", "8192", "1024", "", "", "", "2", "3")):
             with self.subTest(lines=lines):
                 self.assertFalse(self.frontend(*lines).run().start)
                 self.assertFalse(self.setup.changed)
@@ -171,7 +186,7 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn("offline-placeholder", str(failure.exception))
             self.assertFalse(self.setup.changed)
         with self.assertRaisesRegex(ValueError, "API base URL"):
-            self.setup.stage("custom-responses", self.values, "offline-placeholder")
+            self.setup.stage("custom", self.values, "offline-placeholder")
 
     def test_existing_environment_key_is_reused_without_writing_env(self):
         self.factory.environment["EXISTING_KEY"] = "offline-placeholder"
@@ -232,7 +247,7 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
         self.controller.save()
         catalog = (self.root / ".fruitfly/models.yaml").read_bytes()
         environment = (self.root / ".fruitfly/secrets.env").read_bytes()
-        frontend = self.frontend("1", "2", "1", "second", "another-model", "", "8192", "1024", "", "", "", "", "2", "back", "4")
+        frontend = self.frontend("1", "2", "1", "", "second", "another-model", "", "8192", "1024", "", "", "", "2", "back", "3")
         self.assertFalse(frontend.run_for_active_session().start)
         self.assertEqual(self.controller.snapshot().model_profile, "local")
         self.assertFalse(self.controller.snapshot().changed)
@@ -248,7 +263,10 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
         frontend = self.frontend("1", "3", "2", "back", "1", secret="second-placeholder")
         result = frontend.run_for_active_session()
         self.assertTrue(result.start)
-        self.assertTrue(result.saved)
+        self.assertFalse(result.saved)
+        self.assertTrue(self.setup.changed)
+        self.assertFalse((self.root / '.fruitfly/secrets.env').exists())
+        self.assertEqual(self.factory.environment, {})
         self.assertEqual((self.root / ".fruitfly/models.yaml").read_bytes(), catalog)
         self.assertEqual(self.setup.credential_status("local"), "API key set")
         self.assertNotIn("second-placeholder", self.output.getvalue())
@@ -272,8 +290,8 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(one_shot.selection.profile.model_profile, "shared")
 
     def test_chat_service_addition_uses_the_shared_catalog_contract(self):
-        self.assertIn('custom-chat', {option.option_id for option in self.setup.options()})
-        self.setup.stage('custom-chat', {**self.values, 'base_url': 'https://fixture.invalid/v1'}, 'offline-placeholder')
+        self.assertIn('custom', {option.option_id for option in self.setup.options()})
+        self.setup.stage('custom', {**self.values, 'protocol': 'chat-completions', 'base_url': 'https://fixture.invalid/v1'}, 'offline-placeholder')
         self.controller.save()
         spec = load_model_specs(self.root / '.fruitfly/models.yaml')['local']
         self.assertEqual((spec.provider.sdk, spec.provider.protocol), ('openai', 'chat-completions'))
@@ -285,15 +303,14 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
                                             provider_registry=registry)
         self.controller = self.factory.configuration
         self.setup = self.controller.model_setup
-        self.assertNotIn('demo-sdk', self.setup.field('custom-responses', 'sdk', {}).choices)
+        self.assertNotIn('demo-api', self.setup.field('custom', 'protocol', {}).choices)
         construct = Mock()
         registry.register('demo-sdk', 'demo-api', construct)
-        self.assertIn('demo-sdk', self.setup.field('custom-responses', 'sdk', {}).choices)
-        descriptor = self.setup.field('custom-responses', 'protocol', {'sdk': 'demo-sdk'})
-        self.assertEqual(descriptor.choices, ('demo-api',))
+        descriptor = self.setup.field('custom', 'protocol', {'protocol': 'demo-api'})
+        self.assertEqual(descriptor.choices, ('responses', 'messages', 'chat-completions', 'demo-api'))
         self.assertEqual(descriptor.value, 'demo-api')
-        frontend = self.frontend('6', '1', 'local', 'offline-model', 'https://fixture.invalid/v1',
-                                 '8192', '1024', '', '3', '', '', '2', '1')
+        frontend = self.frontend('5', '4', 'local', 'offline-model', 'https://fixture.invalid/v1',
+                                 '8192', '1024', '', '', '', '2', '1')
         self.assertTrue(frontend.run().saved)
         spec = load_model_specs(self.root / '.fruitfly/models.yaml')['local']
         self.assertEqual((spec.provider.sdk, spec.provider.protocol), ('demo-sdk', 'demo-api'))
@@ -301,38 +318,36 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn('demo-api', self.output.getvalue())
         construct.assert_not_called()
 
-    def test_protocol_choices_filter_by_sdk_and_service(self):
-        descriptor = self.setup.field('custom-responses', 'protocol', {'sdk': 'anthropic', 'protocol': 'responses'})
-        self.assertEqual(descriptor.choices, ('messages',))
-        self.assertEqual(descriptor.value, 'messages')
+    def test_protocol_choices_filter_by_service_and_sdk_is_automatic(self):
+        descriptor = self.setup.field('custom', 'protocol', {'sdk': 'anthropic', 'protocol': 'responses'})
+        self.assertEqual(descriptor.choices, ('responses', 'messages', 'chat-completions'))
+        self.assertEqual(descriptor.value, 'responses')
         descriptor = self.setup.field('qwen', 'protocol', {'sdk': 'openai'})
-        self.assertEqual(descriptor.choices, ('chat-completions',))
-        # Named presets retain their declared endpoint/protocol pairing.
+        self.assertEqual(descriptor.choices, ('responses', 'messages', 'chat-completions'))
         descriptor = self.setup.field('deepseek', 'protocol', {'sdk': 'openai'})
-        self.assertEqual(descriptor.choices, ('responses',))
-        with self.assertRaisesRegex(ValueError, 'unregistered SDK/protocol'):
-            self.setup.stage('custom-responses', {**self.values, 'base_url': 'https://fixture.invalid/v1',
+        self.assertEqual(descriptor.choices, ('responses', 'messages', 'chat-completions'))
+        with self.assertRaisesRegex(ValueError, 'SDK is automatic'):
+            self.setup.stage('custom', {**self.values, 'base_url': 'https://fixture.invalid/v1',
                 'sdk': 'anthropic', 'protocol': 'responses'}, 'offline-placeholder')
         self.assertFalse(self.setup.changed)
 
-    def test_qwen_preset_confirms_defaults_without_extra_inputs(self):
-        # Six text inputs, two registered selections, capabilities, review and save.
-        frontend = self.frontend('4', '', '', '', '', '', '', '', '', '', '2', '1')
+    def test_named_service_asks_for_model_and_limits_without_model_defaults(self):
+        frontend = self.frontend('4', '', 'local', 'my-qwen-model', '', '8192', '1024', '', '', '', '2', '1')
         self.assertTrue(frontend.run().saved)
-        spec = load_model_specs(self.root / '.fruitfly/models.yaml')['Qwen3.8-Flash']
-        self.assertEqual(spec.model, 'qwen3.8-flash')
+        spec = load_model_specs(self.root / '.fruitfly/models.yaml')['local']
+        self.assertEqual(spec.model, 'my-qwen-model')
         self.assertEqual(spec.service, 'qwen')
         self.assertEqual(spec.provider.api_key_env, 'DASHSCOPE_API_KEY')
-        self.assertEqual(spec.parameters, {'extra_body': {'enable_thinking': True,
-            'preserve_thinking': True, 'reasoning_effort': 'medium'}})
-        self.assertTrue(spec.capabilities.vision)
-        self.assertIn('"reasoning_effort": "medium"', self.output.getvalue())
+        self.assertEqual(spec.parameters, default_parameters(spec.provider.protocol))
+        self.assertFalse(spec.capabilities.vision)
+        self.assertFalse(spec.capabilities.reasoning)
+        self.assertIn('Some models may not support the selected protocol', self.output.getvalue())
         self.assertIn('"total_timeout": 900.0', self.output.getvalue())
         self.assertNotIn('offline-placeholder', self.output.getvalue())
 
     def test_custom_service_selects_protocol_on_a_separate_screen(self):
-        frontend = self.frontend('6', '3', 'local', 'offline-model', 'https://fixture.invalid/v1',
-                                 '8192', '1024', '', '', '', '', '2', '1')
+        frontend = self.frontend('5', '3', 'local', 'offline-model', 'https://fixture.invalid/v1',
+                                 '8192', '1024', '', '', '', '2', '1')
         self.assertTrue(frontend.run().saved)
         spec = load_model_specs(self.root / '.fruitfly/models.yaml')['local']
         self.assertEqual((spec.provider.sdk, spec.provider.protocol), ('openai', 'chat-completions'))
@@ -340,50 +355,145 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(spec.provider.base_url, 'https://fixture.invalid/v1')
         rendered = self.output.getvalue()
         root_screen, protocol_screen = rendered.split('Add model · Custom service… · Choose API protocol', 1)
-        self.assertRegex(root_screen, r'6\.\s+Custom service…')
+        self.assertRegex(root_screen, r'5\.\s+Custom service…')
         self.assertNotRegex(root_screen, r'1\.\s+Responses API')
         self.assertNotRegex(root_screen, r'2\.\s+Messages API')
         self.assertNotRegex(root_screen, r'3\.\s+Chat Completions API')
-        self.assertRegex(protocol_screen, r'3\.\s+Chat Completions API')
+        self.assertRegex(protocol_screen, r'3\.\s+chat-completions')
         self.assertNotIn('offline-placeholder', rendered)
 
     def test_back_from_custom_protocol_returns_to_services_without_staging(self):
-        frontend = self.frontend('6', 'back', '1', '/cancel', '3')
+        frontend = self.frontend('5', 'back', '1', '', '/cancel', '3')
         self.assertFalse(frontend.run().start)
         rendered = self.output.getvalue()
         self.assertEqual(rendered.count('Add model · Choose a service'), 2)
         self.assertIn('Add model · Custom service… · Choose API protocol', rendered)
-        self.assertIn('Service: OpenAI official', rendered)
+        self.assertIn('Service: OpenAI', rendered)
         self.assertFalse(self.setup.changed)
         self.assertFalse((self.root / '.fruitfly/models.yaml').exists())
 
     def test_quit_custom_protocol_and_preset_field_cancel_write_nothing(self):
-        for lines in (('6', 'q', '3'), ('3', '/cancel', '3'), ('5', '/cancel', '3')):
+        for lines in (('5', 'q', '3'), ('3', '', '/cancel', '3'), ('4', '', '/cancel', '3')):
             with self.subTest(lines=lines):
                 self.assertFalse(self.frontend(*lines).run().start)
                 self.assertFalse(self.setup.changed)
                 self.assertFalse((self.root / '.fruitfly/models.yaml').exists())
 
-    def test_reasoning_checkbox_changes_confirmed_and_persisted_preset_parameters(self):
-        for option_id, expected in (
-                ('qwen', {'extra_body': {'enable_thinking': False, 'preserve_thinking': False}}),
-                ('bigmodel', {'extra_body': {'thinking': {'type': 'disabled'}}}),
-                ('deepseek', {'reasoning': {'effort': 'none'}})):
-            with self.subTest(option_id=option_id):
-                values = {**self.values, 'capabilities.reasoning': 'false'}
-                self.assertEqual(self.setup.defaults(option_id, values)['parameters'], expected)
-                self.setup.stage(option_id, values, 'offline-placeholder')
-                staged = self.setup.models(self.controller.profile())['local']
-                self.assertEqual(staged.parameters, expected)
-                self.controller.reset()
+    def test_reasoning_declaration_does_not_change_protocol_parameter_defaults(self):
+        for option in self.setup.options():
+            for reasoning in ('true', 'false'):
+                with self.subTest(service=option.option_id, reasoning=reasoning):
+                    values = {**self.values, 'capabilities.reasoning': reasoning}
+                    if option.option_id == 'custom':
+                        values['base_url'] = 'https://fixture.invalid/v1'
+                    self.assertEqual(self.setup.defaults(option.option_id, values)['parameters'], default_parameters(self.setup.field(option.option_id, 'protocol', values).value))
+                    self.setup.stage(option.option_id, values, 'offline-placeholder')
+                    staged = self.setup.models(self.controller.profile())['local']
+                    self.assertEqual(staged.parameters, default_parameters(staged.provider.protocol))
+                    self.assertEqual(staged.capabilities.reasoning, reasoning == 'true')
+                    self.controller.reset()
 
     def test_service_defaults_are_isolated_between_reviews(self):
-        defaults = self.setup.defaults('qwen', {'capabilities.reasoning': 'true'})
-        defaults['parameters']['extra_body']['reasoning_effort'] = 'low'
+        defaults = self.setup.defaults('qwen', {})
+        defaults['parameters']['extra_body'] = {'future_feature': True}
         defaults['transport']['retry_max'] = 99
-        again = self.setup.defaults('qwen', {'capabilities.reasoning': 'true'})
-        self.assertEqual(again['parameters']['extra_body']['reasoning_effort'], 'medium')
+        again = self.setup.defaults('qwen', {})
+        self.assertEqual(again['parameters'], {'reasoning_effort': 'medium'})
         self.assertEqual(again['transport']['retry_max'], 3)
+
+    def test_every_service_protocol_can_be_selected_and_saved_without_a_sdk_question(self):
+        expected = {'openai': ('responses', 'chat-completions'),
+            'anthropic': ('messages', 'chat-completions'),
+            'deepseek': ('responses', 'messages', 'chat-completions'),
+            'qwen': ('responses', 'messages', 'chat-completions'),
+            'custom': ('responses', 'messages', 'chat-completions')}
+        self.assertEqual(len(self.setup.options()), 5)
+        with patch('openai.AsyncOpenAI') as openai, patch('anthropic.AsyncAnthropic') as anthropic:
+            for index, (name, protocols) in enumerate(expected.items(), 1):
+                field = self.setup.field(name, 'protocol', {})
+                self.assertEqual(field.choices, protocols)
+                for protocol in protocols:
+                    with self.subTest(service=name, protocol=protocol):
+                        alias = name + '-' + protocol
+                        values = {'protocol': protocol}
+                        model = self.setup.field(name, 'model', values).value or 'fixture-model'
+                        frontend = self.frontend(str(index), str(field.choices.index(protocol) + 1),
+                            alias, model, 'https://fixture.invalid/v1' if name == 'custom' else '',
+                            '100000', '4096', '', '', '', '2')
+                        run_model_setup(frontend._model_form(), self.setup)
+                        self.controller.save()
+                        spec = load_model_specs(self.root / '.fruitfly/models.yaml')[alias]
+                        self.assertEqual(spec.provider.protocol, protocol)
+                        self.assertEqual(spec.provider.sdk, 'anthropic' if protocol == 'messages' else 'openai')
+                        self.assertEqual(spec.parameters, default_parameters(protocol))
+                        import yaml
+                        raw = yaml.safe_load((self.root / '.fruitfly/models.yaml').read_text())['models'][alias]
+                        self.assertEqual(tuple(raw), MODEL_FIELD_ORDER)
+                        rendered = self.output.getvalue()
+                        self.assertLess(rendered.index('Choose API protocol'), rendered.index('models.<name>'))
+                        self.assertNotIn('Add model · sdk', rendered)
+                        self.assertNotIn('offline-placeholder', rendered)
+        openai.assert_not_called()
+        anthropic.assert_not_called()
+
+    def test_back_to_protocol_recalculates_endpoint_parameters_and_keeps_edited_alias(self):
+        frontend = self.frontend('4', '3', 'local', 'my-model', '', 'back', '2', '', '', '', '8192', '1024', '', '', '', '2', '1')
+        self.assertTrue(frontend.run().saved)
+        spec = load_model_specs(self.root / '.fruitfly/models.yaml')['local']
+        self.assertEqual(spec.provider.protocol, 'messages')
+        self.assertEqual(spec.provider.sdk, 'anthropic')
+        self.assertEqual(spec.provider.base_url, 'https://maas.qianwenaiapi.com/apps/anthropic')
+        self.assertEqual(spec.parameters, default_parameters(spec.provider.protocol))
+        self.assertEqual(spec.model, 'my-model')
+        self.assertNotIn('extra_body', spec.parameters)
+
+    def test_ambiguous_sdk_reports_a_configuration_error_without_staging(self):
+        registry = self.setup.registry
+        construct = Mock()
+        registry.register('first', 'fixture-api', construct)
+        registry.register('second', 'fixture-api', construct)
+        frontend = self.frontend('5', '4', 'q')
+        self.assertFalse(frontend.run().start)
+        self.assertIn('explicit default adapter', self.output.getvalue())
+        self.assertFalse(self.setup.changed)
+        construct.assert_not_called()
+
+    def test_parameters_editor_retries_invalid_input_and_saves_the_reviewed_mapping(self):
+        parameters = '{"reasoning":{"effort":"high"},"temperature":0.3,"extra_body":{"future_feature":true}}'
+        frontend = self.frontend('1', '', 'local', 'offline-model', '', '8192', '1024', '', '',
+            '{broken', '[]', '{"model":"override"}', parameters, '2', '1')
+        self.assertTrue(frontend.run().saved)
+        import json
+        spec = load_model_specs(self.root / '.fruitfly/models.yaml')['local']
+        self.assertEqual(spec.parameters, json.loads(parameters))
+        rendered = self.output.getvalue()
+        self.assertIn('parameters must be a JSON object', rendered)
+        self.assertIn('runtime-owned request fields', rendered)
+        self.assertIn('"effort": "high"', rendered)
+        self.assertNotIn('offline-placeholder', rendered)
+
+    def test_parameters_can_explicitly_use_server_defaults(self):
+        frontend = self.frontend('1', '', 'local', 'offline-model', '', '8192', '1024', '', '', '{}', '2', '1')
+        self.assertTrue(frontend.run().saved)
+        self.assertEqual(load_model_specs(self.root / '.fruitfly/models.yaml')['local'].parameters, {})
+
+    def test_parameters_cancellation_writes_nothing_and_does_not_read_the_key(self):
+        frontend = self.frontend('1', '', 'local', 'offline-model', '', '8192', '1024', '', '', '/cancel', '3')
+        self.assertFalse(frontend.run().start)
+        self.assertFalse(self.setup.changed)
+        self.assertEqual(frontend.input.tell(), 0)
+        self.assertFalse((self.root / '.fruitfly/models.yaml').exists())
+
+    def test_failed_save_restores_original_catalog_before_field_reordering(self):
+        catalog = self.root / '.fruitfly/models.yaml'
+        _write_catalog(catalog, {'existing': 'old-model'})
+        original = catalog.read_bytes()
+        self.stage()
+        with patch('fruitfly_agent.run.configuration.controller.save_harness_config', side_effect=OSError('offline write failure')):
+            with self.assertRaises(OSError):
+                self.controller.save()
+        self.assertEqual(catalog.read_bytes(), original)
+        self.assertTrue(self.setup.changed)
 
     def test_ansi_review_pages_expose_all_values_before_confirmation(self):
         frontend = self.frontend('3', '3', '3', '2')

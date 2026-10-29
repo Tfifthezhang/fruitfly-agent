@@ -18,9 +18,9 @@ def bind_commands(registry, *, bindings, configuration, status, cancel,
     registry.register("cancel", cancel_command, summary='cooperatively stop the active run')
     if configuration() is not None:
         registry.register("config", configuration_handler(
-            configuration=configuration, status=status, busy=bindings.busy,
+            configuration=configuration, busy=bindings.busy,
             apply_configuration=bindings.apply_configuration, menu_scope=menu_scope, input_stream=input_stream,
-            output_stream=output_stream, line_editor=line_editor, write=write, welcome=welcome,
+            output_stream=output_stream, line_editor=line_editor, write=write,
         ), summary='open the model and mechanism selection menu')
     if bindings.resume is not None:
         registry.register("resume", resume_handler(

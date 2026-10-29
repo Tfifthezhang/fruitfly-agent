@@ -19,6 +19,10 @@ packages. Invalid or cancelled field input preserves the prior value. Search use
 `simple` without automatic reflection. The panel has no benchmark-specific
 source, runner or configuration.
 
+Task-material explanations and ordinary action guidance use the shared focused
+bottom area. Current task/file values and result summaries remain inline for
+comparison. Confirmation and result text retain their pagination.
+
 Start creates a fresh frozen preview and one confirmation with Cancel selected by
 default. Confirmation binds materials, component scope, generator, guidance and
 allocations. Navigation and previews start no model work.

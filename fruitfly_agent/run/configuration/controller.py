@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import dataclass, field, replace
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -21,10 +22,22 @@ from fruitfly_agent.providers.registry import load_model_specs
 from fruitfly_agent.run.storage.artifacts import DataArtifactStore
 from .views import mechanism_views, prompt_choices
 from .resolution import HarnessSelection, model_catalog_path, resolve_profile_models
+from .persistence import FileTransaction, write_bytes
+from fruitfly_agent.providers.specs import ModelSpec
 
 if TYPE_CHECKING:
     from .model_setup import RunModelSetup
     from .mechanism_setup import RunMechanismSetup
+
+
+@dataclass(frozen=True)
+class PreparedConfiguration:
+    """Frozen assembly inputs and a host-owned commit operation."""
+
+    selection: HarnessSelection
+    models: Mapping[str, ModelSpec]
+    environment: Mapping[str, str] = field(repr=False)
+    commit: Callable[[Callable[[], None]], None] = field(repr=False)
 
 
 class RunConfigurationController:
@@ -126,6 +139,10 @@ class RunConfigurationController:
             name = models[selected_model].provider.api_key_env
             if not self._secret_resolver(name):
                 warnings.append(f"missing model credential: {name}")
+                ready = False
+        if self.model_setup is not None and selected_model is not None and selected_model in models:
+            if self.model_setup.credential_status(selected_model) == 'API key missing':
+                warnings.append('missing model credential: ' + models[selected_model].provider.api_key_env)
                 ready = False
         if self.read_only:
             try:
@@ -457,7 +474,7 @@ class RunConfigurationController:
             "save, then apply or start a session"
         )
 
-    def save(self) -> ConfigurationActionResult:
+    def _validated_config(self) -> HarnessConfig:
         self._assert_editable()
         from fruitfly_agent.run.storage.prompts import resolve_base_prompt
         candidate = HarnessConfig(
@@ -477,21 +494,59 @@ class RunConfigurationController:
                 if profile.model_profile not in models and not (profile.model_profile is None and len(models) == 1):
                     raise ValueError("Select a valid model before saving")
             resolve_base_prompt(profile.prompt, self._artifact_store, contents=profile.artifact_contents)
+        return candidate
+
+    def prepare_application(self, environment: Mapping[str, str]) -> PreparedConfiguration:
+        """Freeze a draft for assembly; only activation may publish its files."""
+        from copy import deepcopy
+        candidate = deepcopy(self._validated_config())
+        setup = self.model_setup
+        payloads = setup.payloads() if setup is not None else {}
+        secrets = dict(setup.credentials.values) if setup is not None else {}
+        profile = candidate.select()
+        models = deepcopy(self._models(profile))
+        files = FileTransaction.capture((*payloads, self._path, model_catalog_path(profile, self._path)))
+        draft = deepcopy(self._draft)
+        selected = self._selected
+
+        def commit(activate):
+            if (self._draft != draft or self._selected != selected or
+                    setup is not None and (setup.payloads() != payloads or setup.credentials.values != secrets)):
+                raise ValueError('configuration draft changed while preparing; retry application')
+            with files.writing((*payloads, self._path)):
+                for path, text in payloads.items():
+                    write_bytes(path, text.encode('utf-8'))
+                save_harness_config(self._path, candidate, catalog=self._catalog,
+                    artifact_reader=self._artifact_store.read_text)
+                activate()
+            if setup is not None:
+                setup.environment.update(secrets)
+                setup.reset()
+            self._accept_saved(candidate)
+
+        return PreparedConfiguration(HarnessSelection(candidate, profile, self._path, True),
+            models, {**environment, **secrets}, commit)
+
+    def save(self) -> ConfigurationActionResult:
+        candidate = self._validated_config()
         if self.model_setup is not None and self.model_setup.changed:
             self.model_setup.persist(lambda: save_harness_config(self._path, candidate, catalog=self._catalog,
                 artifact_reader=self._artifact_store.read_text))
         else:
             save_harness_config(self._path, candidate, catalog=self._catalog, artifact_reader=self._artifact_store.read_text)
-        self._draft = candidate
-        self._original = candidate
-        self._original_selected = self._selected
-        self._persisted = True
+        self._accept_saved(candidate)
         return ConfigurationActionResult(
             message=(
                 f"saved {self._path}; apply settings or use them on a later start or recovery"
             ),
             saved=True,
         )
+
+    def _accept_saved(self, candidate: HarnessConfig) -> None:
+        self._draft = candidate
+        self._original = candidate
+        self._original_selected = self._selected
+        self._persisted = True
 
     def reset(self) -> ConfigurationActionResult:
         if self.model_setup is not None:
