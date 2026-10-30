@@ -10,8 +10,8 @@ from inspect import isawaitable
 import json
 from pathlib import Path
 
-from fruitfly_agent.lab.improvement.tasks.scoring import ScoreResult, task_policy
-from fruitfly_agent.lab.improvement.tasks import (load_pack, read_bytes, _unique_keys)
+from fruitfly_agent.lab.improvement.assessment.scorers.policies import ScoreResult, task_policy
+from .packages import load_pack, read_bytes, unique_keys
 
 
 async def score_answer(workspace, pack_path, case_id, output):
@@ -60,7 +60,7 @@ async def main(argv=None):
             print(f"{args.case}: {result.score:.3f} · {result.feedback}")
             return 0 if result.score == 1 else 1
         path = args.references or args.pack.parent / "references.json"
-        refs = json.loads(read_bytes(workspace, path).decode("utf-8"), object_pairs_hook=_unique_keys)
+        refs = json.loads(read_bytes(workspace, path).decode("utf-8"), object_pairs_hook=unique_keys)
         if not isinstance(refs, dict) or any(not isinstance(v, str) for v in refs.values()):
             raise ValueError("references must map case IDs to answer text")
         policy = task_policy(pack["objective"]["policy_id"])

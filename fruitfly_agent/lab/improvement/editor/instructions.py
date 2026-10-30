@@ -1,9 +1,11 @@
 """Declarative I instructions, independent of any execution component."""
+from fruitfly_agent.improvement.contracts.optimization import OptimizationSpec
 from dataclasses import asdict, dataclass
 import json
 
-from fruitfly_agent.lab.algorithms.targets import TargetBinding, TargetSnapshot
-from fruitfly_agent.improvement.contracts.pipeline import canonical_json, bounded
+from fruitfly_agent.improvement.contracts.optimization import TargetBinding, TargetSnapshot
+from fruitfly_agent.improvement.contracts.versions import canonical_json
+from fruitfly_agent.improvement.contracts.validation import bounded
 
 
 @dataclass(frozen=True)
@@ -50,6 +52,7 @@ class EditorInstructions:
 
 
 class EditorInstructionTarget:
+    optimization = OptimizationSpec('I', 'text', required_capabilities=frozenset({'improver-comparison'}))
     label = 'Improvement editor instructions'
     component_kind = 'improvement-instructions'
     required_capabilities = frozenset({'improver-comparison'})

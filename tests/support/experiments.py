@@ -5,8 +5,11 @@ import json
 from pathlib import Path
 import yaml
 
-from fruitfly_agent.lab.improvement.api import (WorkflowBindings, GeneratorRegistry,
-    CandidateBundle, ComponentFile, HarnessSnapshot, EditReason, ProposalResult)
+from fruitfly_agent.lab.improvement.api import WorkflowBindings
+from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
+from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, EditReason
+from fruitfly_agent.improvement.contracts.components import ComponentFile, HarnessSnapshot
+from fruitfly_agent.improvement.contracts.editing import ProposalResult
 from fruitfly_agent.run import RunApplicationFactory
 from tests.support.improvers import FirstSelector
 

@@ -3,7 +3,9 @@ from dataclasses import replace
 from pathlib import Path
 import tempfile
 import unittest
-from fruitfly_agent.lab.improvement.api import ComponentDocument, ComponentFile, HarnessSnapshot, ExperienceEntry, experience_id
+from fruitfly_agent.improvement.contracts.components import ComponentDocument, ComponentFile, HarnessSnapshot
+from fruitfly_agent.improvement.contracts.plans import ExperienceEntry
+from fruitfly_agent.lab.improvement.experience import experience_id
 from fruitfly_agent.run.storage.experience import ExperienceStore
 from fruitfly_agent.run.storage.artifacts import DataArtifactStore
 

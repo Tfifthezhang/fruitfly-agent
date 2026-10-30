@@ -95,23 +95,20 @@ ENV_CONTRACT_PUBLIC_API = {
 
 LAB_ENV_PUBLIC_API = {"LocalEnv"}
 
+LAB_HOST_PUBLIC_API = {
+    "ASSESSOR_CONFIG", "AgentComposer", "AgentEditor", "AgentGenerator",
+    "AgentReflector", "AgentSelector", "CompletedAssessmentService", "ComponentWorkflow",
+    "EDITOR_CONFIG", "EDITOR_INSTRUCTIONS", "ExecutionContext", "ExplorationSettings",
+    "GeneratorRegistry", "ProcessAssessmentSettings", "ReadOnlyInspector", "SETTINGS",
+    "SYSTEM_SETTINGS", "SearchActivity", "SearchActivitySource", "SearchCompletion",
+    "SearchCompletionSource", "WorkflowBindings", "builtin_completed_assessors",
+    "builtin_executions", "builtin_explorations", "builtin_strategies", "bundle_target",
+    "bundle_text", "component_registry", "entry_from_dict", "entry_to_dict", "experience_id",
+    "extension_spec", "install_workflow_mechanisms", "model_completion", "policy_spec",
+    "process_settings_values", "validate_process_configuration",
+}
+
 MODULE_EXPORTS = {
-    "fruitfly_agent.interactive": {
-        "AgentApplication",
-        "ApplicationState",
-        "ConfigurationActionResult",
-        "ConfigurationController",
-        "ConfigurationLaunchResult",
-        "ConfigurationMechanism",
-        "ConfigurationParameter",
-        "ConfigurationSnapshot",
-        "InteractiveMechanism",
-        "InteractiveSession",
-        "RuntimeFactory",
-        "RuntimeHandle",
-        "TerminalConfigurationFrontend",
-        "TerminalFrontend",
-    },
     "fruitfly_agent.core.env": ENV_CONTRACT_PUBLIC_API,
     "fruitfly_agent.core.env.types": {"ExecOptions", "ExecResult", "FileInfo"},
     "fruitfly_agent.core.env.protocols": {"ExecutionEnv", "FileSystem", "Shell"},
@@ -214,8 +211,6 @@ MODULE_EXPORTS = {
     "fruitfly_agent.core.config": {
         "AgentLoopConfig",
         "ToolExecutionConfig",
-        "BeforeToolCallResult",
-        "PrepareNextTurnResult",
     },
     "fruitfly_agent.core.tool_runtime": {"AgentTool", "ToolCallContext"},
     "fruitfly_agent.core.tool_runtime.schema": {"validate_tool_arguments"},
@@ -311,7 +306,7 @@ MODULE_EXPORTS = {
     "fruitfly_agent.lab.context_manager.augmentation.skills": {
         "Skill", "LoadResult", "load_skills", "render_skills_xml", "SkillCatalogTransformer",
     },
-    "fruitfly_agent.lab.rsi": {
+    "fruitfly_agent.rsi": {
         "AgentVersion", "Candidate", "Verification", "EvolutionBudget",
         "EvolutionOutcome", "EvolutionAttempt", "EvolutionResult", "EvolutionDriver",
         "CandidateGenerator", "CandidateVerifier", "CandidateAdopter",
@@ -319,6 +314,7 @@ MODULE_EXPORTS = {
     "fruitfly_agent.interactive": {
         "AgentApplication",
         "ApplicationState",
+        "ConfigurationLaunchResult",
         "ConfigurationParameter",
         "ConfigurationMechanism",
         "ConfigurationSnapshot",

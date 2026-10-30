@@ -4,8 +4,10 @@ from pathlib import Path
 import hashlib
 import yaml
 
-from fruitfly_agent.lab.improvement.api import (TaskSetSourceDefinition, TaskEntry, TaskMaterial,
-    ScoreSpec, CollectionBinding, ExecutionPorts, content_hash)
+from fruitfly_agent.improvement.contracts.task_sets import TaskSetSourceDefinition, TaskEntry, ScoreSpec, CollectionBinding
+from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
+from fruitfly_agent.improvement.contracts.experiments import ExecutionPorts
+from fruitfly_agent.improvement.contracts.versions import content_hash
 from fruitfly_agent.improvement.contracts.versions import canonical_json
 from eval.contracts import EvaluationRequest
 from eval.catalog import builtin_catalog

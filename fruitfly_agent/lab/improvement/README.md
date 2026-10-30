@@ -6,8 +6,8 @@ The independent [Improvement runtime](../../improvement/README.md) owns the reli
 stage kernel. This package supplies concrete editors, algorithms, assessments,
 component adapters and native execution; Run supplies persistence and activation.
 
-Refine registered Agent components using task execution evidence. The public
-[API](api.py) separates candidate generation, execution, composition, selection,
+Refine registered Agent components using task execution evidence. The [runtime contracts](../../improvement/contracts/README.md) separate candidate
+generation, execution, composition, selection,
 verification, reflection and activation. Run persists jobs; Application owns
 execution and adoption. Container benchmark evaluation belongs to the separate Eval consumer.
 
@@ -25,7 +25,7 @@ Freeze plan, task, H/I/S and experience
 | Stage | Public contract | Default |
 |---|---|---|
 | Materials | `TaskSource`, `TaskMaterial`, `ArtifactAccess` | Freeze explicitly selected workspace inputs as immutable bytes |
-| Components | `ComponentAdapter`, `HarnessSnapshot`, `CandidateBundle` | Object-owned text adapters; complete named file sets |
+| Components | `OptimizationAdapter`, `HarnessSnapshot`, `CandidateBundle` | Object-owned text adapters; complete named file sets |
 | Propose | `CandidateGenerator`, `ProposalRequest`, `ProposalResult` | Tool-using editor with a strategy-declared mission |
 | Probe | `TaskRunner`, `ExecutionRecord`, `ExecutionFacts` | Detached read/write/edit file workspace with attributable facts |
 | Assess | Completed assessor registry and service | Disabled by default; read-only facts and optional model judgment |
@@ -40,7 +40,7 @@ Freeze plan, task, H/I/S and experience
 The independent [experiment CLI](../../experiments/README.md) defaults to
 `simple`: one reference and one candidate per round, no composition and no
 reflection. [Search strategies](strategies/README.md) keep Harness² optional.
-Existing embedding plans retain their Harness² default for compatibility.
+`RunPlan` defaults to Harness²; experiment settings select their strategy explicitly.
 
 Parallel width `k` uses `k` references, `2k` proposals, and `k` compositions when
 each proposal returns one candidate. All proposals in one round receive the same
@@ -257,3 +257,16 @@ online evaluation; a positive integer batches assessment triggers. Fresh process
 assessors observe all committed events. Optional model judges have a separate
 configuration and consume the root budget. Online judgments do not feed back or
 change components without a separately injected control policy and runner support.
+
+## Use owning public interfaces
+
+[api.py](api.py) exposes reviewed host composition and progress contracts. Generic
+values belong to [runtime contracts](../../improvement/contracts/README.md);
+concrete editors, assessors, policies and generators belong to their modules.
+The API does not provide a parallel contract catalog. Shared
+[optimization targets](targets/README.md) retain codecs and state helpers.
+
+Owners supply `OptimizationSpec` explicitly. Text adapters reject a missing
+declaration; file adapters require it at construction. Runner admission checks
+capabilities, update timing and activation boundary before trials. Declarations
+do not grant edits; experiment grants and protected owner fields still apply.

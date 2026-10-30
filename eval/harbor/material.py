@@ -5,12 +5,10 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import shutil
 import tempfile
 from typing import Any
-import zipfile
 
-from eval.installation import SOURCE_FILES, SOURCE_PACKAGES, installation_identity
+from eval.installation import INSTALLATION_SCHEMA, installation_identity, installation_material
 from .host import HostConfig
 
 
@@ -64,34 +62,7 @@ def tree_identity(root: Path, *, exclude_bytecode: bool = False) -> str:
 
 
 def source_snapshot(package: Path, target: Path) -> dict[str, Any]:
-    identity = installation_identity(package)
-    target.mkdir(parents=True)
-    if package.is_file():
-        with zipfile.ZipFile(package) as archive:
-            for name in archive.namelist():
-                path = Path(name)
-                if (path.parts and path.parts[0] in SOURCE_PACKAGES and path.suffix == ".py"
-                        and ".." not in path.parts and not path.is_absolute()):
-                    dest = target / path
-                    dest.parent.mkdir(parents=True, exist_ok=True)
-                    dest.write_bytes(archive.read(name))
-                elif (len(path.parts) > 2 and path.parts[0].endswith(".dist-info")
-                      and path.parts[1] == "licenses" and not name.endswith("/")
-                      and ".." not in path.parts and not path.is_absolute()):
-                    dest = target / "licenses" / Path(*path.parts[2:])
-                    dest.parent.mkdir(parents=True, exist_ok=True)
-                    dest.write_bytes(archive.read(name))
-    else:
-        for name in SOURCE_FILES:
-            shutil.copyfile(package / name, target / name)
-        for name in SOURCE_PACKAGES:
-            for source in (package / name).rglob("*.py"):
-                if "__pycache__" in source.parts or source.is_symlink():
-                    continue
-                dest = target / source.relative_to(package)
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(source, dest)
-    return identity
+    return installation_material(package).snapshot(target)
 
 
 def prepare_material(host: HostConfig, package: Path) -> dict[str, Any]:
@@ -106,7 +77,8 @@ def prepare_material(host: HostConfig, package: Path) -> dict[str, Any]:
         with tempfile.TemporaryDirectory(prefix=".runtime-", dir=root.parent) as temporary:
             staged = Path(temporary) / "runtime"
             staged.mkdir()
-            source_snapshot(package, staged / "source")
+            if source_snapshot(package, staged / "source") != identity:
+                raise ValueError("installation material changed while freezing; run eval prepare again")
             result = {"schema_version": 1, "id": key, "host": host.identity(), "mounts": mounts,
                       "source": str(root / "source"), "source_sha256": tree_identity(staged / "source"),
                       "installation": identity, "python": host.python, "environment": host.runtime_env()}
@@ -123,6 +95,8 @@ def prepare_material(host: HostConfig, package: Path) -> dict[str, Any]:
 def check_material(host: HostConfig, receipt: dict[str, Any]) -> None:
     if receipt.get("schema_version") != 1 or receipt.get("host") != host.identity():
         raise ValueError("Eval host settings changed; run eval prepare again")
+    if receipt.get('installation', {}).get('schema_version') != INSTALLATION_SCHEMA:
+        raise ValueError('prepared installation format changed; run eval prepare again')
     source = Path(receipt["source"])
     if tree_identity(source) != receipt.get("source_sha256"):
         raise ValueError("prepared Agent source changed; run eval prepare again")
@@ -145,7 +119,12 @@ def probe_command(python: str) -> list[str]:
         "import sys,ssl,sqlite3,zlib,ctypes,bz2,lzma,uuid,hashlib,importlib.metadata as m; "
         "assert sys.version_info >= (3,11); "
         "import fruitfly_agent,anthropic,openai,httpx,yaml; "
+        "from pathlib import Path; "
+        "assert Path(fruitfly_agent.__file__).is_relative_to('/installed-agent/fruitfly/source'), "
+        "'Agent imports must resolve from frozen source'; "
         "from fruitfly_agent.run import main; "
+        "from fruitfly_agent.experiments.scaffolding import workspace_templates; "
+        "assert 'default-config.yaml' in workspace_templates(); "
         "print('Python:',sys.executable); "
         "print('Certificate paths:',ssl.get_default_verify_paths()); "
         "print(ssl.OPENSSL_VERSION); "

@@ -135,6 +135,7 @@ class ResumeHistoryTest(unittest.IsolatedAsyncioTestCase):
                 (MechanismContribution("capability", "tools"),)), install,
                 implementation_path='tests/workflows/test_resume_history.py',
                 documentation_path='tests/workflows/README.md',
+                optimization_exemption='Resource startup fixture; no research algorithm is installed.',
             )
             catalog = builtin_catalog().extended((definition,))
             factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=registry, catalog=catalog)

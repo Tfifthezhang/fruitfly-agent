@@ -1,6 +1,5 @@
 """Declarative termination uses the existing pure policy implementations."""
-from fruitfly_agent.lab.improvement.api import (AnyOf, AllOf, IterationLimit,
-    NoImprovement, FailureLimit, ResourceLimit, ScoreAtLeast, MetricThreshold)
+from fruitfly_agent.lab.improvement.termination import AnyOf, AllOf, IterationLimit, NoImprovement, FailureLimit, ResourceLimit, ScoreAtLeast, MetricThreshold
 
 FACTORIES = {'iterations': IterationLimit, 'no_improvement': NoImprovement,
     'failures': FailureLimit, 'resource': ResourceLimit, 'score': ScoreAtLeast,

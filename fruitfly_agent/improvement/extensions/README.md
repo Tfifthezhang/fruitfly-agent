@@ -39,5 +39,5 @@ factory); its implementation identity and parameters join frozen previews.
 It must register owned
 resources immediately. No callback state is shared automatically across jobs.
 
-Offline checks: `tests.lab.test_improvement_kernel` and
+Offline checks: `tests.lab.test_improvement_mechanisms` and
 `tests.architecture.test_improvement_boundaries`.

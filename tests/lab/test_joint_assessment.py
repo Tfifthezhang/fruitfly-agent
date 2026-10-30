@@ -1,8 +1,12 @@
 """Joint selection requires common complete evidence, with explicit collection weights."""
 from dataclasses import replace
 import unittest
-from fruitfly_agent.lab.improvement.api import (TaskSetSnapshot, EvaluationBatch, TrialResult,
-    ExecutionRecord, Measurement, MultiTaskSettings, content_hash, CandidateEvaluation)
+from fruitfly_agent.improvement.contracts.task_sets import TaskSetSnapshot
+from fruitfly_agent.improvement.contracts.evaluation import EvaluationBatch, TrialResult, CandidateEvaluation
+from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
+from fruitfly_agent.improvement.contracts.assessment import Measurement
+from fruitfly_agent.lab.improvement.task_sets import MultiTaskSettings
+from fruitfly_agent.improvement.contracts.versions import content_hash
 from fruitfly_agent.lab.improvement.assessment.joint import assess_batch
 from fruitfly_agent.lab.improvement.assessment.promotion import compare_candidates
 from tests.support.task_sets import collection

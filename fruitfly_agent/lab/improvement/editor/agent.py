@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 
 from fruitfly_agent.core.data_model import UserMessage, ProviderView
-from fruitfly_agent.improvement.contracts.pipeline import CandidateBundle, EditReason
+from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, EditReason
 from ..evidence import EvidenceWorkspace
 from ..evidence.access import EvidenceUnavailable
 from .instructions import EditorInstructions

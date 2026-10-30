@@ -69,7 +69,8 @@ and [budget/stop behavior](../../lab/improvement/workflow/README.md).
 | `stopping.py` | Shared cycle state and structured decisions |
 | `lifecycle.py` | Frozen lifecycle events and bounded input-context contributions |
 
-`pipeline.py` retains explicit compatible exports and orchestration outcomes.
+`pipeline.py` owns orchestration outcomes and the workflow protocol. Import other
+values from their responsible contract modules or the reviewed runtime API.
 There are no parallel definitions or implicit dynamic imports. Live payloads are
 canonical JSON snapshots; readers cannot mutate committed evidence. Online
 assessment status describes scope/completeness, not independent verification.
@@ -91,3 +92,29 @@ freezes component field permissions and bounds; unknown or out-of-scope options
 fail. `ExecutionDefinition.capabilities_for(tool_names)` derives configured tool
 capabilities when `uses_configured_tools` is declared. Other backend capabilities
 remain explicitly owned by the backend.
+
+## Declare optimization surfaces
+
+`optimization.py` defines `OptimizationSpec` and `OptimizationAdapter`. Each
+component adapter declares H/S/I ownership, representation, legal operations,
+update timing, activation boundary, state semantics and required capabilities.
+Numeric configuration, text and retained documents share admission and candidate
+validation. Search algorithms remain independent of target representation.
+`ComponentRegistry.admit` intersects these declarations with execution support;
+unsupported online updates fail before trials. Current standard runners support
+offline, task-boundary candidates. Online observation does not imply online
+replacement or persistent learning. Mutable fields, protected values and numeric
+grants continue through owner validators; metadata grants no editing permission.
+
+`TrialSetup` supplies fresh Core hooks and asynchronous retirement. A component
+registry's `trial_setups` factories create execution-local mechanisms using the
+injected job services. Native runners declare `execution-setup`, own each setup
+before use and retire it after every trial. This contract recreates developer
+extensions without borrowing live callbacks or Session state.
+
+Text projection values `TargetBinding` and `TargetSnapshot` are defined beside
+`OptimizationSpec` in `optimization.py`. `TextProjection.snapshot` returns the
+concrete immutable value. Projection values identify a text view; component
+ownership and candidate identity remain with `ComponentDocument` and
+`HarnessSnapshot`. Owners must declare semantics rather than relying on adapter
+fallbacks. A supported isolated candidate must change real execution.

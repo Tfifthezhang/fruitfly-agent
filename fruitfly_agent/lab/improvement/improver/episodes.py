@@ -6,13 +6,17 @@ from typing import Literal
 
 from ..components import ComponentRegistry, TextComponentAdapter
 from fruitfly_agent.improvement.contracts.experiments import EpisodeResult
-from fruitfly_agent.improvement.contracts.pipeline import RunPlan, TaskMaterial, canonical_json
+from fruitfly_agent.improvement.contracts.plans import RunPlan
+from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
+from fruitfly_agent.improvement.contracts.versions import canonical_json
 from fruitfly_agent.improvement.contracts.versions import SystemVersion, content_hash
 from ..editor import AgentEditor, model_completion
 from ..assessment.selection import AgentSelector
 from ..assessment.inspection import ReadOnlyInspector
 from ..editor.instructions import EditorInstructions, EditorInstructionTarget
-from ..workflow import ImprovementWorkflow, WorkflowServices, GeneratorRegistry, AgentGenerator, AgentComposer
+from fruitfly_agent.lab.improvement.workflow import ImprovementWorkflow
+from fruitfly_agent.improvement.workflow.services import WorkflowServices
+from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry, AgentGenerator, AgentComposer
 from ..execution.file_runner import FileTaskRunner
 from ..assessment.verification import CaseMeasurements
 

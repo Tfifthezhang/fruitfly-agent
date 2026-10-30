@@ -4,7 +4,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Protocol
 
-from fruitfly_agent.improvement.contracts.pipeline import HarnessSnapshot, ImprovementOutcome, TaskMaterial, identifier, bounded
+from fruitfly_agent.improvement.contracts.components import HarnessSnapshot
+from fruitfly_agent.improvement.contracts.pipeline import ImprovementOutcome
+from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
+from fruitfly_agent.improvement.contracts.validation import identifier, bounded
 from fruitfly_agent.improvement.contracts.versions import content_hash, canonical_json
 from fruitfly_agent.improvement.contracts.plans import RunPlan
 from fruitfly_agent.improvement.contracts.task_sets import TaskSetSnapshot

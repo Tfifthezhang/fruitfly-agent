@@ -11,7 +11,7 @@ Protect dependency direction, Core SDK independence, generic algorithm hosts, pr
 | `test_documentation.py` | READMEs, file/heading links, root reachability, parent/backlink tree, English text and a dataset-neutral server guide, project identity, and version consistency |
 | `test_component_configuration.py` | Pure registered configuration discovery, documented ownership and extension loading without host dispatch |
 | `test_ci.py` | Execute the workflow's built-in prompt assertion offline to detect stale packaging checks; installed-wheel checks remain in CI. |
-| `test_suite_structure.py / test_runner.py` | Discovery, shared helpers, explicit online isolation, and fail-fast guard execution |
+| `test_suite_structure.py / test_runner.py` | Unique discovery, duplicate definitions and literal dictionary keys, PTY fixture ownership, registered areas, shared helpers, explicit online isolation, and fail-fast guard execution |
 
 Do not widen dependency allowances to make checks pass. Static checks do not analyze arbitrary reflection or execution.
 

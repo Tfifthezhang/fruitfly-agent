@@ -7,6 +7,23 @@ Run one selected configuration, inspect reports, or add a benchmark adapter. Rea
 For the ordered Linux server procedure and executable YAML/JSON generators,
 start with the [Server Evaluation Guide](SERVER_GUIDE.md).
 
+## Check local execution first
+
+From an installed source checkout, verify the ordinary Agent and frozen runtime
+before configuring a benchmark server:
+
+```bash
+.venv/bin/python -m examples.extensions.offline_guidance
+.venv/bin/python -m unittest tests.eval.test_material_resources
+```
+
+These checks use a fixed Provider, local subprocesses and temporary files. They
+need no model keys, Docker, dataset downloads or network. The resource regression
+checks source and wheel snapshots, Provider imports, configuration/experiment
+templates, CLI startup, resource identities and duplicate host YAML rejection.
+See [Getting Started](../GETTING_STARTED.md#check-the-agent-offline) and the
+[installed-wheel checks](../examples/packaging/README.md).
+
 ## Prepare the environment
 
 | Requirement | Contract |
@@ -171,6 +188,8 @@ task background services alive for the verifier. See
 | Registry connection error | Host proxy/VPN and underlying exception in harbor.log |
 | Image failure | Engine network, registry auth, tag/architecture, and disk space |
 | Setup timeout | Preparation/readiness identities, setup.log and runtime probe; no per-task Agent downloads are expected |
+| Missing package resource during import | Run the local resource regression; verify resource declarations and rebuild/reprepare installation material |
+| Duplicate YAML keys | Remove repeated keys; host settings reject silent overrides |
 | No Agent events | Setup and trial logs |
 | Missing reward | Verifier logs and adapter reward mapping |
 
@@ -198,3 +217,10 @@ instructions, task.toml, an environment and an official verifier definition.
 Dataset identity and its smoke task belong to the adapter declaration. Resource
 filtering and image/runtime diagnostics belong to the shared Harbor layer. Other
 runners implement the same request/result interface; runtime ownership stays outside Eval.
+
+After changing Agent code or package resources, rerun `prepare` and `check` before
+starting a new trial. Installation records use schema 2 and include runtime data;
+older prepared records require a fresh preparation. Package version remains
+`0.1`. Do not repair a frozen cache by copying files into it. Use
+[material validation](harbor/README.md#freeze-complete-installation-material) to
+regenerate a complete content-bound runtime.

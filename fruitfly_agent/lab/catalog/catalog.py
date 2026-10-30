@@ -21,10 +21,11 @@ from .models import (
 class LabCatalog:
     """Resolve selections without scanning packages or mutating global state."""
 
-    def __init__(self, definitions: Iterable[MechanismDefinition], *, bootstrap: CatalogBootstrap | None = None) -> None:
+    def __init__(self, definitions: Iterable[MechanismDefinition], *, bootstrap: CatalogBootstrap | None = None, extension_identities=()) -> None:
         if bootstrap is not None and not callable(bootstrap):
             raise TypeError("catalog bootstrap must be callable")
         self.bootstrap = bootstrap
+        self.extension_identities = tuple(dict(v) for v in extension_identities)
         items = tuple(definitions)
         by_id: dict[str, MechanismDefinition] = {}
         for definition in items:
@@ -49,6 +50,15 @@ class LabCatalog:
                 if len(locations) != 1:
                     raise ValueError(f"selection group {group_id!r} must have one display location")
         self._definitions = by_id
+
+    def require_optimization(self):
+        for definition in self.definitions():
+            if definition.optimization_exemption:
+                continue
+            if (definition.configuration_edit is None and definition.component_specs is None
+                    and not any(s.edit_options is not None for s in definition.configuration_surfaces)
+                    and not definition.descriptor.effects.tools):
+                raise ValueError('algorithm has no executable optimization declaration: ' + definition.descriptor.mechanism_id)
 
     def definitions(self) -> tuple[MechanismDefinition, ...]:
         return tuple(
@@ -75,7 +85,7 @@ class LabCatalog:
     ) -> "LabCatalog":
         """Return a new catalog with explicitly injected app mechanisms."""
 
-        return LabCatalog((*self.definitions(), *tuple(definitions)), bootstrap=self.bootstrap)
+        return LabCatalog((*self.definitions(), *tuple(definitions)), bootstrap=self.bootstrap, extension_identities=self.extension_identities)
 
     def default_selections(self) -> tuple[MechanismSelection, ...]:
         return tuple(

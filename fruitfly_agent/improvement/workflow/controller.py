@@ -4,7 +4,12 @@ import asyncio
 from dataclasses import asdict, replace
 import time
 from uuid import uuid4
-from fruitfly_agent.improvement.contracts.pipeline import CandidateBundle, CompositionRequest, HarnessSnapshot, ImprovementOutcome, ProposalRequest, SelectionDecision, ExecutionRecord, Measurement
+from fruitfly_agent.improvement.contracts.candidates import CandidateBundle
+from fruitfly_agent.improvement.contracts.editing import CompositionRequest, ProposalRequest
+from fruitfly_agent.improvement.contracts.components import HarnessSnapshot
+from fruitfly_agent.improvement.contracts.pipeline import ImprovementOutcome
+from fruitfly_agent.improvement.contracts.assessment import SelectionDecision, Measurement
+from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
 from fruitfly_agent.improvement.workflow.budget import AllocationExhausted
 from fruitfly_agent.improvement.contracts.stopping import SearchState
 from fruitfly_agent.improvement.workflow.services import GeneratorServices
@@ -12,7 +17,7 @@ from fruitfly_agent.improvement.contracts.stopping import StopDecision, stop_rea
 from fruitfly_agent.improvement.contracts.assessment import AssessmentUnavailable
 from fruitfly_agent.improvement.execution.facts import ensure_facts
 from fruitfly_agent.improvement.execution.scheduler import TaskScheduler
-from fruitfly_agent.improvement.workflow.engine import SearchEngine
+from fruitfly_agent.improvement.workflow.engine import SearchEngine, validate_schedule
 from fruitfly_agent.improvement.workflow.problems import SearchProblem
 from .operations import run_stage, diagnostic_reference, require_type, validate_assessment_result
 from .state import WorkflowState
@@ -74,10 +79,12 @@ class ImprovementWorkflow:
         self.components.configure(plan.component_options)
         if self.problem is not None:
             return await self.problem.run(self, plan, task, baseline, services, experience=experience)
-        from fruitfly_agent.improvement.contracts.pipeline import ProposalResult
+        self.components.admit(plan.component_ids, self.runner.capabilities)
+        from fruitfly_agent.improvement.contracts.editing import ProposalResult
         if services.plan != plan:
             raise ValueError('workflow services belong to another plan')
         schedule = self.strategies.get(plan.strategy_id).schedule(plan)
+        validate_schedule(schedule, plan)
         self.components.validate(baseline)
         if set(plan.component_ids) - {c.component_id for c in baseline.components}:
             raise ValueError('plan contains an unregistered component')

@@ -81,8 +81,11 @@ class MechanismDefinition:
     model_role_parameters: Mapping[str, str] = field(default_factory=dict)
     configuration_edit: Callable | None = None
     configuration_snapshot: Callable | None = None
+    optimization_exemption: str = ''
 
     def __post_init__(self) -> None:
+        if not isinstance(self.optimization_exemption, str):
+            raise TypeError('optimization exemption must explain an infrastructure invariant')
         if self.configuration_role not in {'H', 'S', 'I'}:
             raise ValueError('configuration role must be H/S/I')
         if self.configuration_edit is not None and not callable(self.configuration_edit):

@@ -6,6 +6,7 @@ Reusable substitutes and temporary materials. This module contains no TestCases 
 
 | File | Provides |
 |---|---|
+| [catalog.py](catalog.py), [assembly.py](assembly.py), [model_setup.py](model_setup.py) | Explicit registration, runtime assembly and model configuration workspaces |
 | [provider_streams.py](provider_streams.py) | Offline SDK streams, requests, and patched adapter construction |
 | [media.py](media.py) | Original tiny PNG containers, image blocks and offline vision model declarations |
 | [ssh.py](ssh.py) | Fake SFTP filesystem and local subprocess-backed SSH command channels |
@@ -30,3 +31,7 @@ Keep local helpers local unless multiple tests need them. Do not compute reviewe
 fixtures. It builds declarations from typed runtime selections; no fixture reader
 accepts an obsolete configuration grammar. `experiments.py` emits the same
 referenced baseline/task/comparison/edit format used by workspace initialization.
+
+`TerminalProcess` supports context ownership, resize, visible-prompt waits and
+exit-status checks. `run_terminal` supplies one prompt/submission/exit dialogue.
+Both retire children on failures and use bounded waits.

@@ -3,10 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Mapping
 
+from fruitfly_agent.improvement.contracts.optimization import TextProjection
 from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.interactive import ResumableSession
 from fruitfly_agent.interactive.application import RuntimeHandle
-from fruitfly_agent.lab.algorithms.targets import TextTarget, STATE_SNAPSHOTS_COMPONENT, EXPERIMENT_BLOCKERS_COMPONENT
+from fruitfly_agent.improvement.contracts.versions import STATE_SNAPSHOTS_COMPONENT, EXPERIMENT_BLOCKERS_COMPONENT
 from fruitfly_agent.lab.catalog import LabCatalog, builtin_catalog, PermissionPolicy
 from fruitfly_agent.lab.base_prompt import DEFAULT_PROMPT_ID
 from fruitfly_agent.lab.improvement.api import SearchActivitySource
@@ -57,17 +58,29 @@ class RunApplicationFactory:
         permission_policy: PermissionPolicy | None = None,
         improvement_bindings=None,
         tool_service_startup_approval: ToolServiceStartupApproval | None = None,
+        extensions=None,
     ) -> None:
         self.cwd = cwd.resolve()
+        self._base_catalog = catalog or builtin_catalog()
+        self._base_improvement_bindings = improvement_bindings
         self.permission_policy = permission_policy
-        self.improvement_bindings = improvement_bindings
+        if extensions is None:
+            from .extensions import configured_extensions
+            extension_config = Path(config_path).expanduser() if config_path is not None else self.cwd / '.fruitfly/config.yaml'
+            if not extension_config.is_absolute():
+                extension_config = self.cwd / extension_config
+            loaded = configured_extensions(extension_config, profile_id=profile_id)
+            extensions = loaded if loaded.registrations else None
+        self.extensions = extensions
+        self.improvement_bindings = extensions.bindings(improvement_bindings) if extensions is not None else improvement_bindings
         self.tool_service_startup_approval = tool_service_startup_approval
         self.task_pack_sources = tuple(task_pack_sources)
         self._task_snapshots = TaskSnapshotStore(self.cwd)
         self.environment = dict(environment)
         self._requested_config_path = config_path
         self._requested_profile_id = profile_id
-        self.catalog = catalog or builtin_catalog()
+        self.catalog = extensions.catalog(catalog or builtin_catalog()) if extensions is not None else (catalog or builtin_catalog())
+        self.catalog.require_optimization()
         self.provider_registry = provider_registry
         self.data_artifact_bindings = dict(data_artifact_bindings or {})
         self.artifact_store = DataArtifactStore(self.cwd / ".fruitfly" / "artifacts")
@@ -85,7 +98,7 @@ class RunApplicationFactory:
         self._current_components: Mapping[str, Any] = {}
         self._current_runtime_config: AgentLoopConfig | None = None
         self._active_profile: HarnessProfile | None = None
-        self._current_targets: dict[str, TextTarget] = {}
+        self._current_targets: dict[str, TextProjection] = {}
         self._selection = self._resolve()
         self._configuration = RunConfigurationController(
             self._selection,
@@ -211,6 +224,23 @@ class RunApplicationFactory:
         )
         if not self.read_only_configuration:
             self._configure_setup()
+
+    def replacement_extensions(self):
+        """Build a new host without changing the active host or its resources."""
+        from .extensions import load_extensions
+        from fruitfly_agent.runtime_spec import load_harness_config
+        profile = load_harness_config(self.selection.config_path).select(self.selection.profile.profile_id)
+        configured = set(self.selection.profile.extensions)
+        extra = tuple(v['source'] for v in self.extensions.identities if v['source'] not in configured) if self.extensions else ()
+        extensions = load_extensions((*profile.extensions, *extra), workspace=self.cwd)
+        replacement = RunApplicationFactory(cwd=self.cwd, environment=self.environment,
+            config_path=str(self.selection.config_path), profile_id=profile.profile_id,
+            catalog=self._base_catalog, provider_registry=self.provider_registry,
+            data_artifact_bindings=self.data_artifact_bindings, task_pack_sources=self.task_pack_sources,
+            permission_policy=self.permission_policy, improvement_bindings=self._base_improvement_bindings,
+            tool_service_startup_approval=self.tool_service_startup_approval, extensions=extensions)
+        replacement._preparer.sessions = self._preparer.sessions
+        return replacement
 
     def new_session_path(self) -> Path:
         return new_session_path(self.cwd)

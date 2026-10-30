@@ -3,7 +3,8 @@ from dataclasses import asdict
 
 from fruitfly_agent.improvement.contracts.experiments import (ExecutionDefinition, ExecutionParameter as P, ExecutionPorts,
     ExperimentSpec, PreparedExecution)
-from fruitfly_agent.improvement.contracts.pipeline import TaskMaterial, canonical_json
+from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
+from fruitfly_agent.improvement.contracts.versions import canonical_json
 from fruitfly_agent.improvement.contracts.versions import content_hash
 from .materials import freeze, materials
 from .runner import ImproverTaskRunner, TrialMeasurements

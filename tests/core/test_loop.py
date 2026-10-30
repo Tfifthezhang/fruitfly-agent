@@ -3,7 +3,8 @@
 import asyncio
 import unittest
 
-from fruitfly_agent.core.config import BeforeToolCallResult, PrepareNextTurnResult
+from fruitfly_agent.core.data_model.runtime import BeforeToolCallResult
+from fruitfly_agent.core.extensions.protocols import PrepareNextTurnResult
 from fruitfly_agent.core.data_model import (
     AssistantMessage,
     TextBlock,

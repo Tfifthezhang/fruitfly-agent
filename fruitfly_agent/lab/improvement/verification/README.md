@@ -2,31 +2,13 @@
 
 [Up: Improvement](../README.md)
 
-[__init__.py](__init__.py) implements `CaseMeasurements` and
-`HoldoutVerification` behind the public `MeasurementSource` and
-`VerificationPolicy` ports. These are optional capabilities, not prerequisites for
-ordinary task execution or output selection.
+[Assessment verification](../assessment/verification.py) owns `CaseMeasurements`
+and `HoldoutVerification` behind the `MeasurementSource` and `VerificationPolicy`
+ports. Private task cases remain excluded from generation. Independent fixed
+comparisons bind publication eligibility to exact candidate and parent identities;
+Application owns activation. See [Assessment](../assessment/README.md).
 
-Private task-package cases retain answers/checks. Their `TaskMaterial` projections
-contain instructions only. A persistent candidate must pass fixed selection and
-independent holdout comparisons after editing. Both baseline and candidate run
-under the same root allocation. Original training cases must not regress. Selection and independent holdout
-require aggregate strict gain and per-case nonregression. Missing/failed measurements reject publication. The host records
-verification executions without returning answers to the editor.
-
-Generation does not receive verifier objects or holdout instructions. Explicit
-scored feedback is a separate choice for algorithms that need it. Verification
-returns evidence-bound assurance; Run stores a pending candidate and Application
-still owns adoption. Custom policies must declare their tasks, conditions,
-independence, budgets and failure behavior.
-
-Offline fake scoring establishes control flow, not actual model quality.
-Checks: `tests.lab.test_improvement_pipeline`,
-`tests.workflows.test_improvement_pipeline`.
-
-Implementations now live in [Assessment](../assessment/README.md).
-This module retains explicit compatible `CaseMeasurements` and
-`HoldoutVerification` exports; it does not own a second verification engine.
+This module owns deliverable backends. It exposes no compatibility scoring imports.
 
 ## Validate delivery bundles
 

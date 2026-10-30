@@ -37,10 +37,10 @@ from fruitfly_agent.lab.context_manager.augmentation.skills import (
     SkillCatalogTransformer, load_skills, render_skills_xml,
 )
 from fruitfly_agent.lab.context_manager.augmentation.skills.target import SKILL_CATALOG_GUIDANCE_KEY, SkillGuidanceTarget
-from fruitfly_agent.lab.algorithms.targets import TEXT_TARGET_PREFIX
+from fruitfly_agent.lab.improvement.targets.text import TEXT_TARGET_PREFIX
 from fruitfly_agent.improvement.contracts.versions import STATE_SNAPSHOTS_COMPONENT
 from fruitfly_agent.lab.context_manager.augmentation.information.file_memory.snapshots import FileMemorySnapshots
-from fruitfly_agent.lab.algorithms.snapshots import WorkspaceTextSnapshots
+from fruitfly_agent.lab.improvement.targets.state import WorkspaceTextSnapshots
 from fruitfly_agent.improvement.contracts.versions import EXPERIMENT_BLOCKERS_COMPONENT
 from fruitfly_agent.lab.base_prompt.target import BasePromptTarget, configuration_surface as prompt_surface
 from fruitfly_agent.lab.tools.guidance import prepare_guidance, guidance_key
@@ -79,13 +79,14 @@ def builtin_catalog() -> LabCatalog:
             component_specs=lambda parameters, enabled: (ComponentSpec('base_prompt'),
                 ComponentSpec('execution-policy', kind='execution-policy', schema='execution-policy-v1',
                     required_capabilities=frozenset({'execution-config'}))),
-            implementation_path='fruitfly_agent/lab/algorithms/components.py',
-            documentation_path='fruitfly_agent/lab/algorithms/README.md'),
+            implementation_path='fruitfly_agent/lab/improvement/targets/bundle.py',
+            documentation_path='fruitfly_agent/lab/improvement/targets/README.md'),
         ssh_definition(),
         mcp_definition(),
         *web_definitions(),
         _definition(
             "local-env",
+            optimization_exemption='Execution backend binding; optimization belongs to execution policy and tools.',
             layer="capability",
             family="environment",
             label="Local environment",
@@ -232,6 +233,7 @@ def builtin_catalog() -> LabCatalog:
         ),
         _definition(
             "memory-files",
+            optimization_exemption='Filesystem source binding; retained editable memory uses an S document owner.',
             configuration_snapshot=lambda parameters, workspace: FileMemorySnapshots(
                 require_workspace_path(workspace, parameters['root'], name='memory root'), workspace).freeze(),
             layer="capability",
@@ -249,6 +251,7 @@ def builtin_catalog() -> LabCatalog:
         ),
         _definition(
             "knowledge-files",
+            optimization_exemption='Read-only task knowledge source; retained editable knowledge uses an S document owner.',
             configuration_snapshot=lambda parameters, workspace: WorkspaceTextSnapshots(
                 require_workspace_path(workspace, parameters['root'], name='knowledge root'), workspace).freeze(),
             layer="capability",
@@ -265,6 +268,7 @@ def builtin_catalog() -> LabCatalog:
         ),
         _definition(
             "live-http",
+            optimization_exemption='External information connector; experiments require a frozen response source.',
             layer="capability",
             family="context",
             label="Live HTTP information",
@@ -325,19 +329,10 @@ def builtin_catalog() -> LabCatalog:
         configuration_surfaces=(*d.configuration_surfaces,
             *(guidance_surface(name, tool_factory=tool_factories.get(name))
               for name in d.descriptor.effects.tools))) for d in definitions)
-    from fruitfly_agent.lab.improvement.components.parameters import editable_parameters
-    parameter_fields = {
-        'bash-tool': {'default_timeout_seconds', 'max_active_commands', 'retained_commands', 'output_characters'},
-        'ipython-tool': {'max_artifact_bytes', 'max_cell_output_chars', 'cell_timeout_seconds',
-            'max_query_calls', 'max_query_concurrent', 'max_query_input_chars', 'max_query_output_tokens',
-            'max_query_total_tokens', 'max_query_inline_result_chars', 'query_timeout_seconds'},
-        'web-search-tool': {'timeout_seconds', 'max_retries', 'max_response_bytes', 'cache_ttl_seconds',
-            'cache_entries', 'backend'},
-        'web-fetch-tool': {'timeout_seconds', 'max_retries', 'max_response_bytes', 'cache_ttl_seconds',
-            'cache_entries', 'max_redirects', 'backend'},
-    }
-    definitions = tuple(editable_parameters(d, parameter_fields[d.descriptor.mechanism_id])
-        if d.descriptor.mechanism_id in parameter_fields else d for d in definitions)
+    from fruitfly_agent.lab.tools.improvement import expose as tool_surfaces
+    from fruitfly_agent.lab.context_manager.augmentation.improvement import expose as augmentation_surfaces
+    from fruitfly_agent.lab.context_manager.externalization.improvement import expose as externalization_surfaces
+    definitions = tuple(tool_surfaces(augmentation_surfaces(externalization_surfaces(d))) for d in definitions)
     return LabCatalog(definitions, bootstrap=lambda state, context: (
         state.with_component(TEXT_TARGET_PREFIX + "base_prompt", BasePromptTarget(state.config.system_prompt))
         .with_component(TASK_PACK_COMPONENT, TaskPackCatalog(context.workspace, context.task_pack_sources))
@@ -375,6 +370,7 @@ def _definition(
     additional_contributions: tuple[MechanismContribution, ...] = (),
     implementation_id: str | None = None,
     visible: bool = True,
+    optimization_exemption: str = '',
     artifact_slots: frozenset[str] = frozenset(),
     provides: frozenset[str] = frozenset(),
     requires_capabilities: frozenset[str] = frozenset(),
@@ -404,7 +400,7 @@ def _definition(
             effects=effects or MechanismEffects(),
         ),
         install,
-        implementation_id=implementation_id, visible=visible,
+        implementation_id=implementation_id, visible=visible, optimization_exemption=optimization_exemption,
         artifact_slots=artifact_slots, provides=provides,
         requires_capabilities=requires_capabilities, validate_parameters=validate_parameters,
         component_specs=component_specs,
@@ -543,6 +539,7 @@ def _install_information_context(state: AssemblyState, context: AssemblyContext,
     hub = InformationHub(top_k=parameters["top_k"], max_chars=parameters["max_chars"])
     transformer = InformationRecallTransformer(
         hub.pipeline,
+        query_builder=hub.query_builder,
         guidance=lambda: hub.guidance,
     )
     return state.with_component("information", hub).with_context_stage(

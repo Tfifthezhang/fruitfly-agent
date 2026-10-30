@@ -6,7 +6,6 @@ import hashlib
 import json
 from fruitfly_agent.core.data_model import ContextDecision, CustomMessage, UserMessage, CUSTOM_KIND_COMPACTION, ProviderView
 from fruitfly_agent.core.context.validation import valid_tool_links
-from fruitfly_agent.lab.algorithms import Algorithm, AlgorithmSpec
 from ....history import SessionHistory, public_message
 from ....measurement.budget import MeasurementService, MeasurementConfig
 from ...inference import AuxiliaryText
@@ -18,8 +17,7 @@ def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
 
 
-class WorkingMemoryReducer(Algorithm):
-    spec = AlgorithmSpec('working-memory', 'working-memory-v1', 'session')
+class WorkingMemoryReducer:
     estimate_source = 'heuristic_cjk'
     mechanism_id = 'working-memory'
 

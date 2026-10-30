@@ -13,10 +13,14 @@ from fruitfly_agent.core.data_model import AgentToolResult, AssistantMessage, Im
 from fruitfly_agent.core.data_model.media import image_type, validate_image, decode_text_file
 from fruitfly_agent.core.loop import run_agent_loop
 from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone, StreamActivity
-from fruitfly_agent.improvement.contracts.pipeline import ExecutionRecord, Resource, relative_path, canonical_json
+from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
+from fruitfly_agent.improvement.contracts.tasks import Resource
+from fruitfly_agent.improvement.contracts.validation import relative_path
+from fruitfly_agent.improvement.contracts.versions import canonical_json
 from fruitfly_agent.improvement.execution.handles import ManagedExecution
 from fruitfly_agent.improvement.execution.facts import attach_facts, loop_fact_values, receipt_facts
 from fruitfly_agent.improvement.contracts.facts import BudgetFact
+from fruitfly_agent.improvement.contracts.components import TrialSetup
 
 
 class FileTaskRunner:
@@ -26,7 +30,7 @@ class FileTaskRunner:
     project-command execution require their own injected TaskRunner. It does not
     borrow the live Session, tools, callbacks or environment.
     """
-    capabilities = frozenset({'file-workspace', 'tool:read', 'tool:write', 'tool:edit', 'events', 'stop', 'execution-config'})
+    capabilities = frozenset({'file-workspace', 'tool:read', 'tool:write', 'tool:edit', 'events', 'stop', 'execution-config', 'execution-setup'})
 
     def __init__(self, config, components, artifacts, services, *, tool_names=None, model_calls=None):
         self.config, self.components, self.artifacts, self.services = config, components, artifacts, services
@@ -51,6 +55,21 @@ class FileTaskRunner:
             await handle.aclose()
 
     async def execute_files(self, plan, task, harness, *, run_id, journal):
+        setups: list[TrialSetup] = []
+        try:
+            return await self._execute_files(plan, task, harness, run_id=run_id, journal=journal, setups=setups)
+        finally:
+            errors = []
+            for setup in reversed(setups):
+                try:
+                    await self.services.release(setup)
+                except BaseException as exc:
+                    errors.append(exc)
+            if errors:
+                from fruitfly_agent.improvement.contracts.failures import CleanupError
+                raise CleanupError('trial mechanism cleanup failed') from errors[0]
+
+    async def _execute_files(self, plan, task, harness, *, run_id, journal, setups):
         started = time.monotonic()
         files = {r.path: self.artifacts.read(r.artifact_id) for r in task.inputs}
         originals = dict(files)
@@ -152,6 +171,13 @@ class FileTaskRunner:
             max_context_recovery_attempts=self.config.max_context_recovery_attempts,
             tool_execution=self.config.tool_execution,
             on_tool_result=observed)
+        from fruitfly_agent.core.extensions.hooks import HookRegistry
+        for factory in self.components.trial_setups:
+            setup = self.services.own(factory(self.services))
+            setups.append(setup)
+            if not isinstance(setup.hooks, HookRegistry):
+                raise TypeError('trial setup must supply a Core HookRegistry')
+            config = replace(config, hooks=(config.hooks or HookRegistry()).extended(setup.hooks))
         for document in harness.components:
             adapter = self.components.adapters[document.component_id]
             required: frozenset[str] = getattr(adapter, 'required_capabilities', frozenset())

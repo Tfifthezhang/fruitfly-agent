@@ -3,8 +3,9 @@ from dataclasses import dataclass, asdict
 import hashlib
 from pathlib import Path
 
-from fruitfly_agent.lab.improvement.api import (ExecutionDefinition, MaterialOption,
-    PreparedExecution, ExecutionPorts, TaskMaterial, content_hash)
+from fruitfly_agent.improvement.contracts.experiments import ExecutionDefinition, MaterialOption, PreparedExecution, ExecutionPorts
+from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
+from fruitfly_agent.improvement.contracts.versions import content_hash
 from fruitfly_agent.improvement.contracts.versions import canonical_json
 from eval.catalog import builtin_catalog
 from eval.contracts import EvaluationRequest

@@ -29,6 +29,8 @@ URLs and keep key values in the existing secret environment.
 | `task_patches` | Optional exact `task` pattern, `tests/` file `path`, `old` and `new` setup text |
 
 Library directories must be covered by runtime mounts.
+Host YAML rejects duplicate keys at every mapping depth. Repeated `task_patches`
+or nested dependency settings are errors, rather than silent overrides.
 Host paths resolve relative to the host YAML. Host paths and container runtime
 paths expand process environment variables and reject unresolved variables.
 Phase environment values are literal strings. Relative task paths do not refer
@@ -126,6 +128,38 @@ checkout source alone does not update an already frozen Agent; prepare again to
 evaluate that source. Keep runtime directories stable while jobs are active.
 Mounts are read-only inside containers; they are not immutable on the host.
 Concurrent preparation of the same cache is unsupported.
+
+## Freeze complete installation material
+
+[installation.py](../installation.py) produces one validated `InstallationMaterial`
+inventory. Source inventories include package Python and resources declared in
+`tool.setuptools.package-data` in `pyproject.toml`. Exact resource names must
+exist; glob declarations select their current matches and may be empty. Wheel
+inventories include shipped package files and license notices; recorded missing
+files and unsafe members are rejected before freezing. Local secret files,
+bytecode and hidden state are excluded or rejected.
+
+Validation, copying and SHA-256 identity consume the same inventory. A resource
+change invalidates its content identity and creates fresh prepared material.
+The wheel archive identity is retained as well. A source change during copying
+fails preparation. Installation record schema 2 distinguishes complete-resource
+snapshots; an older prepared installation requires `prepare` again. This is a
+persisted-record version, not another host/configuration format.
+
+Declare each new runtime resource with its owning package in `pyproject.toml`.
+Do not add per-resource branches to the freezer. The independent resource
+regression imports the frozen Provider package, loads configuration and experiment
+templates, and starts the CLI without importing the checkout. The real Agent
+probe also checks its frozen import origin and template availability.
+
+```bash
+.venv/bin/python -m unittest tests.eval.test_material_resources
+```
+
+This command is offline and requires no container or model key. For built wheels,
+run the [installed-package check](../../examples/packaging/README.md); CI also
+executes its frozen-runtime check outside the checkout. A passing import does
+not establish model connectivity or verifier completion.
 
 ## Prepare verifier dependencies separately
 

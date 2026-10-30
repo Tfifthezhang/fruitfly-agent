@@ -56,6 +56,9 @@ def configuration_surfaces(catalog):
 
 
 def configure_profile(profile, catalog):
+    missing_extensions = set(profile.extensions) - {row['source'] for row in catalog.extension_identities}
+    if missing_extensions:
+        raise ValueError('configuration requires loaded extensions: ' + ', '.join(sorted(missing_extensions)))
     """Validate and project documents without constructing clients or writing files."""
     if not profile.component_documents or profile.configured:
         return profile

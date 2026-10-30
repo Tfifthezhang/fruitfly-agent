@@ -6,7 +6,6 @@ import re
 from dataclasses import dataclass, replace
 from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.core.data_model import (ContextDecision, CustomMessage, UserMessage, CUSTOM_KIND_COMPACTION)
-from fruitfly_agent.lab.algorithms import Algorithm, AlgorithmSpec
 from ....history import SessionHistory, public_message
 from ....measurement.methods.heuristic.estimator import estimate_message_tokens, resolve_token_estimator
 from ...cut import find_cut_point, valid_tool_links
@@ -23,8 +22,7 @@ class _SummarizingPlan:
     dropped_estimated_tokens: int
 
 
-class SummarizingCompactor(Algorithm):
-    spec = AlgorithmSpec('summarizing', 'summarizing-v3', 'request')
+class SummarizingCompactor:
 
     def __init__(self, config, provider, *, summary_model=None, estimate_fn=None,
                  summary_context_window=None, summary_output_limit=None, history=None, meter=None):

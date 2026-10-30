@@ -41,7 +41,7 @@ describes the request/result boundary. [Runner](../runner.py),
 [runtime staging](../runtime.py) and [results](../results.py) own shared behavior.
 
 ```bash
-.venv/bin/python -m unittest tests.eval.test_catalog tests.eval.test_harbor tests.eval.test_task_batches -v
+.venv/bin/python -m unittest tests.eval.test_catalog tests.eval.test_harbor_runner tests.eval.test_task_batches -v
 ```
 
 These checks are offline. Real execution requires Harbor, task access, Docker,

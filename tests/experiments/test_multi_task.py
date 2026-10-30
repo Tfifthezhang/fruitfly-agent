@@ -10,7 +10,7 @@ from fruitfly_agent.experiments.configuration import load_configuration
 from fruitfly_agent.experiments.composition import prepare_experiment, application_factory
 from fruitfly_agent.experiments.operations.improve import run
 from fruitfly_agent.experiments.records import RunRecords
-from fruitfly_agent.lab.improvement.api import GeneratorRegistry
+from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
 from fruitfly_agent.run import RunApplicationFactory
 from tests.support.experiments import workspace, Rule
 from tests.support.task_packs import install

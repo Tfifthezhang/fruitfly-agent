@@ -1,18 +1,25 @@
 """Keep tests discoverable, fixtures independent, and paid smoke explicit."""
 import ast
 import unittest
-from tests.architecture.checks import ROOT, imported_modules
-
-
-def cases(suite):
-    for item in suite:
-        if isinstance(item, unittest.TestSuite):
-            yield from cases(item)
-        else:
-            yield item
+from tests.architecture.checks import ROOT, imported_modules, suite_structure_violations
+from tests.runner import cases
 
 
 class SuiteStructureTests(unittest.TestCase):
+    def test_test_definitions_and_terminal_process_ownership_are_unambiguous(self):
+        violations = []
+        for path in (ROOT / 'tests').rglob('*.py'):
+            source = '.'.join(path.relative_to(ROOT).with_suffix('').parts)
+            violations.extend(suite_structure_violations(path.read_text(), source))
+        self.assertEqual([], violations)
+
+    def test_runner_areas_cover_all_test_packages(self):
+        from tests.runner import AREAS
+        packages = {path.name for path in (ROOT / 'tests').iterdir()
+                    if path.is_dir() and (path / '__init__.py').is_file()
+                    and path.name not in {'support', 'fixtures', 'integration'}}
+        self.assertEqual(packages, set(AREAS))
+
     def test_default_discovery_has_unique_ids_and_no_paid_smoke(self):
         suite = unittest.TestLoader().discover(str(ROOT / 'tests'), top_level_dir=str(ROOT))
         ids = [case.id() for case in cases(suite)]

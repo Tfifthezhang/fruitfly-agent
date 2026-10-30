@@ -61,7 +61,7 @@ def native(config):
         confirmations = 0
     else:
         raise ValueError('select task.instruction/input_paths or an installed task.pack in experiment.yaml')
-    from fruitfly_agent.lab.improvement.api import builtin_executions
+    from fruitfly_agent.lab.improvement.execution import builtin_executions
     parameters = builtin_executions().get('file-task').normalize(tuple(mapping(
         task.get('parameters', {}), {'assessment_interval', 'model_calls'}, 'file execution parameters').items()))
     return SourceBinding('file-task', pack, instruction, relative, tuple(sorted(parameters.items())), bool(pack),
@@ -70,7 +70,7 @@ def native(config):
 
 
 def editor(config):
-    from fruitfly_agent.lab.improvement.api import builtin_executions
+    from fruitfly_agent.lab.improvement.execution import builtin_executions
     task = mapping(config.task, {'source', 'material', 'parameters'}, 'editor experiment')
     material = task.get('material')
     if not isinstance(material, str) or not material:

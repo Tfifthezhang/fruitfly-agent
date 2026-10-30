@@ -7,10 +7,20 @@ import unittest
 from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.core.data_model import AssistantMessage, TextBlock
 from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone
-from fruitfly_agent.lab.improvement.api import (BatchEvaluator, ComponentWorkflow, CompletedAssessmentService,
-    ExecutionContext, ExecutionPorts, EvaluationBatch, GeneratorRegistry, MultiTaskSettings,
-    ProcessAssessmentSettings, RunPlan, TaskSetSnapshot, WorkflowServices,
-    builtin_completed_assessors, builtin_explorations)
+from fruitfly_agent.improvement.execution.batches import BatchEvaluator
+from fruitfly_agent.lab.improvement.workflow import ImprovementWorkflow as ComponentWorkflow
+from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
+from fruitfly_agent.improvement.workflow.services import WorkflowServices
+from fruitfly_agent.lab.improvement.assessment.completed import CompletedAssessmentService
+from fruitfly_agent.lab.improvement.execution import ExecutionContext
+from fruitfly_agent.improvement.contracts.experiments import ExecutionPorts
+from fruitfly_agent.improvement.contracts.evaluation import EvaluationBatch
+from fruitfly_agent.lab.improvement.task_sets import MultiTaskSettings
+from fruitfly_agent.lab.improvement.assessment.configuration import ProcessAssessmentSettings
+from fruitfly_agent.improvement.contracts.plans import RunPlan
+from fruitfly_agent.improvement.contracts.task_sets import TaskSetSnapshot
+from fruitfly_agent.lab.improvement.assessment.registry import builtin_completed_assessors
+from fruitfly_agent.lab.improvement.strategies.exploration import builtin_explorations
 from fruitfly_agent.lab.improvement.assessment.joint import assess_batch
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
 from fruitfly_agent.lab.improvement.workflow.task_sets import TaskSetProblem

@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 import re
 import tempfile
-from fruitfly_agent.lab.algorithms.evolution import EvolutionJob, VerificationEvidence
+from fruitfly_agent.rsi.contracts import EvolutionJob, VerificationEvidence
 
 class EvolutionStore:
     def __init__(self, workspace):

@@ -35,4 +35,4 @@ during retention. [Editor experiments](../improver/README.md) never stage or com
 experimental lessons, and no inner episode has a production writer.
 
 `reflection.py` owns model-based reflection. It consumes an injected read-only evidence inspector and services; it
-cannot commit its own result. Public `AgentReflector` imports remain compatible.
+cannot commit its own result. `AgentReflector` is provided by `experience.reflection`.

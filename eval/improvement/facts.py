@@ -4,8 +4,9 @@ import json
 from pathlib import Path
 
 from fruitfly_agent.core.data_model import LoopDiagnostics
-from fruitfly_agent.lab.improvement.api import (
-    ArtifactFact, BudgetFact, Resource, attach_facts, loop_fact_values, receipt_facts)
+from fruitfly_agent.improvement.contracts.facts import ArtifactFact, BudgetFact
+from fruitfly_agent.improvement.contracts.tasks import Resource
+from fruitfly_agent.improvement.execution.facts import attach_facts, loop_fact_values, receipt_facts
 
 
 def attach_benchmark_facts(record, root, artifacts, *, model_limit, interrupted=False):

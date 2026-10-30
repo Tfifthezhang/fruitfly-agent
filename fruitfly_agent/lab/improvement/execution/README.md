@@ -35,7 +35,7 @@ Borrowed ports remain caller-owned. Extensions must clean up partial constructio
 `WorkflowBindings.runner`, stage factories and injected verifier/measurements remain
 supported. `WorkflowBindings.executions` can replace the execution registry;
 `stop_policy` replaces only stop decisions. Native `file-task` remains the default.
-Definitions opt in to the legacy runner override with `accepts_runner_override`;
+Definitions opt in to the injected runner override with `accepts_runner_override`;
 its capabilities cannot replace those of unrelated execution definitions.
 An unknown execution ID, unknown parameter, incompatible component, missing scorer
 or insufficient verification allocation fails before model work.
@@ -89,8 +89,7 @@ private selection trials do not produce editor feedback. See [Task sets](../task
 
 ## Stream evidence and control a probe
 
-`file_runner.py` owns native execution; `workflow.execution` remains a compatible
-import. `FileTaskRunner.start` returns a `ManagedExecution` with `events`, `result`,
+`file_runner.py` owns native execution and its public `FileTaskRunner` entry.
 `control` and `aclose`. Final-only runners use `CompletionOnlyRunner` and expose no
 invented intermediate measurements. `events.py` persists immutable ordered event
 references for independent readers. Text streaming is not required by every backend.
@@ -130,3 +129,8 @@ preparation rejects unsupported execution before model work. Task packages witho
 file inputs reject this parameter. [Delivery verification](../verification/README.md#validate-delivery-bundles)
 owns backend behavior, results and clean-directory limits. Existing executions
 without a manifest retain their declared behavior.
+
+Native file trials apply `ComponentRegistry.trial_setups` before owner projections.
+Each setup supplies a fresh Core hook registry and owned state; resources retire
+at the execution boundary. Unsupported runners reject the `execution-setup`
+requirement rather than silently omitting a registered mechanism.

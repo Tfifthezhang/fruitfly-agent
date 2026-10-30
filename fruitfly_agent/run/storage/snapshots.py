@@ -1,8 +1,8 @@
 """Content-addressed text trees and fresh owned materialization directories."""
 from pathlib import Path
 import json
-from fruitfly_agent.lab.algorithms.targets import StateSnapshot
-from fruitfly_agent.lab.algorithms.targets import SnapshotFile
+from fruitfly_agent.improvement.contracts.versions import StateSnapshot
+from fruitfly_agent.improvement.contracts.versions import SnapshotFile
 
 
 def capture_source_tree(root: Path) -> StateSnapshot:

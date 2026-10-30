@@ -1,10 +1,12 @@
 """Owner-declared parameter candidates using the ordinary runtime assembler."""
+from fruitfly_agent.improvement.contracts.optimization import OptimizationSpec
 from dataclasses import replace
 import json
 import math
 from typing import Any
 
-from fruitfly_agent.lab.algorithms.targets import TargetBinding, TargetSnapshot, TEXT_TARGET_PREFIX
+from fruitfly_agent.improvement.contracts.optimization import TargetBinding, TargetSnapshot
+from fruitfly_agent.lab.improvement.targets.text import TEXT_TARGET_PREFIX
 from fruitfly_agent.improvement.contracts.versions import canonical_json
 
 
@@ -17,6 +19,8 @@ class ParameterTarget:
         self.values = definition.descriptor.normalize_parameters(parameters)
         self.editable = frozenset(fields)
         self.label = definition.descriptor.label + ' parameters'
+        self.optimization = OptimizationSpec(definition.configuration_role, 'parameters',
+            required_capabilities=self.required_capabilities)
 
     def snapshot(self):
         name = self.definition.descriptor.mechanism_id

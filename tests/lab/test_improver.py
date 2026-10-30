@@ -6,9 +6,16 @@ import time
 import unittest
 from unittest.mock import AsyncMock
 
-from fruitfly_agent.lab.improvement.api import (BudgetScope, AllocationExhausted, WorkflowServices,
-    SelectionDecision, Measurement, ComponentFile, CandidateBundle, HarnessSnapshot, EditReason,
-    EditorInstructions, EditorInstructionTarget, BoundedStopPolicy, SearchState, TaskMaterial)
+from fruitfly_agent.improvement.workflow.budget import BudgetScope
+from fruitfly_agent.improvement.workflow.budget import AllocationExhausted
+from fruitfly_agent.improvement.workflow.services import WorkflowServices
+from fruitfly_agent.improvement.contracts.assessment import SelectionDecision, Measurement
+from fruitfly_agent.improvement.contracts.components import ComponentFile, HarnessSnapshot
+from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, EditReason
+from fruitfly_agent.lab.improvement.editor.instructions import EditorInstructions, EditorInstructionTarget
+from fruitfly_agent.lab.improvement.termination.policies import BoundedStopPolicy
+from fruitfly_agent.improvement.contracts.stopping import SearchState
+from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
 from tests.support.pipeline import build_pipeline
 
 

@@ -7,8 +7,11 @@ from unittest.mock import Mock
 
 from fruitfly_agent.interactive import AgentApplication
 from fruitfly_agent.interactive.contracts.improvement import WorkflowRequest
-from fruitfly_agent.lab.improvement.api import (WorkflowBindings, GeneratorRegistry,
-    CandidateBundle, HarnessSnapshot, ComponentFile, EditReason, ProposalResult)
+from fruitfly_agent.lab.improvement.api import WorkflowBindings
+from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
+from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, EditReason
+from fruitfly_agent.improvement.contracts.components import HarnessSnapshot, ComponentFile
+from fruitfly_agent.improvement.contracts.editing import ProposalResult
 from fruitfly_agent.run.application import RunApplicationFactory
 from tests.support.faux_provider import FauxProvider
 from tests.support.materials import _write_models
@@ -179,7 +182,8 @@ class ApplicationPipelineTests(unittest.IsolatedAsyncioTestCase):
                 await app.close()
 
     async def test_experience_requires_review_and_next_task_gets_common_baseline(self):
-        from fruitfly_agent.lab.improvement.api import ExperienceEntry, experience_id
+        from fruitfly_agent.improvement.contracts.plans import ExperienceEntry
+        from fruitfly_agent.lab.improvement.experience import experience_id
         class Remember:
             async def reflect(self, outcome):
                 return (ExperienceEntry('lesson-' + outcome.plan.job_id, outcome.task.task_id,

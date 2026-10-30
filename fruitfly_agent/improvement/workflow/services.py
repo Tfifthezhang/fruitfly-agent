@@ -11,10 +11,15 @@ from typing import Any
 from ..contracts.lifecycle import LifecycleEvent
 from ..contracts.versions import canonical_json
 from ..extensions.hooks import HookRegistry
+from fruitfly_agent.core.extensions.operations import OperationSupervisor, consume as _consume_result
 from ..contracts.failures import PersistenceError, CleanupError
 
-from fruitfly_agent.improvement.contracts.pipeline import (CandidateBundle, CompositionRequest, HarnessSnapshot,
-    ImprovementOutcome, ProposalRequest, SelectionDecision, ExecutionRecord, Measurement)
+from fruitfly_agent.improvement.contracts.candidates import CandidateBundle
+from fruitfly_agent.improvement.contracts.editing import CompositionRequest, ProposalRequest
+from fruitfly_agent.improvement.contracts.components import HarnessSnapshot
+from fruitfly_agent.improvement.contracts.pipeline import ImprovementOutcome
+from fruitfly_agent.improvement.contracts.assessment import SelectionDecision, Measurement
+from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
 
 
 from fruitfly_agent.improvement.workflow.budget import BudgetScope, AllocationExhausted, operation_deadline
@@ -36,6 +41,7 @@ class WorkflowServices:
         self.resources = []
         self.verification_budget = None
         self.interrupted_records = []
+        self.supervisor = OperationSupervisor(cleanup_error=CleanupError)
 
     def own(self, resource):
         if all(item is not resource for item in self.resources):
@@ -134,6 +140,10 @@ class WorkflowServices:
         return result
 
     async def operation(self, awaitable):
+        if self.supervisor.poisoned:
+            if inspect.iscoroutine(awaitable):
+                awaitable.close()
+            raise CleanupError('previous stage retirement was not confirmed')
         try:
             self.check()
         except BaseException:
@@ -144,34 +154,14 @@ class WorkflowServices:
                        self.budget.deadline or float('inf'), operation_deadline.get() or float('inf'))
         token = operation_deadline.set(deadline)
         try:
-            work = asyncio.ensure_future(awaitable)
+            return await self.supervisor.run(lambda: awaitable,
+                timeout=max(0, deadline - time.monotonic()), signal=self.signal, check=self.check)
+        except CleanupError:
+            self.record('cleanup-unconfirmed', operation='stage')
+            raise
         finally:
             operation_deadline.reset(token)
-        cancelled = asyncio.create_task(self.signal.wait())
-        try:
-            timeout = max(0, deadline - time.monotonic())
-            done, _ = await asyncio.wait((work, cancelled), timeout=timeout,
-                                         return_when=asyncio.FIRST_COMPLETED)
-            self.check()
-            if work not in done:
-                raise TimeoutError('improvement operation timed out')
-            return await work
-        finally:
-            work.cancel()
-            cancelled.cancel()
-            done, pending = await asyncio.wait((work, cancelled), timeout=10)
-            for task in done:
-                _consume_result(task)
-            if pending:
-                for task in pending:
-                    task.add_done_callback(_consume_result)
-                self.record('cleanup-unconfirmed', operation='stage')
-                raise CleanupError('stage cancellation did not confirm')
 
-
-def _consume_result(task):
-    if not task.cancelled():
-        task.exception()
 
 
 class GeneratorServices:

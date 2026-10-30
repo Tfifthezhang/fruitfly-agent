@@ -98,7 +98,7 @@ remain in [AGENTS.md](AGENTS.md).
 | Source contents | Root guides and licenses, packaging files, public model examples, runtime, Eval, examples, tests, and workflows |
 | Exclusions | Local keys, runtime data, virtual environments, assistant settings, caches, and build artifacts |
 | Distribution contents | Source archive retains the logo, public examples and licenses. Both distributions retain `fruitfly_agent/run/configuration/templates/models.yaml`; all other `models.yaml`, secrets and private environment files are excluded. |
-| Installed wheel | CLI, default prompt, registered extension, function worker, IPython subprocess, and Eval installation material preparation work outside the checkout |
+| Installed wheel | CLI, default prompt, registered extension, function worker, IPython subprocess, and Eval installation material preparation work outside the checkout; the frozen copy independently imports Providers and loads templates |
 | Model configuration | Wheel users provide a catalog in their workspace or configure its path. |
 
 [GitHub Actions](.github/workflows/tests.yml) runs offline checks on macOS/Linux with Python 3.11–3.13 and checks built distributions with harmless secret/state probes. Dependency installation uses the network; tests do not call model services or run benchmark containers. Public CI results are available on the repository's Actions page.

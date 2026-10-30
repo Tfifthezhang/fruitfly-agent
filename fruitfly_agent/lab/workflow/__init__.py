@@ -1,10 +1,12 @@
 """Bounded declarative execution workflows over the public Core callbacks."""
+from fruitfly_agent.improvement.contracts.optimization import OptimizationSpec
 from dataclasses import replace
 import json
 
 from fruitfly_agent.core.data_model import UserMessage
 from fruitfly_agent.core.mechanisms import MechanismDescriptor, MechanismContribution, MechanismEffects
-from fruitfly_agent.lab.algorithms.targets import TargetBinding, TargetSnapshot, validate_text
+from fruitfly_agent.improvement.contracts.optimization import TargetBinding, TargetSnapshot
+from fruitfly_agent.lab.improvement.targets.text import validate_text
 
 WORKFLOW_TARGET = 'execution-workflow'
 DEFAULT_WORKFLOW = '{"steps":["Solve the user task and return the final answer."]}'
@@ -52,6 +54,7 @@ def apply_workflow(config, text):
 
 
 class WorkflowTarget:
+    optimization = OptimizationSpec('H', 'structure')
     label = 'Execution workflow'
     component_kind = 'execution-workflow'
 
@@ -105,7 +108,7 @@ def definition():
 
 
 def _install(state, context, parameters):
-    from fruitfly_agent.lab.algorithms.targets import TEXT_TARGET_PREFIX
+    from fruitfly_agent.lab.improvement.targets.text import TEXT_TARGET_PREFIX
     text = DEFAULT_WORKFLOW
     reference = context.artifact_bindings.get(WORKFLOW_TARGET)
     if reference is not None:

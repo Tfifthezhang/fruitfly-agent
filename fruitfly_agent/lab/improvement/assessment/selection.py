@@ -1,6 +1,8 @@
 """Read-only output selection through an independently injected inspector."""
 import json
-from fruitfly_agent.improvement.contracts.pipeline import HarnessSnapshot, ComponentDocument, SelectionDecision, canonical_json
+from fruitfly_agent.improvement.contracts.components import HarnessSnapshot, ComponentDocument
+from fruitfly_agent.improvement.contracts.assessment import SelectionDecision
+from fruitfly_agent.improvement.contracts.versions import canonical_json
 from ..evidence import EvidenceWorkspace
 
 

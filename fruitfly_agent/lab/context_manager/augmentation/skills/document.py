@@ -1,8 +1,8 @@
 """A compact reusable Skill body, independent of catalog guidance and source files."""
 from fruitfly_agent.core.mechanisms import MechanismDescriptor, MechanismContribution, ParameterDescriptor
-from fruitfly_agent.lab.algorithms.retained import install_retained, configuration_edit
-from fruitfly_agent.lab.algorithms.snapshots import WorkspaceTextSnapshots
-from fruitfly_agent.lab.algorithms.targets import STATE_SNAPSHOTS_COMPONENT
+from fruitfly_agent.lab.improvement.targets.retained import install_retained, configuration_edit
+from fruitfly_agent.lab.improvement.targets.state import WorkspaceTextSnapshots
+from fruitfly_agent.improvement.contracts.versions import STATE_SNAPSHOTS_COMPONENT
 from .catalog import load_skill_document
 
 SKILL_DOCUMENT = 'skill-document'

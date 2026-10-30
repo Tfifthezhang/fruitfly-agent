@@ -12,8 +12,13 @@ from fruitfly_agent.experiments.scaffolding import initialize_workspace
 from fruitfly_agent.interactive import AgentApplication
 from fruitfly_agent.interactive.contracts.improvement import WorkflowRequest
 from fruitfly_agent.lab.catalog import load_system_config
-from fruitfly_agent.lab.improvement.api import (WorkflowBindings, GeneratorRegistry, CandidateBundle,
-    HarnessSnapshot, ComponentFile, EditReason, ProposalResult, Measurement, read_facts)
+from fruitfly_agent.lab.improvement.api import WorkflowBindings
+from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
+from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, EditReason
+from fruitfly_agent.improvement.contracts.components import HarnessSnapshot, ComponentFile
+from fruitfly_agent.improvement.contracts.editing import ProposalResult
+from fruitfly_agent.improvement.contracts.assessment import Measurement
+from fruitfly_agent.improvement.execution.facts import read_facts
 from fruitfly_agent.run import RunApplicationFactory
 from tests.support.faux_provider import FauxProvider
 

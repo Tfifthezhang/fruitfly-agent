@@ -13,9 +13,18 @@ import yaml
 
 from eval.improvement import benchmark_execution
 from eval.improvement.runner import EvalTaskRunner
-from fruitfly_agent.lab.improvement.api import (ComponentRegistry, TextComponentAdapter, RunPlan, WorkflowServices,
-    ExecutionContext, ExecutionRequest, TaskMaterial, CandidateBundle, ComponentFile, HarnessSnapshot, EditReason,
-    ComponentWorkflow, GeneratorRegistry, ProposalResult, SelectionDecision)
+from fruitfly_agent.lab.improvement.components import ComponentRegistry, TextComponentAdapter
+from fruitfly_agent.improvement.contracts.plans import RunPlan
+from fruitfly_agent.improvement.workflow.services import WorkflowServices
+from fruitfly_agent.lab.improvement.workflow import ImprovementWorkflow as ComponentWorkflow
+from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
+from fruitfly_agent.lab.improvement.execution import ExecutionContext
+from fruitfly_agent.improvement.contracts.experiments import ExecutionRequest
+from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
+from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, EditReason
+from fruitfly_agent.improvement.contracts.components import ComponentFile, HarnessSnapshot
+from fruitfly_agent.improvement.contracts.editing import ProposalResult
+from fruitfly_agent.improvement.contracts.assessment import SelectionDecision
 from fruitfly_agent.lab.base_prompt.target import BasePromptTarget
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
 from tests.support.pipeline import version
@@ -263,7 +272,7 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(any(r.path.endswith('session.jsonl') for r in resources))
             task = TaskMaterial('task', 'Work')
             plan = RunPlan('partial', version(), ('base_prompt',))
-            from fruitfly_agent.lab.improvement.api import ExecutionRecord
+            from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
             record = ExecutionRecord('run', task.task_id, task.material_id, plan.parent.harness,
                 plan.parent.state, plan.conditions_id, 'cancelled', '', resources, calls)
             record = attach_benchmark_facts(record, root, artifacts, model_limit=2, interrupted=True)

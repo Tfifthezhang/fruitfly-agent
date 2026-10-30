@@ -2,8 +2,9 @@
 from dataclasses import replace
 import unittest
 
-from fruitfly_agent.lab.improvement.api import (TaskSetSnapshot, MultiTaskSettings, sample_batch,
-    ScoreSpec, task_set_minimum_budget)
+from fruitfly_agent.improvement.contracts.task_sets import TaskSetSnapshot, ScoreSpec
+from fruitfly_agent.lab.improvement.task_sets import MultiTaskSettings, sample_batch
+from fruitfly_agent.lab.improvement.task_sets.execution import minimum_budget as task_set_minimum_budget
 from tests.support.task_sets import collection
 
 

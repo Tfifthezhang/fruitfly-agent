@@ -8,7 +8,9 @@ import unittest
 from eval.improvement.evidence import collect
 from eval.improvement.facts import attach_benchmark_facts
 from fruitfly_agent.core.data_model import LoopDiagnostics
-from fruitfly_agent.lab.improvement.api import ExecutionRecord, TaskMaterial, read_facts
+from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
+from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
+from fruitfly_agent.improvement.execution.facts import read_facts
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
 from tests.support.pipeline import fixture, version
 

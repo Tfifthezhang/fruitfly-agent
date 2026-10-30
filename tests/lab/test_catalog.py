@@ -1,74 +1,10 @@
-"""Generic Lab catalog, profile, and assembly contracts."""
-
+"""Catalog behavior and failure contracts."""
 from __future__ import annotations
-
 from dataclasses import replace
-import tempfile
 import unittest
-from pathlib import Path
+from fruitfly_agent.lab.catalog import LabCatalog, MechanismContribution, MechanismDescriptor, MechanismEffects, MechanismSelection, ParameterDescriptor, builtin_catalog
 
-from fruitfly_agent.core import AgentLoopConfig
-from fruitfly_agent.lab import SummarizingCompactor, SummarizingCompactorConfig
-from fruitfly_agent.lab.catalog import (
-    AssemblyContext,
-    AssemblyState,
-    LabCatalog,
-    MechanismContribution,
-    MechanismDefinition,
-    MechanismDescriptor,
-    MechanismEffects,
-    MechanismSelection,
-    ParameterDescriptor,
-    ProviderBinding,
-    assemble_lab,
-    builtin_catalog,
-)
-from tests.support.faux_provider import FauxProvider
-
-
-def _definition(
-    mechanism_id: str,
-    *,
-    order: int = 100,
-    requires: frozenset[str] = frozenset(),
-    conflicts: frozenset[str] = frozenset(),
-    group: str | None = None,
-    phase: str | None = None,
-    install=None,
-) -> MechanismDefinition:
-    return MechanismDefinition(
-        MechanismDescriptor(
-            mechanism_id=mechanism_id,
-            label=mechanism_id,
-            description="test mechanism",
-            contributions=(
-                MechanismContribution(
-                    "online" if phase is not None else "capability",
-                    "context" if phase is not None else "tools",
-                    phase,
-                ),
-            ),
-            parameters=(
-                ParameterDescriptor(
-                    "limit",
-                    "integer",
-                    "Limit",
-                    "Positive test limit.",
-                    2,
-                    minimum=1,
-                ),
-            ),
-            requires=requires,
-            conflicts=conflicts,
-            exclusive_group=group,
-            install_order=order,
-            effects=MechanismEffects(tools=(mechanism_id,)),
-        ),
-        install or (lambda state, context, parameters: state),
-
-        implementation_path='tests/lab/test_catalog.py',
-        documentation_path='tests/lab/README.md',
-    )
+from tests.support.catalog import mechanism_definition
 
 
 class DescriptorTest(unittest.TestCase):
@@ -79,23 +15,7 @@ class DescriptorTest(unittest.TestCase):
                 (lambda state: state, 'accept'),
                 (lambda state, context, parameters, required: state, 'accept')):
             with self.subTest(install=install), self.assertRaisesRegex(TypeError, message):
-                _definition('invalid-installer', install=install)
-
-    def test_assembly_rejects_broken_lifecycle_before_application_start(self):
-        class Resource:
-            start = 'invalid'
-            def close(self):
-                pass
-        resource = Resource()
-        owned = []
-        definition = _definition('broken-lifecycle',
-            install=lambda state, context, parameters: state.with_component('resource', resource))
-        context = AssemblyContext(Path.cwd(), object(), 'offline',
-            lambda *_: ProviderBinding(FauxProvider(), 'offline', 'offline'), resource_sink=owned)
-        with self.assertRaisesRegex(TypeError, 'component start must be callable'):
-            assemble_lab(AgentLoopConfig(provider=FauxProvider()), catalog=LabCatalog((definition,)),
-                selections=(MechanismSelection('broken-lifecycle'),), context=context)
-        self.assertIn(resource, owned)
+                mechanism_definition('invalid-installer', install=install)
 
     def test_descriptor_serializes_multiple_contributions_without_a_version(self) -> None:
         descriptor = MechanismDescriptor(
@@ -192,7 +112,7 @@ class CatalogTest(unittest.TestCase):
         def credentials(parameters):
             calls.append(parameters["limit"])
             return ("SHARED_KEY", "CUSTOM_KEY", "SHARED_KEY")
-        definition = replace(_definition("custom"), credential_variables=credentials,
+        definition = replace(mechanism_definition("custom"), credential_variables=credentials,
                              install=lambda *args: self.fail("discovery constructed a runtime"))
         catalog = LabCatalog((definition,))
         self.assertEqual(("CUSTOM_KEY", "SHARED_KEY"), catalog.required_credentials((MechanismSelection("custom"),)))
@@ -203,37 +123,6 @@ class CatalogTest(unittest.TestCase):
             invalid = replace(definition, credential_variables=lambda parameters: result)
             with self.subTest(result=result), self.assertRaisesRegex(ValueError, "environment variable"):
                 invalid.required_credentials({})
-
-    def test_assembly_checks_declared_credentials_before_install_and_injects_snapshot(self):
-        lookups = []
-        def resolve(name):
-            lookups.append(name)
-            return "fixture-value"
-        def install(state, context, parameters):
-            self.assertEqual("fixture-value", context.secret_resolver("CUSTOM_KEY"))
-            self.assertIsNone(context.secret_resolver("UNDECLARED_KEY"))
-            return state
-        definition = replace(_definition("custom"), credential_variables=lambda parameters: ("CUSTOM_KEY",), install=install)
-        catalog = LabCatalog((definition,))
-        context = AssemblyContext(Path.cwd(), object(), "offline", lambda *args: None, secret_resolver=resolve)
-        assemble_lab(AgentLoopConfig(provider=FauxProvider()), catalog=catalog,
-                     selections=(MechanismSelection("custom"),), context=context)
-        self.assertEqual(["CUSTOM_KEY"], lookups)
-        with self.assertRaisesRegex(ValueError, "CUSTOM_KEY"):
-            assemble_lab(AgentLoopConfig(provider=FauxProvider()), catalog=catalog,
-                         selections=(MechanismSelection("custom"),), context=replace(context, secret_resolver=None))
-
-    def test_all_registered_algorithms_declare_differentiated_descriptions_and_real_paths(self):
-        definitions = builtin_catalog().definitions()
-        descriptions = [d.descriptor.description for d in definitions]
-        self.assertEqual(len(descriptions), len(set(descriptions)))
-        root = Path(__file__).resolve().parents[2]
-        for definition in definitions:
-            with self.subTest(method=definition.descriptor.mechanism_id):
-                self.assertTrue((root / definition.implementation_path).is_file())
-                self.assertTrue((root / definition.documentation_path).is_file())
-        self.assertEqual(builtin_catalog().get('compaction').input_parameters, ())
-        self.assertEqual(builtin_catalog().get('live-http').input_parameters, ('endpoint',))
 
     def test_registration_rejects_missing_display_metadata_and_unknown_user_fields(self):
         definition = builtin_catalog().get('read-tool')
@@ -267,75 +156,6 @@ class CatalogTest(unittest.TestCase):
         self.assertIn("available: none", message)
         self.assertIn("register the mechanism in the Catalog", message)
 
-    def test_builtin_descriptors_use_two_dimensional_architecture(self) -> None:
-        catalog = builtin_catalog()
-        expected = {
-            "read-tool": ("capability", "tools", None, "tools"),
-            "ipython-tool": ("capability", "tools", None, "tools"),
-            "skill-catalog": (
-                "online",
-                "context",
-                "augmentation",
-                "context-manager",
-            ),
-            "rlm-ipython": (
-                "online",
-                "context",
-                "externalization",
-                "context-manager",
-            ),
-            "compaction": (
-                "online",
-                "context",
-                "reduction",
-                "context-manager",
-            ),
-        }
-        for mechanism_id, coordinates in expected.items():
-            descriptor = catalog.get(mechanism_id).descriptor
-            primary = descriptor.primary
-            self.assertEqual(
-                coordinates[:3],
-                (
-                    primary.layer,
-                    primary.family,
-                    primary.context_phase,
-                ),
-            )
-
-    def test_builtin_catalog_covers_every_current_selectable_harness_feature(self) -> None:
-        self.assertEqual(
-            {item.mechanism_id for item in builtin_catalog().descriptors()},
-            {
-                "local-env",
-                "instruction-components",
-                "ssh-env",
-                "read-tool",
-                "bash-tool",
-                "edit-tool",
-                "write-tool",
-                "save-media-tool",
-                "ipython-tool",
-                "web-search-tool",
-                "web-fetch-tool",
-                "mcp-tools",
-                "skill-catalog",
-                "information-context",
-                "memory-files",
-                "knowledge-files",
-                "live-http",
-                "compaction",
-                "context-history",
-                "context-measurement",
-                "working-memory-reduction",
-                "rlm-ipython",
-                "execution-workflow",
-                "skill-document",
-                "learned-memory",
-                "component-improvement",
-            },
-        )
-
     def test_unknown_mechanisms_are_rejected_even_when_disabled(self) -> None:
         catalog = builtin_catalog()
         for mechanism in ("unregistered-improver", "unregistered-context", "unregistered-tool", "task-material-recording"):
@@ -344,64 +164,17 @@ class CatalogTest(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, "unknown mechanism.*Remove this selection"):
                         catalog.resolve((MechanismSelection(mechanism, enabled=enabled),))
 
-
-
-    def test_ipython_and_rlm_descriptors_have_separate_effects(self) -> None:
-        catalog = builtin_catalog()
-        descriptor = catalog.get("rlm-ipython").descriptor
-        tool = catalog.get("ipython-tool").descriptor
-
-        self.assertEqual(
-            ("online", "context", "externalization"),
-            (
-                descriptor.primary.layer,
-                descriptor.primary.family,
-                descriptor.primary.context_phase,
-            ),
-        )
-        self.assertFalse(descriptor.default_enabled)
-        self.assertEqual(frozenset({"ipython-tool"}), descriptor.requires)
-        self.assertEqual((), descriptor.effects.tools)
-        self.assertFalse(descriptor.effects.uses_provider)
-        self.assertFalse(descriptor.effects.uses_network)
-        self.assertTrue(descriptor.effects.writes_files)
-        self.assertEqual(("ipython",), tool.effects.tools)
-        self.assertTrue(tool.effects.uses_provider)
-        self.assertTrue(tool.effects.uses_network)
-        self.assertIn(
-            "max_query_calls",
-            {parameter.name for parameter in tool.parameters},
-        )
-
-    def test_compaction_descriptor_owns_config_and_costs(self) -> None:
-        definition = builtin_catalog().get("compaction")
-        descriptor = definition.descriptor
-        self.assertEqual("reduction", descriptor.primary.context_phase)
-        self.assertNotIn("profile", {p.name for p in descriptor.parameters})
-        self.assertTrue(descriptor.effects.uses_provider)
-        self.assertTrue(descriptor.effects.uses_network)
-        self.assertEqual("summarizing-v3", definition.implementation_id)
-
-    def test_compaction_rejects_profile_parameter_even_when_disabled(self):
-        for name in ("unregistered-profile", "summarizing"):
-            for enabled in (True, False):
-                with self.subTest(name=name, enabled=enabled):
-                    with self.assertRaisesRegex(ValueError, "unknown context policy parameter: profile"):
-                        builtin_catalog().resolve((MechanismSelection(
-                            "compaction", enabled=enabled, parameters={"profile": name}
-                        ),))
-
     def test_rejects_duplicates_dependencies_conflicts_and_exclusive_groups(self) -> None:
         with self.assertRaisesRegex(ValueError, "duplicate mechanism"):
-            LabCatalog((_definition("same"), _definition("same")))
+            LabCatalog((mechanism_definition("same"), mechanism_definition("same")))
 
         catalog = LabCatalog(
             (
-                _definition("base"),
-                _definition("dependent", requires=frozenset({"base"})),
-                _definition("other", conflicts=frozenset({"base"})),
-                _definition("left", group="slot"),
-                _definition("right", group="slot"),
+                mechanism_definition("base"),
+                mechanism_definition("dependent", requires=frozenset({"base"})),
+                mechanism_definition("other", conflicts=frozenset({"base"})),
+                mechanism_definition("left", group="slot"),
+                mechanism_definition("right", group="slot"),
             )
         )
         with self.assertRaisesRegex(ValueError, "requires"):
@@ -417,8 +190,8 @@ class CatalogTest(unittest.TestCase):
 
         phase_catalog = LabCatalog(
             (
-                _definition("external-a", phase="externalization"),
-                _definition("external-b", phase="externalization"),
+                mechanism_definition("external-a", phase="externalization"),
+                mechanism_definition("external-b", phase="externalization"),
             )
         )
         resolved = phase_catalog.resolve(
@@ -434,7 +207,7 @@ class CatalogTest(unittest.TestCase):
 
     def test_explicit_extension_is_immutable_and_discoverable(self) -> None:
         base = builtin_catalog()
-        custom = _definition("external-knowledge")
+        custom = mechanism_definition("external-knowledge")
         extended = base.extended((custom,))
 
         self.assertNotIn(
@@ -445,126 +218,3 @@ class CatalogTest(unittest.TestCase):
             "external-knowledge",
             {item.mechanism_id for item in extended.descriptors()},
         )
-
-    def test_each_compaction_choice_assembles_with_only_required_provider(self) -> None:
-        catalog = builtin_catalog()
-        for algorithm, expected_provider_calls in (("summarizing", 1),):
-            with self.subTest(algorithm=algorithm), tempfile.TemporaryDirectory() as tmp:
-                calls: list[tuple[str | None, int | None]] = []
-
-                def resolve(profile, max_tokens):
-                    calls.append((profile, max_tokens))
-                    return ProviderBinding(FauxProvider(), "summary-model", "summary")
-
-                result = assemble_lab(
-                    AgentLoopConfig(provider=FauxProvider()),
-                    catalog=catalog,
-                    selections=(
-                        MechanismSelection("context-history"),
-                        MechanismSelection(
-                            "compaction",
-                            parameters={},
-                        ),
-                    ),
-                    context=AssemblyContext(
-                        Path(tmp),
-                        None,
-                        "main-model",
-                        resolve,
-                    ),
-                )
-
-                self.assertIsNotNone(result.context_pipeline)
-                self.assertEqual(("context-history", "compaction"), result.mechanism_ids)
-                self.assertEqual(expected_provider_calls, len(calls))
-
-    def test_assembly_is_stable_and_rejects_non_state_installers(self) -> None:
-        observed: list[str] = []
-
-        def installer(name):
-            def install(state, context, parameters):
-                observed.append(name)
-                return state.with_component(name, parameters["limit"])
-
-            return install
-
-        catalog = LabCatalog(
-            (
-                _definition("later", order=20, install=installer("later")),
-                _definition("first", order=10, install=installer("first")),
-            )
-        )
-        context = AssemblyContext(
-            Path.cwd(),
-            object(),  # installers in this test do not consume SessionLike
-            "offline",
-            lambda *_: ProviderBinding(FauxProvider(), "offline", "offline"),
-        )
-        result = assemble_lab(
-            AgentLoopConfig(provider=FauxProvider()),
-            catalog=catalog,
-            selections=(MechanismSelection("later"), MechanismSelection("first")),
-            context=context,
-        )
-
-        self.assertEqual(observed, ["first", "later"])
-        self.assertEqual(result.mechanism_ids, ("first", "later"))
-        self.assertEqual(result.components, {"first": 2, "later": 2})
-
-        invalid = LabCatalog((_definition("invalid", install=lambda *args: None),))
-        with self.assertRaisesRegex(TypeError, "expected AssemblyState"):
-            assemble_lab(
-                AgentLoopConfig(provider=FauxProvider()),
-                catalog=invalid,
-                selections=(MechanismSelection("invalid"),),
-                context=context,
-            )
-
-    def test_assembly_binds_reduction_to_its_declaring_mechanism(self) -> None:
-        context = AssemblyContext(
-            Path.cwd(),
-            object(),
-            "offline",
-            lambda *_: ProviderBinding(FauxProvider(), "offline", "offline"),
-        )
-
-        def install_reduction(state, context, parameters):
-            return replace(state, reducer=SummarizingCompactor(SummarizingCompactorConfig(), FauxProvider()))
-
-        declared = LabCatalog(
-            (
-                _definition(
-                    "custom-reduction",
-                    phase="reduction",
-                    install=install_reduction,
-                ),
-            )
-        )
-        result = assemble_lab(
-            AgentLoopConfig(provider=FauxProvider()),
-            catalog=declared,
-            selections=(MechanismSelection("custom-reduction"),),
-            context=context,
-        )
-
-        self.assertEqual(
-            ("custom-reduction",),
-            result.context_pipeline.profile.reduction,
-        )
-
-        undeclared = LabCatalog(
-            (_definition("hidden-reduction", install=install_reduction),)
-        )
-        with self.assertRaisesRegex(ValueError, "undeclared reduction"):
-            assemble_lab(
-                AgentLoopConfig(provider=FauxProvider()),
-                catalog=undeclared,
-                selections=(MechanismSelection("hidden-reduction"),),
-                context=context,
-            )
-
-
-
-
-if __name__ == "__main__":
-    unittest.main()

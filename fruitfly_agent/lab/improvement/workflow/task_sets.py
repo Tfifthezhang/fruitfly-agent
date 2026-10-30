@@ -18,7 +18,7 @@ from ..assessment.joint import assess_batch
 from ..assessment.joint_process import choose_seed
 from ..task_sets.sampling import sample_batch
 from fruitfly_agent.improvement.workflow.budget import AllocationExhausted
-from fruitfly_agent.improvement.workflow.engine import SearchEngine
+from fruitfly_agent.improvement.workflow.engine import SearchEngine, validate_schedule
 from fruitfly_agent.improvement.workflow.problems import SearchProblem
 from fruitfly_agent.improvement.workflow.services import GeneratorServices
 from fruitfly_agent.improvement.workflow.operations import run_stage, diagnostic_reference, require_type
@@ -36,8 +36,11 @@ class TaskSetProblem:
         if plan.purpose != 'task' or plan.retain_experience:
             raise ValueError('task-set development search neither adopts nor commits experience')
         schedule = workflow.strategies.get(plan.strategy_id).schedule(plan)
+        validate_schedule(schedule, plan)
         if len(schedule.missions) != 1 or schedule.compositions or schedule.references != 1:
             raise ValueError('task-set search currently needs one sequential candidate per round')
+        for binding in self.bindings:
+            workflow.components.admit(plan.component_ids, binding.capabilities)
         workflow.components.validate(baseline)
         for component in plan.component_ids:
             document = baseline.component(component)

@@ -3,15 +3,24 @@ import asyncio
 from dataclasses import replace
 import unittest
 
-from fruitfly_agent.lab.improvement.api import (AllOf, AnyOf, AssessorRegistry, Assessment, ChangeSet,
-    EvidencePosition, FailureLimit, FeedbackProjection, FileChange, IterationLimit, LexicographicComparison,
-    Metric, ModelAssessor, NoImprovement, Objective, ResourceLimit, RunPlan, ScoreAtLeast, SearchState,
-    StopDecision, TaskMaterial, WeightedSum, WorkflowServices, content_hash)
+from fruitfly_agent.lab.improvement.termination import AllOf, AnyOf, FailureLimit, IterationLimit, NoImprovement, ResourceLimit, ScoreAtLeast, StopDecision
+from fruitfly_agent.lab.improvement.assessment.registry import AssessorRegistry
+from fruitfly_agent.improvement.contracts.live import Assessment, EvidencePosition, Metric
+from fruitfly_agent.lab.improvement.components.changes import ChangeSet, FileChange
+from fruitfly_agent.lab.improvement.assessment.feedback import FeedbackProjection
+from fruitfly_agent.lab.improvement.assessment.comparison import LexicographicComparison, Objective
+from fruitfly_agent.lab.improvement.assessment.scorers.model import ModelAssessor
+from fruitfly_agent.improvement.contracts.plans import RunPlan
+from fruitfly_agent.improvement.contracts.stopping import SearchState
+from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
+from fruitfly_agent.lab.improvement.assessment.aggregation import WeightedSum
+from fruitfly_agent.improvement.workflow.services import WorkflowServices
+from fruitfly_agent.improvement.contracts.versions import content_hash
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
 from fruitfly_agent.improvement.workflow.budget import BudgetScope
-from fruitfly_agent.lab.rsi import AgentVersion, Candidate, EvolutionBudget, EvolutionDriver, Verification
-from fruitfly_agent.lab.rsi.persistent import PersistentEvolutionDriver
-from fruitfly_agent.lab.algorithms.evolution import VerificationEvidence, AdoptionResult
+from fruitfly_agent.rsi import AgentVersion, Candidate, EvolutionBudget, EvolutionDriver, Verification
+from fruitfly_agent.rsi.engine import EvolutionEngine
+from fruitfly_agent.rsi.contracts import VerificationEvidence, AdoptionResult
 from fruitfly_agent.core.config import AgentLoopConfig
 from tests.support.faux_provider import FauxProvider
 from tests.support.pipeline import fixture, version
@@ -20,7 +29,7 @@ from tests.support.pipeline import fixture, version
 class EvolutionPolicyTests(unittest.IsolatedAsyncioTestCase):
     async def test_online_judge_rejects_an_intermediate_json_answer(self):
         from fruitfly_agent.core.data_model import AssistantMessage, TextBlock
-        from fruitfly_agent.lab.improvement.api import ExecutionEvent
+        from fruitfly_agent.improvement.contracts.live import ExecutionEvent
         provider = FauxProvider()
         provider.respond(AssistantMessage([TextBlock('{"metrics":[]}')], stop_reason='stop', continue_turn=True))
         services = WorkflowServices(RunPlan('judge-intermediate', version(), ('prompt',)))
@@ -71,12 +80,12 @@ class EvolutionPolicyTests(unittest.IsolatedAsyncioTestCase):
             async def verify(self, candidate, policy): return VerificationEvidence(candidate, 'artifact', 'manifest', policy, False)
             async def adopt(self, *args): raise AssertionError('cannot adopt a rejection')
         host = Host()
-        result = await PersistentEvolutionDriver().evolve(host, job_id='job', policy_id='policy', direction='improve',
+        result = await EvolutionEngine().evolve(host, job_id='job', policy_id='policy', direction='improve',
             max_steps=5, continue_on_rejection=True, stop_policy=NoImprovement(2))
         self.assertEqual((result.phase, result.steps, result.stop_reason), ('complete', 2, 'no_improvement'))
         self.assertEqual(result.consecutive_no_gain, 2)
         with self.assertRaisesRegex(ValueError, 'strategy'):
-            await PersistentEvolutionDriver().evolve(host, job_id='job', policy_id='policy', direction='improve', max_steps=5)
+            await EvolutionEngine().evolve(host, job_id='job', policy_id='policy', direction='improve', max_steps=5)
 
     async def test_external_settlement_charges_held_quota_even_after_cancellation(self):
         root = BudgetScope({'model': 10, 'execution': 2})
@@ -98,7 +107,7 @@ class EvolutionPolicyTests(unittest.IsolatedAsyncioTestCase):
         services = WorkflowServices(plan)
         judge = ModelAssessor('judge-v1', config=AgentLoopConfig(provider=provider, model='judge-model'),
             services=services, instruction='Assess the supplied evidence.', render=lambda event: event.kind)
-        from fruitfly_agent.lab.improvement.api import ExecutionEvent
+        from fruitfly_agent.improvement.contracts.live import ExecutionEvent
         value = await judge.assess(ExecutionEvent(EvidencePosition('run', baseline.snapshot_id, 'initial', 1), 'finished'))
         self.assertEqual(value.metrics[0].value, 0.8)
         self.assertEqual(services.used['model'], 1)

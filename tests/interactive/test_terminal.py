@@ -1,19 +1,13 @@
-"""Line-oriented terminal commands remain offline and deterministic."""
-
+"""Terminal behavior and failure contracts."""
 from __future__ import annotations
-
-from fruitfly_agent.interactive.contracts.improvement import ImprovementPreview, ImprovementTargetView
+from fruitfly_agent.interactive.contracts.improvement import ImprovementPreview
 from tests.support.improvement_ui import configuration
-
 import asyncio
-from dataclasses import replace
 import io
-from pathlib import Path
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
-
-from fruitfly_agent.interactive import ResumableSession, TerminalFrontend
+from fruitfly_agent.interactive import TerminalFrontend
 from fruitfly_agent.interactive.contracts.commands import CommandResult
 from fruitfly_agent.interactive.interaction.commands import CommandRouter
 from fruitfly_agent.interactive.contracts.events import AssistantTextDelta, AuthorizationRequested, AuthorizationResolved
@@ -25,24 +19,7 @@ from tests.support.application import offline_session
 from tests.support.configuration import MockConfiguration
 from tests.support.terminal import ScriptedLines, MenuScriptedLines, TtyStringIO, run_finished
 
-
-class _TerminalSessionStub:
-    running = False
-    pending_count = 0
-
-    def __init__(self, **kwargs):
-        self.base = offline_session(**kwargs)
-
-    @property
-    def status(self):
-        return self.base.status
-
-    def set_event_sink(self, sink):
-        self.sink = sink
-        self.base.set_event_sink(sink)
-
-    def trace(self, limit=12):
-        return self.base.trace(limit)
+from tests.support.terminal import TerminalSessionStub
 
 
 class TerminalFrontendTest(unittest.IsolatedAsyncioTestCase):
@@ -89,7 +66,7 @@ class TerminalFrontendTest(unittest.IsolatedAsyncioTestCase):
             algorithm="opro", target="base_prompt", role="H", evidence=(("Validation", "1.0"),),
         )
 
-        class ImprovementSession(_TerminalSessionStub):
+        class ImprovementSession(TerminalSessionStub):
             def workflow_configuration(self):
                 return configuration()
 
@@ -142,7 +119,7 @@ class TerminalFrontendTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_inline_terminal_accepts_input_while_run_is_active(self) -> None:
 
-        class ConcurrentSession(_TerminalSessionStub):
+        class ConcurrentSession(TerminalSessionStub):
             def __init__(self) -> None:
                 super().__init__()
                 self.prompts = []
@@ -213,7 +190,7 @@ class TerminalFrontendTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_next_prompt_is_drawn_after_queued_response_finishes(self) -> None:
 
-        class QueuedSession(_TerminalSessionStub):
+        class QueuedSession(TerminalSessionStub):
             def __init__(self) -> None:
                 super().__init__()
                 self.sink = None
@@ -272,7 +249,7 @@ class TerminalFrontendTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_active_text_and_cancel_are_frontend_controls(self) -> None:
 
-        class Controls(_TerminalSessionStub):
+        class Controls(TerminalSessionStub):
             def __init__(self) -> None:
                 super().__init__()
                 self.queued = []
@@ -338,103 +315,6 @@ class TerminalFrontendTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn("trace: empty", rendered)
         self.assertNotIn("\x1b", rendered)
         self.assertEqual(rendered.count("FruitFlyAgent interactive"), 1)
-
-    async def test_resume_picker_switches_session_without_model_submission(self) -> None:
-
-        class ResumeApplication(_TerminalSessionStub):
-
-            def __init__(self) -> None:
-                super().__init__(working_directory='/workspace', session_path='/workspace/current.jsonl')
-                self.resumed: list[str] = []
-                self._status = self.base.status
-
-            @property
-            def status(self):
-                return self._status
-
-
-            def resumable_sessions(self):
-                return (
-                    ResumableSession(
-                        path="/workspace/previous.jsonl",
-                        modified_at=1.0,
-                        message_count=8,
-                        profile="default",
-                        model="offline-model",
-                    ),
-                )
-
-            async def resume(self, path):
-                self.resumed.append(str(path))
-                self._status = replace(
-                    self._status,
-                    session_path=str(path),
-                    message_count=8,
-                )
-
-
-        application = ResumeApplication()
-        output = io.StringIO()
-        frontend = TerminalFrontend(
-            application,
-            output_stream=output,
-            line_editor=ScriptedLines("/resume", "1", "/exit"),
-        )
-
-        self.assertEqual(await frontend.run(), 0)
-        self.assertEqual(application.resumed, ["/workspace/previous.jsonl"])
-        self.assertIn("FruitFlyAgent · resume", output.getvalue())
-        self.assertIn("8 messages", output.getvalue())
-        self.assertIn("previous.jsonl", output.getvalue())
-
-    async def test_resume_refuses_to_switch_while_work_is_active(self) -> None:
-
-        class BusyApplication(_TerminalSessionStub):
-            running = True
-
-
-            async def resume(self, path):
-                raise AssertionError("resume must not run")
-
-
-        output = io.StringIO()
-        frontend = TerminalFrontend(
-            BusyApplication(),
-            output_stream=output,
-            line_editor=ScriptedLines("/resume target.jsonl", "/exit"),
-        )
-
-        self.assertEqual(await frontend.run(), 0)
-        self.assertIn("finish or /cancel", output.getvalue())
-
-    async def test_resume_explicit_relative_path_uses_workspace(self) -> None:
-
-        class ResumeApplication(_TerminalSessionStub):
-
-            def __init__(self) -> None:
-                super().__init__(working_directory='/workspace', session_path='/workspace/current.jsonl')
-                self.resumed = None
-
-
-            async def resume(self, path):
-                self.resumed = path
-
-
-        application = ResumeApplication()
-        frontend = TerminalFrontend(
-            application,
-            output_stream=io.StringIO(),
-            line_editor=ScriptedLines(
-                "/resume .fruitfly/sessions/previous.jsonl",
-                "/exit",
-            ),
-        )
-
-        self.assertEqual(await frontend.run(), 0)
-        self.assertEqual(
-            application.resumed,
-            Path("/workspace/.fruitfly/sessions/previous.jsonl"),
-        )
 
     async def test_line_editor_is_a_replaceable_frontend_boundary(self) -> None:
         app = offline_session()
@@ -508,5 +388,3 @@ class TerminalFrontendTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(await frontend.run(), 0)
         self.assertFalse(controller.saved)
-
-

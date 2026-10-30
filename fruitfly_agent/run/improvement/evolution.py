@@ -1,6 +1,6 @@
 """Durable RSI adapter over the existing improvement inbox and Application."""
 
-from fruitfly_agent.lab.algorithms.evolution import AdoptionResult, EvolutionJob, VerificationEvidence
+from fruitfly_agent.rsi.contracts import AdoptionResult, EvolutionJob, VerificationEvidence
 from fruitfly_agent.run.storage.evolution import EvolutionStore
 
 

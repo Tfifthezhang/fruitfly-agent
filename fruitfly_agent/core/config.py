@@ -4,8 +4,6 @@ Every callback is typed against the core seam vocabulary (data_model /
 protocols): the annotation IS the contract. Turn control remains available as
 fine-grained callbacks rather than a bundled subsystem.
 
-BeforeToolCallResult / PrepareNextTurnResult are re-exported here for
-backward compatibility; they live in data_model.runtime / extensions.protocols.
 """
 
 from __future__ import annotations
@@ -15,10 +13,10 @@ from typing import Awaitable, Callable, Sequence
 
 from .context.budget import ContextMeter
 from .data_model.messages import AgentMessage, AgentToolResult, ToolResultMessage
-from .data_model.runtime import AgentLoopContext, BeforeToolCallResult
+from .data_model.runtime import AgentLoopContext, BeforeToolCallResult as _BeforeToolCallResult
 from .env.protocols import ExecutionEnv
 from .extensions.hooks import HookRegistry
-from .extensions.protocols import PrepareNextTurnResult, Provider, SessionLike
+from .extensions.protocols import PrepareNextTurnResult as _PrepareNextTurnResult, Provider, SessionLike
 from .tool_runtime import AgentTool, ToolCallContext
 from .tool_runtime.authorization import ToolAuthorizer
 
@@ -47,7 +45,7 @@ class AgentLoopConfig:
     prepare_next_turn: (
         Callable[
             [AgentLoopContext],
-            Awaitable[PrepareNextTurnResult | None] | PrepareNextTurnResult | None,
+            Awaitable[_PrepareNextTurnResult | None] | _PrepareNextTurnResult | None,
         ]
         | None
     ) = None
@@ -67,7 +65,7 @@ class AgentLoopConfig:
     before_tool_call: (
         Callable[
             [ToolCallContext],
-            Awaitable[BeforeToolCallResult | None] | BeforeToolCallResult | None,
+            Awaitable[_BeforeToolCallResult | None] | _BeforeToolCallResult | None,
         ]
         | None
     ) = None
@@ -105,3 +103,6 @@ class AgentLoopConfig:
         if duplicates:
             raise ValueError(f"duplicate tool names: {', '.join(duplicates)}")
         object.__setattr__(self, "tools", tools)
+
+
+__all__ = ["AgentLoopConfig", "ToolExecutionConfig"]

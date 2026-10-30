@@ -40,8 +40,14 @@ class HarnessProfile:
     artifact_contents: Mapping[str, str] = field(default_factory=dict, repr=False)
     configured: bool = field(default=False, compare=False, repr=False)
     component_settings: Mapping[str, Any] = field(default_factory=dict)
+    extensions: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
+        if isinstance(self.extensions, str) or any(not isinstance(v, str) or not v.strip() for v in self.extensions):
+            raise ValueError('extensions must be explicit nonempty source strings')
+        object.__setattr__(self, 'extensions', tuple(self.extensions))
+        if len(set(self.extensions)) != len(self.extensions):
+            raise ValueError('duplicate extension sources')
         if not _ID.fullmatch(self.profile_id):
             raise ValueError("harness profile id must be a stable identifier")
         if not isinstance(self.model_catalog, str) or not self.model_catalog.strip():
@@ -90,6 +96,8 @@ class HarnessProfile:
             },
             "mechanisms": [item.to_dict() for item in self.mechanisms],
         }
+        if self.extensions:
+            result['extensions'] = list(self.extensions)
         if self.prompt != DEFAULT_PROMPT_ID:
             result["prompt"] = self.prompt
         if self.artifact_bindings:
@@ -105,7 +113,7 @@ class HarnessProfile:
                                                 else {'inline': document.to_dict()})
         return {'models': {'catalog': self.model_catalog,
                            'roles': {**self.model_roles, **({'executor': self.model_profile} if self.model_profile else {})}},
-                **groups}
+                **groups, **({'extensions': list(self.extensions)} if self.extensions else {})}
 
 
 @dataclass(frozen=True)
@@ -174,7 +182,11 @@ def load_harness_config(path: str | Path) -> HarnessConfig:
 
 
 def _component_profile(profile_id, raw, target, reader):
-    mapping(raw, {'models', 'H', 'S', 'I'}, 'system profile')
+    mapping(raw, {'models', 'H', 'S', 'I', 'extensions'}, 'system profile')
+    sources = raw.get('extensions', [])
+    if not isinstance(sources, list) or any(not isinstance(v, str) or not v for v in sources):
+        raise ValueError('extensions must be a list of source strings')
+    sources = tuple(v if v.startswith('entrypoint:') else str((target.parent / v).expanduser().resolve()) for v in sources)
     models = mapping(raw.get('models'), {'catalog', 'roles'}, 'system models')
     roles = models.get('roles', {})
     if not isinstance(roles, dict):
@@ -192,7 +204,7 @@ def _component_profile(profile_id, raw, target, reader):
             documents.append(document)
     return HarnessProfile(profile_id, model_catalog=models.get('catalog', 'models.yaml'),
                           model_profile=roles.get('executor'), model_roles=roles,
-                          component_documents=tuple(documents))
+                          component_documents=tuple(documents), extensions=sources)
 
 
 def save_harness_config(path: str | Path, config: HarnessConfig) -> None:

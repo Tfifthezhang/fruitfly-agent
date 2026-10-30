@@ -12,17 +12,17 @@ Verify algorithms and components through Core contracts and Catalog assembly.
 | `test_web_tools.py` | Offline search/fetch adapters, extraction, pagination, HTTP deadlines, retries, cache and cancellation |
 | `test_web_services.py` | Service injection, registry extension, credential metadata and known/unknown final URLs |
 | `test_mcp_config.py / test_mcp_client.py / test_mcp_tools.py / test_mcp_authorization.py` | Optional SDK isolation, stdio lifecycle, exact schemas, reply retention and separate per-tool grants |
-| `test_catalog.py / test_base_prompt.py` | Registered identities, actionable rejection errors, and validation of disabled selections |
+| `test_catalog.py / test_catalog_assembly.py / test_builtin_catalog.py / test_base_prompt.py` | Registered identities, actionable rejection errors, and validation of disabled selections |
 | `test_failure_processing.py / test_automatic_improvement.py` | Derived exercises, provenance, original-task gates, independent confirmation, and isolated task execution |
 | `test_skill_catalog.py / test_algorithm_contracts.py` | Bounded guidance, transformer forms, signals, and cancellation |
 | `test_reduction_safety.py / test_summarizing_compaction.py` | Valid summaries, tool associations, overflow, external references, and commits |
 | `test_task_packs.py / test_pack_format.py / test_coding_tasks.py` | Task material, catalog discovery and dangling-link rejection, policy, and restricted scoring |
-| `test_rsi.py / test_rlm.py` | Host-driven evolution and local IPython/artifact behavior |
+| `test_rlm.py` | Local IPython and artifact behavior |
 | `test_improvement_pipeline.py / test_improver.py` | Stage contracts, result retention, stopping, hierarchical budgets and frozen editor fields |
-| `test_improvement_kernel.py` | Synchronous faults, invalid results, hook isolation, missing evidence, research wiring and bounded long sequences |
+| `test_improvement_mechanisms.py` | Synchronous faults, invalid results, hook isolation, missing evidence, research wiring and bounded long sequences |
 | `test_improvement_delivery.py` | Declared outputs, missing sidecars, clean-directory validation and unsupported backend admission |
 | `test_task_sets.py / test_task_set_search.py` | Frozen task identity, deterministic coverage, common full-set selection and incomplete candidates |
-| `test_batch_scheduler.py / test_joint_assessment.py` | Bounded task parallelism, cancellation, explicit objective aggregation and missing-result rejection |
+| `test_joint_assessment.py` | Bounded task parallelism, cancellation, explicit objective aggregation and missing-result rejection |
 | `test_completed_improvement.py` | Zero-reward official selection versus exploration seed, granted facts, independent judgments, failure fallback and stopping |
 | `test_algorithm_audit.py` | Edit spans, rendered budgets, and environment regressions |
 
@@ -39,15 +39,15 @@ independent read-only inspection and assessment failure. `test_evolution_policie
 checks stopping, rejection continuation, scorer separation, private feedback and
 versioned file changes with no real model requests.
 
-`test_evolution_recovery_budget.py` verifies root allowance restoration, changed
-limit rejection and conservative handling of unknown paid phases after restart.
+[RSI runtime tests](../rsi/README.md) own generation and restart accounting.
 
 `test_improvement_configuration.py` verifies configured I search rounds in real
 fake-Provider episodes, exact returned evidence pages, independent assessor
 guidance and immutable local allowances. These are wiring tests, not quality gains.
 
 
-Improvement fault injection is covered by `test_improvement_reliability.py`;
+[Improvement runtime tests](../improvement/README.md) own loop fault injection;
+`test_editor_execution.py` covers native editing and partial execution;
 `test_parameter_candidates.py` checks actual isolated parameter application and
 `test_managed_commands.py` checks polling, capacity and cancellation.
 

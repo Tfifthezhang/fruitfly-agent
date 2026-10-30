@@ -1,13 +1,16 @@
 """Only catalog guidance is improved; referenced Skill files remain separate."""
+from fruitfly_agent.improvement.contracts.optimization import OptimizationSpec
 from dataclasses import replace
 from fruitfly_agent.core.context import ContextFrame
 from .adapter import SkillCatalogTransformer
-from fruitfly_agent.lab.algorithms.targets import TargetBinding, TargetSnapshot, validate_text
+from fruitfly_agent.improvement.contracts.optimization import TargetBinding, TargetSnapshot
+from fruitfly_agent.lab.improvement.targets.text import validate_text
 
 SKILL_CATALOG_GUIDANCE_KEY = 'skill-catalog.guidance'
 
 
 class SkillGuidanceTarget:
+    optimization = OptimizationSpec('H', 'text')
     label = 'Skill catalog guidance'
 
     def __init__(self, guidance, max_chars):

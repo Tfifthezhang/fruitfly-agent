@@ -1,7 +1,8 @@
 """Executable I setting targets, with fixed outer budgets and comparison rules."""
+from fruitfly_agent.improvement.contracts.optimization import OptimizationSpec
 import json
 
-from fruitfly_agent.lab.algorithms.targets import TargetBinding, TargetSnapshot
+from fruitfly_agent.improvement.contracts.optimization import TargetBinding, TargetSnapshot
 from fruitfly_agent.improvement.contracts.versions import canonical_json
 from ..system_configuration import feedback_parameters, search_parameters
 
@@ -18,6 +19,7 @@ def flatten(value, prefix=''):
 
 
 class ImprovementSettingsTarget:
+    optimization = OptimizationSpec('I', 'parameters', required_capabilities=frozenset({'improver-comparison'}))
     component_kind = 'improvement-settings'
     required_capabilities = frozenset({'improver-comparison'})
     adoption_roles = frozenset({'I'})

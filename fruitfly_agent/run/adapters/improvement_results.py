@@ -23,7 +23,7 @@ def result_sections(completion, records, *, error='', stop_reason=''):
             CandidateSection('Evidence', '\n'.join(f'{k}: {v}' for k, v in completion.evidence)),
         )
     if report is None and records and records[0].report is not None:
-        from fruitfly_agent.lab.improvement.api import SearchReport
+        from fruitfly_agent.improvement.evidence.reporting import SearchReport
         report = SearchReport(**records[0].report)
     evidence = dict(completion.evidence) if completion is not None else {}
     if records:

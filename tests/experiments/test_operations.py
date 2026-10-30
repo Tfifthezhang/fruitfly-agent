@@ -12,7 +12,7 @@ from fruitfly_agent.experiments.operations.improve import run as improve
 from fruitfly_agent.experiments.operations.evolve import run as evolve
 from fruitfly_agent.experiments.records import RunRecords
 from fruitfly_agent.interactive import AgentApplication
-from fruitfly_agent.lab.improvement.api import EDITOR_CONFIG, ASSESSOR_CONFIG
+from fruitfly_agent.lab.improvement.registration import EDITOR_CONFIG, ASSESSOR_CONFIG
 from tests.support.experiments import workspace, factory_builder
 from tests.support.faux_provider import FauxProvider
 from tests.support.task_packs import install, package

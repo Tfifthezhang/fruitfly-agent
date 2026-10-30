@@ -6,7 +6,7 @@ import json
 import asyncio
 from fruitfly_agent.improvement.contracts.failures import IntegrityError
 
-from fruitfly_agent.lab.improvement.api import ExecutionRecord
+from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
 from fruitfly_agent.improvement.execution.handles import ManagedExecution
 from .building import RuntimeConfigBuilder
 from .evidence import collect

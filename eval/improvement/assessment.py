@@ -1,5 +1,5 @@
 """Official development measurements; scoring does not grant verification."""
-from fruitfly_agent.lab.improvement.api import Measurement
+from fruitfly_agent.improvement.contracts.assessment import Measurement
 
 
 class OfficialMeasurements:

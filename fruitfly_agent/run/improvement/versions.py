@@ -1,8 +1,8 @@
 """Freeze actual execution, improvement and registered persistent-state material."""
 from pathlib import Path
-from fruitfly_agent.lab.algorithms.targets import (
-    SystemVersion, SnapshotFile, StateSnapshot, canonical_json, TargetChange, VersionCandidate, state_artifact_path, target_edits,
-)
+from fruitfly_agent.improvement.contracts.versions import SystemVersion, SnapshotFile, StateSnapshot, canonical_json
+from fruitfly_agent.improvement.contracts.candidates import TargetChange, VersionCandidate
+from fruitfly_agent.lab.improvement.targets.text import state_artifact_path, target_edits
 from fruitfly_agent.run.storage.snapshots import SnapshotStore, capture_source_tree
 from fruitfly_agent.run.storage.versions import VersionStore
 from fruitfly_agent.run.runtime.manifest import execution_version_payload

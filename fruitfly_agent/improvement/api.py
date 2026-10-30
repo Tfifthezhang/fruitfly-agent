@@ -1,12 +1,12 @@
 """Independent Improvement contracts and runtime; concrete algorithms are injected."""
-from .contracts.pipeline import (
-    TaskMaterial, Resource, ComponentDocument, ComponentFile, HarnessSnapshot,
-    CandidateBundle, EditReason, ExecutionRecord, Measurement, RunPlan,
-    ProposalRequest, ProposalResult, CompositionRequest, SelectionDecision,
-    ExperienceEntry, ImprovementOutcome, ArtifactAccess, ComponentAdapter,
-    CandidateGenerator, GenerationServices, Composer, TaskRunner, Selector,
-    Reflector, MeasurementSource, VerificationPolicy, WorkflowController,
-)
+from fruitfly_agent.improvement.contracts.tasks import TaskMaterial, Resource, ArtifactAccess
+from fruitfly_agent.improvement.contracts.components import ComponentDocument, ComponentFile, HarnessSnapshot
+from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, EditReason
+from fruitfly_agent.improvement.contracts.execution import ExecutionRecord, TaskRunner
+from fruitfly_agent.improvement.contracts.assessment import Measurement, SelectionDecision, Selector, MeasurementSource, VerificationPolicy
+from fruitfly_agent.improvement.contracts.plans import RunPlan, ExperienceEntry
+from fruitfly_agent.improvement.contracts.editing import ProposalRequest, ProposalResult, CompositionRequest, CandidateGenerator, GenerationServices, Composer, Reflector
+from fruitfly_agent.improvement.contracts.pipeline import ImprovementOutcome, WorkflowController
 from .contracts.facts import ExecutionFacts, BudgetFact, ArtifactFact
 from .contracts.evaluation import EvaluationBatch, TrialResult, CandidateEvaluation
 from .contracts.experiments import EpisodeExecutor, EpisodeRequest, EpisodeResult
@@ -24,3 +24,7 @@ from .contracts.failures import Failure, StageFailure, IntegrityError, Persisten
 
 from .contracts.lifecycle import LifecycleEvent, ContextContribution
 from .extensions.hooks import HookRegistry
+
+from fruitfly_agent.core.extensions.operations import OperationSupervisor
+
+from .contracts.optimization import OptimizationSpec, OptimizationAdapter, TextProjection

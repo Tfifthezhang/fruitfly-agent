@@ -8,9 +8,16 @@ from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.core.data_model import AssistantMessage, TextBlock
 from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone
 from fruitfly_agent.lab.base_prompt.target import BasePromptTarget
-from fruitfly_agent.lab.improvement.api import (ComponentRegistry, TextComponentAdapter, RunPlan, WorkflowServices,
-    TaskMaterial, HarnessSnapshot, ComponentFile, CandidateBundle, EditReason, ProposalResult,
-    EditorInstructionTarget, ExecutionContext, EpisodeRequest)
+from fruitfly_agent.lab.improvement.components import ComponentRegistry, TextComponentAdapter
+from fruitfly_agent.improvement.contracts.plans import RunPlan
+from fruitfly_agent.improvement.workflow.services import WorkflowServices
+from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
+from fruitfly_agent.improvement.contracts.components import HarnessSnapshot, ComponentFile
+from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, EditReason
+from fruitfly_agent.improvement.contracts.editing import ProposalResult
+from fruitfly_agent.lab.improvement.editor.instructions import EditorInstructionTarget
+from fruitfly_agent.lab.improvement.execution import ExecutionContext
+from fruitfly_agent.improvement.contracts.experiments import EpisodeRequest
 from fruitfly_agent.lab.improvement.components.configuration import ImprovementSettingsTarget
 from fruitfly_agent.lab.improvement.evidence import EvidenceWorkspace, MemoryArtifacts
 from fruitfly_agent.lab.improvement.workspaces import WorkspaceSession

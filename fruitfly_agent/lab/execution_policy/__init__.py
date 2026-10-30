@@ -1,12 +1,14 @@
 """Object-owned execution configuration, independently editable as H."""
+from fruitfly_agent.improvement.contracts.optimization import OptimizationSpec
 from dataclasses import replace
 import json
 
 from fruitfly_agent.runtime_spec import effective_execution, parse_execution, execution_kwargs
-from fruitfly_agent.lab.algorithms.targets import TargetBinding, TargetSnapshot
+from fruitfly_agent.improvement.contracts.optimization import TargetBinding, TargetSnapshot
 
 
 class ExecutionPolicyTarget:
+    optimization = OptimizationSpec('H', 'parameters', required_capabilities=frozenset({'execution-config'}))
     label = 'Execution policy'
     component_kind = 'execution-policy'
     required_capabilities = frozenset({'execution-config'})

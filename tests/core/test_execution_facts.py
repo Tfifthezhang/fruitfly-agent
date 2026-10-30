@@ -4,7 +4,7 @@ from pathlib import Path
 import unittest
 from dataclasses import replace
 
-from fruitfly_agent.core.config import BeforeToolCallResult
+from fruitfly_agent.core.data_model.runtime import BeforeToolCallResult
 from fruitfly_agent.core.session import Session
 from fruitfly_agent.core.data_model import AgentToolResult
 from tests.support.faux_provider import FauxProvider

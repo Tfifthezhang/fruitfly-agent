@@ -1,6 +1,6 @@
 """Strict candidate submission, independent of evidence reading and model prose."""
 import json
-from fruitfly_agent.improvement.contracts.pipeline import CandidateBundle, EditReason
+from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, EditReason
 
 
 def submission(text, workspace, request, components):

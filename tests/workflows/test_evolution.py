@@ -6,8 +6,8 @@ import tempfile
 import unittest
 
 from fruitfly_agent.interactive import AgentApplication
-from fruitfly_agent.lab.algorithms.evolution import VerificationEvidence
-from fruitfly_agent.lab.rsi.persistent import PersistentEvolutionDriver
+from fruitfly_agent.rsi.contracts import VerificationEvidence
+from fruitfly_agent.rsi.engine import EvolutionEngine
 from fruitfly_agent.run.evolution import RunEvolutionHost
 from fruitfly_agent.run.application import RunApplicationFactory
 from tests.support.improvers import offline_factory, improve
@@ -24,7 +24,7 @@ class PersistentEvolutionTests(unittest.IsolatedAsyncioTestCase):
                 observed.append((record.parent_manifest_digest, text, record.artifact_id))
                 return VerificationEvidence(record.candidate_id, record.artifact_id, record.parent_manifest_digest, 'explicit-policy', True)
             host = RunEvolutionHost(app, factory, policy_id='explicit-policy', verify=verify, request=factory.test_request)
-            result = await PersistentEvolutionDriver().evolve(host, job_id='job', policy_id='explicit-policy', direction='improve', max_steps=2)
+            result = await EvolutionEngine().evolve(host, job_id='job', policy_id='explicit-policy', direction='improve', max_steps=2)
             self.assertEqual(result.phase, 'complete')
             self.assertEqual(result.steps, 2)
             self.assertEqual(len(observed), 2)
@@ -43,7 +43,7 @@ class PersistentEvolutionTests(unittest.IsolatedAsyncioTestCase):
             restored = AgentApplication(fresh_factory)
             await restored.start()
             new_host = RunEvolutionHost(restored, fresh_factory, policy_id='explicit-policy', verify=verify, request=factory.test_request)
-            resumed = await PersistentEvolutionDriver().evolve(new_host, job_id='job', policy_id='explicit-policy', direction='improve', max_steps=2)
+            resumed = await EvolutionEngine().evolve(new_host, job_id='job', policy_id='explicit-policy', direction='improve', max_steps=2)
             self.assertEqual(resumed, result)
             self.assertEqual(len(observed), 2)
             await restored.close()
@@ -76,10 +76,10 @@ class PersistentEvolutionTests(unittest.IsolatedAsyncioTestCase):
                 original(job)
             host.save_job = crash
             with self.assertRaisesRegex(RuntimeError, 'crash after activation'):
-                await PersistentEvolutionDriver().evolve(host, job_id='crash', policy_id='policy', direction='improve', max_steps=1)
+                await EvolutionEngine().evolve(host, job_id='crash', policy_id='policy', direction='improve', max_steps=1)
             self.assertEqual(host.load_job('crash').phase, 'activating')
             host.save_job = original
-            resumed = await PersistentEvolutionDriver().evolve(host, job_id='crash', policy_id='policy', direction='improve', max_steps=1)
+            resumed = await EvolutionEngine().evolve(host, job_id='crash', policy_id='policy', direction='improve', max_steps=1)
             self.assertEqual(resumed.phase, 'complete')
             self.assertEqual(len(app.candidates()), 1)
             await app.close()
@@ -94,7 +94,7 @@ class PersistentEvolutionTests(unittest.IsolatedAsyncioTestCase):
             host = RunEvolutionHost(app, factory, policy_id='policy', verify=wrong, request=factory.test_request)
             before = app.runtime_manifest
             with self.assertRaisesRegex(ValueError, 'exact candidate'):
-                await PersistentEvolutionDriver().evolve(host, job_id='wrong', policy_id='policy', direction='improve')
+                await EvolutionEngine().evolve(host, job_id='wrong', policy_id='policy', direction='improve')
             self.assertEqual(app.runtime_manifest, before)
             await app.close()
 
@@ -107,7 +107,7 @@ class PersistentEvolutionTests(unittest.IsolatedAsyncioTestCase):
             async def fail(direction):
                 raise RuntimeError('proposal interrupted')
             host.propose = fail
-            driver = PersistentEvolutionDriver()
+            driver = EvolutionEngine()
             with self.assertRaisesRegex(RuntimeError, 'proposal interrupted'):
                 await driver.evolve(host, job_id='interrupted', policy_id='policy', direction='improve')
             fresh_host = RunEvolutionHost(app, factory, policy_id='policy', verify=lambda *_: None, request=factory.test_request)

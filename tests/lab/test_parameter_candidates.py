@@ -20,6 +20,54 @@ from fruitfly_agent.runtime_spec.execution import apply_profile_binding
 
 
 class ParameterCandidateTests(unittest.IsolatedAsyncioTestCase):
+    async def test_information_candidate_changes_the_number_of_hits_sent_to_the_provider(self):
+        from fruitfly_agent.core.loop import run_agent_loop
+        from fruitfly_agent.core.data_model import UserMessage
+        from fruitfly_agent.lab.context_manager.augmentation.information import InformationArtifact, InformationRef, create_static_lexical_space
+        from tests.support.faux_provider import FauxProvider
+        catalog = builtin_catalog()
+        counts = []
+        with tempfile.TemporaryDirectory() as directory:
+            baseline = HarnessProfile('default', mechanisms=(MechanismSelection('information-context'),))
+            target = ParameterTarget(catalog.get('information-context'), {}, {'top_k'})
+            values = json.loads(target.snapshot().text); values['top_k'] = 1
+            candidate = apply_profile_binding(baseline, 'configuration', 'component.information-context', json.dumps(values))
+            for index, profile in enumerate((baseline, candidate)):
+                path = materialize_system(profile, Path(directory) / str(index) / 'config.yaml', catalog=catalog)
+                provider = FauxProvider(); provider.respond_text('done')
+                runtime = assemble_lab(AgentLoopConfig(provider=provider), catalog=catalog,
+                    selections=load_system_config(path).select().mechanisms,
+                    context=AssemblyContext(Path(directory), None, '', lambda *args: None))
+                runtime.components['information'].register(create_static_lexical_space('probe', tuple(
+                    InformationArtifact(InformationRef('probe', str(i)), 'Python evidence ' + str(i)) for i in range(3))))
+                result = await run_agent_loop(runtime.config, [UserMessage('Python evidence')], context_pipeline=runtime.context_pipeline)
+                self.assertFalse(result.is_error)
+                counts.append(provider.calls[0]['system_prompt'].count('[probe:'))
+            self.assertEqual(counts, [3, 1])
+            self.assertEqual(baseline.mechanisms[0].parameters, {})
+
+    async def test_skill_catalog_size_candidate_changes_the_projected_catalog(self):
+        from fruitfly_agent.core.context import ContextFrame
+        catalog = builtin_catalog()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            skill = root / '.skills/example/SKILL.md'; skill.parent.mkdir(parents=True)
+            skill.write_text('---\nname: example\ndescription: ' + 'evidence ' * 100 + '\n---\nDo the task.\n')
+            baseline = HarnessProfile('default', mechanisms=(MechanismSelection('skill-catalog'),))
+            target = ParameterTarget(catalog.get('skill-catalog'), {}, {'max_chars'})
+            values = json.loads(target.snapshot().text); values['max_chars'] = 128
+            candidate = apply_profile_binding(baseline, 'configuration', 'component.skill-catalog', json.dumps(values))
+            omitted = []
+            for index, profile in enumerate((baseline, candidate)):
+                path = materialize_system(profile, root / str(index) / 'config.yaml', catalog=catalog)
+                runtime = assemble_lab(AgentLoopConfig(provider=lambda *args: None), catalog=catalog,
+                    selections=load_system_config(path).select().mechanisms,
+                    context=AssemblyContext(root, None, '', lambda *args: None))
+                transform = next(stage.mechanism for stage in runtime.context_pipeline.stages if stage.stage_id == 'skill-catalog')
+                result = transform.transform(ContextFrame('base', (), (), 'fake', 32))
+                omitted.append(result.metadata['catalog_omitted'])
+            self.assertEqual(omitted, [False, True])
+
     async def test_bash_candidate_materializes_and_changes_actual_execution_timeout(self):
         catalog = builtin_catalog()
         definition = catalog.get('bash-tool')

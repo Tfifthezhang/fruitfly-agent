@@ -90,10 +90,10 @@ read again at execution. No service capability is inferred from the model name.
 | [__init__.py](__init__.py) | Stable Run exports |
 | [cli.py](cli.py) | Startup arguments, frontend connection, and process exit |
 | [application.py](application.py) | RuntimeFactory interface and concrete service composition |
-| [assembly.py](assembly.py) | Public assembly/manifest/prompt-resolution exports |
+| [assembly.py](runtime/assembly.py) | Public assembly/manifest/prompt-resolution exports |
 | [profiles.py](profiles.py) | Configuration controller composed with candidate-backed prompt views |
 | [evolution.py](evolution.py) | Bind Application and storage operations to the evolution host |
-| [startup_versions.py](startup_versions.py) | Public startup-selection composition entry |
+| [startup_versions.py](improvement/startup_versions.py) | Public startup-selection composition entry |
 
 Composition entries delegate to one owning implementation. Internal consumers import the owning module. Run consumes public [Catalog](../lab/catalog/README.md) and [Improvement](../lab/improvement/README.md) contracts; it does not implement search, scoring, or concrete algorithm branches.
 
@@ -182,7 +182,7 @@ Task selection does not change runtime configuration. Lab owns pack parsing and 
 For a started Application with an available improver, an embedding host can inject an independent asynchronous verifier:
 
 ```python
-from fruitfly_agent.lab.rsi import PersistentEvolutionDriver
+from fruitfly_agent.rsi import EvolutionEngine
 from fruitfly_agent.run.evolution import RunEvolutionHost
 
 # application, factory, request, and verify_candidate are supplied by the host.
@@ -192,7 +192,7 @@ host = RunEvolutionHost(
     policy_id="my-fixed-policy-v1", verify=verify_candidate, request=request,
 )
 # In the host's event loop, after explicitly authorizing model work:
-# result = await PersistentEvolutionDriver().evolve(
+# result = await EvolutionEngine().evolve(
 #     host, job_id="text-evolution-1", policy_id="my-fixed-policy-v1",
 #     direction="Improve the fixed task", max_steps=2, phase_timeout_seconds=60,
 # )
@@ -246,3 +246,5 @@ keeping protected checks. `--unrestricted` selects the unrestricted strategy for
 a fresh headless task in an externally isolated environment. Both reject
 interactive/resumed launches and cannot be combined. Eval uses `--unrestricted`
 inside Harbor containers. Neither flag is an Agent configuration field.
+
+[Extension hosting](extensions/README.md) loads explicit developer sources and prepares idle replacements.

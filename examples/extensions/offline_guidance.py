@@ -12,7 +12,7 @@ from fruitfly_agent.core.model_stream import AssistantMessageEventStream, Stream
 from fruitfly_agent.interactive import AgentApplication
 from fruitfly_agent.lab.catalog import (
     MechanismContribution, MechanismDefinition, MechanismDescriptor,
-    MechanismSelection, builtin_catalog,
+    MechanismSelection, ParameterDescriptor, builtin_catalog,
 )
 from fruitfly_agent.providers import ProviderRegistry
 from fruitfly_agent.run.application import RunApplicationFactory
@@ -25,34 +25,39 @@ GUIDANCE = '<example-guidance>Answer with a short, concrete sentence.</example-g
 class ExampleGuidance:
     """Transform a request projection without changing canonical messages."""
 
+    def __init__(self, instructions=GUIDANCE):
+        self.instructions = instructions
+
     def transform(self, frame):
-        if GUIDANCE in frame.system_prompt:
+        if self.instructions in frame.system_prompt:
             return None
         return ContextTransform(replace(
-            frame, system_prompt=frame.system_prompt + '\n\n' + GUIDANCE
+            frame, system_prompt=frame.system_prompt + '\n\n' + self.instructions
         ))
 
 
 def install_guidance(state, context, parameters):
     return state.with_context_stage(ContextStage(
-        'example-guidance.augmentation', 'augmentation', ExampleGuidance()
+        'example-guidance.augmentation', 'augmentation', ExampleGuidance(parameters['instructions'])
     ))
 
 
 def example_definition():
-    return MechanismDefinition(
+    from fruitfly_agent.lab.improvement.components.parameters import editable_parameters
+    return editable_parameters(MechanismDefinition(
         descriptor=MechanismDescriptor(
             mechanism_id='example-guidance',
             label='Example guidance',
             description='Add short-answer guidance before each model request.',
             contributions=(MechanismContribution('online', 'context', 'augmentation'),),
+            parameters=(ParameterDescriptor('instructions', 'string', 'Instructions', 'Guidance added to each request.', GUIDANCE),),
         ),
         install=install_guidance,
         implementation_id='example-guidance-v1',
 
         implementation_path='examples/extensions/offline_guidance.py',
         documentation_path='examples/extensions/README.md',
-    )
+    ), {'instructions'})
 
 
 class OfflineProvider:

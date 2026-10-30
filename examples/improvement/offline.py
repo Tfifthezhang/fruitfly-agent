@@ -1,13 +1,21 @@
 """Run the public workflow with a deterministic generator and synthetic execution."""
+from fruitfly_agent.improvement.contracts.optimization import OptimizationSpec
 import asyncio
 from dataclasses import replace
 from uuid import uuid4
 
-from fruitfly_agent.lab.improvement.api import (RunPlan, TaskMaterial, ComponentDocument,
-    ComponentFile, HarnessSnapshot, CandidateBundle, EditReason, ProposalResult,
-    ComponentRegistry, FileComponentAdapter, GeneratorRegistry, WorkflowServices,
-    ComponentWorkflow, ExecutionRecord, SelectionDecision)
-from fruitfly_agent.lab.algorithms.targets import SystemVersion, content_hash
+from fruitfly_agent.improvement.contracts.plans import RunPlan
+from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
+from fruitfly_agent.improvement.contracts.components import ComponentDocument, ComponentFile, HarnessSnapshot
+from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, EditReason
+from fruitfly_agent.improvement.contracts.editing import ProposalResult
+from fruitfly_agent.lab.improvement.components import ComponentRegistry, FileComponentAdapter
+from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
+from fruitfly_agent.improvement.workflow.services import WorkflowServices
+from fruitfly_agent.lab.improvement.workflow import ImprovementWorkflow as ComponentWorkflow
+from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
+from fruitfly_agent.improvement.contracts.assessment import SelectionDecision
+from fruitfly_agent.improvement.contracts.versions import SystemVersion, content_hash
 
 
 class Rule:
@@ -45,7 +53,7 @@ class Select:
 async def main():
     document = ComponentDocument('prompt', 'system-prompt', 'H', 'text-v1',
         (ComponentFile('instructions.txt', 'Complete the task.'),))
-    components = ComponentRegistry((FileComponentAdapter(document, lambda value: None),))
+    components = ComponentRegistry((FileComponentAdapter(document, lambda value: None, optimization=OptimizationSpec(document.role, 'documents')),))
     generators = GeneratorRegistry()
     generators.register('example-rule', Rule)
     plan = RunPlan('offline', SystemVersion(*(content_hash(v) for v in ('H', 'I', 'S'))),

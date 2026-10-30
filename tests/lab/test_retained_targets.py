@@ -8,8 +8,8 @@ import unittest
 from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.core.data_model import AssistantMessage, UserMessage
 from fruitfly_agent.core.loop import run_agent_loop
-from fruitfly_agent.lab.algorithms.retained import RetainedText
-from fruitfly_agent.lab.algorithms.targets import state_artifact_path
+from fruitfly_agent.lab.improvement.targets.retained import RetainedText
+from fruitfly_agent.lab.improvement.targets.text import state_artifact_path
 from fruitfly_agent.lab.workflow import WorkflowTarget, apply_workflow, parse_workflow
 from tests.support.faux_provider import FauxProvider
 
@@ -29,9 +29,13 @@ class RetainedTargetTests(unittest.IsolatedAsyncioTestCase):
                 target.validate(text)
 
     async def trial(self, config, targets, changed, text, calls=10):
-        from fruitfly_agent.lab.improvement.api import (component_registry, RunPlan,
-            TaskMaterial, FileTaskRunner, WorkflowServices, HarnessSnapshot, ComponentFile)
-        from fruitfly_agent.lab.algorithms.targets import SystemVersion, content_hash
+        from fruitfly_agent.lab.improvement.components import component_registry
+        from fruitfly_agent.improvement.contracts.plans import RunPlan
+        from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
+        from fruitfly_agent.lab.improvement.execution.file_runner import FileTaskRunner
+        from fruitfly_agent.improvement.workflow.services import WorkflowServices
+        from fruitfly_agent.improvement.contracts.components import HarnessSnapshot, ComponentFile
+        from fruitfly_agent.improvement.contracts.versions import SystemVersion, content_hash
         from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
         registry = component_registry(targets)
         harness = HarnessSnapshot(tuple(replace(c, files=(ComponentFile('instructions.txt', text),))

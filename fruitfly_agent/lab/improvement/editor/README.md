@@ -2,8 +2,8 @@
 
 [Up: Improvement](../README.md)
 
-[__init__.py](__init__.py) supplies `AgentEditor`, `AgentSelector` and
-`AgentReflector`. The editor reads detached evidence and edits only granted
+[__init__.py](__init__.py) supplies `AgentEditor` and its model-completion helper.
+The editor reads detached evidence and edits only granted
 `harness/<component-id>/` paths using list/read/search/write/delete and structured submission tools. It receives
 no Bash, production environment, adoption operation or live Session.
 
@@ -44,8 +44,8 @@ Offline checks: `tests.lab.test_improvement_pipeline`.
 composition. A bounded [workspace session](../workspaces.py) supplies tools
 without owning editing or scoring policy. Selection now belongs to
 [Assessment](../assessment/README.md); reflection belongs to
-[Experience](../experience/README.md). Legacy imports remain explicit compatible
-exports, not duplicate implementations. Run constructs a separate read-only
+[Experience](../experience/README.md). Import each implementation from its owning module.
+Run constructs a separate read-only
 inspector by default, even when editor and inspector use the same model profile.
 
 

@@ -2,7 +2,7 @@
 import time
 
 from fruitfly_agent.interactive import AgentApplication
-from fruitfly_agent.lab.improvement.api import BudgetScope
+from fruitfly_agent.improvement.workflow.budget import BudgetScope
 from ..composition import application_factory
 from . import observe
 

@@ -1,7 +1,9 @@
 """Validate pending lessons independently of storage and activation."""
 from dataclasses import asdict
 
-from fruitfly_agent.improvement.contracts.pipeline import ExperienceEntry, HarnessSnapshot, experience_id
+from fruitfly_agent.improvement.contracts.plans import ExperienceEntry
+from fruitfly_agent.improvement.contracts.components import HarnessSnapshot
+from fruitfly_agent.improvement.contracts.pipeline import experience_id
 
 
 def entry_to_dict(entry):

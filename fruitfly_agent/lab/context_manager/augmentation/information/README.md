@@ -58,3 +58,9 @@ No module-specific environment variables. Synchronous scanning, expiry clock inj
 ```bash
 .venv/bin/python -m unittest tests.lab.test_information_sources tests.lab.test_information_pipeline tests.lab.test_information_adapters -v
 ```
+
+The Catalog installer passes the configured hub query builder into the context
+transformer. Authorized `top_k` and `max_chars` candidates therefore affect the
+actual retrieval query and rendered context. The owner's parameter adapter uses
+shared configuration materialization. Offline regression:
+`tests.lab.test_parameter_candidates` compares Provider-visible retrieval results.

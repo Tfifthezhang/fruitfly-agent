@@ -1,6 +1,7 @@
 """Persist verified H/I/S bindings without deciding experiment quality."""
 import json
-from fruitfly_agent.lab.algorithms.targets import SystemVersion, VersionCandidate, canonical_json
+from fruitfly_agent.improvement.contracts.versions import SystemVersion, canonical_json
+from fruitfly_agent.improvement.contracts.candidates import VersionCandidate
 
 
 class VersionStore:

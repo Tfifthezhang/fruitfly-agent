@@ -2,18 +2,35 @@
 from fruitfly_agent.improvement.contracts.components import ComponentDocument, ComponentFile, HarnessSnapshot
 
 
+from fruitfly_agent.improvement.contracts.optimization import OptimizationSpec
+
+
 class ComponentRegistry:
     def __init__(self, adapters=()):
         self.adapters = {}
         self.options = {}
+        self.trial_setups = ()
         for adapter in adapters:
             self.register(adapter)
 
     def register(self, adapter):
         document = adapter.snapshot()
+        spec = getattr(adapter, 'optimization', None)
+        if not isinstance(spec, OptimizationSpec) or spec.role != document.role:
+            raise ValueError('component needs an owner-matching optimization declaration')
         if document.component_id in self.adapters:
             raise ValueError('duplicate component owner: ' + document.component_id)
         self.adapters[document.component_id] = adapter
+
+    def admit(self, component_ids, capabilities, *, boundaries=frozenset({'task'}), updates=frozenset({'offline'})):
+        if self.trial_setups and 'execution-setup' not in capabilities:
+            raise ValueError('runner cannot initialize declared trial mechanisms')
+        for name in component_ids:
+            if name not in self.adapters:
+                raise ValueError('unregistered optimization component: ' + name)
+            adapter = self.adapters[name]
+            adapter.optimization.admit(role=adapter.snapshot().role, capabilities=capabilities,
+                boundaries=boundaries, updates=updates)
 
     def configure(self, options):
         if not isinstance(options, dict) or set(options) - set(self.adapters):

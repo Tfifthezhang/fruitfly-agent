@@ -6,14 +6,16 @@ emits committed-state snapshots to passive observers — both flavors always
 fire. Passive observers are awaited for deterministic research telemetry,
 but each receives a private deep copy and therefore cannot affect the run.
 
-Isolation guarantee: a failing hook NEVER kills the run. Active-hook
-exceptions are recorded as hookError session entries; passive-observer
-exceptions are swallowed. Handlers run in registration order.
+Optional ordinary failures are isolated. Required active failures and unconfirmed
+retirement stop execution. Active errors enter hookError records; optional
+observer errors are isolated. Priority order is stable within registrations.
 """
 
 from __future__ import annotations
 
 import copy
+import math
+from .operations import OperationSupervisor, OperationCleanupError
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -122,29 +124,38 @@ class _Handler:
     fn: Callable[[Any], Any]
     active: bool
     priority: int
+    required: bool = False
+    timeout: float = 10
+
+    def __post_init__(self):
+        if isinstance(self.timeout, bool) or not isinstance(self.timeout, (int, float)) or not math.isfinite(self.timeout) or self.timeout <= 0:
+            raise ValueError('hook timeout must be finite and positive')
 
 
 class HookRegistry:
     def __init__(self, session: Any | None = None) -> None:
         self._handlers: dict[str, list[_Handler]] = {name: [] for name in HOOK_NAMES}
         self._session = session
+        self._supervisor = OperationSupervisor()
 
     # -- registration -------------------------------------------------------
 
-    def add(self, name: str, fn: Callable[[Any], Any], *, priority: int = 100) -> None:
+    def add(self, name: str, fn: Callable[[Any], Any], *, priority: int = 100, required: bool = False, timeout: float = 10) -> None:
         """Register an ACTIVE hook: may mutate or block via the event object."""
+        if type(required) is not bool:
+            raise TypeError('required must be boolean')
         if name == REQUEST_PREPARED:
             raise ValueError("request_prepared is observation-only; use on()")
         if name not in self._handlers:
             raise ValueError(f"unknown hook name {name!r}; known: {', '.join(HOOK_NAMES)}")
-        self._handlers[name].append(_Handler(fn=fn, active=True, priority=priority))
+        self._handlers[name].append(_Handler(fn=fn, active=True, priority=priority, required=required, timeout=timeout))
         self._handlers[name].sort(key=lambda h: h.priority)
 
-    def on(self, name: str, fn: Callable[[Any], Any]) -> None:
+    def on(self, name: str, fn: Callable[[Any], Any], *, timeout: float = 10) -> None:
         """Register a PASSIVE observer that receives an isolated snapshot."""
         if name not in self._handlers:
             raise ValueError(f"unknown hook name {name!r}; known: {', '.join(HOOK_NAMES)}")
-        self._handlers[name].append(_Handler(fn=fn, active=False, priority=100))
+        self._handlers[name].append(_Handler(fn=fn, active=False, priority=100, timeout=timeout))
 
     def clone(self) -> "HookRegistry":
         """Copy registrations so a derived config cannot mutate its parent."""
@@ -154,20 +165,25 @@ class HookRegistry:
 
     # -- dispatch -----------------------------------------------------------
 
+    def extended(self, other: "HookRegistry") -> "HookRegistry":
+        cloned = self.clone()
+        for name in HOOK_NAMES:
+            cloned._handlers[name].extend(other._handlers[name])
+            cloned._handlers[name].sort(key=lambda h: h.priority)
+        return cloned
+
     async def run(self, name: str, event: Any) -> Any:
         """Run active handlers in priority order; returns the (possibly mutated) event.
 
-        Per-hook exception isolation: a failing hook is recorded as a
-        hookError session entry and never propagates.
+        Optional failures are recorded and isolated. Required failures propagate;
+        unconfirmed cancellation always stops execution.
         """
         for handler in list(self._handlers.get(name, [])):
             if not handler.active:
                 continue
             try:
                 candidate = copy.deepcopy(event)
-                result = handler.fn(candidate)
-                if hasattr(result, "__await__"):
-                    result = await result
+                result = await self._supervisor.run(lambda: handler.fn(candidate), timeout=handler.timeout)
                 result = candidate if result is None else result
                 if not isinstance(result, type(event)):
                     raise TypeError(
@@ -175,20 +191,24 @@ class HookRegistry:
                         f"expected {type(event).__name__} or None"
                     )
                 event = result
-            except Exception as exc:  # noqa: BLE001 — the isolation guarantee
+            except OperationCleanupError:
+                raise
+            except Exception as exc:
                 self._record_hook_error(name, exc)
+                if handler.required:
+                    raise RuntimeError('required hook failed: ' + name) from exc
         return event
 
     async def emit(self, name: str, event: Any) -> None:
-        """Run passive observers on private snapshots; exceptions swallowed."""
+        """Observe private snapshots; isolate ordinary failures and preserve cleanup errors."""
         for handler in list(self._handlers.get(name, [])):
             if handler.active:
                 continue
             try:
-                result = handler.fn(copy.deepcopy(event))
-                if hasattr(result, "__await__"):
-                    await result
-            except Exception:  # noqa: BLE001
+                await self._supervisor.run(lambda: handler.fn(copy.deepcopy(event)), timeout=handler.timeout)
+            except OperationCleanupError:
+                raise
+            except Exception:
                 pass
 
     # -- internals ----------------------------------------------------------

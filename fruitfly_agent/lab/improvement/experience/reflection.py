@@ -1,6 +1,7 @@
 """Evidence-grounded pending lessons; no publication authority."""
 import json
-from fruitfly_agent.improvement.contracts.pipeline import CompositionRequest, ExperienceEntry
+from fruitfly_agent.improvement.contracts.editing import CompositionRequest
+from fruitfly_agent.improvement.contracts.plans import ExperienceEntry
 from ..evidence import EvidenceWorkspace
 
 class AgentReflector:

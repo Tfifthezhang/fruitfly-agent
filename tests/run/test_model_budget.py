@@ -48,7 +48,7 @@ class ModelBudgetTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(create_parser().parse_args(['--max-model-calls', '8', 'task']).max_model_calls, 8)
 
     def test_unknown_external_usage_is_not_presented_as_actual_calls(self):
-        from fruitfly_agent.lab.improvement.api import SearchReport
+        from fruitfly_agent.improvement.evidence.reporting import SearchReport
         from fruitfly_agent.run.adapters.improvement_results import model_usage
         text = model_usage(SearchReport(model_calls=2, model_limit=10, uncertain_model_allowance=5))
         self.assertIn('unknown (2 confirmed)', text)

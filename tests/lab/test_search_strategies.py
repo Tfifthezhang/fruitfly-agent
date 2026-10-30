@@ -3,14 +3,16 @@ from dataclasses import replace
 import unittest
 from unittest.mock import AsyncMock
 
-from fruitfly_agent.lab.improvement.api import WorkflowServices, TaskMaterial, Measurement
+from fruitfly_agent.improvement.workflow.services import WorkflowServices
+from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
+from fruitfly_agent.improvement.contracts.assessment import Measurement
 from tests.support.pipeline import build_pipeline
 
 
 class SearchStrategyTests(unittest.IsolatedAsyncioTestCase):
     def test_editor_instructions_require_all_current_fields(self):
         import json
-        from fruitfly_agent.lab.improvement.api import EditorInstructions, EditorInstructionTarget
+        from fruitfly_agent.lab.improvement.editor.instructions import EditorInstructions, EditorInstructionTarget
         current = EditorInstructions()
         target = EditorInstructionTarget(current)
         self.assertEqual(target.snapshot().schema, 'editor-instructions-v3')

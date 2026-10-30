@@ -7,12 +7,22 @@ import unittest
 from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.core.data_model import AssistantMessage, TextBlock
 from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone
-from fruitfly_agent.lab.improvement.api import (CandidateBundle, ComponentFile, ComponentWorkflow,
-    EditReason, GeneratorRegistry, HarnessSnapshot, Measurement, ProposalResult, RunPlan, TaskMaterial,
-    WorkflowServices, ProcessAssessmentSettings, CompletedAssessmentService, builtin_completed_assessors,
-    builtin_explorations, ensure_facts, read_facts, receipt_facts, attach_facts, Resource, ArtifactFact,
-    MetricThreshold, FailureLimit, CompletedAssessorRegistry, CompletedAssessorDefinition,
-    ExplorationRegistry, ExplorationDefinition)
+from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, EditReason
+from fruitfly_agent.improvement.contracts.components import ComponentFile, HarnessSnapshot
+from fruitfly_agent.lab.improvement.workflow import ImprovementWorkflow as ComponentWorkflow
+from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
+from fruitfly_agent.improvement.workflow.services import WorkflowServices
+from fruitfly_agent.improvement.contracts.assessment import Measurement
+from fruitfly_agent.improvement.contracts.editing import ProposalResult
+from fruitfly_agent.improvement.contracts.plans import RunPlan
+from fruitfly_agent.improvement.contracts.tasks import TaskMaterial, Resource
+from fruitfly_agent.lab.improvement.assessment.configuration import ProcessAssessmentSettings
+from fruitfly_agent.lab.improvement.assessment.completed import CompletedAssessmentService
+from fruitfly_agent.lab.improvement.assessment.registry import builtin_completed_assessors, CompletedAssessorRegistry, CompletedAssessorDefinition
+from fruitfly_agent.lab.improvement.strategies.exploration import builtin_explorations, ExplorationRegistry, ExplorationDefinition
+from fruitfly_agent.improvement.execution.facts import ensure_facts, read_facts, receipt_facts, attach_facts
+from fruitfly_agent.improvement.contracts.facts import ArtifactFact
+from fruitfly_agent.lab.improvement.termination import MetricThreshold, FailureLimit
 from fruitfly_agent.improvement.contracts.versions import content_hash
 from fruitfly_agent.lab.improvement.evidence import EvidenceWorkspace, MemoryArtifacts
 from tests.support.faux_provider import FauxProvider

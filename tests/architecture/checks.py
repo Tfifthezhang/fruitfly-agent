@@ -7,9 +7,11 @@ SOURCE_ROOTS = (ROOT / "fruitfly_agent", ROOT / "eval")
 DOCUMENTED_ROOTS = (*SOURCE_ROOTS, ROOT / "tests")
 
 ALLOWED_EDGES = {
+    "fruitfly_agent.rsi": {"fruitfly_agent.rsi", "fruitfly_agent.core", "fruitfly_agent.improvement"},
+    "fruitfly_agent.extensions": {"fruitfly_agent.extensions", "fruitfly_agent.core", "fruitfly_agent.improvement", "fruitfly_agent.lab", "fruitfly_agent.interactive"},
     "fruitfly_agent.runtime_spec": {"fruitfly_agent.runtime_spec", "fruitfly_agent.core"},
     # External experiment composition. Existing runtime dependency edges stay unchanged.
-    "fruitfly_agent.experiments": {"fruitfly_agent.runtime_spec", "fruitfly_agent.improvement", 
+    "fruitfly_agent.experiments": {"fruitfly_agent.rsi","fruitfly_agent.runtime_spec", "fruitfly_agent.improvement", 
         "fruitfly_agent.experiments", "fruitfly_agent.run", "fruitfly_agent.lab",
         "fruitfly_agent.providers", "fruitfly_agent.interactive", "eval",
     },
@@ -28,7 +30,7 @@ ALLOWED_EDGES = {
         "fruitfly_agent.interactive",
     },
     "fruitfly_agent": {"fruitfly_agent.core"},
-    "fruitfly_agent.run": {"fruitfly_agent.runtime_spec", "fruitfly_agent.improvement", 
+    "fruitfly_agent.run": {"fruitfly_agent.rsi", "fruitfly_agent.extensions","fruitfly_agent.runtime_spec", "fruitfly_agent.improvement", 
         "fruitfly_agent.run",
         "fruitfly_agent.core",
         "fruitfly_agent.lab",
@@ -147,4 +149,32 @@ def boundary_violations(code: str, source: str, is_pkg: bool = False) -> list[st
             violations.append(f"{source} imports {target}")
         elif _top(source) == "fruitfly_agent.core" and target.split(".")[0] in {"openai", "anthropic", "harbor"}:
             violations.append(f"{source} imports provider/benchmark SDK {target}")
+    return violations
+
+
+def suite_structure_violations(code: str, source: str) -> list[str]:
+    """Reject overwritten tests and duplicated terminal process ownership."""
+    tree = ast.parse(code)
+    violations = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Dict):
+            keys = [key.value for key in node.keys
+                    if isinstance(key, ast.Constant) and isinstance(key.value, str)]
+            if len(keys) != len(set(keys)):
+                violations.append(f'{source}:{node.lineno}: duplicate literal dictionary key')
+    for scope in (tree, *(n for n in ast.walk(tree) if isinstance(n, ast.ClassDef))):
+        seen = set()
+        for node in scope.body:
+            if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+                accessor = isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and any(
+                    isinstance(decorator, ast.Attribute) and decorator.attr in {'setter', 'deleter'}
+                    and isinstance(decorator.value, ast.Name) and decorator.value.id == node.name
+                    for decorator in node.decorator_list)
+                if node.name in seen and not accessor:
+                    violations.append(f'{source}:{node.lineno}: duplicate definition {node.name}')
+                seen.add(node.name)
+    if source.startswith('tests.') and '.test_' in source:
+        for target in imported_modules(code, source):
+            if target == 'pty' or target.startswith('pty.'):
+                violations.append(f'{source}: use tests.support.terminal_process for PTY lifecycle')
     return violations

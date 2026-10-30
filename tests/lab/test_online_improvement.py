@@ -4,9 +4,17 @@ from dataclasses import replace, asdict
 import json
 import unittest
 
-from fruitfly_agent.lab.improvement.api import (AssessedRunner, Assessment, ControlRequest,
-    EvidencePosition, ExecutionEvent, ExecutionRecord, FileTaskRunner, Metric, ProcessMetrics,
-    RunPlan, TaskMaterial, WorkflowServices, ReadOnlyInspector, MetricThreshold, StopExecutionPolicy)
+from fruitfly_agent.lab.improvement.assessment.online import AssessedRunner
+from fruitfly_agent.improvement.contracts.live import Assessment, ControlRequest, EvidencePosition, ExecutionEvent, Metric
+from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
+from fruitfly_agent.lab.improvement.execution.file_runner import FileTaskRunner
+from fruitfly_agent.lab.improvement.assessment.metrics import ProcessMetrics
+from fruitfly_agent.improvement.contracts.plans import RunPlan
+from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
+from fruitfly_agent.improvement.workflow.services import WorkflowServices
+from fruitfly_agent.lab.improvement.assessment.inspection import ReadOnlyInspector
+from fruitfly_agent.lab.improvement.termination import MetricThreshold
+from fruitfly_agent.lab.improvement.workflow.adaptive import StopExecutionPolicy
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
 from fruitfly_agent.improvement.execution.control import ControlDispatcher
 from fruitfly_agent.improvement.execution.events import EventJournal
@@ -164,7 +172,7 @@ class LiveExecutionTests(unittest.IsolatedAsyncioTestCase):
         event = ExecutionEvent(p, 'started', '{"nested":{"value":1}}')
         event.payload['nested']['value'] = 99
         self.assertEqual(event.payload['nested']['value'], 1)
-        from fruitfly_agent.lab.improvement.api import SearchState
+        from fruitfly_agent.improvement.contracts.stopping import SearchState
         goal = MetricThreshold('judge', 'quality', 1)
         value = Assessment(p, 'judge', (Metric('quality', 1),), scope='execution')
         self.assertIsNone(goal.decide(SearchState(0, 1, 1, False, False, assessments=(value,))))

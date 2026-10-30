@@ -46,3 +46,26 @@ def stop_reason(decision):
     if isinstance(decision, str) and decision:
         return decision
     raise ValueError('invalid stop decision')
+
+
+from dataclasses import asdict, is_dataclass
+from .versions import canonical_json
+
+def policy_spec(policy):
+    """Freeze policy parameters, not only their class name, before paid work."""
+    if policy is None:
+        return None
+    config: object
+    if hasattr(policy, 'policies'):
+        config = [policy_spec(p) for p in policy.policies]
+    elif is_dataclass(policy) and not isinstance(policy, type):
+        config = asdict(policy)
+    else:
+        config = getattr(policy, 'configuration', None)
+        if config is None:
+            raise ValueError('frozen custom stop policies require a configuration identity')
+    value = {'implementation': getattr(policy, 'implementation_id', type(policy).__module__ + '.' + type(policy).__qualname__),
+             'configuration': config}
+    canonical_json(value)
+    return value
+

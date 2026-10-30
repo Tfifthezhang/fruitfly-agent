@@ -5,8 +5,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
-from fruitfly_agent.lab.improvement.api import (TaskSetSnapshot, TaskSetSourceRegistry,
-    task_set_execution, task_set_minimum_budget, sample_batch)
+from fruitfly_agent.improvement.contracts.task_sets import TaskSetSnapshot
+from fruitfly_agent.lab.improvement.task_sets import TaskSetSourceRegistry, sample_batch
+from fruitfly_agent.lab.improvement.task_sets.execution import execution_definition as task_set_execution, minimum_budget as task_set_minimum_budget
 from fruitfly_agent.lab.improvement.task_sets.files import definition as files_definition
 from fruitfly_agent.lab.improvement.tasks import TaskPackCatalog
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts

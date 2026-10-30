@@ -4,11 +4,20 @@ from fruitfly_agent.improvement.components.registry import ComponentRegistry
 from fruitfly_agent.improvement.contracts.components import ComponentBinding
 
 
+from fruitfly_agent.improvement.contracts.optimization import OptimizationSpec
+
+
 class TextComponentAdapter:
     """Reuse existing prompt/guidance/retained/workflow validation and projection."""
     def __init__(self, target, kind):
         self.target, self.kind = target, kind
-        self.required_capabilities: frozenset[str] = getattr(target, 'required_capabilities', frozenset())
+        if not isinstance(getattr(target, 'optimization', None), OptimizationSpec):
+            raise ValueError('text owner must explicitly declare its optimization surface')
+        self.required_capabilities = target.optimization.required_capabilities
+
+    @property
+    def optimization(self):
+        return self.target.optimization
 
     def snapshot(self):
         value = self.target.snapshot()
@@ -60,7 +69,7 @@ def component_registry(targets):
 
 
 def bundle_target(targets):
-    from fruitfly_agent.lab.algorithms.components import ComponentTarget
+    from fruitfly_agent.lab.improvement.targets.bundle import ComponentTarget
     return ComponentTarget('component-bundle', 'Component bundle',
         tuple(t for t in targets if t.snapshot().binding.kind != 'components'))
 

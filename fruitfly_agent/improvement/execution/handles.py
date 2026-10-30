@@ -4,6 +4,8 @@ import asyncio
 from fruitfly_agent.improvement.execution.events import EventJournal
 from fruitfly_agent.improvement.execution.control import ControlDispatcher
 from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
+from fruitfly_agent.improvement.contracts.failures import CleanupError
+from fruitfly_agent.core.extensions.operations import consume
 
 
 class ManagedExecution:
@@ -51,7 +53,12 @@ class ManagedExecution:
     async def aclose(self):
         if not self.task.done():
             self.task.cancel()
-        await asyncio.gather(self.task, return_exceptions=True)
+        done, pending = await asyncio.wait((self.task,), timeout=10)
+        if pending:
+            self.task.add_done_callback(consume)
+            raise CleanupError('execution retirement did not confirm')
+        for task in done:
+            consume(task)
 
 
 class CompletionOnlyRunner:

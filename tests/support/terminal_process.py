@@ -3,6 +3,7 @@ import errno
 import fcntl
 import os
 import pty
+import re
 import select
 import signal
 import sys
@@ -15,16 +16,29 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class TerminalProcess:
-    def __init__(self, code, *, term='xterm-256color'):
+    def __init__(self, code, *, term='xterm-256color', rows=30, columns=160, environment=None):
         self.pid, self.fd = pty.fork()
         if self.pid == 0:
             os.chdir(ROOT)
             os.environ['TERM'] = term
             os.environ['INPUTRC'] = os.devnull
+            for key, value in (environment or {}).items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
             os.execl(sys.executable, sys.executable, '-c', code)
         self.output = b''
         self.status = None
-        fcntl.ioctl(self.fd, termios.TIOCSWINSZ, struct.pack('HHHH', 30, 160, 0, 0))
+        self._closed = False
+        self._eof = False
+        self.resize(rows, columns)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *error):
+        self.close()
 
     def send(self, data):
         os.write(self.fd, data)
@@ -38,8 +52,8 @@ class TerminalProcess:
     def read_until(self, marker, *, timeout=5, start=0):
         marker = marker.encode() if isinstance(marker, str) else marker
         deadline = time.monotonic() + timeout
-        while marker not in self.output[start:]:
-            if time.monotonic() >= deadline:
+        while marker not in re.sub(rb'\x1b\[[0-9;]*m', b'', self.output[start:]):
+            if self._eof or time.monotonic() >= deadline:
                 raise AssertionError(f'terminal did not report {marker!r}: {self.output[-2000:]!r}')
             self._read()
         return self.output.decode(errors='replace')
@@ -49,9 +63,11 @@ class TerminalProcess:
             try:
                 chunk = os.read(self.fd, 8192)
                 self.output += chunk
+                self._eof = not chunk
             except OSError as exc:
                 if exc.errno != errno.EIO:
                     raise
+                self._eof = True
 
     def finish(self, *, timeout=5):
         deadline = time.monotonic() + timeout
@@ -63,12 +79,15 @@ class TerminalProcess:
             if time.monotonic() >= deadline:
                 raise AssertionError(f'terminal did not exit: {self.output[-2000:]!r}')
             self._read()
-        self._read()
+        while not self._eof and select.select([self.fd], [], [], 0.05)[0]:
+            self._read()
         if os.waitstatus_to_exitcode(self.status) != 0:
             raise AssertionError(f'terminal failed: {self.output[-2000:]!r}')
         return self.output.decode(errors='replace')
 
     def close(self):
+        if self._closed:
+            return
         if self.status is None:
             try:
                 os.kill(self.pid, signal.SIGKILL)
@@ -79,3 +98,12 @@ class TerminalProcess:
             except ChildProcessError:
                 pass
         os.close(self.fd)
+        self._closed = True
+
+
+def run_terminal(code, keys, *, prompt='❯ ', **options):
+    """Submit only after a visible prompt and always retire the child process."""
+    with TerminalProcess(code, **options) as terminal:
+        terminal.read_until(prompt)
+        terminal.send(keys)
+        return terminal.finish()

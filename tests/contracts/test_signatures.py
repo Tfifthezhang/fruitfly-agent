@@ -10,7 +10,8 @@ from fruitfly_agent.core.extensions.protocols import Provider
 from fruitfly_agent.core.env.protocols import Shell
 from fruitfly_agent.interactive.application import RuntimeFactory, AgentApplication
 from fruitfly_agent.lab.catalog import assemble_lab, LabCatalog
-from fruitfly_agent.lab.improvement.api import CandidateGenerator, Composer, TaskRunner
+from fruitfly_agent.improvement.contracts.editing import CandidateGenerator, Composer
+from fruitfly_agent.improvement.contracts.execution import TaskRunner
 from fruitfly_agent.run import build_runtime
 
 

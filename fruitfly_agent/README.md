@@ -20,7 +20,9 @@ bounded changes. See the [configuration navigation tree](../CONFIGURATION.md#nav
 | [Providers](providers/README.md) | Model API requests, streaming, and error mapping | Core and Providers |
 | [Interactive](interactive/README.md) | Application lifecycle, multi-turn state, events, and terminal | Core and Interactive |
 | [Improvement](improvement/README.md) | Reliable stage execution, budgets, receipts and stopping through injected ports | Core and Improvement |
-| [Lab](lab/README.md) | Tools, environments, context strategies, improvement implementations, and RSI | Core, Runtime specification, Improvement and Lab |
+| [RSI runtime](rsi/README.md) | Reliable generation transitions and activation reconciliation through injected hosts | Core, Improvement and RSI |
+| [Developer Extensions](extensions/README.md) | Developer registration over public owning contracts | Core, Improvement, Lab and Interactive |
+| [Lab](lab/README.md) | Tools, environments, context strategies, improvement implementations, and RSI experiment defaults | Core, Runtime specification, Improvement and Lab |
 | [Run](run/README.md) | Configuration, Provider construction, assembly, and CLI | All runtime layers |
 | [Eval](../eval/README.md) | Optional single-configuration benchmark execution and reports | Core, Runtime specification, Improvement, Providers, Lab, and Eval |
 | [Experiments](experiments/README.md) | Independent CLI, file defaults and public service composition | Run, Lab, Providers, Interactive and optional Eval; no reverse imports |
@@ -34,7 +36,7 @@ Removing Eval leaves normal Agent use and generic improvement intact.
 
 The [Improvement runtime](improvement/README.md), with [Lab implementations](lab/improvement/README.md), separates candidate generation, execution, composition, selection, verification and reflection through public ports. Object-owned component adapters expose legal changes; Run and Application retain persistence and activation.
 
-[Instruction components](lab/algorithms/README.md#improve-multiple-instruction-components) retain separate H/S/I ownership. A candidate can modify multiple executable components; unregistered bindings and missing runner capabilities fail explicitly.
+[Instruction components](lab/improvement/targets/README.md#improve-multiple-instruction-components) retain separate H/S/I ownership. A candidate can modify multiple executable components; unregistered bindings and missing runner capabilities fail explicitly.
 
 Lab registrations own mechanism metadata. Improvement menus use generator, component, source and allocation contracts. Adding a generator does not add algorithm-specific branches to Run or the terminal.
 
@@ -125,7 +127,8 @@ Recovery validates recorded contents and required artifacts, then continues with
 | Execute on an external SSH server | [SSH environment](lab/environment/ssh/README.md) |
 | Search text candidates | [Improvement](lab/improvement/README.md) |
 | Optimize a shared candidate across tasks | [Task sets](lab/improvement/task_sets/README.md) |
-| Verify and adopt across generations | [RSI](lab/rsi/README.md) |
+| Verify and adopt across generations | [RSI runtime](rsi/README.md) |
+| Load developer extensions | [Developer Extensions](extensions/README.md) |
 | Register and assemble a mechanism | [Catalog](lab/catalog/README.md) |
 | Add a frontend | [Interactive](interactive/README.md) |
 
@@ -172,3 +175,8 @@ methods and editable prompts live under [reduction methods](lab/context_manager/
 shared evidence retrieval remains outside them. Measurement reports precision
 and uncertainty rather than presenting all counts as exact. See
 [request budgets](lab/context_manager/measurement/README.md).
+
+Agent, Improvement and RSI retain separate state machines. Core's bounded
+operation supervisor provides shared cooperative timeout/cancellation behavior;
+search decisions stay in Lab. Optimization representation, update timing,
+activation boundary and state scope use the [optimization contract](improvement/contracts/README.md#declare-optimization-surfaces).

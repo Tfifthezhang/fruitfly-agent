@@ -9,6 +9,7 @@ from typing import Any, Mapping
 from urllib.parse import urlsplit
 
 import yaml
+from fruitfly_agent.runtime_spec.documents import UniqueLoader
 
 
 def fields(value: object, allowed: set[str], label: str) -> dict[str, Any]:
@@ -91,7 +92,7 @@ class HostConfig:
         if not path.is_file():
             raise ValueError(f"Eval host configuration is missing: {path}; prepare .fruitfly/eval-host.yaml")
         try:
-            loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
+            loaded = yaml.load(path.read_text(encoding="utf-8"), Loader=UniqueLoader)
         except yaml.YAMLError:
             raise ValueError("invalid Eval host YAML") from None
         data = fields(loaded,

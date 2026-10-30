@@ -32,7 +32,7 @@ from fruitfly_agent.run.storage.prompts import resolve_base_prompt
 from .manifest import RuntimeManifest, digest_manifest as _digest
 from .media import retain_tool_media
 from fruitfly_agent.lab.catalog import resolve_harness, verify_runtime, configure_profile
-from fruitfly_agent.lab.algorithms.targets import TEXT_TARGET_PREFIX
+from fruitfly_agent.lab.improvement.targets.text import TEXT_TARGET_PREFIX
 
 
 @dataclass(frozen=True)
@@ -75,6 +75,7 @@ def build_runtime(
     for item in enabled:
         if item.definition.tool_provider is not None and item.definition.descriptor.mechanism_id not in prepared:
             raise ValueError('tool provider requires asynchronous preparation: ' + item.definition.descriptor.mechanism_id)
+    resolve_harness(profile, catalog, tool_providers=prepared)
     store = artifact_store or DataArtifactStore(cwd / ".fruitfly" / "artifacts")
     media = SessionMedia(store, session)
     for reference, text in profile.artifact_contents.items():

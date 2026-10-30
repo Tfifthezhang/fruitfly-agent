@@ -106,7 +106,7 @@ class RunAlgorithmBoundaryTests(unittest.TestCase):
     def test_run_only_imports_public_lab_host_contracts(self):
         allowed = {"fruitfly_agent.lab.catalog", "fruitfly_agent.lab.catalog.models",
                    "fruitfly_agent.lab.base_prompt", "fruitfly_agent.lab.improvement.api", "fruitfly_agent.lab.improvement.tasks",
-                   "fruitfly_agent.lab.algorithms.targets", "fruitfly_agent.lab.algorithms.evolution"}
+                   "fruitfly_agent.lab.improvement.targets.text", "fruitfly_agent.rsi.contracts"}
         violations = []
         for path in (ROOT / "fruitfly_agent" / "run").rglob("*.py"):
             for target in _project_imports(path):
@@ -231,7 +231,6 @@ class InteractiveDirectoryTests(unittest.TestCase):
         self.assertEqual({"__init__.py"}, {path.name for path in interactive.glob("*.py")})
         self.assertEqual({"__init__.py", "frontend.py", "bindings.py", "commands.py", "notifications.py"},
                          {path.name for path in (interactive / "terminal").glob("*.py")})
-        self.assertFalse((interactive / "terminal" / "actions").exists())
 
     def test_concrete_runtime_owner_satisfies_the_public_handle_protocol(self):
         from fruitfly_agent.interactive import RuntimeHandle

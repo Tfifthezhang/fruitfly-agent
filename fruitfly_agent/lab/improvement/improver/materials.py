@@ -5,10 +5,12 @@ from pathlib import Path
 import unicodedata
 
 from fruitfly_agent.improvement.contracts.experiments import MaterialOption, EpisodeMaterial
-from fruitfly_agent.improvement.contracts.pipeline import canonical_json, identifier
+from fruitfly_agent.improvement.contracts.versions import canonical_json
+from fruitfly_agent.improvement.contracts.validation import identifier
 from fruitfly_agent.improvement.contracts.versions import content_hash
-from ..tasks import read_bytes, FrozenTaskSuite
-from ..tasks.models import TaskCase
+from ..tasks.packages import read_bytes
+from ..tasks import FrozenTaskSuite
+from fruitfly_agent.improvement.contracts.tasks import TaskCase
 
 
 @dataclass(frozen=True)

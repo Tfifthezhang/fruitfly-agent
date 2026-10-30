@@ -11,7 +11,7 @@ from fruitfly_agent.run.storage.candidates import CandidateRecord
 from fruitfly_agent.run.storage.retention import compact_candidates
 from fruitfly_agent.run.runtime.activation import bind_activation
 from fruitfly_agent.run.configuration.operations import BindingEditor
-from fruitfly_agent.lab.algorithms.targets import expand_target
+from fruitfly_agent.lab.improvement.targets.text import expand_target
 
 
 class RunCandidates:

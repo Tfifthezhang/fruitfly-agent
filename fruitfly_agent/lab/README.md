@@ -9,7 +9,7 @@ Add tools, execution backends, context strategies, and improvement algorithms th
 | Module | Responsibility |
 |---|---|
 | [Catalog](catalog/README.md) | Mechanism definitions, parameters, dependencies, and installers |
-| [Algorithms](algorithms/README.md) | Algorithm identity and text-target contracts |
+| [Optimization targets](improvement/targets/README.md) | Explicit owner declarations, text projections and retained-state helpers |
 | [Context manager](context_manager/README.md) | Augmentation, externalization, and reduction |
 | [Tools](tools/README.md) | Model-callable file, shell, IPython and public web operations |
 | [MCP client](mcp/README.md) | Optional selected tools from independently installed local stdio services |

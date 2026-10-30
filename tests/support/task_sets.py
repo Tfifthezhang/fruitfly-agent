@@ -4,9 +4,16 @@ from dataclasses import replace
 from types import SimpleNamespace
 from uuid import uuid4
 
-from fruitfly_agent.lab.improvement.api import (TaskEntry, ScoreSpec, TaskSetSnapshot, CollectionBinding,
-    TaskMaterial, ExecutionRecord, Measurement, CandidateBundle, ComponentFile, HarnessSnapshot,
-    EditReason, ProposalResult, ExecutionContext, ExecutionPorts, content_hash)
+from fruitfly_agent.improvement.contracts.task_sets import TaskEntry, ScoreSpec, TaskSetSnapshot, CollectionBinding
+from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
+from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
+from fruitfly_agent.improvement.contracts.assessment import Measurement
+from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, EditReason
+from fruitfly_agent.improvement.contracts.components import ComponentFile, HarnessSnapshot
+from fruitfly_agent.improvement.contracts.editing import ProposalResult
+from fruitfly_agent.lab.improvement.execution import ExecutionContext
+from fruitfly_agent.improvement.contracts.experiments import ExecutionPorts
+from fruitfly_agent.improvement.contracts.versions import content_hash
 
 
 class IncrementGenerator:

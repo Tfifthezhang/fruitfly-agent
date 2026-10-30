@@ -29,9 +29,12 @@ class ResolvedHarness:
     owners: tuple[tuple[str, str], ...]
     execution_owners: tuple[tuple[str, str], ...] = ()
     settings: dict = field(default_factory=dict)
+    extensions: tuple = ()
 
     def to_dict(self):
         result = asdict(self)
+        if not self.extensions:
+            result.pop('extensions')
         if not self.settings:
             result.pop('settings')
         for component in result['components']:
@@ -91,6 +94,9 @@ def resolve_harness(profile, catalog, *, tool_providers=None):
                 if key in components:
                     raise ValueError('duplicate component declaration: ' + key)
                 components[key], owners[key] = component, name
+    for name, item in enabled.items():
+        if not item.definition.optimization_exemption and name not in owners.values():
+            raise ValueError('active algorithm exposes no optimization component: ' + name)
     mechanisms = tuple({'id': item.definition.descriptor.mechanism_id, 'parameters': dict(item.parameters),
         'implementation_id': item.definition.implementation_id} for item in resolved)
     from .configuration import configuration_surfaces
@@ -102,7 +108,7 @@ def resolve_harness(profile, catalog, *, tool_providers=None):
             owners[name] = owner
     return ResolvedHarness(profile.profile_id, mechanisms, tuple(sorted(tools)), execution_values(profile.execution),
         tuple(components[key] for key in sorted(components)), tuple(sorted(owners.items())), tuple(sorted(controlled.items())),
-        dict(profile.component_settings))
+        dict(profile.component_settings), catalog.extension_identities)
 
 
 def verify_runtime(inventory, config, targets):

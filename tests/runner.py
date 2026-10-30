@@ -8,7 +8,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 GUARDS = ('architecture', 'contracts')
-AREAS = (*GUARDS, 'core', 'providers', 'lab', 'interactive', 'run', 'workflows', 'eval', 'experiments')
+AREAS = (*GUARDS, 'core', 'providers', 'improvement', 'rsi', 'lab', 'interactive', 'run', 'workflows', 'eval', 'experiments')
 
 
 def cases(suite):

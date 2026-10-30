@@ -6,7 +6,9 @@ from fruitfly_agent.runtime_spec.documents import DocumentReader, mapping
 
 from fruitfly_agent.lab.improvement.configuration import ImprovementSettings, TaskSetImprovementSettings
 from fruitfly_agent.lab.rsi.configuration import EvolutionSettings
-from fruitfly_agent.lab.improvement.api import ProcessAssessmentSettings, ExplorationSettings, MultiTaskSettings
+from fruitfly_agent.lab.improvement.assessment.configuration import ProcessAssessmentSettings
+from fruitfly_agent.lab.improvement.strategies.exploration import ExplorationSettings
+from fruitfly_agent.lab.improvement.task_sets import MultiTaskSettings
 
 
 def settings(cls, value, label):

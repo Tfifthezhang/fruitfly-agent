@@ -54,5 +54,5 @@ There is no automatic production S update, cross-task learning, arbitrary source
 editing or activation. Default mechanisms are disabled. Register another hook or
 stop policy to replace this bounded recent-history policy.
 
-Offline checks: `tests.lab.test_improvement_kernel`,
+Offline checks: `tests.lab.test_improvement_mechanisms`,
 `tests.lab.test_improvement_configuration`, `tests.workflows.test_editor_evolution`.

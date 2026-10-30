@@ -20,7 +20,9 @@ Verify Application state/lifecycle, resource cleanup, events, menus, commands, a
 | `test_terminal_renderer.py / test_markdown.py / test_welcome.py` | Event presentation, output bounds, ANSI handling, and layouts |
 | `test_improvement.py / test_improvement_back.py` | Inline target-before-algorithm selection, field focus/current values, compatible budget retention, task revalidation, optional guidance, generic task sources, cost confirmation and cancellation |
 | `test_input_emphasis.py` | Dark/light/unknown terminal palettes, NO_COLOR, editor-only fill, and readable submitted/restored input |
-| `test_line_editor.py` | PTY resize without keystrokes, visible pre-submission form drafts, cursor/history preservation, form exit/echo restoration, explicit TERM, redirected fallback, and model-key echo suppression/restoration |
+| `test_line_editor.py / test_inline_display.py` | Stream/readline fallback, bounded display, input and committed history |
+| `test_editor_terminal.py` | Real PTY resize, drafts, paste, cursor/history and echo restoration |
+| `test_terminal_resume.py` | Session switching, workspace-relative paths and active-work refusal |
 
 Local PTYs and fake models. Assembly/CLI belong to Run; complete multi-module paths belong to Workflows.
 

@@ -4,14 +4,20 @@ from tests.architecture.checks import ROOT, _project_imports
 
 
 class ImprovementBoundaryTests(unittest.TestCase):
-    def test_research_selection_and_delivery_algorithms_have_no_kernel_owner(self):
-        kernel = ROOT / 'fruitfly_agent/improvement'
-        for path in ('termination', 'research', 'verification/delivery.py', 'evidence/query.py',
-                     'workflow/selection.py', 'workflow/exploration.py'):
-            with self.subTest(path=path):
-                # Bytecode directories are not importable source owners.
-                target = kernel / path
-                self.assertFalse(target.is_file() if target.suffix else any(target.glob('*.py')))
+    def test_concrete_stage_implementations_retain_their_lab_owners(self):
+        from fruitfly_agent.lab.improvement.editor import AgentEditor
+        from fruitfly_agent.lab.improvement.assessment.selection import AgentSelector
+        from fruitfly_agent.lab.improvement.experience.reflection import AgentReflector
+        from fruitfly_agent.lab.improvement.termination import BoundedStopPolicy
+        from fruitfly_agent.lab.improvement.assessment.aggregation import WeightedSum
+        for implementation, owner in (
+            (AgentEditor, 'editor'), (AgentSelector, 'assessment'),
+            (AgentReflector, 'experience'), (BoundedStopPolicy, 'termination'),
+            (WeightedSum, 'assessment'),
+        ):
+            with self.subTest(implementation=implementation.__name__):
+                self.assertTrue(implementation.__module__.startswith(
+                    'fruitfly_agent.lab.improvement.' + owner + '.'))
 
     def test_assessment_has_no_concrete_editor_or_host_imports(self):
         root = ROOT / 'fruitfly_agent/lab/improvement/assessment'
@@ -22,15 +28,14 @@ class ImprovementBoundaryTests(unittest.TestCase):
 
     def test_editing_implementation_does_not_import_assessment_implementation(self):
         root = ROOT / 'fruitfly_agent/lab/improvement/editor'
-        # The explicitly documented __init__ facade retains legacy imports.
-        violations = [f'{p.name}: {target}' for p in root.glob('*.py') if p.name != '__init__.py'
+        violations = [f'{p.name}: {target}' for p in root.glob('*.py')
             for target in _project_imports(p) if target.startswith('fruitfly_agent.lab.improvement.assessment')]
         self.assertEqual(violations, [])
 
     def test_improvement_does_not_import_rsi_or_benchmarks(self):
         root = ROOT / 'fruitfly_agent/lab/improvement'
         violations = [f'{p.name}: {target}' for p in root.rglob('*.py') for target in _project_imports(p)
-            if target.startswith(('fruitfly_agent.lab.rsi', 'eval'))]
+            if target.startswith(('fruitfly_agent.rsi', 'eval'))]
         self.assertEqual(violations, [])
 
     def test_batch_execution_receives_aggregation_instead_of_importing_a_scorer(self):

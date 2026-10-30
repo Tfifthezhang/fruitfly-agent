@@ -84,8 +84,10 @@ is not a representative full-dataset score. See [task selection](benchmarks/TASK
 
 A complete source checkout is discovered automatically. Set `FRUITFLY_EVAL_PACKAGE`
 to an absolute source directory or built wheel to override it during `prepare`. Material must
-identify `fruitfly-agent` version `0.1`. Source staging includes package Python,
-build inputs, README and license notices, excluding local secrets and sessions.
+identify `fruitfly-agent` version `0.1`. Source staging includes package Python, declared runtime resources, build inputs,
+README and license notices. Wheel staging preserves the shipped package resources
+and license notices. Both exclude local secrets and sessions. The shared inventory
+owns validation, copying and content identity; see [material preparation](harbor/README.md#freeze-complete-installation-material).
 Preparation freezes that source and an existing Linux runtime. Each trial records
 SHA-256 source/wheel inputs in `agent/installation.json`. The trial installation
 hook probes the mounted interpreter and stages configuration; it never installs

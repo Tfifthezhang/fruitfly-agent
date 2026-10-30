@@ -1,5 +1,8 @@
 """The published extension example runs through the real host, without keys."""
 import os
+from pathlib import Path
+import runpy
+import tempfile
 import subprocess
 import sys
 import unittest
@@ -17,3 +20,13 @@ class OfflineExampleTests(unittest.TestCase):
         )
         self.assertEqual(0, completed.returncode, completed.stderr)
         self.assertEqual('Offline response: example-guidance is active.', completed.stdout.strip())
+
+    def test_installed_check_model_wizard_uses_current_public_input_flow(self):
+        example = runpy.run_path(str(ROOT / 'examples/packaging/check_installed.py'))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            example['check_model_setup'](root)
+            from fruitfly_agent.providers.registry import load_model_specs
+            models = load_model_specs(root / '.fruitfly/models.yaml')
+            self.assertEqual({'wheel-check'}, set(models))
+            self.assertEqual('offline-model', models['wheel-check'].model)

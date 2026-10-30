@@ -52,6 +52,8 @@ The Core loop, task packages/scoring, message codecs, runtime-description adapte
 | [Architecture](architecture/README.md) | Imports, extension boundaries, documentation navigation, and test discovery |
 | [Contracts](contracts/README.md) | Reviewed exports, signatures, persistence, and rejection semantics |
 | [Core](core/README.md) | Loop, messages, hooks, tools, Session, failures, and cancellation |
+| [Improvement](improvement/README.md) | Reliable stages, optimization admission, budgets and scheduling |
+| [RSI](rsi/README.md) | Generation transitions, activation binding and recovery allowances |
 | [Providers](providers/README.md) | Model specifications, codecs, streams, errors, and SDK lifecycle |
 | [Lab](lab/README.md) | Algorithms, tools, environments, context, packs, and Catalog |
 | [Interactive](interactive/README.md) | Application, events, menus, and terminal behavior |
@@ -108,3 +110,34 @@ Command-completion checks cover registered/hidden/overridden commands, custom he
 range edits, prefix filtering, dismissal, history, paste and permission/copy input.
 Local PTY checks exercise the complete frontend: typing shows candidates, Tab edits
 without executing, Enter dispatches once, and terminal modes restore on exit.
+
+## Design and maintain tests
+
+Assign each public behavior one detailed test owner. Use Workflows to verify real
+connections between those owners. A boundary-specific assertion may remain at
+multiple layers when it protects a distinct wiring failure.
+
+| Before adding or changing tests | Required action |
+|---|---|
+| Choose placement | Match the production owner. Improvement and RSI runtime tests have independent areas; concrete policies remain in Lab. |
+| Add another case | Name the failure or outcome it protects. Use `subTest` for input variations of the same rule. |
+| Build a fixture | Keep one-use helpers local. Reuse existing support before adding a shared fixture; support owns no product assertions, TestCases or discovery hooks. |
+| Start a terminal child | Use `TerminalProcess` or `run_terminal` from [terminal support](support/terminal_process.py), with bounded waits and guaranteed cleanup. |
+| Test a terminal flow | Assert observable labels, decisions and effects. Use visible menu labels when row positions are incidental. |
+| Remove an assertion | Identify the retired contract or the remaining test that protects the behavior. Keep distinct failure, cancellation, isolation and recovery scenarios. |
+| Split a file | Separate independently changing responsibilities and remove repeated setup. File length alone does not establish redundancy. |
+| Change an API | Review consumers and update the explicit baseline by hand; never derive expected exports from implementation. |
+| Move a group | Update runner areas, discovery, docs and commands together; each case must be discovered exactly once. |
+
+Architecture checks reject overwritten class/method definitions, repeated literal
+dictionary keys that could hide contract entries, PTY lifecycle
+imports in test modules, cross-test imports, support discovery, duplicate test IDs
+and unregistered test areas. Guard-detection tests inject violations to prove the
+checks work. These guards do not replace review of behavioral coverage.
+
+Packaging and freezing tests must run the copied artifact in an isolated process
+and assert that imports resolve from that artifact. Exercise declared runtime
+resources as well as Python modules. Preserve exclusion of secrets and local
+state. A `.py`-only file list is not evidence that an Agent runtime is complete.
+See [resource regressions](eval/README.md) and the
+[developer smoke sequence](../GETTING_STARTED.md#check-the-agent-offline).

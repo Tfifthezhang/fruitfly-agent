@@ -4,10 +4,11 @@ from dataclasses import dataclass, replace
 from inspect import isawaitable
 from pathlib import Path
 
+from fruitfly_agent.improvement.contracts.optimization import TextProjection
 from fruitfly_agent.core.extensions.protocols import RecoveryValidator
 from fruitfly_agent.interactive import InteractiveSession
 from fruitfly_agent.interactive.application import RuntimeHandle
-from fruitfly_agent.lab.algorithms.targets import TEXT_TARGET_PREFIX, TextTarget
+from fruitfly_agent.lab.improvement.targets.text import TEXT_TARGET_PREFIX
 from fruitfly_agent.run.configuration.resolution import resolve_profile_models
 from fruitfly_agent.run.configuration.profile import HarnessProfile
 from fruitfly_agent.run.storage.sessions import SessionLeases
@@ -22,7 +23,7 @@ from .media import load_image
 class PreparedRuntime:
     runtime: RuntimeAssembly
     profile: HarnessProfile
-    targets: dict[str, TextTarget]
+    targets: dict[str, TextProjection]
     resumed: bool
 
 
@@ -143,8 +144,8 @@ class RuntimePreparer:
             )
             targets = {key[len(TEXT_TARGET_PREFIX):]: value for key, value in runtime.components.items()
                        if key.startswith(TEXT_TARGET_PREFIX)}
-            if any(not isinstance(value, TextTarget) for value in targets.values()):
-                raise TypeError("named text targets must implement TextTarget")
+            if any(not isinstance(value, TextProjection) for value in targets.values()):
+                raise TypeError("named text targets must implement TextProjection")
 
             def activate():
                 with session.transaction():

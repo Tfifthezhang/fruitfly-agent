@@ -18,7 +18,7 @@ def definition():
         parameters=(ParameterDescriptor('config', 'path', 'Service configuration',
             'Workspace-local YAML file declaring stdio servers and selected tools.', '.fruitfly/mcp.yaml'),),
         effects=MechanismEffects(uses_network=True, writes_files=True, cost_notice='Starts configured local processes; external tools may have independent effects and costs.')),
-        install, implementation_id='mcp-stdio-v1', tool_provider=prepare,
+        install, implementation_id='mcp-stdio-v1', optimization_exemption='External tool transport and schemas are protected service bindings.', tool_provider=prepare,
         implementation_path='fruitfly_agent/lab/mcp/client.py', documentation_path='fruitfly_agent/lab/mcp/README.md',
         input_parameters=('config',))
 

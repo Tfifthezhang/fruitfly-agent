@@ -203,7 +203,8 @@ Host services exclude holdout contents from generation and material review; this
 ```
 
 Scoring implementations and the restricted worker belong to
-[Assessment scorers](../assessment/scorers/README.md). Existing `tasks.scoring`
-imports remain compatible. Package parsing, partition validation and discovery
-remain task responsibilities. Scorer/worker identities change when their actual
+[Assessment scorers](../assessment/scorers/README.md). Import task policies directly from their Assessment owner. [packages.py](packages.py)
+owns parsing, partition validation and loading; [catalog.py](catalog.py) owns
+discovery, suite freezing and authorized training edits; [snapshots.py](snapshots.py)
+owns immutable receipts. The package root exposes the supported host services. Scorer/worker identities change when their actual
 implementation bytes change; prior proof is not silently reused.

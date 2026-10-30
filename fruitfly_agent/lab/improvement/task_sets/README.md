@@ -102,7 +102,7 @@ Interrupted batches retain completed receipts and explicitly incomplete coverage
 No unknown paid work is automatically replayed.
 
 ```bash
-.venv/bin/python -m unittest tests.lab.test_task_sets tests.lab.test_batch_scheduler tests.lab.test_joint_assessment tests.lab.test_task_set_search tests.experiments.test_multi_task
+.venv/bin/python -m unittest tests.lab.test_task_sets tests.improvement.test_scheduler tests.lab.test_joint_assessment tests.lab.test_task_set_search tests.experiments.test_multi_task
 ```
 
 Fake rewards validate orchestration, coverage, isolation and accounting only.

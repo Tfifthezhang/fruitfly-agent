@@ -11,8 +11,14 @@ from uuid import uuid4
 
 import yaml
 from eval.improvement.task_sets import freeze
-from fruitfly_agent.lab.improvement.api import (TaskSetSnapshot, MultiTaskSettings, BatchEvaluator,
-    ExecutionContext, WorkflowServices, RunPlan, EvaluationBatch, ComponentRegistry, TextComponentAdapter)
+from fruitfly_agent.improvement.contracts.task_sets import TaskSetSnapshot
+from fruitfly_agent.lab.improvement.task_sets import MultiTaskSettings
+from fruitfly_agent.improvement.execution.batches import BatchEvaluator
+from fruitfly_agent.lab.improvement.execution import ExecutionContext
+from fruitfly_agent.improvement.workflow.services import WorkflowServices
+from fruitfly_agent.improvement.contracts.plans import RunPlan
+from fruitfly_agent.improvement.contracts.evaluation import EvaluationBatch
+from fruitfly_agent.lab.improvement.components import ComponentRegistry, TextComponentAdapter
 from fruitfly_agent.lab.base_prompt.target import BasePromptTarget
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
 from fruitfly_agent.lab.improvement.assessment.joint import assess_batch

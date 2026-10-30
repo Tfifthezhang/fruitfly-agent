@@ -16,6 +16,7 @@ from fruitfly_agent.interactive.terminal import transient_screen
 from fruitfly_agent.providers.config import load_env
 from fruitfly_agent.providers.workspace import WorkspacePaths
 
+from fruitfly_agent.run.extensions import load_extensions
 from fruitfly_agent.run.application import RunApplicationFactory, resolve_session_path as _resolve_path
 from fruitfly_agent.lab.catalog import PermissionPolicy
 from fruitfly_agent.providers.registry import default_registry
@@ -50,12 +51,22 @@ async def run_cli(args: argparse.Namespace) -> int:
                 raise ValueError('model request allowance requires a fresh non-interactive task')
             budget = ModelCallBudget(int(raw_limit), receipt=environment.get('FRUITFLY_MODEL_USAGE_PATH'))
             registry = BudgetedProviderRegistry(default_registry(), budget)
+        from fruitfly_agent.runtime_spec import load_harness_config
+        config_source = Path(args.config) if args.config else cwd / '.fruitfly/config.yaml'
+        if not config_source.is_absolute():
+            config_source = cwd / config_source
+        try:
+            declared = load_harness_config(config_source).select(args.profile).extensions if config_source.is_file() else ()
+        except (ValueError, OSError) as exc:
+            raise ValueError(str(config_source) + ': ' + str(exc)) from exc
+        extensions = load_extensions((*declared, *(getattr(args, 'extension', []) or [])), workspace=cwd)
         factory = RunApplicationFactory(
             cwd=cwd, environment=environment, config_path=args.config,
             profile_id=args.profile, allow_incomplete=not single_task,
             permission_policy=PermissionPolicy.unrestricted(cwd) if unrestricted else None,
             provider_registry=registry,
             tool_service_startup_approval=approve_start,
+            extensions=extensions if extensions.registrations else None,
         )
         if not single_task:
             needs_menu = configure or not factory.configuration.snapshot().ready
@@ -114,7 +125,11 @@ async def run_cli(args: argparse.Namespace) -> int:
                 if event_stream is not None:
                     event_stream.close()
 
-        return await TerminalFrontend(application).run()
+        frontend = TerminalFrontend(application)
+        if extensions.registrations:
+            from fruitfly_agent.run.extensions.commands import bind_extension_commands
+            bind_extension_commands(frontend.commands, application, factory)
+        return await frontend.run()
     except (ValueError, OSError, RuntimeError, SessionCorruptError, TypeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -141,6 +156,8 @@ def create_parser() -> argparse.ArgumentParser:
         prog="fruitfly-agent",
         description="interactive-first agent harness",
     )
+    parser.add_argument('--extension', action='append', default=[], metavar='SOURCE',
+                        help='load a trusted local Python extension or entrypoint:NAME; repeat for multiple sources')
     parser.add_argument(
         "task",
         nargs="?",

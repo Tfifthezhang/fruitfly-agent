@@ -4,8 +4,10 @@ import json
 import unittest
 
 from fruitfly_agent.core import AgentLoopConfig
-from fruitfly_agent.lab.algorithms.components import ComponentTarget
-from fruitfly_agent.lab.algorithms.targets import TargetSnapshot, canonical_json, target_edits
+from fruitfly_agent.lab.improvement.targets.bundle import ComponentTarget
+from fruitfly_agent.improvement.contracts.optimization import TargetSnapshot
+from fruitfly_agent.lab.improvement.targets.text import target_edits
+from fruitfly_agent.improvement.contracts.versions import canonical_json
 from fruitfly_agent.lab.base_prompt.target import BasePromptTarget
 from fruitfly_agent.lab.tools.guidance import ToolGuidanceTarget
 from fruitfly_agent.lab.tools.read import create_read_tool

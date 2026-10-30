@@ -53,3 +53,23 @@ def run_finished() -> RunFinished:
         turn_count=1, tool_call_count=0, input_tokens=1, output_tokens=2,
         is_error=False, error_details=None,
     )
+
+
+class TerminalSessionStub:
+    running = False
+    pending_count = 0
+
+    def __init__(self, **kwargs):
+        from tests.support.application import offline_session
+        self.base = offline_session(**kwargs)
+
+    @property
+    def status(self):
+        return self.base.status
+
+    def set_event_sink(self, sink):
+        self.sink = sink
+        self.base.set_event_sink(sink)
+
+    def trace(self, limit=12):
+        return self.base.trace(limit)

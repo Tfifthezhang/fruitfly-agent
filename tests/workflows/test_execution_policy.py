@@ -10,9 +10,17 @@ from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.interactive import AgentApplication
 from fruitfly_agent.interactive.contracts.improvement import WorkflowRequest
 from fruitfly_agent.lab.execution_policy import ExecutionPolicyTarget
-from fruitfly_agent.lab.improvement.api import (WorkflowBindings, GeneratorRegistry, CandidateBundle,
-    HarnessSnapshot, ComponentFile, EditReason, ProposalResult, ComponentRegistry, TextComponentAdapter,
-    FileTaskRunner, WorkflowServices, RunPlan, TaskMaterial, read_facts)
+from fruitfly_agent.lab.improvement.api import WorkflowBindings
+from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
+from fruitfly_agent.improvement.workflow.services import WorkflowServices
+from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, EditReason
+from fruitfly_agent.improvement.contracts.components import HarnessSnapshot, ComponentFile
+from fruitfly_agent.improvement.contracts.editing import ProposalResult
+from fruitfly_agent.lab.improvement.components import ComponentRegistry, TextComponentAdapter
+from fruitfly_agent.lab.improvement.execution.file_runner import FileTaskRunner
+from fruitfly_agent.improvement.contracts.plans import RunPlan
+from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
+from fruitfly_agent.improvement.execution.facts import read_facts
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
 from fruitfly_agent.run import RunApplicationFactory
 from tests.support.faux_provider import FauxProvider

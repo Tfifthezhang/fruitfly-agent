@@ -15,7 +15,7 @@ from typing import Any, Mapping
 
 
 from fruitfly_agent.run.storage.artifacts import DataArtifactStore
-from fruitfly_agent.lab.improvement.api import SearchReport
+from fruitfly_agent.improvement.evidence.reporting import SearchReport
 
 
 _CANDIDATE_ID = re.compile(r"^[0-9a-f]{32}$")

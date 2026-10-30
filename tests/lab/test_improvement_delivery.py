@@ -6,8 +6,11 @@ import sys
 import tempfile
 import unittest
 
-from fruitfly_agent.lab.improvement.api import (ExecutionContext, ExecutionRequest, WorkflowServices,
-    TaskMaterial, Resource, ExecutionRecord)
+from fruitfly_agent.lab.improvement.execution import ExecutionContext
+from fruitfly_agent.improvement.contracts.experiments import ExecutionRequest
+from fruitfly_agent.improvement.workflow.services import WorkflowServices
+from fruitfly_agent.improvement.contracts.tasks import TaskMaterial, Resource
+from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
 from fruitfly_agent.lab.improvement.execution import files
 from fruitfly_agent.lab.improvement.execution.deliverables import DeliverySpec, DeliveryBundle
 from fruitfly_agent.lab.improvement.verification.delivery import (CommandDeliveryBackend, DeliveryValidationRunner)

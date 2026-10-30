@@ -1,9 +1,12 @@
 """Fixed base prompt as a named text improvement target."""
+from fruitfly_agent.improvement.contracts.optimization import OptimizationSpec
 from dataclasses import replace
-from fruitfly_agent.lab.algorithms.targets import TargetBinding, TargetSnapshot, validate_text
+from fruitfly_agent.improvement.contracts.optimization import TargetBinding, TargetSnapshot
+from fruitfly_agent.lab.improvement.targets.text import validate_text
 
 
 class BasePromptTarget:
+    optimization = OptimizationSpec('H', 'text')
     label = 'Base prompt'
     component_kind = 'system-prompt'
 

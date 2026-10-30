@@ -4,7 +4,8 @@ import tempfile
 import unittest
 
 from fruitfly_agent.interactive import AgentApplication
-from fruitfly_agent.lab.improvement.api import NoImprovement, BudgetScope
+from fruitfly_agent.lab.improvement.termination import NoImprovement
+from fruitfly_agent.improvement.workflow.budget import BudgetScope
 from tests.support.improvers import offline_factory
 
 

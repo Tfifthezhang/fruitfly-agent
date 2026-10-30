@@ -3,7 +3,10 @@ from dataclasses import asdict
 from uuid import uuid4
 
 from fruitfly_agent.improvement.contracts.experiments import EpisodeRequest, TrialReport
-from fruitfly_agent.improvement.contracts.pipeline import ExecutionRecord, Measurement, Resource, TaskMaterial, canonical_json
+from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
+from fruitfly_agent.improvement.contracts.assessment import Measurement
+from fruitfly_agent.improvement.contracts.tasks import Resource, TaskMaterial
+from fruitfly_agent.improvement.contracts.versions import canonical_json
 from fruitfly_agent.improvement.contracts.versions import content_hash
 from fruitfly_agent.improvement.workflow.budget import AllocationExhausted
 from .episodes import NativeEpisodeExecutor

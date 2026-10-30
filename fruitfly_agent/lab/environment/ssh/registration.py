@@ -29,7 +29,7 @@ def definition():
             conflicts=frozenset({'ipython-tool', 'memory-files'}),
             effects=MechanismEffects(uses_network=True, writes_files=True,
                 cost_notice='Selected file and Bash tools operate on the configured server with the remote account permissions.')),
-        install, implementation_id='ssh-env-v1', provides=frozenset({'execution-env'}),
+        install, implementation_id='ssh-env-v1', optimization_exemption='Remote execution binding and verified credentials are protected infrastructure.', provides=frozenset({'execution-env'}),
         implementation_path='fruitfly_agent/lab/environment/ssh/environment.py',
         documentation_path='fruitfly_agent/lab/environment/ssh/README.md',
         input_parameters=('host', 'port', 'cwd', 'username_env', 'password_env', 'known_hosts'),

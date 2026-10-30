@@ -155,3 +155,18 @@ It applies the owning descriptor's normalization before hashing, so a valid JSON
 number and its assembled numeric value cannot produce different candidate identities.
 Run injects this projection into version construction; activation still validates
 the actually assembled runtime.
+
+## Enforce algorithm readiness
+
+`LabCatalog.require_optimization()` runs before Run constructs runtime services.
+Every algorithm needs an executable component/parameter declaration or tool
+guidance target. Infrastructure connectors declare a concrete
+`optimization_exemption` explaining their protected responsibility. This is not
+permission to expose an algorithm without an optimization surface. Assembly
+verifies that declared targets actually exist; component admission also checks
+timing, boundary and runner capabilities through the
+[optimization protocol](../../improvement/contracts/README.md#declare-optimization-surfaces).
+Information retrieval limits, Skill catalog size and programmatic offload
+thresholds have owner-controlled parameter adapters. Their shared configuration
+candidates require configuration materialization; native file trials reject
+unsupported parameter changes before model work.

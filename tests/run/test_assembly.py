@@ -1,127 +1,41 @@
+"""Assembly behavior and failure contracts."""
 from __future__ import annotations
-
-
 from dataclasses import replace
-
-
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import Mock, patch
-
 from fruitfly_agent.core.data_model import UserMessage
 from fruitfly_agent.core.context import ContextFrame
 from fruitfly_agent.core.session import Session
-
 from fruitfly_agent.lab.catalog import (
     MechanismSelection,
     builtin_catalog,
 )
 from fruitfly_agent.run.configuration import HarnessProfile
-from fruitfly_agent.run import DataArtifactStore, build_runtime
+from fruitfly_agent.run import DataArtifactStore
 from fruitfly_agent.run.adapters.runtime import describe_runtime
-
-
 from fruitfly_agent.run.application import discover_resumable_sessions
 from fruitfly_agent.run.application import check_session_manifest, record_session_manifest
 from fruitfly_agent.lab.base_prompt import DEFAULT_PROMPT
-from tests.support.faux_provider import FauxProvider
 from tests.support.run import _write_catalog
+
+from tests.support.assembly import AssemblyWorkspace
 
 
 class RuntimeAssemblyTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.root = Path(self.enterContext(tempfile.TemporaryDirectory()))
-        self.model_path = self.root / "models.yaml"
-        _write_catalog(self.model_path, {"offline": "offline-model"})
-        self.registry = Mock()
-        self.registry.create.side_effect = lambda *_: FauxProvider()
-
-    def assemble(self, profile, session, *, catalog, **kwargs):
-        return build_runtime(
-            profile, session=session, catalog=catalog, cwd=self.root,
-            provider_registry=self.registry, environment=kwargs.pop("environment", {}),
-            config_path=kwargs.pop("config_path", self.root / "config.yaml"), **kwargs,
-        )
-
-    def test_changed_permissions_allow_recovery_with_current_authorizer(self):
-        from fruitfly_agent.lab.catalog import PermissionPolicy
-        from fruitfly_agent.lab.environment.guarded import GuardedEnv
-        catalog = builtin_catalog()
-        profile = HarnessProfile("default", str(self.model_path), "offline", catalog.default_selections())
-        with Session(self.root / "permissions.jsonl") as session:
-            original = self.assemble(profile, session, catalog=catalog)
-            self.assertIsNotNone(original.config.tool_authorizer)
-            self.assertIsInstance(original.config.env, GuardedEnv)
-            self.assertEqual("confirm", original.manifest.permissions["outside_workspace"])
-            record_session_manifest(session, original)
-            changed = self.assemble(profile, session, catalog=catalog,
-                permission_policy=PermissionPolicy(self.root, read_roots=(self.root.parent,)))
-            check_session_manifest(session, changed, resume=True)
-            identical = self.assemble(profile, session, catalog=catalog)
-            check_session_manifest(session, identical, resume=True)
-            self.assertEqual(0, identical.components['authorization'].status()['grants'])
-            self.assertFalse(identical.config.env.write_file(str(session.path), 'corrupt').is_ok)
-
-    def test_transport_identity_is_recorded_but_changes_allow_recovery(self):
-        from tests.support.provider_streams import adapter
-
-        catalog = builtin_catalog()
-        profile = HarnessProfile("default", str(self.model_path), "offline", ())
-        for kind in ("openai", "anthropic"):
-            with self.subTest(kind=kind), Session(self.root / f"{kind}.jsonl") as session:
-                default, _ = adapter(kind, [])
-                explicit, _ = adapter(kind, [], total_timeout=900)
-                changed, _ = adapter(kind, [], total_timeout=901)
-                self.registry.create.side_effect = None
-                self.registry.create.return_value = default
-                original = self.assemble(profile, session, catalog=catalog)
-                self.assertEqual(900.0, original.manifest.models["main"]["transport"]["total_timeout"])
-                record_session_manifest(session, original)
-                self.registry.create.return_value = explicit
-                equivalent = self.assemble(profile, session, catalog=catalog)
-                self.assertEqual(original.manifest.digest, equivalent.manifest.digest)
-                check_session_manifest(session, equivalent, resume=True)
-                self.registry.create.return_value = changed
-                incompatible = self.assemble(profile, session, catalog=catalog)
-                check_session_manifest(session, incompatible, resume=True)
-                self.registry.create.return_value = FauxProvider()
-                missing = self.assemble(profile, session, catalog=catalog)
-                check_session_manifest(session, missing, resume=True)
-
-    def test_algorithm_identity_is_recorded_but_changes_allow_recovery(self):
-        from dataclasses import asdict, replace
-        from fruitfly_agent.lab.catalog import LabCatalog
-        from fruitfly_agent.lab.context_manager.reduction import SummarizingCompactorConfig
-
-        root = self.root
-        model_path = self.model_path
-        catalog = builtin_catalog()
-        profile = HarnessProfile("default", str(model_path), "offline", catalog.default_selections())
-        with Session(root / "session.jsonl") as session:
-            runtime = self.assemble(profile, session, catalog=catalog)
-            component = next(c for c in runtime.manifest.components if c["id"] == "compaction")
-            self.assertEqual("summarizing-v3", component["implementation_id"])
-            self.assertEqual(asdict(SummarizingCompactorConfig()), component["parameters"])
-            record_session_manifest(session, runtime)
-            changed_catalog = LabCatalog(tuple(
-                replace(d, implementation_id="test-summary-implementation") if d.descriptor.mechanism_id == "compaction" else d
-                for d in catalog.definitions()
-            ))
-            changed = self.assemble(profile, session, catalog=changed_catalog)
-            self.assertNotEqual(runtime.manifest.digest, changed.manifest.digest)
-            check_session_manifest(session, changed, resume=True)
+        self.workspace = AssemblyWorkspace(self.enterContext(tempfile.TemporaryDirectory()))
 
     def test_base_prompt_artifact_changes_runtime_identity_and_verified_default_recovers(self) -> None:
-        root = self.root
-        model_path = self.model_path
+        root = self.workspace.root
+        model_path = self.workspace.model_path
         catalog = builtin_catalog()
         store = DataArtifactStore(root / ".fruitfly" / "artifacts")
         ref = store.put_text("A distinct base prompt")
         baseline = HarnessProfile("default", str(model_path), "offline", tuple(s for s in catalog.default_selections() if s.mechanism_id != "compaction"))
         candidate = HarnessProfile("default", str(model_path), "offline", baseline.mechanisms, ref.artifact_id)
         with Session(root / ".fruitfly" / "sessions" / "first.jsonl") as session:
-            original = self.assemble(baseline, session, catalog=catalog, artifact_store=store)
+            original = self.workspace.assemble(baseline, session, catalog=catalog, artifact_store=store)
             self.assertEqual(original.config.system_prompt, DEFAULT_PROMPT.text)
             self.assertEqual(original.manifest.base_prompt["content_hash"], DEFAULT_PROMPT.content_hash)
             record_session_manifest(session, original)
@@ -133,7 +47,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
         self.assertEqual(discovered[0].prompt_label, DEFAULT_PROMPT.label)
         self.assertEqual(discovered[0].prompt_hash, DEFAULT_PROMPT.content_hash)
         with Session(root / "second.jsonl") as session:
-            changed = self.assemble(candidate, session, catalog=catalog, artifact_store=store)
+            changed = self.workspace.assemble(candidate, session, catalog=catalog, artifact_store=store)
             self.assertEqual(changed.config.system_prompt, "A distinct base prompt")
             self.assertEqual(changed.manifest.base_prompt["content_hash"], ref.artifact_id)
             self.assertNotEqual(changed.manifest.digest, original.manifest.digest)
@@ -141,52 +55,11 @@ class RuntimeAssemblyTest(unittest.TestCase):
             check_session_manifest(session, changed, resume=True)
             (store.root / ref.artifact_id[7:]).write_text("tampered", encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "hash check"):
-                self.assemble(candidate, session, catalog=catalog, artifact_store=store)
-
-    def test_legacy_manifests_are_validated_without_reconstructing_old_defaults(self):
-        from fruitfly_agent.run.runtime.manifest import digest_manifest
-        catalog = builtin_catalog()
-        profile = HarnessProfile("default", str(self.model_path), "offline", ())
-        for version in (3, 4, 5, 6):
-            with self.subTest(version=version), Session(self.root / f"legacy-{version}.jsonl") as session:
-                runtime = self.assemble(profile, session, catalog=catalog)
-                stored = runtime.manifest.to_dict()
-                stored.pop("digest")
-                stored.pop("permissions")
-                stored.pop("harness")
-                if version < 6:
-                    stored.pop("execution")
-                stored["schema_version"] = version
-                if version < 5:
-                    stored.pop("base_prompt")
-                stored["digest"] = digest_manifest(stored)
-                session.append("meta", {"kind": "runtimeManifest", "manifest": stored}, sync=True)
-                before = session.path.read_bytes()
-                check_session_manifest(session, runtime, resume=True)
-                self.assertEqual(before, session.path.read_bytes())
-                record_session_manifest(session, runtime)
-                self.assertEqual(stored, session.read_all()[0].payload["manifest"])
-                self.assertEqual(runtime.manifest.to_dict(), session.read_all()[-1].payload["manifest"])
-                record_session_manifest(session, runtime)
-                self.assertEqual(2, len(session.read_all()))
-
-
-    def test_data_artifact_store_is_content_addressed_and_detects_tampering(self) -> None:
-        store = DataArtifactStore(self.root / "artifacts")
-        first = store.put_text("candidate guidance")
-        repeated = store.put_text("candidate guidance")
-
-        self.assertEqual(first, repeated)
-        self.assertEqual("candidate guidance", store.read_text(first.artifact_id))
-        (store.root / first.artifact_id.removeprefix("sha256:")).write_text(
-            "changed", encoding="utf-8"
-        )
-        with self.assertRaisesRegex(ValueError, "hash check"):
-            store.read_text(first.artifact_id)
+                self.workspace.assemble(candidate, session, catalog=catalog, artifact_store=store)
 
     def test_skill_guidance_artifact_is_bound_to_runtime_manifest_and_context(self) -> None:
-        root = self.root
-        model_path = self.model_path
+        root = self.workspace.root
+        model_path = self.workspace.model_path
         store = DataArtifactStore(root / ".fruitfly" / "artifacts")
         ref = store.put_text("Candidate guidance version A")
         catalog = builtin_catalog()
@@ -197,7 +70,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
             mechanisms=catalog.default_selections(),
         )
         with Session(root / "candidate.jsonl") as session:
-            runtime = self.assemble(
+            runtime = self.workspace.assemble(
                 profile, session, catalog=catalog, artifact_store=store,
                 artifact_bindings={'skill-catalog.guidance': ref.artifact_id},
             )
@@ -217,8 +90,8 @@ class RuntimeAssemblyTest(unittest.TestCase):
         self.assertIn("Candidate guidance version A", transformed.frame.system_prompt)
 
     def test_oversized_guidance_artifact_fails_runtime_assembly(self) -> None:
-        root = self.root
-        model_path = self.model_path
+        root = self.workspace.root
+        model_path = self.workspace.model_path
         store = DataArtifactStore(root / ".fruitfly" / "artifacts")
         ref = store.put_text("x" * 16_000)
         catalog = builtin_catalog()
@@ -230,14 +103,14 @@ class RuntimeAssemblyTest(unittest.TestCase):
         )
         with Session(root / "oversized.jsonl") as session:
             with self.assertRaisesRegex(ValueError, "exceeds.*max_chars"):
-                self.assemble(
+                self.workspace.assemble(
                     profile, session, catalog=catalog, artifact_store=store,
                     artifact_bindings={'skill-catalog.guidance': ref.artifact_id},
                 )
 
     def test_guidance_artifact_requires_the_mechanism_to_be_enabled(self) -> None:
-        root = self.root
-        model_path = self.model_path
+        root = self.workspace.root
+        model_path = self.workspace.model_path
         store = DataArtifactStore(root / ".fruitfly" / "artifacts")
         ref = store.put_text("candidate")
         catalog = builtin_catalog()
@@ -252,14 +125,14 @@ class RuntimeAssemblyTest(unittest.TestCase):
         )
         with Session(root / "disabled.jsonl") as session:
             with self.assertRaisesRegex(ValueError, "not consumed"):
-                self.assemble(
+                self.workspace.assemble(
                     profile, session, catalog=catalog, artifact_store=store,
                     artifact_bindings={'skill-catalog.guidance': ref.artifact_id},
                 )
 
     def test_baseline_components_are_not_reported_as_lab_mechanisms(self) -> None:
-        root = self.root
-        model_path = self.model_path
+        root = self.workspace.root
+        model_path = self.workspace.model_path
         catalog = builtin_catalog()
         profile = HarnessProfile(
             "default",
@@ -268,7 +141,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
             mechanisms=catalog.default_selections(),
         )
         with Session(root / "baseline.jsonl") as session:
-            runtime = self.assemble(profile, session, catalog=catalog)
+            runtime = self.workspace.assemble(profile, session, catalog=catalog)
         self.assertFalse((root / ".fruitfly" / "artifacts").exists())
 
         self.assertTrue(
@@ -288,8 +161,8 @@ class RuntimeAssemblyTest(unittest.TestCase):
         self.assertEqual(runtime.manifest.data_artifacts, ())
 
     def test_runtime_manifest_ignores_unused_model_catalog_entries(self) -> None:
-        root = self.root
-        model_path = self.model_path
+        root = self.workspace.root
+        model_path = self.workspace.model_path
         _write_catalog(model_path, {"main": "model-a", "unused": "model-b"})
         catalog = builtin_catalog()
         profile = HarnessProfile(
@@ -301,7 +174,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
 
         def assemble(path: Path, session_path: Path):
             with Session(session_path) as session:
-                return self.assemble(profile, session, config_path=path, catalog=catalog)
+                return self.workspace.assemble(profile, session, config_path=path, catalog=catalog)
 
         first = assemble(root / "config.yaml", root / "first.jsonl")
         _write_catalog(
@@ -319,9 +192,9 @@ class RuntimeAssemblyTest(unittest.TestCase):
 
     def test_runtime_overview_includes_capabilities_and_preserves_experimental_ids(self) -> None:
         catalog = builtin_catalog()
-        profile = HarnessProfile('default', str(self.model_path), 'offline', catalog.default_selections())
-        with Session(self.root / 'overview.jsonl') as session:
-            runtime = self.assemble(profile, session, catalog=catalog)
+        profile = HarnessProfile('default', str(self.workspace.model_path), 'offline', catalog.default_selections())
+        with Session(self.workspace.root / 'overview.jsonl') as session:
+            runtime = self.workspace.assemble(profile, session, catalog=catalog)
         experiment_ids, details, tool_categories = describe_runtime(runtime, catalog)
         views = {item.mechanism_id: item for item in details}
         self.assertNotIn('local-env', experiment_ids)
@@ -344,16 +217,16 @@ class RuntimeAssemblyTest(unittest.TestCase):
             if definition.descriptor.mechanism_id == 'skill-catalog' else definition
             for definition in catalog.definitions()
         ))
-        profile = HarnessProfile('default', str(self.model_path), 'offline', catalog.default_selections())
-        with Session(self.root / 'overview-category.jsonl') as session:
-            runtime = self.assemble(profile, session, catalog=catalog)
+        profile = HarnessProfile('default', str(self.workspace.model_path), 'offline', catalog.default_selections())
+        with Session(self.workspace.root / 'overview-category.jsonl') as session:
+            runtime = self.workspace.assemble(profile, session, catalog=catalog)
         _, details, _ = describe_runtime(runtime, catalog)
         view = next(item for item in details if item.mechanism_id == 'skill-catalog')
         self.assertEqual('learning', view.category)
 
     def test_builtin_tools_are_individually_selectable(self) -> None:
-        root = self.root
-        model_path = self.model_path
+        root = self.workspace.root
+        model_path = self.workspace.model_path
         catalog = builtin_catalog()
         mechanisms = tuple(
             MechanismSelection(
@@ -371,7 +244,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
         )
 
         with Session(root / "tools.jsonl") as session:
-            runtime = self.assemble(
+            runtime = self.workspace.assemble(
                 profile, session, config_path=root / 'fruitfly.yaml', catalog=catalog,
                 environment={'TEST_API_KEY': 'placeholder'},
             )
@@ -383,8 +256,8 @@ class RuntimeAssemblyTest(unittest.TestCase):
         self.assertNotIn("bash-tool", runtime.mechanism_ids)
 
     def test_information_sources_do_not_add_provider_or_memory_tool(self) -> None:
-        root = self.root
-        model_path = self.model_path
+        root = self.workspace.root
+        model_path = self.workspace.model_path
         catalog = builtin_catalog()
         base = HarnessProfile(
             "default",
@@ -402,10 +275,10 @@ class RuntimeAssemblyTest(unittest.TestCase):
                 model_profile="offline",
                 mechanisms=mechanisms,
             )
-            registry = self.registry
+            registry = self.workspace.registry
             registry.reset_mock()
             with Session(root / f"{enabled}.jsonl") as session:
-                runtime = self.assemble(
+                runtime = self.workspace.assemble(
                     profile, session, config_path=root / 'fruitfly.yaml', catalog=catalog,
                     environment={'TEST_API_KEY': 'placeholder'},
                 )
@@ -420,8 +293,8 @@ class RuntimeAssemblyTest(unittest.TestCase):
             )
 
     def test_rlm_runtime_uses_session_path_and_adds_auxiliary_provider(self) -> None:
-        root = self.root
-        model_path = self.model_path
+        root = self.workspace.root
+        model_path = self.workspace.model_path
         catalog = builtin_catalog()
         mechanisms = (
             *catalog.default_selections(),
@@ -434,11 +307,11 @@ class RuntimeAssemblyTest(unittest.TestCase):
             model_profile="offline",
             mechanisms=mechanisms,
         )
-        registry = self.registry
+        registry = self.workspace.registry
         session_path = root / "rlm.jsonl"
 
         with Session(session_path) as session:
-            runtime = self.assemble(
+            runtime = self.workspace.assemble(
                 profile, session, config_path=root / 'fruitfly.yaml', catalog=catalog,
                 environment={'TEST_API_KEY': 'placeholder'},
             )
@@ -457,58 +330,3 @@ class RuntimeAssemblyTest(unittest.TestCase):
             set(runtime.manifest.models),
         )
         self.assertTrue(artifact_exists)
-
-class RuntimePermissionWorkflowTests(unittest.IsolatedAsyncioTestCase):
-    async def test_external_tools_confirm_and_restore_does_not_restore_grants(self):
-        from fruitfly_agent.interactive import AgentApplication
-        from fruitfly_agent.run import RunApplicationFactory
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory).resolve()
-            workspace = root / 'workspace'
-            workspace.mkdir()
-            _write_catalog(workspace / '.fruitfly/models.yaml', {'offline': 'offline-model'})
-            provider = FauxProvider()
-            registry = Mock()
-            registry.create.return_value = provider
-            factory = RunApplicationFactory(cwd=workspace,
-                environment={'TEST_API_KEY': 'offline-placeholder'}, provider_registry=registry)
-            factory.configuration.set_mechanism('compaction', enabled=False)
-            factory.configuration.save()
-            factory.reload_configuration()
-            app = AgentApplication(factory)
-            self.addAsyncCleanup(app.close)
-            prompts = []
-            async def approve(prompt):
-                prompts.append(prompt)
-                return 'session'
-            app.set_authorization_handler(approve)
-            path = workspace / '.fruitfly' / 'sessions' / 'permissions.jsonl'
-            await app.start(session_path=path)
-            target = root / 'outside.txt'
-            provider.respond_tool_call('write', {'path': str(target), 'content': 'first'})
-            provider.respond_text('written')
-            result = await app.submit('write external file')
-            self.assertFalse(result.is_error)
-            self.assertEqual('first', target.read_text())
-            self.assertEqual(1, len(prompts))
-            self.assertEqual(1, app.status.permission_grants)
-            provider.respond_tool_call('read', {'path': str(target)})
-            provider.respond_text('read')
-            await app.submit('read approved directory')
-            self.assertEqual(1, len(prompts))
-            await app.close()
-            await app.start(resume=True, session_path=path)
-            self.assertEqual(0, app.status.permission_grants)
-            provider.respond_tool_call('write', {'path': str(target), 'content': 'second'})
-            provider.respond_text('written again')
-            await app.submit('write after restore')
-            self.assertEqual(2, len(prompts))
-            self.assertEqual('second', target.read_text())
-            app.clear_authorizations()
-            self.assertEqual(0, app.status.permission_grants)
-            await app.close()
-            with Session(path) as durable:
-                decisions = [e.payload for e in durable.read_all() if e.payload.get('kind') == 'authorization']
-                self.assertEqual(3, len(decisions))
-                self.assertTrue(all(e['allowed'] for e in decisions))
-                self.assertTrue(all('arguments' not in e and 'command' not in e for e in decisions))

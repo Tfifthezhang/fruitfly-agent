@@ -1,7 +1,7 @@
 """Present and prepare candidates independently of search execution."""
 from dataclasses import replace
 from fruitfly_agent.interactive.contracts.candidates import CandidateView, CandidateSection
-from fruitfly_agent.lab.improvement.api import SearchReport, restore_search_report
+from fruitfly_agent.improvement.evidence.reporting import SearchReport, restore_search_report
 
 
 def candidate_view(record):

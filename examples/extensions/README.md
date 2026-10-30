@@ -32,3 +32,24 @@ The mechanism needs no Core, Run, or terminal branch. Put real implementations i
 ```
 
 This verifies integration, not model compliance or algorithm gains.
+
+## Load an optimizable developer extension
+
+`developer_guidance.py` exports `register(api)` for the
+[developer SDK](../../fruitfly_agent/extensions/README.md). It registers
+`developer-guidance-owner` and an H text surface named `developer-guidance`.
+Enable the owner through ordinary component configuration, then grant
+`developer-guidance.parameters.text` through the existing experiment edit map.
+Its artifact-backed candidate uses the same installation path on activation.
+The offline integration test executes real Agent requests with a fake Provider,
+compares candidate guidance, activates two generations and checks the final prompt.
+Synthetic verification establishes binding, not model quality.
+
+```bash
+.venv/bin/python -m fruitfly_agent --extension examples/extensions/developer_guidance.py --help
+.venv/bin/python -m unittest tests.workflows.test_developer_extensions
+```
+
+`--help` loads no code and requests no model. Actual Agent commands require a
+configured Provider and may incur cost. Source declarations in the system profile
+also work in native experiments. Container source staging is unsupported.

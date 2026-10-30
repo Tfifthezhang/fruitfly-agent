@@ -67,11 +67,6 @@ class HarnessSnapshot:
                          for c in value['components']))
 
 
-class ComponentAdapter(Protocol):
-    def snapshot(self) -> ComponentDocument: ...
-    def validate(self, document: ComponentDocument) -> None: ...
-
-
 @dataclass(frozen=True)
 class ComponentBinding:
     component_id: str
@@ -86,16 +81,7 @@ class ComponentBinding:
         bounded(self.text, empty=True)
 
 
-class CandidateBuilder(Protocol):
-    def build(self, snapshot: HarnessSnapshot, *, destination: object) -> object: ...
-
-
-class CandidateRuntime(Protocol):
-    capabilities: frozenset[str]
+class TrialSetup(Protocol):
+    """Fresh execution hooks and owned state, retired at the end of each trial."""
+    hooks: object
     async def aclose(self) -> None: ...
-
-
-class ActivationHost(Protocol):
-    async def prepare(self, snapshot: HarnessSnapshot) -> CandidateRuntime: ...
-    async def activate(self, runtime: CandidateRuntime, *, expected_version: str) -> None: ...
-

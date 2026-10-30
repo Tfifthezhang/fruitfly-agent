@@ -16,6 +16,7 @@ class TerminalCommandRegistry:
     """Handlers receive parsed commands and capture only their own capabilities."""
     def __init__(self, handlers: Mapping[str, TerminalCommandHandler] | None = None) -> None:
         self._lock = RLock()
+        self._groups: dict[str, set[str]] = {}
         self._entries: dict[str, tuple[CommandDescription, TerminalCommandHandler]] = {}
         for name, handler in (handlers or {}).items():
             self.register(name, handler)
@@ -29,6 +30,28 @@ class TerminalCommandRegistry:
             if name in self._entries and not replace:
                 raise ValueError(f'terminal command already registered: {name}')
             self._entries[name] = description, handler
+
+    def prepare_group(self, owner: str,
+                      entries: Mapping[str, tuple[TerminalCommandHandler, str]]) -> Callable[[], None]:
+        """Validate a replacement before publishing any group command."""
+        prepared = {}
+        for name, (handler, summary) in entries.items():
+            if not callable(handler):
+                raise TypeError('terminal command handler must be callable')
+            prepared[name] = CommandDescription(name, summary), handler
+        with self._lock:
+            prior = set(self._groups.get(owner, ()))
+            if set(prepared) & (self._entries.keys() - prior):
+                raise ValueError('extension command collides with another owner')
+        def commit() -> None:
+            with self._lock:
+                if set(prepared) & (self._entries.keys() - prior):
+                    raise ValueError('command registry changed before publication')
+                for name in prior:
+                    self._entries.pop(name, None)
+                self._entries.update(prepared)
+                self._groups[owner] = set(prepared)
+        return commit
 
     def descriptions(self) -> tuple[CommandDescription, ...]:
         with self._lock:

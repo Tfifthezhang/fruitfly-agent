@@ -1,7 +1,9 @@
 """Tool-owned instruction bindings; implementations and schemas stay unchanged."""
+from fruitfly_agent.improvement.contracts.optimization import OptimizationSpec
 from dataclasses import replace
 
-from fruitfly_agent.lab.algorithms.targets import TargetBinding, TargetSnapshot, validate_text
+from fruitfly_agent.improvement.contracts.optimization import TargetBinding, TargetSnapshot
+from fruitfly_agent.lab.improvement.targets.text import validate_text
 
 
 def guidance_key(name):
@@ -30,6 +32,7 @@ class ToolGuidanceTarget:
         self.tool = tool
         self.label = tool.label + ' guidance'
         self.required_capabilities = frozenset({'tool:' + tool.name})
+        self.optimization = OptimizationSpec('H', 'text', required_capabilities=self.required_capabilities)
 
     def snapshot(self):
         key = guidance_key(self.tool.name)
@@ -50,7 +53,7 @@ class ToolGuidanceTarget:
 
 def prepare_guidance(state, context):
     """Consume enabled tools' declared artifacts and expose their exact instructions."""
-    from fruitfly_agent.lab.algorithms.targets import TEXT_TARGET_PREFIX
+    from fruitfly_agent.lab.improvement.targets.text import TEXT_TARGET_PREFIX
     config = state.config
     for tool in tuple(config.tools):
         target = ToolGuidanceTarget(tool)

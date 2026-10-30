@@ -38,3 +38,12 @@ Assembly checks record permission identity while allowing configuration changes 
 
 `test_model_budget.py` verifies a shared main/auxiliary request allowance, atomic
 receipts and rejection before an additional Provider invocation.
+
+Assembly details live in `test_assembly.py`; manifest/environment recovery rules
+live in `test_recovery.py`, and content-addressed storage in `test_artifacts.py`.
+CLI parsing is covered by `test_cli.py`; execution, configuration startup and
+session discovery have separate `test_cli_execution.py`,
+`test_cli_configuration.py` and `test_session_discovery.py` owners. Model wizard
+interaction, persistence and declaration validation use `test_model_setup.py`,
+`test_model_persistence.py` and `test_model_configuration.py`, sharing an explicit
+workspace fixture rather than importing test classes.

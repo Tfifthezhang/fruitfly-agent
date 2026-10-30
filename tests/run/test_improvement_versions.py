@@ -17,12 +17,11 @@ from fruitfly_agent.run.application import RunApplicationFactory
 from fruitfly_agent.run.storage.artifacts import DataArtifactStore
 from fruitfly_agent.run.storage.candidates import CandidateStore
 from fruitfly_agent.run.storage.retention import compact_candidates
-from fruitfly_agent.run.startup_versions import RunStartupVersions
 from fruitfly_agent.lab.base_prompt.target import BasePromptTarget
 from fruitfly_agent.lab.context_manager.augmentation.skills.target import SkillGuidanceTarget
 from tests.support.faux_provider import FauxProvider
 from tests.support.materials import _write_models, _write_cases
-from fruitfly_agent.lab.improvement.api import SearchReport, TokenUsage
+from fruitfly_agent.improvement.evidence.reporting import SearchReport, TokenUsage
 
 
 class RetentionTests(unittest.TestCase):
@@ -109,7 +108,7 @@ class StartupVersionsTests(unittest.IsolatedAsyncioTestCase):
             app,factory,provider=await self.setup_app(Path(tmp))
             try:
                 record=self.candidate(app,factory)
-                service=RunStartupVersions(factory)
+                service=factory.startup_versions()
                 token=next(v.token for v in service.versions(factory.configuration.snapshot()) if 'Latest' in v.label)
                 original=factory.selection.profile.prompt
                 handle=await service.prepare(app.runtime_manifest, (token,))
@@ -136,13 +135,13 @@ class StartupVersionsTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as tmp:
             app,factory,provider=await self.setup_app(Path(tmp))
             try:
-                record=self.candidate(app,factory); service=RunStartupVersions(factory)
+                record=self.candidate(app,factory); service=factory.startup_versions()
                 token=next(v.token for v in service.versions(factory.configuration.snapshot()) if 'Latest' in v.label)
                 handle=await service.prepare(app.runtime_manifest, (token,), remember=(token,))
                 await app.activate_runtime(handle, expected_manifest_digest=app.runtime_manifest['digest'])
                 self.assertEqual(record.artifact_id, factory._resolve().profile.prompt)
                 self.assertEqual('adopted',factory.candidate_store.read(record.candidate_id).status)
-                service=RunStartupVersions(factory)
+                service=factory.startup_versions()
                 default=next(v.token for v in service.versions(factory.configuration.snapshot()) if 'default version' in v.label)
                 handle=await service.prepare(app.runtime_manifest,(default,))
                 await app.activate_runtime(handle, expected_manifest_digest=app.runtime_manifest['digest'])
@@ -157,7 +156,7 @@ class StartupVersionsTests(unittest.IsolatedAsyncioTestCase):
             try:
                 record=self.candidate(app,factory)
                 factory.candidate_store._write(replace(record,parent_manifest_digest='wrong'),create=False)
-                service=RunStartupVersions(factory)
+                service=factory.startup_versions()
                 token=next(v.token for v in service.versions(factory.configuration.snapshot()) if 'Latest' in v.label)
                 before=app.runtime_manifest['digest']
                 with self.assertRaisesRegex(ValueError,'stale'):
@@ -173,19 +172,19 @@ class StartupVersionsTests(unittest.IsolatedAsyncioTestCase):
                 factory.configuration.save()
                 await app.rebuild()
                 record=self.candidate(app,factory,target_id='skill-catalog.guidance')
-                service=RunStartupVersions(factory)
+                service=factory.startup_versions()
                 latest=next(v.token for v in service.versions(factory.configuration.snapshot())
                             if v.target == 'skill-catalog.guidance' and 'Latest' in v.label)
                 handle=await service.prepare(app.runtime_manifest,(latest,),remember=(latest,))
                 await app.activate_runtime(handle,expected_manifest_digest=app.runtime_manifest['digest'])
                 self.assertEqual(record.artifact_id,factory._resolve().profile.artifact_bindings['skill-catalog.guidance'])
-                service=RunStartupVersions(factory)
+                service=factory.startup_versions()
                 default=next(v.token for v in service.versions(factory.configuration.snapshot())
                              if v.target == 'skill-catalog.guidance' and 'default version' in v.label)
                 handle=await service.prepare(app.runtime_manifest,(default,),remember=(default,))
                 await app.activate_runtime(handle,expected_manifest_digest=app.runtime_manifest['digest'])
                 self.assertNotIn('skill-catalog.guidance',factory._resolve().profile.artifact_bindings)
-                service=RunStartupVersions(factory)
+                service=factory.startup_versions()
                 accepted=next(v.token for v in service.versions(factory.configuration.snapshot())
                               if v.target == 'skill-catalog.guidance' and 'Latest accepted' in v.label)
                 handle=await service.prepare(app.runtime_manifest,(accepted,))

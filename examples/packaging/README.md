@@ -17,4 +17,14 @@ cd /tmp
 /tmp/fruitfly-wheel/bin/python /path/to/fruitfly-agent/examples/packaging/check_installed.py /path/to/fruitfly_agent-0.1-py3-none-any.whl
 ```
 
-Replace both `/path/to/` paths with actual paths. The environment must have the declared runtime dependencies installed. The script rejects imports from the checkout; it does not verify real Docker installation, benchmark downloads, or model quality. [CI](../../.github/workflows/tests.yml) runs this check after installing the wheel in a fresh environment.
+Replace both `/path/to/` paths with actual paths. The environment must have the declared runtime dependencies installed. The mocked Harbor check also works without the optional `benchmarks` extra. The script rejects imports from the checkout; it does not verify real Docker installation, benchmark downloads, or model quality. [CI](../../.github/workflows/tests.yml) runs this check after installing the wheel in a fresh environment.
+
+Default offline tests exercise `check_model_setup` in a temporary workspace to
+catch stale wizard inputs and credential expectations. The full check imports
+the optional Harbor bridge only when explicitly executed.
+
+The full check imports Providers and loads configuration/experiment templates from
+the wheel's frozen source in a separate `-I -B` process, then checks CLI startup.
+It asserts the import origin to prevent a successful installed copy from masking
+an incomplete frozen copy. Source and wheel inventory regressions can also run
+from the checkout with `python -m unittest tests.eval.test_material_resources`.

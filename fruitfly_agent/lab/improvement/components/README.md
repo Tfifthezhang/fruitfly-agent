@@ -14,9 +14,9 @@ of editing, scoring and execution backends.
 | `changes.py` | Add/replace/remove UTF-8 files with parent/content preconditions |
 
 `ChangeSet` consumes immutable artifacts and returns a new document. It does not
-write production files, compile code or grant activation. `CandidateBuilder`,
-`CandidateRuntime` and `ActivationHost` contracts allow embeddings to declare
-construction and activation for other component kinds. A file registration alone
+write production files, compile code or grant activation. Construction and activation remain explicit host capabilities.
+`FileComponentAdapter` requires an owner-supplied `OptimizationSpec`; registration
+does not imply a construction or deployment backend. A file registration alone
 cannot make source code runnable or publishable. Unsupported exports fail before
 external execution. The registry cannot silently change component ownership.
 

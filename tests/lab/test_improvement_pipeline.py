@@ -1,4 +1,5 @@
 """Public pipeline ports support unscored work and feedback-driven algorithms."""
+from fruitfly_agent.improvement.contracts.optimization import OptimizationSpec
 import asyncio
 from dataclasses import replace
 import tempfile
@@ -6,10 +7,21 @@ from pathlib import Path
 import unittest
 from unittest.mock import AsyncMock
 
-from fruitfly_agent.lab.improvement.api import (RunPlan, TaskMaterial, ComponentDocument, ComponentFile,
-    HarnessSnapshot, CandidateBundle, EditReason, ExecutionRecord, Measurement, SelectionDecision,
-    ProposalResult, ComponentRegistry, FileComponentAdapter, GeneratorRegistry, WorkflowServices, ComponentWorkflow,
-    AgentEditor, AgentSelector, AgentReflector, WorkspaceTaskSource)
+from fruitfly_agent.improvement.contracts.plans import RunPlan
+from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
+from fruitfly_agent.improvement.contracts.components import ComponentDocument, ComponentFile, HarnessSnapshot
+from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, EditReason
+from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
+from fruitfly_agent.improvement.contracts.assessment import Measurement, SelectionDecision
+from fruitfly_agent.improvement.contracts.editing import ProposalResult
+from fruitfly_agent.lab.improvement.components import ComponentRegistry, FileComponentAdapter
+from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
+from fruitfly_agent.improvement.workflow.services import WorkflowServices
+from fruitfly_agent.lab.improvement.workflow import ImprovementWorkflow as ComponentWorkflow
+from fruitfly_agent.lab.improvement.editor import AgentEditor
+from fruitfly_agent.lab.improvement.assessment.selection import AgentSelector
+from fruitfly_agent.lab.improvement.experience.reflection import AgentReflector
+from fruitfly_agent.lab.improvement.materials import WorkspaceTaskSource
 from fruitfly_agent.improvement.contracts.versions import SystemVersion, content_hash
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts, EvidenceWorkspace
 from fruitfly_agent.core.config import AgentLoopConfig
@@ -127,7 +139,7 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
         task = TaskMaterial('task', 'Inspect the source')
         record = ExecutionRecord('reference', task.task_id, task.material_id, baseline.snapshot_id,
                                  plan.parent.state, plan.conditions_id, 'completed', 'Missing inspection')
-        from fruitfly_agent.lab.improvement.api import ProposalRequest
+        from fruitfly_agent.improvement.contracts.editing import ProposalRequest
         request = ProposalRequest(plan, task, baseline, (record,), 'invariant', 0)
         services = WorkflowServices(plan)
         editor = AgentEditor(AgentLoopConfig(provider=provider), artifacts, registry)
@@ -196,7 +208,7 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
     async def test_i_components_require_improver_comparison_before_execution(self):
         flow, plan, baseline, runner = self.build()
         document = replace(baseline.component('prompt'), role='I')
-        adapter = FileComponentAdapter(document, lambda doc: None)
+        adapter = FileComponentAdapter(document, lambda doc: None, optimization=OptimizationSpec(document.role, 'documents'))
         flow.components = ComponentRegistry((adapter,))
         baseline = flow.components.snapshot()
         plan = replace(plan, component_ids=('prompt',))

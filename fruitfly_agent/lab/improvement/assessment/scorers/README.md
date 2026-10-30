@@ -5,7 +5,7 @@
 `policies.py` owns normalized exact scoring and restricted Python function policy
 validation. `python_worker.py` executes only the documented function subset in an
 isolated POSIX subprocess. Task packages still own material format and partitions;
-[task policy imports](../../tasks/scoring.py) remain compatible public imports.
+[policies.py](policies.py) supplies the public task-policy registry and scoring entry points.
 
 `model.py` supplies `ModelAssessor`: a separately configured tool-free model
 judgment with injected rendering, instructions and root-budgeted services. Its

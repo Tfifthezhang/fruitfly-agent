@@ -8,7 +8,7 @@ import asyncio
 from unittest.mock import patch
 
 from fruitfly_agent.interactive import AgentApplication
-from fruitfly_agent.lab.rsi import PersistentEvolutionDriver
+from fruitfly_agent.rsi import EvolutionEngine
 from fruitfly_agent.run.evolution import RunEvolutionHost
 from tests.support.self_improver import experiment_factory
 from tests.support.self_improver import ProceduralProvider
@@ -48,7 +48,7 @@ class EditorEvolutionTests(unittest.IsolatedAsyncioTestCase):
                 await restored.close()
 
     async def test_file_runner_override_does_not_change_editor_execution_capabilities(self):
-        from fruitfly_agent.lab.improvement.api import FileTaskRunner
+        from fruitfly_agent.lab.improvement.execution.file_runner import FileTaskRunner
         class FileOverride:
             capabilities = FileTaskRunner.capabilities
             def __call__(self, *args):
@@ -151,7 +151,7 @@ class EditorEvolutionTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(provider.calls), calls)
 
     async def test_cancellation_closes_inner_episode_without_production_changes(self):
-        from fruitfly_agent.lab.improvement.api import builtin_executions, ExecutionRegistry
+        from fruitfly_agent.lab.improvement.execution import builtin_executions, ExecutionRegistry
         entered, closed = asyncio.Event(), asyncio.Event()
         class HangingEpisode:
             def __init__(self, *args):
@@ -213,14 +213,14 @@ class EditorEvolutionTests(unittest.IsolatedAsyncioTestCase):
             await app.start()
             self.addAsyncCleanup(app.close)
             host = RunEvolutionHost(app, factory, policy_id='improver-paired-v1', request=request)
-            result = await PersistentEvolutionDriver().evolve(host, job_id='editors', policy_id='improver-paired-v1',
+            result = await EvolutionEngine().evolve(host, job_id='editors', policy_id='improver-paired-v1',
                 direction='Improve editing procedures', max_steps=2)
             self.assertEqual((result.phase, result.steps), ('complete', 2))
             self.assertEqual(factory._current_components['component-improvement-editor-instructions'].invariant.count('STEP'), 2)
             counts = [json.loads(p.read_text())['uses'] for p in (Path(directory) / '.fruitfly/improvement').glob('verification-uses.json')]
             self.assertEqual(list(counts[0].values()), [2])
             calls = len(provider.calls)
-            resumed = await PersistentEvolutionDriver().evolve(host, job_id='editors', policy_id='improver-paired-v1',
+            resumed = await EvolutionEngine().evolve(host, job_id='editors', policy_id='improver-paired-v1',
                 direction='Improve editing procedures', max_steps=2)
             self.assertEqual(resumed, result)
             self.assertEqual(len(provider.calls), calls)

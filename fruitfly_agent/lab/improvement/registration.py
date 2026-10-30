@@ -2,7 +2,7 @@
 from dataclasses import replace
 
 from fruitfly_agent.core.mechanisms import MechanismDescriptor, MechanismContribution, MechanismEffects, ParameterDescriptor as P
-from fruitfly_agent.lab.algorithms.targets import TEXT_TARGET_PREFIX
+from fruitfly_agent.lab.improvement.targets.text import TEXT_TARGET_PREFIX
 from .editor.instructions import EditorInstructions, EditorInstructionTarget
 
 

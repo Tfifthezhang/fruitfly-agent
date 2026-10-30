@@ -8,8 +8,10 @@ from typing import Any
 import yaml
 
 from fruitfly_agent.lab.catalog import builtin_catalog, MechanismSelection, materialize_system, configuration_resources
-from fruitfly_agent.lab.improvement.api import (WorkflowBindings, builtin_executions,
-    builtin_completed_assessors, builtin_explorations, validate_process_configuration)
+from fruitfly_agent.lab.improvement.api import WorkflowBindings
+from fruitfly_agent.lab.improvement.execution import builtin_executions
+from fruitfly_agent.lab.improvement.assessment.registry import builtin_completed_assessors
+from fruitfly_agent.lab.improvement.strategies.exploration import builtin_explorations, validate_process_configuration
 from fruitfly_agent.providers.config import load_env
 from fruitfly_agent.providers.registry import load_model_specs
 from fruitfly_agent.providers.workspace import WorkspacePaths
@@ -41,6 +43,8 @@ class PreparedExperiment:
     policy_id: str
     harness: dict | None = None
     resources: tuple = ()
+    catalog: Any = None
+    extensions: Any = None
 
     def summary(self):
         snapshot = self.config.snapshot()
@@ -83,14 +87,16 @@ class PreparedExperiment:
                 return self.profile.artifact_contents[reference]
             return (self.config.workspace / '.fruitfly/artifacts' / reference[7:]).read_text(encoding='utf-8')
         return materialize_system(self.profile, root / 'config.yaml', artifact_reader=read,
-            model_source=self.model_path, resources=self.resources)
+            model_source=self.model_path, resources=self.resources, catalog=self.catalog)
 
     def verify_sources(self):
+        if self.extensions is not None:
+            self.extensions.validate()
         for source in (*self.profile.source_files, *self.config.source_files):
             source.check()
         if self.config_path.read_bytes() != self.config_bytes or self.model_path.read_bytes() != self.model_bytes:
             raise ValueError('runtime configuration or model catalog changed after checking')
-        if configuration_resources(self.profile, builtin_catalog(), self.config.workspace) != self.resources:
+        if configuration_resources(self.profile, self.catalog, self.config.workspace) != self.resources:
             raise ValueError('registered configuration resources changed after checking')
         if resolve_source(self.config, default_source='eval' if self.operation == 'eval' else 'files').source_identity != self.source.source_identity:
             raise ValueError('task material changed after checking')
@@ -100,7 +106,7 @@ def prepare_experiment(config, operation, *, require_prepared=True, environment=
     validate_process_configuration(config.process_assessment, config.exploration,
         builtin_completed_assessors(), builtin_explorations())
     source = resolve_source(config, default_source='eval' if operation == 'eval' else 'files')
-    from fruitfly_agent.lab.improvement.api import MultiTaskSettings
+    from fruitfly_agent.lab.improvement.task_sets import MultiTaskSettings
     if source.task_set is None and config.multi_task != MultiTaskSettings():
         raise ValueError('nondefault multi_task settings require task.source: task-set')
     if source.task_set is not None and 'executor' in config.models and any(
@@ -126,7 +132,11 @@ def prepare_experiment(config, operation, *, require_prepared=True, environment=
     if not config_path.is_file():
         raise ValueError('Agent configuration missing: ' + str(config_path) +
             '; copy the default configuration/model examples or select an explicit configuration')
-    harness = load_harness_config(config_path)
+    from fruitfly_agent.run.extensions import configured_extensions
+    from fruitfly_agent.lab.catalog import load_system_config
+    extensions = configured_extensions(config_path, profile_id=profile_id)
+    catalog = extensions.catalog(builtin_catalog()) if extensions.registrations else builtin_catalog()
+    harness = load_system_config(config_path, catalog=catalog)
     profile = harness.select(profile_id)
     model_path = model_catalog_path(profile, config_path)
     specs = load_model_specs(model_path)
@@ -151,7 +161,6 @@ def prepare_experiment(config, operation, *, require_prepared=True, environment=
     profile = replace(profile, mechanisms=tuple(selected))
     roles = {'executor': executor, **{role: parameters.get(role + '_profile') or executor for role in ('editor', 'assessor') if operation != 'eval'}}
     process_env = {**load_env(WorkspacePaths(config.workspace).secret_file()), **(os.environ if environment is None else environment)}
-    catalog = builtin_catalog()
     required = {*roles.values(), *catalog.required_model_profiles(profile.mechanisms)}
     for name in required:
         if name not in specs:
@@ -177,8 +186,8 @@ def prepare_experiment(config, operation, *, require_prepared=True, environment=
     else:
         policy_id = ''
     if operation != 'eval':
-        if options.generator != 'agent-editor-v1':
-            raise ValueError('the CLI provides agent-editor-v1; custom generators require registered composition')
+        if options.generator not in {d.generator_id for d in extensions.bindings().generators.definitions()}:
+            raise ValueError('unregistered candidate generator: ' + options.generator)
         minimum = source.minimum_budget if persistent or source.task_set is not None else {'model': 8, 'execution': 2}
         for kind, limit in (('model', options.max_model_calls), ('execution', options.max_executions)):
             if minimum.get(kind, 0) > limit:
@@ -197,6 +206,8 @@ def prepare_experiment(config, operation, *, require_prepared=True, environment=
     stop_policy(config.stop.get('improvement'))
     stop_policy(config.stop.get('rsi'))
     if source.benchmark is not None:
+        if extensions.registrations:
+            raise ValueError('container execution does not support Python extension source staging')
         if operation != 'eval' and (options.max_model_calls < 2 * source.benchmark.model_calls + 8 or options.max_executions < 2):
             raise ValueError('budget cannot fund a baseline, candidate and final comparison')
         if require_prepared:
@@ -212,10 +223,10 @@ def prepare_experiment(config, operation, *, require_prepared=True, environment=
         raise ValueError('RSI total allowance must fund at least one declared search')
     from .validation import validate_harness
     inventory = validate_harness(config, profile, source, operation=operation,
-        environment=process_env if require_credentials else None)
+        environment=process_env if require_credentials else None, catalog=catalog)
     return PreparedExperiment(config, operation, source, profile, config_path, model_path,
         config_path.read_bytes(), model_path.read_bytes(), roles, process_env, request, policy_id, inventory,
-        configuration_resources(profile, catalog, config.workspace))
+        configuration_resources(profile, catalog, config.workspace), catalog, extensions)
 
 
 def application_factory(prepared, runtime_path, *, provider_registry=None):
@@ -234,4 +245,4 @@ def application_factory(prepared, runtime_path, *, provider_registry=None):
         component_options=prepared.config.improvement.component_options)
     return RunApplicationFactory(cwd=prepared.config.workspace, environment=prepared.environment,
         config_path=str(runtime_path), profile_id=prepared.profile.profile_id,
-        provider_registry=provider_registry, improvement_bindings=bindings)
+        provider_registry=provider_registry, improvement_bindings=bindings, extensions=prepared.extensions)

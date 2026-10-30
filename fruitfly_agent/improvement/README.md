@@ -67,7 +67,7 @@ arbitrary plugin or certify external process termination.
 ## Verify offline
 
 ```bash
-.venv/bin/python -m unittest tests.lab.test_improvement_reliability tests.architecture.test_improvement_boundaries tests.eval.test_improvement
+.venv/bin/python -m unittest tests.improvement.test_reliability tests.architecture.test_improvement_boundaries tests.eval.test_improvement
 ```
 
 Fake Providers and rewards establish covered control flow, isolation and accounting.

@@ -10,5 +10,5 @@ projections and access tools. Artifact references remain immutable; private
 verification contents never become editing inputs. Search grants no new paths.
 Hosts own durable storage and verify hashes before presenting historical results.
 
-Offline checks: `tests.lab.test_improvement_reliability`,
+Offline checks: `tests.improvement.test_reliability`,
 `tests.workflows.test_improvement_history`.

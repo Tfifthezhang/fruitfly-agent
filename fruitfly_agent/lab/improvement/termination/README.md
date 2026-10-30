@@ -30,13 +30,13 @@ it. Online metrics are a separate path and are not implicitly copied into search
 stopping. Persistent RSI rejection is not a counted failure and its standard
 generation state does not supply these completed-process assessments.
 
-The established `BoundedStopPolicy` and `workflow.stopping` imports remain
-compatible. Defaults still bound rounds and retain original results. Finite
+`BoundedStopPolicy` is provided by this module; stopping contracts belong to
+`improvement.contracts.stopping`. Defaults still bound rounds and retain original results. Finite
 patience is a stopping rule, not proof of convergence or a calibrated confidence
 claim. Provider request and monetary enforcement remain separate accounting.
 
 ```bash
-.venv/bin/python -m unittest tests.lab.test_evolution_policies tests.lab.test_online_improvement tests.lab.test_rsi
+.venv/bin/python -m unittest tests.lab.test_evolution_policies tests.lab.test_online_improvement tests.rsi.test_callbacks
 ```
 
 Frozen host previews retain policy parameters through `policy_spec`, not only

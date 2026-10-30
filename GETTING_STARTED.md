@@ -8,7 +8,7 @@ Install FruitFlyAgent and complete your first terminal session.
 |---|---|
 | Python | 3.11+ |
 | Platform | macOS or Linux; native Windows is unsupported and WSL2 is unverified |
-| Model access | An API key for a model in your catalog |
+| Model access | An API key for real requests; the offline example needs no key |
 | Docker | Only needed for optional [Eval](eval/README.md) |
 
 ## Install
@@ -20,6 +20,25 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -e .
 .venv/bin/python -m fruitfly_agent
 ```
+
+## Check the Agent offline
+
+After installing from a source checkout, run these commands from that checkout:
+
+```bash
+.venv/bin/python -m examples.extensions.offline_guidance
+.venv/bin/python -m unittest tests.eval.test_material_resources
+```
+
+The first runs the actual Application and Agent loop with a fixed Provider.
+Expected output: `Offline response: example-guidance is active.` The second
+freezes source and wheel material, imports Providers, loads templates and checks
+CLI startup from isolated temporary directories. Both need no keys, model calls,
+Docker or network. They validate execution paths, not model quality.
+
+For installed wheels, follow the [installed checks](examples/packaging/README.md).
+For real model testing, continue below. Container benchmarks additionally require
+[Eval preparation](eval/DEVELOPER_GUIDE.md#check-local-execution-first).
 
 ## Choose a model
 

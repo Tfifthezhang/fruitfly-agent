@@ -82,7 +82,9 @@ Update affected pages in the same change. Do not rewrite unrelated pages or dupl
 |---|---|
 | Observable behavior, public protocol, error, configuration, CLI, or boundary | Add or update tests for the changed public behavior. |
 | Bug fix | Include a regression that reproduces the defect. |
-| Contract failure | Fix implementation drift. Do not regenerate baselines, widen dependency allowances, delete assertions, or skip tests to pass. |
+| Packaged or frozen execution | Include declared runtime resources in validation, hashing and copying. Test imports and resource loading from the frozen material in an isolated process, without checkout fallback. |
+| Test growth or reorganization | Follow [test design rules](tests/README.md#design-and-maintain-tests): assign a behavior owner, reuse existing support, preserve distinct failure paths, and keep discovery unique. |
+| Contract failure | Determine whether implementation drifted or an assertion encodes an obsolete assumption. Fix drift; use the authorized contract-change path for a reviewed correction. Do not regenerate baselines, widen dependency allowances, delete behavior coverage, or skip tests to pass. |
 | Explicitly authorized contract change | Review callers and compatibility/rejection behavior; synchronize implementation, tests, and docs; explain the impact. |
 | Documentation, comments, or formatting only | Check links, examples, and consistency. New behavior tests and the full suite may be omitted; explain why. |
 | Main CLI or entry-point change | Run `.venv/bin/python -m fruitfly_agent --help`. |

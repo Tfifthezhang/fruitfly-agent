@@ -1,6 +1,6 @@
 """Frozen environment knowledge learned through explicit verified practice."""
 from fruitfly_agent.core.mechanisms import MechanismDescriptor, MechanismContribution, ParameterDescriptor
-from fruitfly_agent.lab.algorithms.retained import install_retained, configuration_edit
+from fruitfly_agent.lab.improvement.targets.retained import install_retained, configuration_edit
 
 LEARNED_MEMORY = 'learned-memory'
 

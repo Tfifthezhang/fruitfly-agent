@@ -1,6 +1,7 @@
 """Project public results without pretending a task set is a single deliverable."""
 import json
-from fruitfly_agent.lab.improvement.api import TaskSetSnapshot, TaskSetOutcome
+from fruitfly_agent.improvement.contracts.task_sets import TaskSetSnapshot
+from fruitfly_agent.improvement.contracts.evaluation import TaskSetOutcome
 
 
 def material_details(material):

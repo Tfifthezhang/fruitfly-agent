@@ -363,6 +363,20 @@ This validates request fields, profile/model references, required credential nam
 and immutable bindings. It does not contact the model. Eval rejects SSH execution
 profiles: Agent tools must operate in the selected task environment.
 
+Before container preparation, developers using a source checkout can run:
+
+```bash
+.venv/bin/python -m unittest tests.eval.test_material_resources
+```
+
+This uses no Docker, network or model requests. It verifies frozen resource
+loading and rejects YAML duplicate-key overrides. A `services.yaml` or template
+import failure is an installation-material defect: declare the resource in its
+package, rebuild if using a wheel, and rerun preparation. Do not change model
+credentials or manually patch frozen cache files to repair it. See
+[complete installation material](harbor/README.md#freeze-complete-installation-material).
+Host YAML keys must be unique, including nested `dependencies` and `task_patches`.
+
 ## 7. Inspect task selection and local image references
 
 ```bash

@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import AsyncMock
 
-from fruitfly_agent.lab.algorithms.evolution import VerificationEvidence
+from fruitfly_agent.rsi.contracts import VerificationEvidence
 from fruitfly_agent.lab.base_prompt.target import BasePromptTarget
 from fruitfly_agent.lab.improvement.tasks import TaskPackCatalog, TaskSnapshotStore
 from fruitfly_agent.run.configuration.profile import HarnessProfile

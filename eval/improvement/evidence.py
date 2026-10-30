@@ -1,7 +1,7 @@
 """Collect permitted Agent evidence, keeping official private grading separate."""
 from pathlib import Path
 import json
-from fruitfly_agent.lab.improvement.api import Resource
+from fruitfly_agent.improvement.contracts.tasks import Resource
 
 
 def collect(root, artifacts, *, interrupted=False):

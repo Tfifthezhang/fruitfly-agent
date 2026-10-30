@@ -7,7 +7,11 @@ Verify single-configuration requests, Harbor mapping, artifacts, and reports off
 | Files | Protects |
 |---|---|
 | `test_catalog.py / test_execution.py` | Availability, execution, failure handling, and reports |
-| `test_harbor.py` | Commands, reported project version, setup, complete logs/events, registry retry boundaries, and parsing |
+| `test_harbor_runner.py / test_harbor_preflight.py` | Progress, logs, retry boundaries, resource profiles and commands |
+| `test_harbor_results.py` | Official rewards, unknown values, timeout usage and exact trial loading |
+| `test_harbor_installation.py / test_harbor_agent.py` | Source/wheel staging and installed Agent lifecycle |
+| `test_harbor_credentials.py` | Credential discovery, configuration staging and secret precedence |
+| `test_material_resources.py` | Frozen source/wheel imports, templates, resource identities, cache invalidation, exclusions and duplicate YAML rejection |
 | `test_preparation.py` | Machine settings, controller dependency receipts, link/content/image drift, frozen tasks, assets, setup patches and cache boundaries |
 | `test_verifier_environments.py` | Public environment extension, role isolation, inherited/step verifier definitions, versioned datasets and exact verifier ownership |
 | `test_harbor_lifecycle.py` | Scoped stop, timeout/process/container cleanup, startup cancellation, PID reuse and multiple phase failures |

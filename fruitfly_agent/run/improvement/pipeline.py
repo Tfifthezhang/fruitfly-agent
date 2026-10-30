@@ -10,15 +10,17 @@ from typing import Callable
 from uuid import uuid4
 from contextlib import contextmanager
 
-from fruitfly_agent.lab.improvement.api import (RunPlan, ComponentWorkflow, WorkflowServices,
-    GeneratorRegistry, AgentGenerator, AgentComposer, AgentEditor, AgentSelector, AgentReflector,
-    component_registry, experience_id, SearchActivity, SearchReport, SearchCompletion,
-    model_completion, EvidenceInspector, ExecutionContext, ExecutionRequest, builtin_executions,
-    HarnessSnapshot, bundle_target, bundle_text, ReadOnlyInspector, policy_spec, AllocationExhausted, builtin_strategies,
-    ProcessAssessmentSettings, ExplorationSettings, builtin_completed_assessors, builtin_explorations,
-    validate_process_configuration, CompletedAssessmentService, relative_path, process_settings_values, install_workflow_mechanisms, extension_spec)
-from fruitfly_agent.lab.algorithms.targets import SystemVersion, content_hash
-from fruitfly_agent.lab.algorithms.evolution import VerificationEvidence
+from fruitfly_agent.improvement.contracts.plans import RunPlan
+from fruitfly_agent.lab.improvement.api import ComponentWorkflow, GeneratorRegistry, AgentGenerator, AgentComposer, AgentEditor, AgentSelector, AgentReflector, component_registry, experience_id, SearchActivity, SearchCompletion, model_completion, ExecutionContext, builtin_executions, bundle_target, bundle_text, ReadOnlyInspector, policy_spec, builtin_strategies, ProcessAssessmentSettings, ExplorationSettings, builtin_completed_assessors, builtin_explorations, validate_process_configuration, CompletedAssessmentService, process_settings_values, install_workflow_mechanisms, extension_spec
+from fruitfly_agent.improvement.workflow.services import WorkflowServices
+from fruitfly_agent.improvement.workflow.budget import AllocationExhausted
+from fruitfly_agent.improvement.evidence.reporting import SearchReport
+from fruitfly_agent.improvement.contracts.editing import EvidenceInspector
+from fruitfly_agent.improvement.contracts.experiments import ExecutionRequest
+from fruitfly_agent.improvement.contracts.components import HarnessSnapshot
+from fruitfly_agent.improvement.contracts.validation import relative_path
+from fruitfly_agent.improvement.contracts.versions import SystemVersion, content_hash
+from fruitfly_agent.rsi.contracts import VerificationEvidence
 from fruitfly_agent.interactive.contracts.improvement import (WorkflowConfiguration,
     WorkflowChoice, WorkflowComponentView, ImprovementParameterView, ImprovementPreview, WorkflowExecutionView)
 from fruitfly_agent.run.storage.verification import VerificationUseStore

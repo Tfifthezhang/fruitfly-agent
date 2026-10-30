@@ -40,5 +40,11 @@ Unknown external usage has a separate cumulative counter and is not lost when th
 tail rotates. Closed child budgets are removed from the parent's live resources.
 See [lifecycle hooks](../extensions/README.md) for extension and failure boundaries.
 
-Offline checks: `tests.lab.test_improvement_reliability`,
+Offline checks: `tests.improvement.test_reliability`,
 `tests.lab.test_improver`, `tests.lab.test_task_set_lifecycle`.
+
+Search schedules cannot exceed the frozen plan's round/execution limits and have
+bounded mission batches. Child allocations inherit a finite depth limit (16 by
+default), so zero-work recursion cannot allocate forever. Core's operation
+supervisor owns deferred invocation, timeout, cancellation and retirement;
+WorkflowServices supplies root deadlines, accounting and fatal cleanup errors.

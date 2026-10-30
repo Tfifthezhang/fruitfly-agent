@@ -6,8 +6,11 @@ from unittest.mock import Mock
 
 from fruitfly_agent.core.data_model import AssistantMessage, TextBlock, ToolCallBlock, ToolResultMessage
 from fruitfly_agent.core.model_stream import AssistantMessageEventStream
-from fruitfly_agent.lab.improvement.api import (WorkflowBindings, GeneratorRegistry, CandidateBundle,
-    ComponentFile, HarnessSnapshot, EditReason, ProposalResult)
+from fruitfly_agent.lab.improvement.api import WorkflowBindings
+from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
+from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, EditReason
+from fruitfly_agent.improvement.contracts.components import ComponentFile, HarnessSnapshot
+from fruitfly_agent.improvement.contracts.editing import ProposalResult
 from fruitfly_agent.interactive.contracts.improvement import WorkflowRequest
 from fruitfly_agent.run.application import RunApplicationFactory
 from tests.support.faux_provider import FauxProvider

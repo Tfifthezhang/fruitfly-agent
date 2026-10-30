@@ -5,8 +5,9 @@ from dataclasses import asdict, replace
 import hashlib
 from .access import EvidenceAccess
 
-from fruitfly_agent.improvement.contracts.pipeline import (ComponentFile, HarnessSnapshot, relative_path,
-                                 canonical_json, require_hash)
+from fruitfly_agent.improvement.contracts.components import ComponentFile, HarnessSnapshot
+from fruitfly_agent.improvement.contracts.validation import relative_path
+from fruitfly_agent.improvement.contracts.versions import canonical_json, require_hash
 
 
 class MemoryArtifacts:

@@ -60,7 +60,8 @@ def digest_manifest(payload: Mapping[str, Any]) -> str:
 
 def execution_version_payload(manifest: Mapping[str, Any], source: str) -> dict[str, Any]:
     """Execution identity excludes the independently versioned improvement strategy."""
-    return {**({'execution': manifest['execution']} if 'execution' in manifest else {}),
+    return {**({'extensions': manifest['harness']['extensions']} if manifest.get('harness', {}).get('extensions') else {}),
+            **({'execution': manifest['execution']} if 'execution' in manifest else {}),
             **({'tool_services': manifest['tool_services']} if manifest.get('tool_services') else {}),
             "source": source, "components": [c for c in manifest["components"]
             if not any(x.get("layer") == "improvement" for x in c.get("contributions", ()))],

@@ -51,7 +51,7 @@ automatically component configuration fields.
 | Role | Content | Related guide |
 |---|---|---|
 | H | Prompt, tools, guidance, workflow and execution settings | [Runtime architecture](../README.md) |
-| S | Registered retained memory and Skill content | [Algorithm targets](../lab/algorithms/README.md) |
+| S | Registered retained memory and Skill content | [Algorithm targets](../lab/improvement/targets/README.md) |
 | I | Editor, feedback and search settings | [Improvement](../lab/improvement/README.md) |
 
 The pure `runtime_spec.load_harness_config` reads documents and records source
@@ -80,7 +80,7 @@ consume the owning job's budget. Model roles are outside ordinary edit grants.
 | Tool/environment/context mechanism (H) | Its registered descriptors | [Catalog](../lab/catalog/CONFIGURATION.md) |
 | `tool-guidance.<tool>` (H) | `text`; enabled tool must exist | [Tools](../lab/tools/README.md) |
 | `execution-workflow` (H) | `steps`, 1–6 bounded instructions | [Workflow](../lab/workflow/README.md) |
-| `learned-memory`, `skill-document` (S) | `initial_text`, `max_chars`; Skill may declare `source_path` | [Retained targets](../lab/algorithms/README.md) |
+| `learned-memory`, `skill-document` (S) | `initial_text`, `max_chars`; Skill may declare `source_path` | [Retained targets](../lab/improvement/targets/README.md) |
 | `improvement-editor` (I) | `model_role: editor`, `max_tool_calls`, `max_turns`, `instructions` | [Editor](../lab/improvement/editor/README.md) |
 | `improvement-feedback` (I) | `evidence`, `process_assessment`, judgment/comparison guidance | [Assessment](../lab/improvement/assessment/README.md) |
 | `improvement-search` (I) | Strategy/generator/rounds/mode/width, exploration, retention; research/progress/finalization; optional sampling/promotion frequency | [Search](../lab/improvement/strategies/README.md) |
@@ -141,3 +141,14 @@ and `finalization`. Their strict fields, defaults and runtime effects belong to
 They use the same component loader, grants, candidate trial and restoration path
 as other I settings. None changes the kernel's hard quotas or grants access to
 private evaluation material. Unknown nested fields are rejected.
+
+## Declare developer extensions
+
+A system profile may contain `extensions: ["../extension.py", "entrypoint:NAME"]`
+beside `models`, H, S and I. Entries are explicit nonempty source strings; duplicate
+sources fail. File paths resolve relative to the declaring system file. This
+field selects installed developer code, not a model-editable algorithm field.
+It survives materialization and participates in profile identity. Run owns loading;
+the pure specification parser never executes extension code. See
+[Developer Extensions](../extensions/README.md) and
+[Run hosting](../run/extensions/README.md). No configuration version is added.

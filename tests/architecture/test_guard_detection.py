@@ -1,9 +1,36 @@
 """Prove that forbidden dependencies are detected, not merely absent today."""
 import unittest
-from tests.architecture.checks import boundary_violations, imported_modules
+from tests.architecture.checks import boundary_violations, imported_modules, suite_structure_violations
 
 
 class GuardDetectionTests(unittest.TestCase):
+    def test_duplicate_export_baseline_entries_cannot_silently_replace_contracts(self):
+        invalid = 'EXPORTS = {"runtime": {"first"}, "runtime": {"second"}}'
+        self.assertTrue(suite_structure_violations(invalid, 'tests.contracts.api_baseline'))
+        valid = 'EXPORTS = {"runtime": {"first", "second"}, "host": {"first"}}'
+        self.assertEqual([], suite_structure_violations(valid, 'tests.contracts.api_baseline'))
+
+    def test_duplicate_test_and_class_definitions_are_detected_before_import(self):
+        for code in (
+            'class Case:\n    def test_work(self): pass\n    def test_work(self): pass',
+            'class Case: pass\nclass Case: pass',
+        ):
+            with self.subTest(code=code):
+                self.assertTrue(suite_structure_violations(code, 'tests.core.test_example'))
+        self.assertEqual([], suite_structure_violations(
+            'class First:\n    def test_work(self): pass\nclass Second:\n    def test_work(self): pass',
+            'tests.core.test_example'))
+        self.assertEqual([], suite_structure_violations(
+            'class Fixture:\n    @property\n    def value(self): return 1\n'
+            '    @value.setter\n    def value(self, value): pass', 'tests.support.example'))
+
+    def test_pty_aliases_are_rejected_in_cases_and_allowed_in_support(self):
+        for code in ('import pty as terminal', 'from pty import fork as launch',
+                     'def helper():\n    import pty'):
+            with self.subTest(code=code):
+                self.assertTrue(suite_structure_violations(code, 'tests.interactive.test_example'))
+                self.assertEqual([], suite_structure_violations(code, 'tests.support.terminal_process'))
+
     def test_nested_and_type_checking_imports_cannot_cross_layers(self):
         for code in (
             'def factory():\n    import fruitfly_agent.lab.tools',

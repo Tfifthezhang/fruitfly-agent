@@ -4,7 +4,8 @@ import asyncio
 from uuid import uuid4
 
 from fruitfly_agent.improvement.contracts.live import Assessment
-from fruitfly_agent.improvement.contracts.pipeline import ExecutionRecord, Resource
+from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
+from fruitfly_agent.improvement.contracts.tasks import Resource
 from fruitfly_agent.improvement.contracts.versions import canonical_json
 from fruitfly_agent.improvement.execution.handles import CompletionOnlyRunner
 from fruitfly_agent.improvement.workflow.budget import AllocationExhausted

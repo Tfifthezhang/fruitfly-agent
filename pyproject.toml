@@ -114,7 +114,6 @@ files = [
     "fruitfly_agent/run/configuration/controller.py",
     "fruitfly_agent/run/runtime/recovery.py",
     "fruitfly_agent/run/improvement/versions.py",
-    "fruitfly_agent/lab/algorithms/snapshots.py",
     "fruitfly_agent/improvement",
     "fruitfly_agent/lab/improvement",
     "fruitfly_agent/lab/rsi",
@@ -159,7 +158,9 @@ files = [
 module = [
     "fruitfly_agent.core.loop",
     "fruitfly_agent.lab.improvement.tasks",
-    "fruitfly_agent.lab.improvement.tasks.scoring",
+    "fruitfly_agent.lab.improvement.tasks.packages",
+    "fruitfly_agent.lab.improvement.tasks.catalog",
+    "fruitfly_agent.lab.improvement.tasks.snapshots",
     "fruitfly_agent.lab.improvement.assessment.scorers.policies",
     "fruitfly_agent.interactive.terminal.io.live",
     "fruitfly_agent.interactive.terminal.io.display",

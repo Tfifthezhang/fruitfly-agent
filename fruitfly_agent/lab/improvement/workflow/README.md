@@ -15,7 +15,7 @@ seed is the official incumbent. Scope, ownership, evidence
 citations and task/state/condition receipts are checked before reuse. Generator
 factories create job-local state; discovery uses registration metadata only.
 
-[execution.py](execution.py) exports the execution module's `FileTaskRunner`: fresh in-memory files,
+[execution.py](../execution/file_runner.py) exports the execution module's `FileTaskRunner`: fresh in-memory files,
 read/write/edit tools, exact owner projections, root-budgeted model calls and
 immutable output/trajectory resources. It uses final-stage answers. Bash, live
 network tools and ambient Session/filesystem access are absent. Other runners
@@ -46,7 +46,7 @@ keep the official incumbent; unscored output choice has no independent assurance
 The independent exploration policy can choose another completed harness for the
 next proposal, with attributed reasons. It cannot change the reported selection.
 
-[stopping.py](stopping.py) supplies pure `SearchState`, `StopPolicy` and
+[stopping.py](../termination/policies.py) supplies pure `SearchState`, `StopPolicy` and
 `BoundedStopPolicy`. Round limits, no candidate, repeated candidates and generator
 stop are recorded separately from quality assurance. These rules are bounded
 search decisions, not a convergence proof. The host can inject another stop
@@ -62,7 +62,7 @@ charge their leaf executions; trial count is independently bounded.
 
 ## Responsibility boundaries
 
-`fruitfly_agent.improvement.workflow.controller` owns the compatible single-task entry and validation; registered
+`fruitfly_agent.improvement.workflow.controller` owns the single-task entry and validation; registered
 [strategies](../strategies/README.md) supply references, missions, rounds and optional
 composition counts. The controller contains no fixed invariant/domain pairing.
 `fruitfly_agent.improvement.workflow.services` owns job operations and

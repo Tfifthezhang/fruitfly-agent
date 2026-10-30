@@ -133,7 +133,7 @@ implementation IDs continue to do so.
 | `text-target:ID` component | Register an object's snapshot, validation, and trial adapter. |
 | `GeneratorRegistry` | Declare per-job candidate generators through the Improvement API. |
 
-Selection groups share display placement and exclusivity. Display metadata does not enter runtime identity; effective parameters and implementation IDs do. See [Algorithms](../algorithms/README.md), [Improvement](../improvement/README.md), and [Harness configuration](../../run/configuration/README.md).
+Selection groups share display placement and exclusivity. Display metadata does not enter runtime identity; effective parameters and implementation IDs do. See [Algorithms](../improvement/targets/README.md), [Improvement](../improvement/README.md), and [Harness configuration](../../run/configuration/README.md).
 
 No Catalog-specific environment variables. Catalog itself makes no model requests; selected mechanisms declare their own effects.
 
@@ -197,7 +197,7 @@ Custom mechanisms requesting additional models must declare them.
 
 ## Register experiment dependencies
 
-Built-in file memory, workspace skill files and local knowledge register initial text snapshot sources through `persistent-state-snapshots`. Live HTTP context registers an `experiment-blockers` reason because responses cannot be frozen. Installers register capabilities without taking snapshots or starting model work. Custom mechanisms must register each persistent dependency they read; arbitrary plugin heap state and external services remain unsupported. See [Algorithm versions](../algorithms/README.md) and [Original task experiments](../improvement/README.md).
+Built-in file memory, workspace skill files and local knowledge register initial text snapshot sources through `persistent-state-snapshots`. Live HTTP context registers an `experiment-blockers` reason because responses cannot be frozen. Installers register capabilities without taking snapshots or starting model work. Custom mechanisms must register each persistent dependency they read; arbitrary plugin heap state and external services remain unsupported. See [Algorithm versions](../improvement/targets/README.md) and [Original task experiments](../improvement/README.md).
 
 ## Declare per-job improvement support
 

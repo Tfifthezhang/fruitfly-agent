@@ -3,11 +3,11 @@ from pathlib import Path
 import tempfile
 
 from fruitfly_agent.lab.catalog import builtin_catalog, resolve_harness, configuration_inventory
-from fruitfly_agent.lab.improvement.api import builtin_executions
+from fruitfly_agent.lab.improvement.execution import builtin_executions
 
 
-def validate_harness(config, profile, source, *, operation, environment):
-    catalog = builtin_catalog()
+def validate_harness(config, profile, source, *, operation, environment, catalog=None):
+    catalog = catalog or builtin_catalog()
     inventory = resolve_harness(profile, catalog)
     if source.task_set is not None:
         bindings = source.task_set.bindings

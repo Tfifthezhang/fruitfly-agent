@@ -2,8 +2,8 @@
 import time
 
 from fruitfly_agent.interactive import AgentApplication
-from fruitfly_agent.lab.improvement.api import BudgetScope
-from fruitfly_agent.lab.rsi import PersistentEvolutionDriver
+from fruitfly_agent.improvement.workflow.budget import BudgetScope
+from fruitfly_agent.rsi import EvolutionEngine
 from fruitfly_agent.run.evolution import RunEvolutionHost
 from ..composition import application_factory
 from ..policies import stop_policy
@@ -32,7 +32,7 @@ async def run(prepared, record, records, emit, *, resume=False, factory=None):
         host = RunEvolutionHost(application, factory, policy_id=prepared.policy_id, request=prepared.request, budget=budget)
         record['links']['rsi'] = record['id']
         records.save(record)
-        job = await observe(application, PersistentEvolutionDriver().evolve(host, job_id=record['id'], policy_id=prepared.policy_id,
+        job = await observe(application, EvolutionEngine().evolve(host, job_id=record['id'], policy_id=prepared.policy_id,
             direction=prepared.request.direction or 'Improve the declared components using task execution evidence.',
             max_steps=options.max_generations, phase_timeout_seconds=options.phase_timeout,
             continue_on_rejection=options.continue_on_rejection, stop_policy=stop_policy(prepared.config.stop.get('rsi'))),

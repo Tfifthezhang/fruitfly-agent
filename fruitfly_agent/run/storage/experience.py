@@ -6,7 +6,7 @@ import tempfile
 import re
 
 from fruitfly_agent.lab.improvement.api import entry_to_dict, entry_from_dict, experience_id
-from fruitfly_agent.lab.algorithms.targets import StateSnapshot, SnapshotFile
+from fruitfly_agent.improvement.contracts.versions import StateSnapshot, SnapshotFile
 
 
 class ExperienceStore:

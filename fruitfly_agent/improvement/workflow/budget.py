@@ -16,7 +16,13 @@ class AllocationExhausted(RuntimeError):
 class BudgetScope:
     """One synchronous ledger shared by descendants; no await between checks/charges."""
 
-    def __init__(self, limits, *, signal=None, deadline=None, parent=None):
+    def __init__(self, limits, *, signal=None, deadline=None, parent=None, max_depth=16):
+        if type(max_depth) is not int or max_depth < 1:
+            raise ValueError('maximum allocation depth must be positive')
+        self.max_depth = parent.max_depth if parent is not None else max_depth
+        self.depth = parent.depth + 1 if parent is not None else 0
+        if self.depth > self.max_depth:
+            raise AllocationExhausted('nested allocation depth exceeded')
         if set(limits) != {'model', 'execution'} or any(type(v) is not int or v < 0 for v in limits.values()):
             raise ValueError('budget needs nonnegative model and execution limits')
         self.limits = dict(limits)
@@ -106,11 +112,12 @@ class BudgetScope:
     def snapshot(self):
         if self.parent is not None or any(self.held.values()):
             raise ValueError('snapshot requires an unheld root allocation')
-        return {'limits': dict(self.limits), 'used': dict(self.used),
+        return {'limits': dict(self.limits), 'used': dict(self.used), 'max_depth': self.max_depth,
             'deadline_utc': time.time() + self.deadline - time.monotonic() if self.deadline is not None else None}
 
     def restore(self, snapshot):
-        if self.parent is not None or self.closed or any(self.held.values()) or snapshot.get('limits') != self.limits:
+        if (self.parent is not None or self.closed or any(self.held.values())
+                or snapshot.get('limits') != self.limits or snapshot.get('max_depth') != self.max_depth):
             raise ValueError('persisted root allocation differs or is already active')
         used = snapshot.get('used')
         if not isinstance(used, dict) or set(used) != set(self.limits) or any(

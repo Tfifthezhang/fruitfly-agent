@@ -13,7 +13,9 @@ def normalize_experiment(raw, target, *, material_only=False):
     if not isinstance(baseline.get('config'), str) or not baseline['config'].strip():
         raise ValueError('experiment baseline requires config')
     path = (target.parent / baseline['config']).resolve()
-    catalog = builtin_catalog()
+    from fruitfly_agent.run.extensions import configured_extensions
+    extensions = configured_extensions(path, profile_id=baseline.get('profile')) if not material_only else None
+    catalog = extensions.catalog(builtin_catalog()) if extensions is not None else builtin_catalog()
     profile = None if material_only else load_system_config(path, catalog=catalog).select(baseline.get('profile'))
     reader = DocumentReader()
     task, task_path = reader.reference(raw.get('tasks'), target)

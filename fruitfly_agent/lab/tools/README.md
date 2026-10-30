@@ -117,7 +117,7 @@ selection. These descriptions guide model choice; they do not enforce routing.
 ## Bind an instruction candidate
 
 The built-in Catalog exposes one H target `tool-guidance.<name>` per enabled tool,
-plus the combined [execution instruction target](../algorithms/README.md#improve-multiple-instruction-components).
+plus the combined [execution instruction target](../improvement/targets/README.md#improve-multiple-instruction-components).
 An adopted guidance artifact replaces only `AgentTool.description`; it keeps the
 name, parameters, execution function and permission declaration. Each complete
 description must be nonempty and at most 6000 characters. Artifacts are consumed

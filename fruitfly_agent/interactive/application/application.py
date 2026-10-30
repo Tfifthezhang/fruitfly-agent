@@ -472,6 +472,16 @@ class AgentApplication:
             await self._close_previous(previous)
             self._state = ApplicationState.IDLE
 
+    async def replace_factory(self, factory: RuntimeFactory) -> None:
+        """Replace an idle host using the same checked runtime activation boundary."""
+        if self._state != ApplicationState.IDLE or self._pending:
+            raise RuntimeError('finish active work before replacing the runtime host')
+        expected = self.runtime_manifest['digest']
+        path = Path(self._require_handle().session.status.session_path)
+        candidate = await factory.open(resume=True, session_path=path)
+        await self.activate_runtime(candidate, expected_manifest_digest=expected)
+        self._factory = factory
+
     async def rebuild(self, *, preserve_session: bool = False) -> None:
         """Replace the runtime; recover its Session only when explicitly selected."""
 

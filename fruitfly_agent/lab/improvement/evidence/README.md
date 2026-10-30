@@ -71,5 +71,5 @@ and 12000 excerpt characters. The kernel owns neither retrieval nor this policy.
 Optional lifecycle contributions appear under `context/extensions/`; reading a
 research summary does not satisfy the original execution-evidence requirement.
 
-Offline regression: `tests.lab.test_improvement_kernel` rejects a candidate that
+Offline regression: `tests.lab.test_improvement_mechanisms` rejects a candidate that
 writes changes after repeatedly failing to read its cited execution resource.

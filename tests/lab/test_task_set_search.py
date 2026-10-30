@@ -2,8 +2,13 @@
 from types import SimpleNamespace
 import unittest
 
-from fruitfly_agent.lab.improvement.api import (TaskSetSnapshot, MultiTaskSettings, GeneratorRegistry,
-    RunPlan, WorkflowServices, ComponentWorkflow, ExecutionContext)
+from fruitfly_agent.improvement.contracts.task_sets import TaskSetSnapshot
+from fruitfly_agent.lab.improvement.task_sets import MultiTaskSettings
+from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
+from fruitfly_agent.improvement.workflow.services import WorkflowServices
+from fruitfly_agent.lab.improvement.workflow import ImprovementWorkflow as ComponentWorkflow
+from fruitfly_agent.improvement.contracts.plans import RunPlan
+from fruitfly_agent.lab.improvement.execution import ExecutionContext
 from fruitfly_agent.lab.improvement.workflow.task_sets import TaskSetProblem
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts, EvidenceWorkspace
 from tests.support.pipeline import fixture, version

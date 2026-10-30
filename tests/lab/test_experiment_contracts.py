@@ -5,8 +5,9 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from fruitfly_agent.lab.algorithms.targets import SystemVersion, StateSnapshot, SnapshotFile, TargetChange, VersionCandidate, TargetRegistry, content_hash
-from fruitfly_agent.lab.improvement.api import TaskReference, TaskRunEvidence, EvidenceArtifact
+from fruitfly_agent.improvement.contracts.versions import SystemVersion, StateSnapshot, SnapshotFile, content_hash
+from fruitfly_agent.improvement.contracts.candidates import TargetChange, VersionCandidate, TargetRegistry
+from fruitfly_agent.improvement.evidence.receipts import TaskReference, TaskRunEvidence, EvidenceArtifact
 from fruitfly_agent.run.storage.artifacts import DataArtifactStore
 from fruitfly_agent.run.storage.snapshots import SnapshotStore
 

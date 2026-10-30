@@ -1,8 +1,15 @@
 """Deterministic component-stage fixtures shared by pipeline behavior tests."""
+from fruitfly_agent.improvement.contracts.optimization import OptimizationSpec
 from dataclasses import replace
-from fruitfly_agent.lab.improvement.api import (ComponentDocument, ComponentFile, HarnessSnapshot,
-    ComponentRegistry, FileComponentAdapter, CandidateBundle, EditReason, ProposalResult,
-    ExecutionRecord, SelectionDecision, GeneratorRegistry, ComponentWorkflow, RunPlan)
+from fruitfly_agent.improvement.contracts.components import ComponentDocument, ComponentFile, HarnessSnapshot
+from fruitfly_agent.lab.improvement.components import ComponentRegistry, FileComponentAdapter
+from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, EditReason
+from fruitfly_agent.improvement.contracts.editing import ProposalResult
+from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
+from fruitfly_agent.improvement.contracts.assessment import SelectionDecision
+from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
+from fruitfly_agent.lab.improvement.workflow import ImprovementWorkflow as ComponentWorkflow
+from fruitfly_agent.improvement.contracts.plans import RunPlan
 from fruitfly_agent.improvement.contracts.versions import SystemVersion, content_hash
 
 
@@ -13,7 +20,7 @@ def version():
 def fixture():
     docs = tuple(ComponentDocument(name, 'instructions', role, 'text-v1', (ComponentFile('instructions.txt', name),))
                  for name, role in (('prompt', 'H'), ('memory', 'S')))
-    registry = ComponentRegistry(FileComponentAdapter(d, lambda doc: None) for d in docs)
+    registry = ComponentRegistry(FileComponentAdapter(d, lambda doc: None, optimization=OptimizationSpec(d.role, 'documents', state='retained' if d.role == 'S' else 'frozen')) for d in docs)
     return registry, registry.snapshot()
 
 
