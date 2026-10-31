@@ -6,13 +6,13 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from eval.benchmarks.base import BenchmarkVariant, PreflightResult
-from eval.benchmarks.harbor import HarborBenchmarkAdapter, harbor_descriptor
-from eval.catalog import builtin_catalog
-from eval.contracts import EvaluationRequest
-from eval.harbor.preparation import load_preparation, prepare
-from eval.harbor.selection import inspect_images, task_requirements
-from eval.harbor.tasks import prepare_tasks
+from fruitfly_eval.benchmarks.base import BenchmarkVariant, PreflightResult
+from fruitfly_eval.benchmarks.harbor import HarborBenchmarkAdapter, harbor_descriptor
+from fruitfly_eval.catalog import builtin_catalog
+from fruitfly_eval.contracts import EvaluationRequest
+from fruitfly_eval.harbor.preparation import load_preparation, prepare
+from fruitfly_eval.harbor.selection import inspect_images, task_requirements
+from fruitfly_eval.harbor.tasks import prepare_tasks
 from tests.support.evaluation import request_payload
 from tests.support.harbor import prepared_harbor
 
@@ -39,8 +39,8 @@ class TaskBatchTests(unittest.TestCase):
                  "context": str(Path(task["path"]) / "environment")}]
 
     def test_catalog_exposes_only_three_selections_for_every_benchmark(self):
-        with patch("eval.benchmarks.harbor._harbor_executable", return_value=None), patch(
-            "eval.benchmarks.harbor.shutil.which", return_value=None
+        with patch("fruitfly_eval.benchmarks.harbor._harbor_executable", return_value=None), patch(
+            "fruitfly_eval.benchmarks.harbor.shutil.which", return_value=None
         ):
             payload = builtin_catalog().to_dict()
         for benchmark in payload["benchmarks"]:
@@ -57,11 +57,11 @@ class TaskBatchTests(unittest.TestCase):
             return base
         payload = request_payload()
         payload["benchmark"] = {"id": "example", "variant": "no_gpu"}
-        with patch("eval.harbor.selection.environment_definitions", side_effect=definitions), patch(
-            "eval.harbor.preparation.image_identity", side_effect=AssertionError("unexpected probe")
-        ), patch("eval.harbor.selection.image_identity", return_value="sha256:cpu") as images, patch(
-            "eval.harbor.preparation.prepare_material", side_effect=AssertionError("unexpected runtime preparation")
-        ), patch("eval.harbor.preparation.probe_environment", side_effect=AssertionError("unexpected container")):
+        with patch("fruitfly_eval.harbor.selection.environment_definitions", side_effect=definitions), patch(
+            "fruitfly_eval.harbor.preparation.image_identity", side_effect=AssertionError("unexpected probe")
+        ), patch("fruitfly_eval.harbor.selection.image_identity", return_value="sha256:cpu") as images, patch(
+            "fruitfly_eval.harbor.preparation.prepare_material", side_effect=AssertionError("unexpected runtime preparation")
+        ), patch("fruitfly_eval.harbor.preparation.probe_environment", side_effect=AssertionError("unexpected container")):
             result = prepare(EvaluationRequest.from_dict(payload), self.descriptor, self.host, tasks_only=True)
         self.assertEqual(result["selection"]["selected"], ["task-a"])
         self.assertEqual([t["id"] for t in result["selection"]["excluded"]], ["task-b", "task-c"])
@@ -73,7 +73,7 @@ class TaskBatchTests(unittest.TestCase):
 
     def test_full_retains_gpu_tasks_and_smoke_selects_one_exact_task(self):
         (self.inputs / "task-b/task.toml").write_text('[environment]\ngpus = 1\ndocker_image = "gpu:v1"\n')
-        with patch("eval.harbor.selection.environment_definitions", side_effect=self.definitions):
+        with patch("fruitfly_eval.harbor.selection.environment_definitions", side_effect=self.definitions):
             full = prepare_tasks(self.host, self.descriptor, "full")
             smoke = prepare_tasks(self.host, self.descriptor, "smoke")
         self.assertEqual(len(full["tasks"]), 3)
@@ -94,7 +94,7 @@ class TaskBatchTests(unittest.TestCase):
         for content in cases:
             with self.subTest(content=content):
                 (context / "docker-compose.yaml").write_text(content)
-                with patch("eval.harbor.selection.environment_definitions", side_effect=self.definitions):
+                with patch("fruitfly_eval.harbor.selection.environment_definitions", side_effect=self.definitions):
                     result = prepare_tasks(self.host, self.descriptor, "no_gpu")
                 self.assertEqual(result["selection"]["selected"], ["task-a", "task-c"])
                 self.assertEqual(result["selection"]["excluded"][0]["id"], "task-b")
@@ -105,11 +105,11 @@ class TaskBatchTests(unittest.TestCase):
         (context / "docker-compose.yaml").write_text(
             'services:\n  main:\n    image: ' + reference + '\n  helper:\n    image: helper:v1\n    build: .\n')
         task = {"path": str(context.parent), "configuration": {"environment": {}}}
-        with patch("eval.harbor.selection.environment_definitions", side_effect=self.definitions):
+        with patch("fruitfly_eval.harbor.selection.environment_definitions", side_effect=self.definitions):
             requirements = task_requirements(task)
         self.assertEqual(requirements["gpu_requirements"], [])
         self.assertEqual(len(requirements["builds"]), 1)
-        with patch("eval.harbor.selection.image_identity", side_effect=[ValueError("not cached"), "sha256:helper"]) as inspect:
+        with patch("fruitfly_eval.harbor.selection.image_identity", side_effect=[ValueError("not cached"), "sha256:helper"]) as inspect:
             result = inspect_images([{"requirements": requirements}], "docker")
         self.assertEqual(inspect.call_args_list[0].args, ("docker", reference))
         self.assertEqual([r["status"] for r in result], ["unavailable", "cached"])
@@ -125,7 +125,7 @@ class TaskBatchTests(unittest.TestCase):
     def test_all_gpu_selection_fails_without_starting_environments(self):
         for name in ("task-a", "task-b", "task-c"):
             (self.inputs / name / "task.toml").write_text('[environment]\ngpus = 1\n')
-        with patch("eval.harbor.selection.environment_definitions", side_effect=self.definitions), self.assertRaisesRegex(ValueError, "no tasks remain"):
+        with patch("fruitfly_eval.harbor.selection.environment_definitions", side_effect=self.definitions), self.assertRaisesRegex(ValueError, "no tasks remain"):
             prepare_tasks(self.host, self.descriptor, "no_gpu")
 
     def test_variant_rejects_removed_categories_patterns_duplicates_and_invalid_names(self):
@@ -163,12 +163,12 @@ class TaskBatchTests(unittest.TestCase):
                 adapter.descriptor = self.descriptor
                 host, preparation = prepared_harbor(root, TASKS)
                 with patch.object(adapter, "preflight", return_value=PreflightResult(True, (), ("offline-harbor",))), patch(
-                    "eval.benchmarks.harbor.prepare_runtime", return_value=(root / "config", root / "models", ())), patch(
-                    "eval.benchmarks.harbor.load_env", return_value={}
-                ), patch("eval.benchmarks.harbor.run_harbor_job", return_value=(0, "")), patch(
-                    "eval.benchmarks.harbor.HostConfig.read", return_value=host
-                ), patch("eval.benchmarks.harbor.load_preparation", return_value=preparation), patch(
-                    "eval.benchmarks.harbor.inspect_preparation", return_value={"available": True}):
+                    "fruitfly_eval.benchmarks.harbor.prepare_runtime", return_value=(root / "config", root / "models", ())), patch(
+                    "fruitfly_eval.benchmarks.harbor.load_env", return_value={}
+                ), patch("fruitfly_eval.benchmarks.harbor.run_harbor_job", return_value=(0, "")), patch(
+                    "fruitfly_eval.benchmarks.harbor.HostConfig.read", return_value=host
+                ), patch("fruitfly_eval.benchmarks.harbor.load_preparation", return_value=preparation), patch(
+                    "fruitfly_eval.benchmarks.harbor.inspect_preparation", return_value={"available": True}):
                     adapter.run(request_path=request_path, result_path=result_path, variant="full")
                 result = json.loads(result_path.read_text())
                 if passes:

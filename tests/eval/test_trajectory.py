@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from eval.trajectory import session_trajectory
+from fruitfly_eval.trajectory import session_trajectory
 from tests.support.harbor import load_harbor_agent
 from types import SimpleNamespace
 

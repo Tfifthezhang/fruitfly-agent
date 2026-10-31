@@ -9,11 +9,11 @@ from types import ModuleType, SimpleNamespace
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
-from eval.benchmarks.harbor import HarborBenchmarkAdapter, harbor_descriptor
-from eval.harbor.environments import environment_config, environment_definitions, environment_key, probe_environment
-from eval.harbor.lifecycle import owned_projects, record_environment, retire_containers
-from eval.harbor.material import digest
-from eval.harbor.tasks import registry_tasks
+from fruitfly_eval.benchmarks.harbor import HarborBenchmarkAdapter, harbor_descriptor
+from fruitfly_eval.harbor.environments import environment_config, environment_definitions, environment_key, probe_environment
+from fruitfly_eval.harbor.lifecycle import owned_projects, record_environment, retire_containers
+from fruitfly_eval.harbor.material import digest
+from fruitfly_eval.harbor.tasks import registry_tasks
 from tests.support.harbor import load_harbor_environment, prepared_harbor
 
 
@@ -54,7 +54,7 @@ class VerifierEnvironmentTests(unittest.TestCase):
                     secret_names=("MODEL_API_KEY",), host=host, preparation=self.receipt)
                 payload = json.loads(Path(command[3]).read_text())
                 config = payload["environment"]
-                self.assertEqual(config["import_path"], "eval.harbor.docker_environment:PreparedDockerEnvironment")
+                self.assertEqual(config["import_path"], "fruitfly_eval.harbor.docker_environment:PreparedDockerEnvironment")
                 self.assertEqual([m["target"] for m in config["mounts"]],
                                  ["/opt/runtime", "/installed-agent/fruitfly/source"])
                 self.assertEqual([m["target"] for m in config["kwargs"]["dependency_mounts"]],
@@ -166,9 +166,9 @@ class VerifierEnvironmentTests(unittest.TestCase):
             return subprocess.CompletedProcess(command, 0, "container\n" if command[1] == "ps" else "verifier:v1 sha256:verifier\n", "")
         host = replace(self.host, verifier_env={"VERIFIER_SETTING": "yes"}, offline=True)
         with patch.dict("sys.modules", modules), patch(
-            "eval.harbor.environments.environment_definitions", return_value=[definition]
-        ), patch("eval.harbor.environments.subprocess.run", side_effect=docker), patch(
-            "eval.harbor.environments.retire_projects"
+            "fruitfly_eval.harbor.environments.environment_definitions", return_value=[definition]
+        ), patch("fruitfly_eval.harbor.environments.subprocess.run", side_effect=docker), patch(
+            "fruitfly_eval.harbor.environments.retire_projects"
         ) as retire:
             receipt = probe_environment(self.task, self.runtime, "docker", self.root / "probes", host=host)
             arguments = factory.create_environment_from_config.call_args.kwargs
@@ -235,7 +235,7 @@ class VerifierEnvironmentTests(unittest.TestCase):
                 for containers in live.values():
                     containers[:] = [c for c in containers if c not in command[4:]]
             return subprocess.CompletedProcess(command, 0, output, "")
-        with patch("eval.harbor.lifecycle.subprocess.run", side_effect=docker):
+        with patch("fruitfly_eval.harbor.lifecycle.subprocess.run", side_effect=docker):
             removed = retire_containers(self.root, "docker", {})
         self.assertEqual(removed, ["agent-container", "verifier-container"])
         self.assertEqual(live["other-job"], ["unrelated-container"])

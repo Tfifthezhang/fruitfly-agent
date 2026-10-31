@@ -38,8 +38,8 @@ class AgentLoopConfig:
     system_prompt: str = ""
     context_window: int = 200_000
     max_context_recovery_attempts: int = 6
-    max_turns: int = 32
-    max_tool_calls_per_turn: int = 64
+    max_turns: int | None = 32
+    max_tool_calls_per_turn: int | None = 64
 
     # --- the research extension points ---
     prepare_next_turn: (
@@ -95,6 +95,8 @@ class AgentLoopConfig:
         for name, minimum in (("max_context_recovery_attempts", 1), ("max_turns", 0),
                               ("max_tool_calls_per_turn", 0)):
             value = getattr(self, name)
+            if value is None and name in {'max_turns', 'max_tool_calls_per_turn'}:
+                continue
             if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
                 raise ValueError(f"{name} must be at least {minimum}")
         tools = tuple(self.tools or ())

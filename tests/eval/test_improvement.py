@@ -11,8 +11,8 @@ import unittest
 from unittest.mock import patch
 import yaml
 
-from eval.improvement import benchmark_execution
-from eval.improvement.runner import EvalTaskRunner
+from fruitfly_eval.improvement import benchmark_execution
+from fruitfly_eval.improvement.runner import EvalTaskRunner
 from fruitfly_agent.lab.improvement.components import ComponentRegistry, TextComponentAdapter
 from fruitfly_agent.improvement.contracts.plans import RunPlan
 from fruitfly_agent.improvement.workflow.services import WorkflowServices
@@ -46,22 +46,24 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
         task = root / 'task'; task.mkdir(); (task / 'instruction.md').write_text('Complete an external task.')
         source = Path(__file__).resolve().parents[2]
         files = [(name, hashlib.sha256((source / name).read_bytes()).hexdigest()) for name in
-            ('fruitfly_agent/run/runtime/limits.py', 'fruitfly_agent/run/cli.py', 'eval/harbor_agent.py',
+            ('fruitfly_agent/run/runtime/usage.py', 'fruitfly_agent/run/cli.py', 'fruitfly_eval/harbor_agent.py',
              'fruitfly_agent/core/loop.py', 'fruitfly_agent/run/configuration/profile.py',
              'fruitfly_agent/run/runtime/assembly.py', 'fruitfly_agent/runtime_spec/execution.py',
-             'fruitfly_agent/runtime_spec/profiles.py', 'fruitfly_agent/runtime_spec/selections.py', 'eval/runtime.py')]
+             'fruitfly_agent/core/config.py', 'fruitfly_agent/lab/catalog/configuration.py',
+                     'fruitfly_agent/lab/catalog/parameters.py', 'fruitfly_agent/lab/execution_policy/__init__.py',
+                     'fruitfly_agent/run/configuration/templates/components/H/execution-policy.yaml', 'fruitfly_agent/runtime_spec/profiles.py', 'fruitfly_agent/runtime_spec/selections.py', 'fruitfly_eval/runtime.py')]
         receipt = {'id': 'prepared-identity', 'runtime': {'installation': {'files': files}},
             'tasks': [{'id': 'external/task', 'path': str(task)}]}
-        plan = RunPlan('experiment', version(), ('base_prompt',), generator_id='rule', feedback='scored', max_model_calls=100)
+        plan = RunPlan('experiment', version(), ('base_prompt',), generator_id='rule', feedback='scored')
         services = WorkflowServices(plan)
         context = ExecutionContext(root, artifacts, components, None, None, None, plan=plan, services=services)
         return context, request, host, receipt
 
     def freeze(self, context, request, host, receipt, executor):
-        definition = benchmark_execution(request, host, model_calls=2, executor=executor)
+        definition = benchmark_execution(request, host,  executor=executor)
         host_model = SimpleNamespace(agent_env={'FRUITFLY_MAX_MODEL_CALLS': '2'})
-        return definition, patch('eval.improvement.registration.HostConfig.read', return_value=host_model), patch(
-            'eval.improvement.registration.load_preparation', return_value=receipt)
+        return definition, patch('fruitfly_eval.improvement.registration.HostConfig.read', return_value=host_model), patch(
+            'fruitfly_eval.improvement.registration.load_preparation', return_value=receipt)
 
     async def test_candidate_executes_then_official_results_drive_existing_workflow(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -69,7 +71,7 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
             context, request, host, receipt = self.fixture(root)
             calls = []
             async def executor(evaluation, host_path, *, directory, output_root, emit):
-                self.assertGreaterEqual(context.services.budget.held['model'], 2)
+                self.assertFalse(hasattr(context.services,'budget'))
                 from fruitfly_agent.lab.catalog import load_system_config
                 selected = load_system_config(evaluation.runtime.config_path).select()
                 candidate = selected.artifact_contents[selected.prompt] != 'baseline'
@@ -78,7 +80,7 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
                 agent = path / 'artifacts/harbor/job/trial/agent'; agent.mkdir(parents=True)
                 (agent / 'session.jsonl').write_text('{"type":"message"}\n')
                 (agent / 'trajectory.json').write_text('{}')
-                (agent / 'model-budget.json').write_text('{"schema_version":1,"limit":2,"used":2}')
+                (agent / 'model-usage.json').write_text('{"schema_version":1,"used":2,"requests":[{"id":"call-0","status":"completed","usage":null},{"id":"call-1","status":"completed","usage":null}]}')
                 verifier = agent.parent / 'verifier'; verifier.mkdir(); (verifier / 'answers.txt').write_text('PRIVATE')
                 emit('benchmark-progress', event_type='completed')
                 return {'evaluation_id': path.name, 'status': 'completed', 'errors': {},
@@ -92,7 +94,7 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
                     async def propose(self, request, services):
                         document = replace(request.baseline.components[0], files=(ComponentFile('instructions.txt', 'candidate'),))
                         candidate = CandidateBundle(request.plan.parent, request.baseline, HarnessSnapshot((document,)), 'rule',
-                            (EditReason('base_prompt', 'Evidence-driven proposal', (request.records[0].run_id,)),))
+                            (EditReason('base_prompt', 'Evidence-driven proposal', (request.records[0].run_id,), expected_effect='The proposed behavior appears in the subsequent execution.'),))
                         return ProposalResult((candidate,))
                 class Composer:
                     async def compose(self, request, services): return request.candidates[0]
@@ -138,9 +140,9 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
                 await entered.wait(); pending.cancel()
                 with self.assertRaises(asyncio.CancelledError): await pending
                 self.assertTrue(cleaned.is_set())
-                self.assertEqual(context.services.used['model'], 2)
-                self.assertEqual(context.services.budget.held['model'], 0)
-                settlements = [f for e, f in context.services.events if e == 'external-budget-settled']
+                self.assertEqual(context.services.used['model'], 0)
+                self.assertFalse(hasattr(context.services,'budget'))
+                settlements = [f for e, f in context.services.events if e == 'external-usage']
                 self.assertIsNone(settlements[-1]['observed_calls'])
             await context.services.close()
 
@@ -170,12 +172,12 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
         from fruitfly_agent.core.config import AgentLoopConfig
         from fruitfly_agent.lab.improvement.editor.instructions import EditorInstructionTarget, EditorInstructions
         from tests.support.self_improver import ProceduralProvider
-        from eval.improvement import benchmark_improver
+        from fruitfly_eval.improvement import benchmark_improver
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             context, request, host, receipt = self.fixture(root)
             context.components.register(TextComponentAdapter(EditorInstructionTarget(), 'improvement-instructions'))
-            plan = replace(context.plan, component_ids=('improvement-editor',), max_model_calls=512, max_executions=128)
+            plan = replace(context.plan, component_ids=('improvement-editor',))
             context.plan = plan
             context.services = WorkflowServices(plan)
             provider = ProceduralProvider()
@@ -196,24 +198,23 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
                 path = output_root / ('nested-' + str(len(calls)))
                 agent = path / 'artifacts/harbor/job/trial/agent'; agent.mkdir(parents=True)
                 (agent / 'session.jsonl').write_text('{}\n')
-                (agent / 'model-budget.json').write_text('{"schema_version":1,"limit":2,"used":1}')
+                (agent / 'model-usage.json').write_text('{"schema_version":1,"used":1,"requests":[{"id":"call-0","status":"completed","usage":null}]}')
                 return {'evaluation_id': path.name, 'status': 'completed', 'errors': {},
                     'metrics': [{'name': 'official_reward', 'value': float(changed)}]}, path
-            development = benchmark_execution(request, host, model_calls=2, execution_id='development')
-            independent = benchmark_execution(request, second_host, model_calls=2, execution_id='independent')
+            development = benchmark_execution(request, host,  execution_id='development')
+            independent = benchmark_execution(request, second_host,  execution_id='independent')
             study = benchmark_improver((development,), (independent,), executor=executor)
-            supplied = (('inner_strategy', 'harness2'), ('inner_model_calls', 32),
-                ('inner_executions', 8), ('evaluation_model_calls', 2))
-            with patch('eval.improvement.registration.HostConfig.read', side_effect=lambda workspace, path:
+            supplied = (('inner_strategy','harness2'),)
+            with patch('fruitfly_eval.improvement.registration.HostConfig.read', side_effect=lambda workspace, path:
                     SimpleNamespace(agent_env={'FRUITFLY_MAX_MODEL_CALLS': '2'}, receipt=receipts[str(Path(path).resolve())])), patch(
-                    'eval.improvement.registration.load_preparation', side_effect=lambda host, *args: host.receipt):
+                    'fruitfly_eval.improvement.registration.load_preparation', side_effect=lambda host, *args: host.receipt):
                 prepared = study.prepare(context, ExecutionRequest('', (), ('improvement-editor',),
                     'benchmark-editor-study', 'task', 'scored', supplied))
                 self.assertFalse(calls)
                 ports = study.build(context, prepared)
                 baseline = context.components.snapshot()
                 document = baseline.component('improvement-editor')
-                values = json.loads(document.files[0].text); values['invariant'] += ' STEP'
+                values = json.loads(document.files[0].text); values['instructions']['invariant'] += ' STEP'
                 changed = replace(document, files=(ComponentFile('instructions.txt', json.dumps(values)),))
                 candidate = HarnessSnapshot(tuple(changed if d.component_id == changed.component_id else d for d in baseline.components))
                 before = await ports.runner.trial(baseline, 'development')
@@ -224,7 +225,7 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue(any(Path(path).resolve() == second_host.resolve() for path, _ in calls))
                 self.assertEqual(context.services.used['execution'], len(calls))
                 self.assertEqual(context.services.used['model'], len(calls) + len(provider.calls))
-                self.assertEqual(context.services.budget.held, {'model': 0, 'execution': 0})
+                self.assertFalse(hasattr(context.services,'budget'))
                 self.assertEqual(context.components.snapshot(), baseline)
             await context.services.close()
 
@@ -238,11 +239,11 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
                 result_root = root / 'partial'
                 async def __call__(self, *args, **kwargs):
                     agent = self.result_root / 'artifacts/harbor/job/trial/agent'; agent.mkdir(parents=True)
-                    (agent / 'model-budget.json').write_text('{"schema_version":1,"limit":2,"used":1}')
+                    (agent / 'model-usage.json').write_text('{"schema_version":1,"used":1,"requests":[{"id":"call-0","status":"completed","usage":null}]}')
                     (agent / 'session.jsonl').write_text('{"type":"message","message":{"role":"toolResult","content":[]}}\n')
                     await asyncio.Event().wait()
             definition, host_patch, receipt_patch = self.freeze(context, request, host, receipt, Interrupted())
-            context.plan = replace(context.plan, operation_timeout=.01)
+            context.plan = replace(context.plan, timeouts={'editor_seconds':.01,'execution_seconds':.01,'evaluator_seconds':.01})
             context.services = WorkflowServices(context.plan)
             with host_patch, receipt_patch:
                 prepared = definition.prepare(context, ExecutionRequest('', (), ('base_prompt',), 'benchmark-task', 'task', 'scored'))
@@ -258,14 +259,14 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
             await context.services.close()
 
     async def test_interrupted_partial_json_does_not_discard_original_evidence_or_invent_usage(self):
-        from eval.improvement.evidence import collect
-        from eval.improvement.facts import attach_benchmark_facts
+        from fruitfly_eval.improvement.evidence import collect
+        from fruitfly_eval.improvement.facts import attach_benchmark_facts
         from fruitfly_agent.improvement.execution.facts import read_facts
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             agent = root / 'artifacts/harbor/job/trial/agent'; agent.mkdir(parents=True)
             (agent / 'session.jsonl').write_bytes(b'{"message":{"role":"toolResult"}}\n{"message":')
-            (agent / 'model-budget.json').write_text('{"schema_version":1,"used":')
+            (agent / 'model-usage.json').write_text('{"schema_version":1,"used":')
             artifacts = MemoryArtifacts()
             resources, calls = collect(root, artifacts, interrupted=True)
             self.assertIsNone(calls)
@@ -275,8 +276,12 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
             from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
             record = ExecutionRecord('run', task.task_id, task.material_id, plan.parent.harness,
                 plan.parent.state, plan.conditions_id, 'cancelled', '', resources, calls)
-            record = attach_benchmark_facts(record, root, artifacts, model_limit=2, interrupted=True)
+            record = attach_benchmark_facts(record, root, artifacts,  interrupted=True)
             facts = read_facts(record, artifacts)
             self.assertTrue(facts.diagnosable)
             self.assertFalse(facts.complete)
             with self.assertRaises(ValueError): collect(root, artifacts)
+            (agent / 'model-usage.json').write_text('{"schema_version":1,"used":1,"requests":[{}]}')
+            resources, calls = collect(root, artifacts, interrupted=True)
+            self.assertIsNone(calls)
+            self.assertTrue(any(r.path.endswith('session.jsonl') for r in resources))

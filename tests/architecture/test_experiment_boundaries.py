@@ -10,7 +10,7 @@ class ExperimentBoundaryTests(unittest.TestCase):
                 self.assertFalse(any(t.startswith('fruitfly_agent.experiments') for t in _project_imports(path)), str(path))
 
     def test_new_composition_edge_does_not_allow_reverse_imports(self):
-        self.assertEqual([], boundary_violations('from eval.api import run_evaluation\nfrom fruitfly_agent.run import RunApplicationFactory', 'fruitfly_agent.experiments.composition'))
+        self.assertEqual([], boundary_violations('from fruitfly_eval.api import run_evaluation\nfrom fruitfly_agent.run import RunApplicationFactory', 'fruitfly_agent.experiments.composition'))
         for layer in ('core', 'providers', 'interactive', 'lab', 'run'):
             self.assertTrue(boundary_violations('from fruitfly_agent.experiments import cli', 'fruitfly_agent.' + layer + '.example'))
 

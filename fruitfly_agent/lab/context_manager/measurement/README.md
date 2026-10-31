@@ -2,10 +2,11 @@
 
 [Up: Context Manager](../README.md)
 
-Select `context-measurement` to install `MeasurementService` through Catalog.
-It operates independently of the selected [reduction](../reduction/README.md).
-`MeasurementConfig` owns strict defaults; [registration.py](registration.py)
-assembles the service and [improvement.py](improvement.py) exposes its H surface.
+Catalog installs one shared `MeasurementService` automatically. It serves final
+request capacity checks, reduction, tool/image estimates and auxiliary budgets.
+Core owns the measurement contracts and capacity rule; Lab owns the estimator.
+[registration.py](registration.py) assembles the service without a selectable
+component or Improvement target. Embeddings can inject a meter directly.
 
 | Result | Meaning |
 |---|---|
@@ -48,9 +49,8 @@ already includes cache hits; Anthropic input occupancy adds separately reported
 cache reads and creation. Missing usage remains unknown. Calibration is runtime
 local and is not carried into independent candidates or Sessions.
 
-H grants may tune estimator, character coefficient, margins, count timeout and
-sample bound. `provider_count` and `strict` remain protected from parameter
-candidates. Exactness, credentials and outer limits are not tunable claims.
+`MeasurementConfig` is an internal service policy. Counting support, precision,
+calibration and safety margins are outside model edit grants.
 Heuristics may undercount unfamiliar encodings; Provider overflow recovery
 remains necessary. Exact counting does not prove content quality.
 

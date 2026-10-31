@@ -82,7 +82,7 @@ async def run_demo():
         (workspace / '.fruitfly').mkdir()
         (workspace / '.fruitfly/models.yaml').write_text(
             'models:\n  offline:\n    sdk: offline\n    protocol: offline\n    model: offline-example\n'
-            '    api_key_env: OFFLINE_KEY\n    context_window: 4096\n', encoding='utf-8'
+            '    api_key_env: OFFLINE_KEY\n    context_window: 4096\n    max_output_tokens: 1024\n', encoding='utf-8'
         )
         catalog = builtin_catalog().extended((example_definition(),))
         save_harness_config(workspace / '.fruitfly/config.yaml', HarnessConfig(

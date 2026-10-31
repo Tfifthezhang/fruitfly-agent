@@ -24,7 +24,7 @@ class OperationSupervisor:
     async def run(self, operation, *, timeout, signal=None, check=lambda: None):
         if self.poisoned:
             raise self.cleanup_error('previous operation retirement was not confirmed')
-        if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout < 0:
+        if timeout is not None and (isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout < 0):
             raise ValueError('operation timeout must be finite and nonnegative')
         check()
         if signal is not None and signal.is_set():

@@ -14,7 +14,7 @@ from fruitfly_agent.experiments.records import RunRecords
 from fruitfly_agent.interactive import AgentApplication
 from fruitfly_agent.lab.improvement.registration import EDITOR_CONFIG, ASSESSOR_CONFIG
 from tests.support.experiments import workspace, factory_builder
-from tests.support.faux_provider import FauxProvider
+from tests.support.model_evaluation import RoleProvider
 from tests.support.task_packs import install, package
 
 
@@ -23,7 +23,7 @@ class OperationTests(unittest.IsolatedAsyncioTestCase):
         self.root = Path(self.enterContext(tempfile.TemporaryDirectory()))
         workspace(self.root)
         self.records = RunRecords(self.root)
-        self.provider = FauxProvider()
+        self.provider = RoleProvider()
         self.registry = Mock()
         self.registry.create.return_value = self.provider
 
@@ -36,8 +36,8 @@ class OperationTests(unittest.IsolatedAsyncioTestCase):
         with patch('fruitfly_agent.experiments.operations.improve.application_factory', side_effect=factory_builder(self.registry)):
             result = await improve(prepared, record, self.records, lambda event: None)
         self.assertEqual(result['status'], 'completed')
-        self.assertEqual(result['usage'], {'model': 2, 'execution': 2})
-        self.assertEqual(len(self.provider.calls), 2)
+        self.assertEqual(result['usage'], {'model': 4, 'execution': 2})
+        self.assertEqual(len(self.provider.calls), 4)
         self.assertEqual(prepared.config_path.read_bytes(), original)
         plan_path = next((self.root / '.fruitfly/improvement/jobs').glob('*/plan.json'))
         plan = json.loads(plan_path.read_text())
@@ -84,12 +84,13 @@ class OperationTests(unittest.IsolatedAsyncioTestCase):
             resumed = await evolve(prepared, record, self.records, lambda event: None, resume=True)
         self.assertEqual(result['status'], 'complete')
         self.assertEqual(resumed['status'], 'complete')
-        self.assertEqual(calls, 8)
+        self.assertEqual(resumed['usage'], result['usage'])
+        self.assertEqual(calls, 10)
         self.assertEqual(len(self.provider.calls), calls)
         self.assertEqual(prepared.config_path.read_bytes(), original)
         saved = json.loads((self.root / '.fruitfly/evolution' / (record['id'] + '.json')).read_text())
         self.assertEqual(saved['steps'], 1)
-        self.assertEqual(saved['budget_state']['used']['model'], 8)
+        self.assertNotIn('budget_state', saved)
         candidates = list((self.root / '.fruitfly/improvement/candidates').glob('*.json'))
         self.assertEqual(len(candidates), 1)
         self.assertEqual(json.loads(candidates[0].read_text())['status'], 'adopted')

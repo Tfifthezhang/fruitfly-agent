@@ -13,9 +13,9 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import fruitfly_agent
-import eval
-from eval.installation import resolve_installation
-from eval.harbor.material import source_snapshot
+import fruitfly_eval
+from fruitfly_eval.installation import resolve_installation
+from fruitfly_eval.harbor.material import source_snapshot
 from fruitfly_agent.lab.context_manager.externalization.programmatic_context import (
     IpythonRuntime, SessionArtifactStore,
 )
@@ -76,9 +76,9 @@ main()
 
 
 async def check(wheel: Path) -> None:
-    from eval.harbor_agent import FruitFlyHarborAgent
+    from fruitfly_eval.harbor_agent import FruitFlyHarborAgent
     checkout = Path(__file__).resolve().parents[2]
-    for module in (fruitfly_agent, eval):
+    for module in (fruitfly_agent, fruitfly_eval):
         if Path(module.__file__).resolve().is_relative_to(checkout):
             raise RuntimeError("check must import the installed wheel outside the checkout")
     example = runpy.run_path(str(checkout / "examples/extensions/offline_guidance.py"))
@@ -117,7 +117,7 @@ async def check(wheel: Path) -> None:
         agent = FruitFlyHarborAgent.__new__(FruitFlyHarborAgent)
         package = resolve_installation(str(wheel), checkout=root)
         identity = source_snapshot(package, root / "source")
-        assert (root / "source/eval/harbor/supervisor.py").is_file()
+        assert (root / "source/fruitfly_eval/harbor/supervisor.py").is_file()
         check_frozen_runtime(root / 'source')
         installation = root / "prepared-installation"
         installation.mkdir()

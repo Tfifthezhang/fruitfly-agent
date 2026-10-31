@@ -14,7 +14,7 @@ stores, benchmark adapters or production implementations.
 | `contracts.py`: `EvolutionHost`, `EvolutionJob` | Injected effects and durable state, including exact parent and policy bindings |
 | `state.py` | Generation accounting and injected soft stop decisions |
 | `callbacks.py`: `EvolutionDriver` | In-memory callback host using the same engine; no separate loop |
-| `models.py` | Immutable callback versions, candidates, verification and finite allowances |
+| `models.py` | Immutable callback versions, candidates, verification and independent phase times |
 
 The transition path is ready, proposing, proposed, verifying, verified, activating,
 then ready or a terminal phase. Attempts consume the generation limit even when
@@ -24,31 +24,18 @@ Independent verification must bind candidate, parent and policy. Only confirmed
 activation advances the incumbent. Planned adoption does not count as activation.
 The next generation resolves the active improver again.
 
-All asynchronous phases use Core's bounded operation supervisor. Unconfirmed
-retirement stops scheduling. Model/execution quota and the absolute deadline use
-an injected shared Improvement `BudgetScope`. A step limit alone is not a monetary
-or model-call allowance. Stop-policy parameters join persisted strategy identity.
+Core's operation supervisor provides cancellation and confirmed retirement. Composite Improvement jobs keep their independent editor, execution and evaluator times; RSI does not add a shared deadline or quota. The callback host applies `EvolutionBudget.timeouts` to its bare phase callbacks. Stop-policy parameters join persisted strategy identity.
 
 ## Recover without replay
 
-Hosts provide `load_job`, `save_job`, `active_manifest` and `is_active`. An
-interrupted activation is reconciled against actual host identity. Interrupted
-proposing/verifying work remains interrupted; unknown requests are not replayed.
-Root allowances, recursion limits and absolute deadlines survive restart.
-A saved root allocation without its required recursion limit is rejected; changed
-limits cannot authorize a resumed job. Durable schema versions
-remain persistence protocols, independently of the single configuration grammar.
+Hosts provide `load_job`, `save_job`, `active_manifest` and `is_active`. Interrupted activation is reconciled against actual host identity. Interrupted proposing/verifying work remains interrupted; unknown requests are not replayed. Recovery accepts the current durable record schema and rejects changed job conditions.
 
-The [Run host](../run/README.md#explicit-text-evolution) owns activation and storage.
-[Lab RSI defaults](../lab/rsi/README.md) supply finite experiment settings.
-[Improvement](../improvement/README.md) searches one frozen job; RSI decides which
-verified version is used in subsequent generations. I experiments use bounded
-nested Improvement jobs, with child budgets rather than fresh root allowances.
+[Improvement](../improvement/README.md) searches one frozen job; RSI decides which verified version is used in later generations. I experiments create fresh fixed-I studies. Leaf phases retain independent invocation times.
 
 ## Verify offline
 
 ```bash
-.venv/bin/python -m unittest tests.rsi.test_callbacks tests.rsi.test_recovery_budget tests.workflows.test_evolution tests.workflows.test_developer_extensions
+.venv/bin/python -m unittest tests.rsi.test_callbacks tests.rsi.test_recovery tests.workflows.test_evolution tests.workflows.test_developer_extensions
 ```
 
 Fake Providers verify execution binding, cancellation, continuation and recovery.

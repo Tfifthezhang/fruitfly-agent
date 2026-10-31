@@ -12,7 +12,7 @@ class WorkflowPanelTests(unittest.IsolatedAsyncioTestCase):
             ["Task", "Input files", "Start improvement", "Results and history"])
         self.assertEqual(view.request.strategy_id, "simple")
         self.assertFalse(view.request.retain_experience)
-        self.assertEqual(view.request.component_ids, ("base_prompt",))
+        self.assertEqual(view.request.component_ids, ())  # Host discovers legal material/backend targets.
         client.workflow_preview.assert_not_called()
 
     async def test_cancelled_material_input_keeps_previous_selection(self):

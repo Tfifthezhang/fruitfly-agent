@@ -1,75 +1,50 @@
-# Evidence and Receipts
+# Navigate Execution Evidence
 
 [Up: Improvement](../README.md)
 
-[__init__.py](__init__.py) builds detached editor workspaces containing original
-task inputs, execution trajectories and deliverables, candidate changes and
-attributed experience. Evidence paths are read-only; only registered candidate
-paths are writable. Read/write events retain content identities. `MemoryArtifacts`
-is an embedding/test capability; Run supplies durable byte storage.
+Existing Agent and execution hosts retain raw records. This module organizes
+those records without another recorder or model request. Editors and evaluators
+share the same granted evidence service.
 
-Hosted execution resources include `execution-facts.json` and optional
-`process-assessments.json`. They use ordinary read-only evidence paths and content
-identities. Facts retain source references; the editor can inspect the original
-trajectory through the same workspace. No auxiliary extraction or summary stage
-is required. See [execution facts](../execution/README.md#record-execution-facts).
+| Layer | Content |
+|---|---|
+| Overview | Task, output excerpt/reference, deliverables, termination and usage |
+| Event directory | Source spans, event kinds, timestamps and reported durations/status |
+| Originals | Complete messages, commands, outputs, files and execution facts |
 
-[receipts.py](../../../improvement/evidence/receipts.py) defines `TaskReference`, `TaskRunEvidence` and
-`EvidenceArtifact` for optional official executors. Runtime, conditions,
-environment, task material and invocation counts must match the authorized trial.
-Official reward fields remain private in behavior-based editing. Custom executors
-can consume these public values without defining the runtime workflow.
+`organize_evidence` derives immutable `evidence/overview.json` and
+`evidence/events.json` resources after collection. They are rebuildable views;
+originals remain authoritative. Incomplete or unindexed sources are explicit.
+A successful tool status does not establish success of every command it contains.
 
-[reporting.py](../../../improvement/evidence/reporting.py) reads historical reports and validates their journal
-and task-snapshot references. Missing scores and usage stay unknown. Historical
-report readers do not restore the removed search engines or grant adoption.
+| Operation | Behavior |
+|---|---|
+| `catalog` | Page granted paths or filter/sort an event directory |
+| `search` | Literal search over one or more granted sources, with continuation |
+| `read` | Original text pages or supported images |
 
-A tool workspace is a capability boundary, not an OS sandbox for trusted Python
-extensions. Inline evidence and drafts are bounded; large originals stay referenced and text is paginated instead of
-silently truncated. Offline checks: `tests.lab.test_improvement_pipeline`,
-`tests.lab.test_search_reporting`, `tests.workflows.test_improvement_pipeline`.
+Results carry original identities and character intervals. A text citation ID
+identifies the actual returned source span, not the whole file. Catalog entries
+are navigation, not proof that their source contents were read. Empty matches,
+unsupported binary data and collection failures remain distinct. Page sizes bound
+individual responses, not cumulative reading. Private verification inputs remain
+outside development grants.
 
-[Shared workspace transport](../workspaces.py) supplies a shared bounded workspace-model transport. Editing and
-read-only inspection provide their own policy and tools. Unknown external model
-usage remains separate from conservative quota charges in reports.
+| File | Responsibility |
+|---|---|
+| `indexing.py` | Deterministic overview and event extraction |
+| `catalog.py`, `query.py` | Paged navigation and literal retrieval |
+| `resources.py`, `access.py` | Immutable access and supply receipts |
+| `tools.py`, `session.py` | Agent-facing access and role invocation composition |
+| `__init__.py`, `task_sets.py` | Detached single-task and task-set workspaces |
 
-`task_sets.py` projects authorized development entries and joint evaluation rows;
-selection/confirmation content is rejected. `resources.py` supplies read-only
-artifact references so original logs need not all be copied into the editable
-workspace. Existing text pagination and image handling still apply. This is not
-an extraction or summarization stage. Candidate write permissions are unchanged.
+The public `EvidenceReader` contract is in
+[Improvement contracts](../../../improvement/contracts/evidence.py). Retrieval can
+be replaced through `reader_factory(workspace, page_characters=...)` on
+`AgentEditor` or `ModelEvaluator`, without changing evaluator policy. The reader
+must preserve grant checks, exact source spans and supply receipts. The bundled
+reader loads source files in host memory; a disk index is not implemented. The bundled implementation uses
+no vector database, generated summary or extra retrieval Agent.
 
-## Inspect what the editor received
-
-The selected I feedback component owns `evidence.projection` and default
-`evidence.page_characters`. `projections.py` registers pure text views; the bundled
-`granted-full` view returns exact pages from already granted originals. It cannot
-add private files or change immutable execution facts. Custom embedding sessions
-may inject an `EvidenceProjectionRegistry`; the standard config accepts the
-bundled registry's IDs.
-
-Each successful read journals `editor-evidence-page` with the original artifact
-hash and path. Text receipts include offset/limit, returned interval, total source
-characters, truncation, projection implementation and returned page hash. Image
-and unavailable binary reads retain their status and size. Full originals remain
-in the ordinary artifact store. `context/edit-grants.json` gives the editor the
-same owner-normalized field permissions enforced during candidate validation.
-
-## Distinguish access from citation
-
-`access.py` tracks unaccessed grants, available bytes, supplied pages and access
-failures. Listing paths is not evidence supply. The editor may cite an execution
-only after its metadata or a page from its granted execution resources has been
-returned successfully. Empty search results and reads of candidate-written files
-do not authorize a citation. Missing references and unavailable binary renderers
-leave explicit failure receipts. Format repair preserves only already supplied
-citation eligibility; access recovery retains the original evidence grants.
-These checks establish provenance, not semantic understanding or task quality.
-
-`query.py` implements literal search with at most 500 query characters, 50 matches
-and 12000 excerpt characters. The kernel owns neither retrieval nor this policy.
-Optional lifecycle contributions appear under `context/extensions/`; reading a
-research summary does not satisfy the original execution-evidence requirement.
-
-Offline regression: `tests.lab.test_improvement_mechanisms` rejects a candidate that
-writes changes after repeatedly failing to read its cited execution resource.
+Offline checks: `tests.lab.test_evidence_index`, `tests.lab.test_search_reporting`,
+`tests.lab.test_improvement_configuration`.

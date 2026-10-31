@@ -4,7 +4,6 @@ import inspect
 from dataclasses import asdict
 from ..contracts.assessment import AssessmentUnavailable
 from ..contracts.failures import Failure, IntegrityError, StageFailure
-from .budget import AllocationExhausted
 
 
 async def run_stage(services, stage, operation, *, validator=None, bounded=True):
@@ -28,11 +27,12 @@ async def run_stage(services, stage, operation, *, validator=None, bounded=True)
         services.check()
         return value
     try:
-        value = await services.operation(invoke()) if bounded else await invoke()
-    except (asyncio.CancelledError, AllocationExhausted, AssessmentUnavailable, IntegrityError):
+        value = await services.operation(invoke(), stage=stage) if bounded else await invoke()
+    except (asyncio.CancelledError, AssessmentUnavailable, IntegrityError):
         raise
     except Exception as exc:
-        services.budget.check_root()
+        if services.signal.is_set():
+            raise asyncio.CancelledError
         failure = exc.failure if isinstance(exc, StageFailure) else Failure(
             stage, 'timeout' if isinstance(exc, TimeoutError) else 'unavailable', type(exc).__name__)
         services.record('stage-failed', **asdict(failure))

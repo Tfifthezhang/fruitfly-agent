@@ -25,11 +25,11 @@ class SelfRule:
     async def propose(self, request, services):
         document = request.baseline.component('improvement-editor')
         value = json.loads(document.files[0].text)
-        value['invariant'] += ' STEP'
+        value['instructions']['invariant'] += ' STEP'
         updated = replace(document, files=(ComponentFile('instructions.txt', json.dumps(value)),))
         harness = HarnessSnapshot(tuple(updated if c.component_id == updated.component_id else c for c in request.baseline.components))
         return ProposalResult((CandidateBundle(request.plan.parent, request.baseline, harness, self.generator_id,
-            (EditReason(updated.component_id, 'Synthetic supported editor edit', (request.records[0].run_id,)),)),))
+            (EditReason(updated.component_id, 'Synthetic supported editor edit', (request.records[0].run_id,), expected_effect='The proposed behavior appears in the subsequent execution.'),)),))
 
 
 class LastComposition:
@@ -53,21 +53,30 @@ class ProceduralProvider(FauxProvider):
         def tool(name, args):
             return AssistantMessage(content=[ToolCallBlock(id='call-' + str(len(self.calls)), name=name, input=args)], stop_reason='toolUse')
         names = {t.name for t in ctx.tools}
-        if 'list_files' in names:
+        if 'Evaluate granted evidence' in ctx.system_prompt:
+            from tests.support.model_evaluation import judgment, payload
+            result = judgment(ctx, choice=1 if len(payload(ctx)["executions"]) > 1 else 0)
+        elif 'catalog' in names:
             if 'write_file' not in names:
-                result = text('{"choice":"2","reason":"Synthetic procedure comparison"}'
-                    if 'Choose one existing' in ctx.system_prompt else 'NO_ENTRY')
+                from tests.support.model_evaluation import judgment
+                result = judgment(ctx) if 'Evaluate granted evidence' in ctx.system_prompt else text('NO_ENTRY')
             else:
                 contents = [b.text for m in ctx.messages if isinstance(m, ToolResultMessage) for b in m.content if isinstance(b, TextBlock)]
+                def unwrap(text):
+                    try:
+                        value=json.loads(text)
+                        return value.get('text',text) if isinstance(value,dict) else text
+                    except ValueError:return text
+                contents=[unwrap(text) for text in contents]
                 records = next((json.loads(v) for v in contents if v.startswith('[{') and 'run_id' in v), None)
                 level = ctx.system_prompt.count('STEP')
                 if records is None:
-                    result = tool('read_file', {'path': 'context/executions.json'})
+                    result = tool('read', {'path': 'context/executions.json'})
                 elif level and 'Candidate file saved' not in contents:
                     result = tool('write_file', {'path': 'harness/base_prompt/instructions.txt', 'content': f'PROCEDURE_LEVEL={level}'})
                 else:
                     reasons = ([{'component_id': 'base_prompt', 'explanation': 'Synthetic observed contrast',
-                                 'evidence_ids': [records[0]['run_id']]}] if level else [])
+                                 'evidence_ids': [records[0]['run_id']], 'expected_effect':'The proposed behavior appears in the subsequent execution.'}] if level else [])
                     result = text(json.dumps({'reasons': reasons}))
         else:
             level = re.search(r'PROCEDURE_LEVEL=(\d+)', ctx.system_prompt)
@@ -98,6 +107,5 @@ def experiment_factory(root, *, uses=2):
     factory.configuration.save()
     factory.reload_configuration()
     request = WorkflowRequest(component_ids=('improvement-editor',), generator_id=SelfRule.generator_id,
-        execution_id='improver-comparison', task_pack_id='editor', verification='scored', scope='persistent',
-        max_model_calls=512, max_executions=256)
+        execution_id='improver-comparison', task_pack_id='editor', verification='scored', scope='persistent')
     return factory, provider, request

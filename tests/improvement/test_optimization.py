@@ -4,7 +4,6 @@ from dataclasses import replace
 import unittest
 
 from fruitfly_agent.improvement.contracts.optimization import OptimizationSpec
-from fruitfly_agent.improvement.workflow.budget import BudgetScope, AllocationExhausted
 from fruitfly_agent.lab.improvement.components.files import FileComponentAdapter
 from fruitfly_agent.lab.improvement.components.text import TextComponentAdapter
 from fruitfly_agent.improvement.components.registry import ComponentRegistry
@@ -66,18 +65,16 @@ class OptimizationProtocolTests(unittest.IsolatedAsyncioTestCase):
                 await flow.run(plan, TaskMaterial('task', 'Do the task'), baseline, services)
         self.assertEqual(runner.calls, [])
 
-    def test_nested_zero_work_cannot_allocate_unbounded_depth_or_change_root_limits(self):
-        root = BudgetScope({'model': 2, 'execution': 2}, max_depth=2)
-        child = root.child({'model': 1, 'execution': 1})
-        grandchild = child.child({'model': 0, 'execution': 0})
-        with self.assertRaisesRegex(AllocationExhausted, 'depth'):
-            grandchild.child({'model': 0, 'execution': 0})
-        root.close()
-        self.assertEqual(root.held, {'model': 0, 'execution': 0})
+    def test_plan_rejects_retired_allowances(self):
+        _, plan, _, _ = build_pipeline()
+        with self.assertRaises(TypeError):
+            replace(plan, max_model_calls=2)
 
-    def test_restart_cannot_raise_the_recorded_recursion_allowance(self):
-        root = BudgetScope({'model': 2, 'execution': 2}, max_depth=2)
-        saved = root.snapshot()
-        changed = BudgetScope({'model': 2, 'execution': 2}, max_depth=3)
-        with self.assertRaisesRegex(ValueError, 'persisted root allocation'):
-            changed.restore(saved)
+    def test_field_categories_are_explicit_and_not_inferred_from_role(self):
+        from fruitfly_agent.improvement.contracts.optimization import OptimizationField
+        for path in ('parameters.text','parameters.update_instructions','parameters.documents'):
+            with self.subTest(path=path), self.assertRaises(ValueError):
+                OptimizationField(path,'string','Meaning','current','default')
+        for group in ('instructions','settings','content'):
+            field=OptimizationField('parameters.'+group+'.value','string','Meaning','current','default')
+            self.assertTrue(field.path.startswith('parameters.'))

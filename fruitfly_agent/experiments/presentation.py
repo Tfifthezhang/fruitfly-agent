@@ -11,7 +11,7 @@ def show_summary(summary):
     print('Operation: ' + summary['operation'])
     print('Agent configuration: ' + summary['runtime_source'])
     if 'execution' in summary:
-        print('Tools per turn: ' + str(summary['execution']['max_tool_calls_per_turn']))
+        print('Baseline tool limit per turn: ' + str(summary['execution']['max_tool_calls_per_turn']))
     for role, model in summary['model_roles'].items():
         print(f'{role.capitalize()} model: {model}')
     if summary.get('harness'):
@@ -36,11 +36,10 @@ def show_summary(summary):
         print('Joint aggregation: ' + summary['multi_task']['evaluation']['aggregation'])
     if summary['operation'] != 'eval':
         print(f"Search: {request['strategy_id']}; rounds={request['depth']}")
-        process = summary.get('process_assessment', {})
-        print('Completed process assessment: ' + (', '.join(process.get('assessors', ())) or 'disabled'))
+        print('Evaluation: shared model evaluator; process dimensions are defined by instructions')
         print('Exploration: ' + summary.get('exploration', {}).get('policy', 'incumbent'))
-        limits = summary['rsi'] if summary['operation'] == 'rsi' else summary['improvement']
-        print(f"Total allowance: {limits['max_model_calls']} model calls; {limits['max_executions']} executions; {limits['timeout_seconds']} seconds")
+        print('Independent stage times: ' + json.dumps(summary['improvement']['timeouts']))
+        print('Improvement request, tool and token usage is observed without count quotas')
     print('Model connectivity: not checked')
 
 

@@ -1,4 +1,3 @@
-# Requires installed editor-study material with private comparison episodes.
 baseline:
   config: default-config.yaml
   profile: baseline
@@ -13,9 +12,8 @@ edit:
     - parameters.instructions.invariant
     - parameters.instructions.domain
     - parameters.instructions.compose
-budget:
-  max_model_calls: 512
-  max_executions: 256
-  timeout_seconds: 10800
-trial:
-  operation_timeout_seconds: 1200
+trial: {}
+timeouts:
+  editor_seconds: 1200
+  execution_seconds: 3600
+  evaluator_seconds: 1200

@@ -13,18 +13,22 @@ def guidance_key(name):
 def configuration_surface(name, *, tool_factory=None):
     from fruitfly_agent.lab.catalog.configuration import ConfigurationSurface, text_edit_options
     def normalize(parameters):
-        if set(parameters) != {'text'}:
-            raise ValueError('tool guidance parameters require text')
-        validate_text(parameters['text'])
-        if len(parameters['text']) > 6000:
-            raise ValueError('tool guidance exceeds 6000 characters')
+        if not isinstance(parameters,dict) or set(parameters)!={'instructions'} or not isinstance(parameters['instructions'],dict) or set(parameters['instructions'])!={'usage'}:
+            raise ValueError('tool guidance requires instructions.usage')
+        text=parameters['instructions']['usage']
+        validate_text(text)
+        if len(text)>6000:raise ValueError('tool guidance exceeds 6000 characters')
         return parameters
-    return ConfigurationSurface(guidance_key(name), 'H', 'artifact', guidance_key(name), normalize,
-        edit_options=text_edit_options,
-        default=(lambda: {'text': tool_factory().description}) if tool_factory is not None else None)
+    def options(fields,bounds):
+        if fields!=['parameters.instructions.usage'] or bounds:raise ValueError('tool guidance grants require instructions.usage')
+        return {}
+    return ConfigurationSurface(guidance_key(name),'H','artifact',guidance_key(name),normalize,
+        encode=lambda p:p['instructions']['usage'],decode=lambda text:{'instructions':{'usage':text}},edit_options=options,
+        default=(lambda:{'instructions':{'usage':tool_factory().description}}) if tool_factory is not None else None)
 
 
 class ToolGuidanceTarget:
+    description = 'Model-visible guidance for when and how to use this enabled tool. Implementation, argument schema, permissions, and termination rules remain fixed.'
     requires_runtime_trials = True
     component_kind = 'tool-guidance'
 

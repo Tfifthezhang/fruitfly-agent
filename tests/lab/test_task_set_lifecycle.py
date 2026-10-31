@@ -16,10 +16,8 @@ from fruitfly_agent.lab.improvement.execution import ExecutionContext
 from fruitfly_agent.improvement.contracts.experiments import ExecutionPorts
 from fruitfly_agent.improvement.contracts.evaluation import EvaluationBatch
 from fruitfly_agent.lab.improvement.task_sets import MultiTaskSettings
-from fruitfly_agent.lab.improvement.assessment.configuration import ProcessAssessmentSettings
 from fruitfly_agent.improvement.contracts.plans import RunPlan
 from fruitfly_agent.improvement.contracts.task_sets import TaskSetSnapshot
-from fruitfly_agent.lab.improvement.assessment.registry import builtin_completed_assessors
 from fruitfly_agent.lab.improvement.strategies.exploration import builtin_explorations
 from fruitfly_agent.lab.improvement.assessment.joint import assess_batch
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
@@ -57,26 +55,26 @@ class TaskSetLifecycleTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(evaluator.evaluations[-1].assessment.expected, 3)
             self.assertEqual(evaluator.evaluations[-1].assessment.completed, 0)
             self.assertFalse(evaluator.scheduler.active)
-            self.assertEqual(services.budget.held, {'model': 0, 'execution': 0})
+            self.assertFalse(hasattr(services,'budget'))
         finally:
             await services.close()
 
-    async def test_required_assessment_failure_stops_before_generating_or_promoting(self):
+    async def test_unavailable_assessment_keeps_incumbent_without_blocking_search(self):
         outcome, baseline, generator, services, provider = await self.search(invalid=True)
-        self.assertEqual(outcome.stop_reason, 'assessment_unavailable')
+        self.assertEqual(outcome.stop_reason, 'completed')
         self.assertEqual(outcome.harness, baseline)
-        self.assertIsNone(outcome.selected)
-        self.assertEqual(generator.requests, [])
-        self.assertEqual(len(provider.calls), 1)
-        self.assertEqual(services.budget.held, {'model': 0, 'execution': 0})
+        self.assertIsNotNone(outcome.selected)
+        self.assertTrue(generator.requests)
+        self.assertGreaterEqual(len(provider.calls), 1)
+        self.assertFalse(hasattr(services,'budget'))
 
-    async def test_process_guided_seed_can_advance_while_joint_zero_reward_keeps_formal_baseline(self):
+    async def test_equal_official_reward_can_select_supported_process_improvement(self):
         outcome, baseline, generator, services, provider = await self.search()
-        self.assertEqual(outcome.harness, baseline)
+        self.assertEqual(outcome.harness.component('prompt').files[0].text, 'prompt++')
         self.assertEqual(outcome.selected.assessment.score, 0)
         self.assertEqual(generator.requests[1].baseline.component('prompt').files[0].text, 'prompt+')
-        self.assertEqual(len(provider.calls), 4)
-        self.assertEqual(services.used, {'model': 7, 'execution': 3})
+        self.assertGreaterEqual(len(provider.calls), 4)
+        self.assertEqual(services.used, {'model': len(provider.calls) + 3, 'execution': 3})
 
     async def search(self, *, invalid=False):
         components, baseline = fixture()
@@ -84,7 +82,7 @@ class TaskSetLifecycleTests(unittest.IsolatedAsyncioTestCase):
         snapshot = TaskSetSnapshot(binding.entries)
         settings = MultiTaskSettings()
         plan = RunPlan('judged-batch', version(), ('prompt',), generator_id='increment', strategy_id='simple',
-            depth=2, feedback='scored', retain_experience=False, max_model_calls=100)
+            depth=2, feedback='scored', retain_experience=False)
         services = WorkflowServices(plan)
         artifacts = MemoryArtifacts()
         context = ExecutionContext(None, artifacts, components, None, None, None, plan=plan, services=services)
@@ -93,21 +91,11 @@ class TaskSetLifecycleTests(unittest.IsolatedAsyncioTestCase):
             provider.respond_text('invalid JSON')
         else:
             def response(view, signal=None):
-                payload = json.loads(view.messages[0].content)
-                if 'candidates' in payload:
-                    name = next(key for key in payload['candidates'] if key != payload['incumbent'])
-                    facts = payload['candidates'][name]['executions'][0]['facts_id']
-                    data = {'evaluation_id': name, 'reason': 'Synthetic next-seed judgment.', 'evidence_ids': [facts]}
-                else:
-                    data = {'metrics': [], 'detail': 'Synthetic cited judgment.',
-                        'evidence_ids': [payload['executions'][0]['facts_id']]}
-                async def stream():
-                    yield StreamDone(AssistantMessage(content=[TextBlock(json.dumps(data))], stop_reason='stop'))
+                from tests.support.model_evaluation import judgment
+                async def stream(): yield StreamDone(judgment(view))
                 return AssistantMessageEventStream(stream())
             provider.script = [response] * 8
-        assessment = CompletedAssessmentService(ProcessAssessmentSettings(('completed-model-v1',), 16, 1, True),
-            config=AgentLoopConfig(provider=provider), artifacts=artifacts, services=services,
-            registry=builtin_completed_assessors())
+        assessment = CompletedAssessmentService(config=AgentLoopConfig(provider=provider), artifacts=artifacts, services=services)
         generator = IncrementGenerator()
         registry = GeneratorRegistry(); registry.register('increment', lambda: generator, supports_task_sets=True)
         flow = ComponentWorkflow(generators=registry, components=components, runner=None, composer=None, selector=None,

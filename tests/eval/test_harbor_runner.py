@@ -4,7 +4,7 @@ import sys
 import unittest
 from pathlib import Path
 import tempfile
-from eval.runner import (
+from fruitfly_eval.runner import (
     _forward_agent_events, _forward_logs, _forward_trial_results, run_harbor_job,
 )
 from tests.support.harbor import load_harbor_agent

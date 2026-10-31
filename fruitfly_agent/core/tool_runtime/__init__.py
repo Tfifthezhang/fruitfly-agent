@@ -41,6 +41,8 @@ class AgentTool:
     describe_call: Callable[[dict[str, Any]], str] | None = None
     validate_arguments: Callable[[dict[str, Any]], Result[dict[str, Any]]] | None = None
 
+    requires_exclusive_batch: bool = False
+
     def to_schema(self) -> dict[str, Any]:
         return {
             "name": self.name,

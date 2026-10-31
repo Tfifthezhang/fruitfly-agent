@@ -213,8 +213,8 @@ class StartupVersionsTests(unittest.IsolatedAsyncioTestCase):
                     baseline_validation_score=1., candidate_validation_score=1.,
                     baseline_train_completed=8, candidate_train_completed=8,
                     baseline_validation_completed=4, candidate_validation_completed=4,
-                    conclusion='tied', stop_reason='budget_exhausted', exhausted_kind='trial',
-                    trial_calls=32, trial_limit=32, model_calls=33, model_limit=64,
+                    conclusion='tied', stop_reason='completed',
+                    trial_calls=32, model_calls=33,
                     tokens=TokenUsage(input_tokens=100, output_tokens=20, reported_calls=32, missing_calls=1))))
                 (factory.candidate_store.root / f'{record.candidate_id}.json').write_text(json.dumps(asdict(record)))
                 reviewed, _ = app.candidate_detail(record.candidate_id)
@@ -222,8 +222,8 @@ class StartupVersionsTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIn('Tied; no measured improvement', summaries)
                 self.assertIn('0.875 (8/8)', summaries)
                 self.assertIn('1.0 (4/4)', summaries)
-                self.assertIn('32/32', summaries)
-                self.assertIn('Chat and manual testing remain available', summaries)
+                self.assertIn('32', summaries)
+                self.assertIn('Stop: completed', summaries)
                 self.assertIn('Reported tokens: 120', summaries)
                 self.assertIn('actual total unknown', summaries)
 

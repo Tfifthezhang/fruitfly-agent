@@ -14,12 +14,11 @@ from fruitfly_agent.lab.improvement.assessment.selection import AgentSelector
 from fruitfly_agent.lab.improvement.experience.reflection import AgentReflector
 from .assessment.inspection import ReadOnlyInspector
 from fruitfly_agent.lab.improvement.termination.composition import policy_spec
-from .assessment.registry import CompletedAssessorRegistry, builtin_completed_assessors
-from .assessment.configuration import ProcessAssessmentSettings
 from .assessment.completed import CompletedAssessmentService
-from .strategies.exploration import ExplorationSettings, ExplorationRegistry, builtin_explorations, validate_process_configuration
+from .evidence.indexing import organize_evidence
+from .strategies.exploration import ExplorationSettings, ExplorationRegistry, builtin_explorations, validate_exploration
 from .registration import SETTINGS, EDITOR_CONFIG, ASSESSOR_CONFIG, EDITOR_INSTRUCTIONS, SYSTEM_SETTINGS
-from .system_configuration import process_settings_values
+from .system_configuration import exploration_settings
 from .experience import entry_to_dict, entry_from_dict, experience_id
 from .execution import ExecutionContext, ExecutionRegistry, builtin_executions
 from .strategies import StrategyRegistry, builtin_strategies
@@ -44,13 +43,13 @@ class WorkflowBindings:
     executions: ExecutionRegistry | None = None
     stop_policy: StopPolicy | None = None
     strategies: StrategyRegistry | None = None
-    process_assessment: ProcessAssessmentSettings | None = None
     exploration: ExplorationSettings | None = None
-    completed_assessors: CompletedAssessorRegistry | None = None
     explorations: ExplorationRegistry | None = None
     component_options: dict | None = None
     hooks: Callable[[ExecutionContext], None] | None = None
     delivery_backend: Any = None
+    workflow_settings: dict | None = None
+    evidence_settings: dict | None = None
 
 @dataclass(frozen=True)
 class SearchActivity:
@@ -59,9 +58,7 @@ class SearchActivity:
     completed: int = 0
     total: int = 0
     model_calls: int = 0
-    model_limit: int = 0
     trial_calls: int = 0
-    trial_limit: int = 0
     failed_trials: int = 0
     tokens: TokenUsage = TokenUsage()
 
@@ -89,14 +86,13 @@ __all__ = [
     'AgentGenerator',
     'AgentReflector',
     'AgentSelector',
-    'CompletedAssessmentService',
+    'CompletedAssessmentService', 'organize_evidence',
     'ComponentWorkflow',
     'EDITOR_CONFIG',
     'EDITOR_INSTRUCTIONS',
     'ExecutionContext',
     'ExplorationSettings',
     'GeneratorRegistry',
-    'ProcessAssessmentSettings',
     'ReadOnlyInspector',
     'SETTINGS',
     'SYSTEM_SETTINGS',
@@ -105,7 +101,6 @@ __all__ = [
     'SearchCompletion',
     'SearchCompletionSource',
     'WorkflowBindings',
-    'builtin_completed_assessors',
     'builtin_executions',
     'builtin_explorations',
     'builtin_strategies',
@@ -119,6 +114,10 @@ __all__ = [
     'install_workflow_mechanisms',
     'model_completion',
     'policy_spec',
-    'process_settings_values',
-    'validate_process_configuration',
+    'validate_exploration', 'evaluator_instructions', 'exploration_settings',
 ]
+
+
+def evaluator_instructions(settings):
+    from .assessment.instructions import EvaluatorInstructions
+    return EvaluatorInstructions(**settings.get('evaluator', {}).get('instructions', {}))

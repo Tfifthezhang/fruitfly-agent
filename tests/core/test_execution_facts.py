@@ -43,12 +43,12 @@ class LoopFactTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.diagnostics.tool_errors, 1)
         self.assertEqual(result.diagnostics.tool_started, 0)
 
-    async def test_model_allowance_exhaustion_retains_its_distinct_cause(self):
+    async def test_provider_failure_retains_diagnostics_without_runtime_budget_control(self):
         provider = FauxProvider()
-        provider.respond_fatal('request allowance exhausted', kind='model_budget_exhausted', limit=1)
+        provider.respond_fatal('provider failed',diagnostics={'stage':'connect'})
         result = await run_loop(make_config(provider), 'work')
         self.assertTrue(result.is_error)
-        self.assertEqual(result.diagnostics.termination_reason, 'model_budget_exhausted')
+        self.assertEqual(result.diagnostics.termination_reason, 'provider_error')
         self.assertEqual(result.diagnostics.provider_failures, 1)
 
     async def test_tool_reported_errors_remain_errors_without_parsing_the_output(self):

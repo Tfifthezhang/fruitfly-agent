@@ -19,12 +19,12 @@ bounded changes. See the [configuration navigation tree](../CONFIGURATION.md#nav
 | [Core](core/README.md) | Messages, loop, tools, context contracts, and Session persistence | Core only |
 | [Providers](providers/README.md) | Model API requests, streaming, and error mapping | Core and Providers |
 | [Interactive](interactive/README.md) | Application lifecycle, multi-turn state, events, and terminal | Core and Interactive |
-| [Improvement](improvement/README.md) | Reliable stage execution, budgets, receipts and stopping through injected ports | Core and Improvement |
+| [Improvement](improvement/README.md) | Reliable stage execution, independent stage times, receipts and stopping through injected ports | Core and Improvement |
 | [RSI runtime](rsi/README.md) | Reliable generation transitions and activation reconciliation through injected hosts | Core, Improvement and RSI |
 | [Developer Extensions](extensions/README.md) | Developer registration over public owning contracts | Core, Improvement, Lab and Interactive |
 | [Lab](lab/README.md) | Tools, environments, context strategies, improvement implementations, and RSI experiment defaults | Core, Runtime specification, Improvement and Lab |
 | [Run](run/README.md) | Configuration, Provider construction, assembly, and CLI | All runtime layers |
-| [Eval](../eval/README.md) | Optional single-configuration benchmark execution and reports | Core, Runtime specification, Improvement, Providers, Lab, and Eval |
+| [Eval](../fruitfly_eval/README.md) | Optional single-configuration benchmark execution and reports | Core, Runtime specification, Improvement, Providers, Lab, and Eval |
 | [Experiments](experiments/README.md) | Independent CLI, file defaults and public service composition | Run, Lab, Providers, Interactive and optional Eval; no reverse imports |
 
 Eval prepares and mounts a Linux Agent runtime, launches the native CLI inside
@@ -38,7 +38,7 @@ The [Improvement runtime](improvement/README.md), with [Lab implementations](lab
 
 [Instruction components](lab/improvement/targets/README.md#improve-multiple-instruction-components) retain separate H/S/I ownership. A candidate can modify multiple executable components; unregistered bindings and missing runner capabilities fail explicitly.
 
-Lab registrations own mechanism metadata. Improvement menus use generator, component, source and allocation contracts. Adding a generator does not add algorithm-specific branches to Run or the terminal.
+Lab registrations own mechanism metadata. Improvement menus use generator, component, source and timing contracts. Adding a generator does not add algorithm-specific branches to Run or the terminal.
 
 New selectable algorithms must be designed for Improvement from the start, with
 meaningful editable content and evidence that candidates affect actual execution.
@@ -46,18 +46,15 @@ Major feature modules own their Improvement registration entry. Concrete methods
 belong in the owning module's `methods/`; shared contracts and services remain
 outside. See [Lab design rules](lab/README.md#design-for-improvement).
 
-[Execution workflows](lab/workflow/README.md) own bounded H execution. Retained Skill and memory documents belong to S. I editor instructions use a registered [fixed-depth comparison](lab/improvement/improver/README.md)
+Retained Skill documents belong to S. I editor instructions use a registered [fixed-depth comparison](lab/improvement/improver/README.md)
 that measures the downstream H/S changes produced by each editor.
 
 Task materials and executions need no score. Persistent publication requires an injected verification policy; current-task selection retains its weaker assurance. The experience library is a separate attributed S update after explicit pending-lesson review.
-Search preserves reference results, separates stopping from assurance, and charges nested
-work to one root budget. No component changes during a task execution.
+Search preserves reference results and separates stopping from assurance. Editing, execution and evaluation each receive an independent invocation time. Usage is recorded without quotas. No component changes during a task execution.
 
 Hosted executions expose immutable terminal facts through the common
 [execution contract](lab/improvement/execution/README.md#record-execution-facts).
-Optional completed-process assessment supplies feedback and can guide a separate
-next editing seed. Official selection and independent adoption retain their own
-rules; generic files and container benchmarks use the same contracts.
+A prompt-driven model evaluator supplies dimension judgments, process signals and candidate-hypothesis checks. It can guide the next editing seed or compare processes when official scores tie. Official scores remain unchanged; independent adoption retains its own rules.
 
 Run separates [configuration](run/configuration/README.md), [runtime preparation](run/runtime/README.md), [storage](run/storage/README.md), [improvement hosting](run/improvement/README.md), and [adapters](run/adapters/README.md). Its Factory composes these services; leaf services receive explicit capabilities and own their local state.
 
@@ -164,7 +161,7 @@ handles support scoped stop; live code/state replacement is not implied.
 
 The Improvement [extension contract](improvement/extensions/README.md) supplies
 immutable lifecycle snapshots and bounded proposal context. Research state,
-progress analysis, soft reserves and task-output validation remain
+progress analysis and task-output validation remain
 [replaceable Lab mechanisms](lab/improvement/research/README.md). They share
 ordinary and candidate configuration paths without adding a second Agent loop.
 

@@ -154,5 +154,5 @@ class DeliveryValidationRunner:
         facts = receipt_facts(record, self.artifacts, complete=True, diagnosable=True,
             termination_reason='delivery_' + result.status)
         if previous is not None:
-            facts = replace(facts, counters=previous.counters, budgets=previous.budgets, elapsed_seconds=previous.elapsed_seconds)
+            facts = replace(facts, counters=previous.counters, usage=previous.usage, elapsed_seconds=previous.elapsed_seconds)
         return attach_facts(record, facts, self.artifacts)

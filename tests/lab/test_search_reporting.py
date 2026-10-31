@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
-from fruitfly_agent.improvement.evidence.reporting import token_usage, build_report, restore_search_report
+from fruitfly_agent.improvement.evidence.reporting import token_usage, build_report
 from fruitfly_agent.improvement.contracts.versions import content_hash as content_id
 
 
@@ -31,42 +31,7 @@ class ReportingTests(unittest.TestCase):
                             validation_count=0, seed_score=1, candidate_score=1)
         self.assertEqual('tied', tied.conclusion)
 
-    def test_legacy_recovery_uses_frozen_cases_and_checks_hashes(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            identity = {'search_id': 'search', 'parent_manifest': 'parent', 'cases_digest': 'cases'}
-            rows = [{'kind': 'problem', 'baseline_hash': 'old', 'parameters':
-                     {'max_metric_calls': 4, 'max_model_calls': 8}},
-                    {'kind': 'evaluation', 'candidate_id': 'old', 'partition': 'validation',
-                     'score': 1., 'observation_ids': ['old-case']},
-                    {'kind': 'evaluation', 'candidate_id': 'new', 'partition': 'validation',
-                     'score': 1., 'observation_ids': ['new-case']},
-                    {'kind': 'search-result', 'status': 'budget_exhausted',
-                     'candidates': ['new'], 'usage': {'model': 3, 'trial': 4}}]
-            history = '.fruitfly/improvement/searches/search.jsonl'
-            snapshot = '.fruitfly/improvement/task-snapshots/task.json'
-            (root / history).parent.mkdir(parents=True)
-            (root / snapshot).parent.mkdir()
-            encoded = '\n'.join(json.dumps({**row, **identity}) for row in rows)
-            frozen = json.dumps({'target_hash': 'old', 'task': {'cases_digest': 'cases',
-                                                               'train': [{}], 'validation': [{}]}})
-            (root / history).write_text(encoded)
-            (root / snapshot).write_text(frozen)
-            args = dict(history=history, history_hash=content_id(encoded), snapshot=snapshot,
-                        snapshot_hash=content_id(frozen), candidate_id='new', baseline_id='old',
-                        parent_manifest='parent', cases_digest='cases')
-            report = restore_search_report(root, **args)
-            self.assertEqual(('tied', 'trial', 1, 3),
-                             (report.conclusion, report.exhausted_kind, report.validation_count,
-                              report.tokens.missing_calls))
-            self.assertIsNone(report.candidate_train_score)
-            with self.assertRaises(ValueError):
-                restore_search_report(root, **{**args, 'candidate_id': 'unrelated'})
-            (root / history).write_text(encoded + ' ')
-            with self.assertRaises(ValueError):
-                restore_search_report(root, **args)
-
-            malformed = json.dumps([1, 2])
-            (root / history).write_text(malformed)
-            with self.assertRaises(ValueError):
-                restore_search_report(root, **{**args, 'history_hash': content_id(malformed)})
+    def test_removed_report_allowances_are_rejected(self):
+        from fruitfly_agent.improvement.evidence.reporting import SearchReport
+        for name in ('model_limit','trial_limit','uncertain_model_allowance'):
+            with self.subTest(name=name),self.assertRaises(TypeError):SearchReport(**{name:1})

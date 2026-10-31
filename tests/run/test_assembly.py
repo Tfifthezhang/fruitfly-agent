@@ -32,7 +32,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
         catalog = builtin_catalog()
         store = DataArtifactStore(root / ".fruitfly" / "artifacts")
         ref = store.put_text("A distinct base prompt")
-        baseline = HarnessProfile("default", str(model_path), "offline", tuple(s for s in catalog.default_selections() if s.mechanism_id != "compaction"))
+        baseline = HarnessProfile("default", str(model_path), "offline", tuple(s for s in catalog.default_selections() if s.mechanism_id != "working-memory-reduction"))
         candidate = HarnessProfile("default", str(model_path), "offline", baseline.mechanisms, ref.artifact_id)
         with Session(root / ".fruitfly" / "sessions" / "first.jsonl") as session:
             original = self.workspace.assemble(baseline, session, catalog=catalog, artifact_store=store)
@@ -155,7 +155,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
         )
         self.assertEqual(
             runtime.mechanism_ids,
-            ("skill-catalog", "information-context", "compaction", "component-improvement"),
+            ("skill-catalog", "information-context", "working-memory-reduction", "component-improvement"),
         )
         self.assertEqual(runtime.manifest.schema_version, 7)
         self.assertEqual(runtime.manifest.data_artifacts, ())
@@ -202,7 +202,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
         self.assertEqual('environment', views['local-env'].category)
         self.assertEqual('tools', views['read-tool'].category)
         self.assertEqual(('read',), views['read-tool'].tool_names)
-        self.assertEqual('reduction', views['compaction'].display_section)
+        self.assertEqual('reduction', views['working-memory-reduction'].display_section)
         self.assertNotIn('information-context', views)
         self.assertNotIn('web-search-tool', views)
         self.assertEqual('tools', tool_categories['read'])

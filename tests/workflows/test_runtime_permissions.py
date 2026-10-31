@@ -23,7 +23,7 @@ class RuntimePermissionWorkflowTests(unittest.IsolatedAsyncioTestCase):
             registry.create.return_value = provider
             factory = RunApplicationFactory(cwd=workspace,
                 environment={'TEST_API_KEY': 'offline-placeholder'}, provider_registry=registry)
-            factory.configuration.set_mechanism('compaction', enabled=False)
+            factory.configuration.set_mechanism('working-memory-reduction', enabled=False)
             factory.configuration.save()
             factory.reload_configuration()
             app = AgentApplication(factory)

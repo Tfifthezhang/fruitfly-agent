@@ -19,7 +19,6 @@ from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
 from fruitfly_agent.improvement.execution.control import ControlDispatcher
 from fruitfly_agent.improvement.execution.events import EventJournal
 from fruitfly_agent.improvement.execution.handles import ManagedExecution
-from fruitfly_agent.improvement.workflow.budget import AllocationExhausted
 from fruitfly_agent.core.config import AgentLoopConfig
 from tests.support.faux_provider import FauxProvider
 from tests.support.pipeline import fixture, version
@@ -95,15 +94,15 @@ class LiveExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any(e == 'online-assessment' and f['status'] == 'failed' for e, f in services.events))
         await services.close()
 
-    async def test_online_judge_cannot_swallow_root_budget_exhaustion(self):
+    async def test_online_judge_cancellation_propagates(self):
         registry, baseline, artifacts, plan, task, services = self.setup_task()
         class Exhausted:
             assessor_id = 'exhausted'
-            async def assess(self, event): raise AllocationExhausted('model allocation exhausted')
+            async def assess(self, event): raise asyncio.CancelledError
         provider = FauxProvider(); provider.respond_text('answer')
         runner = AssessedRunner(FileTaskRunner(AgentLoopConfig(provider=provider), registry, artifacts, services),
             artifacts=artifacts, services=services, assessors=(Exhausted,))
-        with self.assertRaises(AllocationExhausted):
+        with self.assertRaises(asyncio.CancelledError):
             await runner.execute(plan, task, baseline)
         await services.close()
 
@@ -157,11 +156,10 @@ class LiveExecutionTests(unittest.IsolatedAsyncioTestCase):
         _, _, artifacts, plan, task, services = self.setup_task()
         provider = FauxProvider(); provider.respond_text('NO_CLEAR_CHOICE')
         inspector = ReadOnlyInspector(AgentLoopConfig(provider=provider), artifacts)
-        class Workspace:
-            def paths(self): return ()
-            def read(self, path): return b''
+        from fruitfly_agent.lab.improvement.evidence import EvidenceWorkspace
+        def Workspace():return EvidenceWorkspace(baseline=fixture()[1],files={},writable_ids=())
         await inspector.session('compare', Workspace(), services)
-        self.assertEqual(set(provider.calls[0]['tools']), {'list_files', 'read_file', 'search_file'})
+        self.assertEqual(set(provider.calls[0]['tools']), {'catalog', 'read', 'search'})
         with self.assertRaises(ValueError):
             await inspector.session('edit', Workspace(), services, writable=True)
         await services.close()

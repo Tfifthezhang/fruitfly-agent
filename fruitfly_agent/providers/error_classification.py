@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import json
 import re
+import socket
+import ssl
 from typing import Any
 
 from fruitfly_agent.core.errors import FatalError, OverflowError, RetryableError, TaggedError
@@ -92,7 +94,8 @@ def classify_provider_error(
     resolved_status = _status_code(exc, status_code)
     text = _classification_text(exc)
     non_overflow = any(pattern.search(text) for pattern in _NON_OVERFLOW_PATTERNS)
-    details: dict[str, Any] = {"status_code": resolved_status}
+    details: dict[str, Any] = {"status_code": resolved_status,
+                               "diagnostics": {"causes": _exception_causes(exc)}}
 
     if not non_overflow and any(pattern.search(text) for pattern in _OVERFLOW_PATTERNS):
         return OverflowError(str(exc), details=details)
@@ -109,6 +112,37 @@ def classify_provider_error(
         merged.update(details)
         return FatalError(str(exc), details=merged)
     return FatalError(str(exc), details=details)
+
+
+def _exception_causes(exc: BaseException) -> list[dict[str, Any]]:
+    """Retain structural causes, never exception bodies, request URLs or headers."""
+    result: list[dict[str, Any]] = []
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen and len(result) < 6:
+        seen.add(id(current))
+        category = 'unknown'
+        if isinstance(current, socket.gaierror):
+            category = 'dns'
+        elif isinstance(current, ssl.SSLCertVerificationError):
+            category = 'tls_certificate'
+        elif isinstance(current, ssl.SSLError):
+            category = 'tls'
+        elif isinstance(current, TimeoutError):
+            category = 'timeout'
+        elif isinstance(current, ConnectionRefusedError):
+            category = 'connection_refused'
+        elif isinstance(current, ConnectionResetError):
+            category = 'connection_reset'
+        elif isinstance(current, ConnectionError):
+            category = 'connection'
+        row: dict[str, Any] = {'type': type(current).__name__[:80], 'category': category}
+        number = getattr(current, 'errno', None)
+        if type(number) is int:
+            row['errno'] = number
+        result.append(row)
+        current = current.__cause__ or (None if current.__suppress_context__ else current.__context__)
+    return result
 
 
 def _status_code(exc: Exception, explicit: int | None) -> int | None:

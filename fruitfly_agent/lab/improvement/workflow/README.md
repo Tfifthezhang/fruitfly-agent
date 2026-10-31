@@ -1,116 +1,21 @@
-# Workflow and Execution
+# Assemble Improvement Workflows
 
 [Up: Improvement](../README.md)
 
-[__init__.py](__init__.py) exports the default `WorkflowController`,
-`GeneratorRegistry`, shared allocation and cancellation services. Generation,
-composition, execution, selection, optional verification and reflection use
-public ports. The [independent kernel](../../../improvement/workflow/README.md)
-owns transitions and accounting. `assembly.py` injects built-in Lab strategies.
-No stage activates a candidate.
+Lab supplies concrete strategies, selection, exploration, optional research and
+stop policies to the independent [workflow runtime](../../../improvement/workflow/README.md).
+It owns no second Agent loop.
 
-Parallel proposals share frozen references and prior history. Sequential rounds
-carry the declared exploration seed and accumulated execution evidence; the default
-seed is the official incumbent. Scope, ownership, evidence
-citations and task/state/condition receipts are checked before reuse. Generator
-factories create job-local state; discovery uses registration metadata only.
+| File | Responsibility |
+|---|---|
+| `assembly.py` | Inject concrete workflow policies |
+| `task_sets.py` | Shared-batch execution and complete-set comparison |
+| `mechanisms.py` | Optional research context and progress stopping |
+| `adaptive.py` | Translate explicitly injected online control requests |
 
-[execution.py](../execution/file_runner.py) exports the execution module's `FileTaskRunner`: fresh in-memory files,
-read/write/edit tools, exact owner projections, root-budgeted model calls and
-immutable output/trajectory resources. It uses final-stage answers. Bash, live
-network tools and ambient Session/filesystem access are absent. Other runners
-must declare capabilities and return attributable receipts.
+Task, task-set and fixed-I execution consume the same independent stage times.
+Final selection has no protected call allowance. Completed incumbent evidence is
+retained when a later stage fails. Selection does not grant independent adoption.
 
-Services reserve calls before work and cancel outstanding tasks on timeout or
-cancellation. Exhaustion never invents a complete or verified result. No in-flight
-work is replayed after process loss. Independent verification consumes the same
-root allocation. Token and monetary limits require additional host accounting.
-
-Offline checks: `tests.lab.test_improvement_pipeline`,
-`tests.lab.test_retained_targets`, `tests.workflows.test_improvement_pipeline`.
-
-Per-job factory products can implement `JobResource.aclose`. The Run host registers
-ownership immediately, deduplicates objects and closes in reverse order after
-success, failure or cancellation. Cleanup waits at most ten seconds per resource
-and records failures. All resources are attempted; failed or unconfirmed cleanup
-raises a fatal cleanup error. Borrowed verifier and
-measurement ports remain caller-owned. Embeddings use `async with WorkflowServices`
-or close their services explicitly after execution; generator factories must clean
-up partially failed construction.
-
-## Retain results and stop explicitly
-
-Every successful reference, probe and composition remains selectable. The original
-reference is retained before exploration. Measured ties or missing measurements
-keep the official incumbent; unscored output choice has no independent assurance.
-The independent exploration policy can choose another completed harness for the
-next proposal, with attributed reasons. It cannot change the reported selection.
-
-[stopping.py](../termination/policies.py) supplies pure `SearchState`, `StopPolicy` and
-`BoundedStopPolicy`. Round limits, no candidate, repeated candidates and generator
-stop are recorded separately from quality assurance. These rules are bounded
-search decisions, not a convergence proof. The host can inject another stop
-policy through `WorkflowBindings`.
-
-[budget.py](../../../improvement/workflow/budget.py) supplies `BudgetScope`. Child quota is held rather than
-spent; leaf reservations charge every ancestor once. Closing returns only unused
-quota. Deadline and cancellation inherit through nested operations. Final
-selection holds up to eight model requests when available; independent verification
-has its own protected allocation. Exhaustion retains an already completed result
-without granting verification. Composite runners set `execution_charge=0` and
-charge their leaf executions; trial count is independently bounded.
-
-## Responsibility boundaries
-
-`fruitfly_agent.improvement.workflow.controller` owns the single-task entry and validation; registered
-[strategies](../strategies/README.md) supply references, missions, rounds and optional
-composition counts. The controller contains no fixed invariant/domain pairing.
-`fruitfly_agent.improvement.workflow.services` owns job operations and
-resources. Concrete file execution is in `execution/file_runner.py` under the
-[execution module](../execution/README.md); the old import forwards explicitly.
-Generator registration belongs to the editor. Pure stop implementations belong
-to [Termination](../termination/README.md), and read-only selection belongs to
-[Assessment](../assessment/README.md). `adaptive.py` translates declared online
-conditions into control requests rather than implementing another Agent loop.
-
-Selection runs at completed rounds and retains earlier results on measured ties.
-`SearchState` includes phase, no-gain/failure counts, final completed-process
-assessments, usage and assurance. Structured stop
-decisions are journaled. Protected final-selection quota is released before the
-last selection. External child budgets can settle already held work after
-cancellation; uncertain actual usage remains explicitly distinct from quota charged.
-
-With an explicit artifact port, the controller validates or attaches execution
-facts before supplying read-only completed assessment. Run supplies this port;
-existing standalone embeddings without artifact storage retain their original
-receipt behavior. Official measurement and selection do not use process scores.
-Assessment/exploration implementations belong to their registries, not task- or
-benchmark-specific controller branches. Required unavailable assessment ends
-search before independent publication.
-
-## Share one search loop
-
-`fruitfly_agent.improvement.workflow.engine` owns `SearchEngine`: round missions, sequential candidate probes,
-optional composition, selection, stopping and next-seed transitions. `fruitfly_agent.improvement.workflow.problems`
-defines its explicit operation callbacks. Single tasks and task sets use this same
-engine and [execution queue](../execution/README.md#schedule-task-batches).
-
-`task_sets.py` supplies batch operations. It compares the current seed and challenger
-on identical sampled tasks, then promotes through a full common selection set.
-Its source, sampling, evaluator, aggregation and comparison dependencies remain
-replaceable. Formal selection, development exploration and independent assurance
-have distinct records. See [joint search](../task_sets/README.md).
-
-## Install research mechanisms per job
-
-`mechanisms.py` assembles [research context, progress conditions and finalization
-reserves](../research/README.md) from the selected I search component. Run and
-fixed-I episodes call the same installer with explicit context capabilities.
-`assembly.py` injects selection, incumbent exploration and soft stopping; those
-algorithms are not kernel defaults. `WorkflowBindings.hooks` can install another
-job-local mechanism through [immutable lifecycle events](../../../improvement/extensions/README.md).
-
-Optional hook errors are isolated; required hook errors stop search while keeping
-completed receipts. Private task-set selection/confirmation trials do not enter
-research callbacks. Hard quotas, original material identities and independent
-verification remain kernel/host invariants, rather than research-editable policy.
+Offline checks: `tests.lab.test_task_set_search`,
+`tests.lab.test_task_set_lifecycle`, `tests.workflows.test_improvement_pipeline`.

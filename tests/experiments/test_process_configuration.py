@@ -39,12 +39,12 @@ class ProcessConfigurationTests(unittest.IsolatedAsyncioTestCase):
                     with self.assertRaises(ValueError):
                         prepare_experiment(load_configuration(self.root), 'improvement')
 
-    def test_new_settings_are_frozen_and_old_files_remain_valid(self):
+    def test_evidence_settings_and_exploration_are_frozen(self):
         workspace(self.root)
         old = prepare_experiment(load_configuration(self.root), 'improvement')
-        self.assertEqual(old.summary()['process_assessment']['assessors'], [])
+        self.assertNotIn('process_assessment', old.summary())
         self.assertEqual(old.summary()['execution']['max_tool_calls_per_turn'], 64)
-        workspace(self.root, process_assessment={'assessors': ['completed-model-v1']}, exploration={'policy': 'process-guided'})
+        workspace(self.root, assessment={'evidence': {'page_characters': 8000}}, exploration={'policy': 'process-guided'})
         new = prepare_experiment(load_configuration(self.root), 'improvement')
         self.assertNotEqual(old.summary(), new.summary())
         self.assertEqual(new.summary()['exploration']['policy'], 'process-guided')
@@ -54,18 +54,12 @@ class ProcessConfigurationTests(unittest.IsolatedAsyncioTestCase):
         install(self.root, pack)
         workspace(self.root, task={'source': 'files', 'pack': pack['id']},
             models={'assessor': 'assessor'}, improvement={'rounds': 2},
-            process_assessment={'assessors': ['completed-model-v1']}, exploration={'policy': 'process-guided'})
+            exploration={'policy': 'process-guided'})
         provider = FauxProvider()
         def answer(view, signal=None):
             if view.model == 'offline-assessor':
-                payload = json.loads(view.messages[0].content)
-                value = payload['executions'][-1]
-                if 'incumbent' in payload:
-                    data = {'run_id': value['facts']['run_id'], 'reason': 'Synthetic exploration choice.',
-                        'evidence_ids': [value['facts_id']]}
-                else:
-                    data = {'metrics': [], 'detail': 'Synthetic process assessment.', 'evidence_ids': [value['facts_id']]}
-                text = json.dumps(data)
+                from tests.support.model_evaluation import judgment
+                text = judgment(view).text
             else:
                 text = 'wrong'
             async def stream(): yield StreamDone(AssistantMessage(content=[TextBlock(text)], stop_reason='stop'))
@@ -84,10 +78,10 @@ class ProcessConfigurationTests(unittest.IsolatedAsyncioTestCase):
         with patch('fruitfly_agent.experiments.operations.improve.application_factory', side_effect=build):
             result = await run(prepared, record, records, lambda event: None)
         self.assertEqual(result['status'], 'completed')
-        self.assertEqual(result['usage'], {'model': 7, 'execution': 3})
+        self.assertEqual(result['usage'], {'model': 9, 'execution': 3})
         self.assertEqual(prepared.config_path.read_bytes(), original)
         outcome = json.loads(next((self.root / '.fruitfly/improvement/jobs').glob('*/result.json')).read_text())
-        self.assertEqual(outcome['selected']['run_id'], outcome['records'][0]['run_id'])
+        self.assertEqual(outcome['selected']['run_id'], outcome['records'][-1]['run_id'])
         self.assertEqual(outcome['exploration'][0]['run_id'], outcome['records'][1]['run_id'])
         self.assertIn('Exploration seed', result['links'])
-        self.assertEqual(sum(c['model'] == 'offline-assessor' for c in provider.calls), 4)
+        self.assertEqual(sum(c['model'] == 'offline-assessor' for c in provider.calls), 6)

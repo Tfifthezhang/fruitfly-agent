@@ -3,9 +3,10 @@ role: H
 implementation: execution-policy
 enabled: true
 parameters:
-  max_tool_calls_per_turn: 64
-  max_turns: 32
-  max_context_recovery_attempts: 6
-  tool_execution:
-    max_parallel: 8
-    default_execution_mode: parallel
+  settings:
+    max_tool_calls_per_turn: 64
+    max_turns: 32
+    max_context_recovery_attempts: 6
+    tool_execution:
+      max_parallel: 8
+      default_execution_mode: parallel

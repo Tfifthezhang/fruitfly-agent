@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from eval.__main__ import main
+from fruitfly_eval.__main__ import main
 from tests.support.evaluation import request_payload
 
 
@@ -27,8 +27,8 @@ class EvalCliTests(unittest.TestCase):
         self.assertIn("invalid choice", errors.getvalue())
 
     def test_prepare_and_check_use_machine_configuration_without_running_agent(self):
-        from eval.benchmarks.swe_bench import SWEBenchAdapter
-        from eval.catalog import BenchmarkCatalog
+        from fruitfly_eval.benchmarks.swe_bench import SWEBenchAdapter
+        from fruitfly_eval.catalog import BenchmarkCatalog
         from tests.support.harbor import prepared_harbor
         root = Path(self.enterContext(tempfile.TemporaryDirectory()))
         request = root / "request.json"
@@ -43,10 +43,10 @@ class EvalCliTests(unittest.TestCase):
             output = StringIO()
             function = "prepare" if command.startswith("prepare") else "inspect"
             with self.subTest(command=command, response=response), patch(
-                "eval.__main__.builtin_catalog", return_value=BenchmarkCatalog((SWEBenchAdapter(),))
-            ), patch("eval.harbor.host.HostConfig.read", return_value=host) as read, patch(
-                "eval.harbor.preparation." + function, return_value=response
-            ) as action, patch("eval.__main__.execute_request", side_effect=AssertionError("unexpected Agent run")), redirect_stdout(output):
+                "fruitfly_eval.__main__.builtin_catalog", return_value=BenchmarkCatalog((SWEBenchAdapter(),))
+            ), patch("fruitfly_eval.harbor.host.HostConfig.read", return_value=host) as read, patch(
+                "fruitfly_eval.harbor.preparation." + function, return_value=response
+            ) as action, patch("fruitfly_eval.__main__.execute_request", side_effect=AssertionError("unexpected Agent run")), redirect_stdout(output):
                 code = main([*command.split(), "--request", str(request), "--host-config", "machine.yaml"])
             self.assertEqual(code, expected)
             self.assertEqual(json.loads(output.getvalue()), response)
@@ -57,7 +57,7 @@ class EvalCliTests(unittest.TestCase):
 
     def test_stop_is_not_successful_until_cleanup_is_confirmed(self):
         for state, code in (("finished", 0), ("stop_requested", 1), ("cleanup_failed", 1)):
-            with self.subTest(state=state), patch("eval.harbor.lifecycle.request_stop", return_value={"state": state}), redirect_stdout(StringIO()):
+            with self.subTest(state=state), patch("fruitfly_eval.harbor.lifecycle.request_stop", return_value={"state": state}), redirect_stdout(StringIO()):
                 self.assertEqual(main(["stop", "owned-job"]), code)
 
     def test_task_inventory_does_not_resolve_agent_installation_material(self):
@@ -68,9 +68,9 @@ class EvalCliTests(unittest.TestCase):
         request.write_text(json.dumps(payload))
         from tests.support.harbor import prepared_harbor
         host, _ = prepared_harbor(root)
-        with patch("eval.harbor.host.HostConfig.read", return_value=host), patch(
-            "eval.installation.resolve_installation", side_effect=AssertionError("unexpected Agent material")
-        ), patch("eval.harbor.preparation.prepare", return_value={"task_count": 1}) as prepare, redirect_stdout(StringIO()):
+        with patch("fruitfly_eval.harbor.host.HostConfig.read", return_value=host), patch(
+            "fruitfly_eval.installation.resolve_installation", side_effect=AssertionError("unexpected Agent material")
+        ), patch("fruitfly_eval.harbor.preparation.prepare", return_value={"task_count": 1}) as prepare, redirect_stdout(StringIO()):
             self.assertEqual(main(["prepare", "--request", str(request), "--tasks-only"]), 0)
         self.assertTrue(prepare.call_args.kwargs["tasks_only"])
         self.assertIsNone(prepare.call_args.kwargs["package"])
@@ -102,8 +102,8 @@ class EvalCliTests(unittest.TestCase):
 
     def test_catalog_text_explains_missing_dependencies(self) -> None:
         output = StringIO()
-        with patch("eval.benchmarks.harbor._harbor_executable", return_value=None):
-            with patch("eval.benchmarks.harbor.shutil.which", return_value=None):
+        with patch("fruitfly_eval.benchmarks.harbor._harbor_executable", return_value=None):
+            with patch("fruitfly_eval.benchmarks.harbor.shutil.which", return_value=None):
                 with redirect_stdout(output):
                     result = main(["catalog"])
         self.assertEqual(result, 0)
@@ -118,10 +118,10 @@ class EvalCliTests(unittest.TestCase):
             request = root / "request.json"
             request.write_text(json.dumps(payload), encoding="utf-8")
             output = StringIO()
-            with patch("eval.execution.builtin_catalog") as catalog:
-                from eval.benchmarks.base import PreflightResult
-                from eval.benchmarks.swe_bench import SWEBenchAdapter
-                from eval.catalog import BenchmarkCatalog
+            with patch("fruitfly_eval.execution.builtin_catalog") as catalog:
+                from fruitfly_eval.benchmarks.base import PreflightResult
+                from fruitfly_eval.benchmarks.swe_bench import SWEBenchAdapter
+                from fruitfly_eval.catalog import BenchmarkCatalog
 
                 adapter = SWEBenchAdapter()
                 adapter.preflight = lambda variant: PreflightResult(

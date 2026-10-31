@@ -49,22 +49,23 @@ class ExecutionLimitTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(execution=execution), self.assertRaises(ValueError):
                 HarnessProfile('baseline', execution=execution)
 
-    async def test_file_trial_preserves_configured_limit_and_records_what_was_delivered(self):
+    async def test_file_trial_uses_time_only_mode_and_records_all_deliverables(self):
         registry, baseline = fixture()
         artifacts = MemoryArtifacts()
         provider = FauxProvider()
         provider.respond_tool_call('write', {'path': 'answer.txt', 'content': 'first'})
-        provider.respond_tool_call('write', {'path': 'other.txt', 'content': 'skipped'})
+        provider.respond_tool_call('write', {'path': 'other.txt', 'content': 'second'})
+        provider.respond_text('done')
         plan = RunPlan('limits', version(), ('prompt',))
         services = WorkflowServices(plan)
         runner = FileTaskRunner(AgentLoopConfig(provider=provider, max_tool_calls_per_turn=1), registry, artifacts, services)
         try:
             result = await runner.execute(plan, TaskMaterial('task', 'Create an answer.'), baseline)
             facts = read_facts(result, artifacts)
-            self.assertEqual(facts.termination_reason, 'tool_budget_exhausted')
-            self.assertEqual(facts.budgets[0].limit, 1)
-            self.assertEqual(dict(facts.counters)['tool_started'], 1)
-            self.assertEqual([a.path for a in facts.artifacts], ['deliverables/answer.txt'])
+            self.assertEqual(facts.termination_reason, 'model_complete')
+            self.assertFalse(any(hasattr(v,'limit')for v in facts.usage))
+            self.assertEqual(dict(facts.counters)['tool_started'], 2)
+            self.assertEqual([a.path for a in facts.artifacts], ['deliverables/answer.txt','deliverables/other.txt'])
             self.assertEqual(result.status, 'completed')
         finally:
             await services.close()

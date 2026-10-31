@@ -29,12 +29,13 @@ class CaseMeasurements:
 class HoldoutVerification:
     """Compare unchanged original selection and holdout tasks once after editing.
 
-    The executor is a budgeted host capability. Verification tasks and answers
+    The executor is a separately timed host capability. Verification tasks and answers
     are not supplied to generators, composers or reflection.
     """
     policy_id = 'task-holdout-v1'
+    manages_stage_times = True
     def __init__(self, *, baseline, selection, holdout, execute, measurements,
-                 direction='max', min_gain=0, max_case_regression=0, regression=(), artifacts=None):
+                 direction='max', min_gain=0, max_case_regression=0, regression=(), artifacts=None, evaluate=None):
         if not selection or not holdout:
             raise ValueError('persistent comparison requires selection and independent holdout')
         if {t.material_id for t in selection} & {t.material_id for t in holdout}:
@@ -43,6 +44,7 @@ class HoldoutVerification:
             raise ValueError('invalid fixed verification policy')
         self.baseline, self.selection, self.holdout = baseline, tuple(selection), tuple(holdout)
         self.execute, self.measurements = execute, measurements
+        self.evaluate = evaluate or measurements.measure
         self.direction, self.min_gain, self.max_case_regression = direction, min_gain, max_case_regression
         self.regression = tuple(regression)
         self.receipts = []
@@ -55,8 +57,8 @@ class HoldoutVerification:
             for task in partition:
                 before = await self.execute(task, self.baseline)
                 after = await self.execute(task, outcome.harness)
-                a = await self.measurements.measure(task, before)
-                b = await self.measurements.measure(task, after)
+                a = await self.evaluate(task, before)
+                b = await self.evaluate(task, after)
                 self.receipts.append((before, after, a, b))
                 if a is None or b is None:
                     return None

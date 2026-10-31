@@ -4,11 +4,11 @@ import asyncio
 from uuid import uuid4
 
 from fruitfly_agent.improvement.contracts.live import Assessment
+from fruitfly_agent.improvement.contracts.failures import IntegrityError
 from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
 from fruitfly_agent.improvement.contracts.tasks import Resource
 from fruitfly_agent.improvement.contracts.versions import canonical_json
 from fruitfly_agent.improvement.execution.handles import CompletionOnlyRunner
-from fruitfly_agent.improvement.workflow.budget import AllocationExhausted
 
 
 class AssessedRunner:
@@ -52,16 +52,14 @@ class AssessedRunner:
                 for assessor in assessors:
                     try:
                         value = await self.services.operation(asyncio.wait_for(
-                            assessor.assess(event), timeout=self.assessor_timeout))
+                            assessor.assess(event), timeout=self.assessor_timeout), stage='evaluator')
                         if value is None:
                             continue
                         if value.position != event.position or value.assessor_id != assessor.assessor_id:
                             raise ValueError('online assessment has mismatched evidence or scorer')
                         previous = last.get(assessor.assessor_id, '')
                         value = replace(value, supersedes=previous)
-                    except asyncio.CancelledError:
-                        raise
-                    except AllocationExhausted:
+                    except (asyncio.CancelledError, IntegrityError):
                         raise
                     except Exception as exc:
                         value = Assessment(event.position, assessor.assessor_id, (), status='failed',
@@ -72,7 +70,7 @@ class AssessedRunner:
                     self.services.record('online-assessment', evidence=ref, status=value.status,
                         assessor_id=value.assessor_id, sequence=event.position.sequence)
                     if not final and self.control_policy is not None and value.visibility == 'development' and value.status not in {'failed', 'unavailable', 'incomplete'}:
-                        requests = await self.services.operation(self.control_policy.decide(value))
+                        requests = await self.services.operation(self.control_policy.decide(value), stage='evaluator')
                         for request in requests:
                             await handle.control(request)
             try:

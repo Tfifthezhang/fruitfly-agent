@@ -86,13 +86,6 @@ Both flags reject interactive/resumed launches and conflict with each other.
 Eval invokes `--unrestricted` inside Harbor task environments. Agent configuration
 contains no permission preference.
 
-## Bound fresh-task model requests
+## Observe fresh-task model requests
 
-`limits.py` supplies `ModelCallBudget` and a Provider registry wrapper shared by
-main and auxiliary models. Fresh non-interactive CLI tasks accept
-`--max-model-calls`; `FRUITFLY_MAX_MODEL_CALLS` is the fallback. Interactive/resumed
-launches reject this per-process allowance. An optional
-`FRUITFLY_MODEL_USAGE_PATH` receives an atomic count before each Provider call.
-Unknown responses remain charged. SDK-internal retries and shell-issued service
-requests are outside this harness-invocation count; it is not a price limit.
-The override does not rewrite harness/model configuration or create new keys.
+`usage.py` supplies `ModelUsage`, `ObservedProvider` and `ObservedProviderRegistry`. Main and auxiliary requests are observed without admission limits. `FRUITFLY_MODEL_USAGE_PATH` writes atomic request receipts, reported usage and interruption status. Unknown usage stays unknown. SDK-internal retries and shell-issued calls remain outside this harness invocation count.

@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from eval.api import read_report, stop_evaluation
+from fruitfly_eval.api import read_report, stop_evaluation
 
 
 class PublicServiceTests(unittest.TestCase):

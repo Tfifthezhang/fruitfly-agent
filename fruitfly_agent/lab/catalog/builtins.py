@@ -6,7 +6,7 @@ from dataclasses import replace
 from typing import Any, Mapping
 
 from fruitfly_agent.lab.context_manager.reduction.registration import definitions as reduction_definitions
-from fruitfly_agent.lab.context_manager.measurement.registration import definition as measurement_definition
+from fruitfly_agent.lab.context_manager.measurement.registration import install as install_measurement
 from fruitfly_agent.core.context import ContextStage
 from fruitfly_agent.lab.environment import LocalEnv
 from fruitfly_agent.lab.environment.description import EXECUTION_ENVIRONMENT_COMPONENT, ExecutionEnvironmentDescription
@@ -29,10 +29,8 @@ from fruitfly_agent.lab.context_manager.externalization.adapter import (
 )
 from fruitfly_agent.lab.improvement.tasks import TaskPackCatalog, TASK_PACK_COMPONENT
 from fruitfly_agent.lab.improvement.registration import definition as improvement_definition
-from fruitfly_agent.lab.workflow import definition as execution_workflow_definition
 from fruitfly_agent.lab.tools.web.registration import definitions as web_definitions
 from fruitfly_agent.lab.context_manager.augmentation.skills.document import definition as skill_document_definition
-from fruitfly_agent.lab.context_manager.augmentation.information.file_memory.learned import definition as learned_memory_definition
 from fruitfly_agent.lab.context_manager.augmentation.skills import (
     SkillCatalogTransformer, load_skills, render_skills_xml,
 )
@@ -285,7 +283,6 @@ def builtin_catalog() -> LabCatalog:
             ),
             effects=MechanismEffects(uses_network=True, cost_notice="The configured endpoint may have its own charges."),
         ),
-        measurement_definition(),
         *reduction_definitions(),
         _definition(
             "rlm-ipython",
@@ -316,10 +313,8 @@ def builtin_catalog() -> LabCatalog:
                 writes_files=True,
             ),
         ),
-        execution_workflow_definition(),
         improvement_definition(),
         skill_document_definition(),
-        learned_memory_definition(),
     )
     from fruitfly_agent.lab.tools.guidance import configuration_surface as guidance_surface
     tool_factories = {'read': create_read_tool, 'bash': create_bash_tool,
@@ -334,7 +329,7 @@ def builtin_catalog() -> LabCatalog:
     from fruitfly_agent.lab.context_manager.externalization.improvement import expose as externalization_surfaces
     definitions = tuple(tool_surfaces(augmentation_surfaces(externalization_surfaces(d))) for d in definitions)
     return LabCatalog(definitions, bootstrap=lambda state, context: (
-        state.with_component(TEXT_TARGET_PREFIX + "base_prompt", BasePromptTarget(state.config.system_prompt))
+        install_measurement(state, context).with_component(TEXT_TARGET_PREFIX + "base_prompt", BasePromptTarget(state.config.system_prompt))
         .with_component(TASK_PACK_COMPONENT, TaskPackCatalog(context.workspace, context.task_pack_sources))
     ))
 
@@ -446,11 +441,9 @@ def _ipython_tool_parameters() -> tuple[ParameterDescriptor, ...]:
         ("max_artifact_bytes", "Maximum artifact bytes"),
         ("max_cell_output_chars", "Maximum cell output characters"),
         ("cell_timeout_seconds", "Cell timeout seconds"),
-        ("max_query_calls", "Maximum model query calls"),
         ("max_query_concurrent", "Maximum concurrent model queries"),
         ("max_query_input_chars", "Maximum model query input characters"),
         ("max_query_output_tokens", "Maximum model query output tokens"),
-        ("max_query_total_tokens", "Maximum total model query tokens"),
         ("max_query_inline_result_chars", "Maximum inline result characters"),
         ("query_timeout_seconds", "Model query timeout seconds"),
     )

@@ -3,7 +3,7 @@ from dataclasses import asdict, replace
 import json
 import hashlib
 
-from fruitfly_agent.improvement.contracts.facts import ArtifactFact, BudgetFact, ExecutionFacts
+from fruitfly_agent.improvement.contracts.facts import ArtifactFact, UsageFact, ExecutionFacts
 from fruitfly_agent.improvement.contracts.tasks import Resource
 
 FACTS_PATH = 'execution-facts.json'
@@ -46,7 +46,7 @@ def receipt_facts(record, artifact_store, **values):
     return ExecutionFacts(**{name: getattr(record, name) for name in
         ('run_id', 'task_id', 'material_id', 'harness_id', 'conditions_id', 'initial_state_id', 'status')},
         evidence=record.artifacts, output_id=artifact_store.put(record.output.encode('utf-8')),
-        **{'budgets': (BudgetFact('model_calls', 'execution', record.model_calls, source='execution receipt'),),
+        **{'usage': (UsageFact('model_calls', 'execution', record.model_calls, source='execution receipt'),),
            'artifacts': tuple(ArtifactFact(r.path, 'collected', 'execution receipt', r.artifact_id)
                 for r in record.artifacts if r.kind == 'deliverable'), **values})
 
@@ -55,6 +55,17 @@ def ensure_facts(record, artifacts):
     if read_facts(record, artifacts) is not None:
         return record
     return attach_facts(record, receipt_facts(record, artifacts), artifacts)
+
+
+def timed_out(record, artifacts):
+    """Retain partial evidence while recording the host's observed timeout."""
+    facts = read_facts(record, artifacts)
+    resources = tuple(replace(r, path='interrupted-facts.json') if r.path == FACTS_PATH else r
+                      for r in record.artifacts)
+    record = replace(record, status='timeout', artifacts=resources)
+    facts = (replace(facts, status='timeout', termination_reason='execution_timeout', complete=False)
+             if facts is not None else receipt_facts(record, artifacts, termination_reason='execution_timeout'))
+    return attach_facts(record, facts, artifacts)
 
 
 def loop_fact_values(diagnostics):
@@ -66,6 +77,18 @@ def loop_fact_values(diagnostics):
         'tool_budget_skipped', 'tool_output_skipped'))
     return {'termination_reason': diagnostics.termination_reason, 'counters': counters,
         'diagnosable': diagnostics.tool_started > 0,
-        'complete': True, 'budgets': (
-            BudgetFact('tool_calls', 'turn', diagnostics.last_turn_tool_attempts,
-                       diagnostics.tool_limit_per_turn, 'Core loop diagnostics'),)}
+        'complete': True, 'usage': (
+            UsageFact('tool_calls', 'turn', diagnostics.last_turn_tool_attempts, 'Core loop diagnostics'),)}
+
+
+def model_usage_facts(rows, calls):
+    """Report known token subtotals separately from unknown execution totals."""
+    from ..evidence.reporting import token_usage
+    tokens = token_usage(rows, calls or 0)
+    complete = calls is not None and tokens.reported_calls == calls
+    values = [UsageFact('reported_model_calls', 'execution', tokens.reported_calls, 'Provider receipts')]
+    for name in ('input_tokens', 'output_tokens', 'cache_read_tokens', 'cache_creation_tokens'):
+        value = getattr(tokens, name)
+        values.extend((UsageFact(name, 'execution', value if complete else None, 'Provider receipts'),
+                       UsageFact('reported_' + name, 'execution', value, 'Reported subtotal only')))
+    return tuple(values)

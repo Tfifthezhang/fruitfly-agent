@@ -1,6 +1,6 @@
 """Improvement execution contracts and frontend views."""
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Mapping, Protocol, runtime_checkable
 from fruitfly_agent.interactive.contracts.candidates import CandidateView, CandidateSection
 
@@ -58,9 +58,7 @@ class WorkflowRequest:
     scope: str = 'task'
     width: int = 1
     depth: int = 1
-    max_model_calls: int = 64
-    max_executions: int = 32
-    operation_timeout: float = 120
+    timeouts: dict[str, float] = field(default_factory=lambda: {'editor_seconds':1200,'execution_seconds':3600,'evaluator_seconds':1200})
     direction: str = ''
     task_pack_id: str = ''
     execution_id: str = 'file-task'
@@ -109,9 +107,7 @@ class ImprovementActivity:
     completed: int = 0
     total: int = 0
     model_calls: int = 0
-    model_limit: int = 0
     trial_calls: int = 0
-    trial_limit: int = 0
     failed_trials: int = 0
     input_tokens: int = 0
     output_tokens: int = 0

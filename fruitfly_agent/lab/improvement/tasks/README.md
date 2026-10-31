@@ -2,7 +2,7 @@
 
 [Up: Improvement](../README.md)
 
-Define tasks, acceptance criteria, and fixed data splits for candidate search. The active target supplies the baseline; runtime configuration supplies the model, improver, and budgets.
+Define tasks, acceptance criteria, and fixed data splits for candidate search. The active target supplies the baseline; runtime configuration supplies the model and improver; the experiment supplies phase times.
 
 ## Prepare a pack
 
@@ -156,11 +156,11 @@ cp -R examples/improvement/python_functions .fruitfly/improvement/task-packs/pyt
 | 1 | Prepare the default Agent configuration, model catalog and secret environment. |
 | 2 | Reference a task document with `source: files` and `pack` set to the installed package ID. |
 | 3 | Use experiment `edit` grants for registered component fields; default feedback uses the pack measurement. |
-| 4 | Set `scope: persistent` in the referenced comparison document, and fund paired train/selection/holdout checks in the experiment budget. |
+| 4 | Set `scope: persistent` in the referenced comparison document, and configure suitable independent phase times. |
 | 5 | Run `fruitfly-agent-lab improvement check`, then explicitly `improvement run`; model requests may incur charges. |
 | 6 | Inspect the result and evidence; `rsi run` performs verified adoption into its experiment configuration copy. |
 
-Selecting a pack changes one job, not the YAML or runtime manifest. `/improvement TEXT` prefills direction, not a path. Search only changes target text, not Python task outputs. See [Improvement](../README.md) for budgets, results, and retention.
+Selecting a pack changes one job, not the YAML or runtime manifest. `/improvement TEXT` prefills direction, not a path. Search only changes target text, not Python task outputs. See [Improvement](../README.md) for timing, results, and retention.
 
 Embedding hosts can register read-only sources with `TaskPackRegistration` via `RunApplicationFactory(task_pack_sources=...)`. The default CLI scans the workspace task-packs directory, not arbitrary examples or Session directories.
 

@@ -13,7 +13,7 @@ def definition():
     root = 'fruitfly_agent/lab/context_manager/reduction/methods/working_memory/'
     value = MechanismDefinition(MechanismDescriptor('working-memory-reduction', 'Working memory',
         'Incrementally maintain bounded task memory and reset only after complete evidence coverage.',
-        contributions=(MechanismContribution('online', 'context', 'reduction'),), install_order=60,
+        contributions=(MechanismContribution('online', 'context', 'reduction'),), default_enabled=True, install_order=60,
         parameters=parameters(WorkingMemoryConfig), exclusive_group='compaction', requires=frozenset({'context-history'}),
         effects=MechanismEffects(uses_provider=True, uses_network=True, writes_files=True,
             lifecycle_hooks=('before_compaction',),
@@ -21,6 +21,7 @@ def definition():
         install, implementation_id='working-memory-v1', implementation_path=root + 'algorithm.py',
         documentation_path=root + 'README.md', selection_group='reduction', selection_group_label='Reduction',
         validate_parameters=partial(validate, WorkingMemoryConfig))
+    value=replace(value,parameter_paths={name: ('instructions.update' if name=='update_instructions' else 'instructions.shrink' if name=='shrink_instructions' else 'settings.'+name) for name in WorkingMemoryConfig.__dataclass_fields__})
     return expose(value, WorkingMemoryConfig)
 
 

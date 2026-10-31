@@ -17,7 +17,7 @@ class ExecutionRecord:
     harness_id: str
     initial_state_id: str
     conditions_id: str
-    status: Literal['completed', 'error', 'cancelled', 'budget_exhausted']
+    status: Literal['completed', 'error', 'cancelled', 'timeout']
     output: str = ''
     artifacts: tuple[Resource, ...] = ()
     model_calls: int | None = None
@@ -27,7 +27,7 @@ class ExecutionRecord:
             identifier(value)
         for value in (self.material_id, self.harness_id, self.initial_state_id, self.conditions_id):
             require_hash(value)
-        if self.status not in {'completed', 'error', 'cancelled', 'budget_exhausted'}:
+        if self.status not in {'completed', 'error', 'cancelled', 'timeout'}:
             raise ValueError('invalid execution status')
         bounded(self.output, 120_000, empty=True)
         object.__setattr__(self, 'artifacts', tuple(self.artifacts))

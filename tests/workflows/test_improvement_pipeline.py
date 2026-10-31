@@ -13,7 +13,7 @@ from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, Edi
 from fruitfly_agent.improvement.contracts.components import HarnessSnapshot, ComponentFile
 from fruitfly_agent.improvement.contracts.editing import ProposalResult
 from fruitfly_agent.run.application import RunApplicationFactory
-from tests.support.faux_provider import FauxProvider
+from tests.support.model_evaluation import RoleProvider as FauxProvider
 from tests.support.materials import _write_models
 from tests.support.task_packs import install
 
@@ -28,7 +28,7 @@ class LocalRule:
             if c.component_id in request.plan.component_ids else c for c in request.baseline.components)
         return ProposalResult((CandidateBundle(request.plan.parent, request.baseline,
             HarnessSnapshot(documents), self.generator_id,
-            tuple(EditReason(name, 'Reference skipped a source', (request.records[0].run_id,))
+            tuple(EditReason(name, 'Reference skipped a source', (request.records[0].run_id,), expected_effect='The proposed behavior appears in the subsequent execution.')
                   for name in request.plan.component_ids)),))
 
 
@@ -42,6 +42,13 @@ class NoEntry:
         return ()
 
 
+def evaluation_response(view, signal=None):
+    from tests.support.model_evaluation import judgment
+    from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone
+    async def events(): yield StreamDone(judgment(view))
+    return AssistantMessageEventStream(events())
+
+
 class ApplicationPipelineTests(unittest.IsolatedAsyncioTestCase):
     async def test_host_installs_research_and_custom_hooks_and_persists_entries(self):
         import json
@@ -53,8 +60,7 @@ class ApplicationPipelineTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as directory:
             factory = offline_factory(Path(directory))
             jobs = factory._component_jobs
-            settings = jobs.system_settings
-            jobs.system_settings = lambda: {**settings(), 'search': {'research': {'enabled': True}}}
+            jobs.workflow_settings = {'research': {'enabled': True}}
             jobs.hooks_factory = install_hooks
             app = AgentApplication(factory)
             await app.start()
@@ -122,7 +128,6 @@ class ApplicationPipelineTests(unittest.IsolatedAsyncioTestCase):
             for text in ('reference output', 'candidate output', 'candidate output', 'composed output'):
                 provider.respond_tool_call('read', {'path': 'input.txt'})
                 provider.respond_text(text)
-            provider.respond_text('{"choice":"4","reason":"Selected the complete source-based output"}')
             providers = Mock()
             providers.create.return_value = provider
             generators = GeneratorRegistry()
@@ -151,8 +156,8 @@ class ApplicationPipelineTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual((root / 'input.txt').read_text(), 'Original task source')
                 result = app.improvement_history()[0]
                 self.assertIn('composed output', next(s.text for s in result.sections if s.title == 'Task output'))
-                self.assertEqual(len(provider.calls), 9)
-                for call in provider.calls[1:8:2]:
+                self.assertEqual(len(provider.calls), 13)
+                for call in [c for c in provider.calls if 'Evaluate granted evidence' not in c['system_prompt']][1:8:2]:
                     self.assertIn('Original task source', repr(call['messages']))
                 with self.assertRaisesRegex(ValueError, 'unknown|consumed'):
                     await app.improve('', preview_token=preview.preview_token)
@@ -213,7 +218,6 @@ class ApplicationPipelineTests(unittest.IsolatedAsyncioTestCase):
                 for index in range(2):
                     for text in ('reference', 'probe', 'probe', 'final'):
                         provider.respond_text(text)
-                    provider.respond_text('{"choice":"4","reason":"Complete revised result"}')
                     preview = app.workflow_preview(WorkflowRequest('Complete a file task.',
                         component_ids=('base_prompt',), generator_id='local-rule'))
                     await app.improve('', preview_token=preview.preview_token)

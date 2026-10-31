@@ -1,6 +1,6 @@
 """Accepted request fields and explicit rejection of removed experiment features."""
 import unittest
-from eval.contracts import EvaluationRequest
+from fruitfly_eval.contracts import EvaluationRequest
 from tests.support.evaluation import request_payload
 
 

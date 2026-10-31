@@ -6,7 +6,7 @@ import unittest
 
 from fruitfly_agent.core.data_model import UserMessage, ImageBlock, ToolResultMessage, TextBlock, Usage
 from fruitfly_agent.providers.token_counting import OPENAI_COUNT_FIELDS
-from fruitfly_agent.run.runtime.limits import BudgetedProvider, ModelCallBudget
+from fruitfly_agent.run.runtime.usage import ObservedProvider, ModelUsage
 from tests.support.provider_streams import adapter, SDKStream, view
 from tests.support.loop import make_tool
 
@@ -48,8 +48,8 @@ class ProviderTokenCountingTests(unittest.IsolatedAsyncioTestCase):
     async def test_generation_budget_wrapper_forwards_count_without_charging_generation(self):
         provider, _ = adapter('openai', [SDKStream()], service='openai')
         provider._client.responses.input_tokens = NS(count=AsyncMock(return_value=NS(input_tokens=5)))
-        budget = ModelCallBudget(1)
-        wrapped = BudgetedProvider(provider, budget)
+        budget = ModelUsage()
+        wrapped = ObservedProvider(provider, budget)
         self.assertTrue(wrapped.input_count_supported)
         self.assertEqual(5, await wrapped.count_input(view()))
         self.assertEqual(0, budget.used)

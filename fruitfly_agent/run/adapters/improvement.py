@@ -131,7 +131,7 @@ class RunImprovementService:
         if value is None:
             return None
         return ImprovementActivity(value.phase, value.completed, value.total,
-            value.model_calls, value.model_limit, value.trial_calls, value.trial_limit, value.failed_trials,
+            value.model_calls, value.trial_calls, value.failed_trials,
             value.tokens.input_tokens, value.tokens.output_tokens, value.tokens.cache_read_tokens,
             value.tokens.cache_creation_tokens, value.tokens.reported_calls, value.tokens.missing_calls)
 

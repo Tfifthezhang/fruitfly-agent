@@ -22,6 +22,7 @@ def normalize(parameters):
 
 
 class GuidanceTarget:
+    description = 'Task guidance appended to the system prompt; preserve concrete evidence and a useful next action.'
     optimization = OptimizationSpec('H', 'text')
     def __init__(self, text):
         self.text = text

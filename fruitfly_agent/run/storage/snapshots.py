@@ -7,7 +7,7 @@ from fruitfly_agent.improvement.contracts.versions import SnapshotFile
 
 def capture_source_tree(root: Path) -> StateSnapshot:
     files = []
-    for package in ("fruitfly_agent", "eval"):
+    for package in ("fruitfly_agent", "fruitfly_eval"):
         for path in sorted((root / package).rglob("*.py")):
             if "__pycache__" not in path.parts and not path.is_symlink():
                 files.append(SnapshotFile(path.relative_to(root).as_posix(), path.read_text(encoding="utf-8")))

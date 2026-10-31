@@ -26,8 +26,7 @@ def extension_spec(extension):
 def mechanism_parameters(parameters):
     definitions: dict[str, dict[str, Any]] = {
         'research': {'enabled': False, 'max_entries': 128, 'retrieve_entries': 8, 'guidance': ''},
-        'progress': {'patience': 0, 'failure_patience': 0},
-        'finalization': {'reserve_model_calls': 0, 'reserve_executions': 0}}
+        'progress': {'patience': 0, 'failure_patience': 0}}
     result = {}
     for name, defaults in definitions.items():
         supplied = mapping(parameters.get(name, {}), set(defaults), name)
@@ -47,36 +46,11 @@ def mechanism_parameters(parameters):
     return result
 
 
-class FinalizationReserve:
-    def __init__(self, services, parameters):
-        self.services, self.parameters, self.scope = services, parameters, None
-
-    def start(self, event):
-        self.scope = self.services.budget.child({'model': self.parameters['reserve_model_calls'],
-                                               'execution': self.parameters['reserve_executions']})
-
-    def release(self, event=None):
-        if self.scope is not None:
-            self.scope.close()
-            self.scope = None
-
-    def exhausted(self):
-        if self.scope is None:
-            return False
-        return any(self.parameters[key] and self.services.budget.available(kind) == 0
-                   for key, kind in (('reserve_model_calls', 'model'), ('reserve_executions', 'execution')))
-
-    async def aclose(self):
-        self.release()
-
-
 class ResearchStopPolicy:
-    def __init__(self, base, progress, reserve):
-        self.base, self.progress, self.reserve = base, progress, reserve
+    def __init__(self, base, progress):
+        self.base, self.progress = base, progress
 
     async def decide(self, state):
-        if self.reserve.exhausted():
-            return StopDecision('finalization_reserve')
         for key, counter in (('patience', state.consecutive_no_gain), ('failure_patience', state.consecutive_failures)):
             if self.progress[key] and counter >= self.progress[key]:
                 return StopDecision('progress.' + key)
@@ -85,13 +59,10 @@ class ResearchStopPolicy:
 
 
 def install_workflow_mechanisms(context, *, stop_policy=None):
-    parameters = mechanism_parameters((context.system_settings or {}).get('search', {}))
+    parameters = mechanism_parameters((context.workflow_settings or {}))
     services = context.services
     if parameters['research']['enabled']:
         ResearchLedger(context, **{k: v for k, v in parameters['research'].items() if k != 'enabled'}).install()
-    reserve = services.own(FinalizationReserve(services, parameters['finalization']))
-    services.hooks.register('before_run', reserve.start, required=True, priority=0, identity='finalization-reserve')
-    services.hooks.register('before_finalization', reserve.release, required=True, priority=0, identity='finalization-reserve')
     if context.hooks_factory is not None:
         context.hooks_factory(context)
-    return ResearchStopPolicy(stop_policy or BoundedStopPolicy(), parameters['progress'], reserve)
+    return ResearchStopPolicy(stop_policy or BoundedStopPolicy(), parameters['progress'])

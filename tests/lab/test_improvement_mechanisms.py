@@ -13,7 +13,6 @@ from fruitfly_agent.lab.improvement.evidence.access import EvidenceAccess
 from fruitfly_agent.lab.improvement.research import ResearchLedger
 from fruitfly_agent.lab.improvement.system_configuration import search_parameters
 from fruitfly_agent.lab.improvement.workflow.mechanisms import install_workflow_mechanisms
-from fruitfly_agent.lab.improvement.components.configuration import ImprovementSettingsTarget
 from fruitfly_agent.core.config import AgentLoopConfig
 from tests.support.pipeline import build_pipeline, RuleGenerator
 from tests.support.faux_provider import FauxProvider
@@ -76,7 +75,7 @@ class KernelTests(unittest.IsolatedAsyncioTestCase):
         services = WorkflowServices(plan)
         saved = []
         context = ExecutionContext('.', artifacts, flow.components, None, None, None,
-            plan=plan, services=services, system_settings={'search': {'research': {'enabled': True}}},
+            plan=plan, services=services, workflow_settings={'research': {'enabled': True}},
             save_record=lambda path, value: saved.append((path, value)))
         flow.stop_policy = install_workflow_mechanisms(context)
         try:
@@ -95,19 +94,18 @@ class KernelTests(unittest.IsolatedAsyncioTestCase):
         finally:
             await services.close()
 
-    async def test_finalization_reserve_returns_quota_without_increasing_limits(self):
+    async def test_workflow_observes_usage_without_hidden_reserves(self):
         flow, plan, baseline, runner = build_pipeline()
-        plan = replace(plan, max_executions=5)
+        plan = replace(plan)
         services = WorkflowServices(plan)
         context = ExecutionContext('.', MemoryArtifacts(), flow.components, None, None, None,
-            plan=plan, services=services, system_settings={'search': {'finalization': {'reserve_executions': 2}}})
+            plan=plan, services=services, workflow_settings={})
         flow.stop_policy = install_workflow_mechanisms(context)
         try:
             result = await flow.run(plan, TaskMaterial('task', 'Work'), baseline, services)
             self.assertIsNotNone(result.selected)
-            self.assertEqual(services.used['execution'], 3)
-            self.assertEqual(services.budget.available('execution'), 2)
-            self.assertEqual(services.budget.limits['execution'], 5)
+            self.assertEqual(services.used['execution'], 4)
+            self.assertFalse(hasattr(services, 'budget'))
         finally:
             await services.close()
 
@@ -117,14 +115,14 @@ class KernelTests(unittest.IsolatedAsyncioTestCase):
         record = await runner.execute(plan, task, baseline)
         artifacts, provider = MemoryArtifacts(), FauxProvider()
         for _ in range(2):
-            provider.respond_tool_call('read_file', {'path': 'context/executions/' + record.run_id + '/missing.log'})
+            provider.respond_tool_call('read', {'path': 'context/executions/' + record.run_id + '/missing.log'})
             provider.respond_tool_call('write_file', {'path': 'harness/prompt/instructions.txt', 'content': 'unsupported edit'})
-            provider.respond_text(json.dumps({'reasons': [{'component_id': 'prompt', 'explanation': 'Unseen evidence', 'evidence_ids': [record.run_id]}]}))
+            provider.respond_text(json.dumps({'reasons': [{'component_id': 'prompt', 'explanation': 'Unseen evidence', 'evidence_ids': [record.run_id], 'expected_effect':'The proposed behavior appears in the subsequent execution.'}]}))
         services = WorkflowServices(plan)
         try:
             editor = AgentEditor(AgentLoopConfig(provider=provider), artifacts, flow.components)
-            candidate = await editor.edit('propose', ProposalRequest(plan, task, baseline, (record,), 'invariant', 0), services)
-            self.assertEqual(candidate.harness, baseline)
+            with self.assertRaises(RuntimeError):
+                await editor.edit('propose', ProposalRequest(plan, task, baseline, (record,), 'invariant', 0), services)
             self.assertTrue(any(e == 'editor-evidence-unavailable' for e, _ in services.events))
             access = EvidenceAccess((record.run_id,))
             access.provided('harness/prompt/fake.json', '{"run_id":"' + record.run_id + '"}')
@@ -132,14 +130,9 @@ class KernelTests(unittest.IsolatedAsyncioTestCase):
         finally:
             await services.close()
 
-    def test_new_policy_fields_are_strict_editable_and_identity_bound(self):
-        target = ImprovementSettingsTarget('search', {})
-        original = target.snapshot()
-        value = json.loads(original.text)
-        value['research']['enabled'] = True
-        value['progress']['patience'] = 2
-        value['finalization']['reserve_model_calls'] = 4
-        target.validate_change(json.dumps(value), {'editable_fields': ['research.enabled', 'progress.patience', 'finalization.reserve_model_calls']})
-        self.assertNotEqual(ImprovementSettingsTarget('search', value).snapshot().text, original.text)
+    def test_fixed_experiment_policies_reject_unknown_fields(self):
+        value = search_parameters({'research': {'enabled': True}, 'progress': {'patience': 2}})
+        with self.assertRaises(ValueError):
+            search_parameters({'finalization': {'reserve_model_calls': 4}})
         value['progress']['unknown'] = 1
         with self.assertRaises(ValueError): search_parameters(value)

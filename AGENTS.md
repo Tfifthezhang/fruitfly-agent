@@ -34,7 +34,7 @@ Follow the dependency table in [Runtime architecture](fruitfly_agent/README.md#m
 | Put a concrete algorithm or vendor special case in Core | Implement it in Lab or Providers through existing protocols, hooks, and callbacks. Extend Core only for a general runtime requirement they cannot express. |
 | Put Lab logic in a Provider | Keep the adapter responsible for API messages, streams, capabilities, and errors; register the algorithm in [Lab](fruitfly_agent/lab/README.md#develop-an-algorithm). |
 | Add algorithm-specific branches to Run or the terminal | Register a definition and installer in [Catalog](fruitfly_agent/lab/catalog/README.md); extend a generic host contract only when required. |
-| Let a benchmark dictate runtime, configuration, lifecycle, or algorithm interfaces | Extend [Eval](eval/DEVELOPER_GUIDE.md#add-a-benchmark) as a consumer. Normal interaction must work without Eval. |
+| Let a benchmark dictate runtime, configuration, lifecycle, or algorithm interfaces | Extend [Eval](fruitfly_eval/DEVELOPER_GUIDE.md#add-a-benchmark) as a consumer. Normal interaction must work without Eval. |
 | Bypass boundaries with hidden imports, dynamic imports, or copied code | Use the owning module's public interface. |
 | Add selectable behavior without a configuration position | Declare its H/S/I identity, strict parameters/defaults, dependencies, lifecycle/state and edit/trial/activation support through [Catalog configuration](fruitfly_agent/lab/catalog/CONFIGURATION.md). Daily, experiment and candidate execution must consume the shared configuration and assembly path. |
 | Design an algorithm first and add optimization support later | FruitFlyAgent is designed for RSI. Every new selectable algorithm must expose meaningful prompts, parameters, policies or retained content to Improvement from its initial design. Declare mutable/protected fields, grants, validation, isolated trials, identity, state/reset/recovery and verified activation through its owner. Configuration visibility alone is insufficient; prove an authorized candidate changes actual execution. See [Lab development](fruitfly_agent/lab/README.md#design-for-improvement). |
@@ -64,7 +64,7 @@ Follow the dependency table in [Runtime architecture](fruitfly_agent/README.md#m
 | Current state | Describe implemented behavior and limits. Do not create histories, changelogs, migration narratives, roadmaps, planning files, or design diaries. |
 | Examples | Check imports, arguments, profile IDs, commands, and results against the implementation. Identify placeholders and network/cost requirements beside the operation. |
 | Research sources | Cite the paper in the algorithm's README and state which ideas and capabilities are actually implemented. Keep project inspiration and upstream naming in top-level documentation and legal attribution. |
-| Naming | Use FruitFlyAgent, `fruitfly_agent`, `eval`, `fruitfly-agent`, `fruitfly-agent-eval`, and Provider consistently. |
+| Naming | Use FruitFlyAgent, `fruitfly_agent`, `fruitfly_eval`, `fruitfly-agent`, `fruitfly-agent-eval`, and Provider consistently. |
 | Removed or renamed content | Use `rg` to find stale paths, names, commands, fields, and links; update all affected references without relocating obsolete explanations. |
 
 | Changed area | Documentation to check |
@@ -88,7 +88,7 @@ Update affected pages in the same change. Do not rewrite unrelated pages or dupl
 | Explicitly authorized contract change | Review callers and compatibility/rejection behavior; synchronize implementation, tests, and docs; explain the impact. |
 | Documentation, comments, or formatting only | Check links, examples, and consistency. New behavior tests and the full suite may be omitted; explain why. |
 | Main CLI or entry-point change | Run `.venv/bin/python -m fruitfly_agent --help`. |
-| Eval entry-point change | Run `.venv/bin/python -m eval catalog --json`. |
+| Eval entry-point change | Run `.venv/bin/python -m fruitfly_eval catalog --json`. |
 
 Run relevant offline checks first. For behavior changes, run the full suite and resolve every failure before delivery:
 

@@ -12,7 +12,7 @@ import importlib.abc
 import sys
 class NoEval(importlib.abc.MetaPathFinder):
     def find_spec(self, fullname, path=None, target=None):
-        if fullname == 'eval' or fullname.startswith('eval.'):
+        if fullname == 'fruitfly_eval' or fullname.startswith('fruitfly_eval.'):
             raise ModuleNotFoundError('eval intentionally unavailable')
 sys.meta_path.insert(0, NoEval())
 import asyncio
@@ -50,7 +50,7 @@ async def check():
         finally:
             await app.close()
 asyncio.run(check())
-assert not any(name == 'eval' or name.startswith('eval.') for name in sys.modules)
+assert not any(name == 'fruitfly_eval' or name.startswith('fruitfly_eval.') for name in sys.modules)
 print('optional-eval-independent')
 '''
         result = subprocess.run([sys.executable, '-c', script], cwd=ROOT, capture_output=True, text=True, timeout=20)

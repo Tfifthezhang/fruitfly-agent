@@ -24,6 +24,7 @@ def definition():
         install_order=32), _install, implementation_id='retained-skill-v1',
         artifact_slots=frozenset({SKILL_DOCUMENT}), configuration_role='S',
         configuration_edit=configuration_edit,
+        parameter_paths={'initial_text':'content.body','source_path':'settings.source_path','max_chars':'settings.max_chars'},
         configuration_snapshot=_snapshot,
         component_specs=lambda parameters, enabled: (ComponentSpec(SKILL_DOCUMENT, 'S', 'retained-document', 'skill-document-v1'),) if enabled else (),
         implementation_path='fruitfly_agent/lab/context_manager/augmentation/skills/document.py',

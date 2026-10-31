@@ -93,10 +93,12 @@ async def close_transport(operation, timeout):
 async def attempts(provider, view, signal):
     policy = provider._policy
     total_deadline = time.monotonic() + policy.total_timeout
+    failures = []
     for attempt in range(provider.retry_max + 1):
         if signal is not None and signal.is_set():
             raise asyncio.CancelledError
         delivered = False
+        started = time.monotonic()
         yield StreamActivity("waiting_model", attempt + 1, provider.retry_max + 1)
         producer = provider._stream_once(view, signal, deadline=AttemptDeadline(policy, total_deadline))
         try:
@@ -110,6 +112,13 @@ async def attempts(provider, view, signal):
             raise
         except TaggedError as exc:
             details = exc.details if isinstance(exc.details, dict) else {}
+            diagnostics = dict(details.get('diagnostics', {}))
+            failures.append({'attempt': attempt + 1, 'elapsed_seconds': time.monotonic() - started,
+                             'error_kind': type(exc).__name__, 'status_code': details.get('status_code'),
+                             'content_delivered': delivered, 'causes': diagnostics.get('causes', [])})
+            failures = failures[-8:]
+            diagnostics.update(attempt_count=attempt + 1, attempts=list(failures))
+            exc.details = {**details, 'diagnostics': diagnostics}
             kind = details.get("timeout_kind", type(exc).__name__)
             if details.get("timeout_kind"):
                 yield StreamActivity("provider_timeout", attempt + 1, provider.retry_max + 1, error_kind=kind)
@@ -128,6 +137,7 @@ async def attempts(provider, view, signal):
                 await bounded_wait(provider._sleep(delay, signal), signal, total_deadline,
                                    "total_timeout", policy.cleanup_timeout)
             except RetryableError as timeout:
+                timeout.details = {**(timeout.details or {}), 'diagnostics': diagnostics}
                 yield StreamActivity("provider_timeout", attempt + 1, provider.retry_max + 1, error_kind="total_timeout")
                 yield StreamError(timeout)
                 return

@@ -19,7 +19,7 @@ from fruitfly_agent.improvement.contracts.validation import relative_path
 from fruitfly_agent.improvement.contracts.versions import canonical_json
 from fruitfly_agent.improvement.execution.handles import ManagedExecution
 from fruitfly_agent.improvement.execution.facts import attach_facts, loop_fact_values, receipt_facts
-from fruitfly_agent.improvement.contracts.facts import BudgetFact
+from fruitfly_agent.improvement.contracts.facts import UsageFact
 from fruitfly_agent.improvement.contracts.components import TrialSetup
 
 
@@ -32,12 +32,9 @@ class FileTaskRunner:
     """
     capabilities = frozenset({'file-workspace', 'tool:read', 'tool:write', 'tool:edit', 'events', 'stop', 'execution-config', 'execution-setup'})
 
-    def __init__(self, config, components, artifacts, services, *, tool_names=None, model_calls=None):
+    def __init__(self, config, components, artifacts, services, *, tool_names=None):
         self.config, self.components, self.artifacts, self.services = config, components, artifacts, services
         self.tool_names = frozenset({"read", "write", "edit"} if tool_names is None else tool_names)
-        if model_calls is not None and (type(model_calls) is not int or model_calls < 1):
-            raise ValueError('task model_calls must be a positive integer')
-        self.model_limit = model_calls
         self.capabilities = frozenset(c for c in type(self).capabilities if not c.startswith("tool:") or c[5:] in self.tool_names)
 
     async def start(self, plan, task, harness):
@@ -74,7 +71,7 @@ class FileTaskRunner:
         files = {r.path: self.artifacts.read(r.artifact_id) for r in task.inputs}
         originals = dict(files)
         calls = 0
-        model_limit_hit = False
+        usage_rows: list[dict[str, Any]] = []
         partial_messages = [UserMessage(content=task.instruction)]
         completed_tools = 0
         def read_path(path):
@@ -126,13 +123,12 @@ class FileTaskRunner:
         tools = tuple(tool for tool in (replace(factory(), execute=execute) for factory, execute in (
             (create_read_tool, read), (create_write_tool, write), (create_edit_tool, edit))) if tool.name in self.tool_names)
         def provider(view, *, signal=None):
-            nonlocal calls, model_limit_hit
-            if self.model_limit is not None and calls >= self.model_limit:
-                model_limit_hit = True
-                from fruitfly_agent.improvement.workflow.budget import AllocationExhausted
-                raise AllocationExhausted('task model-call limit exhausted')
-            self.services.reserve('model')
+            nonlocal calls
+            self.services.observe('model')
             calls += 1
+            request_id = uuid4().hex
+            usage_rows.append({'kind': 'request', 'id': request_id})
+            self.services.record('request', id=request_id, model=view.model)
             journal.publish('model-request', model=view.model, call=calls)
             self.services.record('task-model-request', task_id=task.task_id, harness_id=harness.snapshot_id)
             async def events():
@@ -145,6 +141,10 @@ class FileTaskRunner:
                     message = await inner.result()
                 finally:
                     await inner.aclose()
+                self.services.record('response', attempt_id=request_id, status='completed',
+                    usage=message.usage.to_dict() if message.usage else None)
+                usage_rows.append({'kind': 'response', 'attempt_id': request_id,
+                                   'usage': message.usage.to_dict() if message.usage else None})
                 partial_messages.append(replace(message, provider_state=None))
                 if message.text:
                     journal.publish('assistant-output', artifact_id=self.artifacts.put(message.text.encode('utf-8')),
@@ -166,8 +166,8 @@ class FileTaskRunner:
         config = AgentLoopConfig(provider=provider, model=self.config.model,
             context_meter=self.config.context_meter,
             max_tokens=self.config.max_tokens, context_window=self.config.context_window,
-            system_prompt=self.config.system_prompt, tools=tools, max_turns=self.config.max_turns,
-            max_tool_calls_per_turn=self.config.max_tool_calls_per_turn,
+            system_prompt=self.config.system_prompt, tools=tools, max_turns=None,
+            max_tool_calls_per_turn=None,
             max_context_recovery_attempts=self.config.max_context_recovery_attempts,
             tool_execution=self.config.tool_execution,
             on_tool_result=observed)
@@ -189,6 +189,7 @@ class FileTaskRunner:
                 config = adapter.prepare_trial(config, document)
             elif document != adapter.snapshot():
                 raise ValueError('the file-task runner cannot install this component')
+        config=replace(config,max_turns=None,max_tool_calls_per_turn=None)
         def finish(result=None):
             messages = result.messages if result is not None else partial_messages
             answers = [m for m in messages if isinstance(m, AssistantMessage)]
@@ -203,16 +204,16 @@ class FileTaskRunner:
                 if content != originals.get(path):
                     artifacts.append(Resource('deliverables/' + path, self.artifacts.put(content),
                                               'application/octet-stream', 'deliverable'))
-            status: Literal['completed', 'error', 'cancelled', 'budget_exhausted'] = ('completed' if not result.is_error and result.stop_reason == 'stop' else 'error') if result is not None else 'cancelled'
+            status: Literal['completed', 'error', 'cancelled', 'timeout'] = ('completed' if not result.is_error and result.stop_reason == 'stop' else 'error') if result is not None else 'cancelled'
             record = ExecutionRecord(run_id, task.task_id, task.material_id, harness.snapshot_id,
                 plan.parent.state, plan.conditions_id, status, output, tuple(artifacts), calls)
             values: dict[str, Any] = loop_fact_values(result.diagnostics) if result is not None else {
                 'termination_reason': 'execution_interrupted', 'diagnosable': completed_tools > 0,
                 'counters': (('tool_completed', completed_tools),)}
-            if model_limit_hit:
-                values['termination_reason'] = 'model_budget_exhausted'
-            values['budgets'] = (*values.get('budgets', ()), BudgetFact('model_calls', 'execution', calls, self.model_limit,
-                source='budgeted file-task Provider'))
+            values['usage'] = (*values.get('usage', ()), UsageFact('model_calls', 'execution', calls,
+                source='file-task Provider observations'))
+            from fruitfly_agent.improvement.execution.facts import model_usage_facts
+            values['usage'] = (*values['usage'], *model_usage_facts(usage_rows, calls))
             facts = receipt_facts(record, self.artifacts, elapsed_seconds=time.monotonic() - started, **values)
             return attach_facts(record, facts, self.artifacts)
         try:

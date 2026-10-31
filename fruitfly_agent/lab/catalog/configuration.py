@@ -10,6 +10,7 @@ from typing import Callable
 
 from fruitfly_agent.runtime_spec import HarnessConfig, MechanismSelection
 from fruitfly_agent.runtime_spec.components import ComponentConfiguration
+from .parameters import encode_parameters, decode_parameters
 from fruitfly_agent.runtime_spec.profiles import load_harness_config, DEFAULT_PROMPT_ID
 
 
@@ -75,10 +76,10 @@ def configure_profile(profile, catalog):
             raise ValueError('component does not match its registered ID/role: ' + document.id)
         if set(document.parameters) & set(definition.model_role_parameters.values()):
             raise ValueError('bind component model aliases through system models.roles: ' + document.id)
+        parameters = decode_parameters(definition,dict(document.parameters))
         if definition.validate_parameters:
-            definition.validate_parameters(document.parameters)
-        definition.descriptor.normalize_parameters(document.parameters)
-        parameters = dict(document.parameters)
+            definition.validate_parameters(parameters)
+        definition.descriptor.normalize_parameters(parameters)
         for role, field in definition.model_role_parameters.items():
             if role in profile.model_roles:
                 if field in parameters and parameters[field] != profile.model_roles[role]:
@@ -178,8 +179,8 @@ def edit_grants(profile, grants, catalog):
 
 
 def text_edit_options(fields, bounds):
-    if fields != ['parameters.text'] or bounds:
-        raise ValueError('text component permits only parameters.text without numeric bounds')
+    if len(fields)!=1 or fields[0] not in {'parameters.instructions.system','parameters.instructions.usage'} or bounds:
+        raise ValueError('text component requires its instruction path without numeric bounds')
     return {}
 
 
@@ -192,11 +193,12 @@ def configuration_inventory(profile, catalog, *, artifact_reader=None):
         if document.implementation in surfaces:
             owner, surface = surfaces[document.implementation]
             effective = surface.normalize(dict(document.parameters))
+            if surface.binding=='configuration':effective=surface.decode(surface.encode(effective))
             editable = surface.edit_options is not None
         else:
             definition = catalog.get(document.implementation)
             owner = definition.descriptor.mechanism_id
-            effective = definition.descriptor.normalize_parameters(document.parameters)
+            effective = encode_parameters(definition,definition.descriptor.normalize_parameters(decode_parameters(definition,dict(document.parameters))))
             editable = definition.configuration_edit is not None
         def fields(value, prefix='parameters'):
             return {key: entry for name, item in value.items()
@@ -245,7 +247,7 @@ def component_profile(profile, catalog, *, artifact_reader=None):
             if alias:
                 roles[role] = alias
         fresh = ComponentConfiguration(selection.mechanism_id,
-            definition.configuration_role, selection.mechanism_id, parameters, selection.enabled,
+            definition.configuration_role, selection.mechanism_id, encode_parameters(definition,parameters), selection.enabled,
             artifacts=artifacts)
         old = documents.get(selection.mechanism_id)
         documents[selection.mechanism_id] = old if old == fresh else fresh
@@ -256,7 +258,7 @@ def component_profile(profile, catalog, *, artifact_reader=None):
             continue
         parameters = None
         if surface.binding == 'configuration':
-            parameters = dict(getattr(profile, surface.key))
+            parameters = surface.decode(json.dumps(dict(getattr(profile,surface.key))))
         elif surface.binding == 'settings':
             parameters = profile.component_settings.get(surface.key)
             if parameters is not None and name in profile.artifact_bindings:
@@ -379,12 +381,13 @@ def materialize_system(profile, destination, *, catalog=None, artifact_reader=No
 
 def normalize_configuration_binding(key, text, catalog):
     """Normalize a configuration binding for the exact assembled execution identity."""
-    from fruitfly_agent.runtime_spec.execution import parse_execution
     if key == 'execution':
-        values = parse_execution(text)
+        from fruitfly_agent.lab.execution_policy import parse_policy
+        values = parse_policy(text)
     elif key.startswith('component.'):
+        from .parameters import decode_parameters
         definition = catalog.get(key.removeprefix('component.'))
-        values = definition.descriptor.normalize_parameters(json.loads(text))
+        values = definition.descriptor.normalize_parameters(decode_parameters(definition, json.loads(text)))
         if definition.validate_parameters:
             definition.validate_parameters(values)
     else:

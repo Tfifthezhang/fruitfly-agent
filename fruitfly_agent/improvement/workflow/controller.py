@@ -10,7 +10,6 @@ from fruitfly_agent.improvement.contracts.components import HarnessSnapshot
 from fruitfly_agent.improvement.contracts.pipeline import ImprovementOutcome
 from fruitfly_agent.improvement.contracts.assessment import SelectionDecision, Measurement
 from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
-from fruitfly_agent.improvement.workflow.budget import AllocationExhausted
 from fruitfly_agent.improvement.contracts.stopping import SearchState
 from fruitfly_agent.improvement.workflow.services import GeneratorServices
 from fruitfly_agent.improvement.contracts.stopping import StopDecision, stop_reason
@@ -115,7 +114,6 @@ class ImprovementWorkflow:
         state.harnesses = {baseline.snapshot_id: baseline}
         current, reason = (baseline, 'completed')
         state.decision = state.selected = None
-        selection_budget = None
         state.selection_count = -1
         state.no_gain = 0
         state.failures = 0
@@ -130,19 +128,22 @@ class ImprovementWorkflow:
             services.record('workflow-checkpoint', outcome=asdict(value))
 
         async def execute(harness):
-            services.reserve('execution', getattr(self.runner, 'execution_charge', 1))
+            services.observe('execution', getattr(self.runner, 'execution_charge', 1))
             services.record('execution-start', harness_id=harness.snapshot_id, task_id=task.task_id)
             await services.emit('before_trial', {'harness_id': harness.snapshot_id, 'task_id': task.task_id})
             try:
-                record = (await scheduler.map((lambda: run_stage(services, 'execute', lambda: self.runner.execute(plan, task, harness), validator=lambda v: require_type(v, ExecutionRecord)),)))[0]
+                record = (await scheduler.map((lambda: run_stage(services, 'execute', lambda: self.runner.execute(plan, task, harness), validator=lambda v: require_type(v, ExecutionRecord), bounded=getattr(self.runner, 'execution_charge', 1) != 0),)))[0]
             except StageFailure as exc:
                 record = exc.record or ExecutionRecord('failed-' + uuid4().hex, task.task_id, task.material_id, harness.snapshot_id, plan.parent.state, plan.conditions_id, 'error', 'Execution ended without a complete receipt: ' + exc.failure.code)
+                if exc.failure.code == 'timeout' and self.artifacts is not None:
+                    from ..execution.facts import timed_out
+                    record = timed_out(record, self.artifacts)
                 if self.artifacts is not None and exc.record is None:
-                    record = attach_facts(record, receipt_facts(record, self.artifacts, termination_reason='execution_' + exc.failure.code), self.artifacts)
+                    record = ensure_facts(record, self.artifacts)
             if record.task_id != task.task_id or record.material_id != task.material_id or record.harness_id != harness.snapshot_id or (record.initial_state_id != plan.parent.state) or (record.conditions_id != plan.conditions_id) or any((r.run_id == record.run_id for r in state.records)):
                 raise IntegrityError('execution receipt differs from frozen task, state, conditions or harness')
             if self.artifacts is not None:
-                record = ensure_facts(record, self.artifacts)
+                record = services.prepare_evidence(task,record,self.artifacts)
             state.records.append(record)
             state.failures = 0 if record.status == 'completed' else state.failures + 1
             state.harnesses[harness.snapshot_id] = harness
@@ -201,12 +202,9 @@ class ImprovementWorkflow:
                     state.selected = record
                     state.decision = SelectionDecision(record.run_id, 'Baseline retained until supported comparison')
                     checkpoint()
-                if self.completed_assessment is not None:
-                    await run_stage(services, 'assess', lambda: self.completed_assessment.ensure_available())
             if not any((diagnostic_reference(r, self.artifacts) for r in state.records)):
                 reason = 'reference_unavailable'
             else:
-                selection_budget = services.budget.child({'model': min(8, services.budget.available('model') // 8), 'execution': 0})
                 reference_records: tuple[ExecutionRecord, ...] = ()
                 prior_candidates: tuple[CandidateBundle, ...] = ()
 
@@ -228,6 +226,7 @@ class ImprovementWorkflow:
                         return proposal
                     await run_stage(services, 'propose', lambda: validate_batch())
                     for candidate in proposal.candidates:
+                        services.hypotheses[candidate.harness.snapshot_id]=candidate.reasons
                         state.candidates.append(candidate)
                         services.record('candidate-validated', candidate=asdict(candidate))
                         await services.emit('after_candidate_validated', {'candidate_id': candidate.candidate_id, 'harness_id': candidate.harness.snapshot_id, 'reasons': [asdict(r) for r in candidate.reasons]})
@@ -235,24 +234,19 @@ class ImprovementWorkflow:
 
                 async def probe(harness):
                     await execute(harness)
-                    if self.completed_assessment is not None:
-                        await run_stage(services, 'assess', lambda: self.completed_assessment.ensure_available())
 
                 async def compose(current, history, index):
                     request = CompositionRequest(plan, task, current, history, tuple(state.records), index, tuple(experience), tuple(state.feedback))
                     candidate = await run_stage(services, 'compose', lambda: self.composer.compose(request, restricted))
                     await run_stage(services, 'compose', lambda: self.validate(candidate, plan=plan, baseline=current, records=tuple(state.records)))
+                    services.hypotheses[candidate.harness.snapshot_id]=candidate.reasons
                     state.candidates.append(candidate)
                     services.record('candidate-validated', candidate=asdict(candidate))
                     await services.emit('after_candidate_validated', {'candidate_id': candidate.candidate_id, 'harness_id': candidate.harness.snapshot_id, 'reasons': [asdict(r) for r in candidate.reasons]})
                     return candidate
 
                 async def select(round_index, last):
-                    nonlocal selection_budget
                     previous = state.selected.harness_id if state.selected else None
-                    if last and selection_budget is not None:
-                        selection_budget.close()
-                        selection_budget = None
                     await choose()
                     state.no_gain = state.no_gain + 1 if state.selected is None or state.selected.harness_id == previous else 0
 
@@ -270,8 +264,6 @@ class ImprovementWorkflow:
                     services.record('exploration-selected', **asdict(seed))
                     return state.harnesses[chosen_seed.harness_id]
                 reason = await SearchEngine().run(schedule, baseline, SearchProblem(begin, propose, probe, compose, select, stop, advance, services.record, state=state, services=services, managed=True))
-        except AllocationExhausted:
-            reason = 'budget_exhausted'
         except AssessmentUnavailable:
             reason = 'assessment_unavailable'
         except StageFailure as exc:
@@ -283,12 +275,7 @@ class ImprovementWorkflow:
             reason = 'stage_failed.hook'
         if state.selected is not None:
             try:
-                if selection_budget is not None:
-                    selection_budget.close()
                 await choose()
-            except AllocationExhausted:
-                services.record('selection-insufficient', reason='budget exhausted; incumbent retained')
-                reason = 'budget_exhausted'
             except StageFailure:
                 services.record('selection-insufficient', reason='selection stage failed; incumbent retained')
         services.check()
@@ -297,25 +284,16 @@ class ImprovementWorkflow:
         if reason in {'assessment_unavailable', 'stage_failed.hook'}:
             return outcome
         if plan.purpose == 'persistent' and state.selected is not None:
-            protected = services.verification_budget
-            if protected is not None:
-                protected.extend({k: services.budget.available(k) for k in ('model', 'execution')})
             try:
-                with services.phase(protected or services.budget):
-                    proof = await run_stage(services, 'verify', lambda: self.verifier.verify(outcome), validator=lambda v: require_type(v, SelectionDecision, optional=True))
-            except AllocationExhausted:
-                return replace(outcome, decision=None, stop_reason='budget_exhausted')
+                proof = await run_stage(services, 'verify', lambda: self.verifier.verify(outcome), validator=lambda v: require_type(v, SelectionDecision, optional=True), bounded=not getattr(self.verifier, 'manages_stage_times', False))
             except StageFailure:
                 return replace(outcome, decision=None, stop_reason='verification_failed')
-            finally:
-                if protected is not None:
-                    protected.close()
             if proof is None or proof.assurance != 'verified' or proof.run_id != state.selected.run_id:
                 return replace(outcome, decision=None, stop_reason='verification_failed')
             outcome = replace(outcome, decision=proof)
         if plan.retain_experience and self.reflector is not None and (state.selected is not None):
             try:
-                entries = await services.operation(self.reflector.reflect(outcome))
+                entries = await services.operation(self.reflector.reflect(outcome), stage='reflect')
                 known = {r.run_id for r in state.records}
                 for entry in entries:
                     if entry.task_id != task.task_id or entry.harness != outcome.harness or set(entry.evidence_ids) - known:

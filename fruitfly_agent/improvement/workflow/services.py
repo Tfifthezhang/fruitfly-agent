@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import contextmanager
 from dataclasses import asdict, replace
 import time
 import inspect
@@ -22,25 +21,24 @@ from fruitfly_agent.improvement.contracts.assessment import SelectionDecision, M
 from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
 
 
-from fruitfly_agent.improvement.workflow.budget import BudgetScope, AllocationExhausted, operation_deadline
+from .timing import StageClock, current_stage, stage_role
 
 
 class WorkflowServices:
     """Job-local accounting and cancellation. Editor receives a restricted view."""
-    def __init__(self, plan, *, edit=None, complete=None, record=None, signal=None, budget=None, hooks=None):
+    def __init__(self, plan, *, edit=None, complete=None, record=None, signal=None, hooks=None):
         self.plan, self.editor = plan, edit
         self.completer = complete
         self.sink = record or (lambda event, **fields: None)
-        self.budget = budget or BudgetScope({'model': plan.max_model_calls, 'execution': plan.max_executions}, signal=signal)
-        self.signal = self.budget.signal
-        self.used = self.budget.used
+        self.signal = signal if signal is not None else asyncio.Event()
+        self.used = {'model': 0, 'execution': 0}
         self.events: deque[tuple[str, dict[str, Any]]] = deque(maxlen=256)
         self.hooks = hooks if hooks is not None else HookRegistry()
         self.state = None
-        self.uncertain_model_allowance = 0
         self.resources = []
-        self.verification_budget = None
         self.interrupted_records = []
+        self.evidence_builder = None
+        self.hypotheses = {}
         self.supervisor = OperationSupervisor(cleanup_error=CleanupError)
 
     def own(self, resource):
@@ -51,14 +49,11 @@ class WorkflowServices:
     async def close(self):
         """Close owned optional async resources, even after cancellation."""
         errors = []
-        try:
-            for resource in reversed(tuple(self.resources)):
-                try:
-                    await self.release(resource)
-                except (Exception, asyncio.CancelledError) as exc:
-                    errors.append(exc)
-        finally:
-            self.budget.close()
+        for resource in reversed(tuple(self.resources)):
+            try:
+                await self.release(resource)
+            except (Exception, asyncio.CancelledError) as exc:
+                errors.append(exc)
         if errors:
             raise CleanupError('owned resource cleanup failed') from errors[0]
 
@@ -87,30 +82,37 @@ class WorkflowServices:
         await self.close()
 
     def check(self):
-        self.budget.check()
+        if self.supervisor.poisoned:
+            raise CleanupError('previous stage retirement was not confirmed')
+        if self.signal.is_set():
+            raise asyncio.CancelledError('improvement cancelled')
+        clock = current_stage.get()
+        if clock is not None and clock.owner is self:
+            clock.check()
 
     def retain_execution(self, record):
         self.interrupted_records.append(record)
         self.record('execution-interrupted', receipt=asdict(record))
 
-    def reserve(self, kind, amount=1):
-        self.budget.reserve(kind, amount)
+    def prepare_evidence(self,task,record,artifacts):
+        from ..contracts.tasks import Resource
+        from ..execution.facts import ensure_facts
+        reasons=self.hypotheses.get(record.harness_id,())
+        if reasons and not any(r.path=='candidate-hypotheses.json' for r in record.artifacts):
+            resource=Resource('candidate-hypotheses.json',artifacts.put(canonical_json([asdict(v)for v in reasons]).encode()),'application/json','diagnostic')
+            record=replace(record,artifacts=(*record.artifacts,resource))
+        record=ensure_facts(record,artifacts)
+        return self.evidence_builder(task,record,artifacts) if self.evidence_builder is not None else record
 
-    @contextmanager
-    def phase(self, budget):
-        previous = self.budget
-        self.budget = budget
-        try:
-            yield
-        finally:
-            self.budget = previous
-
-    def protect_verification(self, limits):
-        self.verification_budget = self.budget.child(limits)
+    def observe(self, kind, amount=1):
+        if kind not in self.used or type(amount) is not int or amount < 0:
+            raise ValueError('invalid usage observation')
+        self.used[kind] += amount
 
     def record(self, event, **fields):
-        if event == 'external-budget-settled' and fields.get('observed_calls') is None:
-            self.uncertain_model_allowance += fields['charged_allowance']
+        clock = current_stage.get()
+        if clock is not None and clock.owner is self:
+            fields.setdefault('role', clock.stage)
         self.events.append((event, fields))
         try:
             self.sink(event, **fields)
@@ -133,34 +135,46 @@ class WorkflowServices:
     async def complete(self, system, prompt):
         if self.completer is None:
             raise ValueError('this generator requires a model completion capability')
-        self.reserve('model')
+        self.observe('model')
         self.record('generator-model-request')
         result = await self.operation(self.completer(system, prompt, signal=self.signal))
         self.record('generator-model-response', text=result)
         return result
 
-    async def operation(self, awaitable):
+    async def operation(self, awaitable, *, stage='editor'):
+        role = stage_role(stage)
+        active = current_stage.get()
+        if active is not None and active.owner is self and active.stage == role:
+            self.check()
+            return await awaitable
         if self.supervisor.poisoned:
             if inspect.iscoroutine(awaitable):
                 awaitable.close()
             raise CleanupError('previous stage retirement was not confirmed')
-        try:
-            self.check()
-        except BaseException:
+        if self.signal.is_set():
             if inspect.iscoroutine(awaitable):
                 awaitable.close()
-            raise
-        deadline = min(time.monotonic() + self.plan.operation_timeout,
-                       self.budget.deadline or float('inf'), operation_deadline.get() or float('inf'))
-        token = operation_deadline.set(deadline)
+            raise asyncio.CancelledError
+        started = time.monotonic()
+        seconds = getattr(self.plan.timeouts, role + '_seconds')
+        clock = StageClock(self, role, started, started + seconds)
+        token = current_stage.set(clock)
+        self.record('operation-started', role=role, timeout_seconds=seconds)
+        status = 'completed'
         try:
-            return await self.supervisor.run(lambda: awaitable,
-                timeout=max(0, deadline - time.monotonic()), signal=self.signal, check=self.check)
-        except CleanupError:
-            self.record('cleanup-unconfirmed', operation='stage')
+            return await self.supervisor.run(lambda: awaitable, timeout=seconds, signal=self.signal)
+        except TimeoutError:
+            status = 'timeout'
+            raise
+        except asyncio.CancelledError:
+            status = 'cancelled'
+            raise
+        except BaseException:
+            status = 'error'
             raise
         finally:
-            operation_deadline.reset(token)
+            current_stage.reset(token)
+            self.record('operation-finished', role=role, status=status, elapsed_seconds=time.monotonic() - started)
 
 
 

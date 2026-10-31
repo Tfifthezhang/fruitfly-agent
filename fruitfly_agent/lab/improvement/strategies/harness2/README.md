@@ -5,7 +5,7 @@
 Adapt the contrastive Propose–Probe–Compose schedule from
 [Harness²: Recursive Agent Harnessing for an Open World](https://arxiv.org/abs/2610.14224).
 `strategy.py` owns invariant/domain mission pairing, reference width and composition
-count. Shared services own execution, evidence, budgets, comparison and verification.
+count. Shared services own execution, evidence, phase times, comparison and verification.
 
 Parallel width `k` runs `k` references, `2k` proposals and `k` compositions when each
 proposal supplies one candidate. Sequential depth `k` chains those contrastive

@@ -39,7 +39,7 @@ class KernelTests(unittest.IsolatedAsyncioTestCase):
     async def test_required_hook_stops_job_and_optional_timeout_does_not(self):
         for required in (False, True):
             flow, plan, baseline, _ = build_pipeline()
-            plan = replace(plan, operation_timeout=.01)
+            plan = replace(plan, timeouts={'editor_seconds':.01,'execution_seconds':.01,'evaluator_seconds':.01})
             services = WorkflowServices(plan)
             async def hanging(event):
                 await asyncio.Event().wait()
@@ -67,18 +67,15 @@ class KernelTests(unittest.IsolatedAsyncioTestCase):
         finally:
             await services.close()
 
-    async def test_long_sequence_bounds_closed_children_events_and_unknown_usage(self):
-        _, plan, _, _ = build_pipeline()
-        services = WorkflowServices(plan)
+    async def test_long_sequence_bounds_events_without_quota_control(self):
+        _,plan,_,_=build_pipeline()
+        services=WorkflowServices(plan)
         for index in range(3000):
-            child = services.budget.child({'model': 0, 'execution': 0})
-            child.close()
-            services.record('external-budget-settled', observed_calls=None, charged_allowance=1)
-            services.record('transition', index=index)
-        self.assertEqual(services.budget.children, [])
-        self.assertEqual(len(services.events), 256)
-        self.assertEqual(services.uncertain_model_allowance, 3000)
-        self.assertEqual(services.used['model'], 0)
+            services.observe('model')
+            services.record('transition',index=index)
+        self.assertEqual(len(services.events),256)
+        self.assertEqual(services.used['model'],3000)
+        self.assertFalse(hasattr(services,'budget'))
         await services.close()
 
     async def test_long_sequence_of_stage_transitions_isolates_deterministic_faults(self):

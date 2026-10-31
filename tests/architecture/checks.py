@@ -3,7 +3,7 @@ import ast
 from importlib.util import resolve_name
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE_ROOTS = (ROOT / "fruitfly_agent", ROOT / "eval")
+SOURCE_ROOTS = (ROOT / "fruitfly_agent", ROOT / "fruitfly_eval")
 DOCUMENTED_ROOTS = (*SOURCE_ROOTS, ROOT / "tests")
 
 ALLOWED_EDGES = {
@@ -13,15 +13,15 @@ ALLOWED_EDGES = {
     # External experiment composition. Existing runtime dependency edges stay unchanged.
     "fruitfly_agent.experiments": {"fruitfly_agent.rsi","fruitfly_agent.runtime_spec", "fruitfly_agent.improvement", 
         "fruitfly_agent.experiments", "fruitfly_agent.run", "fruitfly_agent.lab",
-        "fruitfly_agent.providers", "fruitfly_agent.interactive", "eval",
+        "fruitfly_agent.providers", "fruitfly_agent.interactive", "fruitfly_eval",
     },
     "fruitfly_agent.core": {"fruitfly_agent.core"},
     "fruitfly_agent.improvement": {"fruitfly_agent.improvement", "fruitfly_agent.core"},
     "fruitfly_agent.lab": {"fruitfly_agent.runtime_spec", "fruitfly_agent.core", "fruitfly_agent.improvement", "fruitfly_agent.lab"},
-    "eval": {"fruitfly_agent.runtime_spec", "fruitfly_agent.improvement", 
+    "fruitfly_eval": {"fruitfly_agent.runtime_spec", "fruitfly_agent.improvement", 
         "fruitfly_agent.core",
         "fruitfly_agent.lab",
-        "eval",
+        "fruitfly_eval",
         "fruitfly_agent.providers",
     },
     "fruitfly_agent.providers": {"fruitfly_agent.core", "fruitfly_agent.providers"},
@@ -71,16 +71,16 @@ def _resolve(node: ast.ImportFrom, source_module: str, is_pkg: bool) -> list[str
 
 def _top(module: str) -> str:
     parts = module.split(".")
-    if parts[0] == "eval":
-        return "eval"
+    if parts[0] == "fruitfly_eval":
+        return "fruitfly_eval"
     if len(parts) >= 2:
         return ".".join(parts[:2])
     return parts[0]
 
 def _is_project_module(module: str) -> bool:
     return (
-        module == "eval"
-        or module.startswith("eval.")
+        module == "fruitfly_eval"
+        or module.startswith("fruitfly_eval.")
         or module == "fruitfly_agent"
         or module.startswith("fruitfly_agent.")
     )

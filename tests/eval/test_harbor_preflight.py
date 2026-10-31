@@ -5,8 +5,8 @@ import unittest
 from pathlib import Path
 import tempfile
 from unittest.mock import patch
-from eval.benchmarks.harbor import _harbor_executable
-from eval.benchmarks.swe_bench import SWEBenchAdapter
+from fruitfly_eval.benchmarks.harbor import _harbor_executable
+from fruitfly_eval.benchmarks.swe_bench import SWEBenchAdapter
 from tests.support.harbor import load_harbor_agent, prepared_harbor
 
 
@@ -20,7 +20,7 @@ class HarborAdapterTests(unittest.TestCase):
             docker_command="/bin/docker",
         )
         with patch(
-            "eval.benchmarks.harbor._docker_check",
+            "fruitfly_eval.benchmarks.harbor._docker_check",
             return_value={"ok": True, "detail": "ready"},
         ):
             self.assertTrue(adapter.preflight("smoke").available)
@@ -34,8 +34,8 @@ class HarborAdapterTests(unittest.TestCase):
             executable = Path(directory) / "harbor"
             executable.write_text("", encoding="utf-8")
             executable.chmod(0o755)
-            with patch("eval.benchmarks.harbor.sys.executable", str(executable.with_name("python"))):
-                with patch("eval.benchmarks.harbor.shutil.which", return_value=None):
+            with patch("fruitfly_eval.benchmarks.harbor.sys.executable", str(executable.with_name("python"))):
+                with patch("fruitfly_eval.benchmarks.harbor.shutil.which", return_value=None):
                     self.assertEqual(_harbor_executable(), str(executable))
 
     def test_preflight_explains_docker_engine_failure(self) -> None:
@@ -44,7 +44,7 @@ class HarborAdapterTests(unittest.TestCase):
             docker_command="/bin/docker",
         )
         with patch(
-            "eval.benchmarks.harbor._docker_check",
+            "fruitfly_eval.benchmarks.harbor._docker_check",
             side_effect=(
                 {"ok": False, "detail": "Docker engine is unavailable"},
                 {"ok": True, "detail": "2.0"},
@@ -61,7 +61,7 @@ class HarborAdapterTests(unittest.TestCase):
             docker_command="/bin/docker",
         )
         with patch(
-            "eval.benchmarks.harbor._docker_check",
+            "fruitfly_eval.benchmarks.harbor._docker_check",
             side_effect=(
                 {"ok": True, "detail": "28.0"},
                 {"ok": False, "detail": "Docker Compose v2 is unavailable"},
@@ -89,7 +89,7 @@ class HarborAdapterTests(unittest.TestCase):
             secret_names=("TEST_API_KEY",), host=host, preparation=preparation,
         )
         job = json.loads((root / "harbor-job.json").read_text())
-        self.assertEqual(job["agents"][0]["import_path"], "eval.harbor_agent:FruitFlyHarborAgent")
+        self.assertEqual(job["agents"][0]["import_path"], "fruitfly_eval.harbor_agent:FruitFlyHarborAgent")
         self.assertEqual(job["tasks"], [{"path": preparation["tasks"][0]["path"], "source": adapter.descriptor.dataset}])
         self.assertEqual(job["n_attempts"], 2)
         self.assertEqual(job["retry"]["max_retries"], 0)

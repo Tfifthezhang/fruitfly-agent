@@ -187,7 +187,7 @@ class WebAssemblyTests(unittest.IsolatedAsyncioTestCase):
                 return client
             factory = RunApplicationFactory(cwd=root, environment={"BRAVE_SEARCH_API_KEY": "offline-search-token"},
                                              provider_registry=registry)
-            factory.configuration.set_mechanism("compaction", enabled=False)
+            factory.configuration.set_mechanism("working-memory-reduction", enabled=False)
             for name in ("web-search-tool", "web-fetch-tool"):
                 factory.configuration.set_mechanism(name, enabled=True)
             factory.configuration.save()

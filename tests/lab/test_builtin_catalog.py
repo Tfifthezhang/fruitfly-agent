@@ -15,7 +15,7 @@ class CatalogTest(unittest.TestCase):
             with self.subTest(method=definition.descriptor.mechanism_id):
                 self.assertTrue((root / definition.implementation_path).is_file())
                 self.assertTrue((root / definition.documentation_path).is_file())
-        self.assertEqual(builtin_catalog().get('compaction').input_parameters, ())
+        self.assertEqual(builtin_catalog().get('working-memory-reduction').input_parameters, ())
         self.assertEqual(builtin_catalog().get('live-http').input_parameters, ('endpoint',))
 
     def test_builtin_descriptors_use_two_dimensional_architecture(self) -> None:
@@ -35,7 +35,7 @@ class CatalogTest(unittest.TestCase):
                 "externalization",
                 "context-manager",
             ),
-            "compaction": (
+            "working-memory-reduction": (
                 "online",
                 "context",
                 "reduction",
@@ -75,17 +75,21 @@ class CatalogTest(unittest.TestCase):
                 "memory-files",
                 "knowledge-files",
                 "live-http",
-                "compaction",
-                "context-history",
-                "context-measurement",
                 "working-memory-reduction",
+                "context-history",
                 "rlm-ipython",
-                "execution-workflow",
                 "skill-document",
-                "learned-memory",
                 "component-improvement",
             },
         )
+
+    def test_current_configuration_rejects_retired_components(self):
+        from fruitfly_agent.lab.catalog.configuration import configuration_surfaces
+        catalog = builtin_catalog()
+        for name in ('compaction', 'context-measurement', 'execution-workflow', 'learned-memory'):
+            with self.subTest(component=name), self.assertRaises(ValueError): catalog.get(name)
+        for name in ('improvement-feedback', 'improvement-search'):
+            self.assertNotIn(name, configuration_surfaces(catalog))
 
     def test_ipython_and_rlm_descriptors_have_separate_effects(self) -> None:
         catalog = builtin_catalog()
@@ -110,24 +114,24 @@ class CatalogTest(unittest.TestCase):
         self.assertTrue(tool.effects.uses_provider)
         self.assertTrue(tool.effects.uses_network)
         self.assertIn(
-            "max_query_calls",
+            "query_timeout_seconds",
             {parameter.name for parameter in tool.parameters},
         )
 
     def test_compaction_descriptor_owns_config_and_costs(self) -> None:
-        definition = builtin_catalog().get("compaction")
+        definition = builtin_catalog().get("working-memory-reduction")
         descriptor = definition.descriptor
         self.assertEqual("reduction", descriptor.primary.context_phase)
         self.assertNotIn("profile", {p.name for p in descriptor.parameters})
         self.assertTrue(descriptor.effects.uses_provider)
         self.assertTrue(descriptor.effects.uses_network)
-        self.assertEqual("summarizing-v3", definition.implementation_id)
+        self.assertEqual("working-memory-v1", definition.implementation_id)
 
     def test_compaction_rejects_profile_parameter_even_when_disabled(self):
-        for name in ("unregistered-profile", "summarizing"):
+        for name in ("unregistered-profile", "retired-method"):
             for enabled in (True, False):
                 with self.subTest(name=name, enabled=enabled):
                     with self.assertRaisesRegex(ValueError, "unknown context policy parameter: profile"):
                         builtin_catalog().resolve((MechanismSelection(
-                            "compaction", enabled=enabled, parameters={"profile": name}
+                            "working-memory-reduction", enabled=enabled, parameters={"profile": name}
                         ),))

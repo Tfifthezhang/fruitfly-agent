@@ -48,7 +48,7 @@ class OfflineGenerator:
             for c in request.baseline.components)
         return ProposalResult((CandidateBundle(request.plan.parent, request.baseline,
             HarnessSnapshot(documents), self.generator_id,
-            tuple(EditReason(name, 'Synthetic offline contrast', (request.records[0].run_id,))
+            tuple(EditReason(name, 'Synthetic offline contrast', (request.records[0].run_id,), expected_effect='The proposed behavior appears in the subsequent execution.')
                   for name in request.plan.component_ids)),))
 
 

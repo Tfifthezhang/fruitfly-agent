@@ -14,6 +14,8 @@ def validate_execution(value):
         raise ValueError('execution contains unsupported fields')
     result = dict(value)
     for key, minimum in LIMITS.items():
+        if key in result and result[key] is None and key in {'max_turns', 'max_tool_calls_per_turn'}:
+            continue
         if key in result and (type(result[key]) is not int or result[key] < minimum):
             raise ValueError('execution.' + key + ' must be an integer of at least ' + str(minimum))
     if 'tool_execution' in result:
@@ -87,7 +89,7 @@ def apply_profile_binding(profile, kind, key, text):
             raise ValueError('parameter binding requires an existing enabled component')
         return replace(profile,
             mechanisms=tuple(replace(m, parameters=parameters) if m.mechanism_id == name else m for m in profile.mechanisms),
-            component_documents=tuple(replace(d, parameters=parameters) if d.id == name else d for d in profile.component_documents))
+            component_documents=profile.component_documents)
     if kind != 'configuration' or key != 'execution':
         raise ValueError('unsupported configuration binding')
     return replace(profile, execution=parse_execution(text))

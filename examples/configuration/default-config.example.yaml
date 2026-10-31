@@ -20,10 +20,8 @@ profiles:
         file: components/H/tools/write-tool.yaml
       context-history:
         file: components/H/context-history.yaml
-      context-measurement:
-        file: components/H/context-measurement.yaml
-      compaction:
-        file: components/H/compaction.yaml
+      working-memory-reduction:
+        file: components/H/working-memory-reduction.yaml
       base_prompt:
         file: components/H/base-prompt.yaml
       execution-policy:
@@ -32,7 +30,5 @@ profiles:
     I:
       improvement-editor:
         file: components/I/improvement-editor.yaml
-      improvement-feedback:
-        file: components/I/improvement-feedback.yaml
-      improvement-search:
-        file: components/I/improvement-search.yaml
+      improvement-evaluator:
+        file: components/I/improvement-evaluator.yaml

@@ -1,50 +1,34 @@
-# Workflow Kernel
+# Run Improvement Stages
 
 [Up: Improvement Runtime](../README.md)
 
-`engine.py` implements shared round transitions through `SearchProblem` callbacks.
-`controller.py` binds single-task ports and validates parent, component, task,
-state, conditions and result identities. Concrete batch search operations and
-strategy registration belong to [Lab](../../lab/improvement/workflow/README.md).
+`WorkflowServices` supplies cancellation, resource ownership, durable events,
+observational usage and independent stage times. It constructs no Provider or
+concrete editor/evaluator.
 
-`state.py` owns one job-local transition state. It is not passed to extensions.
-`operations.py` covers deferred synchronous invocation, awaiting and result
-validation, then normalizes stage-local failures while preserving cancellation,
-root deadlines and integrity errors. Failures never grant assurance. Earlier
-completed executions remain available after generation, execution, measurement
-or selection failure. Verification failure removes publication eligibility.
+| Stage | Default seconds | Scope |
+|---|---:|---|
+| Editor | 1200 | One editing invocation, including repair |
+| Execution | 3600 | One leaf task execution |
+| Evaluator | 1200 | One assessment or comparison |
 
-`services.py` supplies restricted generator capabilities, operation deadlines,
-owned resource retirement and journal delivery. Journal failure is fatal. On
-cancellation an operation waits at most ten seconds for retirement; unconfirmed
-work stops scheduling. Each resource close also has a ten-second bound; all closes
-are attempted before a cleanup error is raised. Hosts must supply durable sinks.
+Time starts when work begins. Same-stage nested work shares its invocation time;
+subsequent stages receive their full independent time. Composite task batches
+and fixed-I studies schedule leaf invocations rather than impose a shared deadline.
+User cancellation propagates globally. Timeout retires local work and preserves
+completed records. Unconfirmed cleanup prevents further scheduling.
 
-`budget.py` reserves before work. Child allocations hold quota and leaf work
-charges ancestors once. Closing returns unused quota. Confirmed external work can
-settle after cancellation; unknown usage consumes its reserved maximum. Root and
-local deadlines remain distinct. Final selection and verification use protected
-allocations. Tokens, monetary cost and SDK retries require separate accounting.
+Usage observations never authorize or reject work. There are no root allocations,
+child quotas or protected finalization reserves. Search schedules and explicit
+stop policies determine when another round starts.
 
-Concrete [selection](../../lab/improvement/assessment/README.md),
-[exploration](../../lab/improvement/strategies/README.md) and
-[soft stopping](../../lab/improvement/termination/README.md) belong to Lab.
-The engine executes injected operations; it does not decide their algorithms.
-Managed problems apply deadlines at leaf stages, allowing composite operations
-to retire a timed-out leaf and persist its receipt before proceeding. Custom
-problems receive the normal operation deadline unless explicitly managed.
-No workflow resource changes production configuration or replays uncertain work.
+| File | Responsibility |
+|---|---|
+| `timing.py` | Invocation clocks and stage roles |
+| `services.py` | Injected operations, observations and cleanup |
+| `operations.py` | Stage result validation and attributable failure |
+| `controller.py`, `engine.py` | Shared search transitions and result retention |
+| `problems.py`, `state.py` | Injected search callbacks and local state |
 
-The resident event tail has 256 entries; the injected sink receives every event.
-Unknown external usage has a separate cumulative counter and is not lost when the
-tail rotates. Closed child budgets are removed from the parent's live resources.
-See [lifecycle hooks](../extensions/README.md) for extension and failure boundaries.
-
-Offline checks: `tests.improvement.test_reliability`,
-`tests.lab.test_improver`, `tests.lab.test_task_set_lifecycle`.
-
-Search schedules cannot exceed the frozen plan's round/execution limits and have
-bounded mission batches. Child allocations inherit a finite depth limit (16 by
-default), so zero-work recursion cannot allocate forever. Core's operation
-supervisor owns deferred invocation, timeout, cancellation and retirement;
-WorkflowServices supplies root deadlines, accounting and fatal cleanup errors.
+Offline checks: `tests.improvement.test_stage_timing`,
+`tests.improvement.test_services`, `tests.improvement.test_reliability`.

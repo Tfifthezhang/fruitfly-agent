@@ -38,7 +38,7 @@ class RuleGenerator:
         documents = tuple(replace(c, files=(ComponentFile('instructions.txt', c.files[0].text + ' improved'),))
                           if c.component_id == chosen else c for c in request.baseline.components)
         candidate = CandidateBundle(request.plan.parent, request.baseline, HarnessSnapshot(documents), self.generator_id,
-            (EditReason(chosen, 'Observed missing behavior', (request.records[0].run_id,)),))
+            (EditReason(chosen, 'Observed missing behavior', (request.records[0].run_id,), expected_effect='The proposed behavior appears in the subsequent execution.'),))
         return ProposalResult((candidate,))
 
 
@@ -51,7 +51,7 @@ class RuleComposer:
         harness = HarnessSnapshot(tuple(documents.values()))
         names = [c.component_id for c in harness.components if c != request.baseline.component(c.component_id)]
         return CandidateBundle(request.plan.parent, request.baseline, harness, 'rule-composer',
-            tuple(EditReason(name, 'Supported composition', (request.records[-1].run_id,)) for name in names))
+            tuple(EditReason(name, 'Supported composition', (request.records[-1].run_id,), expected_effect='The proposed behavior appears in the subsequent execution.') for name in names))
 
 
 class Runner:

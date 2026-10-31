@@ -21,12 +21,12 @@ metadata/materials without constructing Providers or starting model work.
 | [Editor experiments](../improver/README.md) | Registered fixed-depth I comparison |
 
 Preparation validates the exact component scope, typed parameters, source hashes
-and minimum allocation. `PreparedExecution` keeps private material out of editor
+and material compatibility. `PreparedExecution` keeps private material out of editor
 requests. Its source query is checked again before execution. File inputs are
 frozen bytes; task packages and experiment sources must still match their preview.
 
 Construction returns `ExecutionPorts`: a runner, optional measurement/verifier/
-selector, protected verification allocation, and whether pending experience may be
+selector, and whether pending experience may be
 retained. Factories register owned resources with job services immediately.
 Borrowed ports remain caller-owned. Extensions must clean up partial construction.
 
@@ -38,7 +38,7 @@ supported. `WorkflowBindings.executions` can replace the execution registry;
 Definitions opt in to the injected runner override with `accepts_runner_override`;
 its capabilities cannot replace those of unrelated execution definitions.
 An unknown execution ID, unknown parameter, incompatible component, missing scorer
-or insufficient verification allocation fails before model work.
+fails before model work.
 
 The default file environment supplies isolated in-memory read/write/edit files.
 It does not inherit Bash, SSH, network tools, live Session or production files.
@@ -46,10 +46,7 @@ Its declaration supports H/S only. External environments require a registered
 runner with truthful capabilities, state isolation and attributable receipts.
 Registration is not an OS sandbox or permission to deploy code.
 
-Native execution forwards Provider activity while preserving exact continuation
-inside its bounded Agent loop. Each non-final response spends another model-call
-reservation. Editor-facing `trajectory.json` omits opaque Provider continuation;
-protocol signatures are not editing evidence or portable task outputs.
+Native execution preserves exact Provider continuation within the Core loop. Improvement does not apply model/tool/turn count quotas. Each execution has its own time. Editor-facing trajectories omit opaque Provider state.
 
 ## Check offline
 
@@ -64,9 +61,12 @@ configured models and may incur charges.
 
 `facts.py` attaches immutable `ExecutionFacts` to an ordinary execution receipt.
 Facts bind task/material, harness, initial state, conditions, source, termination,
-recorded counters, budgets and collected artifacts. Missing diagnostics remain
+recorded counters, usage and collected artifacts. Missing diagnostics remain
 unknown. Collection failure differs from confirmed absence; counters do not
 establish task quality. Native and external runners retain their original logs.
+Token facts distinguish reported subtotals from unknown totals. Composite
+verifiers declare `manages_stage_times` and time each leaf execution and
+measurement; ordinary verifier callbacks receive one evaluator time.
 See [completed assessment](../assessment/README.md) for read-only feedback.
 
 ## Schedule task batches
@@ -75,16 +75,11 @@ See [completed assessment](../assessment/README.md) for read-only feedback.
 cancellation and cleanup. Single-task execution uses the same queue at concurrency
 one; multiple tasks at concurrency one run serially.
 
-`batches.py` owns `BatchEvaluator`. It receives source bindings and an injected
-aggregation callback; it does not import a concrete scorer or benchmark. Each
-trial builds fresh ports with child model/leaf-execution quota and records exact
-task/harness/state/condition identities. Admission waits for active sibling holds,
-never for protected final-selection quota. Confirmed reusable trials are cached
-within the same frozen run and attempt; reused receipts do not become new samples.
+`batches.py` owns `BatchEvaluator` in the Improvement runtime. Each leaf builds fresh ports and independent execution/evaluation times, recording exact task/harness/state/condition identities. Confirmed reusable receipts are cached within the same frozen run and attempt; reuse does not create a new sample.
 
 Task and source failures remain distinct from scored zero. Interrupted batches
-save completed receipts and incomplete coverage. Root exhaustion/cancellation
-propagate. Optional completed-process assessment runs on development evidence;
+save completed receipts and incomplete coverage. User cancellation
+propagates. Completed model assessment runs on development evidence;
 private selection trials do not produce editor feedback. See [Task sets](../task_sets/README.md).
 
 ## Stream evidence and control a probe
@@ -110,7 +105,7 @@ Hosted native file execution restricts its read/write/edit tools to the configur
 tool set. Standalone `FileTaskRunner` callers may explicitly pass `tool_names`;
 omission retains the detached runner's established three-tool default. All
 declared scalar execution settings reach Core; final values are saved as
-`runtime-execution.json`. Backend isolation and fixed root quotas remain active.
+`runtime-execution.json`. Backend isolation remains active. Improvement uses independent phase times and records usage without count quotas.
 
 ## Validate declared task outputs
 

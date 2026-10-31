@@ -18,7 +18,6 @@ def install_history(state, context, parameters):
 
 
 def definitions():
-    from .methods.summarizing.registration import definition as summarizing
     from .methods.working_memory.registration import definition as working_memory
     history = MechanismDefinition(MechanismDescriptor('context-history', 'Context evidence',
         'Retrieve public canonical evidence and immutable reduction artifacts within one session.',
@@ -29,4 +28,4 @@ def definitions():
         implementation_path='fruitfly_agent/lab/context_manager/history.py',
         documentation_path='fruitfly_agent/lab/context_manager/reduction/README.md',
         validate_parameters=partial(validate, HistoryConfig))
-    return expose(history, HistoryConfig), summarizing(), working_memory()
+    return expose(history, HistoryConfig), working_memory()

@@ -30,6 +30,8 @@ class ExecutionContext:
     system_settings: Any = None
     hooks_factory: Any = None
     delivery_backend: Any = None
+    workflow_settings: Any = None
+    evidence_settings: Any = None
 
 
 class ExecutionRegistry:

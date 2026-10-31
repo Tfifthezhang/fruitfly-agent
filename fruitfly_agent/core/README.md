@@ -32,9 +32,10 @@ Configure `AgentLoopConfig` with a Provider, tools, execution environment, conte
 | Provider failure | Adapters may retry transient errors within configured limits; Core routes overflow to recovery and other failures to a terminal result. |
 | Output token limit | Skip all tool calls in the truncated response and record associated error results. Three consecutive truncated responses end with an `output_limit` error; a complete response resets the counter. |
 | Non-final response | `AssistantMessage.continue_turn` requests another model response. Consecutive non-final responses without tools are separately bounded by `max_turns`; the limit returns `continuation_limit`. |
+| Final response | A complete response without tool calls or `continue_turn` ends the inner loop. Injected follow-up messages may start another bounded turn. Normal completion does not establish task correctness. |
 | Tool budget | `max_tool_calls_per_turn` limits attempts within one outer turn. Execute only the remaining batch allowance; skipped calls each receive an associated error result. Follow-up turns receive a fresh allowance. |
 | Turn budget | `max_turns` bounds outer turns, including follow-ups; it is not a Provider request or monetary limit. |
-| Tool termination | Finish only when every result in the batch requests termination. |
+| Tool termination | Finish only when every result in the batch requests termination. Exclusive tools reject mixed batches before effects. |
 | Cancellation | Propagate task cancellation after recording an aborted snapshot and notifying passive end observers. Preserve completed tool outcomes and pair unresolved calls with interrupted/unknown results; effects are not rolled back or automatically replayed. |
 | Context change | Validate and persist a decision before committing the model projection. |
 | Canonical conversation | Preserve valid conversation facts rather than replacing them with summaries. |

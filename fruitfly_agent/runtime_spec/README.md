@@ -57,7 +57,7 @@ allowances remain independent fixed comparison conditions.
 
 Run assembles the configuration and [Catalog](../lab/catalog/README.md) checks
 component availability. [Execution policy](../lab/execution_policy/README.md)
-provides the optional H editing adapter. [Eval](../../eval/README.md) uses the same
+provides the optional H editing adapter. [Eval](../../fruitfly_eval/README.md) uses the same
 profile parser before staging a selected runtime.
 
 ```bash

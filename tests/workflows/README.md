@@ -13,7 +13,7 @@ Exercise actual Application, Run assembly, and terminal paths with offline model
 | `test_terminal_interrupt.py` | Actual Ctrl+C/SIGINT, quiet-run continuation, clean exit, and terminal restoration in ANSI and non-ANSI terminals |
 | `test_decoupling.py / test_offline_example.py` | Public extensions, interchangeable improvers/targets, and the installed-check model wizard |
 | `test_improvement.py / test_evolution.py` | Preview, adoption, explicit policy, and interrupted activation reconciliation |
-| `test_improvement_pipeline.py` | Public stages, task evidence, shared budgets, component execution and pending experience review |
+| `test_improvement_pipeline.py` | Public stages, task evidence, independent phase times, component execution and pending experience review |
 | `test_editor_evolution.py` | Actual I prompt loading, two isolated generations, paired private verification, proof reuse and failure/cancellation |
 | `test_task_packs.py / test_coding_improvement.py / test_unified_packs.py` | Discovery, frozen tasks, corrections, and scoring |
 | `test_optional_eval.py` | Normal CLI and offline conversation with Eval imports prohibited |
@@ -28,9 +28,9 @@ Verify usable integration, not model quality. New algorithms should reuse generi
 
 Terminal interrupt workflows also exercise permission Enter/numeric/arrow selection, Esc denial, Ctrl+C cancellation, and session approval in ANSI and non-ANSI PTYs.
 
-`test_evolution_scope.py` verifies frozen stop parameters and one root allowance
+`test_evolution_scope.py` verifies frozen stop parameters and independent phase times
 across successive host jobs. No model service is contacted.
 
-`test_candidate_configuration.py` executes a changed tool allowance through the
+`test_candidate_configuration.py` executes changed tool parallelism through the
 native Core loop, exports the complete candidate, reloads it through ordinary
 configuration, and verifies unchanged baseline files.

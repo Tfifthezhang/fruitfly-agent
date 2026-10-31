@@ -11,7 +11,7 @@ H/S/I files. All recipes use the same format without version markers.
 |---|---|
 | [Native](native.example.yaml) | Generated system and [native task](tasks/native.yaml) |
 | [Benchmark smoke](benchmark-smoke.example.yaml) | Prepared [Eval collection](tasks/tb4-smoke.yaml) |
-| [Benchmark with execution edits](benchmark.example.yaml) | Same collection, explicit tool-limit grant |
+| [Benchmark with execution edits](benchmark.example.yaml) | Same collection, explicit tool-parallelism grant |
 | [Editor study](editor.example.yaml) | Installed [editor material](tasks/editor.yaml), disjoint private packages |
 | [Multiple collections](multi-task.example.yaml) | Prepared requests/hosts referenced by [multi-task material](tasks/multi.yaml) |
 | [TB4 request](tb4-smoke-request.example.json) | Benchmark smoke and the [Linux walkthrough](TB4_SERVER.md) |
@@ -81,16 +81,16 @@ Benchmark development reward alone cannot authorize persistent adoption.
 ├── components/
 │   ├── H/                     # Prompt, execution, environment, tools, context
 │   ├── S/                     # Optional retained documents
-│   └── I/                     # Editor, feedback and search
-├── experiment.yaml            # Baseline, task reference, edit grants, budgets
+│   └── I/                     # Editor and evaluator prompts
+├── experiment.yaml            # Baseline, task reference, optional edit narrowing, phase times
 ├── comparison.yaml            # Fixed comparison conditions
 ├── tasks/                     # Task sources and material references
 ├── eval-request.json          # Optional benchmark request
 └── eval-host.yaml             # Optional machine/runtime host
 ```
 
-Only selected components need files. Model roles live in config, rounds in I
-search, assessment in I feedback, tool limits in H execution, and permitted
+Only selected components need files. Model roles live in config; experiment
+`search` fixes scheduling; `assessment` fixes evidence page size; `timeouts` fixes independent phase times. Daily execution limits live in H execution; permitted
 changes in experiment. Paths resolve from the file that declares each reference.
 Daily `.fruitfly/config.yaml` uses the same system schema and shared `models.yaml`.
 Daily and baseline configs select their own model aliases and component documents.
@@ -128,11 +128,10 @@ startup. Official benchmark grading is independent of the model assessor.
 
 Use [multiple collections](multi-task.example.yaml), configure its placeholder
 request/host paths and select one shared baseline. Each collection retains its
-objective, partitions and source identity. I search may configure `sampling` and
+objective, partitions and source identity. Experiment `search` configures `sampling` and
 `promotion_every_rounds`; experiment `trial` controls concurrency and attempts.
 Comparison owns aggregation and regression limits. Edit grants must be supported
-by every selected execution backend. Default root totals scale with material;
-explicit totals must fund initial probes and protected final selection.
+by every selected execution backend. Each editor, leaf execution and evaluator starts its own configured phase clock. Usage is observed without count quotas.
 
 `check --json` lists task keys, coverage, effective values and capabilities.
 Use the actual keys for fixed sampling. Confirmation inputs remain private.
@@ -140,21 +139,18 @@ Candidate concurrency is one. See [task-set contracts](../../fruitfly_agent/lab/
 
 ## Enable task-local research
 
-In the referenced `components/I/improvement-search.yaml`, this example enables a
-bounded ledger and retains existing root allowances:
+In fixed experiment `search`, this example enables a
+task-local research ledger:
 
 ```yaml
-parameters:
+search:
   research: {enabled: true, max_entries: 128, retrieve_entries: 8}
   progress: {patience: 3, failure_patience: 2}
-  finalization: {reserve_model_calls: 4, reserve_executions: 1}
 ```
 
-Merge these fields with the existing parameter mapping. Research is I behavior;
-ordinary H/S search consumes it without an I edit grant. To compare it as a
-candidate, select editor comparison and grant the [owner-supported fields](../../fruitfly_agent/experiments/CONFIGURATION.md#grant-component-changes).
-Actual runs call models; configuration checking remains offline. Reserves must
-fit the experiment allocation after protected verification holds.
+Merge these fields into fixed experiment `search`. Research is scheduling
+infrastructure and cannot be edited by I candidates.
+Actual runs call models; configuration checking remains offline.
 
 For command deliverables, an embedding must explicitly supply a delivery backend
 and a frozen `delivery_manifest` input. The ordinary CLI's in-memory file runner

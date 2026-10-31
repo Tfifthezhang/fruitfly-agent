@@ -41,8 +41,6 @@ class TaskEntry:
     origin_id: str
     group_id: str = ''
     partition: str = 'development'
-    model_limit: int = 80
-    execution_limit: int = 1
 
     def __post_init__(self):
         for value in (self.key, self.collection_id, self.backend_id):
@@ -52,9 +50,6 @@ class TaskEntry:
             raise ValueError('a task needs a canonical source identity')
         if self.partition not in {'development', 'selection', 'confirmation'}:
             raise ValueError('invalid task partition')
-        for allowance in (self.model_limit, self.execution_limit):
-            if type(allowance) is not int or allowance < 1:
-                raise ValueError('declare positive per-task model and leaf-execution allowances')
 
 
 @dataclass(frozen=True)

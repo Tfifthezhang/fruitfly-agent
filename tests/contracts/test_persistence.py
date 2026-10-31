@@ -8,7 +8,7 @@ from fruitfly_agent.core.session import Session
 from fruitfly_agent.core.env.types import ExecOptions, ExecResult, FileInfo
 from fruitfly_agent.core.data_model import UserMessage
 from fruitfly_agent.run.runtime.manifest import RuntimeManifest
-from eval.contracts import EvaluationRequest
+from fruitfly_eval.contracts import EvaluationRequest
 from tests.support.evaluation import request_payload
 
 

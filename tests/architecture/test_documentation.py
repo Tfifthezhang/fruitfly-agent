@@ -77,7 +77,7 @@ class DocumentationTest(unittest.TestCase):
         for path in documents():
             content = path.read_text(encoding='utf-8')
             commands = re.findall(
-                r'python\s+-m\s+((?:fruitfly_agent|eval|examples)(?:\.\w+)*)', content)
+                r'python\s+-m\s+((?:fruitfly_agent|fruitfly_eval|examples)(?:\.\w+)*)', content)
             for module in commands:
                 target = ROOT.joinpath(*module.split('.'))
                 if not (target.with_suffix('.py').is_file() or (target / '__main__.py').is_file()):
@@ -119,7 +119,7 @@ class DocumentationTest(unittest.TestCase):
         self.assertEqual([], non_english)
 
     def test_server_evaluation_guide_has_generic_english_workflow(self):
-        path = ROOT / 'eval/SERVER_GUIDE.md'
+        path = ROOT / 'fruitfly_eval/SERVER_GUIDE.md'
         source = path.read_text(encoding='utf-8')
         self.assertNotRegex(source, r'Terminal-Bench|SWE-bench|workbuddy')
         for entry in ('--tasks-only', 'controller-versions.txt', 'agent-versions.txt',

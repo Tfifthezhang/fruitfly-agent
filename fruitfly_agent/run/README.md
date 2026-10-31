@@ -173,7 +173,7 @@ or completed without a candidate; reports retain usage, stopping reasons and
 verified journal references. History protects referenced candidates without
 relaxing activation checks.
 
-Component and generator views declare capability availability. Typed workflow requests select materials, component scope, exploration, allocations and optional feedback. Adding an implementation does not add algorithm branches to Run or the terminal.
+Component and generator views declare capability availability. Typed workflow requests select materials, component scope, exploration, independent phase times and optional feedback. Adding an implementation does not add algorithm branches to Run or the terminal.
 
 Task selection does not change runtime configuration. Lab owns pack parsing and training edits. Readable `latest.txt` exports are not runtime inputs. Failed replacement retains the active runtime; external writes and effects do not automatically roll back. See [Improvement results](../lab/improvement/README.md#results-and-retention).
 
@@ -186,7 +186,7 @@ from fruitfly_agent.rsi import EvolutionEngine
 from fruitfly_agent.run.evolution import RunEvolutionHost
 
 # application, factory, request, and verify_candidate are supplied by the host.
-# request is an explicit WorkflowRequest selecting materials, scope and budgets.
+# request is an explicit WorkflowRequest selecting materials, scope and phase times.
 host = RunEvolutionHost(
     application, factory,
     policy_id="my-fixed-policy-v1", verify=verify_candidate, request=request,
@@ -238,7 +238,7 @@ Authorization audit entries contain call/tool identity, operation, outcome, and 
 Use `/improvement` for explicit instructions/input files or a saved package,
 one simple base-prompt comparison and result review. Advanced settings and RSI
 use the independent [experiment CLI](../experiments/README.md), which also composes
-optional [Eval](../../eval/README.md) through public services. Run itself does not
+optional [Eval](../../fruitfly_eval/README.md) through public services. Run itself does not
 import Eval. See [Improvement](../lab/improvement/README.md).
 
 `--approve-tools` answers ordinary confirmations for a fresh headless task while
@@ -248,3 +248,4 @@ interactive/resumed launches and cannot be combined. Eval uses `--unrestricted`
 inside Harbor containers. Neither flag is an Agent configuration field.
 
 [Extension hosting](extensions/README.md) loads explicit developer sources and prepares idle replacements.
+

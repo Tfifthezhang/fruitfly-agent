@@ -105,11 +105,14 @@ class CandidateComparison:
     batch_id: str
     result: str
     gain: float | None = None
+    judgment_id: str = ''
+    reason: str = ''
 
     def __post_init__(self):
         for name in (self.before_id, self.after_id):
             identifier(name)
         require_hash(self.batch_id)
+        if self.judgment_id:require_hash(self.judgment_id)
         if self.result not in {'better', 'worse', 'tied', 'insufficient'}:
             raise ValueError('invalid candidate comparison')
 

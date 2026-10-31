@@ -98,7 +98,7 @@ Chat uses native terminal scrollback; temporary menus restore it on return.
 | Persistent adoption | Publish verified text candidates for explicit review and activation | [Improvement host](fruitfly_agent/run/improvement/README.md) |
 | Experience | Stage attributed lessons; commit or reject separately while idle | [Experience](fruitfly_agent/lab/improvement/experience/README.md) |
 | RSI | An explicitly invoked host repeats verified adoption and loads the adopted version for the next generation | [RSI](fruitfly_agent/lab/rsi/README.md) |
-| Benchmark execution | Run the native Agent in Harbor containers and collect official results | [Eval](eval/README.md) |
+| Benchmark execution | Run the native Agent in Harbor containers and collect official results | [Eval](fruitfly_eval/README.md) |
 
 Use the independent [experiment CLI](fruitfly_agent/experiments/README.md) for Eval,
 Improvement and RSI. File settings have bounded defaults; `simple` proposes one
@@ -121,7 +121,7 @@ ordinary chat does not collect training material. See [task preparation](fruitfl
 | Add or replace an algorithm | [Lab development](fruitfly_agent/lab/README.md#develop-an-algorithm) |
 | Prepare an improvement experiment | [Examples](examples/improvement/README.md) · [Task packs](fruitfly_agent/lab/improvement/tasks/README.md) |
 | Start Eval, Improvement or RSI | [Experiment CLI](fruitfly_agent/experiments/README.md) · [File templates](examples/experiments/README.md) |
-| Run Terminal-Bench or SWE-bench | [Eval](eval/README.md) |
+| Run Terminal-Bench or SWE-bench | [Eval](fruitfly_eval/README.md) |
 | Change and verify the implementation | [Contributing](CONTRIBUTING.md) · [Tests](tests/README.md) |
 
 ## Project layout
@@ -129,7 +129,7 @@ ordinary chat does not collect training material. See [task preparation](fruitfl
 | Directory | Responsibility |
 |---|---|
 | [fruitfly_agent/](fruitfly_agent/README.md) | Runtime architecture and module entry points |
-| [eval/](eval/README.md) | Optional benchmark execution and reports |
+| [fruitfly_eval/](fruitfly_eval/README.md) | Optional benchmark execution and reports |
 | [examples/](examples/README.md) | Runnable extensions and task packs |
 | [tests/](tests/README.md) | Offline contracts, architecture and behavior checks |
 | [AGENTS.md](AGENTS.md) | Engineering rules for AI-assisted development |
@@ -169,7 +169,7 @@ Research sources and the scope of each adaptation are documented in the correspo
 Improvement/RSI are independent of Eval. Daily and file tasks use their declared
 backends. `eval run` does not implicitly improve the Agent. See
 [architecture](fruitfly_agent/README.md#separate-search-evolution-and-evaluation)
-and the optional [benchmark adapter](eval/improvement/README.md).
+and the optional [benchmark adapter](fruitfly_eval/improvement/README.md).
 
 [Online assessment](fruitfly_agent/lab/improvement/assessment/README.md) can inspect
 intermediate events. Explicit control policies may request supported actions;

@@ -21,12 +21,12 @@ class ComponentConfigurationTests(unittest.TestCase):
         _write_catalog(self.root / 'models.yaml', {'offline': 'offline-model'})
         self.path = self.root / 'config.yaml'
         self.document = {'id': 'execution-policy', 'role': 'H',
-                         'implementation': 'execution-policy', 'parameters': {'max_tool_calls_per_turn': 128}}
+                         'implementation': 'execution-policy', 'parameters': {'settings': {'max_tool_calls_per_turn': 128}}}
         self.config = {'default_profile': 'baseline', 'profiles': {'baseline': {
             'models': {'catalog': 'models.yaml', 'roles': {'executor': 'offline'}},
             'H': {'execution-policy': {'file': 'execution.yaml'}, 'base_prompt': {'inline': {
                 'id': 'base_prompt', 'role': 'H', 'implementation': 'base_prompt',
-                'parameters': {'text': 'Use the supplied evidence.\nKeep exact text.\n'}}}},
+                'parameters': {'instructions': {'system': 'Use the supplied evidence.\nKeep exact text.\n'}}}}},
             'I': {'improvement-editor': {'inline': {'id': 'improvement-editor',
                 'role': 'I', 'implementation': 'improvement-editor', 'parameters': {}}}}}}}
 

@@ -243,7 +243,12 @@ can reset it. Silent reasoning can still exceed the first-progress deadline.
 Before delivered output/effects, transient failures may retry within both limits
 and honor Retry-After. After partial delivery or server-tool activity they fail
 without replay. No output proves neither non-execution nor zero cost. Cleanup
-may extend the total elapsed time. Run records effective transport values.
+may extend the total elapsed time. Run records effective transport values. Terminal errors retain bounded structural
+diagnostics: up to six causal exception types/categories and eight recent attempt
+records with elapsed seconds, HTTP status and partial-delivery state. Raw cause
+messages, URLs, headers and credentials are excluded. Core preserves this data
+in the result and Session run records, which Eval retains as native evidence.
+Retry and timeout policy is unchanged.
 
 Usage records available input/output/cache receipts and optional reasoning-token
 counts. Reasoning is a subset of output, not an additional charge in total_tokens;

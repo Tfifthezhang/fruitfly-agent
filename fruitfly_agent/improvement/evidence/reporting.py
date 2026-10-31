@@ -46,12 +46,8 @@ class SearchReport:
     metric: str = ''
     direction: str = ''
     stop_reason: str = ''
-    exhausted_kind: str = ''
     trial_calls: int = 0
-    trial_limit: int = 0
     model_calls: int = 0
-    model_limit: int = 0
-    uncertain_model_allowance: int = 0
     tokens: TokenUsage = TokenUsage()
 
     def __post_init__(self):
@@ -70,8 +66,6 @@ class SearchReport:
             raise ValueError('invalid comparison conclusion')
         if self.direction not in {'', 'max', 'min'}:
             raise ValueError('invalid report objective direction')
-        if type(self.uncertain_model_allowance) is not int or self.uncertain_model_allowance < 0:
-            raise ValueError('uncertain model allowance must be nonnegative')
 
 
 def token_usage(rows, model_calls):
@@ -95,8 +89,7 @@ def token_usage(rows, model_calls):
 
 def build_report(rows, *, baseline_id, candidate_id, train_count, validation_count,
                  seed_score=None, candidate_score=None, metric='', direction='',
-                 stop_reason='', exhausted_kind='', model_calls=0, model_limit=0,
-                 trial_calls=0, trial_limit=0):
+                 stop_reason='', model_calls=0, trial_calls=0):
     values: dict[str, Any] = {}
     for prefix, identity in (('baseline', baseline_id), ('candidate', candidate_id)):
         for partition, count in (('train', train_count), ('validation', validation_count)):
@@ -115,68 +108,7 @@ def build_report(rows, *, baseline_id, candidate_id, train_count, validation_cou
             conclusion = 'improved' if better else 'worse'
     return SearchReport(train_count=train_count, validation_count=validation_count, **values,
         conclusion=conclusion, metric=metric, direction=direction,
-        stop_reason=stop_reason, exhausted_kind=exhausted_kind,
-        model_calls=model_calls, model_limit=model_limit, trial_calls=trial_calls, trial_limit=trial_limit,
+        stop_reason=stop_reason,
+        model_calls=model_calls, trial_calls=trial_calls,
         tokens=token_usage(rows, model_calls))
 
-
-def restore_search_report(workspace, *, history, history_hash, candidate_id, baseline_id,
-                          parent_manifest, cases_digest, snapshot='', snapshot_hash=''):
-    """Recover old receipts after checking identity and immutable evidence hashes.
-
-    Unknown legacy objective direction stays unknown; ties are direction-neutral.
-    Missing/corrupt evidence is handled by the caller as unavailable reporting.
-    """
-    root = Path(workspace).resolve()
-    def read(reference, digest, directory):
-        raw = root / reference
-        path = raw.resolve()
-        if raw.is_symlink() or path.parent != root / '.fruitfly' / 'improvement' / directory:
-            raise ValueError('report evidence must stay in its workspace directory')
-        encoded = path.read_bytes()
-        if 'sha256:' + hashlib.sha256(encoded).hexdigest() != digest:
-            raise ValueError('report evidence hash mismatch')
-        return encoded.decode('utf-8')
-    rows = [json.loads(line) for line in read(history, history_hash, 'searches').splitlines() if line.strip()]
-    if not rows or any(not isinstance(r, dict) for r in rows):
-        raise ValueError('invalid report journal rows')
-    if any(r.get('parent_manifest') != parent_manifest or r.get('cases_digest') != cases_digest
-                       or r.get('search_id') != rows[0].get('search_id') for r in rows):
-        raise ValueError('report search identity mismatch')
-    problem: dict[str, Any] = next((r for r in rows if r.get('kind') == 'problem'), {})
-    context: dict[str, Any] = next((r for r in rows if r.get('kind') == 'report-context'), {})
-    problem = {**problem, **context}
-    result: dict[str, Any] = next((r for r in reversed(rows) if r.get('kind') == 'search-result'), {})
-    if problem.get('baseline_hash') != baseline_id or candidate_id not in result.get('candidates', ()):
-        raise ValueError('report candidate identity mismatch')
-    task = {}
-    if snapshot and snapshot_hash:
-        frozen = json.loads(read(snapshot, snapshot_hash, 'task-snapshots'))
-        if not isinstance(frozen, dict) or not isinstance(frozen.get('task'), dict):
-            raise ValueError('invalid report task snapshot')
-        if frozen.get('target_hash') != baseline_id or frozen.get('task', {}).get('cases_digest') != cases_digest:
-            raise ValueError('report task snapshot identity mismatch')
-        task = frozen['task']
-    def score(identity):
-        matches = [r.get('score') for r in rows if r.get('kind') == 'evaluation'
-                   and r.get('candidate_id') == identity and r.get('partition') == 'validation']
-        return matches[-1] if matches else None
-    params, usage = problem.get('parameters', {}), result.get('usage', {})
-    if not isinstance(params, dict) or not isinstance(usage, dict):
-        raise ValueError('invalid report budget receipt')
-    trials, models = usage.get('trial', 0), usage.get('model', 0)
-    trial_limit, model_limit = params.get('max_metric_calls', 0), params.get('max_model_calls', 0)
-    # Old journals do not state which reserve failed; do not guess when ambiguous.
-    exhausted = result.get('exhausted_kind', '')
-    if not exhausted and result.get('status') == 'budget_exhausted':
-        if trial_limit and trials == trial_limit and models < model_limit:
-            exhausted = 'trial'
-        elif model_limit and models == model_limit and trials < trial_limit:
-            exhausted = 'model'
-    return build_report(rows, baseline_id=baseline_id, candidate_id=candidate_id,
-        train_count=problem.get('train_count', len(task.get('train', ()))),
-        validation_count=problem.get('validation_count', len(task.get('validation', ()))),
-        seed_score=score(baseline_id), candidate_score=score(candidate_id),
-        metric=problem.get('metric', ''), direction=problem.get('objective_direction', ''),
-        stop_reason=result.get('status', ''), exhausted_kind=exhausted,
-        trial_calls=trials, trial_limit=trial_limit, model_calls=models, model_limit=model_limit)

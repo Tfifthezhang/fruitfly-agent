@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from fruitfly_agent.improvement.contracts.task_sets import TaskSetSnapshot
 from fruitfly_agent.lab.improvement.task_sets import TaskSetSourceRegistry, sample_batch
-from fruitfly_agent.lab.improvement.task_sets.execution import execution_definition as task_set_execution, minimum_budget as task_set_minimum_budget
+from fruitfly_agent.lab.improvement.task_sets.execution import execution_definition as task_set_execution
 from fruitfly_agent.lab.improvement.task_sets.files import definition as files_definition
 from fruitfly_agent.lab.improvement.tasks import TaskPackCatalog
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
@@ -60,9 +60,9 @@ def specifications(config):
             if key in row:
                 row[key] = str(config.resolve(row[key]))
         if row['source'] == 'eval':
-            from eval.improvement.configuration import resolve_benchmark
+            from fruitfly_eval.improvement.configuration import resolve_benchmark
             benchmark = resolve_benchmark(replace(config, task={key: value for key, value in row.items()
-                if key in {'source', 'request', 'host', 'model_calls'}}))
+                if key in {'source', 'request', 'host'}}))
             row['request'] = str(benchmark.source_request)
             row['host'] = str(benchmark.require_host())
         rows.append(row)
@@ -71,13 +71,13 @@ def specifications(config):
 
 def prepare_collections(config, *, tasks_only=False, progress=None):
     """Only the explicit Eval prepare action calls these external operations."""
-    from eval.improvement.configuration import resolve_benchmark
-    from eval.api import prepare_evaluation
+    from fruitfly_eval.improvement.configuration import resolve_benchmark
+    from fruitfly_eval.api import prepare_evaluation
     result = {}
     for row in config.task.get('collections', ()):
         if row.get('source') == 'eval':
             benchmark = resolve_benchmark(replace(config, task={key: value for key, value in row.items()
-                if key in {'source', 'request', 'host', 'model_calls'}}))
+                if key in {'source', 'request', 'host'}}))
             result[row['id']] = prepare_evaluation(benchmark.request,
                 host_config_path=benchmark.stage_host(), tasks_only=tasks_only, progress=progress)
     if not result:
@@ -88,7 +88,7 @@ def prepare_collections(config, *, tasks_only=False, progress=None):
 def registry_for(rows):
     registry = TaskSetSourceRegistry((files_definition(),))
     if any(row['source'] == 'eval' for row in rows):
-        from eval.improvement.task_sets import definition
+        from fruitfly_eval.improvement.task_sets import definition
         registry.register(definition())
     return registry
 
@@ -101,7 +101,7 @@ def resolve(config):
     profile = config.runtime.get('profile')
     for row in rows:
         if row['source'] == 'eval':
-            from eval.contracts import EvaluationRequest
+            from fruitfly_eval.contracts import EvaluationRequest
             runtime = EvaluationRequest.read(row['request']).runtime
             path, profile = runtime_reference(config.workspace, runtime.config_path, runtime.profile,
                 inherited_path=path, inherited_profile=profile)
@@ -113,7 +113,6 @@ def resolve(config):
     preparation.snapshot = snapshot
     preparation.bindings = bindings
     batch = sample_batch(snapshot, config.multi_task.sampling, 0, attempts=config.multi_task.execution.attempts)
-    minimum = task_set_minimum_budget(snapshot, config.multi_task)
     from fruitfly_agent.lab.improvement.assessment.joint import assess_batch
     assess_batch(snapshot, batch, (), config.multi_task.evaluation)
     if config.improvement.strategy != 'simple' or config.improvement.retain_experience:
@@ -121,7 +120,6 @@ def resolve(config):
     if config.improvement.feedback == 'behavior':
         raise ValueError('joint task-set search needs declared task objectives')
     return SourceBinding('task-set', 'task-set', measured=True, source_identity=snapshot.snapshot_id,
-        minimum_budget=minimum, adoption_notice='joint development scores need an independently registered adoption verifier',
+        adoption_notice='joint development scores need an independently registered adoption verifier',
         config_path=path, profile=profile,
-        defaults={'max_model_calls': max(256, minimum['model'] * 2),
-                  'max_executions': max(16, minimum['execution'] * 2)}, task_set=preparation)
+        task_set=preparation)

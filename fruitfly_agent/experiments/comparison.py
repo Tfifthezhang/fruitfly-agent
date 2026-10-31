@@ -3,11 +3,10 @@ from pathlib import Path
 
 from fruitfly_agent.runtime_spec.documents import DocumentReader, mapping
 from fruitfly_agent.lab.catalog import builtin_catalog, load_system_config, edit_grants
-from fruitfly_agent.lab.improvement.system_configuration import process_configuration
 
 
 def normalize_experiment(raw, target, *, material_only=False):
-    mapping(raw, {'baseline', 'tasks', 'comparison', 'edit', 'budget', 'trial', 'rsi', 'stop'},
+    mapping(raw, {'baseline', 'tasks', 'comparison', 'edit', 'timeouts', 'trial', 'rsi', 'stop', 'search', 'assessment'},
             'experiment')
     baseline = mapping(raw.get('baseline'), {'config', 'profile'}, 'experiment baseline')
     if not isinstance(baseline.get('config'), str) or not baseline['config'].strip():
@@ -20,7 +19,7 @@ def normalize_experiment(raw, target, *, material_only=False):
     reader = DocumentReader()
     task, task_path = reader.reference(raw.get('tasks'), target)
     mapping(task, {'source', 'instruction', 'input_paths', 'pack', 'parameters', 'request', 'host',
-                   'model_calls', 'collections', 'material'}, 'task document')
+                   'collections', 'material'}, 'task document')
     def paths(value):
         result = dict(value)
         for field in ('request', 'host'):
@@ -30,18 +29,9 @@ def normalize_experiment(raw, target, *, material_only=False):
             result['input_paths'] = [str((task_path.parent / name).absolute()) for name in result['input_paths']]
         return result
     task = paths(task)
-    trial = mapping(raw.get('trial', {}), {'model_calls', 'operation_timeout_seconds', 'attempts', 'concurrency'}, 'trial')
+    trial = mapping(raw.get('trial', {}), {'attempts', 'concurrency'}, 'trial')
     if 'collections' in task:
         task['collections'] = [paths(row) for row in task['collections']]
-        for row in task['collections']:
-            if 'model_calls' in trial or row.get('source') == 'eval':
-                row['model_calls'] = trial.get('model_calls', 80)
-    elif task.get('source') == 'eval':
-        task['model_calls'] = trial.get('model_calls', 80)
-    elif task.get('source') == 'files' and 'model_calls' in trial:
-        task['parameters'] = {**task.get('parameters', {}), 'model_calls': trial['model_calls']}
-    elif 'model_calls' in trial:
-        raise ValueError('editor studies use their explicit inner/evaluation model allowances')
     comparison, comparison_path = reader.reference(raw.get('comparison'), target)
     mapping(comparison, {'scope', 'feedback', 'aggregation', 'selection', 'minimum_gain',
                          'max_collection_regression', 'adoption', 'weights'}, 'comparison')
@@ -49,31 +39,36 @@ def normalize_experiment(raw, target, *, material_only=False):
         raise ValueError('select independent verification through the supported persistent execution policy')
     if comparison.get('selection', 'all') != 'all':
         raise ValueError('comparison selection must be all')
-    grants = raw.get('edit')
-    options = {} if material_only else edit_grants(profile, grants, catalog)
-    search = dict(profile.component_settings.get('search', {})) if profile is not None else {}
-    search.pop('exploration', None)
+    grants = raw.get('edit', {})
+    if not isinstance(grants, dict):
+        raise ValueError('edit must map component IDs to field grants')
+    options = {} if material_only or not grants else edit_grants(profile, grants, catalog)
+    from fruitfly_agent.lab.improvement.system_configuration import search_parameters, feedback_parameters
+    search = search_parameters(raw.get('search', {}))
+    fixed_workflow = {key: search[key] for key in ('research', 'progress')}
+    assessment = feedback_parameters(raw.get('assessment', {}))
+    exploration_policy = search.pop('exploration')
     # These I mechanisms are assembled from the original shared system settings.
     # They are not a second set of experiment allocation fields.
-    for name in ('research', 'progress', 'finalization'):
+    for name in ('research', 'progress'):
         search.pop(name, None)
     sampling = search.pop('sampling', {})
     promotion_interval = search.pop('promotion_every_rounds', None)
-    budget = mapping(raw.get('budget', {}), {'max_model_calls', 'max_executions', 'timeout_seconds'}, 'budget')
-    improvement = {**search, **budget, 'components': list(grants), 'component_options': options,
-                   'scope': comparison.get('scope', 'task'), 'feedback': comparison.get('feedback', 'auto')}
-    if 'operation_timeout_seconds' in trial:
-        improvement['operation_timeout'] = trial['operation_timeout_seconds']
-    from fruitfly_agent.lab.improvement.system_configuration import process_settings_values
-    process, exploration = process_configuration(profile) if profile is not None else process_settings_values({})
+    from fruitfly_agent.improvement.contracts.plans import StageTimeouts
     from dataclasses import asdict
+    timeouts = StageTimeouts(**mapping(raw.get('timeouts', {}), set(StageTimeouts.__dataclass_fields__), 'timeouts'))
+    improvement = {**search, 'timeouts': asdict(timeouts), 'components': list(grants), 'component_options': options,
+                   'scope': comparison.get('scope', 'task'), 'feedback': comparison.get('feedback', 'auto')}
+    from fruitfly_agent.lab.improvement.system_configuration import exploration_settings
+    exploration = exploration_settings({'search': {'exploration': exploration_policy}})
     runtime = {'config': str(path)}
     if profile is not None or baseline.get('profile'):
         runtime['profile'] = profile.profile_id if profile is not None else baseline['profile']
     normalized = {'task': task, 'runtime': runtime,
-                  'improvement': improvement, 'process_assessment': {**asdict(process), 'assessors': list(process.assessors)},
+                  'improvement': improvement,
                   'exploration': asdict(exploration),
                   'models': {key: value for key, value in profile.model_roles.items() if key in {'editor', 'assessor'}} if profile is not None else {},
+                  'workflow_settings': fixed_workflow, 'evidence_settings': assessment['evidence'],
                   'rsi': raw.get('rsi', {}), 'stop': raw.get('stop', {})}
     if task.get('source') == 'task-set':
         normalized['multi_task'] = {'execution': {key: trial[key] for key in ('attempts', 'concurrency') if key in trial},

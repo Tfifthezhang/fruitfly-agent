@@ -14,7 +14,7 @@ Lab assembles concrete mechanisms; Run owns durable records and activation.
 | `before_trial` | Declared harness before execution |
 | `after_trial` | Completed development receipt; private selection trials are excluded |
 | `after_round` | Completed round and current incumbent identity when available |
-| `before_finalization` | Search has stopped; release Lab reserves before final selection/verification |
+| `before_finalization` | Search has stopped; prepare final selection/verification |
 | `before_run_end` | Normal outcome, including refused verification; not a promise after cancellation or fatal integrity failure |
 
 `LifecycleEvent` is frozen and contains a canonical JSON snapshot, never mutable
@@ -23,13 +23,13 @@ within active and observer groups; active handlers run first. Only `before_propo
 accepts active handlers. They return `ContextContribution` containing at most 32
 distinct input artifact references in total. Existing editor read grants expose
 them under `context/extensions/`. Hooks cannot return scores, activation decisions,
-replacement candidates or increased hard budgets.
+replacement candidates or changed phase times.
 
 Synchronous invocation, awaiting, timeout and return validation share the stage
 boundary. Optional callback failures, conflicting contributions and invalid return
 types are journaled and isolated. Required failures stop search; cancellation,
-root deadlines, persistence, integrity and cleanup errors propagate. Handlers share
-the job operation deadline and must cooperate with cancellation. A trusted Python
+persistence, integrity and cleanup errors propagate. Nested handlers share
+the current invocation deadline and must cooperate with cancellation. A trusted Python
 extension can retain external references; these contracts are not an OS sandbox.
 
 Embeddings register directly on `WorkflowServices.hooks`. Hosted jobs may supply

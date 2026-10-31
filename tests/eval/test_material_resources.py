@@ -1,14 +1,15 @@
 """Frozen source and wheel resources remain executable and content-bound."""
 from pathlib import Path
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
 import zipfile
 
-from eval.harbor.host import HostConfig
-from eval.harbor.material import check_material, prepare_material, source_snapshot
-from eval.installation import SOURCE_FILES, installation_identity, validate_installation
+from fruitfly_eval.harbor.host import HostConfig
+from fruitfly_eval.harbor.material import check_material, prepare_material, source_snapshot
+from fruitfly_eval.installation import SOURCE_FILES, installation_identity, validate_installation
 from tests.architecture.checks import ROOT
 from tests.support.harbor import prepared_harbor
 
@@ -22,7 +23,7 @@ class MaterialResourceTests(unittest.TestCase):
         root.mkdir()
         for name in SOURCE_FILES:
             (root / name).write_text('Fixture build input')
-        for name in ('fruitfly_agent', 'eval'):
+        for name in ('fruitfly_agent', 'fruitfly_eval'):
             (root / name).mkdir()
             (root / name / '__init__.py').write_text('')
         (root / 'fruitfly_agent/assets').mkdir()
@@ -31,6 +32,24 @@ class MaterialResourceTests(unittest.TestCase):
             '[project]\nname="fruitfly-agent"\nversion="0.1"\n'
             '[tool.setuptools.package-data]\nfruitfly_agent=["assets/settings.txt", "assets/*.json"]\n')
         return root
+
+    def test_frozen_entry_points_ignore_packages_in_the_task_working_directory(self):
+        target, task = self.root / 'frozen', self.root / 'task'
+        source_snapshot(ROOT, target)
+        for name in ('eval', 'fruitfly_eval', 'fruitfly_agent'):
+            package = task / name
+            package.mkdir(parents=True)
+            (package / '__init__.py').write_text("raise RuntimeError('task package must not be imported')")
+        environment = {**os.environ, 'PYTHONPATH': str(target), 'PYTHONDONTWRITEBYTECODE': '1'}
+        for arguments in (['-m', 'fruitfly_agent', '--help'],
+                          ['-m', 'fruitfly_eval.harbor.supervisor', '--record', str(self.root / 'absent.json'), '--stop'],
+                          ['-c', 'import fruitfly_agent,fruitfly_eval; print(fruitfly_agent.__file__); print(fruitfly_eval.__file__)']):
+            with self.subTest(arguments=arguments):
+                result = subprocess.run([sys.executable, '-P', *arguments], cwd=task, env=environment,
+                                        capture_output=True, text=True, timeout=20)
+                self.assertEqual(0, result.returncode, result.stderr)
+                if arguments[0] == '-c':
+                    self.assertTrue(all(Path(line).is_relative_to(target) for line in result.stdout.splitlines()))
 
     def test_declared_resources_are_copied_hashed_and_missing_named_resources_reject(self):
         source = self.source()
@@ -51,7 +70,7 @@ class MaterialResourceTests(unittest.TestCase):
     def test_source_and_wheel_snapshots_import_providers_and_load_templates_in_isolation(self):
         wheel = self.root / 'fruitfly_agent-0.1-py3-none-any.whl'
         with zipfile.ZipFile(wheel, 'w') as archive:
-            for directory in ('fruitfly_agent', 'eval'):
+            for directory in ('fruitfly_agent', 'fruitfly_eval'):
                 for path in (ROOT / directory).rglob('*'):
                     if path.is_file() and path.suffix in {'.py', '.yaml'} and '__pycache__' not in path.parts:
                         archive.write(path, path.relative_to(ROOT).as_posix())
@@ -118,7 +137,7 @@ main()
             with self.subTest(member=name):
                 with zipfile.ZipFile(wheel, 'w') as archive:
                     archive.writestr('fruitfly_agent/__init__.py', '')
-                    archive.writestr('eval/__init__.py', '')
+                    archive.writestr('fruitfly_eval/__init__.py', '')
                     archive.writestr('fruitfly_agent-0.1.dist-info/METADATA', 'Name: fruitfly-agent\nVersion: 0.1\n')
                     if name.endswith('services.yaml'):
                         archive.writestr('fruitfly_agent-0.1.dist-info/RECORD', name + ',,\n')

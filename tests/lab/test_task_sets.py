@@ -4,7 +4,6 @@ import unittest
 
 from fruitfly_agent.improvement.contracts.task_sets import TaskSetSnapshot, ScoreSpec
 from fruitfly_agent.lab.improvement.task_sets import MultiTaskSettings, sample_batch
-from fruitfly_agent.lab.improvement.task_sets.execution import minimum_budget as task_set_minimum_budget
 from tests.support.task_sets import collection
 
 
@@ -37,13 +36,10 @@ class TaskSetTests(unittest.TestCase):
         snapshot = TaskSetSnapshot((*a.entries, *b.entries))
         self.assertEqual({e.collection_id for e in snapshot.selection_entries()}, {'benchmark', 'daily'})
 
-    def test_minimum_budget_protects_full_selection_and_repeated_leaf_execution(self):
-        a, _ = collection('benchmark', 2, limit=3)
-        b, _ = collection('daily', 1, limit=5, partition='selection')
-        snapshot = TaskSetSnapshot((*a.entries, *b.entries))
-        settings = MultiTaskSettings.from_dict({'sampling': {'batch_size': 1}, 'execution': {'attempts': 2}})
-        # Two harnesses: one sampled task plus all three selection tasks, twice.
-        self.assertEqual(task_set_minimum_budget(snapshot, settings), {'model': 64, 'execution': 16})
+    def test_task_entries_reject_retired_allowance_fields(self):
+        a,_=collection('benchmark',2)
+        for key in ('model_limit','execution_limit'):
+            with self.subTest(key=key),self.assertRaises(TypeError):replace(a.entries[0],**{key:1})
 
     def test_configuration_rejects_unused_fields_invalid_weights_and_candidate_parallelism(self):
         for raw in ({'unknown': {}}, {'execution': {'candidate_concurrency': 2}},

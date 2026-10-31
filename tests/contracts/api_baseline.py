@@ -99,13 +99,15 @@ LAB_HOST_PUBLIC_API = {
     "ASSESSOR_CONFIG", "AgentComposer", "AgentEditor", "AgentGenerator",
     "AgentReflector", "AgentSelector", "CompletedAssessmentService", "ComponentWorkflow",
     "EDITOR_CONFIG", "EDITOR_INSTRUCTIONS", "ExecutionContext", "ExplorationSettings",
-    "GeneratorRegistry", "ProcessAssessmentSettings", "ReadOnlyInspector", "SETTINGS",
+    "GeneratorRegistry",  "ReadOnlyInspector", "SETTINGS",
     "SYSTEM_SETTINGS", "SearchActivity", "SearchActivitySource", "SearchCompletion",
-    "SearchCompletionSource", "WorkflowBindings", "builtin_completed_assessors",
+    "SearchCompletionSource", "WorkflowBindings", 
     "builtin_executions", "builtin_explorations", "builtin_strategies", "bundle_target",
     "bundle_text", "component_registry", "entry_from_dict", "entry_to_dict", "experience_id",
     "extension_spec", "install_workflow_mechanisms", "model_completion", "policy_spec",
-    "process_settings_values", "validate_process_configuration",
+      "evaluator_instructions",
+    'validate_exploration', 'exploration_settings', 'organize_evidence',
+
 }
 
 MODULE_EXPORTS = {
@@ -117,8 +119,8 @@ MODULE_EXPORTS = {
         "InformationQuery",
         "LocalEnv",
         "Skill",
-        "SummarizingCompactor",
-        "SummarizingCompactorConfig",
+        "WorkingMemoryReducer",
+        "WorkingMemoryConfig",
         "builtin_tools",
     },
     "fruitfly_agent.lab.environment": LAB_ENV_PUBLIC_API,
@@ -281,10 +283,8 @@ MODULE_EXPORTS = {
         "ContextTransformer",
         "ContextStage",
     },
-    "fruitfly_agent.lab.context_manager.reduction.methods.summarizing.algorithm": {
-        "SummarizingCompactor",
-        "SummarizingCompactorConfig",
-        "install",
+    "fruitfly_agent.lab.context_manager.reduction.methods.working_memory.algorithm": {
+        "WorkingMemoryReducer",
     },
     "fruitfly_agent.lab.context_manager.augmentation.skills.catalog": {
         "Skill",

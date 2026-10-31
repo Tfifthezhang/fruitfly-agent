@@ -10,6 +10,7 @@ SKILL_CATALOG_GUIDANCE_KEY = 'skill-catalog.guidance'
 
 
 class SkillGuidanceTarget:
+    description = 'Guidance for interpreting and using the configured Skill catalog. Does not edit referenced Skill files or their implementations.'
     optimization = OptimizationSpec('H', 'text')
     label = 'Skill catalog guidance'
 

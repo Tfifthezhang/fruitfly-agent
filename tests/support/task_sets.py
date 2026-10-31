@@ -30,14 +30,14 @@ class IncrementGenerator:
         document = replace(document, files=(ComponentFile('instructions.txt', document.files[0].text + '+'),))
         harness = HarnessSnapshot(tuple(document if c.component_id == name else c for c in request.baseline.components))
         return ProposalResult((CandidateBundle(request.plan.parent, request.baseline, harness, self.generator_id,
-            (EditReason(name, 'Synthetic observed hypothesis', (request.records[0].run_id,)),)),))
+            (EditReason(name, 'Synthetic observed hypothesis', (request.records[0].run_id,), expected_effect='The proposed behavior appears in the subsequent execution.'),)),))
 
 
 def collection(name, count=2, *, limit=2, score=None, partition='development', source=None):
     state = SimpleNamespace(active=0, peak=0, calls=[], cleaned=0)
     entries = tuple(TaskEntry(name + '-' + str(i), name, content_hash(source or name), name,
         TaskMaterial(name + '-' + str(i), 'Complete fixture ' + name + ' ' + str(i)),
-        ScoreSpec('fixture-score'), name + '/' + str(i), partition=partition, model_limit=limit) for i in range(count))
+        ScoreSpec('fixture-score'), name + '/' + str(i), partition=partition) for i in range(count))
     class Measurements:
         async def measure(self, task, record):
             return Measurement(record.run_id, 'fixture-score', float(record.output))
@@ -49,7 +49,7 @@ def collection(name, count=2, *, limit=2, score=None, partition='development', s
             state.peak = max(state.peak, state.active)
             state.calls.append((task.task_id, harness.snapshot_id))
             try:
-                self.context.services.reserve('model')
+                self.context.services.observe('model')
                 await asyncio.sleep(0)
                 value = score(task, harness) if score else float(any('+' in c.files[0].text for c in harness.components))
                 return ExecutionRecord('leaf-' + uuid4().hex, task.task_id, task.material_id, harness.snapshot_id,

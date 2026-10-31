@@ -1,6 +1,7 @@
 """Loop invariants — G1..G5 gates (faux provider, zero network)."""
 
 import asyncio
+from dataclasses import replace
 import unittest
 
 from fruitfly_agent.core.data_model.runtime import BeforeToolCallResult
@@ -39,6 +40,7 @@ class TestLoop(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.stop_reason, "stop")
         self.assertEqual(result.messages[-1].text, "hello there")
         self.assertEqual(len(self.provider.calls), 1)
+        self.assertEqual(result.diagnostics.termination_reason, "model_complete")
 
     # --- G1: length-truncated tool calls are NEVER executed -----------------
 
@@ -160,6 +162,32 @@ class TestLoop(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result.is_error)
         self.assertEqual(len(calls), 1)
         self.assertEqual(len(self.provider.calls), 1)  # second response never consumed
+        self.assertEqual(result.diagnostics.termination_reason, "tool_terminated")
+        self.assertIsInstance(result.messages[-1], ToolResultMessage)
+
+    async def test_exclusive_tool_rejects_mixed_batch_before_effects_and_can_retry(self):
+        tool, calls = make_tool()
+        terminator, finishes = make_tool("finish", terminate=True)
+        terminator = replace(terminator, requires_exclusive_batch=True)
+        observed = []
+        self.provider.respond(AssistantMessage(content=[
+            ToolCallBlock("finish-mixed", "finish", {"value": "premature"}),
+            ToolCallBlock("write-mixed", "count", {"value": "must not execute"}),
+        ], stop_reason="toolUse"))
+        self.provider.respond_tool_call("finish", {"value": "ready"})
+        self.provider.respond_text("must not be requested")
+        result = await run_loop(make_config(self.provider, [tool, terminator],
+            on_tool_result=lambda name, result, cancelled: observed.append((name, result.is_error))), "work")
+
+        self.assertFalse(result.is_error, result.error_details)
+        self.assertEqual(calls, [])
+        self.assertEqual(finishes, [{"value": "ready"}])
+        self.assertEqual(observed, [("finish", True), ("count", True), ("finish", False)])
+        errors = [m for m in result.messages if isinstance(m, ToolResultMessage) and m.is_error]
+        self.assertEqual([m.tool_call_id for m in errors], ["finish-mixed", "write-mixed"])
+        self.assertTrue(all("no calls were executed" in m.text for m in errors))
+        self.assertEqual(len(self.provider.calls), 2)
+        self.assertEqual(result.diagnostics.termination_reason, "tool_terminated")
 
     # --- G3: nothing can kill the loop --------------------------------------
 

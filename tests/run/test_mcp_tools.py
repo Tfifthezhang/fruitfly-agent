@@ -41,7 +41,7 @@ class McpApplicationTests(unittest.IsolatedAsyncioTestCase):
     def factory(self, *, approve=True, **options):
         factory = RunApplicationFactory(cwd=self.root, environment={'FIXTURE_SECRET': 'fixture-private-value'},
             provider_registry=self.registry, tool_service_startup_approval=self.approve if approve else None, **options)
-        factory.configuration.set_mechanism('compaction', enabled=False)
+        factory.configuration.set_mechanism('working-memory-reduction', enabled=False)
         factory.configuration.set_mechanism('mcp-tools', enabled=True)
         factory.configuration.save()
         factory.reload_configuration()

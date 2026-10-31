@@ -10,7 +10,6 @@ from fruitfly_agent.core.data_model import AssistantMessage, UserMessage
 from fruitfly_agent.core.loop import run_agent_loop
 from fruitfly_agent.lab.improvement.targets.retained import RetainedText
 from fruitfly_agent.lab.improvement.targets.text import state_artifact_path
-from fruitfly_agent.lab.workflow import WorkflowTarget, apply_workflow, parse_workflow
 from tests.support.faux_provider import FauxProvider
 
 
@@ -40,61 +39,22 @@ class RetainedTargetTests(unittest.IsolatedAsyncioTestCase):
         registry = component_registry(targets)
         harness = HarnessSnapshot(tuple(replace(c, files=(ComponentFile('instructions.txt', text),))
             if c.component_id == changed else c for c in registry.snapshot().components))
-        plan = RunPlan('test', SystemVersion(*(content_hash(v) for v in ('H', 'I', 'S'))), (changed,), max_model_calls=calls)
+        plan = RunPlan('test', SystemVersion(*(content_hash(v) for v in ('H', 'I', 'S'))), (changed,))
         services = WorkflowServices(plan)
         record = await FileTaskRunner(config, registry, MemoryArtifacts(), services).execute(
             plan, TaskMaterial('task', 'select'), harness)
         return record, services
 
-    async def test_workflow_production_and_trials_use_same_steps_and_final_output(self):
-        text = json.dumps({'steps': ['Solve carefully.', 'Critique and return final answer only.']})
-        provider = FauxProvider()
-        provider.respond_text('draft')
-        provider.respond_text('B')
-        config = AgentLoopConfig(provider=provider, system_prompt='base')
-        result = await run_agent_loop(apply_workflow(config, text), [UserMessage(content='select')])
-        self.assertEqual([m.text for m in result.messages if isinstance(m, AssistantMessage)], ['draft', 'B'])
-        production_calls = provider.calls.copy()
-        provider.calls.clear()
-        provider.respond_text('draft')
-        provider.respond_text('B')
-        record, services = await self.trial(config, (WorkflowTarget(text),), 'execution-workflow', text)
-        self.assertEqual((record.status, record.output), ('completed', 'B'))
-        self.assertEqual(services.used['model'], 2)
-        self.assertEqual(provider.calls[0]['system_prompt'], production_calls[0]['system_prompt'])
-        self.assertEqual(provider.calls[1]['messages'][-1].content, 'Critique and return final answer only.')
-
-    async def test_fixed_workflow_and_other_state_survive_a_skill_trial(self):
-        provider = FauxProvider()
-        provider.respond_text('draft')
-        provider.respond_text('B')
+    async def test_skill_trial_changes_only_its_frozen_document(self):
+        provider = FauxProvider(); provider.respond_text('B')
         skill = RetainedText('skill-document', 'old skill', 'Skill', 'skill-document-v1')
-        memory = RetainedText('learned-memory', 'fixed memory', 'Memory', 'environment-memory-v1')
-        workflow = WorkflowTarget('{"steps":["reason","return final"]}')
-        record, _ = await self.trial(AgentLoopConfig(provider=provider), (skill, memory, workflow), 'skill-document', 'new skill')
+        fixed = RetainedText('fixture-memory', 'fixed note', 'Fixture', 'fixture-v1')
+        record, services = await self.trial(AgentLoopConfig(provider=provider), (skill, fixed), 'skill-document', 'new skill')
         self.assertEqual(record.output, 'B')
-        self.assertIn('fixed memory', provider.calls[0]['system_prompt'])
+        self.assertIn('fixed note', provider.calls[0]['system_prompt'])
         self.assertIn('new skill', provider.calls[0]['system_prompt'])
         self.assertNotIn('old skill', provider.calls[0]['system_prompt'])
-        self.assertEqual(len(provider.calls), 2)
-
-    async def test_multistep_execution_stops_at_shared_model_budget(self):
-        provider = FauxProvider()
-        provider.respond_text('draft')
-        target = WorkflowTarget('{"steps":["reason","finish"]}')
-        record, services = await self.trial(AgentLoopConfig(provider=provider), (target,), 'execution-workflow', target.text, calls=1)
-        self.assertEqual(record.status, 'error')
-        self.assertEqual(services.used['model'], 1)
-        self.assertEqual(len(provider.calls), 1)
-
-    def test_workflow_rejects_code_unknown_fields_and_unbounded_steps(self):
-        for value in ('print(1)', '{}', '{"steps":[]}', '{"steps":[1]}',
-                      json.dumps({'steps': ['x'] * 7}), '{"steps":["ok"],"exec":"code"}',
-                      '{"steps":["<!-- fruitfly:skill-document:start -->"]}'):
-            with self.subTest(value=value), self.assertRaises(ValueError):
-                parse_workflow(value)
-        with self.assertRaises(ValueError):
-            apply_workflow(AgentLoopConfig(provider=FauxProvider(), max_turns=1), '{"steps":["a","b"]}')
+        self.assertEqual(skill.text, 'old skill')
 
     def test_selected_skill_source_is_bounded_and_rejects_symlinks(self):
         from fruitfly_agent.lab.context_manager.augmentation.skills.catalog import load_skill_document

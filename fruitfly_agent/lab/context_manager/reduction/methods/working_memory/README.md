@@ -32,4 +32,4 @@ H candidates may tune both prompts, memory size, update frequency, switch ratio,
 pages, auxiliary output/attempt limits and timeout. Outer budgets, coverage and
 integrity rules remain protected. Counting is conservative unless a supported
 exact Provider counter is selected; bounded text does not prove factual fidelity.
-See [shared checks](../../README.md#extend-a-method).
+See [shared checks](../../README.md#optimize-policy).

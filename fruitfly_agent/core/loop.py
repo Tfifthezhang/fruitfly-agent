@@ -167,7 +167,7 @@ async def _run(
     termination_reason = 'turn_budget_exhausted'
 
     # Outer loop: turns (steering + follow-up can extend a turn).
-    while turn_count < config.max_turns:
+    while config.max_turns is None or turn_count < config.max_turns:
         if _aborted(signal):
             return await _finish(config, ctx, hooks, "aborted", turn_count, tool_call_count)
         turn_count += 1
@@ -237,6 +237,8 @@ async def _run(
                         "error_kind": type(assistant.error).__name__,
                         "error": _bounded_session_text(str(assistant.error)),
                         "disposition": "terminal" if handled is not None else "recovered",
+                        **({'diagnostics': assistant.error.details['diagnostics']}
+                           if isinstance(assistant.error.details, dict) and 'diagnostics' in assistant.error.details else {}),
                     },
                 )
                 if handled is not None:
@@ -276,7 +278,7 @@ async def _run(
             if not tool_calls:
                 if assistant.continue_turn:
                     continuation_responses += 1
-                    if continuation_responses >= config.max_turns:
+                    if config.max_turns is not None and continuation_responses >= config.max_turns:
                         return await _finish(config, ctx, hooks, 'error', turn_count, tool_call_count,
                             is_error=True, error_details={'kind': 'continuation_limit',
                                 'error': 'consecutive non-final response limit reached'})
@@ -285,7 +287,7 @@ async def _run(
 
             continuation_responses = 0
 
-            remaining = max(0, config.max_tool_calls_per_turn - turn_tool_call_count)
+            remaining = len(tool_calls) if config.max_tool_calls_per_turn is None else max(0, config.max_tool_calls_per_turn - turn_tool_call_count)
             batch_results, terminate = await execute_tool_batch(
                 ctx, assistant, config, hooks, signal, max_calls=remaining,
             )
@@ -541,10 +543,10 @@ async def _handle_failure(
         "kind": type(error).__name__,
         "error": str(error),
         "model": ctx.model,
+        **({'diagnostics': error.details['diagnostics']}
+           if isinstance(error.details, dict) and 'diagnostics' in error.details else {}),
         **({"timeout_kind": error.details["timeout_kind"]}
            if isinstance(error.details, dict) and "timeout_kind" in error.details else {}),
-        **({'termination_reason': error.details['kind']}
-           if isinstance(error.details, dict) and error.details.get('kind') == 'model_budget_exhausted' else {}),
     }
 
 
@@ -640,6 +642,8 @@ def _session_error(details: dict | None) -> dict[str, Any] | None:
             if isinstance(value, str)
             else value
         )
+    if 'diagnostics' in details:
+        result['diagnostics'] = details['diagnostics']
     return result
 
 

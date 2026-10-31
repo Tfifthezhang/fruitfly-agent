@@ -8,8 +8,8 @@ Build the model's request context through three Core stages. Canonical Session m
 |---|---|---|
 | [Augmentation](augmentation/README.md) | Add bounded instructions or retrieved information | Skills and Information spaces |
 | [Externalization](externalization/README.md) | Replace large content with retrievable references | Programmatic context |
-| [Reduction](reduction/README.md) | Fit the projection to the request budget | Summarizing or working memory |
-| [Measurement](measurement/README.md) | Measure request occupancy and uncertainty | Optional Provider count, heuristic calibration |
+| [Reduction](reduction/README.md) | Fit the projection to the request budget | Incremental working memory |
+| [Measurement](measurement/README.md) | Measure request occupancy and uncertainty | Shared internal service, optional Provider count and heuristic calibration |
 
 ```text
 canonical messages → augmentation → externalization → reduction → model projection

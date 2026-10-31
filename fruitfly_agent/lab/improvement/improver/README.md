@@ -20,19 +20,16 @@ Outer current editor -> propose candidate editor I'
   -> pending I candidate -> explicit adoption -> next RSI generation
 ```
 
-The executed I can change `AgentEditor` instructions, feedback settings and search
-settings through the same registered component configuration. Each episode holds
-candidate I fixed while executing a fresh inner H/S search. Supported settings are
-listed in the [system grammar](../../../runtime_spec/COMPONENTS.md); grants and bounds
-are enforced by the component's adapter. Search rounds are capped by the fixed
-`inner_depth`; assessment and task work consume the same outer hard allowances.
-The task Agent's base prompt remains an inner H component. `propose`, `invariant`, `domain`, `compose`, `max_tool_calls` and `max_turns` are editable
-only with corresponding grants and bounds. `system`, `select` and
-`reflect` must equal their frozen parent values. Unknown fields and changes to
-component ownership fail. Loaded I snapshots preserve the exact bound source bytes,
-including valid JSON formatting, so saved-default reconciliation and recovery
-compare the actual adopted artifact rather than a reserialized approximation. Model, scorer, permissions, thresholds and budgets
-remain outside the edit grant. I cannot be mixed with H/S in an outer job.
+Candidate I changes editor or evaluator prompts through registered configuration.
+All six editor prompts and three evaluator prompts are eligible under explicit
+grants. Each role uses an independent invocation time. Schemas,
+permissions, independent objectives, thresholds and private material stay fixed.
+Inner search cannot edit I. Each episode has fresh H/S and frozen experience.
+Exact adopted source bytes survive restoration and recovery.
+
+[Evaluator comparison](methods/evaluator_comparison/README.md) installs candidate
+prompts into this same episode runner. Private checks use the frozen outer
+reference policy; candidate judgments cannot verify their own adoption.
 
 | File | Owns |
 |---|---|
@@ -80,7 +77,7 @@ fresh suites for later research. This limit does not establish statistical valid
 Use the [experiment CLI](../../../experiments/README.md) with a referenced task
 document containing `source: editor` and `material: editor-study`. Grant the selected
 I fields in experiment `edit`. The [editor recipe](../../../../examples/experiments/editor.example.yaml)
-selects measured feedback and a larger allocation. Run `improvement check`, then explicitly
+selects measured feedback and independent phase times. Run `improvement check`, then explicitly
 `improvement run` or `rsi run`; real requests may incur charges. Public embedding
 requests remain available below.
 
@@ -90,19 +87,10 @@ requests remain available below.
 | `inner_components` | `base_prompt` | Space-separated registered H/S IDs; must be runnable in the file environment |
 | `repetitions` | 2 | Independent fresh episodes per package, 2–10 |
 | `inner_depth` | 1 | Sequential inner search depth, 1–3 |
-| `inner_model_calls` | 12 | Shared model allowance per inner search, 4–1000 |
-| `inner_executions` | 4 | Leaf executions per inner search, 4–100 |
-| `evaluation_model_calls` | 1 | Reserved model allowance per private check, 1–10000; must cover the selected backend |
-| `max_trials` | 8 | Outer development trial limit, 1–40 |
 | `min_gain` | 0 | Candidate paired mean gain must strictly exceed this value |
 | `max_regression` | 0 | Allowed per-case and paired regression |
-| `max_model_ratio` | 1.5 | Maximum candidate/old-editor model-call ratio |
 
-Selecting the strategy recommends a root allowance of 512 model calls and 256
-leaf task executions. Larger suites need larger budgets. Preparation calculates
-a minimum that includes protected final verification; the minimum is not a
-promise that every requested exploration round fits. Exhaustion rejects incomplete
-evidence rather than inventing a score. Costs and tokens can remain unknown.
+Phase times come from the outer `RunPlan.timeouts`; each editor, leaf execution and evaluator starts its own clock. Repetitions and fixed depth define the study, while usage is observed without model/execution quotas. Incomplete evidence cannot pass verification.
 
 For a started Application, this is the equivalent request. The IDs are
 placeholders; the actual `improve` operation calls models and can incur charges:
@@ -116,8 +104,6 @@ request = WorkflowRequest(
     task_pack_id="editor-study",
     verification="scored",
     scope="persistent",
-    max_model_calls=512,
-    max_executions=256,
     direction="Improve proposal procedures",
     execution_parameters=(("inner_components", "base_prompt"), ("repetitions", 2)),
 )
@@ -145,7 +131,6 @@ Final validation alternates old/new execution order across repeats. It requires:
 - No failed episode or missing measurement.
 - Candidate case gains and paired case differences above the regression floor.
 - Paired mean improvement strictly above `min_gain`.
-- Candidate model calls within `max_model_ratio` of the old editor.
 
 These are finite-sample rules, not a statistical confidence certificate. Providers
 may be stochastic and may not expose seeds. No claim of universal nonregression
@@ -158,10 +143,7 @@ and file workspace. Both branches start from the same H/S and experience. Inner
 experience has no production writer. H/S experiment artifacts are never activated
 by adopting I. The experiment uses Lab directly, not recursive Application jobs.
 
-Every nested model request and leaf task execution spends the root ledger once.
-Child allocations hold quota without reporting it as spent. Unused quota returns
-on close; deadlines and cancellation propagate. An outer I trial has no additional
-leaf-execution charge, and `max_trials` bounds development scheduling separately.
+Every nested request and leaf execution contributes an observation to its enclosing report. There is no child quota, cost-ratio veto or aggregate I-trial deadline. User cancellation propagates; unconfirmed retirement stops further scheduling.
 
 Persistent candidates use ordinary [host adoption](../../../run/improvement/README.md).
 Only an idle Application can activate a separately prepared runtime. Startup
@@ -177,24 +159,18 @@ code replacement, model training or online editing is installed.
 ```
 
 Synthetic Providers test actual prompt loading, private trials, paired checks,
-budgeting and two-generation activation. Their designed response behavior proves
+timing and two-generation activation. Their designed response behavior proves
 control flow only. Real quality and API behavior require explicitly authorized
 integration experiments. No new secret environment variables are introduced.
 
 Embedding hosts can supply another `EpisodeExecutor` through
 `ImproverTaskRunner(..., episode_factory=...)` and register the enclosing execution
-definition. The public request/result contracts keep budgets, source identity and
+definition. The public request/result contracts keep timing, source identity and
 private comparison separate from the task backend. The bundled native material catalog uses task packages. The optional
-[Eval episode composition](../../../../eval/improvement/README.md#compare-i-on-prepared-benchmarks)
+[Eval episode composition](../../../../fruitfly_eval/improvement/README.md#compare-i-on-prepared-benchmarks)
 registers benchmark-backed comparisons through `comparison_definition`; Lab does
 not import Eval. A task runner alone does not install an episode study.
 
-## Execute candidate research settings
+## Keep infrastructure fixed
 
-The selected I search component can grant [research, progress and finalization
-parameters](../research/README.md#configure-and-compare-mechanisms). Each native
-or registered benchmark-backed episode installs fresh instances from candidate I.
-Research contributions reach the actual proposal workspace. The inner fixed budget
-and private evaluation inputs remain unchanged. Editing a reserve changes how
-existing quota is held, never the outer allocation. Adoption uses the same exact
-settings artifact and Catalog restoration path as other I fields.
+Research, progress, evidence access and search schedules are fixed experiment conditions. Editor and evaluator prompts are mutable I surfaces. See [experiment conditions](../../../experiments/CONFIGURATION.md).

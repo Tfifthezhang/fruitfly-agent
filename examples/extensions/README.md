@@ -39,7 +39,7 @@ This verifies integration, not model compliance or algorithm gains.
 [developer SDK](../../fruitfly_agent/extensions/README.md). It registers
 `developer-guidance-owner` and an H text surface named `developer-guidance`.
 Enable the owner through ordinary component configuration, then grant
-`developer-guidance.parameters.text` through the existing experiment edit map.
+`developer-guidance.parameters.instructions.usage` through the existing experiment edit map.
 Its artifact-backed candidate uses the same installation path on activation.
 The offline integration test executes real Agent requests with a fake Provider,
 compares candidate guidance, activates two generations and checks the final prompt.

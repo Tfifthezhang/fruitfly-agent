@@ -8,9 +8,9 @@ from .state import WorkflowState
 
 
 def validate_schedule(schedule, plan):
-    if (type(schedule.references) is not int or not 1 <= schedule.references <= plan.max_executions
+    if (type(schedule.references) is not int or schedule.references < 1
             or type(schedule.rounds) is not int or not 1 <= schedule.rounds <= plan.depth
-            or type(schedule.compositions) is not int or not 0 <= schedule.compositions <= plan.max_executions
+            or type(schedule.compositions) is not int or schedule.compositions < 0
             or not isinstance(schedule.missions, tuple) or not 1 <= len(schedule.missions) <= 100
             or any(not isinstance(m, tuple) or len(m) != 2 or not isinstance(m[0], str)
                 or type(m[1]) is not int or m[1] < 0 for m in schedule.missions)):

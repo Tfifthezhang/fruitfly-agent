@@ -8,15 +8,6 @@ from fruitfly_agent.improvement.contracts.versions import content_hash, canonica
 from dataclasses import asdict, replace
 
 
-def minimum_budget(snapshot, settings):
-    """Fund paired initial probes, paired final selection and editor allowance."""
-    batch = sample_batch(snapshot, settings.sampling, 0, attempts=settings.execution.attempts)
-    entries = {e.key: e for e in snapshot.entries}
-    tasks = (*snapshot.selection_entries(), *(entries[key] for key in batch.task_keys))
-    return {'model': 2 * sum(e.model_limit for e in tasks) * batch.attempts + 8,
-            'execution': 2 * sum(e.execution_limit for e in tasks) * batch.attempts}
-
-
 def execution_definition(freeze, settings, *, expected, capabilities, roles=frozenset({'H', 'S'})):
     conditions = content_hash(canonical_json({'task_set_id': expected.snapshot_id, 'settings': asdict(settings)}))
     def plan_factory(*args, **kwargs):
@@ -51,8 +42,7 @@ def execution_definition(freeze, settings, *, expected, capabilities, roles=froz
         return PreparedExecution(snapshot, snapshot.snapshot_id,
             (('Task count', str(len(snapshot.entries))), ('Development tasks', str(len(snapshot.partition('development')))),
              ('Execution concurrency', str(settings.execution.concurrency)), ('Candidate concurrency', '1'),
-             ('Joint aggregation', settings.evaluation.aggregation)), current, bindings,
-            minimum_budget=minimum_budget(snapshot, settings))
+             ('Joint aggregation', settings.evaluation.aggregation)), current, bindings)
 
     def build(context, prepared):
         return ExecutionPorts(None, retain_experience=False,

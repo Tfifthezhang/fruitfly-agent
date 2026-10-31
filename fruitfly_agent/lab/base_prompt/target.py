@@ -6,7 +6,9 @@ from fruitfly_agent.lab.improvement.targets.text import validate_text
 
 
 class BasePromptTarget:
+    description = 'Overall task-execution instructions: reasoning, tool use, and delivery. Does not change tools or permissions.'
     optimization = OptimizationSpec('H', 'text')
+    optimization_field = 'instructions.system'
     label = 'Base prompt'
     component_kind = 'system-prompt'
 
@@ -27,12 +29,16 @@ class BasePromptTarget:
 def configuration_surface():
     from fruitfly_agent.lab.catalog.configuration import ConfigurationSurface, text_edit_options
     def normalize(parameters):
-        if set(parameters) != {'text'}:
-            raise ValueError('base_prompt parameters require text')
-        validate_text(parameters['text'])
+        if not isinstance(parameters,dict) or set(parameters)!={'instructions'} or not isinstance(parameters['instructions'],dict) or set(parameters['instructions'])!={'system'}:
+            raise ValueError('base prompt requires instructions.system')
+        validate_text(parameters['instructions']['system'])
         return parameters
     def reference(parameters):
         from . import builtins
-        return next((prompt.prompt_id for prompt in builtins() if prompt.text == parameters['text']), None)
-    return ConfigurationSurface('base_prompt', 'H', 'prompt', '', normalize,
-                                edit_options=text_edit_options, reference=reference)
+        return next((p.prompt_id for p in builtins() if p.text==parameters['instructions']['system']),None)
+    def options(fields,bounds):
+        if fields!=['parameters.instructions.system'] or bounds:raise ValueError('base prompt grants require instructions.system')
+        return {}
+    return ConfigurationSurface('base_prompt','H','prompt','',normalize,
+        encode=lambda p:p['instructions']['system'], decode=lambda text:{'instructions':{'system':text}},
+        edit_options=options,reference=reference)

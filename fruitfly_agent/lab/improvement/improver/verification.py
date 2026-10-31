@@ -21,6 +21,7 @@ def combine(reports):
 
 class ImproverVerification:
     policy_id = 'improver-paired-v1'
+    manages_stage_times = True
 
     def __init__(self, runner, claim):
         self.runner, self.claim = runner, claim
@@ -51,8 +52,7 @@ class ImproverVerification:
         if (any(v < -params['max_regression'] for v in after.regressions) or
                 not case_pairs or any(v < -params['max_regression'] for v in case_pairs) or
                 any(v < -params['max_regression'] for v in paired) or
-                sum(paired) / len(paired) <= params['min_gain'] or
-                after.model_calls > max(1, before.model_calls) * params['max_model_ratio']):
+                sum(paired) / len(paired) <= params['min_gain']):
             return None
         payload = {'schema_version': 1, 'policy_id': self.policy_id,
             'source_id': runner.materials.source_id, 'experiment_id': runner.spec.conditions_id,

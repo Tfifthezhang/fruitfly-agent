@@ -36,7 +36,7 @@ Configuration and assembly tests share local setup helpers while keeping model i
 
 Assembly checks record permission identity while allowing configuration changes on resume, require the current authorizer, protect the Session writer, and construct fresh approval services.
 
-`test_model_budget.py` verifies a shared main/auxiliary request allowance, atomic
+`test_model_usage.py` verifies main/auxiliary observations, atomic
 receipts and rejection before an additional Provider invocation.
 
 Assembly details live in `test_assembly.py`; manifest/environment recovery rules

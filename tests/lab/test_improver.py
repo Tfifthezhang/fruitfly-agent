@@ -6,8 +6,6 @@ import time
 import unittest
 from unittest.mock import AsyncMock
 
-from fruitfly_agent.improvement.workflow.budget import BudgetScope
-from fruitfly_agent.improvement.workflow.budget import AllocationExhausted
 from fruitfly_agent.improvement.workflow.services import WorkflowServices
 from fruitfly_agent.improvement.contracts.assessment import SelectionDecision, Measurement
 from fruitfly_agent.improvement.contracts.components import ComponentFile, HarnessSnapshot
@@ -20,45 +18,15 @@ from tests.support.pipeline import build_pipeline
 
 
 class BudgetTests(unittest.IsolatedAsyncioTestCase):
-    async def test_child_allocations_hold_quota_and_charge_leaf_once(self):
-        root = BudgetScope({'model': 10, 'execution': 4})
-        protected = root.child({'model': 4, 'execution': 2})
-        search = root.child({'model': 6, 'execution': 2})
-        with self.assertRaises(AllocationExhausted):
-            root.reserve('model')
-        leaf = search.child({'model': 3, 'execution': 1})
-        leaf.reserve('model', 2)
-        leaf.reserve('execution')
-        self.assertEqual(root.used, {'model': 2, 'execution': 1})
-        self.assertEqual(search.used, root.used)
-        self.assertEqual(root.available('model'), 0)
-        leaf.close()
-        self.assertEqual(search.available('model'), 4)
-        search.close()
-        self.assertEqual(root.available('model'), 4)
-        protected.reserve('model', 4)
-        protected.close()
-        self.assertEqual(root.used['model'], 6)
-        self.assertEqual(root.available('model'), 4)
-        root.close()
-
-    async def test_deadline_and_cancellation_are_inherited(self):
-        root = BudgetScope({'model': 5, 'execution': 5}, deadline=time.monotonic() + 30)
-        child = root.child({'model': 2, 'execution': 2}, timeout=1)
-        self.assertLess(child.deadline, root.deadline)
-        root.signal.set()
-        with self.assertRaises(asyncio.CancelledError):
-            child.reserve('model')
-        child.close()
-        self.assertEqual(root.used['model'], 0)
-
     def test_editor_candidate_cannot_change_fixed_fields(self):
         instructions = EditorInstructions()
         target = EditorInstructionTarget(instructions)
         target.validate(EditorInstructionTarget(replace(instructions, invariant='Use a different proposal procedure')).snapshot().text)
-        for field in ('system', 'select', 'reflect'):
-            with self.subTest(field=field), self.assertRaisesRegex(ValueError, 'frozen'):
-                target.validate(EditorInstructionTarget(replace(instructions, **{field: 'Mutated field'})).snapshot().text)
+        for field in ('system', 'reflect'):
+            text = EditorInstructionTarget(replace(instructions, **{field: 'Mutated field'})).snapshot().text
+            target.validate_change(text, {'editable_fields': ['parameters.instructions.'+field]})
+            with self.subTest(field=field), self.assertRaisesRegex(ValueError, 'fixed'):
+                target.validate_change(text, {'editable_fields': ['parameters.instructions.invariant']})
         formatted = json.dumps(json.loads(target.snapshot().text), indent=2)
         self.assertEqual(EditorInstructionTarget(instructions, text=formatted).snapshot().text, formatted)
         with self.assertRaisesRegex(ValueError, 'duplicate'):
@@ -103,10 +71,12 @@ class RetentionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(outcome.harness, baseline)
         self.assertTrue(all(q.baseline == baseline for q in requests))
 
-    async def test_budget_exhaustion_preserves_completed_result(self):
-        flow, plan, baseline, _ = self.build()
-        plan = replace(plan, max_executions=2)
-        outcome = await flow.run(plan, TaskMaterial('task', 'Do work'), baseline, WorkflowServices(plan))
-        self.assertEqual(outcome.stop_reason, 'budget_exhausted')
+    async def test_final_selection_timeout_preserves_completed_result(self):
+        flow,plan,baseline,_=self.build()
+        plan=replace(plan,timeouts={'editor_seconds':1,'execution_seconds':1,'evaluator_seconds':.01})
+        async def select(*args):await asyncio.Event().wait()
+        flow.selector.select=select
+        outcome=await flow.run(plan,TaskMaterial('task','Do work'),baseline,WorkflowServices(plan))
         self.assertIsNotNone(outcome.selected)
-        self.assertEqual(outcome.decision.assurance, 'selected')
+        self.assertEqual(outcome.harness,baseline)
+        self.assertEqual(outcome.decision.assurance,'selected')

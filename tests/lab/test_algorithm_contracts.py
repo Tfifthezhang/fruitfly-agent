@@ -13,7 +13,7 @@ from fruitfly_agent.core.data_model import (
 from fruitfly_agent.core.loop import run_agent_loop
 from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone
 from fruitfly_agent.lab.context_manager.reduction import (
-    SummarizingCompactor, SummarizingCompactorConfig,
+    WorkingMemoryReducer, WorkingMemoryConfig,
 )
 from tests.support.faux_provider import FauxProvider
 from tests.support.loop import make_config
@@ -56,8 +56,8 @@ def _snapshot(signal=None):
 
 def _compactors(provider, *, timeout=60):
     return (
-        SummarizingCompactor(SummarizingCompactorConfig(
-            reserve_tokens=0, keep_recent_tokens=1, summary_attempts=1, summary_timeout_seconds=timeout,
+        WorkingMemoryReducer(WorkingMemoryConfig(
+            memory_tokens=32, auxiliary_attempts=1, auxiliary_timeout_seconds=timeout, update_every_messages=1,
         ), provider),
     )
 
@@ -109,7 +109,8 @@ class AlgorithmContractTests(unittest.IsolatedAsyncioTestCase):
         signal.set()
         provider = FauxProvider()
         for compactor in _compactors(provider):
-            await compactor.check_budget(_snapshot(signal))
+            with self.assertRaises(asyncio.CancelledError):
+                await compactor.check_budget(_snapshot(signal))
         self.assertEqual([], provider.calls)
 
     async def test_core_passes_signal_and_stops_before_main_provider_after_reduction(self):
@@ -134,7 +135,7 @@ class AlgorithmContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([], provider.calls)
 
     def test_summary_timeouts_reject_invalid_values(self):
-        for config in (SummarizingCompactorConfig,):
+        for config in (WorkingMemoryConfig,):
             for value in (True, 0, -1, float("inf"), float("nan")):
                 with self.subTest(config=config, value=value), self.assertRaises(ValueError):
-                    config(summary_timeout_seconds=value)
+                    config(auxiliary_timeout_seconds=value)

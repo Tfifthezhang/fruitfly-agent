@@ -10,7 +10,7 @@ from unittest.mock import patch
 from uuid import uuid4
 
 import yaml
-from eval.improvement.task_sets import freeze
+from fruitfly_eval.improvement.task_sets import freeze
 from fruitfly_agent.improvement.contracts.task_sets import TaskSetSnapshot
 from fruitfly_agent.lab.improvement.task_sets import MultiTaskSettings
 from fruitfly_agent.improvement.execution.batches import BatchEvaluator
@@ -43,13 +43,16 @@ class EvalCollectionTests(unittest.IsolatedAsyncioTestCase):
                 tasks.append({'id': 'fixture/' + name, 'path': str(path)})
             source = Path(__file__).resolve().parents[2]
             files = [(name, hashlib.sha256((source / name).read_bytes()).hexdigest()) for name in (
-                'fruitfly_agent/run/runtime/limits.py', 'fruitfly_agent/run/cli.py', 'eval/harbor_agent.py',
+                'fruitfly_agent/run/runtime/usage.py', 'fruitfly_agent/run/cli.py', 'fruitfly_eval/harbor_agent.py',
                 'fruitfly_agent/core/loop.py', 'fruitfly_agent/run/configuration/profile.py',
                 'fruitfly_agent/run/runtime/assembly.py', 'fruitfly_agent/runtime_spec/execution.py',
-             'fruitfly_agent/runtime_spec/profiles.py', 'fruitfly_agent/runtime_spec/selections.py', 'eval/runtime.py')]
+             'fruitfly_agent/core/config.py', 'fruitfly_agent/lab/catalog/configuration.py',
+             'fruitfly_agent/lab/catalog/parameters.py', 'fruitfly_agent/lab/execution_policy/__init__.py',
+             'fruitfly_agent/run/configuration/templates/components/H/execution-policy.yaml',
+             'fruitfly_agent/runtime_spec/profiles.py', 'fruitfly_agent/runtime_spec/selections.py', 'fruitfly_eval/runtime.py')]
             prepared = {'id': 'prepared-fixture', 'tasks': tasks, 'runtime': {'installation': {'files': files}}}
             components = ComponentRegistry((TextComponentAdapter(BasePromptTarget('baseline'), 'system-prompt'),))
-            plan = RunPlan('joint-eval', version(), ('base_prompt',), feedback='scored', max_model_calls=20)
+            plan = RunPlan('joint-eval', version(), ('base_prompt',), feedback='scored')
             services = WorkflowServices(plan)
             context = ExecutionContext(root, MemoryArtifacts(), components, None, None, None, plan=plan, services=services)
             context.runtime_config, context.runtime_profile = config, None
@@ -60,16 +63,16 @@ class EvalCollectionTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(evaluation.execution.concurrency, 1)
                 path = output_root / uuid4().hex
                 agent = path / 'artifacts/harbor/job/trial/agent'; agent.mkdir(parents=True)
-                (agent / 'model-budget.json').write_text('{"schema_version":1,"limit":2,"used":1}')
+                (agent / 'model-usage.json').write_text('{"schema_version":1,"used":1,"requests":[{"id":"call-0","status":"completed","usage":null}]}')
                 (agent / 'session.jsonl').write_text('{"type":"message"}\n')
                 (agent / 'trajectory.json').write_text('{}')
                 private = agent.parent / 'verifier'; private.mkdir(); (private / 'answer.txt').write_text('PRIVATE')
                 return {'status': 'completed', 'evaluation_id': path.name, 'errors': {},
                     'metrics': [{'name': 'official_reward', 'value': 0}]}, path
             try:
-                with patch('eval.improvement.task_sets.HostConfig.read', return_value=SimpleNamespace(agent_env={'FRUITFLY_MAX_MODEL_CALLS': '2'})), \
-                        patch('eval.improvement.task_sets.load_preparation', return_value=prepared):
-                    binding = freeze({'id': 'bench', 'source': 'eval', 'request': str(request), 'host': str(host), 'model_calls': 2},
+                with patch('fruitfly_eval.improvement.task_sets.HostConfig.read', return_value=SimpleNamespace(agent_env={'FRUITFLY_MAX_MODEL_CALLS': '2'})), \
+                        patch('fruitfly_eval.improvement.task_sets.load_preparation', return_value=prepared):
+                    binding = freeze({'id': 'bench', 'source': 'eval', 'request': str(request), 'host': str(host)},
                         context, executor=executor)
                     snapshot = TaskSetSnapshot(binding.entries)
                     evaluator = BatchEvaluator(context, snapshot, (binding,), MultiTaskSettings(), aggregate=assess_batch)

@@ -10,8 +10,7 @@ import yaml
 from fruitfly_agent.lab.catalog import builtin_catalog, MechanismSelection, materialize_system, configuration_resources
 from fruitfly_agent.lab.improvement.api import WorkflowBindings
 from fruitfly_agent.lab.improvement.execution import builtin_executions
-from fruitfly_agent.lab.improvement.assessment.registry import builtin_completed_assessors
-from fruitfly_agent.lab.improvement.strategies.exploration import builtin_explorations, validate_process_configuration
+from fruitfly_agent.lab.improvement.strategies.exploration import builtin_explorations, validate_exploration
 from fruitfly_agent.providers.config import load_env
 from fruitfly_agent.providers.registry import load_model_specs
 from fruitfly_agent.providers.workspace import WorkspacePaths
@@ -73,9 +72,8 @@ class PreparedExperiment:
                     'development': sum(e.collection_id == name and e.partition == 'development' for e in material.entries),
                     'selection': sum(e.collection_id == name for e in material.selection_entries())}
                     for name in sorted({e.collection_id for e in material.entries})],
-                'minimum_budget': self.source.minimum_budget,
                 'tasks': [{'key': e.key, 'collection_id': e.collection_id, 'origin_id': e.origin_id,
-                           'partition': e.partition, 'model_limit': e.model_limit} for e in material.entries],
+                           'partition': e.partition} for e in material.entries],
                 'candidate_concurrency': 1, 'executor_usage': 'provider calls; SDK retries and external grader calls are separate'}
         return json.loads(json.dumps(snapshot, ensure_ascii=False, allow_nan=False))
 
@@ -103,8 +101,7 @@ class PreparedExperiment:
 
 
 def prepare_experiment(config, operation, *, require_prepared=True, environment=None, require_credentials=True):
-    validate_process_configuration(config.process_assessment, config.exploration,
-        builtin_completed_assessors(), builtin_explorations())
+    validate_exploration(config.exploration, builtin_explorations())
     source = resolve_source(config, default_source='eval' if operation == 'eval' else 'files')
     from fruitfly_agent.lab.improvement.task_sets import MultiTaskSettings
     if source.task_set is None and config.multi_task != MultiTaskSettings():
@@ -169,9 +166,33 @@ def prepare_experiment(config, operation, *, require_prepared=True, environment=
         if require_credentials and not process_env.get(specs[name].provider.api_key_env):
             raise ValueError('missing model credential variable: ' + specs[name].provider.api_key_env)
     catalog.resolve(profile.mechanisms)
+    from fruitfly_agent.lab.catalog import resolve_harness
+    inventory = resolve_harness(profile, catalog)
+    from fruitfly_agent.lab.improvement.execution import builtin_executions
+    if source.task_set is not None:
+        capabilities=frozenset.intersection(*(b.capabilities for b in source.task_set.bindings))
+        allowed_roles=frozenset.intersection(*(b.roles for b in source.task_set.bindings))
+    elif source.benchmark is not None:
+        from fruitfly_eval.improvement import benchmark_execution
+        execution=benchmark_execution(source.benchmark.source_request,source.benchmark.generated_host,runtime_override=source.benchmark.request.runtime)
+        capabilities=execution.capabilities_for(inventory.tools)
+        allowed_roles=execution.roles
+    else:
+        execution=builtin_executions().get(source.execution_id)
+        capabilities=execution.capabilities_for(inventory.tools)
+        allowed_roles=execution.roles
+    if not config.improvement.components:
+        legal=tuple(c.component_id for c in inventory.components if c.role in allowed_roles and not c.required_capabilities-capabilities)
+        from fruitfly_agent.lab.improvement.tasks import TaskPackCatalog
+        packs=[row['pack'] for row in config.task.get('collections',()) if row.get('source')=='files' and row.get('pack')]
+        if source.execution_id=='file-task' and source.material_id:packs.append(source.material_id)
+        for pack in packs:
+            legal=tuple(name for name in legal if name in TaskPackCatalog(config.workspace).compatible_targets(pack))
+        if not legal:raise ValueError('no legal optimization targets for this execution and material')
+        config=replace(config,improvement=replace(config.improvement,components=legal))
     options = config.improvement
     if source.defaults:
-        values = {name: value for name, value in source.defaults.items() if 'improvement.' + name not in config.sources}
+        values = {name: value for name, value in source.defaults.items() if 'improvement.' + name not in config.sources and name != 'components'}
         options = replace(options, **values)
         config = replace(config, improvement=options)
     persistent = operation != 'eval' and (operation == 'rsi' or options.scope == 'persistent')
@@ -188,10 +209,6 @@ def prepare_experiment(config, operation, *, require_prepared=True, environment=
     if operation != 'eval':
         if options.generator not in {d.generator_id for d in extensions.bindings().generators.definitions()}:
             raise ValueError('unregistered candidate generator: ' + options.generator)
-        minimum = source.minimum_budget if persistent or source.task_set is not None else {'model': 8, 'execution': 2}
-        for kind, limit in (('model', options.max_model_calls), ('execution', options.max_executions)):
-            if minimum.get(kind, 0) > limit:
-                raise ValueError(f'root {kind} budget is too small; need at least {minimum[kind]}')
         if source.required_components and options.components != source.required_components:
             raise ValueError('the execution requires components: ' + ', '.join(source.required_components))
         if set(options.components) & set(source.forbidden_components):
@@ -199,8 +216,7 @@ def prepare_experiment(config, operation, *, require_prepared=True, environment=
     feedback = ('scored' if source.measured else 'behavior') if options.feedback == 'auto' else options.feedback
     request = WorkflowRequest(source.instruction, source.input_paths, options.components,
         generator_id=options.generator, mode=options.mode, width=options.width, depth=options.rounds,
-        verification=feedback, scope='persistent' if persistent else 'task', max_model_calls=options.max_model_calls,
-        max_executions=options.max_executions, operation_timeout=options.operation_timeout, direction=options.direction,
+        verification=feedback, scope='persistent' if persistent else 'task', timeouts=asdict(options.timeouts), direction=options.direction,
         task_pack_id=source.material_id, execution_id=source.execution_id, execution_parameters=source.parameters,
         strategy_id=options.strategy, retain_experience=options.retain_experience)
     stop_policy(config.stop.get('improvement'))
@@ -208,19 +224,15 @@ def prepare_experiment(config, operation, *, require_prepared=True, environment=
     if source.benchmark is not None:
         if extensions.registrations:
             raise ValueError('container execution does not support Python extension source staging')
-        if operation != 'eval' and (options.max_model_calls < 2 * source.benchmark.model_calls + 8 or options.max_executions < 2):
-            raise ValueError('budget cannot fund a baseline, candidate and final comparison')
         if require_prepared:
             source.benchmark.require_host()
-            from eval.api import check_evaluation
+            from fruitfly_eval.api import check_evaluation
             result = check_evaluation(source.benchmark.request, host_config_path=source.benchmark.generated_host)
             if not result['available']:
                 details = '; '.join(c['detail'] for c in result.get('checks', ()) if c.get('status') == 'failed')
                 raise PreparationUnavailable('benchmark preparation is unavailable; run fruitfly-agent-lab eval prepare. ' + details)
             if operation != 'eval' and result.get('task_count') != 1:
                 raise ValueError('benchmark improvement requires exactly one prepared task')
-    if operation == 'rsi' and (config.rsi.max_model_calls < options.max_model_calls or config.rsi.max_executions < options.max_executions):
-        raise ValueError('RSI total allowance must fund at least one declared search')
     from .validation import validate_harness
     inventory = validate_harness(config, profile, source, operation=operation,
         environment=process_env if require_credentials else None, catalog=catalog)
@@ -235,14 +247,15 @@ def application_factory(prepared, runtime_path, *, provider_registry=None):
     if prepared.source.task_set is not None:
         executions.register(prepared.source.task_set.definition())
     if prepared.source.benchmark is not None:
-        from eval.improvement import benchmark_execution
+        from fruitfly_eval.improvement import benchmark_execution
         benchmark = prepared.source.benchmark
         executions.register(benchmark_execution(benchmark.source_request, benchmark.require_host(),
-            model_calls=benchmark.model_calls, runtime_override=benchmark.request.runtime))
+            runtime_override=benchmark.request.runtime))
     bindings = WorkflowBindings(executions=executions,
         stop_policy=stop_policy(prepared.config.stop.get('improvement')),
-        process_assessment=prepared.config.process_assessment, exploration=prepared.config.exploration,
-        component_options=prepared.config.improvement.component_options)
+        exploration=prepared.config.exploration,
+        component_options=prepared.config.improvement.component_options,
+        workflow_settings=prepared.config.workflow_settings, evidence_settings=prepared.config.evidence_settings)
     return RunApplicationFactory(cwd=prepared.config.workspace, environment=prepared.environment,
         config_path=str(runtime_path), profile_id=prepared.profile.profile_id,
         provider_registry=provider_registry, improvement_bindings=bindings, extensions=prepared.extensions)

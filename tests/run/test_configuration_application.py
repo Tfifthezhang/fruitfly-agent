@@ -127,7 +127,7 @@ class ConfigurationApplicationTest(unittest.IsolatedAsyncioTestCase):
         await app.submit('question')
         original = app.conversation()
         path = app.status.session_path
-        for algorithm in ('working-memory-reduction', 'compaction'):
+        for algorithm in ('working-memory-reduction', 'working-memory-reduction'):
             app.configuration.select_algorithm('reduction', algorithm)
             await app.apply_configuration()
             self.assertEqual(app.status.session_path, path)
@@ -244,7 +244,7 @@ class ConfigurationApplicationTest(unittest.IsolatedAsyncioTestCase):
         provider.respond_text('original answer')
         await app.submit('original question')
         original = app.conversation()
-        app.configuration.set_mechanism('compaction', enabled=False)
+        app.configuration.set_mechanism('working-memory-reduction', enabled=False)
         app.configuration.save()
         await app.apply_configuration()
         self.assertEqual(app.conversation(), original)

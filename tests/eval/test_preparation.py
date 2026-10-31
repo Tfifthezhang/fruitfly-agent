@@ -12,16 +12,16 @@ from types import ModuleType, SimpleNamespace
 
 import yaml
 
-from eval.benchmarks.harbor import harbor_descriptor
-from eval.contracts import EvaluationRequest
-from eval.harbor.dependencies import check_dependencies, dependency_mounts, prepare_dependencies
-from eval.harbor.controller import environment_snapshot
-from eval.harbor.docker import run_container
-from eval.harbor.environments import environment_key, probe_environment
-from eval.harbor.host import HostConfig
-from eval.harbor.material import check_material, digest, prepare_material, tree_identity
-from eval.harbor.preparation import inspect, load_preparation, prepare
-from eval.harbor.tasks import prepare_tasks, validate_coverage
+from fruitfly_eval.benchmarks.harbor import harbor_descriptor
+from fruitfly_eval.contracts import EvaluationRequest
+from fruitfly_eval.harbor.dependencies import check_dependencies, dependency_mounts, prepare_dependencies
+from fruitfly_eval.harbor.controller import environment_snapshot
+from fruitfly_eval.harbor.docker import run_container
+from fruitfly_eval.harbor.environments import environment_key, probe_environment
+from fruitfly_eval.harbor.host import HostConfig
+from fruitfly_eval.harbor.material import check_material, digest, prepare_material, tree_identity
+from fruitfly_eval.harbor.preparation import inspect, load_preparation, prepare
+from fruitfly_eval.harbor.tasks import prepare_tasks, validate_coverage
 from tests.support.evaluation import request_payload
 from tests.support.harbor import prepared_harbor
 
@@ -29,9 +29,9 @@ from tests.support.harbor import prepared_harbor
 class PreparationTests(unittest.TestCase):
     def setUp(self):
         self.root = Path(self.enterContext(tempfile.TemporaryDirectory())).resolve()
-        self.enterContext(patch("eval.harbor.tasks.task_requirements", return_value={
+        self.enterContext(patch("fruitfly_eval.harbor.tasks.task_requirements", return_value={
             "gpu_requirements": [], "images": [{"reference": "fixture:v1", "role": "agent", "step": None}], "builds": []}))
-        self.enterContext(patch("eval.harbor.preparation.inspect_images", return_value=[]))
+        self.enterContext(patch("fruitfly_eval.harbor.preparation.inspect_images", return_value=[]))
         self.host, _ = prepared_harbor(self.root)
         runtime = self.root / "runtime/bin"
         runtime.mkdir(parents=True)
@@ -83,7 +83,7 @@ class PreparationTests(unittest.TestCase):
         utils = ModuleType("packaging.utils")
         utils.canonicalize_name = lambda name: name.lower()
         with patch.dict(sys.modules, {"packaging.requirements": requirements, "packaging.utils": utils}), patch(
-            "eval.harbor.controller.metadata.distributions", return_value=distributions
+            "fruitfly_eval.harbor.controller.metadata.distributions", return_value=distributions
         ), patch.dict(
             "os.environ", {"MODEL_API_KEY": "placeholder-do-not-record"}
         ):
@@ -96,16 +96,16 @@ class PreparationTests(unittest.TestCase):
     def test_check_detects_controller_changes_and_keeps_declared_conflicts_visible(self):
         def probe(task, *args, **kwargs):
             return {"environment_key": environment_key(task), "images": []}
-        with patch("eval.harbor.preparation.probe_environment", side_effect=probe):
+        with patch("fruitfly_eval.harbor.preparation.probe_environment", side_effect=probe):
             prepared = prepare(self.request, self.descriptor, self.host)
         receipt = json.loads(Path(prepared["receipt"]).read_text())
         conflict = {**receipt["controller"], "dependency_check": "conflicts", "dependency_issues": [{"package": "fixture"}]}
         receipt["controller"] = conflict
-        with patch("eval.harbor.preparation.environment_snapshot", return_value=conflict):
+        with patch("fruitfly_eval.harbor.preparation.environment_snapshot", return_value=conflict):
             checked = inspect(self.request, self.descriptor, self.host, receipt=receipt)
         self.assertTrue(checked["available"])
         self.assertEqual(next(c for c in checked["checks"] if c["id"] == "controller_dependencies")["status"], "unverified")
-        with patch("eval.harbor.preparation.environment_snapshot", return_value={**conflict, "python": "changed"}):
+        with patch("fruitfly_eval.harbor.preparation.environment_snapshot", return_value={**conflict, "python": "changed"}):
             self.assertFalse(inspect(self.request, self.descriptor, self.host, receipt=receipt)["available"])
 
     def test_invalid_host_fields_mounts_and_secrets_fail_early(self):
@@ -133,7 +133,7 @@ class PreparationTests(unittest.TestCase):
         receipt = prepare_material(self.host, Path(__file__).resolve().parents[2])
         source = Path(receipt["source"])
         self.assertTrue((source / "fruitfly_agent/__init__.py").is_file())
-        self.assertTrue((source / "eval/harbor/supervisor.py").is_file())
+        self.assertTrue((source / "fruitfly_eval/harbor/supervisor.py").is_file())
         self.assertFalse(any(p.name in {".fruitfly", ".venv", ".env", "secrets.env", ".git"} for p in source.rglob("*")))
         check_material(self.host, receipt)
         (source / "fruitfly_agent/__init__.py").write_text("changed")
@@ -223,8 +223,8 @@ class PreparationTests(unittest.TestCase):
 
     def test_cache_warming_runs_once_and_never_runs_offline_during_prepare(self):
         host = replace(self.host, offline=True, preparation=({"image": "fixture:v1", "command": "warm-exact-packages"},))
-        with patch("eval.harbor.dependencies.image_identity", return_value="sha256:image"), patch(
-                "eval.harbor.dependencies.run_container", return_value=subprocess.CompletedProcess([], 0)) as run:
+        with patch("fruitfly_eval.harbor.dependencies.image_identity", return_value="sha256:image"), patch(
+                "fruitfly_eval.harbor.dependencies.run_container", return_value=subprocess.CompletedProcess([], 0)) as run:
             first = prepare_dependencies(host, "docker")
             second = prepare_dependencies(host, "docker")
         self.assertEqual(first, second)
@@ -241,28 +241,28 @@ class PreparationTests(unittest.TestCase):
             if command[1] == "run":
                 raise subprocess.TimeoutExpired(command, 1)
             return subprocess.CompletedProcess(command, 0, "", "")
-        with patch("eval.harbor.docker.subprocess.run", side_effect=run), self.assertRaises(subprocess.TimeoutExpired):
+        with patch("fruitfly_eval.harbor.docker.subprocess.run", side_effect=run), self.assertRaises(subprocess.TimeoutExpired):
             run_container("docker", ["image", "command"], timeout=1)
         self.assertEqual(calls[1], ["docker", "rm", "-f", "-v", calls[0][3]])
 
     def test_preparation_and_check_are_benchmark_independent_and_detect_drift(self):
         def probe(task, runtime, docker, directory, *, host):
             return {"environment_key": environment_key(task), "images": [{"reference": "fixture:v1", "id": "sha256:first"}], "detail": "fake imports passed"}
-        with patch("eval.harbor.preparation.probe_environment", side_effect=probe) as probes:
+        with patch("fruitfly_eval.harbor.preparation.probe_environment", side_effect=probe) as probes:
             prepared = prepare(self.request, self.descriptor, self.host)
         self.assertEqual(prepared["task_count"], 2)
         probes.assert_called_once()  # Same environment and runtime, distinct tasks.
         receipt = load_preparation(self.host, self.descriptor, "no_gpu")
-        with patch("eval.harbor.preparation.image_identity", return_value="sha256:first"):
+        with patch("fruitfly_eval.harbor.preparation.image_identity", return_value="sha256:first"):
             self.assertTrue(inspect(self.request, self.descriptor, self.host)["available"])
-        with patch("eval.harbor.preparation.image_identity", return_value="sha256:changed"):
+        with patch("fruitfly_eval.harbor.preparation.image_identity", return_value="sha256:changed"):
             self.assertFalse(inspect(self.request, self.descriptor, self.host)["available"])
         (Path(receipt["tasks"][0]["path"]) / "instruction.md").write_text("drift")
         with self.assertRaisesRegex(ValueError, "prepared task changed"):
             load_preparation(self.host, self.descriptor, "no_gpu")
 
     def test_check_never_silently_prepares_missing_material(self):
-        with patch("eval.harbor.preparation.prepare", side_effect=AssertionError("unexpected preparation")):
+        with patch("fruitfly_eval.harbor.preparation.prepare", side_effect=AssertionError("unexpected preparation")):
             result = inspect(self.request, self.descriptor, self.host)
         self.assertFalse(result["available"])
         self.assertIn("run eval prepare", result["checks"][0]["detail"])
@@ -272,13 +272,13 @@ class PreparationTests(unittest.TestCase):
             return {"environment_key": environment_key(task), "images": [
                 {"reference": "agent:v1", "id": "sha256:agent"},
                 {"reference": "verifier:v1", "id": "sha256:verifier"}]}
-        with patch("eval.harbor.preparation.probe_environment", side_effect=probe):
+        with patch("fruitfly_eval.harbor.preparation.probe_environment", side_effect=probe):
             result = prepare(self.request, self.descriptor, self.host)
         path = Path(result["receipt"])
         receipt = load_preparation(self.host, self.descriptor, "no_gpu")
-        with patch("eval.harbor.preparation.image_identity", side_effect=lambda docker, image:
+        with patch("fruitfly_eval.harbor.preparation.image_identity", side_effect=lambda docker, image:
                    "sha256:agent" if image == "agent:v1" else "sha256:changed"), patch(
-            "eval.harbor.preparation.probe_environment", side_effect=AssertionError("check must not start environments")
+            "fruitfly_eval.harbor.preparation.probe_environment", side_effect=AssertionError("check must not start environments")
         ):
             checked = inspect(self.request, self.descriptor, self.host)
         self.assertFalse(checked["available"])
@@ -330,9 +330,9 @@ class PreparationTests(unittest.TestCase):
         task = {"id": "example/task-a", "path": str(self.tasks / "task-a"), "image": None, "configuration": {}}
         def docker(command, **kwargs):
             return subprocess.CompletedProcess(command, 0, "owned-container\n" if command[1] == "ps" else "fixture:v1 sha256:fixture\n", "")
-        with patch.dict(sys.modules, modules), patch("eval.harbor.environments.environment_definitions", return_value=[definition]), patch(
-            "eval.harbor.environments.subprocess.run", side_effect=docker), patch(
-            "eval.harbor.environments.retire_projects"
+        with patch.dict(sys.modules, modules), patch("fruitfly_eval.harbor.environments.environment_definitions", return_value=[definition]), patch(
+            "fruitfly_eval.harbor.environments.subprocess.run", side_effect=docker), patch(
+            "fruitfly_eval.harbor.environments.retire_projects"
         ) as retire:
             probed = probe_environment(task, receipt["runtime"], "docker", directory, host=self.host)
             self.assertEqual(probed["images"], [{"reference": "fixture:v1", "id": "sha256:fixture"}])

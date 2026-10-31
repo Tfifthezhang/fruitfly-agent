@@ -167,7 +167,7 @@ Lab · Active session
 Context Manager
   Augmentation     Skill catalog
   Externalization  Not enabled
-  Reduction        Summarizing
+  Reduction        Working memory
 
 Environment
   Local workspace        /Users/example/fruitfly-agent

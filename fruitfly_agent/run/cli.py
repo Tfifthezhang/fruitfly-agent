@@ -20,7 +20,7 @@ from fruitfly_agent.run.extensions import load_extensions
 from fruitfly_agent.run.application import RunApplicationFactory, resolve_session_path as _resolve_path
 from fruitfly_agent.lab.catalog import PermissionPolicy
 from fruitfly_agent.providers.registry import default_registry
-from fruitfly_agent.run.runtime.limits import ModelCallBudget, BudgetedProviderRegistry
+from fruitfly_agent.run.runtime.usage import ModelUsage, ObservedProviderRegistry
 from fruitfly_agent.core.data_model import TextBlock
 from fruitfly_agent.core.data_model.media import UserContent
 from fruitfly_agent.interactive.terminal.features.tool_services.approval import approve_start
@@ -42,15 +42,10 @@ async def run_cli(args: argparse.Namespace) -> int:
             raise ValueError("--unrestricted requires a fresh non-interactive task and conflicts with --approve-tools")
         paths = WorkspacePaths(cwd)
         environment = {**load_env(paths.secret_file()), **os.environ}
-        raw_limit = getattr(args, 'max_model_calls', None)
-        if raw_limit is None:
-            raw_limit = environment.get('FRUITFLY_MAX_MODEL_CALLS')
-        registry = None
-        if raw_limit is not None:
-            if not single_task or args.resume:
-                raise ValueError('model request allowance requires a fresh non-interactive task')
-            budget = ModelCallBudget(int(raw_limit), receipt=environment.get('FRUITFLY_MODEL_USAGE_PATH'))
-            registry = BudgetedProviderRegistry(default_registry(), budget)
+        if 'FRUITFLY_MAX_MODEL_CALLS' in environment:
+            raise ValueError('FRUITFLY_MAX_MODEL_CALLS is unsupported; use stage times')
+        usage_path=environment.get('FRUITFLY_MODEL_USAGE_PATH')
+        registry=ObservedProviderRegistry(default_registry(),ModelUsage(receipt=usage_path)) if usage_path else None
         from fruitfly_agent.runtime_spec import load_harness_config
         config_source = Path(args.config) if args.config else cwd / '.fruitfly/config.yaml'
         if not config_source.is_absolute():
@@ -176,8 +171,6 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument("--unrestricted", action="store_true",
                         help="disable application tool permission checks for a fresh task in an externally isolated environment")
     parser.add_argument("--cwd", default=None, help="working directory")
-    parser.add_argument('--max-model-calls', type=int, default=None,
-                        help='shared main/auxiliary Provider request allowance for a fresh task')
     parser.add_argument('--image', action='append', default=[], metavar='PATH',
                         help='attach a local PNG/JPEG/GIF/WebP image; repeat for multiple images; paths resolve from --cwd')
     parser.add_argument(

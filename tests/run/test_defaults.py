@@ -134,7 +134,7 @@ class DefaultConfigurationTests(unittest.TestCase):
             name: component_document(name) for name in ('local-env', 'write-tool')}
         config['profiles']['baseline']['H']['execution-policy'] = {'inline': {
             'id': 'execution-policy', 'implementation': 'execution-policy', 'role': 'H',
-            'parameters': {'max_tool_calls_per_turn': 96}}}
+            'parameters': {'settings': {'max_tool_calls_per_turn': 96}}}}
         path.write_text(yaml.safe_dump(config))
         controller.restore_defaults()
         self.assertEqual({m.mechanism_id for m in controller.profile().mechanisms}, {"local-env", "write-tool"})
@@ -160,8 +160,8 @@ class DefaultConfigurationTests(unittest.TestCase):
                 'implementation': name, 'parameters': parameters}}
         path.write_text(yaml.safe_dump({'default_profile': 'baseline',
             'profiles': {'baseline': {'models': {'catalog': 'models.yaml', 'roles': {'executor': 'fake'}},
-                'H': {'base_prompt': component('base_prompt', 'H', {'text': 'Exact restored prompt.\n'})},
-                'I': {'improvement-search': component('improvement-search', 'I', {'rounds': 2})}}}}))
+                'H': {'base_prompt': component('base_prompt', 'H', {'instructions': {'system': 'Exact restored prompt.\n'}})},
+                'I': {'improvement-evaluator': component('improvement-evaluator', 'I', {'instructions': {'compare': 'Compare verified deliverables.'}})}}}}))
         original = path.read_bytes()
         controller = self.factory().configuration
         controller.restore_defaults()
@@ -169,7 +169,7 @@ class DefaultConfigurationTests(unittest.TestCase):
         config = load_harness_config(self.root / '.fruitfly/config.yaml')
         self.assertNotIn("schema_version", config.to_dict())
         profile = config.select()
-        self.assertEqual(profile.component_settings['search']['rounds'], 2)
+        self.assertEqual(profile.component_settings['evaluator']['instructions']['compare'], 'Compare verified deliverables.')
         self.assertEqual(profile.artifact_contents[profile.prompt], 'Exact restored prompt.\n')
         self.assertEqual(profile.model_catalog, 'models.yaml')
         self.assertEqual(path.read_bytes(), original)

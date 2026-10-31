@@ -4,7 +4,8 @@
 
 Expose declared scalar Core execution parameters as one H component. Runtime
 configuration, candidate execution and publication share the
-[runtime specification](../../runtime_spec/README.md). No Core loop is modified.
+[runtime specification](../../runtime_spec/README.md). Core supplies generic execution settings; this module owns their optimization surface.
+Improvement protects tool/turn count fields and runs without those quotas. Recovery attempts and tool ordering/parallelism remain editable.
 
 | Entry | Responsibility |
 |---|---|
@@ -23,13 +24,13 @@ Add the component explicitly in the experiment configuration:
 ```yaml
 edit:
   execution-policy:
-    fields: [parameters.max_tool_calls_per_turn]
+    fields: [parameters.settings.tool_execution.max_parallel]
     bounds:
-      parameters.max_tool_calls_per_turn: {minimum: 64, maximum: 256}
+      parameters.settings.tool_execution.max_parallel: {minimum: 1, maximum: 16}
 ```
 
-Experiments require explicit fields. Nested fields use dotted paths such
-as `parameters.tool_execution.max_parallel`. Typed embedding requests may use the adapter defaults; enabled mechanism owners exclude
+Omitting experiment `edit` discovers legal fields automatically. Explicit grants narrow that set. Nested fields use dotted paths such
+as `parameters.settings.tool_execution.max_parallel`. Typed embedding requests may use the adapter defaults; enabled mechanism owners exclude
 fields they control. Options for unselected, absent or unsupported
 components fail. A fixed field cannot change, and every proposal must also satisfy
 the base parameter schema. The initial value must fit the declared bounds.
@@ -37,7 +38,7 @@ the base parameter schema. The initial value must fit the declared bounds.
 Mechanisms declare `execution_fields` when they control scalar settings. Shared
 fields cannot have competing mechanism owners. The policy does not edit these
 fields or rewrite their controlling algorithms. Mechanism enablement, model
-selection, permissions, experiment budgets and grading remain fixed.
+selection, permissions, phase times and grading remain fixed.
 
 Candidates are constructed in isolation. Run records full effective execution
 settings in manifest schema 7 and H identity. Native trials also save

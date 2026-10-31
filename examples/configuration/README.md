@@ -39,16 +39,16 @@ It passes `--unrestricted` inside task containers; no permission configuration
 belongs in either Agent file.
 
 The generated tree includes H prompt/execution/environment/context/tool files and
-I editor/feedback/search files. S is optional; examples include
-[memory](components/S/learned-memory.yaml) and [Skill content](components/S/skill-document.yaml).
+I editor/evaluator files. S is optional; examples include
+[Skill content](components/S/skill-document.yaml).
 Select those files under the profile's S mapping before use. Initialization does
 not create placeholder S state. Candidate editing additionally needs an explicit
 [experiment grant](../../fruitfly_agent/experiments/CONFIGURATION.md#grant-component-changes).
 
 The Eval host template is independent of daily/default Agent configuration and
-contains no model/key preferences. See [Harbor preparation](../../eval/harbor/README.md)
+contains no model/key preferences. See [Harbor preparation](../../fruitfly_eval/harbor/README.md)
 for preparation, path/link changes and verifier cache declarations.
-The [server guide](../../eval/SERVER_GUIDE.md) walks through private-file
+The [server guide](../../fruitfly_eval/SERVER_GUIDE.md) walks through private-file
 transfer, Linux runtime installation and machine/request file generation in order.
 
 | Profile | `sdk` | `protocol` | `model` | `base_url` |
@@ -132,40 +132,28 @@ Optional [web tools](../../fruitfly_agent/lab/tools/web/README.md) are disabled 
 ## Select reduction and measurement
 
 Keep [context-history](components/H/context-history.yaml) enabled for public
-source retrieval and [context-measurement](components/H/context-measurement.yaml)
-for final request budgets. The default profile selects
-[compaction](components/H/compaction.yaml). To use incremental task memory,
-replace that profile's `compaction` reference with:
-
-```yaml
-working-memory-reduction:
-  file: components/H/working-memory-reduction.yaml
-```
-
-Use the supplied [working memory component](components/H/working-memory-reduction.yaml).
-Keep one enabled reduction method. The terminal's Reduction selector uses the
-same Catalog definitions. Prompt and policy settings belong in their component
-files; [method behavior and limits](../../fruitfly_agent/lab/context_manager/reduction/README.md)
-have one owner.
+source retrieval. The default selects [working memory](components/H/working-memory-reduction.yaml).
+Shared request measurement is assembled automatically; it has no component
+selection or optimization grant. [Method behavior](../../fruitfly_agent/lab/context_manager/reduction/README.md)
+owns coverage, recovery and policy limits.
 
 A materializing experiment can grant, for example:
 
 ```yaml
 edit:
   working-memory-reduction:
-    fields: [parameters.update_instructions, parameters.memory_tokens]
+    fields: [parameters.instructions.update, parameters.settings.memory_tokens]
     bounds:
-      parameters.memory_tokens: {minimum: 512, maximum: 4096}
+      parameters.settings.memory_tokens: {minimum: 512, maximum: 4096}
 ```
 
 The selected baseline must already enable that method and fit those bounds.
 Candidate prompt text, policy values and isolated execution use the ordinary
 component path. Native file-only trials cannot materialize mechanism changes;
 choose a compatible runner. Configuration inspection is offline. Auxiliary
-summary/memory calls and optional Provider input counting can contact services;
+memory calls and optional Provider input counting can contact services;
 live validation requires explicit invocation and may incur charges.
 
-Default measurement is heuristic with explicit uncertainty. Set `provider_count`
-to request a declared exact counter; `strict` rejects unsupported counters and
-never silently downgrades. DeepSeek/proxy protocols currently use conservative
-estimates and reported usage calibration, not an invented exact tokenizer.
+Default measurement is heuristic with explicit uncertainty and reported-usage
+calibration. Embeddings can inject a configured `MeasurementService`; precision
+controls are outside model edit grants. See [measurement](../../fruitfly_agent/lab/context_manager/measurement/README.md).

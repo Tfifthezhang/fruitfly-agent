@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from fruitfly_agent.improvement.contracts.plans import StageTimeouts
 import math
 from typing import Literal
 
@@ -63,20 +64,16 @@ class Verification:
 @dataclass(frozen=True)
 class EvolutionBudget:
     max_steps: int = 3
-    phase_timeout_seconds: float = 60.0
     max_feedback_chars: int = 8_000
+    timeouts: StageTimeouts = field(default_factory=StageTimeouts)
 
     def __post_init__(self) -> None:
+        if isinstance(self.timeouts,dict):object.__setattr__(self,'timeouts',StageTimeouts(**self.timeouts))
+        if not isinstance(self.timeouts,StageTimeouts):raise ValueError('expected independent stage times')
         for name in ("max_steps", "max_feedback_chars"):
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, int) or value < 1:
                 raise ValueError(f"{name} must be a positive integer")
-        timeout = self.phase_timeout_seconds
-        if (
-            isinstance(timeout, bool) or not isinstance(timeout, (int, float))
-            or not math.isfinite(timeout) or timeout <= 0
-        ):
-            raise ValueError("phase_timeout_seconds must be finite and positive")
 
 
 EvolutionOutcome = Literal[

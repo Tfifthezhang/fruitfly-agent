@@ -14,9 +14,9 @@ def validate_harness(config, profile, source, *, operation, environment, catalog
         capabilities = frozenset.intersection(*(b.capabilities for b in bindings))
         roles = frozenset.intersection(*(b.roles for b in bindings))
     elif source.benchmark is not None:
-        from eval.improvement import benchmark_execution
+        from fruitfly_eval.improvement import benchmark_execution
         definition = benchmark_execution(source.benchmark.source_request, source.benchmark.generated_host,
-            model_calls=source.benchmark.model_calls, runtime_override=source.benchmark.request.runtime)
+            runtime_override=source.benchmark.request.runtime)
         capabilities, roles = definition.capabilities_for(inventory.tools), definition.roles
     else:
         definition = builtin_executions().get(source.execution_id)
@@ -37,13 +37,13 @@ def validate_harness(config, profile, source, *, operation, environment, catalog
     # Exercise the actual Eval staging path, including bound artifact integrity.
     benchmarks = ([source.benchmark] if source.benchmark is not None else [])
     if source.task_set is not None:
-        from eval.improvement.configuration import resolve_benchmark
+        from fruitfly_eval.improvement.configuration import resolve_benchmark
         from dataclasses import replace
         benchmarks = [resolve_benchmark(replace(config, task={key: value for key, value in row.items()
             if key in {'source', 'request', 'host', 'model_calls'}}))
             for row in source.task_set.specifications if row['source'] == 'eval']
     for benchmark in benchmarks:
-        from eval.runtime import prepare_runtime
+        from fruitfly_eval.runtime import prepare_runtime
         with tempfile.TemporaryDirectory(prefix='fruitfly-runtime-check-') as directory:
             prepare_runtime(runtime=benchmark.request.to_dict()['runtime'], output_dir=Path(directory), environment=environment)
     selected = set(config.improvement.components) if operation != 'eval' else set()

@@ -16,7 +16,6 @@ Add tools, execution backends, context strategies, and improvement algorithms th
 | [Environment](environment/README.md) | Local filesystem and process backend |
 | [Base prompt](base_prompt/README.md) | Built-in prompt text and its target adapter |
 | [Execution policy](execution_policy/README.md) | Typed execution parameters and the H candidate adapter |
-| [Workflow](workflow/README.md) | Bounded sequential execution and its H target |
 | [Improvement](improvement/README.md) | Component workflow, task evidence, experience and optional verification |
 | [RSI](rsi/README.md) | Verified adoption and continuation across generations |
 | [Known limitations](ALGORITHM_AUDIT.md) | Current budget, I/O, cancellation, and composition limits |
@@ -126,6 +125,9 @@ execution. Editing the Improvement procedure itself belongs to I.
 | Offline regression | Public behavior, assembly, Application use, and resource handling |
 | Live model checks | Actual model behavior; explicit network and cost authorization required |
 
-Researchers manage formal experiments and their records externally. Learning mechanisms still define initial state, data splits, reset rules, and state sharing. A RuntimeManifest is not a source or learning-state snapshot. [Eval](../../eval/README.md) can consume public capabilities, but must not define their production interfaces.
+Researchers manage formal experiments and their records externally. Learning mechanisms still define initial state, data splits, reset rules, and state sharing. A RuntimeManifest is not a source or learning-state snapshot. [Eval](../../fruitfly_eval/README.md) can consume public capabilities, but must not define their production interfaces.
 
 Lab has no shared environment variables and does not read ambient API keys. Hosts inject credentials required by selected tools. [Configuration](../../CONFIGURATION.md) selects mechanisms; each child guide describes its own external effects.
+
+
+Shared model role invocation: [Agent runner](agents/README.md).

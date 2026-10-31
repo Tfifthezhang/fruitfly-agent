@@ -29,7 +29,7 @@ class WelcomeRenderingTest(unittest.TestCase):
             session_path="session.jsonl",
             message_count=3,
             tool_names=("read", "bash", "edit"),
-            mechanisms=("SummarizingCompactor", "HookRegistry"),
+            mechanisms=("WorkingMemoryReducer", "HookRegistry"),
         )
 
     def test_wide_layout_has_fly_wordmark_and_runtime_context(self) -> None:
@@ -48,7 +48,7 @@ class WelcomeRenderingTest(unittest.TestCase):
             rendered,
         )
         self.assertNotIn("View commands", rendered)
-        self.assertNotIn("SummarizingCompactor", rendered)
+        self.assertNotIn("WorkingMemoryReducer", rendered)
         self.assertNotIn("HookRegistry", rendered)
         self.assertIn("session resumed · 3 messages", rendered)
         self._assert_fits(rendered, 119)

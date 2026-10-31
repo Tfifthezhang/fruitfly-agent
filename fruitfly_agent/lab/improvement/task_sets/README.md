@@ -23,16 +23,16 @@ and start preparation containers. Native collections require no Eval installatio
 | [files.py](files.py) | Existing task packs; preserve train/selection/holdout |
 | [sampling.py](sampling.py) | All, fixed and deterministic collection-stratified cycles |
 | [configuration.py](configuration.py) | Independent typed sampling, parallel, joint and promotion settings |
-| [execution.py](execution.py) | Public execution definition, frozen preview and shared `task_set_minimum_budget` calculation |
+| [execution.py](execution.py) | Public execution definition and frozen preview |
 | [Contracts](../../../improvement/contracts/README.md) | Task entries, snapshots, batch receipts and editing requests |
-| [Execution](../execution/README.md#schedule-task-batches) | One bounded queue and leaf allocations |
-| [Assessment](../assessment/README.md#compare-task-sets) | Declared utilities, promotion and process-guided exploration |
-| [Workflow](../workflow/README.md#share-one-search-loop) | One shared round engine |
+| [Execution](../execution/README.md#schedule-task-batches) | One bounded queue and independent leaf phases |
+| [Assessment](../assessment/README.md) | Declared utilities, promotion and process-guided exploration |
+| [Workflow](../workflow/README.md) | One shared round engine |
 
 ## Freeze tasks and conditions
 
 `TaskSetSnapshot` binds task namespaces, canonical origins, source/material
-identities, partitions, objective ranges, and per-task model/leaf-execution limits.
+identities, partitions, objective ranges, and task objectives.
 Duplicate origins and cross-partition groups fail. Existing source partitions are
 preserved. Editing receives only development entries, never private acceptance,
 selection/confirmation inputs or verifier files. No automatic conversation mining
@@ -50,9 +50,8 @@ capability checks.
 
 Each round evaluates the current exploration seed and its challenger on the same
 task keys, attempts and conditions. The next seed defaults to the better complete
-result on that shared development batch; ties retain its incumbent. Optional
-`process-guided` exploration can choose another complete evaluation without changing
-the formal winner. Search scores from different batches are not directly ranked.
+result on that shared development batch; supported process comparisons can resolve official-score ties. Optional
+`process-guided` exploration can choose another complete evaluation as a separate next-seed decision. Search scores from different batches are not directly ranked.
 
 Formal selection runs every `promotion.every_rounds` and at search completion,
 using the complete common selection set. For each collection, explicit selection
@@ -62,11 +61,7 @@ The previous formal harness survives incomplete or worse comparisons. Reports
 distinguish official evaluation, exploration seed, collection utilities and coverage.
 `selected` is development assurance, not independent verification or adoption.
 
-Final comparison holds a separate root allocation. An unaffordable intermediate
-promotion is deferred. No-gain patience advances only after a complete comparable
-promotion. A repeated harness on a different sampled batch does not itself stop
-search. `score` stopping can use `joint-development-v1` with `assurance: selected`.
-Leaf process metrics do not implicitly become whole-task-set stop conditions.
+Final comparison uses fresh evaluator invocations. No-gain patience advances only after a complete comparable promotion. Repeating a harness on another sampled batch does not itself stop search. Leaf process metrics do not implicitly become task-set stop conditions.
 
 Confirmation material stays private and unused by this development search.
 Task-set persistent scope/RSI are rejected until an independent adoption policy is
@@ -82,10 +77,7 @@ roles and a private `build(leaf_context)` callback. Preparation has no model sid
 effects. The callback returns ordinary `ExecutionPorts`; the runner keeps the
 established `TaskRunner.execute(plan, task, harness)` signature.
 
-Each leaf gets fresh job services and its own child quota. Own resources before
-fallible construction; borrowed ports remain caller-owned. Missing outcome/cost
-receipts remain unknown. Composite runners declare their leaf charge and task
-execution allowance. Trusted extensions are not an OS sandbox.
+Each leaf receives fresh services and independent execution/evaluator times. Own resources before fallible construction; borrowed ports remain caller-owned. Missing usage stays unknown. Composite runners report their actual leaf observations and delegate timing to leaf phases.
 
 The experiment composition root registers built-in `files` and optional `eval`
 sources. Adding another backend or task family does not add branches to Core,

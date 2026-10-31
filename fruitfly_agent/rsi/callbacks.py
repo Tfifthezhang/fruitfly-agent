@@ -5,6 +5,7 @@ from typing import Protocol
 from .models import AgentVersion, Candidate, Verification, EvolutionAttempt, EvolutionBudget, EvolutionResult
 from .contracts import VerificationEvidence, AdoptionResult
 from .engine import EvolutionEngine
+from fruitfly_agent.core.extensions.operations import OperationSupervisor
 
 
 class CandidateGenerator(Protocol):
@@ -48,7 +49,7 @@ class CallbackHost:
         self.candidate = self.verification = None
         self.feedback = self.feedback[:self.driver.budget.max_feedback_chars]
         generator = self.driver.generator_for(self.current)
-        candidate = await generator(self.current, self.feedback, signal=self.signal)
+        candidate = await OperationSupervisor().run(lambda:generator(self.current,self.feedback,signal=self.signal),timeout=self.driver.budget.timeouts.editor_seconds,signal=self.signal)
         if candidate is None:
             self.attempts.append(EvolutionAttempt(self.current, None, None, 'no_candidate'))
             return None
@@ -58,7 +59,7 @@ class CallbackHost:
         return 'candidate-' + str(self.job.steps)
 
     async def verify(self, candidate_id, policy_id):
-        value = await self.driver.verify(self.candidate, signal=self.signal)
+        value = await OperationSupervisor().run(lambda:self.driver.verify(self.candidate,signal=self.signal),timeout=self.driver.budget.timeouts.evaluator_seconds,signal=self.signal)
         if not isinstance(value, Verification) or value.version != self.candidate.version or value.policy_id != policy_id:
             raise ValueError('verification candidate or policy mismatch')
         self.verification = value
@@ -69,7 +70,7 @@ class CallbackHost:
             value.passed, value.feedback, value.score)
 
     async def adopt(self, candidate_id, evidence):
-        adopted = await self.driver.adopt(self.candidate, self.verification, signal=self.signal)
+        adopted = await OperationSupervisor().run(lambda:self.driver.adopt(self.candidate,self.verification,signal=self.signal),timeout=self.driver.budget.timeouts.execution_seconds,signal=self.signal)
         if not isinstance(adopted, bool):
             raise TypeError('adopter must return bool and reconcile its active version')
         self.attempts.append(EvolutionAttempt(self.current, self.candidate, self.verification,
@@ -105,6 +106,6 @@ class EvolutionDriver:
         host = CallbackHost(self, initial, feedback, signal)
         job = await EvolutionEngine().evolve(host, job_id='callback', policy_id=self.policy_id,
             direction='Improve current version', max_steps=self.budget.max_steps,
-            phase_timeout_seconds=self.budget.phase_timeout_seconds, signal=signal,
+            signal=signal,
             continue_on_rejection=True, stop_policy=self.stop_policy, failure_handler=host.recover)
         return EvolutionResult(host.current, tuple(host.attempts), job.stop_reason)

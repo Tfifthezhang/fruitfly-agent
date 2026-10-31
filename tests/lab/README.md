@@ -15,7 +15,7 @@ Verify algorithms and components through Core contracts and Catalog assembly.
 | `test_catalog.py / test_catalog_assembly.py / test_builtin_catalog.py / test_base_prompt.py` | Registered identities, actionable rejection errors, and validation of disabled selections |
 | `test_failure_processing.py / test_automatic_improvement.py` | Derived exercises, provenance, original-task gates, independent confirmation, and isolated task execution |
 | `test_skill_catalog.py / test_algorithm_contracts.py` | Bounded guidance, transformer forms, signals, and cancellation |
-| `test_reduction_safety.py / test_summarizing_compaction.py` | Valid summaries, tool associations, overflow, external references, and commits |
+| `test_reduction_safety.py / test_working_memory.py` | Valid memory updates, tool associations, overflow, external references, and commits |
 | `test_task_packs.py / test_pack_format.py / test_coding_tasks.py` | Task material, catalog discovery and dangling-link rejection, policy, and restricted scoring |
 | `test_rlm.py` | Local IPython and artifact behavior |
 | `test_improvement_pipeline.py / test_improver.py` | Stage contracts, result retention, stopping, hierarchical budgets and frozen editor fields |

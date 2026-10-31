@@ -41,7 +41,7 @@ class TerminalConfigurationFrontendTest(unittest.TestCase):
         from fruitfly_agent.interactive.terminal.features.configuration.presentation import category_rows, settings_rows
         catalog = builtin_catalog()
         profile = HarnessProfile('daily', mechanisms=(
-            MechanismSelection('compaction', parameters={'keep_recent_tokens':12345}),
+            MechanismSelection('working-memory-reduction', parameters={'memory_tokens':12345}),
             MechanismSelection('live-http', parameters={'endpoint':'https://example.test/?q={query}'}),
             MechanismSelection('skill-document', parameters={'source_path':'.skills/check/SKILL.md'})))
         mechanisms, groups = mechanism_views(profile, catalog, [])
@@ -50,8 +50,8 @@ class TerminalConfigurationFrontendTest(unittest.TestCase):
         self.assertFalse(any(a.kind == 'parameter' for a in actions))
         self.assertTrue(all(not r.references and not r.detail for r in rows))
         self.assertTrue(all('Enabled' not in r.label and 'Disabled' not in r.label for r in rows))
-        compaction = next(m for m in mechanisms if m.mechanism_id == 'compaction')
-        self.assertEqual(next(p.value for p in compaction.parameters if p.name == 'keep_recent_tokens'), 12345)
+        compaction = next(m for m in mechanisms if m.mechanism_id == 'working-memory-reduction')
+        self.assertEqual(next(p.value for p in compaction.parameters if p.name == 'memory_tokens'), 12345)
         for identity, names in [('live-http', ['endpoint']), ('skill-document', ['initial_text', 'source_path'])]:
             item = next(m for m in mechanisms if m.mechanism_id == identity)
             _, actions = settings_rows(item, original=snapshot)

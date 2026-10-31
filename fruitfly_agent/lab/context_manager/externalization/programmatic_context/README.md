@@ -52,7 +52,7 @@ Based on Zhang et al., [Recursive Language Models](https://arxiv.org/abs/2512.24
 | Query timeout | Does not include semaphore queue time. |
 | Non-final query response | Rejected; call and available usage stay charged, with no hidden continuation requests. |
 | Token budget | Estimate/reservation with actual-usage reconciliation. |
-| Reduction composition | Summarizing preserves externalized projections and references; new reducers must verify source mappings. |
+| Reduction composition | Working memory reads canonical public evidence and retains its coverage mapping; source artifacts remain available. |
 
 Register subprocess resources immediately with `context.own` and expose them in assembly components. Define schema, serialization errors, reset, and cancellation for added state. See [Catalog](../../../catalog/README.md) and [Known limitations](../../../ALGORITHM_AUDIT.md).
 

@@ -120,6 +120,7 @@ class AlgorithmConfiguration(MockConfiguration):
         return ConfigurationActionResult('parameter', changed=True)
 
 from fruitfly_agent.lab.catalog import builtin_catalog, component_profile
+from fruitfly_agent.lab.catalog.parameters import encode_parameters
 from fruitfly_agent.runtime_spec import HarnessProfile, MechanismSelection
 
 
@@ -128,7 +129,7 @@ def component_document(name, *, parameters=None, enabled=True, catalog=None):
     definition = catalog.get(name)
     return {'inline': {'id': name, 'implementation': name,
         'role': definition.configuration_role, 'enabled': enabled,
-        'parameters': parameters or {}}}
+        'parameters': encode_parameters(definition,parameters or {})}}
 
 
 def profile_document(*, catalog='models.yaml', executor=None, mechanisms=(),

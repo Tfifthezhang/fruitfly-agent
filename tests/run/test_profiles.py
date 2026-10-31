@@ -49,8 +49,7 @@ class HarnessProfileTest(unittest.TestCase):
                 "information-context",
                 "memory-files",
                 "context-history",
-                "context-measurement",
-                "compaction",
+                "working-memory-reduction",
                 "component-improvement",
             ),
         )

@@ -1,8 +1,8 @@
 """Exact prepared subsets preserve task content and validate coverage before execution."""
 from dataclasses import replace
 import unittest
-from eval.contracts import EvaluationRequest
-from eval.task_selection import select_prepared_tasks
+from fruitfly_eval.contracts import EvaluationRequest
+from fruitfly_eval.task_selection import select_prepared_tasks
 
 
 class PreparedSelectionTests(unittest.TestCase):

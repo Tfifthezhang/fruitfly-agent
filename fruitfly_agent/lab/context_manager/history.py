@@ -6,14 +6,16 @@ import json
 import os
 from pathlib import Path
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from fruitfly_agent.core.data_model import TextBlock, ToolCallBlock, ImageBlock, CustomMessage
 
 
 @dataclass(frozen=True)
 class HistoryConfig:
-    max_artifact_bytes: int = 16_000_000
+    max_artifact_bytes: int = field(default=16_000_000, metadata={
+        'description': 'Maximum bytes in one immutable history artifact; does not enlarge the task or storage allowance.',
+        'minimum': 1024, 'maximum': 64_000_000})
 
     def __post_init__(self):
         if type(self.max_artifact_bytes) is not int or not 1024 <= self.max_artifact_bytes <= 64_000_000:

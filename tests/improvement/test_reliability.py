@@ -33,7 +33,7 @@ class ReliabilityTests(unittest.IsolatedAsyncioTestCase):
                 await asyncio.Event().wait()
             return await original(plan, task, harness)
         runner.execute = execute
-        plan = replace(plan, operation_timeout=.01)
+        plan = replace(plan, timeouts={'editor_seconds':.01,'execution_seconds':.01,'evaluator_seconds':.01})
         services = WorkflowServices(plan)
         result = await flow.run(plan, TaskMaterial('task', 'Work'), baseline, services)
         self.assertEqual(result.harness, baseline)
@@ -85,7 +85,7 @@ class ReliabilityTests(unittest.IsolatedAsyncioTestCase):
             services.record('checkpoint')
         await services.close()
 
-    async def test_cleanup_attempts_all_resources_and_closes_budget(self):
+    async def test_cleanup_attempts_all_resources(self):
         _, plan, _, _ = build_pipeline()
         closed = []
         class Resource:
@@ -97,4 +97,4 @@ class ReliabilityTests(unittest.IsolatedAsyncioTestCase):
         services.own(Resource('good')); services.own(Resource('bad'))
         with self.assertRaises(CleanupError): await services.close()
         self.assertEqual(closed, ['bad', 'good'])
-        self.assertTrue(services.budget.closed)
+        self.assertEqual(services.resources, [])

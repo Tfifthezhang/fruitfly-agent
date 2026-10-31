@@ -50,7 +50,7 @@ text-only auxiliary model from IPython:
 
 The returned dict contains `text`, model identity, usage and an optional
 `reference` when the full result was stored externally. Calls incur network
-cost and have hard per-Runtime call/token/concurrency limits. The auxiliary
+cost and have reported usage and bounded per-request inputs, outputs, time and concurrency. The auxiliary
 call has no tools and cannot recursively invoke `llm_query`.
 
 The IPython process uses the current workspace permissions and is not a
@@ -69,11 +69,9 @@ class IpythonToolConfig:
     max_artifact_bytes: int = 64 * 1024 * 1024
     max_cell_output_chars: int = 50_000
     cell_timeout_seconds: int = 120
-    max_query_calls: int = 16
     max_query_concurrent: int = 4
     max_query_input_chars: int = 200_000
     max_query_output_tokens: int = 4_096
-    max_query_total_tokens: int = 100_000
     max_query_inline_result_chars: int = 100_000
     query_timeout_seconds: int = 180
 
@@ -123,11 +121,9 @@ def install_ipython_tool(
         profile=binding.profile,
         store=store,
         config=ModelQueryConfig(
-            max_calls=config.max_query_calls,
             max_concurrent=config.max_query_concurrent,
             max_input_chars=config.max_query_input_chars,
             max_output_tokens=config.max_query_output_tokens,
-            max_total_tokens=config.max_query_total_tokens,
             max_inline_result_chars=config.max_query_inline_result_chars,
             timeout_seconds=config.query_timeout_seconds,
         ),

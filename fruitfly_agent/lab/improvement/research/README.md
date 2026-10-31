@@ -4,8 +4,7 @@
 
 `ResearchLedger` records bounded, task-local observations, candidate hypotheses and
 round experiments. It installs through [lifecycle hooks](../../../improvement/extensions/README.md).
-`workflow/mechanisms.py` owns assembly, progress stopping and soft finalization
-reserves. The independent kernel has no research schema or research policy.
+`workflow/mechanisms.py` owns assembly and progress stopping. The independent kernel has no research schema or research policy.
 
 | Data | Source and limit |
 |---|---|
@@ -25,30 +24,20 @@ execution-evidence citation requirement.
 
 ## Configure and compare mechanisms
 
-Set these fields in the selected I `improvement-search` document. The
-[runtime grammar](../../../runtime_spec/COMPONENTS.md) owns configuration position;
-[experiment grants](../../../experiments/CONFIGURATION.md) authorize editing.
+Set these fields under fixed experiment `search`. The
+[experiment grammar](../../../experiments/CONFIGURATION.md) owns their position.
+They are scheduling infrastructure and are outside Improvement edit grants.
 
 | Group | Fields and defaults |
 |---|---|
 | `research` | `enabled: false`, `max_entries: 128`, `retrieve_entries: 8`, `guidance: ""` |
 | `progress` | `patience: 0`, `failure_patience: 0`; zero disables that condition |
-| `finalization` | `reserve_model_calls: 0`, `reserve_executions: 0` |
 
 Research requires `1 <= retrieve_entries <= max_entries <= 256`; guidance has at
-most 4000 characters. Progress and reserve fields are integers in `0..10000`.
-Unknown fields fail. All fields are I candidates only under the corresponding
-grant; candidate normalization and bounds apply before trial. Native fixed-I
-episodes, including registered benchmark-backed episodes, restore and execute the
-candidate values with fresh mechanism instances. Outer hard allowances, evaluation
-inputs, scorers and independent verification remain fixed.
+most 4000 characters. Progress fields are integers in `0..10000`.
+Unknown fields fail. Every trial uses fresh mechanism instances; phase times, objectives and private verification remain fixed.
 
-Progress conditions stop after consecutive unchanged incumbent rounds or failed
-executions. They establish neither convergence nor task success. Finalization holds
-declared child quota, leaving it unavailable to exploratory work. The lifecycle
-releases it before final selection/verification; cleanup releases it on failure.
-It cannot raise a root limit or borrow protected verification quota. An existing
-executed incumbent and immutable output artifacts survive unsuccessful later edits.
+Progress conditions stop after consecutive unchanged incumbent rounds or failed executions. They establish neither convergence nor task success. An executed incumbent and immutable output artifacts survive unsuccessful later edits.
 
 There is no automatic production S update, cross-task learning, arbitrary source
 editing or activation. Default mechanisms are disabled. Register another hook or

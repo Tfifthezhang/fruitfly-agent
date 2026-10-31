@@ -47,7 +47,7 @@ jobs:
       - name: CLI smoke
         run: |
           python -m fruitfly_agent --help
-          python -m eval catalog --json
+          python -m fruitfly_eval catalog --json
 
   package:
     runs-on: ubuntu-latest

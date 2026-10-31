@@ -42,8 +42,8 @@ cp -R examples/improvement/ticket_triage .fruitfly/improvement/task-packs/ticket
 | Step | Action |
 |---|---|
 | 1 | Prepare the independent default Agent/model files and credentials. |
-| 2 | Set `task.source: files` and `task.pack: ticket-triage` in `.fruitfly/experiment.yaml`. |
-| 3 | For persistent verification, set `improvement.scope: persistent` and `improvement.max_executions: 64` to fund the declared paired cases. |
+| 2 | Select `source: files` and the pack in the task document referenced by experiment `tasks`. |
+| 3 | For persistent verification, set `scope: persistent` in the referenced comparison document and choose suitable independent phase times. |
 | 4 | Run `fruitfly-agent-lab improvement check`, then explicitly `improvement run`; model calls may incur charges. |
 | 5 | Inspect the linked candidate and evidence. `rsi run` performs verified adoption into its experiment copy. |
 

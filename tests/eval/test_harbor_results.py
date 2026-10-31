@@ -4,7 +4,7 @@ import json
 import unittest
 from pathlib import Path
 import tempfile
-from eval.results import load_harbor_job_result, parse_harbor_job_result
+from fruitfly_eval.results import load_harbor_job_result, parse_harbor_job_result
 from tests.support.harbor import load_harbor_agent
 
 

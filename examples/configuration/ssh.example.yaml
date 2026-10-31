@@ -1,9 +1,3 @@
-# Copy only when .fruitfly/config.yaml is absent, or merge the SSH settings
-# into an existing profile. Fill secrets in .fruitfly/secrets.env, never here.
-# Requires pip install -e '.[ssh]', a verified known_hosts entry, and an existing
-# POSIX server directory with SFTP, python3 and /bin/bash available.
-# Starting this profile connects to the configured SSH server; model tasks also
-# contact the selected model service and may incur charges.
 default_profile: remote
 profiles:
   remote:

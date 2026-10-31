@@ -4,11 +4,11 @@ from fruitfly_agent.improvement.components.registry import ComponentRegistry
 from fruitfly_agent.improvement.contracts.components import ComponentBinding
 
 
-from fruitfly_agent.improvement.contracts.optimization import OptimizationSpec
+from fruitfly_agent.improvement.contracts.optimization import OptimizationSpec, OptimizationField
 
 
 class TextComponentAdapter:
-    """Reuse existing prompt/guidance/retained/workflow validation and projection."""
+    """Reuse existing prompt/guidance/retained validation and projection."""
     def __init__(self, target, kind):
         self.target, self.kind = target, kind
         if not isinstance(getattr(target, 'optimization', None), OptimizationSpec):
@@ -23,6 +23,23 @@ class TextComponentAdapter:
         value = self.target.snapshot()
         return ComponentDocument(value.target_id, self.kind, value.role, value.schema,
                                  (ComponentFile('instructions.txt', value.text),))
+
+    def describe_fields(self, document=None):
+        if document is not None:
+            self.validate(document)
+        describe = getattr(self.target, 'describe_fields', None)
+        if describe is not None:
+            return describe(document.files[0].text) if document is not None else describe()
+        if self.optimization.representation not in {'text', 'documents'}:
+            raise ValueError('structured component owner must describe its parameters')
+        value = self.target.snapshot()
+        name = getattr(self.target,'optimization_field', 'content.body' if self.optimization.representation == 'documents' else 'instructions.usage')
+        description = getattr(self.target, 'description', '') or type(self.target).__doc__
+        if not description:
+            raise ValueError('text component owner must describe its content')
+        current = document.files[0].text if document is not None else value.text
+        return (OptimizationField('parameters.' + name, 'string', description.strip(), current, value.text,
+            unit='characters', constraints='Owner validation and the experiment grant remain authoritative.'),)
 
     def validate(self, document):
         if len(document.files) != 1 or document.files[0].path != 'instructions.txt':
@@ -43,9 +60,7 @@ class TextComponentAdapter:
         self.validate(document)
         if not document.files[0].text and document == self.snapshot():
             return config
-        config = self.target.prepare_trial(config, document.files[0].text)
-        execution = getattr(self.target, 'prepare_execution', None)
-        return execution(config, document.files[0].text) if execution is not None else config
+        return self.target.prepare_trial(config, document.files[0].text)
 
     def to_text(self, document):
         self.validate(document)
@@ -54,7 +69,9 @@ class TextComponentAdapter:
     def export(self, document):
         self.validate(document)
         binding = self.target.snapshot().binding
-        return ComponentBinding(document.component_id, binding.kind, binding.key, document.files[0].text)
+        text=document.files[0].text
+        export=getattr(self.target,'export_text',None)
+        return ComponentBinding(document.component_id,binding.kind,binding.key,export(text) if export is not None else text)
 
 
 def component_registry(targets):

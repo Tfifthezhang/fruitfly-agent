@@ -8,11 +8,10 @@ from fruitfly_agent.improvement.contracts.assessment import Measurement
 from fruitfly_agent.improvement.contracts.tasks import Resource, TaskMaterial
 from fruitfly_agent.improvement.contracts.versions import canonical_json
 from fruitfly_agent.improvement.contracts.versions import content_hash
-from fruitfly_agent.improvement.workflow.budget import AllocationExhausted
 from .episodes import NativeEpisodeExecutor
 from fruitfly_agent.improvement.contracts.failures import IntegrityError
 from fruitfly_agent.improvement.execution.facts import attach_facts, receipt_facts
-from fruitfly_agent.improvement.contracts.facts import BudgetFact
+from fruitfly_agent.improvement.contracts.facts import UsageFact
 
 
 class ImproverTaskRunner:
@@ -24,14 +23,6 @@ class ImproverTaskRunner:
         self.episode_factory = episode_factory
         self.reports = {}
         self.trials = 0
-
-    def allocation(self, partition):
-        episodes = getattr(self.materials, partition)
-        evaluations = sum(2 * len(e.evaluations) for e in episodes)
-        repeats = self.parameters['repetitions']
-        return {'model': repeats * (len(episodes) * self.parameters['inner_model_calls'] +
-                    evaluations * self.parameters['evaluation_model_calls']),
-                'execution': repeats * (len(episodes) * self.parameters['inner_executions'] + evaluations)}
 
     async def trial(self, harness, partition, *, repeats=None):
         context, params = self.context, self.parameters
@@ -49,10 +40,6 @@ class ImproverTaskRunner:
         for repeat in range(params['repetitions']) if repeats is None else repeats:
             for episode in getattr(self.materials, partition):
                 identity = 'episode-' + uuid4().hex
-                evaluations = 2 * len(episode.evaluations)
-                budget = context.services.budget.child({
-                    'model': params['inner_model_calls'] + evaluations * params['evaluation_model_calls'],
-                    'execution': params['inner_executions'] + evaluations})
                 request = EpisodeRequest(identity, instructions, baseline, self.spec.inner_components,
                     episode.adaptation, repeat,
                     improver=harness)
@@ -60,11 +47,11 @@ class ImproverTaskRunner:
                     instructions_id=instructions_id, experiment_id=self.spec.conditions_id, repeat=repeat)
                 try:
                     executor = self.episode_factory(context, episode, params)
-                    result = await context.services.operation(executor.run(request, budget=budget, signal=context.services.signal))
+                    result = await executor.run(request, signal=context.services.signal)
                     if (result.episode_id != identity or not result.scores_before or
                             len(result.scores_before) != len(episode.evaluations) or
                             len(result.scores_after) != len(result.scores_before) or
-                            result.outcome.stop_reason in {'budget_exhausted', 'reference_unavailable'}):
+                            result.outcome.stop_reason in {'timeout', 'reference_unavailable'}):
                         raise ValueError('episode evidence is incomplete')
                     values = tuple(b - a for a, b in zip(result.scores_before, result.scores_after))
                     gains.append(sum(values) / len(values))
@@ -74,14 +61,12 @@ class ImproverTaskRunner:
                     ref = context.artifacts.put(canonical_json(asdict(result)).encode())
                     evidence.append(ref)
                     context.services.record('episode-finished', episode_id=identity, evidence=ref,
-                        model_calls=budget.used['model'], executions=budget.used['execution'])
-                except (AllocationExhausted, IntegrityError):
+                        model_calls=result.model_calls, executions=result.executions)
+                except IntegrityError:
                     raise
                 except (ValueError, RuntimeError, TimeoutError) as exc:
                     failures += 1
                     context.services.record('episode-failed', episode_id=identity, error=type(exc).__name__)
-                finally:
-                    budget.close()
         report = TrialReport(self.spec.conditions_id, instructions_id, self.spec.initial_harness_id, partition,
             tuple(gains), tuple(regressions), failures,
             context.services.used['model'] - start['model'], context.services.used['execution'] - start['execution'],
@@ -91,8 +76,6 @@ class ImproverTaskRunner:
     async def execute(self, plan, task, harness):
         if plan != self.context.plan:
             raise ValueError('I runner belongs to another frozen plan')
-        if self.trials >= self.parameters['max_trials']:
-            raise AllocationExhausted('development trial limit exhausted')
         self.trials += 1
         report = await self.trial(harness, 'development')
         reference = self.context.artifacts.put(canonical_json(asdict(report)).encode())
@@ -105,8 +88,8 @@ class ImproverTaskRunner:
             (Resource('trial-report.json', reference, 'application/json', 'diagnostic'),), report.model_calls)
         facts = receipt_facts(record, self.context.artifacts,
             termination_reason='episode_failed' if report.failures else 'composite_completed',
-            budgets=(BudgetFact('model_calls', 'composite', report.model_calls, source='paired development trial'),
-                     BudgetFact('executions', 'composite', report.executions, source='paired development trial')),
+            usage=(UsageFact('model_calls', 'composite', report.model_calls, source='paired development trial'),
+                     UsageFact('executions', 'composite', report.executions, source='paired development trial')),
             counters=(('episode_failures', report.failures),), children=report.evidence)
         return attach_facts(record, facts, self.context.artifacts)
 

@@ -11,10 +11,8 @@ class WorkflowPanel:
         self.client, self.configuration = client, configuration
         self.choose, self.read, self.confirm, self.report = choose, read, confirm, report
         self.execute, self.history = execute, history
-        components = tuple(c.component_id for c in configuration.components if c.available)
         generators = tuple(c.choice_id for c in configuration.generators if c.available)
-        self.request = WorkflowRequest(component_ids=("base_prompt",) if "base_prompt" in components else (),
-            generator_id=generators[0] if generators else "", direction=direction,
+        self.request = WorkflowRequest(generator_id=generators[0] if generators else "", direction=direction,
             strategy_id="simple", retain_experience=False)
 
     async def run(self):

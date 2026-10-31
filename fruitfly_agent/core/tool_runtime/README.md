@@ -58,3 +58,7 @@ by the loop outside batch dispatch and do not invoke this callback.
 The cancellation flag identifies interrupted or unexecuted calls in an aborted batch;
 it does not imply rollback. Completed calls retain their actual outcomes. Call IDs
 associate concurrent results; callbacks do not guarantee completion order.
+
+`AgentTool.requires_exclusive_batch` rejects every call in a mixed batch before
+execution. A batch ends the loop only when every result has `terminate=True`.
+See [runtime rules](../README.md#runtime-rules) for other termination conditions.

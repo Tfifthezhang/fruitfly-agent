@@ -21,7 +21,7 @@ class TaskSetSearchTests(unittest.IsolatedAsyncioTestCase):
         components, baseline = fixture()
         snapshot = TaskSetSnapshot(binding.entries)
         plan = RunPlan('joint-fixture', version(), ('prompt',), generator_id='increment', strategy_id='simple',
-            depth=rounds, feedback='scored', retain_experience=False, max_model_calls=model_calls)
+            depth=rounds, feedback='scored', retain_experience=False)
         services = WorkflowServices(plan)
         context = ExecutionContext(None, MemoryArtifacts(), components, None, None, None, plan=plan, services=services)
         registry = GeneratorRegistry(); registry.register('increment', IncrementGenerator)
@@ -39,7 +39,7 @@ class TaskSetSearchTests(unittest.IsolatedAsyncioTestCase):
         snapshot = TaskSetSnapshot(a.entries)
         settings = MultiTaskSettings.from_dict({'sampling': {'batch_size': 2}, 'execution': {'concurrency': 2}})
         plan = RunPlan('joint', version(), ('prompt',), generator_id='increment', strategy_id='simple',
-            depth=2, feedback='scored', retain_experience=False, max_model_calls=100)
+            depth=2, feedback='scored', retain_experience=False)
         services = WorkflowServices(plan)
         artifacts = MemoryArtifacts()
         context = ExecutionContext(None, artifacts, components, None, None, None, plan=plan, services=services)
@@ -91,11 +91,11 @@ class TaskSetSearchTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(incomplete[0].assessment.completed, 1)
         self.assertEqual(state.cleaned, len(state.calls))
 
-    async def test_budget_admission_waits_for_live_reservations_instead_of_resetting_quotas(self):
+    async def test_concurrency_is_not_reduced_by_hidden_model_reservations(self):
         binding, state = collection('a', 3, limit=3)
         outcome, baseline, services = await self.execute(binding,
             settings=MultiTaskSettings.from_dict({'execution': {'concurrency': 3}}), model_calls=26)
         self.assertEqual(outcome.selected.assessment.score, 1)
         self.assertEqual(services.used['model'], len(state.calls))
         self.assertEqual(services.used['execution'], len(state.calls))
-        self.assertEqual(state.peak, 2)
+        self.assertEqual(state.peak, 3)

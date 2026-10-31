@@ -124,6 +124,10 @@ class TaskPackCatalog:
             raise ValueError("unknown or duplicate task package id")
         return found[0]
 
+    def compatible_targets(self, pack_id: str) -> tuple[str, ...]:
+        """Public material scope; no private acceptance content."""
+        return tuple(self._locate(pack_id)[2]['compatible_targets'])
+
     def source_hash(self, pack_id: str) -> str:
         return self._locate(pack_id)[3]
 

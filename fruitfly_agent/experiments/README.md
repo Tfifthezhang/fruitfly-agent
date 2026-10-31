@@ -3,7 +3,7 @@
 [Up: Runtime Architecture](../README.md)
 
 Run fixed-version Eval, Improvement and RSI independently of chat. System config
-selects H/S/I; an experiment selects tasks, edit grants and fixed comparison
+selects H/S/I; an experiment selects tasks, optional edit narrowing and fixed comparison
 conditions. Daily, baseline and candidate configs use the same runtime assembler.
 
 ## Configure a workspace
@@ -31,7 +31,7 @@ The configuration guide tree is:
 
 - [Configuration overview](../../CONFIGURATION.md): file responsibilities and precedence.
 - [Component documents](../runtime_spec/COMPONENTS.md): write a system and its H/S/I files.
-- [Experiment configuration](CONFIGURATION.md): tasks, grants, comparisons and budgets.
+- [Experiment configuration](CONFIGURATION.md): tasks, grants, comparisons and phase times.
 - [Component registration](../lab/catalog/CONFIGURATION.md): expose a new implementation.
 - [Runnable recipes](../../examples/experiments/README.md): initialize, check and execute.
 
@@ -69,12 +69,12 @@ Start from the generated tree and edit the responsible file:
 |---|---|
 | Available model definitions and Provider parameters | Shared `models.yaml` |
 | Model roles or selected components | `default-config.yaml` |
-| Prompt/tool/workflow/execution values | Referenced H component |
-| Retained memory or Skill | Referenced S component |
+| Prompt/tool/context/execution values | Referenced H component |
+| Retained Skill | Referenced S component |
 | Editor instructions | Referenced I editor component |
-| Process assessment and evidence presentation | Referenced I feedback component |
-| Strategy, rounds, sampling and next-seed policy | Referenced I search component |
-| Editable fields, root budget and task allowance | `experiment.yaml` |
+| Evaluator prompts | Referenced I evaluator component |
+| Strategy, rounds, sampling and next-seed policy | Fixed experiment `search` |
+| Optional edit narrowing and independent phase times | `experiment.yaml` |
 | Formal comparison/assurance | `comparison.yaml` |
 | Task source and material | Referenced task document |
 
@@ -82,17 +82,11 @@ Do not copy component values into experiment sections. See the complete
 [field guide](CONFIGURATION.md) rather than maintaining a second field list here.
 CLI choices do not activate arbitrary Python or install plugins.
 
-## Enable completed-process feedback
+## Use completed-process feedback
 
-Configure `process_assessment.assessors` in I feedback and `exploration` in I
-search. [The field guide](CONFIGURATION.md#enable-completed-process-feedback)
-contains complete parameter excerpts and model/cost rules. Use at least two
-rounds for a next-seed decision. Official selection remains separate.
+The shared evaluator uses I evaluator prompts and the assessor model role. Configure evidence page size under `assessment.evidence` and the next-seed policy under `search.exploration`. See [the field guide](CONFIGURATION.md#configure-assessment-and-exploration).
 
-Raw execution facts remain immutable. Optional model judgments use the assessor
-role and root allowance. Their local cap does not reset the root. Required
-unavailable assessment stops the search; optional failure retains the incumbent.
-Online file-task assessment is a separate explicit execution parameter.
+Raw execution facts remain immutable. Model judgments report dimensions, process signals and behavior hypotheses with cited source spans. Unknown judgments retain the incumbent. Official scores and independent verification retain their authority. Online file-task assessment remains a separate explicit parameter.
 
 ## Prepare benchmarks
 
@@ -105,12 +99,12 @@ fruitfly-agent-lab improvement check
 fruitfly-agent-lab improvement run
 ```
 
-The adapter derives a bounded host from the trial model allowance. Original host
+The adapter stages a derived host for the selected runtime. Original host
 files stay unchanged. Preparation must match current runtime source and frozen
 inputs. Checks never silently prepare, download or launch task containers.
 All collections share one baseline and workspace; conflicting explicit request
-references fail. See [Eval](../../eval/README.md) and its
-[Improvement adapter](../../eval/improvement/README.md).
+references fail. See [Eval](../../fruitfly_eval/README.md) and its
+[Improvement adapter](../../fruitfly_eval/improvement/README.md).
 
 ## Inspect records and stop safely
 
@@ -124,7 +118,7 @@ fruitfly-agent-lab rsi resume '<RUN_ID>'
 
 Use actual run IDs. `check` constructs no Providers and makes no model request.
 It validates sources, model aliases, credential presence, capabilities and
-applicable budgets; external connectivity and quality remain unverified.
+phase times and grants; external connectivity and quality remain unverified.
 
 Run indexes stay in `.fruitfly/experiments/runs/<id>/`. Journals and trials stay
 in `.fruitfly/improvement/jobs/<job-id>/`; each generated candidate has an
@@ -132,9 +126,7 @@ ordinary config under `candidates/<id>/config.yaml` there. Models and component
 contents are frozen with the candidate; source defaults stay unchanged. Follow
 recorded links to Eval and independent verification evidence.
 
-The host owns scoped cancellation and cleanup. Resume restores durable budget
-usage/deadlines, does not replay uncertain paid work and reconciles activation.
-One process owns each run. A selected output is not independent verification.
+The host owns scoped cancellation and cleanup. Resume restores durable job conditions, rejects unsupported records, avoids replaying uncertain requests and reconciles activation. Each role invocation starts its own clock. One process owns each run.
 
 `--events jsonl` reports lifecycle/search events. Exit 0 means command completion,
 1 incomplete execution, 2 configuration error, 3 blocked execution and 130
@@ -161,13 +153,12 @@ containers. Installed templates are checked outside the source checkout.
 ## Optimize a shared task set
 
 Use the [multi-collection recipe](../../examples/experiments/multi-task.example.yaml).
-Task documents preserve collection objectives and private partitions. I search
-owns sampling/promotion scheduling; fixed comparison owns aggregation/regression
+Task documents preserve collection objectives and private partitions. Experiment
+`search` owns sampling/promotion scheduling; fixed comparison owns aggregation/regression
 rules; `trial` owns attempts/concurrency. Candidate concurrency remains one.
 
 Each leaf is an attributable execution. Shared-batch exploration and complete
-selection remain separate; incomplete coverage cannot win. Root allowances
-scale with material when omitted. Task-set search currently requires simple,
+selection remain separate; incomplete coverage cannot win. Each editor, execution and evaluator invocation has its own time. Task-set search currently requires simple,
 scored, task scope without experience retention. Independent adoption needs a
 separately implemented policy.
 

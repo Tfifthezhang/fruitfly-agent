@@ -7,8 +7,8 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
-from eval.improvement.process import EvalProcess
-from eval.contracts import EvaluationRequest
+from fruitfly_eval.improvement.process import EvalProcess
+from fruitfly_eval.contracts import EvaluationRequest
 
 
 class EvalProcessTests(unittest.IsolatedAsyncioTestCase):
@@ -28,7 +28,7 @@ class EvalProcessTests(unittest.IsolatedAsyncioTestCase):
                 b'{"type":"started","evaluation_id":"evaluation"}\n',
                 b'{"type":"log","text":"PRIVATE_TEST_OUTPUT"}\n', b'']))
             events = []
-            with patch('eval.improvement.process.asyncio.create_subprocess_exec', AsyncMock(return_value=process)) as spawn:
+            with patch('fruitfly_eval.improvement.process.asyncio.create_subprocess_exec', AsyncMock(return_value=process)) as spawn:
                 actual, path = await EvalProcess()(self.request(root), root / 'host.yaml',
                     directory=root, output_root=output, emit=lambda *args, **fields: events.append((args, fields)))
             self.assertEqual(actual, report); self.assertEqual(path, target)
@@ -45,7 +45,7 @@ class EvalProcessTests(unittest.IsolatedAsyncioTestCase):
             process.wait = AsyncMock(side_effect=wait)
             async def spawn(*args, **kwargs):
                 entered.set(); await release.wait(); return process
-            with patch('eval.improvement.process.asyncio.create_subprocess_exec', spawn):
+            with patch('fruitfly_eval.improvement.process.asyncio.create_subprocess_exec', spawn):
                 pending = asyncio.create_task(EvalProcess()(self.request(root), root / 'host.yaml',
                     directory=root, output_root=root / 'eval', emit=lambda *args, **kwargs: None))
                 await entered.wait(); pending.cancel(); await asyncio.sleep(0); release.set()

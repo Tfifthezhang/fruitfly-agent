@@ -64,7 +64,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
     def test_algorithm_identity_is_recorded_but_changes_allow_recovery(self):
         from dataclasses import asdict, replace
         from fruitfly_agent.lab.catalog import LabCatalog
-        from fruitfly_agent.lab.context_manager.reduction import SummarizingCompactorConfig
+        from fruitfly_agent.lab.context_manager.reduction import WorkingMemoryConfig
 
         root = self.workspace.root
         model_path = self.workspace.model_path
@@ -72,12 +72,12 @@ class RuntimeAssemblyTest(unittest.TestCase):
         profile = HarnessProfile("default", str(model_path), "offline", catalog.default_selections())
         with Session(root / "session.jsonl") as session:
             runtime = self.workspace.assemble(profile, session, catalog=catalog)
-            component = next(c for c in runtime.manifest.components if c["id"] == "compaction")
-            self.assertEqual("summarizing-v3", component["implementation_id"])
-            self.assertEqual(asdict(SummarizingCompactorConfig()), component["parameters"])
+            component = next(c for c in runtime.manifest.components if c["id"] == "working-memory-reduction")
+            self.assertEqual("working-memory-v1", component["implementation_id"])
+            self.assertEqual(asdict(WorkingMemoryConfig()), component["parameters"])
             record_session_manifest(session, runtime)
             changed_catalog = LabCatalog(tuple(
-                replace(d, implementation_id="test-summary-implementation") if d.descriptor.mechanism_id == "compaction" else d
+                replace(d, implementation_id="test-summary-implementation") if d.descriptor.mechanism_id == "working-memory-reduction" else d
                 for d in catalog.definitions()
             ))
             changed = self.workspace.assemble(profile, session, catalog=changed_catalog)

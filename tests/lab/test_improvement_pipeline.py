@@ -1,6 +1,7 @@
 """Public pipeline ports support unscored work and feedback-driven algorithms."""
 from fruitfly_agent.improvement.contracts.optimization import OptimizationSpec
 import asyncio
+import json
 from dataclasses import replace
 import tempfile
 from pathlib import Path
@@ -95,13 +96,13 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(ValueError, 'receipt'):
             await flow.run(plan, task, baseline, WorkflowServices(plan))
         runner.execute = original
-        plan = replace(plan, max_executions=1)
+        plan = replace(plan)
         outcome = await flow.run(plan, task, baseline, WorkflowServices(plan))
-        self.assertEqual(outcome.stop_reason, 'budget_exhausted')
-        self.assertEqual(outcome.harness, baseline)
+        self.assertEqual(outcome.stop_reason, 'completed')
+        self.assertNotEqual(outcome.harness, baseline)
         self.assertEqual(outcome.decision.assurance, 'selected')
         self.assertIsNotNone(outcome.selected)
-        plan = replace(plan, component_ids=('prompt',), max_executions=8)
+        plan = replace(plan, component_ids=('prompt',))
         guarded = WorkflowServices(plan)
         rejected = await flow.run(plan, task, baseline, guarded)
         self.assertTrue(all(set(c.changed_ids) <= {'prompt'} for c in rejected.candidates))
@@ -131,10 +132,10 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
         registry, baseline = fixture()
         artifacts = MemoryArtifacts()
         provider = FauxProvider()
-        provider.respond_tool_call('read_file', {'path': 'context/task.md'})
-        provider.respond_tool_call('read_file', {'path': 'context/executions.json'})
+        provider.respond_tool_call('describe_target', {'component_id': 'prompt'})
+        provider.respond_tool_call('read', {'path': 'context/executions.json'})
         provider.respond_tool_call('write_file', {'path': 'harness/prompt/instructions.txt', 'content': 'New task procedure'})
-        provider.respond_text('{"reasons":[{"component_id":"prompt","explanation":"Observed omission","evidence_ids":["reference"]}]}')
+        provider.respond_text('{"reasons":[{"component_id":"prompt","explanation":"Observed omission","expected_effect":"Perform the previously omitted inspection","evidence_ids":["reference"]}]}')
         plan = RunPlan('job', version(), ('prompt',))
         task = TaskMaterial('task', 'Inspect the source')
         record = ExecutionRecord('reference', task.task_id, task.material_id, baseline.snapshot_id,
@@ -148,6 +149,10 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(services.used['model'], 4)
         self.assertEqual(baseline.component('prompt').files[0].text, 'prompt')
         self.assertTrue(any(event == 'editor-read' for event, _ in services.events))
+        self.assertTrue(any(event == 'component-descriptions' and fields['artifact_id'] in artifacts.values
+            for event, fields in services.events))
+        descriptions = json.loads(json.loads(provider.calls[1]['messages'][-1].content[0].text)['text'])
+        self.assertIn('parameters.content.documents', {f['path'] for f in descriptions['fields']})
 
     def test_workspace_paths_binary_sources_and_read_only_evidence(self):
         registry, baseline = fixture()
@@ -218,7 +223,7 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_timeout_closes_running_work_and_selector_cannot_invent_output(self):
         flow, plan, baseline, runner = self.build()
-        services = WorkflowServices(replace(plan, operation_timeout=0.01))
+        services = WorkflowServices(replace(plan, timeouts={'editor_seconds':0.01,'execution_seconds':0.01,'evaluator_seconds':0.01}))
         closed = asyncio.Event()
         async def blocking():
             try:

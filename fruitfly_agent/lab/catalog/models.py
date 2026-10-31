@@ -82,8 +82,13 @@ class MechanismDefinition:
     configuration_edit: Callable | None = None
     configuration_snapshot: Callable | None = None
     optimization_exemption: str = ''
+    parameter_paths: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        if self.parameter_paths:
+            names={p.name for p in self.descriptor.parameters}
+            if set(self.parameter_paths)!=names or len(set(self.parameter_paths.values()))!=len(names) or any(not v.startswith(('instructions.','settings.','content.')) for v in self.parameter_paths.values()):
+                raise ValueError('owner must declare distinct categorized paths for every parameter')
         if not isinstance(self.optimization_exemption, str):
             raise TypeError('optimization exemption must explain an infrastructure invariant')
         if self.configuration_role not in {'H', 'S', 'I'}:

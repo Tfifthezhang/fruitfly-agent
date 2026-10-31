@@ -4,14 +4,12 @@ import asyncio
 import json
 from typing import Any
 
-from fruitfly_agent.core.data_model import ProviderView, UserMessage
-from fruitfly_agent.improvement.contracts.live import Assessment, EvidencePosition, Metric
+from fruitfly_agent.improvement.contracts.live import Assessment, EvidencePosition
 from fruitfly_agent.improvement.contracts.assessment import AssessmentUnavailable
-from fruitfly_agent.improvement.contracts.search import ExplorationDecision
+from fruitfly_agent.improvement.contracts.failures import IntegrityError
 from fruitfly_agent.improvement.contracts.tasks import Resource
 from fruitfly_agent.improvement.contracts.versions import canonical_json
 from fruitfly_agent.improvement.execution.facts import FACTS_PATH, read_facts
-from fruitfly_agent.improvement.workflow.budget import AllocationExhausted
 from .feedback import FeedbackProjection
 
 
@@ -41,120 +39,58 @@ def completed_input(task, record, artifacts):
 
 
 class CompletedAssessmentService:
-    def __init__(self, settings, *, config, artifacts, services, registry, instructions=None):
-        self.settings, self.config, self.artifacts, self.services = settings, config, artifacts, services
-        self.registry = registry
-        self.instructions = dict(instructions or {})
-        self.model_calls = 0
+    """One model evaluator for completed feedback and comparisons."""
+    def __init__(self, *, config, artifacts, services, instructions=None, evidence_settings=None):
+        from .instructions import EvaluatorInstructions
+        from .evaluator import ModelEvaluator
+        self.config, self.artifacts, self.services = config, artifacts, services
+        self.instructions = instructions if isinstance(instructions, EvaluatorInstructions) else EvaluatorInstructions(**(instructions or {}).get('instructions', {}))
+        self.evaluator = ModelEvaluator(config, artifacts, instructions=self.instructions, **(evidence_settings or {}))
         self.values = {}
-        self.feedback = FeedbackProjection(include_detail=True, all_metrics=True)
-        self.assessors = tuple(registry.create(name, self, own=services.own) for name in settings.assessors)
-
-    async def complete(self, instruction, payload):
-        self.services.check()
-        body = canonical_json(payload)
-        if len(body.encode('utf-8')) > 2_000_000:
-            raise AssessmentUnavailable('complete assessment input exceeds its allocation')
-        if self.model_calls >= self.settings.max_model_calls:
-            raise AssessmentUnavailable('process-assessment model allowance exhausted')
-        self.services.reserve('model')
-        self.model_calls += 1
-        self.services.record('assessor-model-request', model=self.config.model, purpose='completed-process-assessment')
-        view = ProviderView(instruction, [UserMessage(content=body)], [],
-            self.config.model, self.config.max_tokens)
-        async def request():
-            stream = self.config.provider(view, signal=self.services.signal)
-            try:
-                return await stream.result()
-            finally:
-                await stream.aclose()
-        result = await self.services.operation(asyncio.wait_for(
-            request(), self.settings.timeout_seconds))
-        if result.stop_reason != 'stop' or result.tool_calls or result.continue_turn:
-            raise ValueError('completed assessor needs a tool-free final result')
-        return json.loads(result.text)
-
-    def render(self, inputs):
-        rows = []
-        size = 0
-        for value in inputs:
-            evidence = []
-            resources = (*value.facts.evidence, Resource('output.txt', value.facts.output_id))
-            seen = set()
-            for resource in resources:
-                if resource.artifact_id in seen:
-                    continue
-                seen.add(resource.artifact_id)
-                data = self.artifacts.read(resource.artifact_id)
-                size += len(data)
-                if size > 2_000_000:
-                    raise AssessmentUnavailable('complete granted evidence exceeds assessor input allocation')
-                try:
-                    body = data.decode('utf-8')
-                except UnicodeDecodeError:
-                    body = None
-                evidence.append({'path': resource.path, 'artifact_id': resource.artifact_id,
-                    'media_type': resource.media_type, 'content': body, 'size_bytes': len(data)})
-            rows.append({'task': value.task.instruction, 'facts_id': value.facts_id, 'facts': value.facts.to_dict(), 'evidence': evidence,
-                'assessments': [asdict(a) for a in self.values.get(value.record.run_id, ())]})
-        return {'task': inputs[0].task.instruction, 'executions': rows}
 
     async def assess(self, task, record):
-        if not self.assessors:
-            return record, ()
         value = completed_input(task, record, self.artifacts)
-        assessments = []
-        for assessor in self.assessors:
-            try:
-                assessment = await self.services.operation(asyncio.wait_for(
-                    assessor.assess(value), self.settings.timeout_seconds))
-                self.validate(assessment, value, assessor.assessor_id)
-                assessment = self.feedback.project(assessment)
-            except (AllocationExhausted, asyncio.CancelledError):
-                raise
-            except Exception as exc:
-                self.services.check()
-                assessment = Assessment(value.position, assessor.assessor_id, (), status='unavailable',
-                    scope='execution', detail=type(exc).__name__, facts_id=value.facts_id,
-                    evidence_ids=(value.facts_id,))
-            assessments.append(assessment)
-            self.services.record('completed-assessment', run_id=record.run_id,
-                assessor_id=assessment.assessor_id, status=assessment.status,
-                evidence=self.artifacts.put(canonical_json(asdict(assessment)).encode()))
-        self.values[record.run_id] = tuple(assessments)
-        reference = self.artifacts.put(canonical_json([asdict(a) for a in assessments]).encode())
-        return replace(record, artifacts=(*record.artifacts,
-            Resource('process-assessments.json', reference, 'application/json', 'diagnostic'))), tuple(assessments)
-
-    @staticmethod
-    def validate(assessment, value, assessor_id):
-        if (assessment.position != value.position or assessment.assessor_id != assessor_id
-                or assessment.facts_id != value.facts_id or assessment.visibility != 'development'
-                or assessment.scope != 'execution' or assessment.status != 'final'
-                or set(assessment.evidence_ids) - set(value.evidence_ids)):
-            raise ValueError('completed assessment differs from granted facts or identity')
-
-    def ensure_available(self):
-        if self.settings.required and any(a.status != 'final' for values in self.values.values() for a in values):
-            raise AssessmentUnavailable('required completed assessment is unavailable')
-
-    async def compare(self, task, records, incumbent):
-        eligible = tuple(r for r in records if r.status == 'completed'
-            and any(a.status == 'final' for a in self.values.get(r.run_id, ())))
-        assessors = tuple(a for a in self.assessors if callable(getattr(a, 'compare', None)))
-        if len(eligible) < 2 or not assessors:
-            raise AssessmentUnavailable('completed comparison evidence is insufficient')
-        inputs = tuple(completed_input(task, r, self.artifacts) for r in eligible)
+        from fruitfly_agent.improvement.contracts.live import DimensionJudgment, EvidenceFinding
         try:
-            decision = await self.services.operation(asyncio.wait_for(
-                assessors[0].compare(inputs, incumbent.run_id), self.settings.timeout_seconds))
-            if (decision.run_id not in {r.run_id for r in eligible}
-                    or set(decision.evidence_ids) - {v for i in inputs for v in i.evidence_ids}
-                    or not decision.evidence_ids):
-                raise ValueError('exploration comparison cited unavailable execution evidence')
-            return decision
-        except (AllocationExhausted, asyncio.CancelledError):
+            data, reference = await self.evaluator.evaluate(task, (record,), self.services, inputs=(value,))
+            assessment = Assessment(value.position, self.evaluator.implementation_id, (), status='final', scope='execution',
+                detail=data['reason'], facts_id=value.facts_id, evidence_ids=tuple(data['evidence_ids']),
+                dimensions=tuple(DimensionJudgment(**d) for d in data['evaluations'][0]['dimensions']),
+                findings=tuple(EvidenceFinding(**f) for f in data['evaluations'][0]['findings']))
+        except (asyncio.CancelledError, IntegrityError):
             raise
         except Exception as exc:
             self.services.check()
-            raise AssessmentUnavailable(type(exc).__name__) from exc
+            assessment = Assessment(value.position, self.evaluator.implementation_id, (), status='unavailable',
+                scope='execution', detail=type(exc).__name__, facts_id=value.facts_id, evidence_ids=(value.facts_id,))
+        self.values[record.run_id] = (assessment,)
+        reference = self.artifacts.put(canonical_json(asdict(assessment)).encode())
+        self.services.record('completed-assessment', run_id=record.run_id, status=assessment.status, evidence=reference)
+        return replace(record, artifacts=(*record.artifacts, Resource('assessment.json', reference, 'application/json', 'diagnostic'))), (assessment,)
+
+    async def compare(self, task, records, incumbent):
+        from fruitfly_agent.improvement.contracts.search import ExplorationDecision
+        eligible = tuple(r for r in records if r.status == 'completed')
+        inputs = tuple(completed_input(task, r, self.artifacts) for r in eligible)
+        data, reference = await self.evaluator.evaluate(task, eligible, self.services, inputs=inputs, incumbent=incumbent.run_id)
+        return ExplorationDecision(data['choice'] or incumbent.run_id, data['reason'], tuple(data['evidence_ids']), 'process-guided')
+
+    async def compare_batches(self, groups, incumbent):
+        votes, evidence, reasons, references = [], [], [], []
+        width = {len(values) for values in groups.values()}
+        if len(width) != 1:
+            raise AssessmentUnavailable('batch comparison requires paired tasks')
+        for index in range(next(iter(width))):
+            inputs = tuple(values[index] for values in groups.values())
+            if len({v.record.task_id for v in inputs}) != 1:
+                raise AssessmentUnavailable('batch comparison requires the same ordered tasks')
+            data, reference = await self.evaluator.evaluate(inputs[0].task, tuple(v.record for v in inputs), self.services, inputs=inputs)
+            references.append(reference)
+            mapping = {values[index].record.run_id: key for key, values in groups.items()}
+            votes.append(mapping.get(data['choice'], incumbent))
+            evidence.extend(data['evidence_ids'])
+            reasons.append(data['reason'])
+        choice = votes[0] if votes and len(set(votes)) == 1 else incumbent
+        result={'evaluation_id': choice, 'reason': '; '.join(reasons)[:4000], 'evidence_ids': sorted(set(evidence))}
+        self.last_comparison_id=self.artifacts.put(canonical_json({'groups':list(groups),'result':result,'judgments':references}).encode())
+        return result

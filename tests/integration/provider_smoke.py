@@ -23,8 +23,8 @@ from fruitfly_agent.core.extensions.hooks import HookRegistry
 from fruitfly_agent.core.loop import run_agent_loop
 from fruitfly_agent.core.session import Session
 from fruitfly_agent.lab.context_manager.reduction import (
-    SummarizingCompactor,
-    SummarizingCompactorConfig,
+    WorkingMemoryReducer,
+    WorkingMemoryConfig,
 )
 from fruitfly_agent.lab.tools import builtin_tools
 from fruitfly_agent.core.data_model import AgentLoopResult, UserMessage
@@ -130,11 +130,11 @@ async def scenario_2(spec: ModelSpec, env: dict[str, str], root: Path) -> SmokeO
     window = min(spec.context_window, 64_000)
     try:
         config = _config(spec, env, work, session, context_window=window)
-        compaction = SummarizingCompactorConfig(
-            reserve_tokens=min(8_000, window // 4),
-            keep_recent_tokens=min(12_000, window // 3),
+        compaction = WorkingMemoryConfig(
+            memory_tokens=min(2048, window // 8),
+            update_every_messages=8,
         )
-        compactor = SummarizingCompactor(
+        compactor = WorkingMemoryReducer(
             compaction, _provider(spec, env, max_tokens=2048)
         )
         result = await run_agent_loop(config, [UserMessage(content=(

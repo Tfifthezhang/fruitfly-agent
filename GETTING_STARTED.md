@@ -9,7 +9,7 @@ Install FruitFlyAgent and complete your first terminal session.
 | Python | 3.11+ |
 | Platform | macOS or Linux; native Windows is unsupported and WSL2 is unverified |
 | Model access | An API key for real requests; the offline example needs no key |
-| Docker | Only needed for optional [Eval](eval/README.md) |
+| Docker | Only needed for optional [Eval](fruitfly_eval/README.md) |
 
 ## Install
 
@@ -38,7 +38,7 @@ Docker or network. They validate execution paths, not model quality.
 
 For installed wheels, follow the [installed checks](examples/packaging/README.md).
 For real model testing, continue below. Container benchmarks additionally require
-[Eval preparation](eval/DEVELOPER_GUIDE.md#check-local-execution-first).
+[Eval preparation](fruitfly_eval/DEVELOPER_GUIDE.md#check-local-execution-first).
 
 ## Choose a model
 

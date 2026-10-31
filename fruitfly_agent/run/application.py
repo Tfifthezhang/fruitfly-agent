@@ -300,8 +300,8 @@ class RunApplicationFactory:
     def improvement_target_id(self):
         return next(iter(self._current_targets))
 
-    def improvement_budget_scope(self, budget):
-        return self._component_jobs.budget_scope(budget)
+    def improvement_usage(self):
+        return dict(self._component_jobs.observed_usage)
 
     def task_pack_catalog(self):
         if self._current_runtime_config is None:

@@ -33,7 +33,7 @@ class SshRunTests(unittest.IsolatedAsyncioTestCase):
 
     def factory(self):
         factory = RunApplicationFactory(cwd=self.root, environment=self.secrets, provider_registry=self.registry)
-        factory.configuration.set_mechanism('compaction', enabled=False)
+        factory.configuration.set_mechanism('working-memory-reduction', enabled=False)
         factory.configuration.set_mechanism('ssh-env', enabled=True)
         factory.configuration.set_parameter('ssh-env', 'host', 'server.example')
         factory.configuration.set_parameter('ssh-env', 'port', '2222')

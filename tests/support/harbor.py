@@ -7,7 +7,7 @@ from types import ModuleType, SimpleNamespace
 from unittest.mock import patch
 import json
 
-from eval.harbor.host import HostConfig, Mount
+from fruitfly_eval.harbor.host import HostConfig, Mount
 
 
 def prepared_harbor(root, names=("task",)):
@@ -60,7 +60,7 @@ def load_harbor_agent():
         module = ModuleType(name)
         module.__dict__.update(values)
         modules[name] = module
-    path = Path(__file__).resolve().parents[2] / "eval" / "harbor_agent.py"
+    path = Path(__file__).resolve().parents[2] / "fruitfly_eval" / "harbor_agent.py"
     spec = importlib.util.spec_from_file_location("_fruitfly_harbor_bridge_test", path)
     module = importlib.util.module_from_spec(spec)
     with patch.dict(sys.modules, modules):
@@ -82,8 +82,8 @@ def load_harbor_environment():
         module = ModuleType(name)
         module.__dict__.update(attributes)
         modules[name] = module
-    path = Path(__file__).resolve().parents[2] / "eval/harbor/docker_environment.py"
-    spec = importlib.util.spec_from_file_location("eval.harbor._environment_test", path)
+    path = Path(__file__).resolve().parents[2] / "fruitfly_eval/harbor/docker_environment.py"
+    spec = importlib.util.spec_from_file_location("fruitfly_eval.harbor._environment_test", path)
     module = importlib.util.module_from_spec(spec)
     with patch.dict(sys.modules, modules):
         spec.loader.exec_module(module)

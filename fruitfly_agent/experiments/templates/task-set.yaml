@@ -5,14 +5,10 @@ tasks:
   file: tasks/tb4-smoke.yaml
 comparison:
   file: comparison.yaml
-edit:
-  base_prompt:
-    fields:
-    - parameters.text
-budget:
-  timeout_seconds: 10800
 trial:
-  operation_timeout_seconds: 3600
-  model_calls: 80
   concurrency: 1
   attempts: 1
+timeouts:
+  editor_seconds: 1200
+  execution_seconds: 3600
+  evaluator_seconds: 1200

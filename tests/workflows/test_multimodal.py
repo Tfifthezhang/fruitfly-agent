@@ -311,17 +311,19 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
     async def test_improvement_editor_reader_uses_the_same_media_contract(self):
         import base64
         from types import SimpleNamespace as NS
-        from fruitfly_agent.lab.improvement.workspaces import WorkspaceSession
+        from fruitfly_agent.lab.improvement.evidence.session import EvidenceSession
+        from fruitfly_agent.lab.improvement.evidence import EvidenceWorkspace
+        from tests.support.pipeline import fixture
         gif = base64.b64decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7')
         for data, mime in ((png_bytes(), 'image/png'), (gif, 'image/gif')):
             with self.subTest(media_type=mime):
                 provider = FauxProvider()
-                provider.respond_tool_call('read_file', {'path': 'input'})
+                provider.respond_tool_call('read', {'path': 'input'})
                 provider.respond_text('checked')
-                services = NS(check=lambda: None, reserve=lambda *args: None,
+                services = NS(check=lambda: None, observe=lambda *args: None,
                     record=lambda *args, **kwargs: None, signal=asyncio.Event())
-                workspace = NS(paths=lambda: ('input',), read=lambda _: data)
-                result = await WorkspaceSession(AgentLoopConfig(provider=provider), None).session(
+                workspace = EvidenceWorkspace(baseline=fixture()[1], files={'input': data}, writable_ids=())
+                result = await EvidenceSession(AgentLoopConfig(provider=provider), None).session(
                     'Inspect media', workspace, services)
                 self.assertEqual(result, 'checked')
                 tool = next(m for m in provider.calls[-1]['messages'] if m.role == 'toolResult')

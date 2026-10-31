@@ -5,7 +5,7 @@ from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.core.data_model import AgentToolResult, TextBlock, UserMessage
 from fruitfly_agent.core.loop import run_agent_loop
 from fruitfly_agent.lab.context_manager.measurement.budget import MeasurementService, MeasurementConfig
-from fruitfly_agent.lab.context_manager.reduction import SummarizingCompactor, SummarizingCompactorConfig
+from fruitfly_agent.lab.context_manager.reduction import WorkingMemoryReducer, WorkingMemoryConfig
 from fruitfly_agent.lab.context_manager.reduction.cut import valid_tool_links
 from tests.support.faux_provider import FauxProvider
 from tests.support.loop import make_tool
@@ -22,8 +22,7 @@ class LongContextTests(unittest.IsolatedAsyncioTestCase):
         async def log(ctx): return AgentToolResult(content=[TextBlock('middle evidence ' + ctx.args['value'] + 'x' * 3000)])
         tool = replace(tool, execute=log)
         meter = MeasurementService(MeasurementConfig(margin_tokens=0, margin_ratio=0))
-        reducer = SummarizingCompactor(SummarizingCompactorConfig(reserve_tokens=128, keep_recent_tokens=1000,
-            summary_max_tokens=128), auxiliary)
+        reducer = WorkingMemoryReducer(WorkingMemoryConfig(memory_tokens=128, auxiliary_max_tokens=128, update_every_messages=3), auxiliary)
         config = AgentLoopConfig(provider, tools=(tool,), context_window=4096, max_tokens=64,
             max_tool_calls_per_turn=100, context_meter=meter)
         result = await run_agent_loop(config, [UserMessage('Finish all steps and verify the result')], context_pipeline=reducer)
@@ -39,12 +38,14 @@ class LongContextTests(unittest.IsolatedAsyncioTestCase):
             measure = await meter.measure(ProviderView(call['system_prompt'], call['messages'], [tool], call['model'], call['max_tokens']), provider)
             self.assertTrue(measure.fits(config.context_window))
 
-    async def test_signed_prefix_refusal_happens_before_auxiliary_call(self):
+    async def test_signed_prefix_retains_projection_while_memory_updates(self):
         from fruitfly_agent.core.data_model import ContextSnapshot, ContextItem
         provider = FauxProvider()
         messages = (UserMessage('old' * 4000), UserMessage('current'))
         snapshot = ContextSnapshot(tuple(ContextItem(str(i), m) for i,m in enumerate(messages)),
             messages, '', (), 4096, 'fake', 64, 'budget', rebase_allowed=False)
-        reducer = SummarizingCompactor(SummarizingCompactorConfig(), provider)
-        self.assertIsNone(await reducer.check_budget(snapshot))
-        self.assertEqual([], provider.calls)
+        reducer = WorkingMemoryReducer(WorkingMemoryConfig(max_pages=64, update_every_messages=1), provider)
+        for _ in range(64): provider.respond_text('bounded memory')
+        decision = await reducer.check_budget(snapshot)
+        self.assertIsNone(decision.messages)
+        self.assertTrue(provider.calls)

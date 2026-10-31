@@ -1,7 +1,7 @@
 """Present and prepare candidates independently of search execution."""
 from dataclasses import replace
 from fruitfly_agent.interactive.contracts.candidates import CandidateView, CandidateSection
-from fruitfly_agent.improvement.evidence.reporting import SearchReport, restore_search_report
+from fruitfly_agent.improvement.evidence.reporting import SearchReport
 
 
 def candidate_view(record):
@@ -51,17 +51,7 @@ class RunCandidateService:
     def _report(self, record):
         if record.report is not None:
             return SearchReport(**record.report)
-        evidence = dict(record.evidence)
-        try:
-            return restore_search_report(self.workspace,
-                history=evidence.get('Search history', ''),
-                history_hash=evidence.get('Search history hash', ''),
-                snapshot=evidence.get('Task snapshot', ''),
-                snapshot_hash=evidence.get('Task snapshot hash', ''),
-                candidate_id=record.artifact_id, baseline_id=record.parent_target_hash,
-                parent_manifest=record.parent_manifest_digest, cases_digest=record.cases_digest)
-        except (OSError, ValueError, TypeError, KeyError):
-            return None
+        return None
 
     def candidate_detail(self, candidate_id):
         record, diff = self.candidate_service.candidate_detail(candidate_id)
@@ -87,9 +77,6 @@ class RunCandidateService:
                     'worse': 'Worse on declared objective', 'unavailable': 'Comparison unavailable'}[report.conclusion]
                 evaluation = f'{conclusion}\nObjective ({report.metric}): {record.seed_score} → {record.validation_score}'
             stop = report.stop_reason or 'unknown'
-            if stop == 'budget_exhausted':
-                kind = {'trial': 'Trial evaluation', 'model': 'Model request'}.get(report.exhausted_kind, 'Search call')
-                stop = f'{kind} limit reached; automatic search stopped. Chat and manual testing remain available.'
             tokens = report.tokens
             if tokens.reported_calls:
                 usage = (f'Reported tokens: {tokens.total_tokens:,} (input {tokens.input_tokens:,}; output {tokens.output_tokens:,})'
@@ -99,8 +86,8 @@ class RunCandidateService:
                     usage += f'; {tokens.missing_calls} missing — reported subtotal, actual total unknown'
             else:
                 usage = 'Token consumption unknown: Provider usage not reported' if report.model_calls else 'Tokens: 0 (no model calls)'
-            consumption = (f'Stop: {stop}\nTrial evaluations: {report.trial_calls}/{report.trial_limit}; '
-                           f'model requests: {report.model_calls}/{report.model_limit}\n{usage}')
+            consumption = (f'Stop: {stop}\nTrial evaluations: {report.trial_calls}; '
+                           f'model requests: {report.model_calls}\n{usage}')
         evidence = dict(record.evidence)
         if evidence.get('Independent confirmation'):
             evaluation += ('\nIndependent confirmation: ' + evidence['Independent confirmation']

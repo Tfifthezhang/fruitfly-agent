@@ -1,21 +1,21 @@
 """Strict working-memory policy; checkpoint integrity is not editable."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import math
 from .prompts import UPDATE, SHRINK
 
 
 @dataclass(frozen=True)
 class WorkingMemoryConfig:
-    update_instructions: str = UPDATE
-    shrink_instructions: str = SHRINK
-    memory_tokens: int = 2048
-    update_every_messages: int = 8
-    switch_ratio: float = .85
-    page_char_limit: int = 24000
-    max_pages: int = 8
-    auxiliary_max_tokens: int = 3072
-    auxiliary_attempts: int = 2
-    auxiliary_timeout_seconds: float = 60.0
+    update_instructions: str = field(default=UPDATE, metadata={'description': 'Merge new evidence into task memory: preserve requirements, corrections, decisions, failures, and unresolved work.', 'advanced': False})
+    shrink_instructions: str = field(default=SHRINK, metadata={'description': 'Shorten oversized task memory while preserving necessary facts and explicit uncertainty.', 'advanced': False})
+    memory_tokens: int = field(default=2048, metadata={'description': 'Target task-memory token capacity; larger memory retains more content but consumes request context.', 'advanced': False, 'minimum': 1, 'maximum': 32000})
+    update_every_messages: int = field(default=8, metadata={'description': 'New canonical messages between memory updates; frequent updates can increase auxiliary model work.', 'advanced': False, 'minimum': 1, 'maximum': 1024})
+    switch_ratio: float = field(default=.85, metadata={'description': 'Input-capacity ratio that triggers an update or projection switch; integrity and coverage checks still apply.', 'advanced': False, 'minimum': 0.1, 'maximum': 1})
+    page_char_limit: int = field(default=24000, metadata={'description': 'Maximum source characters per evidence page sent to a memory update.', 'advanced': True, 'minimum': 1, 'maximum': 120000})
+    max_pages: int = field(default=8, metadata={'description': 'Maximum evidence pages per update; unprocessed pages never count as covered.', 'advanced': True, 'minimum': 1, 'maximum': 128})
+    auxiliary_max_tokens: int = field(default=3072, metadata={'description': 'Maximum output tokens per auxiliary memory response; does not raise the main task allowance.', 'advanced': True, 'minimum': 1, 'maximum': 64000})
+    auxiliary_attempts: int = field(default=2, metadata={'description': 'Maximum attempts for an auxiliary memory update, within the outer hard allowance.', 'advanced': True, 'minimum': 1, 'maximum': 8})
+    auxiliary_timeout_seconds: float = field(default=60.0, metadata={'description': 'Seconds allowed for one auxiliary update; cannot extend the task deadline.', 'advanced': True, 'minimum': 0.01, 'maximum': 600})
 
     def __post_init__(self):
         for name in ('update_instructions', 'shrink_instructions'):

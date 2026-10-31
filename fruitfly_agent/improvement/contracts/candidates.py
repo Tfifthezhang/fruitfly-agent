@@ -96,10 +96,12 @@ class EditReason:
     component_id: str
     explanation: str
     evidence_ids: tuple[str, ...]
+    expected_effect: str
 
     def __post_init__(self):
         identifier(self.component_id)
         bounded(self.explanation, 4000)
+        bounded(self.expected_effect, 4000)
         object.__setattr__(self, 'evidence_ids', tuple(self.evidence_ids))
         if not self.evidence_ids or any(not isinstance(v, str) or not v for v in self.evidence_ids):
             raise ValueError('edits need attributable evidence')

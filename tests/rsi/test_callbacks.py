@@ -133,7 +133,7 @@ class RsiTests(unittest.IsolatedAsyncioTestCase):
                 cleaned.set()
         with self.assertRaises(TimeoutError):
             await self.driver(
-                adopt=stall, budget=EvolutionBudget(phase_timeout_seconds=0.01),
+                adopt=stall, budget=EvolutionBudget(timeouts={'editor_seconds':1,'execution_seconds':.01,'evaluator_seconds':1}),
             ).evolve(self.initial)
         self.assertTrue(cleaned.is_set())
 
@@ -152,7 +152,7 @@ class RsiTests(unittest.IsolatedAsyncioTestCase):
             finally:
                 cleaned.set()
         result = await self.driver(
-            generate=stall, budget=EvolutionBudget(max_steps=2, phase_timeout_seconds=0.01),
+            generate=stall, budget=EvolutionBudget(max_steps=2,timeouts={'editor_seconds':.01,'execution_seconds':1,'evaluator_seconds':1}),
         ).evolve(self.initial)
         self.assertTrue(cleaned.is_set())
         self.assertEqual(2, len(result.attempts))
@@ -194,7 +194,7 @@ class RsiTests(unittest.IsolatedAsyncioTestCase):
 
     def test_values_and_budget_are_validated(self):
         for kwargs in ({"max_steps": True}, {"max_steps": 0}, {"max_feedback_chars": 0},
-                       {"phase_timeout_seconds": float("inf")}, {"phase_timeout_seconds": 0}):
+                       {"timeouts":{"editor_seconds":float("inf")}}, {"timeouts":{"evaluator_seconds":0}}):
             with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
                 EvolutionBudget(**kwargs)
         with self.assertRaises(ValueError):

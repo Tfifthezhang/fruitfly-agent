@@ -1,4 +1,3 @@
-# Benchmark recipe. Edit component values under components/; this file grants changes.
 baseline:
   config: default-config.yaml
   profile: baseline
@@ -9,18 +8,18 @@ comparison:
 edit:
   base_prompt:
     fields:
-    - parameters.text
+    - parameters.instructions.system
   execution-policy:
     fields:
-    - parameters.max_tool_calls_per_turn
+    - parameters.settings.tool_execution.max_parallel
     bounds:
-      parameters.max_tool_calls_per_turn:
-        minimum: 64
-        maximum: 256
-budget:
-  timeout_seconds: 10800
+      parameters.settings.tool_execution.max_parallel:
+        minimum: 1
+        maximum: 16
 trial:
-  operation_timeout_seconds: 3600
-  model_calls: 80
   concurrency: 1
   attempts: 1
+timeouts:
+  editor_seconds: 1200
+  execution_seconds: 3600
+  evaluator_seconds: 1200

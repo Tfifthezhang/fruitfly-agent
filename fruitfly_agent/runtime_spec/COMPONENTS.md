@@ -33,7 +33,8 @@ role: H
 implementation: execution-policy
 enabled: true
 parameters:
-  max_tool_calls_per_turn: 128
+  settings:
+    max_tool_calls_per_turn: 128
 ```
 
 The component ID and role must match its position and registered definition.
@@ -41,7 +42,7 @@ Paths resolve from the declaring file. `{inline: ...}` may contain the complete
 component document instead of `{file: ...}`; exactly one is required. Unknown
 fields and duplicate YAML keys fail. Moving a file does not change its role.
 
-Use a `base_prompt` document with `parameters.text: |` for inline instructions.
+Use a `base_prompt` document with `parameters.instructions.system: |` for inline instructions.
 There is no mandatory separate prompt text file. Tool parameters come from the
 owning [Catalog definition](../lab/catalog/README.md); tool-call arguments are not
 automatically component configuration fields.
@@ -50,9 +51,9 @@ automatically component configuration fields.
 
 | Role | Content | Related guide |
 |---|---|---|
-| H | Prompt, tools, guidance, workflow and execution settings | [Runtime architecture](../README.md) |
-| S | Registered retained memory and Skill content | [Algorithm targets](../lab/improvement/targets/README.md) |
-| I | Editor, feedback and search settings | [Improvement](../lab/improvement/README.md) |
+| H | Prompt, tools, guidance, context and execution settings | [Runtime architecture](../README.md) |
+| S | Registered retained Skill content | [Algorithm targets](../lab/improvement/targets/README.md) |
+| I | Editor and evaluator prompts | [Improvement](../lab/improvement/README.md) |
 
 The pure `runtime_spec.load_harness_config` reads documents and records source
 hashes. `lab.catalog.load_system_config` also validates registered owners and
@@ -69,28 +70,23 @@ has no version marker or alternative flat profile reader.
 The executor is the task model; editor and assessor select separate services.
 Missing editor/assessor choices inherit the executor. Unused I services are lazy
 and do not construct auxiliary clients during daily startup. Actual calls still
-consume the owning job's budget. Model roles are outside ordinary edit grants.
+contribute observed usage. Model roles are outside ordinary edit grants.
 
 ## Describe supported H/S/I content
 
 | Document | Typical parameters | Parameter owner |
 |---|---|---|
-| `base_prompt` (H) | `text` | [Base prompt](../lab/base_prompt/README.md) |
-| `execution-policy` (H) | Tool/turn/recovery limits and `tool_execution` | [Execution policy](../lab/execution_policy/README.md) |
+| `base_prompt` (H) | `instructions.system` | [Base prompt](../lab/base_prompt/README.md) |
+| `execution-policy` (H) | `settings`: daily optional tool/turn limits, recovery and tool execution | [Execution policy](../lab/execution_policy/README.md) |
 | Tool/environment/context mechanism (H) | Its registered descriptors | [Catalog](../lab/catalog/CONFIGURATION.md) |
-| `tool-guidance.<tool>` (H) | `text`; enabled tool must exist | [Tools](../lab/tools/README.md) |
-| `execution-workflow` (H) | `steps`, 1–6 bounded instructions | [Workflow](../lab/workflow/README.md) |
-| `learned-memory`, `skill-document` (S) | `initial_text`, `max_chars`; Skill may declare `source_path` | [Retained targets](../lab/improvement/targets/README.md) |
-| `improvement-editor` (I) | `model_role: editor`, `max_tool_calls`, `max_turns`, `instructions` | [Editor](../lab/improvement/editor/README.md) |
-| `improvement-feedback` (I) | `evidence`, `process_assessment`, judgment/comparison guidance | [Assessment](../lab/improvement/assessment/README.md) |
-| `improvement-search` (I) | Strategy/generator/rounds/mode/width, exploration, retention; research/progress/finalization; optional sampling/promotion frequency | [Search](../lab/improvement/strategies/README.md) |
+| `tool-guidance.<tool>` (H) | `instructions.usage`; enabled tool must exist | [Tools](../lab/tools/README.md) |
+| `skill-document` (S) | `content.body`, `settings.max_chars`, optional `settings.source_path` | [Retained targets](../lab/improvement/targets/README.md) |
+| `improvement-editor` (I) | `instructions.{system,propose,invariant,domain,compose,reflect}` | [Editor](../lab/improvement/editor/README.md) |
+| `improvement-evaluator` (I) | `instructions.criteria`, `instructions.assess`, `instructions.compare` | [Assessment](../lab/improvement/assessment/README.md) |
 
-I search supports registered `simple` and `harness2` settings. Simple uses width 1
-and parallel mode; task sets currently require simple/scored/task operation.
-I feedback exposes `granted-full` evidence with bounded character pages and
-`evidence.access_mode: search` (default) or `paged`;
-that view never grants private verification material. Facts collection is an
-execution contract, independent of which optional assessor is enabled.
+Search scheduling, evidence page size and independent phase times belong to the
+fixed [experiment configuration](../experiments/CONFIGURATION.md). They do not
+become editable I components. Facts collection preserves raw observations for the shared model evaluator.
 
 A tool's default guidance is derived from the registered tool; a separate guidance
 file is needed only for an explicit value. To configure S, select its owner under
@@ -101,7 +97,7 @@ Editing retained text does not imply automatic learning or trained weights.
 
 Generated bundles may place an `artifacts` mapping in an owning component document.
 It maps declared artifact slots to exact text. This preserves adopted instructions,
-workflow JSON and retained content without depending on the source artifact store.
+evaluator prompts and retained content without depending on the source artifact store.
 The owner must declare and consume each slot; unknown slots fail. For an explicit
 surface, the artifact and readable parameters must describe the same value.
 Normal authoring should use parameters and let candidate/export code create these
@@ -132,15 +128,6 @@ quality. Owner-declared initial resource files are copied to `resources/`, with
 workspace-relative paths recorded in the snapshot. Explicit export previews
 those files before writing. Keep that working-directory layout for resource-backed
 components; services and runtime-specific dependencies still need preparation.
-
-## Configure outer-loop research
-
-The I `improvement-search.parameters` mapping also accepts `research`, `progress`
-and `finalization`. Their strict fields, defaults and runtime effects belong to
-[Lab research](../lab/improvement/research/README.md#configure-and-compare-mechanisms).
-They use the same component loader, grants, candidate trial and restoration path
-as other I settings. None changes the kernel's hard quotas or grants access to
-private evaluation material. Unknown nested fields are rejected.
 
 ## Declare developer extensions
 

@@ -11,12 +11,12 @@ Application, filesystem store or activation service.
 
 | Owner | Responsibility |
 |---|---|
-| Improvement | Stage transitions, evidence identity, hard budgets, scheduling, lifecycle hooks and result retention |
+| Improvement | Stage transitions, evidence identity, independent stage times, scheduling, lifecycle hooks and result retention |
 | [Core](../core/README.md) | Existing messages, tools, Provider and Agent loop contracts |
 | [Lab](../lab/improvement/README.md) | Editors, assessors, selection/exploration/soft stopping, research, delivery validation, strategies and adapters |
 | [Catalog](../lab/catalog/README.md) | Configuration, supported fields, dependencies and assembly |
 | [Run](../run/improvement/README.md) / Application | Composition, durable records, publication and explicit activation |
-| [Eval](../../eval/improvement/README.md) | Optional benchmark runners and benchmark episode adapters |
+| [Eval](../../fruitfly_eval/improvement/README.md) | Optional benchmark runners and benchmark episode adapters |
 
 A generator proposes an evidence-grounded candidate; an executor supplies its
 receipt; a selector chooses an existing completed result; an independent verifier
@@ -35,7 +35,7 @@ or close it explicitly; borrowed ports remain caller-owned.
 | Module | Purpose |
 |---|---|
 | [Contracts](contracts/README.md) | Materials, snapshots, stages, receipts, failures and identities |
-| [Workflow](workflow/README.md) | Shared search engine, controller and hierarchical accounting |
+| [Workflow](workflow/README.md) | Shared search engine, controller and usage observation |
 | [Execution](execution/README.md) | Bounded queues, handles, immutable events and batch execution |
 | [Components](components/README.md) | Owner registry, exact component set and publication binding validation |
 | [Evidence](evidence/README.md) | Immutable receipt/report reading |
@@ -43,7 +43,7 @@ or close it explicitly; borrowed ports remain caller-owned.
 
 [Lab termination](../lab/improvement/termination/README.md) supplies concrete soft
 stop conditions. [Lab research](../lab/improvement/research/README.md) supplies
-research context, progress analysis and finalization reserves; none belongs in
+research context and progress analysis; none belongs in
 the kernel merely because it affects task success.
 
 ## Handle failure without inventing success
@@ -55,12 +55,12 @@ unsupported promotion; failed selection retains the incumbent. A failed referenc
 can support diagnosis only when its granted facts explicitly mark useful observed
 execution. Diagnostic evidence supplies no missing score or verification.
 
-Root cancellation, exhausted root deadlines, mismatched immutable identities,
+User cancellation, mismatched immutable identities,
 failed persistence and unconfirmed cleanup stop work. Cancellation propagates;
 unknown model work is never automatically replayed. The host journals execution
 receipts, validated candidates and selection checkpoints as work completes.
 Checkpoints support inspection, not transparent resumption of uncertain work.
-Cleanup attempts all owned resources, returns unused quota and reports failures.
+Cleanup attempts all owned resources and reports failures.
 Trusted plugins must cooperate with cancellation; Python cannot forcibly stop an
 arbitrary plugin or certify external process termination.
 

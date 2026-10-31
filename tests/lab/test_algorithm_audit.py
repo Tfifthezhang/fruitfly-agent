@@ -15,9 +15,6 @@ from fruitfly_agent.lab.context_manager.augmentation.information import (
 from fruitfly_agent.lab.context_manager.augmentation.information.application import (
     INFORMATION_BLOCK_START, INFORMATION_BLOCK_END,
 )
-from fruitfly_agent.lab.context_manager.reduction import (
-    SummarizingCompactor, SummarizingCompactorConfig,
-)
 from fruitfly_agent.lab.context_manager.reduction.cut import find_cut_point
 from tests.support.faux_provider import FauxProvider
 from fruitfly_agent.core.tool_runtime import ToolCallContext
@@ -146,12 +143,4 @@ class EnvironmentAuditTests(unittest.IsolatedAsyncioTestCase):
         finally:
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)
-
-
-class ReductionAuditTests(unittest.IsolatedAsyncioTestCase):
-    async def test_disabled_summarizer_never_proposes_overflow_projection(self):
-        provider = FauxProvider()
-        compactor = SummarizingCompactor(SummarizingCompactorConfig(enabled=False), provider)
-        self.assertIsNone(await compactor.react_to_overflow(_snapshot(), RuntimeError()))
-        self.assertEqual([], provider.calls)
 

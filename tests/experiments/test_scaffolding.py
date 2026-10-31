@@ -24,7 +24,7 @@ class ScaffoldingTests(unittest.TestCase):
         original_import = builtins.__import__
 
         def without_eval(name, *args, **kwargs):
-            if name == 'eval' or name.startswith('eval.'):
+            if name == 'fruitfly_eval' or name.startswith('fruitfly_eval.'):
                 raise AssertionError('native init imported Eval')
             return original_import(name, *args, **kwargs)
 
@@ -48,9 +48,9 @@ class ScaffoldingTests(unittest.TestCase):
         self.assertFalse((self.root / '.fruitfly/experiments/runs').exists())
 
     def test_benchmark_init_uses_catalog_and_works_from_another_process_directory(self):
-        from eval.benchmarks.terminal_bench_4 import TerminalBench4Adapter
-        from eval.contracts import EvaluationRequest
-        from eval.harbor.host import HostConfig
+        from fruitfly_eval.benchmarks.terminal_bench_4 import TerminalBench4Adapter
+        from fruitfly_eval.contracts import EvaluationRequest
+        from fruitfly_eval.harbor.host import HostConfig
         output = io.StringIO()
         with patch.object(TerminalBench4Adapter, 'preflight', side_effect=AssertionError('preflight')), \
              patch('fruitfly_agent.providers.registry.ProviderRegistry.create', side_effect=AssertionError('model')), \
@@ -70,7 +70,7 @@ class ScaffoldingTests(unittest.TestCase):
                                    'FRUITFLY_EVAL_VENV': '/opt/fixture-agent'}, clear=True):
             host = HostConfig.read(self.root, config.resolve(row['host']))
             self.assertEqual(host.cache, self.root / '.fruitfly/eval-cache')
-            with patch('eval.api.prepare_evaluation', return_value={'task_count': 1}) as prepare, \
+            with patch('fruitfly_eval.api.prepare_evaluation', return_value={'task_count': 1}) as prepare, \
                  redirect_stdout(io.StringIO()):
                 self.assertEqual(main(['--cwd', str(self.root), 'eval', 'prepare', '--tasks-only']), 0)
             actual_request = prepare.call_args.args[0]
@@ -80,7 +80,7 @@ class ScaffoldingTests(unittest.TestCase):
                          len(workspace_templates(source='task-set', benchmark='terminal-bench-4')) + 1)
 
     def test_generated_task_set_checks_with_prepared_material_from_another_directory(self):
-        from eval.improvement.configuration import resolve_benchmark
+        from fruitfly_eval.improvement.configuration import resolve_benchmark
         from dataclasses import replace
         initialize_workspace(self.root, source='task-set', benchmark='terminal-bench-4')
         config = load_configuration(self.root)
@@ -90,7 +90,9 @@ class ScaffoldingTests(unittest.TestCase):
         (instruction / 'instruction.md').write_text('Offline fixture task, without private grading.')
         project = Path(__file__).resolve().parents[2]
         source_files = [(str(path.relative_to(project)), hashlib.sha256(path.read_bytes()).hexdigest())
-            for package in ('fruitfly_agent', 'eval') for path in (project / package).rglob('*.py')]
+            for package in ('fruitfly_agent', 'fruitfly_eval') for path in (project / package).rglob('*.py')]
+        resource = 'fruitfly_agent/run/configuration/templates/components/H/execution-policy.yaml'
+        source_files.append((resource, hashlib.sha256((project / resource).read_bytes()).hexdigest()))
         prepared = {'id': 'offline-prepared-fixture',
             'tasks': [{'id': 'terminal-bench/interleaved-vigenere', 'path': str(instruction)}],
             'runtime': {'installation': {'files': source_files}}}
@@ -99,7 +101,7 @@ class ScaffoldingTests(unittest.TestCase):
                 'FRUITFLY_EVAL_PYTHON_ROOT': '/opt/fixture-python',
                 'FRUITFLY_EVAL_VENV': '/opt/fixture-agent'}, clear=True), \
              patch('fruitfly_agent.providers.registry.ProviderRegistry.create', side_effect=AssertionError('model')), \
-             patch('eval.improvement.task_sets.load_preparation', return_value=prepared), \
+             patch('fruitfly_eval.improvement.task_sets.load_preparation', return_value=prepared), \
              redirect_stdout(output):
             resolve_benchmark(replace(config, task={k: v for k, v in collection.items() if k != 'id'})).stage_host()
             self.assertNotEqual(Path.cwd().resolve(), self.root)
@@ -107,7 +109,9 @@ class ScaffoldingTests(unittest.TestCase):
             summary = json.loads(output.getvalue())
             self.assertEqual(summary['task_set']['collections'][0]['tasks'], 1)
             self.assertEqual(summary['multi_task']['execution']['concurrency'], 1)
-            self.assertEqual(summary['request']['component_ids'], ['base_prompt'])
+            self.assertIn('base_prompt', summary['request']['component_ids'])
+            self.assertIn('working-memory-reduction', summary['request']['component_ids'])
+            self.assertNotIn('improvement-editor', summary['request']['component_ids'])
             self.assertEqual(summary['execution']['max_tool_calls_per_turn'], 64)
             # Relative paths must still be inside the declared experiment workspace.
             request_path = config.resolve(collection['request'])

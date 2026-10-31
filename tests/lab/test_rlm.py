@@ -136,9 +136,9 @@ class ModelQueryBrokerTest(unittest.IsolatedAsyncioTestCase):
                 await broker.handle('model.query', {'prompt': 'task'})
             health = await broker.health()
             self.assertEqual(health['calls'], 1)
-            self.assertEqual(health['estimated_or_actual_tokens'], 15)
+            self.assertEqual(health['reported_tokens'], 15)
 
-    async def test_query_is_text_only_and_enforces_call_budget(self) -> None:
+    async def test_query_is_text_only_and_observes_calls_without_a_quota(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             provider = FauxProvider()
             provider.respond_text("child result")
@@ -148,11 +148,11 @@ class ModelQueryBrokerTest(unittest.IsolatedAsyncioTestCase):
                 profile="child-profile",
                 store=SessionArtifactStore(Path(tmp), max_artifact_bytes=10_000),
                 config=ModelQueryConfig(
-                    max_calls=1,
+                    
                     max_concurrent=1,
                     max_input_chars=100,
                     max_output_tokens=20,
-                    max_total_tokens=100,
+                    
                     max_inline_result_chars=100,
                     timeout_seconds=5,
                 ),
@@ -167,8 +167,10 @@ class ModelQueryBrokerTest(unittest.IsolatedAsyncioTestCase):
             self.assertEqual("child-profile", result["model_profile"])
             self.assertEqual([], provider.calls[0]["tools"])
             self.assertEqual(10, provider.calls[0]["max_tokens"])
-            with self.assertRaisesRegex(RuntimeError, "call budget exhausted"):
-                await broker.handle("model.query", {"prompt": "again"})
+            provider.respond_text("second result")
+            second = await broker.handle("model.query", {"prompt": "again"})
+            self.assertEqual(second["text"], "second result")
+            self.assertEqual(len(provider.calls), 2)
 
 
 class IpythonRuntimeTest(unittest.IsolatedAsyncioTestCase):
@@ -339,7 +341,7 @@ class RlmPipelineTest(unittest.IsolatedAsyncioTestCase):
                 selections=(
                     MechanismSelection("context-history"),
                     MechanismSelection(
-                        "compaction",
+                        "working-memory-reduction",
                         parameters={},
                     ),
                     MechanismSelection(

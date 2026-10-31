@@ -8,9 +8,9 @@ import unittest
 
 import yaml
 
-from eval.runtime import prepare_runtime
-from eval.installation import installation_identity
-from eval.contracts import EvaluationRequest
+from fruitfly_eval.runtime import prepare_runtime
+from fruitfly_eval.installation import installation_identity
+from fruitfly_eval.contracts import EvaluationRequest
 from fruitfly_agent.lab.catalog import load_system_config
 
 
@@ -44,7 +44,7 @@ class RuntimeStagingTests(unittest.TestCase):
     def fixture(self, root):
         state = root / ".fruitfly"
         state.mkdir()
-        profile = profile_document(catalog="models.yaml", executor="main", mechanisms=[{"id": n} for n in ("local-env", "read-tool", "bash-tool", "context-history", "compaction")])
+        profile = profile_document(catalog="models.yaml", executor="main", mechanisms=[{"id": n} for n in ("local-env", "read-tool", "bash-tool", "context-history", "working-memory-reduction")])
         (state / "default-config.yaml").write_text(yaml.safe_dump({
             "default_profile": "baseline", "profiles": {"baseline": profile}}))
         spec = {'sdk': 'openai', 'protocol': 'responses', "model": "fixture", "context_window": 32768,
@@ -83,8 +83,8 @@ class RuntimeStagingTests(unittest.TestCase):
                 self.assertNotIn(b"fixture-not-a-real-key", body)
                 self.assertNotIn(b"not-for-container", body)
             normalized = [item.to_dict() for item in load_system_config(config).select().mechanisms]
-            compaction = next(m for m in normalized if m["id"] == "compaction")
-            self.assertIn("keep_recent_tokens", compaction["parameters"])
+            compaction = next(m for m in normalized if m["id"] == "working-memory-reduction")
+            self.assertIn("memory_tokens", compaction["parameters"])
 
     def test_missing_default_fails_without_falling_back_and_credentials_are_checked_offline(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -125,18 +125,15 @@ class RuntimeStagingTests(unittest.TestCase):
                 'default_profile': 'baseline', 'profiles': {'baseline': {
                     'models': {'catalog': 'models.yaml', 'roles': {
                         'executor': 'main', 'editor': 'editor', 'assessor': 'editor'}},
-                    'H': {'execution-policy': component('execution-policy', 'H', {'max_tool_calls_per_turn': 128}),
-                          'base_prompt': component('base_prompt', 'H', {'text': 'Exact prompt.\n'})},
-                    'I': {'improvement-feedback': component('improvement-feedback', 'I', {
-                        'evidence': {'page_characters': 23}, 'judgment_guidance': 'Inspect loops.'}),
-                          'improvement-search': component('improvement-search', 'I', {'rounds': 2})}}}}))
+                    'H': {'execution-policy': component('execution-policy', 'H', {'settings': {'max_tool_calls_per_turn': 128}}),
+                          'base_prompt': component('base_prompt', 'H', {'instructions': {'system': 'Exact prompt.\n'}})},
+                    'I': {'improvement-evaluator': component('improvement-evaluator', 'I', {
+                        'instructions': {'assess': 'Inspect loops.'}})}}}}))
             generated, models, names = prepare_runtime(runtime={'working_directory': str(root)},
                 output_dir=output, environment={'SHARED_KEY': 'fixture'})
             staged = load_system_config(generated).select()
             self.assertNotIn('schema_version', yaml.safe_load(generated.read_text()))
-            self.assertEqual(staged.component_settings['feedback']['evidence']['page_characters'], 23)
-            self.assertEqual(staged.component_settings['feedback']['judgment_guidance'], 'Inspect loops.')
-            self.assertEqual(staged.component_settings['search']['rounds'], 2)
+            self.assertEqual(staged.component_settings['evaluator']['instructions']['assess'], 'Inspect loops.')
             self.assertEqual(staged.execution['max_tool_calls_per_turn'], 128)
             self.assertEqual(staged.artifact_contents[staged.prompt], 'Exact prompt.\n')
             self.assertEqual(staged.model_roles['editor'], 'editor')
@@ -155,7 +152,7 @@ class RuntimeStagingTests(unittest.TestCase):
                     'max_context_recovery_attempts': 3,
                     'tool_execution': {'max_parallel': 2, 'default_execution_mode': 'sequential'}}
                 profile['H']['execution-policy'] = {'inline': {'id': 'execution-policy',
-                    'role': 'H', 'implementation': 'execution-policy', 'parameters': execution}}
+                    'role': 'H', 'implementation': 'execution-policy', 'parameters': {'settings': execution}}}
                 (state / 'default-config.yaml').write_text(yaml.safe_dump({
                     'default_profile': 'baseline', 'profiles': {'baseline': profile}}))
                 config, _, _ = prepare_runtime(runtime={'working_directory': str(root)}, output_dir=output)
@@ -175,7 +172,7 @@ class RuntimeStagingTests(unittest.TestCase):
             with self.subTest(value=value), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 state, profile, output = self.fixture(root)
-                profile['H']['execution-policy']['inline']['parameters'] = value
+                profile['H']['execution-policy']['inline']['parameters'] = {'settings': value}
                 (state / 'default-config.yaml').write_text(yaml.safe_dump({
                     'default_profile': 'baseline', 'profiles': {'baseline': profile}}))
                 with self.assertRaisesRegex(ValueError, 'execution'):
@@ -247,7 +244,7 @@ class RuntimeStagingTests(unittest.TestCase):
                                          "working_directory": str(root)}, output_dir=output)
 
     def test_installation_identity_ignores_local_state_and_tracks_source_bytes(self):
-        from eval.installation import SOURCE_FILES, SOURCE_PACKAGES
+        from fruitfly_eval.installation import SOURCE_FILES, SOURCE_PACKAGES
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             for name in SOURCE_PACKAGES:

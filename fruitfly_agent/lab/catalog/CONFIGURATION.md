@@ -14,7 +14,7 @@ algorithm-specific parsing to Run, the terminal or Eval.
 | Tool, environment, context mechanism, retained document | Owning Lab module, composed by Catalog |
 | Candidate generator | Improvement `GeneratorRegistry` |
 | Search and next-seed policy | Improvement strategy/exploration registries |
-| Completed assessor | Assessment registry |
+| Completed assessment/comparison | Shared prompt-driven model evaluator |
 | Task execution | Execution registry |
 | Model protocol | Providers |
 
@@ -141,12 +141,23 @@ materialization, without creating a runtime or opening a service.
 
 ## Expose parameter candidates
 
+Declare `MechanismDefinition.parameter_paths` to map installer parameter names to
+public `instructions.*`, `settings.*` or `content.*` paths. The ordinary loader,
+inspection, candidate export and activation use the same codec in `parameters.py`.
+`editable_parameters` defaults scalar descriptor paths to `settings.<name>`;
+owners map model-facing prompts and retained content explicitly. Every editable
+field needs a nonempty description, type, current/default value and constraints.
+Optimization descriptions and experiment grants use the exact full
+`parameters.<category>.<name>` path. Internal installer names are not a second
+public configuration format.
+
+
 [Parameter adapters](../improvement/components/README.md#edit-owner-parameters)
-reuse ordinary normalization and assembly. Built-in Bash, reduction, measurement, Web and
+reuse ordinary normalization and assembly. Built-in Bash, working memory, context history, Web and
 IPython owners declare explicit editable parameter whitelists. Discovery still
 constructs no clients. Their targets require `configuration-materialization`;
-unsupported runners reject the edit. I editor tool allowance and feedback access
-policy use fixed-I comparison instead of ordinary task scores. Authorize fields
+unsupported runners reject the edit. I editor/evaluator prompts use fixed-I comparison instead
+of ordinary task scores. Evidence response page size and independent phase times remain fixed experiment settings. Authorize fields
 and numeric bounds through the existing experiment grants; model bindings and
 secret values are not editable parameters.
 

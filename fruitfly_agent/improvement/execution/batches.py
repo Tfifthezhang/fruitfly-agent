@@ -1,11 +1,10 @@
-"""Execute batches through a shared bounded queue and per-trial child allocations."""
+"""Execute batches through a shared bounded queue and independent leaf invocations."""
 import asyncio
 from dataclasses import asdict, replace
 from uuid import uuid4
 from fruitfly_agent.improvement.contracts.evaluation import CandidateEvaluation, TrialResult
 from fruitfly_agent.improvement.contracts.versions import canonical_json
 from fruitfly_agent.improvement.contracts.assessment import AssessmentUnavailable
-from fruitfly_agent.improvement.workflow.budget import AllocationExhausted
 from fruitfly_agent.improvement.workflow.services import WorkflowServices
 from fruitfly_agent.improvement.execution.facts import ensure_facts
 from fruitfly_agent.improvement.execution.scheduler import TaskScheduler
@@ -24,8 +23,6 @@ class BatchEvaluator:
         self.backends = {e.key: binding for binding in bindings for e in binding.entries}
         self.scheduler = context.services.own(TaskScheduler(settings.execution.concurrency))
         self.cache, self.evaluations, self.batch_cache = ({}, [], {})
-        self.condition = asyncio.Condition()
-        self.in_flight = 0
 
     def persist(self, kind, name, value):
         reference = self.context.artifacts.put(canonical_json(value).encode())
@@ -75,19 +72,14 @@ class BatchEvaluator:
 
     async def trial(self, plan, harness, entry, attempt, *, assess=True):
         parent = self.context.services
-        async with self.condition:
-            while entry.model_limit > parent.budget.available('model') or parent.budget.available('execution') < entry.execution_limit:
-                if not self.in_flight:
-                    raise AllocationExhausted('remaining allowance cannot fund the next task')
-                await self.condition.wait()
-                parent.check()
-            scope = parent.budget.child({'model': entry.model_limit, 'execution': entry.execution_limit})
-            self.in_flight += 1
-        services = WorkflowServices(plan, budget=scope, record=lambda event, **fields: parent.record(event, task_key=entry.key, attempt=attempt, **fields))
+        services = WorkflowServices(plan, signal=parent.signal,
+            record=lambda event, **fields: parent.record(event, task_key=entry.key, attempt=attempt, **fields))
+        services.evidence_builder = parent.evidence_builder
+        services.hypotheses = parent.hypotheses
         context = replace(self.context, services=services)
         record = measurement = None
         error = ''
-        parent.record('trial-started', task_key=entry.key, attempt=attempt, harness_id=harness.snapshot_id, model_limit=entry.model_limit)
+        parent.record('trial-started', task_key=entry.key, attempt=attempt, harness_id=harness.snapshot_id)
         try:
             binding = self.backends[entry.key]
             try:
@@ -98,12 +90,12 @@ class BatchEvaluator:
                 raise IntegrityError('task collection changed during execution')
             ports = binding.build(context)
             runner = services.own(ports.runner)
-            services.reserve('execution', getattr(runner, 'execution_charge', 1))
+            services.observe('execution', getattr(runner, 'execution_charge', 1))
             record = await run_stage(services, 'execute', lambda: runner.execute(plan, entry.task, harness),
                 validator=lambda value: require_type(value, ExecutionRecord))
             if record.task_id != entry.task.task_id or record.material_id != entry.task.material_id or record.harness_id != harness.snapshot_id or (record.conditions_id != plan.conditions_id) or (record.initial_state_id != plan.parent.state):
                 raise IntegrityError('trial receipt differs from frozen task, harness or conditions')
-            record = ensure_facts(record, context.artifacts)
+            record = services.prepare_evidence(entry.task,record,context.artifacts)
             if record.status == 'completed' and ports.measurements is not None:
                 measurement = await run_stage(services, 'measure', lambda: ports.measurements.measure(entry.task, record),
                     validator=lambda value: require_type(value, Measurement, optional=True))
@@ -112,16 +104,21 @@ class BatchEvaluator:
             if self.assessment is not None and assess:
                 record, values = await run_stage(services, 'assess', lambda: self.assessment.assess(entry.task, record),
                     validator=lambda value: validate_assessment_result(value, record))
-                await run_stage(services, 'assess', lambda: self.assessment.ensure_available())
-        except (AllocationExhausted, AssessmentUnavailable, IntegrityError, asyncio.CancelledError) as exc:
+        except (AssessmentUnavailable, IntegrityError, asyncio.CancelledError) as exc:
             error = type(exc).__name__
             raise
         except StageFailure as exc:
-            parent.budget.check_root()
+            parent.check()
             record = exc.record
             if record is not None and (record.task_id != entry.task.task_id or record.material_id != entry.task.material_id or record.harness_id != harness.snapshot_id or (record.conditions_id != plan.conditions_id) or (record.initial_state_id != plan.parent.state)):
                 raise IntegrityError('interrupted receipt differs from frozen task or conditions')
             error = exc.failure.code
+            if exc.failure.stage == 'execute' and error == 'timeout':
+                from .facts import timed_out
+                record = record or ExecutionRecord('timeout-' + uuid4().hex, entry.task.task_id,
+                    entry.task.material_id, harness.snapshot_id, plan.parent.state,
+                    plan.conditions_id, 'error', 'Execution timed out before a complete receipt.')
+                record = services.prepare_evidence(entry.task, timed_out(record, context.artifacts), context.artifacts)
         except Exception as exc:
             parent.check()
             error = type(exc).__name__
@@ -131,10 +128,7 @@ class BatchEvaluator:
                 if record is not None:
                     parent.record('leaf-receipt', task_key=entry.key, attempt=attempt, receipt=asdict(record), measurement=asdict(measurement) if measurement is not None else None)
             finally:
-                try:
-                    await services.close()
-                finally:
-                    async with self.condition:
-                        self.in_flight -= 1
-                        self.condition.notify_all()
+                await services.close()
+                for kind, amount in services.used.items():
+                    parent.observe(kind, amount)
         return TrialResult(entry.key, attempt, record, measurement, error)

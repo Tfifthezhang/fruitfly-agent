@@ -15,7 +15,7 @@ class SearchStrategyTests(unittest.IsolatedAsyncioTestCase):
         from fruitfly_agent.lab.improvement.editor.instructions import EditorInstructions, EditorInstructionTarget
         current = EditorInstructions()
         target = EditorInstructionTarget(current)
-        self.assertEqual(target.snapshot().schema, 'editor-instructions-v3')
+        self.assertEqual(target.snapshot().schema, 'editor-instructions')
         target.validate(target.snapshot().text)
         value = json.loads(current.serialize())
         value.pop('propose')

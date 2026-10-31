@@ -8,18 +8,16 @@ import asyncio
 from fruitfly_agent.improvement.contracts.candidates import CandidateBundle
 from typing import Callable
 from uuid import uuid4
-from contextlib import contextmanager
 
 from fruitfly_agent.improvement.contracts.plans import RunPlan
-from fruitfly_agent.lab.improvement.api import ComponentWorkflow, GeneratorRegistry, AgentGenerator, AgentComposer, AgentEditor, AgentSelector, AgentReflector, component_registry, experience_id, SearchActivity, SearchCompletion, model_completion, ExecutionContext, builtin_executions, bundle_target, bundle_text, ReadOnlyInspector, policy_spec, builtin_strategies, ProcessAssessmentSettings, ExplorationSettings, builtin_completed_assessors, builtin_explorations, validate_process_configuration, CompletedAssessmentService, process_settings_values, install_workflow_mechanisms, extension_spec
+from fruitfly_agent.lab.improvement.api import ComponentWorkflow, GeneratorRegistry, AgentGenerator, AgentComposer, AgentEditor, AgentSelector, AgentReflector, component_registry, experience_id, SearchActivity, SearchCompletion, model_completion, ExecutionContext, builtin_executions, bundle_target, bundle_text, ReadOnlyInspector, policy_spec, builtin_strategies, ExplorationSettings, builtin_explorations, validate_exploration, CompletedAssessmentService, exploration_settings, install_workflow_mechanisms, extension_spec, evaluator_instructions, organize_evidence
 from fruitfly_agent.improvement.workflow.services import WorkflowServices
-from fruitfly_agent.improvement.workflow.budget import AllocationExhausted
 from fruitfly_agent.improvement.evidence.reporting import SearchReport
 from fruitfly_agent.improvement.contracts.editing import EvidenceInspector
 from fruitfly_agent.improvement.contracts.experiments import ExecutionRequest
 from fruitfly_agent.improvement.contracts.components import HarnessSnapshot
 from fruitfly_agent.improvement.contracts.validation import relative_path
-from fruitfly_agent.improvement.contracts.versions import SystemVersion, content_hash
+from fruitfly_agent.improvement.contracts.versions import SystemVersion, content_hash, canonical_json
 from fruitfly_agent.rsi.contracts import VerificationEvidence
 from fruitfly_agent.interactive.contracts.improvement import (WorkflowConfiguration,
     WorkflowChoice, WorkflowComponentView, ImprovementParameterView, ImprovementPreview, WorkflowExecutionView)
@@ -45,7 +43,9 @@ class RunComponentJobs:
                  targets, generators=None, runner=None, composer=None, selector=None,
                  reflector=None, verifier=None, measurements=None, workflow_factory=None,
                  tasks=None, publish=None, editor=None, inspector=None, components=None, executions=None, stop_policy=None, strategies=None,
-                 process_assessment=None, exploration=None, completed_assessors=None, explorations=None, component_options=None, hooks=None, delivery_backend=None):
+                 exploration=None, explorations=None, component_options=None, hooks=None, delivery_backend=None, workflow_settings=None, evidence_settings=None):
+        self.workflow_settings = dict(workflow_settings or {})
+        self.evidence_settings = dict(evidence_settings or {})
         self.component_options = json.loads(json.dumps(component_options or {}, allow_nan=False))
         self.workspace, self.artifacts = Path(workspace), ArtifactPort(artifacts)
         self.experience, self.manifest, self.version = experience, manifest, version
@@ -71,32 +71,17 @@ class RunComponentJobs:
         self.stop_policy = stop_policy
         self.hooks_factory = hooks
         self.delivery_backend = delivery_backend
-        self.process_settings = process_assessment or ProcessAssessmentSettings()
-        self.exploration_settings = exploration or ExplorationSettings()
-        self.process_from_system = process_assessment is None
-        self.exploration_from_system = exploration is None
-        self.completed_assessors = completed_assessors or builtin_completed_assessors()
+        self.exploration_settings = exploration
         self.explorations = explorations or builtin_explorations()
-        validate_process_configuration(self.process_settings, self.exploration_settings,
-            self.completed_assessors, self.explorations)
+        if exploration is not None:
+            validate_exploration(exploration, self.explorations)
         self.verification_uses = VerificationUseStore(self.workspace / '.fruitfly/improvement/verification-uses.json')
         self.previews = {}
         self.services = None
         self.outcome = None
         self._completion = None
         self.running_improver = None
-        self.shared_budget = None
-
-    @contextmanager
-    def budget_scope(self, budget):
-        if self.services is not None or self.shared_budget is not None:
-            raise ValueError('improvement budget is already in use')
-        self.shared_budget = budget
-        try:
-            yield
-        finally:
-            self.shared_budget = None
-
+        self.observed_usage = {'model': 0, 'execution': 0}
     def registry(self):
         registry = self.component_factory(tuple(self.targets()))
         registry.configure(self.component_options)
@@ -104,7 +89,7 @@ class RunComponentJobs:
 
     def identity(self, *, system_settings=None):
         values = self.system_settings() if system_settings is None else system_settings
-        process, exploration = self.process_configuration(values)
+        exploration = self.exploration_configuration(values)
         def identity(value, default):
             return getattr(value, 'implementation_id',
                 getattr(value, '__module__', type(value).__module__) + '.' +
@@ -125,26 +110,22 @@ class RunComponentJobs:
                 'hooks': extension_spec(self.hooks_factory),
                 'delivery_backend': extension_spec(self.delivery_backend),
                 'component_options': self.component_options,
-                'process_assessment': asdict(process),
-                'completed_assessors': [(d.assessor_id, d.implementation_id) for d in self.completed_assessors.definitions()],
+                'workflow_settings': self.workflow_settings, 'evidence_settings': self.evidence_settings,
                 'exploration': {**asdict(exploration),
                     'implementation_id': self.explorations.get(exploration.policy).implementation_id}}
 
-    def process_configuration(self, values=None):
-        process, exploration = process_settings_values(self.system_settings() if values is None else values)
-        process = process if self.process_from_system else self.process_settings
-        exploration = exploration if self.exploration_from_system else self.exploration_settings
-        validate_process_configuration(process, exploration, self.completed_assessors, self.explorations)
-        return process, exploration
+    def exploration_configuration(self, values=None):
+        value = self.exploration_settings or exploration_settings(self.system_settings() if values is None else values)
+        validate_exploration(value, self.explorations)
+        return value
 
     def completed_assessment(self, services):
-        return CompletedAssessmentService(self.process_configuration()[0],
-            config=self.assessor_configuration() if self.assessor_configuration else self.editor_configuration(),
-            artifacts=self.artifacts, services=services, registry=self.completed_assessors,
-            instructions=self.system_settings().get('feedback', {}))
+        return CompletedAssessmentService(config=self.assessor_configuration() if self.assessor_configuration else self.editor_configuration(),
+            artifacts=self.artifacts, services=services,
+            instructions=self.system_settings().get('evaluator', {}), evidence_settings=self.evidence_settings)
 
     def exploration_policy(self, services):
-        return self.explorations.create(self.process_configuration()[1].policy, own=services.own)
+        return self.explorations.create(self.exploration_configuration().policy, own=services.own)
 
     def context(self, plan=None, services=None, experience=()):
         return ExecutionContext(self.workspace, self.artifacts, self.registry(),
@@ -154,7 +135,7 @@ class RunComponentJobs:
             remaining_verification=self.verification_uses.remaining,
             assessor_config=self.assessor_configuration() if self.assessor_configuration else self.editor_configuration(),
             completed_assessment_factory=self.completed_assessment, exploration_factory=self.exploration_policy,
-            generator_definitions=self.generators.definitions(), system_settings=self.system_settings(), hooks_factory=self.hooks_factory, delivery_backend=self.delivery_backend)
+            generator_definitions=self.generators.definitions(), system_settings=self.system_settings(), workflow_settings=self.workflow_settings, evidence_settings=self.evidence_settings, hooks_factory=self.hooks_factory, delivery_backend=self.delivery_backend)
 
     def workflow_configuration(self):
         context = self.context()
@@ -186,13 +167,13 @@ class RunComponentJobs:
              WorkflowChoice('scored', 'Measured feedback', measured, '' if measured else 'No measurement source is registered.')),
             (WorkflowChoice('task', 'Current task only'), WorkflowChoice('persistent', 'Publish a persistent candidate',
              self.publish is not None, '' if self.publish else 'Publication is unavailable.')),
-            tuple(ImprovementParameterView(name, label, kind, self.defaults().get(name, default), low, high, 'budget', description)
+            tuple(ImprovementParameterView(name, label, kind, self.defaults().get(name, default), low, high, 'timing' if name.endswith('_seconds') else 'search', description)
                 for name, label, kind, default, low, high, description in (
                     ('width', 'Exploration width', 'integer', 1, 1, 10, 'Independent proposals per diagnostic scope.'),
                     ('depth', 'Refinement depth', 'integer', 1, 1, 10, 'Successive rounds; only selected incumbents advance.'),
-                    ('max_model_calls', 'Model calls', 'integer', 64, 1, 10000, 'Root allowance includes all nested calls and verification.'),
-                    ('max_executions', 'Task executions', 'integer', 32, 1, 1000, 'Root allowance counts leaf task executions once.'),
-                    ('operation_timeout', 'Operation timeout', 'number', 120, 1, 14400, 'Seconds per operation, bounded by parent deadline.'))),
+                    ('editor_seconds', 'Editor time', 'number', 1200, 0, None, 'Independent seconds for one editing invocation.'),
+                    ('execution_seconds', 'Execution time', 'number', 3600, 0, None, 'Independent seconds for one task execution.'),
+                    ('evaluator_seconds', 'Evaluator time', 'number', 1200, 0, None, 'Independent seconds for one assessment or comparison.'))),
             primary.materials, tuple(views))
 
     def preview(self, request, *, material=None):
@@ -201,6 +182,11 @@ class RunComponentJobs:
         options = self.workflow_configuration()
         definition = self.executions.get(request.execution_id)
         view = next(v for v in options.executions if v.execution_id == request.execution_id)
+        if not request.component_ids:
+            component_ids = view.component_ids
+            if definition.component_scope is not None:
+                component_ids = definition.component_scope(self.context(), request.task_pack_id, component_ids)
+            request = replace(request, component_ids=component_ids)
         if not request.component_ids or set(request.component_ids) - set(view.component_ids):
             raise ValueError('select available editable components for this execution strategy')
         for selected, choices in ((request.generator_id, options.generators), (request.mode, options.modes),
@@ -210,20 +196,18 @@ class RunComponentJobs:
         parameters = tuple(sorted(definition.normalize(request.execution_parameters).items()))
         plan = definition.plan_factory('job-' + uuid4().hex, self.version(), request.component_ids, request.generator_id,
             request.mode, request.width, request.depth, request.scope, request.verification,
-            request.max_model_calls, request.max_executions, request.operation_timeout, request.direction)
+            timeouts=request.timeouts, direction=request.direction)
         plan = replace(plan, strategy_id=request.strategy_id, retain_experience=request.retain_experience,
             component_options=self.component_options)
         self.strategies.get(plan.strategy_id).schedule(plan)
         experience = self.experience.snapshot()
         context = self.context(plan, experience=experience)
+        plan = replace(plan, component_description_id=content_hash(canonical_json(
+            context.components.descriptions(plan.component_ids))))
+        context.plan = plan
         execution_request = ExecutionRequest(request.instruction, request.input_paths,
             request.component_ids, request.task_pack_id, request.scope, request.verification, parameters)
         prepared = definition.prepare(context, execution_request)
-        for kind, limit in (('model', plan.max_model_calls), ('execution', plan.max_executions)):
-            if prepared.minimum_budget.get(kind, 0) > limit:
-                raise ValueError(f'root {kind} budget is too small; need at least {prepared.minimum_budget[kind]}')
-            if self.shared_budget is not None and prepared.minimum_budget.get(kind, 0) > self.shared_budget.available(kind):
-                raise AllocationExhausted(f'shared {kind} allowance cannot fund the next experiment minimum')
         token = uuid4().hex
         if len(self.previews) >= 16:
             self.previews.pop(next(iter(self.previews)))
@@ -237,7 +221,7 @@ class RunComponentJobs:
              ('Search strategy', plan.strategy_id),
              ('Exploration', f'{plan.mode}; width={plan.width}; depth={plan.depth}'),
              ('Feedback', plan.feedback), ('Effect scope', plan.purpose),
-             ('Model calls', str(plan.max_model_calls)), ('Task executions', str(plan.max_executions)),
+             ('Stage times', json.dumps(asdict(plan.timeouts))),
              ('Experience snapshot', experience_id(experience)),
              ('Feedback assurance', 'Development signals do not grant independent verification.'),
              *prepared.details), target='component-bundle', preview_token=token,
@@ -254,6 +238,8 @@ class RunComponentJobs:
                 or experience_id(self.experience.snapshot()) != experience_id(experience)
                 or prepared.current_source() != prepared.source_id):
             raise ValueError('task improvement conditions changed; preview again')
+        if content_hash(canonical_json(self.registry().descriptions(plan.component_ids))) != plan.component_description_id:
+            raise ValueError('component descriptions changed; preview again')
         root = self.workspace / '.fruitfly/improvement/jobs' / plan.job_id
         if not root.resolve().is_relative_to(self.workspace.resolve()):
             raise ValueError('job records must remain inside the workspace')
@@ -283,15 +269,8 @@ class RunComponentJobs:
                     stream.write(json.dumps({'event': 'candidate-configuration', 'candidate_id': candidate.candidate_id,
                         'config': str(path.relative_to(self.workspace)), 'conditions_id': plan.conditions_id}) + '\n')
                     stream.flush()
-        scope = None
-        if self.shared_budget is not None:
-            try:
-                scope = self.shared_budget.child({'model': min(plan.max_model_calls, self.shared_budget.available('model')),
-                    'execution': min(plan.max_executions, self.shared_budget.available('execution'))})
-            except BaseException:
-                stream.close()
-                raise
-        services = WorkflowServices(plan, record=record, budget=scope)
+        services = WorkflowServices(plan, record=record)
+        services.evidence_builder = organize_evidence
         self.services, self.running_improver, self.outcome = services, self, None
         self._completion = None
         stop = 'error'
@@ -300,11 +279,7 @@ class RunComponentJobs:
             if self.editor_factory is AgentEditor:
                 editor = self.editor_factory(self.editor_configuration(), self.artifacts, registry,
                     instructions=self.editor_instructions(),
-                    max_turns=self.system_settings().get('editor', {}).get('max_turns', 12),
-                    max_tool_calls=self.system_settings().get('editor', {}).get('max_tool_calls', 48),
-                    page_characters=self.system_settings().get('feedback', {}).get('evidence', {}).get('page_characters', 12000),
-                    projection=self.system_settings().get('feedback', {}).get('evidence', {}).get('projection', 'granted-full'),
-                    access_mode=self.system_settings().get('feedback', {}).get('evidence', {}).get('access_mode', 'search'))
+                    page_characters=self.evidence_settings.get('page_characters', 12000))
             else:
                 editor = self.editor_factory(self.editor_configuration(), self.artifacts, registry)
             services.own(editor)
@@ -313,7 +288,8 @@ class RunComponentJobs:
             inspector = (self.inspector_factory(assessment_config, self.artifacts, registry)
                 if self.inspector_factory is not None
                 else ReadOnlyInspector(assessment_config, self.artifacts, registry,
-                                 instructions=self.editor_instructions()))
+                                 instructions=self.editor_instructions(),
+                                 evaluator_instructions=evaluator_instructions(self.system_settings()), evidence_settings=self.evidence_settings))
             services.own(inspector)
             context = self.context(plan, services, experience)
             context.components = registry
@@ -335,8 +311,6 @@ class RunComponentJobs:
             context.save_record = save_record
             ports = definition.build(context, prepared)
             runner = services.own(ports.runner)
-            if plan.purpose == 'persistent' and any(ports.verification_reserve.values()):
-                services.protect_verification(ports.verification_reserve)
             stop_policy = install_workflow_mechanisms(context, stop_policy=self.stop_policy)
             composer = self.composer_factory(plan, services) if self.composer_factory else AgentComposer()
             services.own(composer)
@@ -396,17 +370,20 @@ class RunComponentJobs:
             services.record('workflow-interrupted', stop_reason=stop, error=type(exc).__name__)
             raise
         finally:
+            for kind, amount in services.used.items():
+                self.observed_usage[kind] += amount
             try:
                 await services.close()
             finally:
                 self.running_improver, self.services = None, None
                 stream.close()
             view = result_view(self.outcome)
-            uncertain = services.uncertain_model_allowance
+            from fruitfly_agent.improvement.evidence.reporting import token_usage
+            rows = [{**row, 'kind': row['event']}
+                    for row in (json.loads(line) for line in (root / 'events.jsonl').read_text().splitlines())]
             self._completion = SearchCompletion(SearchReport(stop_reason=stop,
-                model_calls=services.used['model'] - uncertain, model_limit=plan.max_model_calls,
-                uncertain_model_allowance=uncertain,
-                trial_calls=services.used['execution'], trial_limit=plan.max_executions),
+                tokens=token_usage(rows, services.used['model']),
+                model_calls=services.used['model'], trial_calls=services.used['execution']),
                 (('Component job', str(root.relative_to(self.workspace))),
                  ('Assurance', self.outcome.decision.assurance if self.outcome and self.outcome.decision else 'unavailable'),
                  *(((view['label'], view['id']),) if view['id'] else ()),
@@ -473,8 +450,7 @@ class RunComponentJobs:
             return None
         used, plan = self.services.used, self.services.plan
         phase = self.services.events[-1][0] if self.services.events else 'Preparing task'
-        return SearchActivity(phase, model_calls=used['model'], model_limit=plan.max_model_calls,
-                              trial_calls=used['execution'], trial_limit=plan.max_executions)
+        return SearchActivity(phase, model_calls=used['model'], trial_calls=used['execution'])
 
     def cancel(self):
         if self.services is None:

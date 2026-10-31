@@ -40,6 +40,7 @@ class EvidenceWorkspace:
         self.baseline, self.files = baseline, dict(files)
         self.writable_ids = frozenset(writable_ids)
         self.max_bytes = max_bytes
+        self.provided_ids = set()
         self.access = access or EvidenceAccess(record=record)
         self.record = record or (lambda event, **fields: None)
         if self.writable_ids - {c.component_id for c in baseline.components}:
@@ -101,8 +102,9 @@ class EvidenceWorkspace:
         files = {'context/submission.txt': response.encode('utf-8')[:120000],
                  'context/repair.json': canonical_json({'error': reason, 'evidence_ids': sorted(evidence_ids),
                      'writable_components': sorted(self.writable_ids)}).encode('utf-8')}
-        if 'context/edit-grants.json' in self.files:
-            files['context/edit-grants.json'] = self.files['context/edit-grants.json']
+        for path in ('context/edit-grants.json', 'context/component-descriptions.json'):
+            if path in self.files:
+                files[path] = self.files[path]
         repair = EvidenceWorkspace(baseline=self.baseline, files=files,
             writable_ids=self.writable_ids, record=self.record, max_bytes=self.max_bytes, access=self.access)
         repair.files = {p: data for p, data in repair.files.items() if not p.startswith('harness/')}

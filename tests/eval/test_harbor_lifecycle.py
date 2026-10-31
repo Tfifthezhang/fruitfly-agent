@@ -13,11 +13,11 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import AsyncMock, patch
 
-from eval.harbor.lifecycle import owned_containers, request_stop, retire_containers
-from eval.harbor.material import write_json
-from eval.harbor.supervisor import signal_owned, stop
-from eval.results import load_harbor_job_result, parse_harbor_job_result
-from eval.runner import run_harbor_job
+from fruitfly_eval.harbor.lifecycle import owned_containers, request_stop, retire_containers
+from fruitfly_eval.harbor.material import write_json
+from fruitfly_eval.harbor.supervisor import signal_owned, stop
+from fruitfly_eval.results import load_harbor_job_result, parse_harbor_job_result
+from fruitfly_eval.runner import run_harbor_job
 from tests.support.harbor import installed_agent_inputs, load_harbor_agent
 
 FruitFlyHarborAgent = load_harbor_agent()
@@ -84,7 +84,7 @@ class HarborLifecycleTests(unittest.TestCase):
             if command[1] == "ps":
                 return subprocess.CompletedProcess(command, 0, "owned-id\n" if len(calls) == 1 else "", "")
             return subprocess.CompletedProcess(command, 0, "", "")
-        with patch("eval.harbor.lifecycle.subprocess.run", side_effect=run):
+        with patch("fruitfly_eval.harbor.lifecycle.subprocess.run", side_effect=run):
             self.assertEqual(retire_containers(self.root, "docker", {}), ["owned-id"])
         self.assertEqual(calls[0][-1], "label=com.docker.compose.project=task-name__ab1__env")
         self.assertEqual(calls[1], ["docker", "rm", "-f", "-v", "owned-id"])
@@ -101,7 +101,7 @@ class HarborLifecycleTests(unittest.TestCase):
                 self.assertEqual(command[-1], "label=com.docker.compose.project=owned__env")
                 output = "owned-" + command[1]
             return subprocess.CompletedProcess(command, 0, output, "")
-        with patch("eval.harbor.lifecycle.subprocess.run", side_effect=run):
+        with patch("fruitfly_eval.harbor.lifecycle.subprocess.run", side_effect=run):
             retire_containers(self.root, "docker", {})
         self.assertIn(["docker", "network", "rm", "owned-network"], calls)
         self.assertIn(["docker", "volume", "rm", "owned-volume"], calls)
@@ -112,7 +112,7 @@ class HarborLifecycleTests(unittest.TestCase):
         trial = self.root / "job/actual"
         trial.mkdir(parents=True)
         (trial / "config.json").write_text('{"trial_name":"unrelated"}')
-        with patch("eval.harbor.lifecycle.subprocess.run") as docker:
+        with patch("fruitfly_eval.harbor.lifecycle.subprocess.run") as docker:
             self.assertEqual(owned_containers(self.root, "docker", {}), [])
         docker.assert_not_called()
 
@@ -120,7 +120,7 @@ class HarborLifecycleTests(unittest.TestCase):
         events = self.root / "job/trial/agent/live-events.jsonl"
         events.parent.mkdir(parents=True)
         events.write_text("evidence")
-        with patch("eval.runner.retire_containers", side_effect=RuntimeError("Docker unavailable")):
+        with patch("fruitfly_eval.runner.retire_containers", side_effect=RuntimeError("Docker unavailable")):
             with self.assertRaisesRegex(RuntimeError, "cleanup is unconfirmed"):
                 run_harbor_job([sys.executable, "-c", "pass"], environment={}, timeout=5,
                                job_root=self.root, progress=None, job_id="owned", docker="fake")
@@ -130,7 +130,7 @@ class HarborLifecycleTests(unittest.TestCase):
     def test_supervisor_pid_reuse_never_signals_an_unrelated_process(self):
         record = self.root / "process.json"
         write_json(record, {"state": "running", "pid": 12345, "start_ticks": 1, "token": "one"})
-        with patch("eval.harbor.supervisor.process_identity", return_value=(1, 2)), patch("os.kill") as kill:
+        with patch("fruitfly_eval.harbor.supervisor.process_identity", return_value=(1, 2)), patch("os.kill") as kill:
             with self.assertRaisesRegex(RuntimeError, "PID was reused"):
                 stop(record)
             signal_owned([(12345, 1)], signal.SIGKILL)
@@ -162,6 +162,20 @@ class HarborLifecycleTests(unittest.TestCase):
             asyncio.run(agent.run("task", environment, SimpleNamespace()))
         environment.stop.assert_awaited_once_with(delete=False)
 
+    def test_primary_launch_failure_survives_control_and_environment_cleanup_failures(self):
+        agent = FruitFlyHarborAgent.__new__(FruitFlyHarborAgent)
+        installed_agent_inputs(agent, self.root)
+        agent.profile = 'default'
+        primary = FileNotFoundError('runtime unavailable')
+        agent.exec_as_agent = AsyncMock(side_effect=[primary, RuntimeError('control unavailable')])
+        environment = SimpleNamespace(stop=AsyncMock(side_effect=TimeoutError('stop unavailable')))
+        with self.assertRaisesRegex(RuntimeError, 'stop unconfirmed') as caught:
+            asyncio.run(agent.run('task', environment, SimpleNamespace()))
+        self.assertIs(primary, caught.exception.__cause__)
+        self.assertIn('Primary failure type: FileNotFoundError', caught.exception.__notes__)
+        self.assertIn('Cleanup failure type: RuntimeError', caught.exception.__notes__)
+        self.assertIn('Environment stop failure type: TimeoutError', caught.exception.__notes__)
+
     def test_zero_reward_has_completed_execution_and_multiple_timeouts_survive(self):
         trial = self.root / "trial"
         trial.mkdir()
@@ -186,7 +200,7 @@ class HarborLifecycleTests(unittest.TestCase):
     def test_linux_normal_completion_preserves_task_background_services(self):
         record = self.root / "process.json"
         pid_file = self.root / "service-pid"
-        command = [sys.executable, "-m", "eval.harbor.supervisor", "--record", str(record), "--",
+        command = [sys.executable, "-m", "fruitfly_eval.harbor.supervisor", "--record", str(record), "--",
                    sys.executable, "-c", "import subprocess,sys; "
                    f"p=subprocess.Popen([sys.executable,'-c','import time; time.sleep(30)'],start_new_session=True); "
                    f"open({str(pid_file)!r},'w').write(str(p.pid))"]
@@ -207,7 +221,7 @@ class HarborLifecycleTests(unittest.TestCase):
         record = self.root / "process.json"
         marker = self.root / "should-not-exist"
         stop(record, "startup")
-        result = subprocess.run([sys.executable, "-m", "eval.harbor.supervisor", "--record", str(record),
+        result = subprocess.run([sys.executable, "-m", "fruitfly_eval.harbor.supervisor", "--record", str(record),
                                  "--token", "startup", "--", sys.executable, "-c",
                                  f"open({str(marker)!r},'w').write('launched')"],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=8)
@@ -218,7 +232,7 @@ class HarborLifecycleTests(unittest.TestCase):
     def test_linux_cancellation_stops_detached_descendants(self):
         record = self.root / "process.json"
         pid_file = self.root / "background-pid"
-        command = [sys.executable, "-m", "eval.harbor.supervisor", "--record", str(record), "--",
+        command = [sys.executable, "-m", "fruitfly_eval.harbor.supervisor", "--record", str(record), "--",
                    sys.executable, "-c", "import subprocess,sys,time; "
                    f"p=subprocess.Popen([sys.executable,'-c','import time; time.sleep(60)'],start_new_session=True); "
                    f"open({str(pid_file)!r},'w').write(str(p.pid)); time.sleep(60)"]

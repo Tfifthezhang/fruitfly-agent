@@ -36,13 +36,13 @@ class PolicyGenerator:
     async def propose(self, request, services):
         document = request.baseline.component('execution-policy')
         values = json.loads(document.files[0].text)
-        values['max_tool_calls_per_turn'] = 128
+        values['settings']['tool_execution']['max_parallel'] = 2
         changed = replace(document, files=(ComponentFile('instructions.txt', json.dumps(values)),))
         candidate = HarnessSnapshot(tuple(changed if c.component_id == changed.component_id else c
             for c in request.baseline.components))
         return ProposalResult((CandidateBundle(request.plan.parent, request.baseline, candidate,
             self.generator_id, (EditReason('execution-policy', 'Synthetic parameter comparison.',
-                (request.records[0].run_id,)),)),))
+                (request.records[0].run_id,), expected_effect='The proposed behavior appears in the subsequent execution.'),)),))
 
 
 class PolicyRunner(OfflineRunner):
@@ -83,8 +83,8 @@ class ExecutionPolicyTests(unittest.IsolatedAsyncioTestCase):
             factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=providers,
                 improvement_bindings=WorkflowBindings(generators=generators, runner=lambda *args: PolicyRunner(),
                     selector=lambda *args: FirstSelector(), verifier=SyntheticVerification(),
-                    component_options={'execution-policy': {'editable_fields': ['max_tool_calls_per_turn'],
-                        'bounds': {'max_tool_calls_per_turn': {'minimum': 32, 'maximum': 256}}}}))
+                    component_options={'execution-policy': {'editable_fields': ['parameters.settings.tool_execution.max_parallel'],
+                        'bounds': {'parameters.settings.tool_execution.max_parallel': {'minimum': 1, 'maximum': 16}}}}))
             factory.configuration.save(); factory.reload_configuration()
             app = AgentApplication(factory)
             await app.start()
@@ -96,15 +96,15 @@ class ExecutionPolicyTests(unittest.IsolatedAsyncioTestCase):
                 candidates = await app.improve('', preview_token=preview.preview_token)
                 self.assertEqual(len(candidates), 1)
                 self.assertEqual(factory.system_version(), before)
-                self.assertEqual(app.runtime_manifest['execution']['max_tool_calls_per_turn'], 64)
+                self.assertEqual(app.runtime_manifest['execution']['tool_execution']['max_parallel'], 8)
                 await app.adopt_candidate(candidates[0].candidate_id)
                 after = factory.system_version()
                 self.assertNotEqual(after.harness, before.harness)
                 self.assertEqual(after.improver, before.improver)
                 self.assertEqual(after.state, before.state)
-                self.assertEqual(app.runtime_manifest['execution']['max_tool_calls_per_turn'], 128)
-                self.assertEqual(factory.configuration.profile().execution['max_tool_calls_per_turn'], 128)
-                self.assertEqual(provider.calls, [])
+                self.assertEqual(app.runtime_manifest['execution']['tool_execution']['max_parallel'], 2)
+                self.assertEqual(factory.configuration.profile().execution['tool_execution']['max_parallel'], 2)
+                self.assertTrue(all('Evaluate granted evidence'in c['system_prompt']for c in provider.calls))
             finally:
                 await app.close()
 
@@ -112,11 +112,12 @@ class ExecutionPolicyTests(unittest.IsolatedAsyncioTestCase):
         provider = FauxProvider()
         provider.respond_tool_call('write', {'path': 'a', 'content': 'a'})
         provider.respond_tool_call('write', {'path': 'b', 'content': 'b'})
+        provider.respond_text('done')
         config = AgentLoopConfig(provider=provider, max_tool_calls_per_turn=256)
         components = ComponentRegistry((TextComponentAdapter(ExecutionPolicyTarget(config), 'execution-policy'),))
         baseline = components.snapshot()
         document = baseline.component('execution-policy')
-        values = json.loads(document.files[0].text); values['max_tool_calls_per_turn'] = 1
+        values = json.loads(document.files[0].text); values['settings']['tool_execution']['max_parallel'] = 1
         candidate = HarnessSnapshot((replace(document, files=(ComponentFile('instructions.txt', json.dumps(values)),)),))
         artifacts = MemoryArtifacts()
         plan = RunPlan('policy-trial', version(), ('execution-policy',))
@@ -124,9 +125,9 @@ class ExecutionPolicyTests(unittest.IsolatedAsyncioTestCase):
         try:
             result = await FileTaskRunner(config, components, artifacts, services).execute(plan,
                 TaskMaterial('task', 'Write two files.'), candidate)
-            self.assertEqual(dict(read_facts(result, artifacts).counters)['tool_started'], 1)
+            self.assertEqual(dict(read_facts(result, artifacts).counters)['tool_started'], 2)
             reference = next(r.artifact_id for r in result.artifacts if r.path == 'runtime-execution.json')
-            self.assertEqual(json.loads(artifacts.read(reference))['max_tool_calls_per_turn'], 1)
+            self.assertEqual(json.loads(artifacts.read(reference))['tool_execution']['max_parallel'], 1)
             self.assertEqual(config.max_tool_calls_per_turn, 256)
         finally:
             await services.close()
@@ -137,12 +138,12 @@ class ExecutionPolicyTests(unittest.IsolatedAsyncioTestCase):
             required_capabilities = frozenset()
             async def propose(self, request, services):
                 document = request.baseline.component('bash-tool')
-                value = json.loads(document.files[0].text); value['default_timeout_seconds'] = 17
+                value = json.loads(document.files[0].text); value['settings']['default_timeout_seconds'] = 17
                 changed = replace(document, files=(ComponentFile('instructions.txt', json.dumps(value)),))
                 harness = HarnessSnapshot(tuple(changed if c.component_id == changed.component_id else c
                     for c in request.baseline.components))
                 return ProposalResult((CandidateBundle(request.plan.parent, request.baseline, harness, self.generator_id,
-                    (EditReason('bash-tool', 'Synthetic timeout comparison.', (request.records[0].run_id,)),)),))
+                    (EditReason('bash-tool', 'Synthetic timeout comparison.', (request.records[0].run_id,), expected_effect='The proposed behavior appears in the subsequent execution.'),)),))
         class ParameterRunner(OfflineRunner):
             capabilities = OfflineRunner.capabilities | {'configuration-materialization'}
         with tempfile.TemporaryDirectory() as directory:
@@ -154,8 +155,8 @@ class ExecutionPolicyTests(unittest.IsolatedAsyncioTestCase):
             factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=providers,
                 improvement_bindings=WorkflowBindings(generators=generators, runner=runner,
                     selector=lambda *args: FirstSelector(), verifier=SyntheticVerification(),
-                    component_options={'bash-tool': {'editable_fields': ['default_timeout_seconds'],
-                        'bounds': {'default_timeout_seconds': {'minimum': 1, 'maximum': 120}}}}))
+                    component_options={'bash-tool': {'editable_fields': ['parameters.settings.default_timeout_seconds'],
+                        'bounds': {'parameters.settings.default_timeout_seconds': {'minimum': 1, 'maximum': 120}}}}))
             factory.configuration.save(); factory.reload_configuration()
             app = AgentApplication(factory); await app.start()
             try:
@@ -172,5 +173,5 @@ class ExecutionPolicyTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual((after.improver, after.state), (before.improver, before.state))
                 component = next(c for c in app.runtime_manifest['components'] if c['id'] == 'bash-tool')
                 self.assertEqual(component['parameters']['default_timeout_seconds'], 17)
-                self.assertEqual(providers.create.return_value.calls, [])
+                self.assertTrue(all('Evaluate granted evidence'in c['system_prompt']for c in providers.create.return_value.calls))
             finally: await app.close()

@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from fruitfly_agent.core import AgentLoopConfig
-from fruitfly_agent.lab import SummarizingCompactor, SummarizingCompactorConfig
+from fruitfly_agent.lab import WorkingMemoryReducer, WorkingMemoryConfig
 from fruitfly_agent.lab.catalog import AssemblyContext, LabCatalog, MechanismSelection, ProviderBinding, assemble_lab, builtin_catalog
 from tests.support.faux_provider import FauxProvider
 
@@ -52,7 +52,7 @@ class CatalogTest(unittest.TestCase):
 
     def test_each_compaction_choice_assembles_with_only_required_provider(self) -> None:
         catalog = builtin_catalog()
-        for algorithm, expected_provider_calls in (("summarizing", 1),):
+        for algorithm, expected_provider_calls in (("working memory", 1),):
             with self.subTest(algorithm=algorithm), tempfile.TemporaryDirectory() as tmp:
                 calls: list[tuple[str | None, int | None]] = []
 
@@ -66,7 +66,7 @@ class CatalogTest(unittest.TestCase):
                     selections=(
                         MechanismSelection("context-history"),
                         MechanismSelection(
-                            "compaction",
+                            "working-memory-reduction",
                             parameters={},
                         ),
                     ),
@@ -79,7 +79,7 @@ class CatalogTest(unittest.TestCase):
                 )
 
                 self.assertIsNotNone(result.context_pipeline)
-                self.assertEqual(("context-history", "compaction"), result.mechanism_ids)
+                self.assertEqual(("context-history", "working-memory-reduction"), result.mechanism_ids)
                 self.assertEqual(expected_provider_calls, len(calls))
 
     def test_assembly_is_stable_and_rejects_non_state_installers(self) -> None:
@@ -133,7 +133,7 @@ class CatalogTest(unittest.TestCase):
         )
 
         def install_reduction(state, context, parameters):
-            return replace(state, reducer=SummarizingCompactor(SummarizingCompactorConfig(), FauxProvider()))
+            return replace(state, reducer=WorkingMemoryReducer(WorkingMemoryConfig(), FauxProvider()))
 
         declared = LabCatalog(
             (

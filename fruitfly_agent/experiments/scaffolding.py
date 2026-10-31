@@ -29,8 +29,8 @@ def workspace_templates(*, source: str = 'files', benchmark: str | None = None,
         if not benchmark:
             raise ValueError('--source task-set requires --benchmark with a registered catalog ID')
         # Eval remains optional. Descriptor lookup does not invoke preflight or Harbor.
-        from eval.catalog import builtin_catalog
-        from eval.contracts import EvaluationRequest
+        from fruitfly_eval.catalog import builtin_catalog
+        from fruitfly_eval.contracts import EvaluationRequest
         descriptor = builtin_catalog().get(benchmark).descriptor
         if variant not in {item.variant_id for item in descriptor.variants}:
             raise ValueError('benchmark does not declare variant: ' + variant)

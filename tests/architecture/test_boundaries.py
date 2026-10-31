@@ -33,7 +33,7 @@ class LayeringTest(unittest.TestCase):
             "fruitfly_agent.core",
             "fruitfly_agent.providers",
             "fruitfly_agent.lab",
-            "eval",
+            "fruitfly_eval",
         )
         violations = [
             f"{path.name} imports {target}"

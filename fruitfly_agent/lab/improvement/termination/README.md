@@ -3,7 +3,7 @@
 [Up: Improvement](../README.md)
 
 Pure conditions shared by task control, candidate search and cross-generation RSI.
-Stopping never grants quality assurance and cannot override budget/cancellation.
+Stopping never grants quality assurance and cannot override phase time/cancellation.
 
 | Policy | Trigger |
 |---|---|

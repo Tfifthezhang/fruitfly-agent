@@ -20,7 +20,7 @@ no reflection; existing embedding `RunPlan` defaults retain Harness² and explic
 stored plans without a strategy field read as Harness².
 
 I uses the same strategy interface inside fresh downstream episodes. Its independent
-verification remains separate. Budgets and unknown-outcome rules belong to the
+verification remains separate. Phase times and unknown-outcome rules belong to the
 shared workflow, not individual strategy counters. Source replacement, arbitrary
 graph search and model training are not implemented.
 

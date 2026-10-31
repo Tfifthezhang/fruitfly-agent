@@ -35,9 +35,16 @@ class SelectionDecision:
     run_id: str
     reason: str
     assurance: Literal['selected', 'verified'] = 'selected'
+    evidence_ids: tuple[str, ...] = ()
+    comparison_id: str = ''
 
     def __post_init__(self):
         identifier(self.run_id)
+        object.__setattr__(self, 'evidence_ids', tuple(self.evidence_ids))
+        for value in self.evidence_ids:
+            require_hash(value)
+        if self.comparison_id:
+            require_hash(self.comparison_id)
         bounded(self.reason, 4000)
         if self.assurance not in {'selected', 'verified'}:
             raise ValueError('selection assurance must be explicit')

@@ -10,12 +10,12 @@ from ..assessment.verification import CaseMeasurements
 
 
 def freeze(spec, context):
-    if set(spec) - {'id', 'source', 'pack', 'model_calls', 'objective'}:
+    if set(spec) - {'id', 'source', 'pack', 'objective'}:
         raise ValueError('unknown file collection fields')
     pack = spec.get('pack')
     if not isinstance(pack, str) or not pack:
         raise ValueError('a file collection needs an installed task pack')
-    for component in context.component_ids:
+    for component in context.component_ids or context.tasks.compatible_targets(pack):
         suite = context.tasks.freeze(pack, component)
     holdout = context.tasks.holdout(pack)
     groups = context.tasks.case_groups(pack)
@@ -30,7 +30,7 @@ def freeze(spec, context):
             key = spec['id'] + '-' + content_hash(origin)[7:31]
             task = TaskMaterial(key, case.input, environment_id='file-workspace-v1', origin='task-pack:' + pack)
             entries.append(TaskEntry(key, spec['id'], suite.source_hash, spec['id'], task, objective, origin,
-                group_id=groups.get(case.case_id) or origin, partition=partition, model_limit=spec.get('model_calls', 8)))
+                group_id=groups.get(case.case_id) or origin, partition=partition))
             cases[key] = case
 
     def current_source():

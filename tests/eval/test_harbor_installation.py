@@ -7,8 +7,8 @@ from types import SimpleNamespace
 import tempfile
 import zipfile
 from unittest.mock import AsyncMock, patch
-from eval.benchmarks.swe_bench import SWEBenchAdapter
-from eval.installation import resolve_installation, validate_installation
+from fruitfly_eval.benchmarks.swe_bench import SWEBenchAdapter
+from fruitfly_eval.installation import resolve_installation, validate_installation
 from tests.support.evaluation import request_payload
 from tests.support.harbor import load_harbor_agent, prepared_harbor, installed_agent_inputs
 
@@ -42,12 +42,12 @@ class HarborAdapterTests(unittest.TestCase):
         agent.exec_as_agent.assert_not_called()
 
     def test_invalid_installation_material_fails_before_environment_access(self) -> None:
-        from eval.contracts import EvaluationRequest
-        from eval.harbor.preparation import prepare
+        from fruitfly_eval.contracts import EvaluationRequest
+        from fruitfly_eval.harbor.preparation import prepare
         root = Path(self.enterContext(tempfile.TemporaryDirectory()))
         host, _ = prepared_harbor(root)
         (root / "runtime").mkdir()
-        with patch("eval.harbor.preparation.probe_environment") as probe:
+        with patch("fruitfly_eval.harbor.preparation.probe_environment") as probe:
             with self.assertRaisesRegex(ValueError, "incomplete FruitFlyAgent source"):
                 prepare(EvaluationRequest.from_dict(request_payload()), SWEBenchAdapter().descriptor, host, package=root)
         probe.assert_not_called()
@@ -55,27 +55,27 @@ class HarborAdapterTests(unittest.TestCase):
             resolve_installation(None, checkout=root)
 
     def test_wheel_preparation_freezes_source_without_installation(self) -> None:
-        from eval.harbor.material import source_snapshot
+        from fruitfly_eval.harbor.material import source_snapshot
         root = Path(self.enterContext(tempfile.TemporaryDirectory()))
         wheel = root / "fruitfly_agent-0.1-py3-none-any.whl"
         with zipfile.ZipFile(wheel, "w") as archive:
             archive.writestr("fruitfly_agent/__init__.py", "")
-            archive.writestr("eval/__init__.py", "")
+            archive.writestr("fruitfly_eval/__init__.py", "")
             archive.writestr("fruitfly_agent-0.1.dist-info/METADATA", "Name: fruitfly-agent\nVersion: 0.1\n")
             archive.writestr("fruitfly_agent-0.1.dist-info/licenses/LICENSE", "Fixture license")
         self.assertEqual(validate_installation(wheel), wheel.resolve())
         source_snapshot(wheel, root / "snapshot")
         self.assertTrue((root / "snapshot/fruitfly_agent/__init__.py").is_file())
-        self.assertTrue((root / "snapshot/eval/__init__.py").is_file())
+        self.assertTrue((root / "snapshot/fruitfly_eval/__init__.py").is_file())
         self.assertEqual((root / "snapshot/licenses/LICENSE").read_text(), "Fixture license")
 
     def test_source_preparation_stages_build_inputs_without_local_state(self) -> None:
-        from eval.harbor.material import source_snapshot
+        from fruitfly_eval.harbor.material import source_snapshot
         root = Path(self.enterContext(tempfile.TemporaryDirectory()))
         source_snapshot(Path(__file__).resolve().parents[2], root / "source")
         staged_names = [str(path.relative_to(root / "source")) for path in (root / "source").rglob("*") if path.is_file()]
         for name in ("README.md", "LICENSE", "THIRD_PARTY_NOTICES.md", "pyproject.toml",
-                     "fruitfly_agent/__init__.py", "eval/__init__.py"):
+                     "fruitfly_agent/__init__.py", "fruitfly_eval/__init__.py"):
             self.assertIn(name, staged_names)
         for name in ('fruitfly_agent/providers/services.yaml',
                      'fruitfly_agent/run/configuration/templates/default-config.yaml',
@@ -95,7 +95,7 @@ class HarborAdapterTests(unittest.TestCase):
         path = root / "other-0.1-py3-none-any.whl"
         with zipfile.ZipFile(path, "w") as archive:
             archive.writestr("fruitfly_agent/__init__.py", "")
-            archive.writestr("eval/__init__.py", "")
+            archive.writestr("fruitfly_eval/__init__.py", "")
             archive.writestr("other-0.1.dist-info/METADATA", "Name: other\nVersion: 0.1\n")
         with self.assertRaisesRegex(ValueError, "fruitfly-agent version 0.1"):
             validate_installation(path)

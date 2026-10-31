@@ -16,7 +16,13 @@ def measured_selection(records, measurements, *, direction='max'):
 class SelectionPolicy:
     async def choose(self, plan, task, records, feedback, *, selector, measurements):
         if plan.feedback == 'scored':
-            return measured_selection(records, feedback, direction=getattr(measurements, 'direction', 'max'))
+            decision=measured_selection(records,feedback,direction=getattr(measurements,'direction','max'))
+            if decision is None:return None
+            scores={m.run_id:m.score for m in feedback}
+            tied=tuple(r for r in records if r.status=='completed' and scores.get(r.run_id)==scores[decision.run_id])
+            if len(tied)>1 and selector is not None:
+                return await selector.select(task,tied)
+            return decision
         if len(records) == 1:
             return SelectionDecision(records[0].run_id, 'Only available executed result')
         return await selector.select(task, records)

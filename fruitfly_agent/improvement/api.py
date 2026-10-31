@@ -7,14 +7,13 @@ from fruitfly_agent.improvement.contracts.assessment import Measurement, Selecti
 from fruitfly_agent.improvement.contracts.plans import RunPlan, ExperienceEntry
 from fruitfly_agent.improvement.contracts.editing import ProposalRequest, ProposalResult, CompositionRequest, CandidateGenerator, GenerationServices, Composer, Reflector
 from fruitfly_agent.improvement.contracts.pipeline import ImprovementOutcome, WorkflowController
-from .contracts.facts import ExecutionFacts, BudgetFact, ArtifactFact
+from .contracts.facts import ExecutionFacts, UsageFact, ArtifactFact
 from .contracts.evaluation import EvaluationBatch, TrialResult, CandidateEvaluation
 from .contracts.experiments import EpisodeExecutor, EpisodeRequest, EpisodeResult
 from .workflow.controller import ImprovementWorkflow
 from .workflow.engine import SearchEngine
 from .workflow.problems import SearchProblem
 from .workflow.services import WorkflowServices, GeneratorServices
-from .workflow.budget import BudgetScope, AllocationExhausted
 from .execution.scheduler import TaskScheduler
 from .execution.handles import ManagedExecution, CompletionOnlyRunner
 from .execution.facts import attach_facts, ensure_facts, read_facts, receipt_facts

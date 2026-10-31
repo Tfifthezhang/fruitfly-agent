@@ -12,7 +12,7 @@ from tests.support.experiments import workspace
 
 class HarnessValidationTests(unittest.TestCase):
     def test_absent_components_are_rejected_before_provider_construction(self):
-        for name in ('tool-guidance.read', 'skill-document', 'learned-memory'):
+        for name in ('tool-guidance.read', 'skill-document'):
             with self.subTest(component=name), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 workspace(root, improvement={'components': [name]})
@@ -26,11 +26,11 @@ class HarnessValidationTests(unittest.TestCase):
             workspace(root)
             path = root / '.fruitfly/default-config.yaml'
             data = yaml.safe_load(path.read_text())
-            data['profiles']['baseline']['S']['learned-memory'] = {'inline': {
-                'id': 'learned-memory', 'implementation': 'learned-memory', 'role': 'S', 'parameters': {}}}
+            data['profiles']['baseline']['S']['skill-document'] = {'inline': {
+                'id': 'skill-document', 'implementation': 'skill-document', 'role': 'S', 'parameters': {}}}
             path.write_text(yaml.safe_dump(data))
             summary = prepare_experiment(load_configuration(root), 'improvement').summary()
-            memory = next(c for c in summary['harness']['editable_components'] if c['id'] == 'learned-memory')
+            memory = next(c for c in summary['harness']['editable_components'] if c['id'] == 'skill-document')
             self.assertTrue(memory['available'])
             self.assertFalse(memory['selected'])
             self.assertEqual(summary['request']['component_ids'], ['base_prompt'])
@@ -39,10 +39,10 @@ class HarnessValidationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             workspace(root, improvement={'components': ['execution-policy'], 'component_options': {
-                'execution-policy': {'editable_fields': ['max_tool_calls_per_turn'],
-                                     'bounds': {'max_tool_calls_per_turn': {'minimum': 32, 'maximum': 256}}}}})
+                'execution-policy': {'editable_fields': ['parameters.settings.tool_execution.max_parallel'],
+                                     'bounds': {'parameters.settings.tool_execution.max_parallel': {'minimum': 1, 'maximum': 16}}}}})
             summary = prepare_experiment(load_configuration(root), 'improvement').summary()
-            self.assertEqual(summary['execution']['max_tool_calls_per_turn'], 64)
+            self.assertEqual(summary['execution']['tool_execution']['max_parallel'], 8)
             self.assertIn('execution-config', summary['harness']['backend_capabilities'])
             selected = [c['id'] for c in summary['harness']['editable_components'] if c['selected']]
             self.assertEqual(selected, ['execution-policy'])

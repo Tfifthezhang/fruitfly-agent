@@ -17,7 +17,6 @@ from fruitfly_agent.lab.improvement.assessment.aggregation import WeightedSum
 from fruitfly_agent.improvement.workflow.services import WorkflowServices
 from fruitfly_agent.improvement.contracts.versions import content_hash
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
-from fruitfly_agent.improvement.workflow.budget import BudgetScope
 from fruitfly_agent.rsi import AgentVersion, Candidate, EvolutionBudget, EvolutionDriver, Verification
 from fruitfly_agent.rsi.engine import EvolutionEngine
 from fruitfly_agent.rsi.contracts import VerificationEvidence, AdoptionResult
@@ -87,17 +86,13 @@ class EvolutionPolicyTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(ValueError, 'strategy'):
             await EvolutionEngine().evolve(host, job_id='job', policy_id='policy', direction='improve', max_steps=5)
 
-    async def test_external_settlement_charges_held_quota_even_after_cancellation(self):
-        root = BudgetScope({'model': 10, 'execution': 2})
-        child = root.child({'model': 7, 'execution': 0})
-        self.assertEqual(root.available('model'), 3)
-        root.signal.set()
-        child.settle('model', 4)
-        child.close()
-        self.assertEqual(root.used['model'], 4)
-        self.assertEqual(root.held['model'], 0)
-        root.signal.clear()
-        self.assertEqual(root.available('model'), 6)
+    async def test_observed_usage_remains_available_after_cancellation(self):
+        services=WorkflowServices(RunPlan('usage',version(),('prompt',)))
+        services.signal.set();services.observe('model',4)
+        self.assertEqual(services.used['model'],4)
+        services.signal.clear();services.observe('model',100)
+        self.assertEqual(services.used['model'],104)
+        await services.close()
 
     async def test_model_judge_has_its_own_configuration_and_shared_budget(self):
         artifacts = MemoryArtifacts()

@@ -94,7 +94,7 @@ The root contains only this guide and public exports. Contracts never import the
 
 Terminal features share input and rendering facilities through public interfaces. They cannot import other features or Application/Session implementations. Adding a feature does not change the input loop. Directory dependency checks enforce these responsibilities.
 
-No module-specific environment variables. [Run](../run/README.md) constructs the default factory; [Improvement](../lab/improvement/README.md) and [Eval](../../eval/README.md) own their execution semantics.
+No module-specific environment variables. [Run](../run/README.md) constructs the default factory; [Improvement](../lab/improvement/README.md) and [Eval](../../fruitfly_eval/README.md) own their execution semantics.
 
 ```bash
 .venv/bin/python -m unittest discover -s tests/interactive -t . -v

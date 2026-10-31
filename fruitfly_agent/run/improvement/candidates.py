@@ -166,6 +166,10 @@ class RunCandidates:
             raise ValueError('candidate does not change any component')
         result = []
         for part, value in parts:
+            owner = self.target(part.target_id)
+            export = getattr(owner, 'export_text', None)
+            if export is not None:
+                value = export(value)
             reference = self.artifacts.put_text(value).artifact_id
             binding = part.binding
             if (binding.kind == 'artifact' and binding.key in self.pinned_bindings

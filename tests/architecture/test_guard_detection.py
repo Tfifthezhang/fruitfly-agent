@@ -34,7 +34,7 @@ class GuardDetectionTests(unittest.TestCase):
     def test_nested_and_type_checking_imports_cannot_cross_layers(self):
         for code in (
             'def factory():\n    import fruitfly_agent.lab.tools',
-            'from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    from eval import execution',
+            'from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    from fruitfly_eval import execution',
         ):
             with self.subTest(code=code):
                 self.assertTrue(boundary_violations(code, 'fruitfly_agent.core.example'))
@@ -45,11 +45,11 @@ class GuardDetectionTests(unittest.TestCase):
 
     def test_dynamic_imports_and_importlib_aliases_cannot_cross_layers(self):
         for code in (
-            '__import__("eval.execution")',
+            '__import__("fruitfly_eval.execution")',
             'import importlib\nimportlib.import_module("fruitfly_agent.lab.tools")',
-            'import importlib as loader\nloader.import_module("eval")',
-            'from importlib import import_module as load\nload("eval.execution")',
-            'from importlib import import_module\nimport_module(name="eval.execution")',
+            'import importlib as loader\nloader.import_module("fruitfly_eval")',
+            'from importlib import import_module as load\nload("fruitfly_eval.execution")',
+            'from importlib import import_module\nimport_module(name="fruitfly_eval.execution")',
         ):
             with self.subTest(code=code):
                 self.assertTrue(boundary_violations(code, 'fruitfly_agent.core.example'))

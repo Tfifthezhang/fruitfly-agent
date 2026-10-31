@@ -46,12 +46,12 @@ benchmarks = [
 
 [project.scripts]
 fruitfly-agent = "fruitfly_agent.run:main"
-fruitfly-agent-eval = "eval.__main__:main"
+fruitfly-agent-eval = "fruitfly_eval.__main__:main"
 fruitfly-agent-lab = "fruitfly_agent.experiments.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["fruitfly_agent*", "eval*"]
+include = ["fruitfly_agent*", "fruitfly_eval*"]
 
 [tool.setuptools.package-data]
 "fruitfly_agent.providers" = ["services.yaml"]
@@ -118,7 +118,7 @@ files = [
     "fruitfly_agent/lab/improvement",
     "fruitfly_agent/lab/rsi",
     "fruitfly_agent/experiments",
-    "fruitfly_agent/run/runtime/limits.py",
+    "fruitfly_agent/run/runtime/usage.py",
     "fruitfly_agent/run/evolution.py",
     "fruitfly_agent/run/improvement/evolution.py",
     "fruitfly_agent/run/improvement/pipeline.py",
@@ -136,22 +136,22 @@ files = [
     "fruitfly_agent/providers",
     "fruitfly_agent/run/storage",
     "fruitfly_agent/run/adapters",
-    "eval/benchmarks",
-    "eval/harbor",
-    "eval/improvement",
-    "eval/api.py",
-    "eval/task_selection.py",
-    "eval/service.py",
-    "eval/catalog.py",
-    "eval/contracts.py",
-    "eval/execution.py",
-    "eval/report.py",
-    "eval/storage.py",
-    "eval/installation.py",
-    "eval/runtime.py",
-    "eval/runner.py",
-    "eval/results.py",
-    "eval/trajectory.py",
+    "fruitfly_eval/benchmarks",
+    "fruitfly_eval/harbor",
+    "fruitfly_eval/improvement",
+    "fruitfly_eval/api.py",
+    "fruitfly_eval/task_selection.py",
+    "fruitfly_eval/service.py",
+    "fruitfly_eval/catalog.py",
+    "fruitfly_eval/contracts.py",
+    "fruitfly_eval/execution.py",
+    "fruitfly_eval/report.py",
+    "fruitfly_eval/storage.py",
+    "fruitfly_eval/installation.py",
+    "fruitfly_eval/runtime.py",
+    "fruitfly_eval/runner.py",
+    "fruitfly_eval/results.py",
+    "fruitfly_eval/trajectory.py",
 ]
 
 [[tool.mypy.overrides]]
@@ -177,7 +177,7 @@ module = [
     "fruitfly_agent.providers.openai_codec",
     "fruitfly_agent.providers.anthropic_codec",
     "fruitfly_agent.run.adapters.runtime",
-    "eval.benchmarks.harbor",
+    "fruitfly_eval.benchmarks.harbor",
 ]
 disallow_untyped_defs = true
 

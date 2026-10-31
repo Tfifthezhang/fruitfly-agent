@@ -8,20 +8,19 @@ from fruitfly_agent.improvement.contracts.versions import canonical_json, requir
 
 
 @dataclass(frozen=True)
-class BudgetFact:
+class UsageFact:
     resource: str
     scope: str
     used: int | None = None
-    limit: int | None = None
     source: str = ''
 
     def __post_init__(self):
         identifier(self.resource)
         if self.scope not in {'turn', 'execution', 'composite'}:
-            raise ValueError('budget facts need an explicit accounting scope')
-        for value in (self.used, self.limit):
+            raise ValueError('usage facts need an explicit accounting scope')
+        for value in (self.used,):
             if value is not None and (type(value) is not int or value < 0):
-                raise ValueError('budget facts require nonnegative counts or unknown')
+                raise ValueError('usage facts require nonnegative counts or unknown')
         bounded(self.source, 500, empty=True)
 
 
@@ -51,7 +50,7 @@ class ExecutionFacts:
     initial_state_id: str
     status: str
     termination_reason: str = 'unknown'
-    budgets: tuple[BudgetFact, ...] = ()
+    usage: tuple[UsageFact, ...] = ()
     counters: tuple[tuple[str, int | None], ...] = ()
     artifacts: tuple[ArtifactFact, ...] = ()
     evidence: tuple[Resource, ...] = ()
@@ -69,10 +68,10 @@ class ExecutionFacts:
             require_hash(value)
         if self.schema_version != 1 or type(self.schema_version) is not int:
             raise ValueError('unsupported execution facts schema')
-        if self.status not in {'completed', 'error', 'cancelled', 'budget_exhausted'}:
+        if self.status not in {'completed', 'error', 'cancelled', 'timeout'}:
             raise ValueError('invalid execution facts status')
         identifier(self.termination_reason)
-        for name in ('budgets', 'counters', 'artifacts', 'evidence', 'children'):
+        for name in ('usage', 'counters', 'artifacts', 'evidence', 'children'):
             object.__setattr__(self, name, tuple(getattr(self, name)))
         if len({name for name, value in self.counters}) != len(self.counters):
             raise ValueError('fact counters must be distinct')
@@ -80,8 +79,8 @@ class ExecutionFacts:
             identifier(name)
             if count is not None and (type(count) is not int or count < 0):
                 raise ValueError('fact counters require nonnegative counts or unknown')
-        if len({(b.resource, b.scope) for b in self.budgets}) != len(self.budgets):
-            raise ValueError('fact budgets must have distinct resources and scopes')
+        if len({(b.resource, b.scope) for b in self.usage}) != len(self.usage):
+            raise ValueError('fact usage must have distinct resources and scopes')
         if type(self.complete) is not bool:
             raise ValueError('fact completeness must be explicit')
         if type(self.diagnosable) is not bool:
@@ -101,10 +100,10 @@ class ExecutionFacts:
 
     @classmethod
     def from_dict(cls, value):
-        if not isinstance(value, dict) or set(value) - set(cls.__dataclass_fields__):
-            raise ValueError('unknown execution facts fields')
+        if not isinstance(value, dict) or set(value) != set(cls.__dataclass_fields__):
+            raise ValueError('execution facts require the complete current schema')
         return cls(**{**value,
-            'budgets': tuple(BudgetFact(**v) for v in value.get('budgets', ())),
+            'usage': tuple(UsageFact(**v) for v in value.get('usage', ())),
             'counters': tuple(tuple(v) for v in value.get('counters', ())),
             'artifacts': tuple(ArtifactFact(**v) for v in value.get('artifacts', ())),
             'evidence': tuple(Resource(**v) for v in value.get('evidence', ()))})

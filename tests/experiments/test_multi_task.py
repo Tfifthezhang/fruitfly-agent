@@ -14,7 +14,7 @@ from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
 from fruitfly_agent.run import RunApplicationFactory
 from tests.support.experiments import workspace, Rule
 from tests.support.task_packs import install
-from tests.support.faux_provider import FauxProvider
+from tests.support.model_evaluation import RoleProvider
 
 
 class BatchRule(Rule):
@@ -30,7 +30,7 @@ class MultiTaskExperimentTests(unittest.IsolatedAsyncioTestCase):
             prepared = prepare_experiment(load_configuration(root), 'improvement')
             records = RunRecords(root)
             record = records.create('improvement', prepared.summary())
-            provider = FauxProvider()
+            provider = RoleProvider()
             for text in ('wrong', 'A', 'wrong', 'B'): provider.respond_text(text)
             registry = Mock(); registry.create.return_value = provider
             def builder(prepared, path):
@@ -42,7 +42,7 @@ class MultiTaskExperimentTests(unittest.IsolatedAsyncioTestCase):
             with patch('fruitfly_agent.experiments.operations.improve.application_factory', side_effect=builder):
                 result = await run(prepared, record, records, lambda event: None)
             self.assertEqual(result['status'], 'completed')
-            self.assertEqual(result['usage'], {'model': 4, 'execution': 4})
+            self.assertEqual(result['usage'], {'model': len(provider.calls), 'execution': 4})
             self.assertEqual(prepared.config_path.read_bytes(), original)
             self.assertIn('Official evaluation', record['links'])
             job = root / record['links']['Component job']
@@ -61,13 +61,13 @@ class MultiTaskExperimentTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(ValueError, 'trial contains unknown fields'):
                 load_configuration(root)
 
-    def test_joint_check_preserves_material_and_supports_explicit_large_finite_budgets(self):
+    def test_joint_check_preserves_material_and_supports_explicit_large_finite_times(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory); install(root)
             workspace(root, task={'source': 'task-set', 'collections': [{'id': 'daily', 'source': 'files', 'pack': 'project'}]},
-                improvement={'max_model_calls': 20000, 'max_executions': 2000})
+                improvement={'timeouts': {'editor_seconds': 20000, 'execution_seconds': 2000, 'evaluator_seconds': 1200}})
             before = {p: p.read_bytes() for p in root.rglob('*') if p.is_file()}
             with patch('fruitfly_agent.providers.registry.ProviderRegistry.create', side_effect=AssertionError('Provider constructed')):
                 prepared = prepare_experiment(load_configuration(root), 'improvement')
-            self.assertEqual(prepared.request.max_model_calls, 20000)
+            self.assertEqual(prepared.request.timeouts['editor_seconds'], 20000)
             self.assertEqual(before, {p: p.read_bytes() for p in root.rglob('*') if p.is_file()})

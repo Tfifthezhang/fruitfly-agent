@@ -61,7 +61,7 @@ class EditorEvolutionTests(unittest.IsolatedAsyncioTestCase):
             self.addAsyncCleanup(app.close)
             options = app.workflow_configuration()
             editor = next(v for v in options.executions if v.execution_id == 'improver-comparison')
-            self.assertEqual(editor.component_ids, ('improvement-editor',))
+            self.assertEqual(editor.component_ids, ('improvement-editor', 'improvement-evaluator'))
             self.assertTrue(app.workflow_preview(request).preview_token)
             self.assertEqual(provider.calls, [])
 
@@ -128,7 +128,7 @@ class EditorEvolutionTests(unittest.IsolatedAsyncioTestCase):
     async def test_failed_independent_comparison_cannot_publish_or_reuse_suite(self):
         original = ProceduralProvider.reply
         def fail_private(provider, ctx, *, signal=None):
-            if 'list_files' not in {t.name for t in ctx.tools} and 'independent' in repr(ctx.messages):
+            if 'catalog' not in {t.name for t in ctx.tools} and 'independent' in repr(ctx.messages):
                 return AssistantMessageEventStream(provider._message_stream(
                     AssistantMessage(content=[TextBlock(text='wrong')], stop_reason='stop')))
             return original(provider, ctx, signal=signal)
@@ -156,7 +156,7 @@ class EditorEvolutionTests(unittest.IsolatedAsyncioTestCase):
         class HangingEpisode:
             def __init__(self, *args):
                 pass
-            async def run(self, request, *, budget, signal):
+            async def run(self, request, *, signal):
                 entered.set()
                 try:
                     await asyncio.Event().wait()
@@ -247,7 +247,7 @@ class EditorEvolutionTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(app.pending_experience(), ())
                 self.assertEqual(factory._experience_store.snapshot(), ())
                 self.assertEqual(factory._component_jobs.completion().report.model_calls, len(provider.calls) - calls)
-                self.assertLessEqual(factory._component_jobs.completion().report.trial_calls, request.max_executions)
+                self.assertGreater(factory._component_jobs.completion().report.trial_calls, 0)
                 job = root / '.fruitfly/improvement/jobs' / outcome.plan.job_id
                 self.assertEqual(json.loads((job / 'plan.json').read_text())['schema_version'], 2)
                 self.assertIn('independent-verification', (job / 'events.jsonl').read_text())
@@ -263,6 +263,7 @@ class EditorEvolutionTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(instructions.invariant.count('STEP'), generation)
                 self.assertEqual(factory._current_runtime_config.system_prompt, original_prompt)
             self.assertEqual(len(app.improvement_history()), 2)
+            self.assertEqual(factory.improvement_usage()['model'], len(provider.calls))
 
     async def test_invalid_scope_material_changes_and_insufficient_budget_make_no_requests(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -270,7 +271,7 @@ class EditorEvolutionTests(unittest.IsolatedAsyncioTestCase):
             app = AgentApplication(factory)
             await app.start()
             self.addAsyncCleanup(app.close)
-            for invalid in (replace(request, verification='behavior'), replace(request, max_model_calls=1),
+            for invalid in (replace(request, verification='behavior'), replace(request, timeouts={'editor_seconds': 0}),
                             replace(request, component_ids=('base_prompt', 'improvement-editor')),
                             replace(request, execution_parameters=(('inner_components', 'improvement-editor'),))):
                 with self.subTest(invalid=invalid), self.assertRaises(ValueError):

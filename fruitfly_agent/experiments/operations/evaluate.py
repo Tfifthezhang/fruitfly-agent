@@ -2,7 +2,7 @@
 
 
 def prepare(prepared, *, tasks_only=False, progress=None):
-    from eval.api import prepare_evaluation
+    from fruitfly_eval.api import prepare_evaluation
     benchmark = prepared.source.benchmark
     host_path = benchmark.stage_host()
     return prepare_evaluation(benchmark.request, host_config_path=host_path,
@@ -10,7 +10,7 @@ def prepare(prepared, *, tasks_only=False, progress=None):
 
 
 def run(prepared, record, records, emit):
-    from eval.api import run_evaluation
+    from fruitfly_eval.api import run_evaluation
     prepared.verify_sources()
     benchmark = prepared.source.benchmark
     def progress(event):

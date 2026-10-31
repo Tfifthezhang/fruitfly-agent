@@ -101,12 +101,12 @@ class ChatMediaStreamTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_heuristic_measurement_includes_chat_observation_text_and_preserves_wrapper_ports(self):
         from fruitfly_agent.lab.context_manager.measurement.budget import MeasurementService
-        from fruitfly_agent.run.runtime.limits import BudgetedProvider, ModelCallBudget
+        from fruitfly_agent.run.runtime.usage import ObservedProvider, ModelUsage
         history = [UserMessage('inspect'), AssistantMessage([ToolCallBlock('a', 'capture', {})]),
                    ToolResultMessage('a', [TextBlock('long observation ' * 100), image()])]
         with patch('openai.AsyncOpenAI', return_value=NS()):
             provider = ChatCompletionsProvider(api_key='offline-placeholder', model='chosen-model', vision=True)
-        wrapped = BudgetedProvider(provider, ModelCallBudget(1))
+        wrapped = ObservedProvider(provider, ModelUsage())
         meter = MeasurementService()
         current = replace(view(), messages=history)
         baseline = meter.estimate(current)
@@ -114,4 +114,4 @@ class ChatMediaStreamTests(unittest.IsolatedAsyncioTestCase):
         self.assertGreater(result.input_tokens, baseline)
         self.assertEqual(result.quality, 'heuristic')
         self.assertIn('image-estimate', result.uncertain)
-        self.assertEqual(wrapped.budget.used, 0)
+        self.assertEqual(wrapped.usage.used, 0)

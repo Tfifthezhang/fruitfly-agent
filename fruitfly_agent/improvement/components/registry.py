@@ -45,6 +45,21 @@ class ComponentRegistry:
     def snapshot(self):
         return HarnessSnapshot(tuple(a.snapshot() for a in self.adapters.values()))
 
+    def descriptions(self, component_ids, *, snapshot=None):
+        result = {}
+        for name in component_ids:
+            adapter = self.adapters[name]
+            describe = getattr(adapter, 'describe_fields', None)
+            if describe is None:
+                raise ValueError('component must describe editable fields: ' + name)
+            fields = tuple(describe(snapshot.component(name)) if snapshot is not None else describe())
+            if not fields or len({f.path for f in fields}) != len(fields):
+                raise ValueError('component must describe distinct editable fields: ' + name)
+            result[name] = {'role': adapter.snapshot().role,
+                            'fields': [f.to_dict() for f in fields],
+                            'grant': self.options.get(name, {})}
+        return result
+
     def validate(self, snapshot):
         if {c.component_id for c in snapshot.components} != set(self.adapters):
             raise ValueError('harness must preserve its registered component set')

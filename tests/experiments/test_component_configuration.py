@@ -29,22 +29,21 @@ class ComponentExperimentTests(unittest.TestCase):
             return prepare_experiment(load_configuration(self.root), 'improvement', require_credentials=False)
 
     def test_component_search_and_feedback_are_consumed_and_grants_are_visible(self):
-        self.change('components/I/improvement-search.yaml', lambda value: value['parameters'].update(rounds=2))
-        self.change('components/I/improvement-feedback.yaml', lambda value: value['parameters'].update(
-            process_assessment={'assessors': ['execution-facts-v1']}))
-        self.change('experiment.yaml', lambda value: value['edit'].update({'execution-policy': {
-            'fields': ['parameters.max_tool_calls_per_turn'],
-            'bounds': {'parameters.max_tool_calls_per_turn': {'minimum': 32, 'maximum': 128}}}}))
+        self.change('experiment.yaml', lambda value: value.update(search={'rounds': 2},
+            assessment={'evidence': {'page_characters': 8000}}))
+        self.change('experiment.yaml', lambda value: value.setdefault('edit', {}).update({'execution-policy': {
+            'fields': ['parameters.settings.tool_execution.max_parallel'],
+            'bounds': {'parameters.settings.tool_execution.max_parallel': {'minimum': 1, 'maximum': 16}}}}))
         prepared = self.prepare()
         self.assertEqual(prepared.request.depth, 2)
-        self.assertEqual(prepared.config.process_assessment.assessors, ('execution-facts-v1',))
+        self.assertEqual(prepared.config.evidence_settings['page_characters'], 8000)
         self.assertIn('execution-policy', prepared.request.component_ids)
         self.assertEqual(prepared.config.improvement.component_options['execution-policy']['editable_fields'],
-                         ['max_tool_calls_per_turn'])
+                         ['parameters.settings.tool_execution.max_parallel'])
         self.assertNotIn('offline-placeholder', json.dumps(prepared.summary()))
 
     def test_referenced_component_and_comparison_changes_invalidate_prepared_inputs(self):
-        for name in ('components/H/execution-policy.yaml', 'components/I/improvement-search.yaml', 'comparison.yaml'):
+        for name in ('components/H/execution-policy.yaml', 'components/I/improvement-evaluator.yaml', 'comparison.yaml'):
             with self.subTest(name=name):
                 prepared = self.prepare()
                 path = self.directory / name
@@ -57,7 +56,7 @@ class ComponentExperimentTests(unittest.TestCase):
         for name, grant in (
             ('base_prompt', {'fields': ['models.executor']}),
             ('execution-policy', {'fields': ['parameters.max_turns'], 'bounds': {'parameters.max_turns': {'minimum': 100}}}),
-            ('improvement-feedback', {'fields': ['parameters.process_assessment.max_model_calls']})):
+            ('improvement-evaluator', {'fields': ['parameters.max_model_calls']})):
             with self.subTest(name=name):
                 (self.directory / 'experiment.yaml').write_text(original)
                 self.change('experiment.yaml', lambda value: value.update(edit={name: grant}))

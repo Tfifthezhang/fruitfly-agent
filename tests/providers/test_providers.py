@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import tempfile
+import json
+import socket
+import ssl
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -22,6 +25,24 @@ from fruitfly_agent.providers.registry import ProviderRegistry, default_registry
 
 
 class ProviderTests(unittest.TestCase):
+    def test_structural_connection_causes_are_bounded_and_do_not_copy_secrets(self) -> None:
+        failures = ((socket.gaierror(-2, 'offline-private-host'), 'dns'),
+                    (ssl.SSLCertVerificationError(1, 'offline-private-certificate'), 'tls_certificate'),
+                    (ConnectionRefusedError(61, 'offline-private-url'), 'connection_refused'),
+                    (ConnectionResetError(54, 'offline-private-header'), 'connection_reset'))
+        for cause, category in failures:
+            for classify in (classify_openai_error, classify_anthropic_error):
+                with self.subTest(category=category, classifier=classify.__module__):
+                    error = ConnectionError('Connection error.')
+                    error.__cause__ = cause
+                    cause.__cause__ = error
+                    result = classify(error)
+                    rows = result.details['diagnostics']['causes']
+                    self.assertEqual(2, len(rows))
+                    self.assertEqual(category, rows[-1]['category'])
+                    self.assertEqual(cause.errno, rows[-1]['errno'])
+                    self.assertNotIn('offline-private', json.dumps(result.details))
+
     def test_public_model_template_loads_without_live_credentials(self) -> None:
         specs = load_model_specs(Path(__file__).resolve().parents[2] / "examples/configuration/models.example.yaml")
         self.assertEqual({"deepseek-flash-openai", "deepseek-flash-anthropic"}, set(specs))

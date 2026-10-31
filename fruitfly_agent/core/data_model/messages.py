@@ -348,9 +348,9 @@ class LoopDiagnostics:
     tool_denied: int
     tool_budget_skipped: int
     tool_output_skipped: int
-    tool_limit_per_turn: int
+    tool_limit_per_turn: int | None
     last_turn_tool_attempts: int
-    turn_limit: int
+    turn_limit: int | None
 
 
 @dataclass(frozen=True)

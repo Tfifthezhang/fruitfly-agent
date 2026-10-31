@@ -16,7 +16,7 @@ needs a complete Linux Python installation visible inside task containers.
 Installation downloads packages. A macOS venv cannot serve as that runtime.
 
 For an existing server, first inspect and reuse validated environments using the
-[server guide](../../eval/SERVER_GUIDE.md#1-inspect-the-server-before-installing).
+[server guide](../../fruitfly_eval/SERVER_GUIDE.md#1-inspect-the-server-before-installing).
 For a **new installation only**, using previously unused environment paths:
 
 ```bash
@@ -43,7 +43,7 @@ read-only into tasks with its complete base Python, preserving absolute links.
 The controller also freezes the selected project source during preparation.
 Do not mount the entire checkout or `/usr`. For glibc, native libraries,
 certificates, dependency snapshots and proxies, follow
-[environment preparation](../../eval/SERVER_GUIDE.md#3-establish-and-freeze-the-two-python-environments).
+[environment preparation](../../fruitfly_eval/SERVER_GUIDE.md#3-establish-and-freeze-the-two-python-environments).
 
 ## Generate a fresh experiment
 
@@ -65,9 +65,9 @@ not overwrite defaults, reuse old candidate results or start Docker/model work.
 |---|---|
 | `models.yaml` | Shared daily/experiment model ID, protocol, endpoint, capabilities, token limits and key variable name |
 | `default-config.yaml` | Executor profile, enabled mechanisms and tool-call limit, initially 64 per turn |
-| `components/H/`, `components/I/` | Execution/tool values, editor instructions, feedback and search settings |
+| `components/H/`, `components/I/` | Execution/tool values, editor/evaluator prompts |
 | `tasks/tb4-smoke.yaml`, `comparison.yaml` | Task material and fixed comparison rules |
-| `experiment.yaml` | Baseline/task/comparison references, editable fields and hard allocations |
+| `experiment.yaml` | Baseline/task/comparison references, editable fields, fixed search/assessment settings and independent phase times |
 | `secrets.env` | Fill the empty model key privately, or use the process environment; never commit it |
 | `eval-request.json` | TB4 `smoke`, one attempt, concurrency 1 and whole-job timeout |
 | `eval-host.yaml` | Linux runtime mounts, cache location and optional task/dependency settings |
@@ -101,18 +101,12 @@ Stop at the first failed command. These steps make no model requests:
 Task-only preparation can download definitions and inspect local image references.
 Full preparation can pull/build/start environments and probes Agent/Verifier
 compatibility. `improvement check` validates prepared inputs, credential presence,
-effective mechanisms, component permissions, backend support and allocations
+effective mechanisms, component permissions, backend support and phase times
 without constructing Providers or starting containers. It does not establish
 successful model access or task quality. Review the selected task and exact image
-identities; see [preparation evidence](../../eval/SERVER_GUIDE.md#8-prepare-check-and-run-the-smoke).
+identities; see [preparation evidence](../../fruitfly_eval/SERVER_GUIDE.md#8-prepare-check-and-run-the-smoke).
 
-The [smoke experiment template](benchmark-smoke.example.yaml) enables only
-`base_prompt` editing. Enabled tools do not grant candidate editing permission.
-Select additional available components explicitly and inspect the check inventory.
-Tool attempts (the H `execution-policy` file), per-leaf model calls (`trial.model_calls: 80`),
-and root model/execution totals are independent allowances. Root totals are derived
-when omitted. Raising one allowance does not automatically raise the others;
-check after changes and review the [complete reference](benchmark.example.yaml).
+The [smoke experiment template](benchmark-smoke.example.yaml) automatically discovers legal targets supported by the runtime and task material. Add `edit` only to narrow that set. Check resolved fields and owner descriptions before running. Configure independent editor, execution and evaluator seconds under `timeouts`; counts and tokens are observations without admission quotas.
 
 ## Run and inspect the search
 
@@ -130,7 +124,7 @@ charges may apply. Use a persistent terminal on disconnect-prone connections:
 Use the actual run ID. Candidate settings stay in the experiment's isolated run
 copy; they do not edit the source checkout or baseline defaults. Official task
 scores select results. Optional completed-process feedback is disabled in this
-minimal template; the [experiment guide](../../fruitfly_agent/experiments/README.md#enable-completed-process-feedback)
+minimal template; the [experiment guide](../../fruitfly_agent/experiments/README.md#use-completed-process-feedback)
 shows how to enable it and separate exploration from official selection.
 
 Edit model-role selections in `default-config.yaml`, execution values in

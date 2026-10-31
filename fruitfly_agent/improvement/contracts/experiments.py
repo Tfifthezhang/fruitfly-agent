@@ -64,7 +64,7 @@ class EpisodeMaterial(Protocol):
 
 
 class EpisodeExecutor(Protocol):
-    async def run(self, request: EpisodeRequest, *, budget: Any, signal: Any) -> EpisodeResult: ...
+    async def run(self, request: EpisodeRequest, *, signal: Any) -> EpisodeResult: ...
 
 
 @dataclass(frozen=True)
@@ -142,7 +142,6 @@ class PreparedExecution:
     details: tuple[tuple[str, str], ...]
     current_source: Callable[[], str]
     private: Any = None
-    minimum_budget: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass
@@ -151,7 +150,6 @@ class ExecutionPorts:
     measurements: Any = None
     verifier: Any = None
     selector: Any = None
-    verification_reserve: dict[str, int] = field(default_factory=lambda: {'model': 0, 'execution': 0})
     retain_experience: bool = True
     search_problem: Any = None
 
@@ -172,6 +170,7 @@ class ExecutionDefinition:
     accepts_runner_override: bool = False
     plan_factory: Callable = RunPlan
     uses_configured_tools: bool = False
+    component_scope: Callable | None = None
 
     def capabilities_for(self, tool_names):
         return self.capabilities | (frozenset("tool:" + name for name in tool_names) if self.uses_configured_tools else frozenset())

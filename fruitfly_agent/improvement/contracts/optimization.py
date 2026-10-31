@@ -3,9 +3,35 @@ from dataclasses import dataclass, asdict
 from typing import Literal, Protocol, runtime_checkable
 import hashlib
 import re
+from typing import Any
 from fruitfly_agent.core.config import AgentLoopConfig
 
 from .components import ComponentDocument
+
+
+@dataclass(frozen=True)
+class OptimizationField:
+    """Owner-authored field semantics; never an editable candidate document."""
+    path: str
+    kind: str
+    description: str
+    current: Any
+    default: Any
+    unit: str = ''
+    minimum: float | None = None
+    maximum: float | None = None
+    choices: tuple[Any, ...] = ()
+    constraints: str = ''
+
+    def __post_init__(self):
+        if not self.path.startswith(('parameters.instructions.', 'parameters.settings.', 'parameters.content.')) or not re.fullmatch(r'[A-Za-z0-9_.-]+', self.path):
+            raise ValueError('optimization field requires an exact parameters path')
+        if not self.description.strip() or self.kind not in {'string', 'integer', 'number', 'boolean', 'choice', 'path', 'string_list', 'documents'}:
+            raise ValueError('optimization field requires its type and owner description')
+        object.__setattr__(self, 'choices', tuple(self.choices))
+
+    def to_dict(self):
+        return asdict(self)
 
 
 @dataclass(frozen=True)
@@ -47,6 +73,7 @@ class OptimizationSpec:
 
 class OptimizationAdapter(Protocol):
     optimization: OptimizationSpec
+    def describe_fields(self, document: ComponentDocument | None = None) -> tuple[OptimizationField, ...]: ...
     def snapshot(self) -> ComponentDocument: ...
     def validate(self, document: ComponentDocument) -> None: ...
 

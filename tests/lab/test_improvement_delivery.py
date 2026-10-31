@@ -15,7 +15,7 @@ from fruitfly_agent.lab.improvement.execution import files
 from fruitfly_agent.lab.improvement.execution.deliverables import DeliverySpec, DeliveryBundle
 from fruitfly_agent.lab.improvement.verification.delivery import (CommandDeliveryBackend, DeliveryValidationRunner)
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
-from fruitfly_agent.improvement.execution.facts import read_facts
+from fruitfly_agent.improvement.execution.facts import read_facts, ensure_facts
 from tests.support.pipeline import build_pipeline
 
 
@@ -30,6 +30,8 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
             baseline.snapshot_id, plan.parent.state, plan.conditions_id, 'completed', 'Done',
             (reference('main.py', script),))
         task = TaskMaterial('task', 'Work')
+        record = ensure_facts(record, artifacts)
+        initial_usage = read_facts(record, artifacts).usage
         class Runner:
             capabilities = frozenset()
             async def execute(self, *args): return record
@@ -44,6 +46,7 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
             record = replace(record, artifacts=(*record.artifacts, reference('weights.dat', b'42')))
             valid = await runner.execute(plan, task, baseline)
             self.assertEqual(valid.status, 'completed')
+            self.assertEqual(read_facts(valid, artifacts).usage, initial_usage)
             receipt = next(r for r in valid.artifacts if r.path == 'delivery-validation.json')
             value = json.loads(artifacts.read(receipt.artifact_id))
             self.assertEqual(value['result']['stdout'], '42\n')

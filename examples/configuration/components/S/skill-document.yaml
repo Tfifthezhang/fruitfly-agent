@@ -2,9 +2,11 @@ id: skill-document
 role: S
 implementation: skill-document
 parameters:
-  initial_text: '# Initial skill
+  content:
+    body: '# Initial skill
 
-    Read task requirements before acting.
+      Read task requirements before acting.
 
-    '
-  max_chars: 16000
+      '
+  settings:
+    max_chars: 16000

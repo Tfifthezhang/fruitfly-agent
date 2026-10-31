@@ -1,182 +1,93 @@
-"""Single summarizer safety, composition and bounded recovery, offline."""
+"""Working-memory invalid output, coverage, budget and tool-link safety."""
 from dataclasses import replace
 import unittest
-
-from fruitfly_agent.core.data_model import (
-    AssistantMessage, ContextItem, ContextSnapshot, CustomMessage, ImageBlock,
-    TextBlock, ToolCallBlock, ToolResultMessage, UserMessage,
-)
-from fruitfly_agent.lab.context_manager.reduction import SummarizingCompactor, SummarizingCompactorConfig
+from fruitfly_agent.core.data_model import AssistantMessage, ContextItem, ContextSnapshot, TextBlock, ToolCallBlock, ToolResultMessage, UserMessage, CustomMessage, ImageBlock
+from fruitfly_agent.lab.context_manager.reduction import WorkingMemoryConfig, WorkingMemoryReducer
 from fruitfly_agent.lab.context_manager.reduction.cut import find_cut_point, valid_tool_links
 from tests.support.faux_provider import FauxProvider
-from tests.support.loop import make_tool
 
 
 def snapshot(messages=None, **overrides):
-    messages = tuple(messages or (
-        UserMessage(content="old task " + "x" * 2000),
-        AssistantMessage(content=[TextBlock("completed step")]),
-        UserMessage(content="latest task"),
-    ))
+    messages = tuple(messages or (UserMessage('task'), AssistantMessage([TextBlock('evidence ' + 'x' * 4000)]), UserMessage('correction')))
     values = dict(messages=messages, canonical_items=tuple(ContextItem(str(i), m) for i, m in enumerate(messages)),
-                  system_prompt="", tools=(), context_window=256, model="main", max_tokens=32, trigger="budget")
+        system_prompt='', tools=(), context_window=512, model='fake', max_tokens=32, trigger='budget')
     values.update(overrides)
     return ContextSnapshot(**values)
 
 
-def compactor(provider, **overrides):
-    values = dict(reserve_tokens=0, keep_recent_tokens=1, reactive_keep_recent_tokens=1, summary_attempts=1)
-    values.update(overrides)
-    return SummarizingCompactor(SummarizingCompactorConfig(**values), provider)
+def reducer(provider, **changes):
+    return WorkingMemoryReducer(WorkingMemoryConfig(memory_tokens=64, auxiliary_attempts=1, auxiliary_max_tokens=128, **changes), provider)
 
 
 class ReductionSafetyTests(unittest.IsolatedAsyncioTestCase):
-    async def test_rejects_blank_truncated_error_and_tool_outputs(self):
-        responses = (
-            AssistantMessage([TextBlock("   \n")], stop_reason="stop"),
-            AssistantMessage([TextBlock("summary")], stop_reason="length"),
-            AssistantMessage([TextBlock("intermediate")], stop_reason="stop", continue_turn=True),
-            AssistantMessage([TextBlock("summary")], stop_reason="error"),
-            AssistantMessage([TextBlock("summary"), ToolCallBlock("c", "write", {})], stop_reason="stop"),
-        )
+    async def test_rejects_blank_truncated_error_and_tool_outputs_without_changing_source(self):
+        original = snapshot(); before = [m.to_dict() for m in original.messages]
+        for response in (AssistantMessage([TextBlock(' ')], stop_reason='stop'),
+                AssistantMessage([TextBlock('memory')], stop_reason='length'),
+                AssistantMessage([TextBlock('memory')], stop_reason='stop', continue_turn=True),
+                AssistantMessage([TextBlock('memory')], stop_reason='error'),
+                AssistantMessage([ToolCallBlock('call', 'write', {})], stop_reason='stop')):
+            with self.subTest(response=response):
+                provider = FauxProvider(); provider.respond(response)
+                self.assertIsNone(await reducer(provider).check_budget(original))
+                self.assertEqual(before, [m.to_dict() for m in original.messages])
+
+    async def test_oversized_memory_and_failed_shortening_never_commit(self):
+        provider = FauxProvider(); provider.respond_text('x' * 1000); provider.respond_text('x' * 1000)
         original = snapshot()
-        before = [m.to_dict() for m in original.messages]
-        for response in responses:
-            provider = FauxProvider()
-            provider.respond(response)
-            self.assertIsNone(await compactor(provider).check_budget(original))
-            self.assertEqual(before, [m.to_dict() for m in original.messages])
+        self.assertIsNone(await reducer(provider).check_budget(original))
+        self.assertEqual({}, original.context_state)
 
-    async def test_rejects_larger_and_smaller_but_still_over_budget(self):
-        for text in ("s" * 3000, "s" * 1000):
-            provider = FauxProvider()
-            provider.respond_text(text)
-            self.assertIsNone(await compactor(provider).check_budget(snapshot()))
+    async def test_fitting_projection_preserves_original_task_and_canonical_corrections_in_memory_input(self):
+        provider = FauxProvider(); provider.respond_text('task; correction; pending verification')
+        method = reducer(provider); original = snapshot()
+        decision = await method.check_budget(original)
+        self.assertIsNotNone(decision.messages)
+        self.assertEqual(original.messages[0], decision.messages[-1])
+        self.assertIn('correction', provider.calls[0]['messages'][0].content)
+        self.assertLess(method.estimate(replace(original, messages=decision.messages)), original.context_window - original.max_tokens)
+        self.assertEqual(len(original.canonical_items), decision.state['covered'])
 
-    async def test_accepts_only_fitting_smaller_projection_and_keeps_tail(self):
-        provider = FauxProvider()
-        provider.respond_text("old task and pending work")
-        reducer = compactor(provider)
-        original = snapshot()
-        decision = await reducer.check_budget(original)
-        self.assertIsNotNone(decision)
-        self.assertEqual(original.messages[-1], decision.messages[-1])
-        self.assertLess(reducer.estimate(replace(original, messages=decision.messages)), reducer.estimate(original))
-        self.assertLessEqual(reducer.estimate(replace(original, messages=decision.messages)), original.context_window - original.max_tokens)
-        self.assertFalse(decision.retry)
-
-    async def test_fixed_prompt_tools_and_output_cannot_be_discarded(self):
-        tool, _ = make_tool()
-        for changes in ({"system_prompt": "s" * 2000}, {"tools": (replace(tool, description="t" * 2000),)}, {"max_tokens": 256}):
+    async def test_invalid_or_pending_tool_links_do_not_start_auxiliary_work(self):
+        for messages in ((UserMessage('task'), ToolResultMessage('missing', [TextBlock('result')])),
+                (UserMessage('task'), AssistantMessage([ToolCallBlock('c', 'read', {})]), UserMessage('steering'))):
             provider = FauxProvider()
-            self.assertIsNone(await compactor(provider).check_budget(snapshot(**changes)))
+            self.assertIsNone(await reducer(provider).check_budget(snapshot(messages)))
             self.assertEqual([], provider.calls)
 
-    async def test_indivisible_latest_turn_remains_without_auxiliary_call(self):
-        provider = FauxProvider()
-        messages = [UserMessage("old"), AssistantMessage([TextBlock("old")]), UserMessage("x" * 2000)]
-        self.assertIsNone(await compactor(provider).react_to_overflow(snapshot(messages, trigger="overflow", overflow_attempt=1), RuntimeError()))
-        self.assertEqual([], provider.calls)
+    async def test_failed_page_can_be_retried_without_permanent_suppression(self):
+        provider = FauxProvider(); method = reducer(provider)
+        provider.respond_text(' ')
+        self.assertIsNone(await method.check_budget(snapshot()))
+        provider.respond_text('memory')
+        self.assertIsNotNone((await method.check_budget(snapshot())).messages)
 
-    async def test_no_permanent_suppression_after_invalid_summary(self):
+    async def test_auxiliary_model_capacity_limits_each_page_and_preserves_every_character(self):
         provider = FauxProvider()
-        reducer = compactor(provider)
-        provider.respond_text(" ")
-        self.assertIsNone(await reducer.check_budget(snapshot()))
-        provider.respond_text("summary")
-        self.assertIsNotNone(await reducer.check_budget(snapshot()))
+        for _ in range(100): provider.respond_text('bounded memory')
+        method = WorkingMemoryReducer(WorkingMemoryConfig(memory_tokens=64, auxiliary_max_tokens=64,
+            page_char_limit=100, max_pages=128), provider, memory_context_window=1024, memory_output_limit=32)
+        result = await method.check_budget(snapshot())
+        self.assertEqual(len(snapshot().canonical_items), result.state['covered'])
+        pages = [c['messages'][0].content.split('<evidence>\n')[1].split('\n</evidence>')[0] for c in provider.calls]
+        self.assertIn('x' * 4000, ''.join(pages))
+        self.assertTrue(all(c['max_tokens'] == 32 for c in provider.calls))
+        self.assertTrue(all(method.meter.text_tokens(c['system_prompt'] + c['messages'][0].content) + 32 < 1024 for c in provider.calls))
 
-    async def test_overflow_requires_progress_and_obeys_attempt_limit(self):
-        provider = FauxProvider()
-        provider.respond_text("summary")
-        provider.respond_text("summary")
-        reducer = compactor(provider)
-        original = snapshot(trigger="overflow", overflow_attempt=1)
-        first = await reducer.react_to_overflow(original, RuntimeError())
-        self.assertTrue(first.retry)
-        next_snapshot = replace(original, messages=first.messages, overflow_attempt=2)
-        self.assertIsNone(await reducer.react_to_overflow(next_snapshot, RuntimeError()))
-        self.assertIsNone(await reducer.react_to_overflow(replace(original, overflow_attempt=100), RuntimeError()))
-        self.assertEqual(2, len(provider.calls))
-
-    async def test_serializes_text_blocks_calls_results_errors_and_previous_summary(self):
-        provider = FauxProvider()
-        provider.respond_text("summary")
-        messages = [
-            CustomMessage("compactionSummary", "prior decisions"),
-            UserMessage([TextBlock("important constraint"), ImageBlock("base64-secret", "image/png")]),
-            AssistantMessage([ToolCallBlock("call", "write", {"path": "important.txt", "content": "value"})]),
-            ToolResultMessage("call", [TextBlock("failed " + "x" * 2000)], is_error=True),
-            UserMessage("latest task"),
-        ]
-        decision = await compactor(provider).check_budget(snapshot(messages))
-        self.assertIsNotNone(decision)
-        prompt = provider.calls[0]["messages"][0].content
-        for text in ("prior decisions", "important constraint", "image/png", "write", "important.txt", "error=True"):
-            self.assertIn(text, prompt)
-        self.assertNotIn("base64-secret", prompt)
-
-    async def test_retains_projected_tail_and_external_reference_deterministically(self):
-        reference = "context://sha256/" + "a" * 64
-        messages = [UserMessage("reference: " + reference + "\n" + "x" * 2000), AssistantMessage([TextBlock("old")]), UserMessage("projected tail")]
-        canonical = tuple(ContextItem(str(i), UserMessage("canonical " + "y" * 1000)) for i in range(3))
-        provider = FauxProvider()
-        provider.respond_text("summary without references")
-        decision = await compactor(provider).check_budget(snapshot(messages, canonical_items=canonical))
-        self.assertIsNotNone(decision)
-        self.assertIn(reference, decision.messages[0].text)
-        self.assertEqual(messages[-1], decision.messages[-1])
-        self.assertNotIn("canonical", decision.messages[0].text)
-
-    async def test_auxiliary_input_and_output_have_separate_model_budget(self):
-        provider = FauxProvider()
-        for _ in range(32): provider.respond_text("summary")
-        reducer = SummarizingCompactor(SummarizingCompactorConfig(reserve_tokens=0, keep_recent_tokens=1), provider,
-                                      summary_context_window=256, summary_output_limit=32)
-        self.assertIsNotNone(await reducer.check_budget(snapshot()))
-        call = provider.calls[0]
-        self.assertEqual(32, call["max_tokens"])
-        self.assertLessEqual(reducer.estimate_tokens(call["system_prompt"] + call["messages"][0].content) + 16 + 32, 256)
-        evidence = "".join(c["messages"][0].content.split("<history>\n", 1)[1].split("\n</history>", 1)[0] for c in provider.calls)
-        self.assertIn("x" * 2000, evidence)
-        for c in provider.calls:
-            self.assertLessEqual(reducer.estimate_tokens(c["system_prompt"] + c["messages"][0].content) + 32 + 32, 256)
-
-    async def test_invalid_or_pending_tool_links_are_not_compressed(self):
-        for messages in (
-            [UserMessage("old" * 1000), ToolResultMessage("missing", [TextBlock("result")]), UserMessage("latest")],
-            [UserMessage("old" * 1000), AssistantMessage([ToolCallBlock("c", "read", {})]), UserMessage("latest")],
-        ):
-            provider = FauxProvider()
-            self.assertIsNone(await compactor(provider).check_budget(snapshot(messages)))
-            self.assertEqual([], provider.calls)
+    async def test_canonical_public_sources_keep_errors_and_omit_image_bytes(self):
+        provider = FauxProvider(); provider.respond_text('memory')
+        messages = (CustomMessage('compactionSummary', 'prior decisions'),
+            UserMessage([TextBlock('constraint'), ImageBlock('base64-secret', 'image/png')]),
+            AssistantMessage([ToolCallBlock('c', 'write', {'path': 'important.txt'})]),
+            ToolResultMessage('c', [TextBlock('failed ' + 'x' * 4000)], is_error=True))
+        await reducer(provider).check_budget(snapshot(messages))
+        prompt = provider.calls[0]['messages'][0].content
+        for text in ('prior decisions', 'constraint', 'image/png', 'important.txt', 'error=True'): self.assertIn(text, prompt)
+        self.assertNotIn('base64-secret', prompt)
 
     def test_steering_boundary_cannot_split_a_tool_pair(self):
-        messages = [UserMessage("old"), AssistantMessage([TextBlock("answer")]), UserMessage("task"),
-                    AssistantMessage([ToolCallBlock("c", "read", {})]), UserMessage("steering"),
-                    ToolResultMessage("c", [TextBlock("result")])]
+        messages = [UserMessage('old'), AssistantMessage([TextBlock('answer')]), UserMessage('task'),
+            AssistantMessage([ToolCallBlock('c', 'read', {})]), UserMessage('steering'), ToolResultMessage('c', [TextBlock('result')])]
         cut = find_cut_point(messages, 1, lambda _: 1)
         self.assertEqual(2, cut)
         self.assertTrue(valid_tool_links(messages[cut:]))
-
-    async def test_large_window_default_pages_cover_every_source_character(self):
-        from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone
-        class Provider:
-            def __init__(self): self.sizes = []
-            def __call__(self, view, *, signal=None):
-                prompt = view.messages[0].content
-                page = prompt.split('<history>\n', 1)[1].split('\n</history>', 1)[0]
-                self.sizes.append(len(page))
-                async def events(): yield StreamDone(AssistantMessage([TextBlock('continuity summary')], stop_reason='stop'))
-                return AssistantMessageEventStream(events())
-        provider = Provider()
-        reducer = SummarizingCompactor(SummarizingCompactorConfig(), provider, estimate_fn=lambda text: (len(text) + 3) // 4)
-        messages = [UserMessage('old task'), AssistantMessage([TextBlock('x' * 3_800_000)]), UserMessage('latest task')]
-        original = snapshot(messages, context_window=1_000_000, max_tokens=32768)
-        decision = await reducer.check_budget(original)
-        self.assertIsNotNone(decision)
-        self.assertEqual(len(reducer._serialize_history(messages[:decision.metadata['cut']], bounded=False)), sum(provider.sizes))
-        self.assertLessEqual(len(provider.sizes), reducer.config.max_pages)
-        self.assertGreater(len(provider.sizes), 16)
-        source = reducer.history.text(decision.metadata['source'])
-        self.assertIn('x' * 3_800_000, source)

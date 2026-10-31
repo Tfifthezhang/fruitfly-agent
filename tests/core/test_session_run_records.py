@@ -11,12 +11,25 @@ from fruitfly_agent.core.data_model import Usage, UserMessage
 from fruitfly_agent.core.extensions.hooks import AFTER_RESPONSE, HookRegistry
 from fruitfly_agent.core.loop import run_agent_loop
 from fruitfly_agent.core.session import Session
+from fruitfly_agent.core.errors import RetryableError
 
 from tests.support.faux_provider import FauxProvider
 from tests.support.loop import make_config, make_tool
 
 
 class SessionRunRecordTests(unittest.IsolatedAsyncioTestCase):
+    async def test_structured_failure_diagnostics_survive_result_and_session(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            diagnostics = {'causes': [{'type': 'ConnectionRefusedError', 'category': 'connection_refused'}]}
+            def provider(view, *, signal=None):
+                raise RetryableError('Connection error.', details={'diagnostics': diagnostics})
+            with Session(Path(directory) / 'session.jsonl') as session:
+                result = await run_agent_loop(make_config(provider, session=session), [UserMessage(content='go')])
+                self.assertEqual(diagnostics, result.error_details['diagnostics'])
+                records = [entry.payload for entry in session.read_all() if entry.payload.get('kind') == 'runRecord']
+                self.assertEqual(diagnostics, next(r['data']['diagnostics'] for r in records if r['event'] == 'provider_attempt_failed'))
+                self.assertEqual(diagnostics, records[-1]['data']['error']['diagnostics'])
+
     async def test_hook_adjusted_receipts_are_persisted_before_response_observation(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             provider = FauxProvider()

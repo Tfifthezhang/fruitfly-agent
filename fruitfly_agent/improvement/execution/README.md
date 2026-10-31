@@ -19,6 +19,6 @@ never makes a failed execution selectable or verified.
 
 Concrete file/SSH/container capabilities belong to their registered backend.
 See [Lab execution](../../lab/improvement/execution/README.md) and optional
-[Eval](../../../eval/improvement/README.md). Offline checks:
+[Eval](../../../fruitfly_eval/improvement/README.md). Offline checks:
 `tests.improvement.test_reliability`, `tests.lab.test_task_set_lifecycle`,
 `tests.eval.test_execution_facts`.

@@ -17,7 +17,6 @@ from ..assessment.promotion import compare_candidates
 from ..assessment.joint import assess_batch
 from ..assessment.joint_process import choose_seed
 from ..task_sets.sampling import sample_batch
-from fruitfly_agent.improvement.workflow.budget import AllocationExhausted
 from fruitfly_agent.improvement.workflow.engine import SearchEngine, validate_schedule
 from fruitfly_agent.improvement.workflow.problems import SearchProblem
 from fruitfly_agent.improvement.workflow.services import GeneratorServices
@@ -61,8 +60,6 @@ class TaskSetProblem:
         evaluator.persist('materials', 'task-set', asdict(self.snapshot))
         entries = self.snapshot.selection_entries()
         selection_batch = EvaluationBatch(self.snapshot.snapshot_id, tuple((e.key for e in entries)), 'selection', self.settings.execution.attempts)
-        limits = {'model': 2 * sum((e.model_limit for e in entries)) * selection_batch.attempts, 'execution': 2 * sum((e.execution_limit for e in entries)) * selection_batch.attempts}
-        final_budget = services.budget.child(limits)
         state = services.state = WorkflowState(baseline)
         candidates: list[CandidateBundle] = []
         exploration: list[dict[str, str]] = []
@@ -83,7 +80,7 @@ class TaskSetProblem:
             services.check()
             await services.emit('before_trial', {'harness_id': harness.snapshot_id})
             result = await run_stage(services, 'execute', lambda: evaluator.evaluate(plan, harness, target or batch),
-                validator=lambda value: require_type(value, CandidateEvaluation))
+                validator=lambda value: require_type(value, CandidateEvaluation), bounded=False)
             # Private selection receipts never enter research/editor hooks.
             if (target or batch).phase == 'search':
                 for trial in result.trials:
@@ -111,6 +108,7 @@ class TaskSetProblem:
                 raise StageFailure(Failure('propose', 'invalid_result', 'ValueError'))
             for candidate in proposal.candidates:
                 await run_stage(services, 'propose', lambda: workflow.validate(candidate, plan=plan, baseline=current, records=request.records))
+                services.hypotheses[candidate.harness.snapshot_id]=candidate.reasons
                 candidates.append(candidate)
                 services.record('candidate-validated', candidate=asdict(candidate))
                 await services.emit('after_candidate_validated', {'candidate_id': candidate.candidate_id, 'harness_id': candidate.harness.snapshot_id, 'reasons': [asdict(r) for r in candidate.reasons]})
@@ -130,38 +128,38 @@ class TaskSetProblem:
             if provisional is None or not provisional.complete:
                 return
             challenger = harnesses[provisional.harness_id]
-            if not final:
-                if any((services.budget.available(k) < v for k, v in limits.items())):
-                    services.record('promotion-deferred', reason='final comparison quota remains protected')
-                    return
-
             async def compare():
                 nonlocal official, official_harness, decision, no_gain
                 before = await evaluate(official_harness, selection_batch)
                 after = await evaluate(challenger, selection_batch)
                 comparison = self.compare(before, after, self.settings.promotion)
+                if (comparison.result=='tied' and comparison.gain==0 and self.settings.promotion.minimum_gain==0
+                        and before.harness_id!=after.harness_id and workflow.completed_assessment is not None):
+                    selected, explanation=await choose_seed(workflow.completed_assessment,self.snapshot,(before,after),before)
+                    comparison=replace(comparison,result='better' if selected.evaluation_id==after.evaluation_id else 'tied',
+                        judgment_id=getattr(workflow.completed_assessment,'last_comparison_id',''),reason=explanation)
                 evaluator.persist('comparisons', 'comparison-' + uuid4().hex, asdict(comparison))
                 if before.complete:
                     official = before
                     decision = JointSelection(before.evaluation_id, 'Incumbent on the complete shared selection set')
                 if comparison.result == 'better':
                     official, official_harness = (after, challenger)
-                    decision = JointSelection(after.evaluation_id, 'Improved on the complete shared selection set')
+                    decision = JointSelection(after.evaluation_id, comparison.reason or 'Improved on the complete shared selection set')
                     no_gain = 0
                 elif comparison.result != 'insufficient':
                     no_gain += 1
+            await compare()
             if final:
-                with services.phase(final_budget):
-                    await compare()
                 final_compared = True
-            else:
-                await compare()
 
         async def select(index, last):
             nonlocal provisional
             complete = [e for e in round_evaluations if e.complete]
             if complete:
                 provisional = max(complete, key=lambda e: e.assessment.score)
+                tied=tuple(e for e in complete if e.assessment.score==provisional.assessment.score)
+                if len(tied)>1 and workflow.completed_assessment is not None:
+                    provisional,_=await choose_seed(workflow.completed_assessment,self.snapshot,tied,provisional)
             if last or (index + 1) % self.settings.promotion.every_rounds == 0:
                 await promote(final=last)
 
@@ -193,18 +191,9 @@ class TaskSetProblem:
                 await services.emit('before_finalization')
                 if not final_compared:
                     await run_stage(services, 'select', lambda: promote(final=True), bounded=False)
-        except AllocationExhausted:
-            reason = 'budget_exhausted'
-            await services.emit('before_finalization')
-            try:
-                await run_stage(services, 'select', lambda: promote(final=True), bounded=False)
-            except AllocationExhausted:
-                pass
         except AssessmentUnavailable:
             reason = 'assessment_unavailable'
         except StageFailure as exc:
             reason = 'stage_failed.' + exc.failure.stage
-        finally:
-            final_budget.close()
         await services.emit('before_finalization')
         return TaskSetOutcome(plan, self.snapshot, official, official_harness, tuple(candidates), tuple(evaluator.evaluations), decision, reason, tuple(exploration))

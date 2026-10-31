@@ -92,7 +92,7 @@ class ResumeHistoryTest(unittest.IsolatedAsyncioTestCase):
                 from fruitfly_agent.core.data_model import UserMessage
                 saved.append("compaction", {"messages": [UserMessage(content="old projected summary").to_dict()]})
             factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=registry)
-            factory.configuration.set_mechanism("compaction", enabled=False)
+            factory.configuration.set_mechanism("working-memory-reduction", enabled=False)
             factory.configuration.save()
             factory.reload_configuration()
             app = AgentApplication(factory)

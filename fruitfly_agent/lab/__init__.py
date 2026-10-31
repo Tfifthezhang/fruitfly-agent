@@ -8,7 +8,7 @@ from .context_manager.augmentation.information import (
     create_local_knowledge_space,
 )
 from .context_manager.augmentation.skills import Skill, load_skills, render_skills_xml
-from .context_manager.reduction import SummarizingCompactor, SummarizingCompactorConfig
+from .context_manager.reduction import WorkingMemoryReducer, WorkingMemoryConfig
 from .environment import LocalEnv
 from .tools import builtin_tools
 
@@ -21,8 +21,8 @@ __all__ = [
     "Skill",
     "load_skills",
     "render_skills_xml",
-    "SummarizingCompactor",
-    "SummarizingCompactorConfig",
+    "WorkingMemoryReducer",
+    "WorkingMemoryConfig",
     "LocalEnv",
     "builtin_tools",
 ]

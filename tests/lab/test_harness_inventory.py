@@ -18,16 +18,16 @@ class HarnessInventoryTests(unittest.TestCase):
         inventory = resolve_harness(profile, catalog)
         self.assertEqual(inventory.tools, ())
         self.assertFalse(any(c.role == 'S' or c.kind == 'tool-guidance' for c in inventory.components))
-        for name in ('learned-memory', 'skill-document', 'tool-guidance.read'):
+        for name in ('skill-document', 'tool-guidance.read'):
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, 'absent'):
                 inventory.select((name,), frozenset({'execution-config'}), frozenset({'H', 'S'}))
 
     def test_enabled_state_and_tools_are_discovered_without_running_installers(self):
         catalog = builtin_catalog()
-        selections = tuple(MechanismSelection(name) for name in ('local-env', 'read-tool', 'skill-document', 'learned-memory'))
+        selections = tuple(MechanismSelection(name) for name in ('local-env', 'read-tool', 'skill-document'))
         inventory = resolve_harness(HarnessProfile('baseline', mechanisms=selections), catalog)
         self.assertEqual(inventory.tools, ('read',))
-        self.assertEqual({c.component_id for c in inventory.components if c.role == 'S'}, {'skill-document', 'learned-memory'})
+        self.assertEqual({c.component_id for c in inventory.components if c.role == 'S'}, {'skill-document'})
         with self.assertRaisesRegex(ValueError, 'backend'):
             inventory.select(('tool-guidance.read',), frozenset(), frozenset({'H'}))
         selected = inventory.select(('base_prompt',), frozenset(), frozenset({'H'}))
@@ -49,16 +49,16 @@ class HarnessInventoryTests(unittest.TestCase):
         installer.assert_not_called()
 
     def test_execution_policy_respects_field_permissions_ranges_and_other_owners(self):
-        config = SimpleNamespace(**execution_kwargs({'max_tool_calls_per_turn': 256}))
-        target = ExecutionPolicyTarget(config)
-        options = {'editable_fields': ['max_tool_calls_per_turn'],
-                   'bounds': {'max_tool_calls_per_turn': {'minimum': 64, 'maximum': 512}}}
+        config=SimpleNamespace(**execution_kwargs({}))
+        target=ExecutionPolicyTarget(config)
+        field='parameters.settings.tool_execution.max_parallel'
+        options={'editable_fields':[field],'bounds':{field:{'minimum':1,'maximum':16}}}
         target.validate_options(options)
-        value = json.loads(target.snapshot().text)
-        target.validate_change(json.dumps({**value, 'max_tool_calls_per_turn': 128}), options)
-        with self.assertRaisesRegex(ValueError, 'bounds'):
-            target.validate_change(json.dumps({**value, 'max_tool_calls_per_turn': 1024}), options)
-        with self.assertRaisesRegex(ValueError, 'fixed'):
-            target.validate_change(json.dumps({**value, 'max_turns': 8}), options)
-        owned = ExecutionPolicyTarget(config, fixed_fields={'max_turns'})
-        with self.assertRaises(ValueError): owned.validate_options({'editable_fields': ['max_turns']})
+        value=json.loads(target.snapshot().text);value['settings']['tool_execution']['max_parallel']=2
+        target.validate_change(json.dumps(value),options)
+        value['settings']['tool_execution']['max_parallel']=32
+        with self.assertRaisesRegex(ValueError,'bounds'):target.validate_change(json.dumps(value),options)
+        value=json.loads(target.snapshot().text);value['settings']['max_turns']=8
+        with self.assertRaisesRegex(ValueError,'fixed'):target.validate_change(json.dumps(value),options)
+        for field in ('parameters.settings.max_turns','parameters.settings.max_tool_calls_per_turn'):
+            with self.assertRaises(ValueError):target.validate_options({'editable_fields':[field]})

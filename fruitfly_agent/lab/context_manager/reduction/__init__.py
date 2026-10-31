@@ -1,9 +1,5 @@
-"""Selectable reduction methods through one Core contract."""
-
-from .methods.summarizing.config import SummarizingCompactorConfig
-from .methods.summarizing.algorithm import SummarizingCompactor, install as install_summarizing
+"""Working-memory reduction through the Core context contract."""
 from .methods.working_memory.config import WorkingMemoryConfig
 from .methods.working_memory.algorithm import WorkingMemoryReducer
 
-__all__ = ["SummarizingCompactor", "SummarizingCompactorConfig", "install_summarizing",
-           "WorkingMemoryConfig", "WorkingMemoryReducer"]
+__all__ = ["WorkingMemoryConfig", "WorkingMemoryReducer"]

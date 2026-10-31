@@ -14,8 +14,8 @@ selection decisions and attributed experience. Stage protocols are exported thro
 | `CandidateBundle` | Frozen parent, complete component set and per-edit evidence |
 | `ExecutionRecord` | Task, material, harness, initial state and conditions identities |
 | `SelectionDecision` | Existing run ID; output selection differs from verification |
-| `JobServices` / `JobResource` | Shared budgets, cancellation, operations and optional asynchronous cleanup |
-| `RunPlan` | Exact component scope, generator, modes and shared allocations |
+| `JobServices` / `JobResource` | Observed usage, cancellation, operations and optional asynchronous cleanup |
+| `RunPlan` | Exact component scope, generator, modes and independent phase times |
 | `ExperienceEntry` | Task attribution, lesson, limitations, evidence and reusable snapshot |
 
 [Versions](versions.py) bind H/I/S separately. [Candidates](candidates.py) declare
@@ -40,16 +40,10 @@ separate discovery, validation and construction. Typed parameter declarations
 reject unknown or duplicate fields. Run converts these public values to frontend
 views rather than exposing Lab implementations to Interactive.
 
-`CompositionRequest.feedback` supplies explicitly permitted development
-measurements. `ImprovementOutcome.verification` optionally references a completed
-independent proof envelope; old outcomes without that field remain ordinary
-historical data and do not acquire fabricated proof. Existing generator/composer/
-runner call signatures remain unchanged. Job plan schema 2 records execution
-identity and normalized request; schema 1 journals and historical reports remain
-readable. A preview is never restored as authorization to rerun unknown work.
+`CompositionRequest.feedback` supplies permitted development measurements. `ImprovementOutcome.verification` references independent proof when available. Job plan schema 2 records execution identity and normalized request. A preview never authorizes replay of uncertain work.
 
 See [execution](../../lab/improvement/execution/README.md), [editor experiments](../../lab/improvement/improver/README.md)
-and [budget/stop behavior](../../lab/improvement/workflow/README.md).
+and [time/stop behavior](../../lab/improvement/workflow/README.md).
 
 ## Import contracts by responsibility
 
@@ -58,7 +52,7 @@ and [budget/stop behavior](../../lab/improvement/workflow/README.md).
 | `components.py` | Documents, snapshots, publication/build/runtime/activation seams |
 | `tasks.py` | Materials, resources and private acceptance-case values |
 | `execution.py` | Final execution records and established TaskRunner signature |
-| `facts.py` | Immutable facts, budget scope and artifact collection status |
+| `facts.py` | Immutable facts, usage scope and artifact collection status |
 | `search.py` | Attributed exploration decisions |
 | `task_sets.py` | Frozen collection identities, task objectives and private source construction ports |
 | `evaluation.py` | Expected batches, leaf trials, candidate evaluations and joint selection outcomes |
@@ -75,12 +69,7 @@ There are no parallel definitions or implicit dynamic imports. Live payloads are
 canonical JSON snapshots; readers cannot mutate committed evidence. Online
 assessment status describes scope/completeness, not independent verification.
 
-`PreparedExecution.task` explicitly accepts `TaskMaterial` or `TaskSetSnapshot`.
-`ExecutionPorts.search_problem` supplies operations for the shared engine, and
-`ExecutionDefinition.plan_factory` owns mode-specific bounded plans. Ordinary
-`RunPlan` limits remain compatible; `TaskSetRunPlan` permits larger explicit finite
-totals and binds task-set settings into comparison conditions. Batch outcomes keep
-candidate evaluation IDs instead of fabricating single task executions.
+`PreparedExecution.task` accepts `TaskMaterial` or `TaskSetSnapshot`. `ExecutionPorts.search_problem` supplies operations for the shared engine. `ExecutionDefinition.plan_factory` selects the appropriate plan; both plans use `StageTimeouts`. Batch outcomes keep candidate evaluation IDs instead of fabricating single-task executions.
 
 `TaskSetProposalRequest` grants only development tasks and their evidence.
 `TaskSetCandidateGenerator` describes that request; generator metadata declares
@@ -118,3 +107,9 @@ concrete immutable value. Projection values identify a text view; component
 ownership and candidate identity remain with `ComponentDocument` and
 `HarnessSnapshot`. Owners must declare semantics rather than relying on adapter
 fallbacks. A supported isolated candidate must change real execution.
+
+Optimization adapters expose `describe_fields()` returning `OptimizationField`
+values with public parameter paths, meaning, type, current/default values, unit,
+bounds, choices and owner constraints. Descriptions are read-only evidence; edit
+grants and owner validators remain authoritative. Hosted plans bind the metadata
+identity through `component_description_id`.

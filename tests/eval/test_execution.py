@@ -6,11 +6,11 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from eval.benchmarks import BenchmarkDescriptor, BenchmarkVariant, PreflightResult
-from eval.catalog import BenchmarkCatalog
-from eval.contracts import EvaluationRequest
-from eval.execution import execute_request
-from eval.report import report_from_runner_result
+from fruitfly_eval.benchmarks import BenchmarkDescriptor, BenchmarkVariant, PreflightResult
+from fruitfly_eval.catalog import BenchmarkCatalog
+from fruitfly_eval.contracts import EvaluationRequest
+from fruitfly_eval.execution import execute_request
+from fruitfly_eval.report import report_from_runner_result
 from tests.support.evaluation import request_payload
 
 

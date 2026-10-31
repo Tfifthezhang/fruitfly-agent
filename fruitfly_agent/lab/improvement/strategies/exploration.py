@@ -24,8 +24,6 @@ class ProcessGuidedExploration:
         try:
             return await assessment.compare(task, records, incumbent)
         except AssessmentUnavailable as exc:
-            if assessment.settings.required:
-                raise
             return ExplorationDecision(incumbent.run_id,
                 'Process comparison unavailable; retain incumbent: ' + str(exc), policy_id='process-guided')
 
@@ -70,10 +68,5 @@ def builtin_explorations():
         ExplorationDefinition('process-guided', 'process-seed-v1', ProcessGuidedExploration, True)))
 
 
-def validate_process_configuration(settings, exploration, assessors, explorations):
-    definitions = tuple(assessors.get(name) for name in settings.assessors)
-    policy = explorations.get(exploration.policy)
-    if any(d.uses_model for d in definitions) and settings.max_model_calls < 1:
-        raise ValueError('model process assessment needs a positive model allowance')
-    if policy.requires_comparison and not any(d.comparison for d in definitions):
-        raise ValueError('process-guided exploration requires a comparison-capable completed assessor')
+def validate_exploration(exploration, explorations):
+    explorations.get(exploration.policy)

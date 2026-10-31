@@ -10,6 +10,18 @@ from fruitfly_agent.improvement.contracts.components import HarnessSnapshot
 from fruitfly_agent.improvement.contracts.versions import SystemVersion
 
 @dataclass(frozen=True)
+class StageTimeouts:
+    editor_seconds: float = 1200
+    execution_seconds: float = 3600
+    evaluator_seconds: float = 1200
+
+    def __post_init__(self):
+        for value in asdict(self).values():
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+                raise ValueError('stage times must be finite positive seconds')
+
+
+@dataclass(frozen=True)
 class RunPlan:
     job_id: str
     parent: SystemVersion
@@ -20,15 +32,16 @@ class RunPlan:
     depth: int = 1
     purpose: Literal['task', 'persistent'] = 'task'
     feedback: Literal['behavior', 'scored'] = 'behavior'
-    max_model_calls: int = 64
-    max_executions: int = 32
-    operation_timeout: float = 120
+    timeouts: StageTimeouts = field(default_factory=StageTimeouts)
     direction: str = ''
     strategy_id: str = 'harness2'
     retain_experience: bool = True
     component_options: dict = field(default_factory=dict)
+    component_description_id: str = ''
 
     def __post_init__(self):
+        if self.component_description_id:
+            require_hash(self.component_description_id)
         if not isinstance(self.component_options, dict) or set(self.component_options) - set(self.component_ids):
             raise ValueError('component options must name selected components')
         identifier(self.job_id)
@@ -45,16 +58,14 @@ class RunPlan:
             raise ValueError('invalid improvement mode or purpose')
         if self.feedback not in {'behavior', 'scored'}:
             raise ValueError('invalid feedback capability')
-        for value, maximum in ((self.width, 10), (self.depth, 10), (self.max_model_calls, self.allocation_maximum('model')), (self.max_executions, self.allocation_maximum('execution'))):
+        for value, maximum in ((self.width, 10), (self.depth, 10)):
             if type(value) is not int or value < 1 or maximum is not None and value > maximum:
                 raise ValueError('improvement allocation exceeds its bound')
-        if (isinstance(self.operation_timeout, bool) or not isinstance(self.operation_timeout, (int, float))
-                or not math.isfinite(self.operation_timeout) or not 0 < self.operation_timeout <= 14400):
-            raise ValueError('a bounded operation timeout is required')
+        if isinstance(self.timeouts, dict):
+            object.__setattr__(self, 'timeouts', StageTimeouts(**self.timeouts))
+        if not isinstance(self.timeouts, StageTimeouts):
+            raise ValueError('plan requires stage times')
         bounded(self.direction, 2000, empty=True)
-
-    def allocation_maximum(self, resource):
-        return 10000 if resource == 'model' else 1000
 
     @property
     def conditions_id(self):
@@ -63,16 +74,13 @@ class RunPlan:
 
 @dataclass(frozen=True)
 class TaskSetRunPlan(RunPlan):
-    """Batch runs use explicit finite integer totals, without single-task ceilings."""
+    """Bind task-set comparison conditions to the common phase-time plan."""
     task_set_conditions: str = ''
 
     def __post_init__(self):
         super().__post_init__()
         if self.task_set_conditions:
             require_hash(self.task_set_conditions)
-
-    def allocation_maximum(self, resource):
-        return None
 
 
 @dataclass(frozen=True)

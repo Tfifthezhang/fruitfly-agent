@@ -42,7 +42,6 @@ class EvolutionJob:
     direction: str
     current_manifest: str
     max_steps: int = 2
-    phase_timeout_seconds: float = 60.0
     steps: int = 0
     phase: str = 'ready'
     candidate_id: str = ''
@@ -52,18 +51,15 @@ class EvolutionJob:
     stop_reason: str = ''
     consecutive_no_gain: int = 0
     consecutive_failures: int = 0
-    budget_state: dict = field(default_factory=dict)
     elapsed_seconds: float = 0
 
     def __post_init__(self):
-        if self.schema_version not in (1, 2) or isinstance(self.schema_version, bool):
+        if self.schema_version != 2 or isinstance(self.schema_version, bool):
             raise ValueError("unsupported evolution job schema")
         if not all(isinstance(v, str) and v for v in (self.job_id, self.policy_id, self.direction, self.current_manifest)):
             raise ValueError('evolution job identities and direction must not be empty')
         if isinstance(self.max_steps, bool) or not isinstance(self.max_steps, int) or self.max_steps < 1 or isinstance(self.steps, bool) or not isinstance(self.steps, int) or not 0 <= self.steps <= self.max_steps:
             raise ValueError('invalid evolution job step budget')
-        if isinstance(self.phase_timeout_seconds, bool) or not isinstance(self.phase_timeout_seconds, (int, float)) or not math.isfinite(self.phase_timeout_seconds) or self.phase_timeout_seconds <= 0:
-            raise ValueError("phase timeout must be finite and positive")
         if self.phase not in {'ready', 'proposing', 'proposed', 'verifying', 'verified', 'activating', 'complete', 'interrupted', 'planned', 'rejected', 'stale', 'failed'}:
             raise ValueError('invalid evolution job phase')
         if self.phase in {'proposed', 'verifying', 'verified', 'activating'} and not self.candidate_id:
@@ -74,7 +70,7 @@ class EvolutionJob:
             raise ValueError('evolution counters must be nonnegative integers')
         if isinstance(self.elapsed_seconds, bool) or not isinstance(self.elapsed_seconds, (int, float)) or not math.isfinite(self.elapsed_seconds) or self.elapsed_seconds < 0:
             raise ValueError('evolution elapsed time must be finite and nonnegative')
-        if not isinstance(self.budget_state, dict) or not isinstance(self.stop_reason, str):
+        if not isinstance(self.stop_reason, str):
             raise ValueError('invalid evolution budget or stopping record')
 
 

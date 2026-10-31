@@ -12,9 +12,9 @@ def configuration():
         (WorkflowChoice('parallel', 'Parallel'), WorkflowChoice('sequential', 'Sequential')),
         (WorkflowChoice('behavior', 'Execution evidence'),),
         (WorkflowChoice('task', 'Current task'), WorkflowChoice('persistent', 'Persistent')),
-        (ImprovementParameterView('width', 'Width', 'integer', 1, 1, 10, 'budget', 'Exploration width'),
-         ImprovementParameterView('depth', 'Depth', 'integer', 1, 1, 10, 'budget', 'Refinement depth'),
-         ImprovementParameterView('max_model_calls', 'Model calls', 'integer', 64, 1, 10000, 'budget', 'Shared model allocation')),
+        (ImprovementParameterView('width', 'Width', 'integer', 1, 1, 10, 'search', 'Exploration width'),
+         ImprovementParameterView('depth', 'Depth', 'integer', 1, 1, 10, 'search', 'Refinement depth'),
+         ImprovementParameterView('editor_seconds', 'Editor time', 'number', 1200, 0, None, 'timing', 'Independent editor invocation time')),
         (WorkflowChoice('', 'Current task and input files'), WorkflowChoice('pack', 'Saved package')))
 
 from types import SimpleNamespace

@@ -32,6 +32,19 @@ async def execute_tool_batch(
     *,
     max_calls: int,
 ) -> tuple[list[ToolResultMessage], bool]:
+    exclusive_conflict = len(assistant.tool_calls) > 1 and any(
+        t.requires_exclusive_batch for t in ctx.tools if t.name in {c.name for c in assistant.tool_calls})
+    if exclusive_conflict:
+        results = [_error_result(c.id, 'Exclusive tool must be the only call in its batch; no calls were executed.')
+                   for c in assistant.tool_calls]
+        ctx.tool_error_count += len(results)
+        ctx.tool_call_count += len(results)
+        ctx.turn_tool_call_count += len(results)
+        for call, rejected in zip(assistant.tool_calls, results):
+            if config.on_tool_result is not None:
+                await call_extension(config.on_tool_result, call.name, rejected, False,
+                                     label='on_tool_result', default=None)
+        return results, False
     calls = assistant.tool_calls[:max_calls]
     names = {tc.name for tc in calls}
     sequential = config.tool_execution.default_execution_mode == "sequential" or any(

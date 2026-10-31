@@ -32,16 +32,16 @@ class HarnessSelectionTest(unittest.TestCase):
         _write_catalog(root / ".fruitfly/models.yaml", {"local": "model-a"})
         catalog = builtin_catalog()
         selection = self.selection(catalog=catalog)
-        parameter = next(item for item in catalog.get("compaction").descriptor.parameters
+        parameter = next(item for item in catalog.get("working-memory-reduction").descriptor.parameters
                          if item.kind == "number")
         profile = replace(selection.profile, mechanisms=(
-            MechanismSelection("compaction", enabled=False),
-            MechanismSelection("compaction", enabled=True),
+            MechanismSelection("working-memory-reduction", enabled=False),
+            MechanismSelection("working-memory-reduction", enabled=True),
         ))
         selection = replace(selection, profile=profile,
                             config=replace(selection.config, profiles={profile.profile_id: profile}))
         controller = RunConfigurationController(selection, catalog)
-        controller.set_parameter("compaction", parameter.name, str(parameter.default))
+        controller.set_parameter("working-memory-reduction", parameter.name, str(parameter.default))
         with self.assertRaisesRegex(ValueError, "duplicate mechanism selection"):
             controller.save()
 
@@ -53,8 +53,8 @@ class HarnessSelectionTest(unittest.TestCase):
         controller = RunConfigurationController(selected, catalog)
         reduction = next(item for item in controller.snapshot().selection_groups
                          if item.group_id == "reduction")
-        self.assertEqual(reduction.option_ids, ("compaction", "working-memory-reduction"))
-        self.assertEqual(reduction.selected_id, "compaction")
+        self.assertEqual(reduction.option_ids, ("working-memory-reduction",))
+        self.assertEqual(reduction.selected_id, "working-memory-reduction")
         self.assertEqual(reduction.label, "Reduction")
         self.assertNotIn('text-improver', {g.group_id for g in controller.snapshot().selection_groups})
 
@@ -62,9 +62,9 @@ class HarnessSelectionTest(unittest.TestCase):
         root = self.root
         _write_catalog(root / ".fruitfly/models.yaml", {"only": "model-a"})
         original = builtin_catalog()
-        summarizing = original.get("compaction")
-        alternative = replace(summarizing, descriptor=replace(
-            summarizing.descriptor, mechanism_id="alternative-reducer",
+        working_memory = original.get("working-memory-reduction")
+        alternative = replace(working_memory, descriptor=replace(
+            working_memory.descriptor, mechanism_id="alternative-reducer",
             label="Alternative reducer", default_enabled=False,
         ))
         catalog = original.extended((alternative,))
@@ -73,10 +73,10 @@ class HarnessSelectionTest(unittest.TestCase):
         controller.select_algorithm("reduction", "alternative-reducer")
         group = next(item for item in controller.snapshot().selection_groups
                      if item.group_id == "reduction")
-        self.assertEqual(set(group.option_ids), {"compaction", "alternative-reducer", "working-memory-reduction"})
+        self.assertEqual(set(group.option_ids), {"working-memory-reduction", "alternative-reducer", "working-memory-reduction"})
         self.assertEqual(group.selected_id, "alternative-reducer")
         self.assertFalse(next(item for item in controller.snapshot().mechanisms
-                              if item.mechanism_id == "compaction").enabled)
+                              if item.mechanism_id == "working-memory-reduction").enabled)
 
     def test_prompt_choice_is_staged_and_persisted_for_next_session(self) -> None:
         root = self.root
@@ -105,15 +105,15 @@ class HarnessSelectionTest(unittest.TestCase):
         selected = self.selection(catalog=catalog)
         controller = RunConfigurationController(selected, catalog)
 
-        summarizing = next(
+        working_memory = next(
             item for item in controller.snapshot().mechanisms
-            if item.mechanism_id == "compaction"
+            if item.mechanism_id == "working-memory-reduction"
         )
         with self.assertRaises(ValueError):
-            controller.set_parameter("compaction", "profile", "window")
+            controller.set_parameter("working-memory-reduction", "profile", "window")
 
-        self.assertIn("uses an auxiliary Provider", summarizing.effects)
-        self.assertTrue(any("may incur Provider charges" in row for row in summarizing.effects))
+        self.assertIn("uses an auxiliary Provider", working_memory.effects)
+        self.assertTrue(any("may incur Provider charges" in row for row in working_memory.effects))
 
     def test_sole_model_synthesizes_documented_catalog_defaults(self) -> None:
         root = self.root
@@ -141,8 +141,7 @@ class HarnessSelectionTest(unittest.TestCase):
                 "information-context",
                 "memory-files",
                 "context-history",
-                "context-measurement",
-                "compaction",
+                "working-memory-reduction",
                 "component-improvement",
             },
         )
@@ -305,11 +304,11 @@ class HarnessSelectionTest(unittest.TestCase):
         self.assertEqual("context", before.family)
         self.assertEqual("externalization", before.context_phase)
         self.assertEqual(
-            ["augmentation"] * 8 + ["externalization", "reduction", "reduction"],
+            ["augmentation"] * 6 + ["externalization", "reduction"],
             [item.display_section for item in context_items],
         )
         self.assertEqual(
-            {"skill-catalog", "memory-files", "knowledge-files", "live-http", "skill-document", "learned-memory", "context-history", "context-measurement"},
+            {"skill-catalog", "memory-files", "knowledge-files", "live-http", "skill-document", "context-history"},
             {
                 item.mechanism_id
                 for item in context_items
@@ -363,7 +362,7 @@ class HarnessSelectionTest(unittest.TestCase):
         from tests.support.terminal import ScriptedLines
         _write_catalog(self.root / '.fruitfly/models.yaml', {'only': 'model-a'})
         controller = RunConfigurationController(self.selection(), builtin_catalog())
-        controller.set_parameter('component-improvement', 'max_model_calls', '3')
+        controller.set_parameter('component-improvement', 'editor_profile', 'only')
         controller.save()
         output = io.StringIO()
         frontend = TerminalConfigurationFrontend(controller, output_stream=output,
@@ -373,4 +372,4 @@ class HarnessSelectionTest(unittest.TestCase):
         self.assertIn('. Context', output.getvalue())
         self.assertTrue(all(not m.visible for m in controller.snapshot().mechanisms
                             if m.category == 'improvement'))
-        self.assertEqual(next(s for s in controller.profile().mechanisms if s.mechanism_id == 'component-improvement').parameters['max_model_calls'], 3)
+        self.assertEqual(next(s for s in controller.profile().mechanisms if s.mechanism_id == 'component-improvement').parameters['editor_profile'], 'only')

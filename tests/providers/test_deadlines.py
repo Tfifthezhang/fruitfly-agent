@@ -19,6 +19,22 @@ def delta(kind, text='answer', thinking=False):
 
 
 class DeadlineTests(unittest.IsolatedAsyncioTestCase):
+    async def test_failed_attempt_receipt_keeps_timing_causes_and_partial_delivery(self):
+        for kind in ('openai', 'anthropic'):
+            with self.subTest(kind=kind):
+                failure = ConnectionError('Connection error.')
+                failure.__cause__ = ConnectionRefusedError(61, 'private endpoint')
+                provider, request = adapter(kind, [SDKStream([failure]), SDKStream([failure])], retry_max=1)
+                with self.assertRaises(RetryableError) as caught:
+                    await provider(view()).result()
+                diagnostics = caught.exception.details['diagnostics']
+                self.assertEqual(2, diagnostics['attempt_count'])
+                self.assertEqual([1, 2], [a['attempt'] for a in diagnostics['attempts']])
+                self.assertTrue(all(a['elapsed_seconds'] >= 0 for a in diagnostics['attempts']))
+                self.assertTrue(all(not a['content_delivered'] for a in diagnostics['attempts']))
+                self.assertEqual('connection_refused', diagnostics['causes'][-1]['category'])
+                self.assertEqual(2, request.call_count)
+
     async def test_signal_interrupts_headers_and_quiet_chunks_and_closes_acquired_stream(self):
         for kind in ('openai', 'anthropic'):
             for headers in (False, True):

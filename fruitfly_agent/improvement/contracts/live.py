@@ -64,6 +64,44 @@ class Metric:
 
 
 @dataclass(frozen=True)
+class DimensionJudgment:
+    dimension: str
+    criterion: str
+    judgment: str
+    reason: str
+    uncertainty: str
+    evidence_ids: tuple[str, ...] = ()
+
+    def __post_init__(self):
+        identifier(self.dimension)
+        for value in (self.criterion, self.reason, self.uncertainty):
+            bounded(value, 4000)
+        if self.judgment not in {'met', 'partial', 'unmet', 'unknown'}:
+            raise ValueError('invalid dimension judgment')
+        object.__setattr__(self, 'evidence_ids', tuple(self.evidence_ids))
+        if self.judgment != 'unknown' and not self.evidence_ids:
+            raise ValueError('known judgments require evidence')
+        for value in self.evidence_ids:
+            require_hash(value)
+
+
+@dataclass(frozen=True)
+class EvidenceFinding:
+    kind: str
+    subject: str
+    observation: str
+    uncertainty: str
+    evidence_ids: tuple[str, ...]
+
+    def __post_init__(self):
+        if self.kind not in {'process','hypothesis','direction'}:raise ValueError('invalid evidence finding kind')
+        for value in (self.subject,self.observation,self.uncertainty):bounded(value,4000)
+        object.__setattr__(self,'evidence_ids',tuple(self.evidence_ids))
+        if not self.evidence_ids:raise ValueError('findings require observed evidence')
+        for identity in self.evidence_ids:require_hash(identity)
+
+
+@dataclass(frozen=True)
 class Assessment:
     position: EvidencePosition
     assessor_id: str
@@ -75,8 +113,15 @@ class Assessment:
     detail: str = ''
     facts_id: str = ''
     evidence_ids: tuple[str, ...] = ()
+    dimensions: tuple[DimensionJudgment, ...] = ()
+    findings: tuple[EvidenceFinding, ...] = ()
 
     def __post_init__(self):
+        object.__setattr__(self, 'findings', tuple(self.findings))
+        if any(not isinstance(f,EvidenceFinding) for f in self.findings):raise ValueError('assessment requires immutable findings')
+        object.__setattr__(self, 'dimensions', tuple(self.dimensions))
+        if len({d.dimension for d in self.dimensions}) != len(self.dimensions):
+            raise ValueError('assessment dimensions must be distinct')
         identifier(self.assessor_id)
         object.__setattr__(self, 'metrics', tuple(self.metrics))
         if len({m.name for m in self.metrics}) != len(self.metrics):

@@ -16,7 +16,7 @@ services receive explicit callbacks and stores, never the composition Factory.
 
 Preview freezes the instruction, byte resources, components, parent H/I/S,
 experience and comparison materials. Its one-use token binds exact guidance and
-allocations. Changed conditions reject execution. Construction, timeout,
+phase times. Changed conditions reject execution. Construction, timeout,
 cancellation and ordinary failure close journal resources; submitted intent remains
 in history even without a candidate.
 
@@ -51,11 +51,7 @@ borrowed model/task/component/artifact ports and persists schema 2 job plans.
 It does not import a concrete editor-comparison implementation. Interactive gets
 execution/material/parameter views, never Lab objects.
 
-A job records normalized execution parameters, source identity, initial H/I/S,
-parent-child episode events, exact artifacts, stopping reason and assurance.
-Private material remains inside the prepared execution. Model requests start only
-after the one-use preview is revalidated. Protected verification quota is reserved
-before search. Root reports count actual model calls and leaf task executions.
+A job records normalized execution parameters, source identity, initial H/S/I, parent-child events, exact artifacts, stopping reason and assurance. Private material stays inside prepared execution. Requests start after preview revalidation. Reports observe actual model requests and leaf executions.
 
 ## Reuse a completed independent proof
 
@@ -76,7 +72,7 @@ Experience review is an independent capability. Task-local lessons are staged;
 Application guards explicit commit/reject while idle. Storage owns pending records
 and use ledgers, while quality decisions remain in Lab.
 
-## Keep assessment and allocations separate
+## Compose assessment and independent phase times
 
 Registered task-set preparation supplies a search problem through public execution
 ports. Run persists typed material and batch/trial/evaluation/comparison records,
@@ -89,23 +85,18 @@ Run constructs an independent read-only inspector for selection/reflection.
 assessors never acquire candidate write tools. Native execution parameters can
 request online process assessment without changing the editor.
 
-`WorkflowBindings.process_assessment`, `completed_assessors`, `exploration` and
-`explorations` independently supply completed-assessment settings/registry and
-next-seed settings/registry. Defaults disable process judgments and follow the
-official incumbent. Previews freeze settings and implementation identities; changed
-configuration rejects stale work. Run supplies the artifact port and separately
-configured assessor, owns factory products through job services and persists their
-results. It does not interpret process metrics or benchmark failures.
+Run constructs one `CompletedAssessmentService` with the separately configured assessor model and active evaluator prompts. Completed assessment and comparison share this service. Exploration selects the next seed through its registered policy. Previews freeze instructions, evidence page settings and implementation identities.
+
+Factory `improvement_usage()` returns cumulative observations for its jobs;
+each completion report retains its own usage. RSI experiment records preserve
+observations across resume without using them to admit work.
 
 Reports identify the official execution separately from the exploration seed.
 Only ordinary selection plus independent verification can support persistent
 publication. See [completed assessment](../../lab/improvement/assessment/README.md)
 and [exploration](../../lab/improvement/strategies/README.md#choose-the-next-editing-seed).
 
-`RunComponentJobs.budget_scope` and Factory `improvement_budget_scope` borrow a
-root allocation for explicitly coordinated evolution. Scopes cannot overlap;
-child jobs retain their own records and charge the common root. No concrete
-benchmark imports or new lifecycle authority are introduced.
+Editing, execution and evaluation use `RunPlan.timeouts`. Each invocation starts a fresh clock. Nested work within the same invocation shares that clock; composite task sets and I studies delegate timing to their leaves. User cancellation covers the job. Usage observations do not reject requests.
 
 Configuration candidates use the shared declarative binding adapter. Their
 normalized execution values change H identity and are applied to an isolated
@@ -122,7 +113,7 @@ Every proposed candidate is exported once to
 component loader. Changes record complete before/after component payloads, parent
 H/S/I and cited reasons. These review bundles do not grant activation.
 
-Configured and derived prompt/tool guidance, workflow, retained text and I values
+Configured and derived prompt/tool guidance, retained text and I values
 use Catalog's shared materializer. Immutable component text is embedded in the
 bundle. Registered initial files are copied under `resources/`; the snapshot lists
 the original workspace-relative locations and hashes. Use that directory as the
@@ -130,12 +121,7 @@ working directory when replaying dependencies. External services and dynamic
 schemas retain their declared preparation requirements. The source component files
 and daily defaults are never overwritten by candidate generation.
 
-I feedback/search/editor settings come from the active system configuration.
-Explicit embedding `WorkflowBindings` overrides retain precedence. Previews bind
-the effective settings, while configured assessor guidance and editor page/tool
-limits reach their independently constructed stage ports. Supported I candidates
-execute through the registered fixed-I episode runner; ordinary file/Eval runners
-reject I modification.
+I editor/evaluator prompts come from active system configuration. Search schedules and evidence page sizes come from fixed experiment bindings. Explicit embedding overrides retain precedence. I candidates run through registered fixed-I studies; ordinary task runners reject I edits.
 
 I publication restores the settings identity through the registered surface adapter.
 Fresh activation verifies the resulting I settings and exact artifact bytes against
@@ -166,8 +152,8 @@ identity and are rechecked against the actually assembled candidate before activ
 `WorkflowBindings.hooks(context)` registers job-local callbacks on
 `context.services.hooks`; the public [hook contract](../../improvement/extensions/README.md)
 passes immutable snapshots and accepts only bounded context contributions.
-[Lab assembly](../../lab/improvement/workflow/README.md#install-research-mechanisms-per-job)
-installs configured research/progress/finalization mechanisms through the same
+[Lab assembly](../../lab/improvement/workflow/README.md)
+installs configured research/progress mechanisms through the same
 entry for normal jobs and fixed-I candidate trials. Run injects capabilities and
 owns durable research records; it does not branch on research algorithms.
 

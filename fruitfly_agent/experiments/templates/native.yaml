@@ -5,11 +5,8 @@ tasks:
   file: tasks/native.yaml
 comparison:
   file: comparison.yaml
-edit:
-  base_prompt:
-    fields:
-    - parameters.text
-budget:
-  timeout_seconds: 3600
-trial:
-  operation_timeout_seconds: 1200
+trial: {}
+timeouts:
+  editor_seconds: 1200
+  execution_seconds: 3600
+  evaluator_seconds: 1200

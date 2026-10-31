@@ -72,7 +72,7 @@ def dispatch(args):
     records = RunRecords(workspace)
     operation, command = args.operation, args.command
     if command == 'catalog':
-        from eval.catalog import builtin_catalog
+        from fruitfly_eval.catalog import builtin_catalog
         print_json(builtin_catalog().to_dict())
         return 0
     if command == 'list':

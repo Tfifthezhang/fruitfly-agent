@@ -9,13 +9,14 @@ from fruitfly_agent.improvement.contracts.versions import SnapshotFile, StateSna
 
 
 def configuration_edit(fields, bounds):
-    if fields != ['parameters.initial_text'] or bounds:
-        raise ValueError('retained text grants permit parameters.initial_text without numeric bounds')
+    if fields != ['parameters.content.body'] or bounds:
+        raise ValueError('retained text grants permit parameters.content.body without numeric bounds')
     return {}
 
 
 @dataclass(frozen=True)
 class RetainedText:
+    description = 'Complete retained document projected into task context. Edit reusable procedures without changing source paths, grants, or reference access.'
     optimization = OptimizationSpec('S', 'documents', state='retained')
     key: str
     text: str

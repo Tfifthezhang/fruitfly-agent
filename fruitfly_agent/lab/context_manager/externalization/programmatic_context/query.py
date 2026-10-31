@@ -17,11 +17,9 @@ from .artifacts import SessionArtifactStore
 
 @dataclass(frozen=True)
 class ModelQueryConfig:
-    max_calls: int = 16
     max_concurrent: int = 4
     max_input_chars: int = 200_000
     max_output_tokens: int = 4_096
-    max_total_tokens: int = 100_000
     max_inline_result_chars: int = 100_000
     timeout_seconds: int = 180
 
@@ -86,19 +84,8 @@ class ModelQueryBroker:
         else:
             max_tokens = min(requested_tokens, self.config.max_output_tokens)
 
-        estimated = max(1, input_chars // 4) + max_tokens
         async with self._lock:
-            if self._calls >= self.config.max_calls:
-                raise RuntimeError(
-                    f"model.query call budget exhausted ({self.config.max_calls})"
-                )
-            if self._tokens + estimated > self.config.max_total_tokens:
-                raise RuntimeError(
-                    "model.query token budget exhausted "
-                    f"({self.config.max_total_tokens})"
-                )
             self._calls += 1
-            self._tokens += estimated
 
         call_id = uuid.uuid4().hex
         started = time.monotonic()
@@ -119,7 +106,7 @@ class ModelQueryBroker:
         if usage is not None:
             actual = usage.total_tokens
             async with self._lock:
-                self._tokens += actual - estimated
+                self._tokens += actual
         if assistant.continue_turn:
             raise RuntimeError('model.query requires a final single-response result; the model returned an intermediate response')
         text = assistant.text
@@ -147,9 +134,7 @@ class ModelQueryBroker:
         return {
             "status": "ready",
             "calls": self._calls,
-            "estimated_or_actual_tokens": self._tokens,
-            "max_calls": self.config.max_calls,
-            "max_total_tokens": self.config.max_total_tokens,
+            "reported_tokens": self._tokens,
         }
 
 

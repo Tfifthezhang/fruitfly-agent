@@ -1,4 +1,4 @@
-"""A separately configured, budgeted model judge without candidate-edit tools."""
+"""A separately timed online model judge without candidate-edit tools."""
 import json
 from fruitfly_agent.core.data_model import ProviderView, UserMessage
 from fruitfly_agent.improvement.contracts.live import Assessment, Metric
@@ -11,11 +11,17 @@ class ModelAssessor:
         self.instruction, self.render = instruction, render
 
     async def assess(self, event):
-        self.services.reserve('model')
+        self.services.observe('model')
         self.services.record('assessor-model-request', assessor_id=self.assessor_id, model=self.config.model)
         view = ProviderView(self.instruction, [UserMessage(content=self.render(event))], [],
             self.config.model, self.config.max_tokens)
-        result = await self.services.operation(self.config.provider(view, signal=self.services.signal).result())
+        async def invoke():
+            stream = self.config.provider(view, signal=self.services.signal)
+            try:
+                return await stream.result()
+            finally:
+                await stream.aclose()
+        result = await self.services.operation(invoke(), stage='evaluator')
         if result.stop_reason != 'stop' or result.tool_calls or result.continue_turn:
             raise ValueError('assessor did not finish a tool-free judgment')
         value = json.loads(result.text)
