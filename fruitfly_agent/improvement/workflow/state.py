@@ -19,7 +19,6 @@ class WorkflowState:
     no_gain: int = 0
     failures: int = 0
     assessments: list[Any] = field(default_factory=list)
-    exploration_decisions: list[Any] = field(default_factory=list)
     history: tuple[Any, ...] = ()
     seen: set[str] = field(default_factory=set)
 

@@ -17,6 +17,10 @@ from fruitfly_agent.interactive.contracts.candidates import CandidateActivationS
 from fruitfly_agent.interactive.contracts.task_packs import TaskPackService
 
 
+class RuntimeCleanupError(RuntimeError):
+    """Owned resources could not be retired; do not retry in this process."""
+
+
 class RuntimeSession(Protocol):
     """Public conversation and execution operations consumed by Application."""
     @property

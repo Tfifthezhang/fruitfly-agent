@@ -20,8 +20,9 @@ phase times. Changed conditions reject execution. Construction, timeout,
 cancellation and ordinary failure close journal resources; submitted intent remains
 in history even without a candidate.
 
-Native file tasks use detached in-memory inputs. Full runtime, SSH or container
-execution requires an explicitly injected runner through the public stage ports.
+Task materials use frozen inputs. Execution requires an explicitly registered
+runner through the public stage ports; no built-in local task executor exists.
+The backend owns configuration assembly, tool selection, isolation and lifecycle.
 The interactive host does not discover benchmark tasks or launch Eval processes.
 
 Persistent publication requires `verified` assurance from the injected verifier.
@@ -55,7 +56,8 @@ A job records normalized execution parameters, source identity, initial H/S/I, p
 
 ## Reuse a completed independent proof
 
-Built-in file and editor verification produce immutable proof artifacts. The host
+Task-package and editor verification adapters produce immutable proof artifacts
+when a compatible execution backend is registered. The host
 binds the proof to execution/implementation, normalized request, source, plan,
 parent H/I/S and candidate snapshot. Candidate records reference that envelope.
 `verified_candidate(record, policy_id)` revalidates scope, active parent, source,
@@ -82,27 +84,27 @@ nested JSON records and artifact references.
 
 Run constructs an independent read-only inspector for selection/reflection.
 `WorkflowBindings.inspector` can supply another configuration/implementation;
-assessors never acquire candidate write tools. Native execution parameters can
+assessors never acquire candidate write tools. Registered-task parameters can
 request online process assessment without changing the editor.
 
-Run constructs one `CompletedAssessmentService` with the separately configured assessor model and active evaluator prompts. Completed assessment and comparison share this service. Exploration selects the next seed through its registered policy. Previews freeze instructions, evidence page settings and implementation identities.
+Run constructs one `CompletedAssessmentService` with the separately configured assessor model and active evaluator prompts. Completed assessment and comparison share this service. The retained incumbent seeds the next round. Previews freeze instructions, evidence page settings and implementation identities.
 
 Factory `improvement_usage()` returns cumulative observations for its jobs;
 each completion report retains its own usage. RSI experiment records preserve
 observations across resume without using them to admit work.
 
-Reports identify the official execution separately from the exploration seed.
+Reports identify the retained official execution.
 Only ordinary selection plus independent verification can support persistent
 publication. See [completed assessment](../../lab/improvement/assessment/README.md)
-and [exploration](../../lab/improvement/strategies/README.md#choose-the-next-editing-seed).
+and [evidence](../../lab/improvement/evidence/README.md).
 
 Editing, execution and evaluation use `RunPlan.timeouts`. Each invocation starts a fresh clock. Nested work within the same invocation shares that clock; composite task sets and I studies delegate timing to their leaves. User cancellation covers the job. Usage observations do not reject requests.
 
 Configuration candidates use the shared declarative binding adapter. Their
-normalized execution values change H identity and are applied to an isolated
+normalized component values change H identity and are applied to an isolated
 profile before activation. I and S remain unchanged unless separately declared
 components change. [Execution policy](../../lab/execution_policy/README.md) documents
-field permissions, mechanism ownership and offline activation tests.
+fixed runtime settings; execution policy is not an optimization target.
 
 ## Inspect complete candidate configurations
 
@@ -113,7 +115,7 @@ Every proposed candidate is exported once to
 component loader. Changes record complete before/after component payloads, parent
 H/S/I and cited reasons. These review bundles do not grant activation.
 
-Configured and derived prompt/tool guidance, retained text and I values
+Configured and derived prompt/Tool catalog policy, retained text and I values
 use Catalog's shared materializer. Immutable component text is embedded in the
 bundle. Registered initial files are copied under `resources/`; the snapshot lists
 the original workspace-relative locations and hashes. Use that directory as the
@@ -121,7 +123,7 @@ working directory when replaying dependencies. External services and dynamic
 schemas retain their declared preparation requirements. The source component files
 and daily defaults are never overwritten by candidate generation.
 
-I editor/evaluator prompts come from active system configuration. Search schedules and evidence page sizes come from fixed experiment bindings. Explicit embedding overrides retain precedence. I candidates run through registered fixed-I studies; ordinary task runners reject I edits.
+I editor/evaluator prompts come from active system configuration. Round limits and evidence response limits come from fixed experiment bindings. Explicit embedding overrides retain precedence. I candidates run through registered fixed-I studies; ordinary task runners reject I edits.
 
 I publication restores the settings identity through the registered surface adapter.
 Fresh activation verifies the resulting I settings and exact artifact bytes against
@@ -153,9 +155,9 @@ identity and are rechecked against the actually assembled candidate before activ
 `context.services.hooks`; the public [hook contract](../../improvement/extensions/README.md)
 passes immutable snapshots and accepts only bounded context contributions.
 [Lab assembly](../../lab/improvement/workflow/README.md)
-installs configured research/progress mechanisms through the same
-entry for normal jobs and fixed-I candidate trials. Run injects capabilities and
-owns durable research records; it does not branch on research algorithms.
+installs shared evidence navigation and configured stopping through the same
+entry for normal jobs and fixed-I trials. Run injects capabilities and persists
+existing records; the evidence owner maintains cross-round relationships.
 
 `WorkflowBindings.delivery_backend` explicitly supplies a task-output validation
 backend. File execution requires it when `delivery_manifest` names a frozen input.

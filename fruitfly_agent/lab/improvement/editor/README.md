@@ -24,7 +24,7 @@ invalid submissions can be repaired within the same stage time. Completed earlie
 executions survive a failed later proposal.
 
 `improvement-editor` exposes
-`parameters.instructions.{system,propose,invariant,domain,compose,reflect}`.
+`parameters.instructions.{system,propose,reflect}`.
 Owners validate instructions and experiment scope. I comparisons run fresh
 fixed-I inner searches; instructions do not replace themselves during a call.
 
@@ -33,7 +33,7 @@ fixed-I inner searches; instructions do not replace themselves during a call.
 | `agent.py` | Editing mission and repair |
 | `instructions.py` | Owner-described mutable instructions |
 | `tools.py`, `submission.py` | Candidate operations and attribution validation |
-| `generators.py` | Registered generation and composition |
+| `generators.py` | Registered zero-or-one candidate generation |
 
 Offline checks: `tests.lab.test_improvement_pipeline`,
 `tests.lab.test_improvement_configuration`, `tests.workflows.test_editor_evolution`.

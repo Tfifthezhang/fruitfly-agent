@@ -7,7 +7,6 @@ from fruitfly_agent.runtime_spec.documents import mapping
 from .assessment.instructions import EvaluatorInstructions, EvaluatorInstructionTarget
 from .editor.instructions import EditorInstructions
 from .configuration import ImprovementSettings
-from .strategies.exploration import ExplorationSettings, validate_exploration, builtin_explorations
 
 
 def editor_parameters(parameters):
@@ -20,34 +19,8 @@ def editor_parameters(parameters):
             'instructions': asdict(EditorInstructions(**value))}
 
 
-def feedback_parameters(parameters):
-    mapping(parameters, {'evidence'}, 'assessment')
-    evidence = mapping(parameters.get('evidence', {}), {'page_characters'}, 'evidence')
-    page = evidence.get('page_characters', 12000)
-    if type(page) is not int or not 1 <= page <= 24000:
-        raise ValueError('evidence.page_characters must be 1..24000')
-    return {'evidence': {'page_characters': page}}
 
 
-def search_parameters(parameters):
-    allowed = {'strategy', 'generator', 'rounds', 'mode', 'width', 'exploration', 'retain_experience',
-               'sampling', 'promotion_every_rounds', 'research', 'progress'}
-    mapping(parameters, allowed, 'search parameters')
-    values = {key: value for key, value in parameters.items() if key not in {'exploration', 'sampling', 'promotion_every_rounds', 'research', 'progress'}}
-    settings = ImprovementSettings(**values)
-    policy = parameters.get('exploration', 'incumbent')
-    builtin_explorations().get(policy)
-    result = {**{key: getattr(settings, key) for key in allowed - {'exploration', 'sampling', 'promotion_every_rounds', 'research', 'progress'}}, 'exploration': policy}
-    if 'sampling' in parameters or 'promotion_every_rounds' in parameters:
-        from .task_sets.configuration import MultiTaskSettings
-        sampling = parameters.get('sampling', {})
-        multi = MultiTaskSettings.from_dict({'sampling': sampling,
-            'promotion': {'every_rounds': parameters.get('promotion_every_rounds', 3)}})
-        result.update(sampling={**asdict(multi.sampling), 'task_keys': list(multi.sampling.task_keys)},
-                      promotion_every_rounds=multi.promotion.every_rounds)
-    from .workflow.mechanisms import mechanism_parameters
-    result.update(mechanism_parameters(parameters))
-    return result
 
 
 def evaluator_parameters(parameters):
@@ -94,7 +67,3 @@ def validate_component_options(name, options, inventory):
     targets[name]().validate_options(options)
 
 
-def exploration_settings(values=None):
-    settings = ExplorationSettings((values or {}).get('search', {}).get('exploration', 'incumbent'))
-    validate_exploration(settings, builtin_explorations())
-    return settings

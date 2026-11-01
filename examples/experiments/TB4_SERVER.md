@@ -64,10 +64,10 @@ not overwrite defaults, reuse old candidate results or start Docker/model work.
 | Generated file under `.fruitfly/` | Review before execution |
 |---|---|
 | `models.yaml` | Shared daily/experiment model ID, protocol, endpoint, capabilities, token limits and key variable name |
-| `default-config.yaml` | Executor profile, enabled mechanisms and tool-call limit, initially 64 per turn |
+| `default-config.yaml` | Executor profile, enabled mechanisms and tool-call limit, initially 512 per turn |
 | `components/H/`, `components/I/` | Execution/tool values, editor/evaluator prompts |
-| `tasks/tb4-smoke.yaml`, `comparison.yaml` | Task material and fixed comparison rules |
-| `experiment.yaml` | Baseline/task/comparison references, editable fields, fixed search/assessment settings and independent phase times |
+| `tasks/tb4-smoke.yaml` | Task material and fixed comparison rules |
+| `experiment.yaml` | Baseline/task references, editable fields, fixed search/assessment settings and independent phase times |
 | `secrets.env` | Fill the empty model key privately, or use the process environment; never commit it |
 | `eval-request.json` | TB4 `smoke`, one attempt, concurrency 1 and whole-job timeout |
 | `eval-host.yaml` | Linux runtime mounts, cache location and optional task/dependency settings |
@@ -106,7 +106,7 @@ without constructing Providers or starting containers. It does not establish
 successful model access or task quality. Review the selected task and exact image
 identities; see [preparation evidence](../../fruitfly_eval/SERVER_GUIDE.md#8-prepare-check-and-run-the-smoke).
 
-The [smoke experiment template](benchmark-smoke.example.yaml) automatically discovers legal targets supported by the runtime and task material. Add `edit` only to narrow that set. Check resolved fields and owner descriptions before running. Configure independent editor, execution and evaluator seconds under `timeouts`; counts and tokens are observations without admission quotas.
+The [smoke experiment template](benchmark-smoke.example.yaml) automatically discovers legal targets supported by the runtime and task material. Add `edit` only to narrow that set. Check resolved fields and owner descriptions before running. Configure independent editor, execution and evaluator seconds under `execution` and `evaluation`; counts and tokens are observations without admission quotas.
 
 ## Run and inspect the search
 
@@ -123,12 +123,12 @@ charges may apply. Use a persistent terminal on disconnect-prone connections:
 
 Use the actual run ID. Candidate settings stay in the experiment's isolated run
 copy; they do not edit the source checkout or baseline defaults. Official task
-scores select results. Optional completed-process feedback is disabled in this
-minimal template; the [experiment guide](../../fruitfly_agent/experiments/README.md#use-completed-process-feedback)
-shows how to enable it and separate exploration from official selection.
+scores select results. The shared model evaluator assesses completed evidence. The
+[experiment guide](../../fruitfly_agent/experiments/README.md#use-completed-process-feedback)
+explains dimensions, evidence and authoritative score handling.
 
 Edit model-role selections in `default-config.yaml`, execution values in
-`components/H/execution-policy.yaml`, and search/feedback in their I component
+`components/H/execution-policy.yaml`, and editor/evaluator prompts in their I component
 files. `experiment.yaml` selects the baseline, task document and comparison,
 grants changes and bounds the job. The [field guide](../../fruitfly_agent/experiments/CONFIGURATION.md)
 describes the complete configuration tree. Refresh preparation after runtime changes.
@@ -149,11 +149,12 @@ filesystems and Docker images are not complete archived copies of the experiment
 Change the request's variant or exact task names, then repeat preparation and
 checks. Before moving beyond smoke, choose bounded sampling and task concurrency
 using the [joint template](multi-task.example.yaml). Multiple collections can
-reference different registered benchmarks or installed native packs while sharing
+reference different registered benchmarks while sharing
 one compatible baseline. Candidate parallelism currently stays at 1.
 
 `eval prepare` prepares task-set collections. Fixed-version `eval run` instead
 requires `task.source: eval` with `request`, `host` and optional `model_calls` at
 the task level; it never starts Improvement. `rsi run` needs an independent
 adoption verifier, which benchmark development rewards alone do not provide.
-For a ready native holdout example, see the [Python function pack](../improvement/python_functions/README.md).
+The [Python function pack](../improvement/python_functions/README.md) supplies holdout
+material for embeddings with an explicitly registered task backend.

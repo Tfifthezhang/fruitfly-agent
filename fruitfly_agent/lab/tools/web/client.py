@@ -28,8 +28,8 @@ class WebError(RuntimeError):
 
 @dataclass(frozen=True)
 class WebConfig:
-    timeout_seconds: float = 20
-    max_retries: int = 1
+    timeout_seconds: float = 60
+    max_retries: int = 2
     max_response_bytes: int = 2_000_000
     cache_ttl_seconds: float = 300
     cache_entries: int = 32

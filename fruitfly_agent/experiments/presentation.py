@@ -35,11 +35,12 @@ def show_summary(summary):
         print(f"Concurrency: {parallel['concurrency']} task executions; 1 candidate")
         print('Joint aggregation: ' + summary['multi_task']['evaluation']['aggregation'])
     if summary['operation'] != 'eval':
-        print(f"Search: {request['strategy_id']}; rounds={request['depth']}")
+        print(f"Candidate rounds: {request['rounds']}")
         print('Evaluation: shared model evaluator; process dimensions are defined by instructions')
-        print('Exploration: ' + summary.get('exploration', {}).get('policy', 'incumbent'))
         print('Independent stage times: ' + json.dumps(summary['improvement']['timeouts']))
         print('Improvement request, tool and token usage is observed without count quotas')
+    if not summary.get('available', True):
+        print('Execution unavailable: ' + summary['unavailable_reason'])
     print('Model connectivity: not checked')
 
 

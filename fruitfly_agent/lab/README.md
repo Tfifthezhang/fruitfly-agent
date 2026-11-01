@@ -28,7 +28,7 @@ Add tools, execution backends, context strategies, and improvement algorithms th
 | How are improvements proposed and compared? | Improvement | Replaceable generators propose evidence-based component edits. |
 | Who verifies, adopts, and continues? | Human or explicit RSI host | Review one result, or run verified text evolution. |
 
-Improvement runs independently of RSI. Its public stage contracts separate proposal, execution, composition, output selection, verification and reflection. Persistent RSI requires an explicit host and verification policy; only confirmed activation advances the deployed version.
+Improvement runs independently of RSI. Its public stage contracts separate proposal, execution, output selection, verification and reflection. Persistent RSI requires an explicit host and verification policy; only confirmed activation advances the deployed version.
 
 Generators implement `CandidateGenerator`; `WorkflowBindings` injects replaceable stages. Existing H/S text owners reuse the same execution and adoption path. I edits use the registered fixed-depth editor-comparison runner and independent paired verification.
 See [editor experiments](improvement/improver/README.md).

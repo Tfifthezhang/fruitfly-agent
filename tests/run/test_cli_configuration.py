@@ -8,11 +8,13 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 from fruitfly_agent.core.config import AgentLoopConfig
-from fruitfly_agent.interactive import ConfigurationLaunchResult, InteractiveSession, RuntimeHandle
+from fruitfly_agent.interactive import InteractiveSession, RuntimeHandle
 from fruitfly_agent.run.application import RunApplicationFactory
 from fruitfly_agent.run import cli
 from tests.support.faux_provider import FauxProvider
 from tests.support.run import _write_catalog, _args
+from tests.support.configuration import MockConfiguration
+from fruitfly_agent.interactive.contracts.startup import ConfigurationEditResult
 
 
 class CliRunTest(unittest.IsolatedAsyncioTestCase):
@@ -25,12 +27,13 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
             launch.mkdir()
             (launch / ".env").write_text("TEST_SETTING=wrong-workspace\nFILE_ONLY=wrong\n", encoding="utf-8")
             setup = Mock()
-            setup.run.return_value = ConfigurationLaunchResult(start=False)
+            setup.run.return_value = 'exit'
             with patch.dict(os.environ, {"TEST_SETTING": "process"}, clear=True), patch.object(
                 cli, "RunApplicationFactory"
-            ) as factory, patch.object(cli, "TerminalConfigurationFrontend", return_value=setup), patch.object(
+            ) as factory, patch.object(cli, "TerminalStartupFrontend", return_value=setup), patch.object(
                 Path, "cwd", return_value=launch
             ):
+                factory.return_value.configuration.snapshot.return_value = MockConfiguration(model='offline').snapshot()
                 self.assertEqual(await cli.run_cli(_args(cwd=tmp)), 0)
             self.assertEqual(factory.call_args.kwargs["cwd"], root.resolve())
             environment = factory.call_args.kwargs["environment"]
@@ -42,16 +45,16 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
             root = Path(tmp)
             _write_catalog(root / ".fruitfly/models.yaml", {"a": "model-a", "b": "model-b"})
             setup = Mock()
-            setup.run.return_value = ConfigurationLaunchResult(start=False)
+            setup.run.return_value = 'exit'
             with patch.object(cli, "load_env", return_value={}), patch.object(
-                cli, "TerminalConfigurationFrontend", return_value=setup
+                cli, "TerminalStartupFrontend", return_value=setup
             ), patch.object(cli, "AgentApplication") as application_type:
                 code = await cli.run_cli(_args(cwd=tmp))
 
         self.assertEqual(code, 0)
         application_type.assert_not_called()
 
-    async def test_complete_interactive_run_enters_welcome_without_a_menu_or_model_request(self):
+    async def test_complete_interactive_run_requires_start_before_welcome_without_model_request(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             _write_catalog(root / '.fruitfly/models.yaml', {'only': 'model-a'})
@@ -61,12 +64,14 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
             output = io.StringIO()
             with patch.dict(os.environ, {}, clear=True), patch.object(cli, 'load_env', return_value={'TEST_API_KEY': 'offline-fixture'}), patch(
                     'fruitfly_agent.run.runtime.assembly.default_registry', return_value=registry), patch.object(
-                    cli, 'transient_screen', side_effect=AssertionError('ready startup opened a menu screen')), patch(
-                    'sys.stdin', io.StringIO('/exit\n')), contextlib.redirect_stdout(output):
+                    cli, 'transient_screen', wraps=cli.transient_screen) as screen, patch(
+                    'sys.stdin', io.StringIO('1\n/exit\n')), contextlib.redirect_stdout(output):
                 self.assertEqual(await cli.run_cli(_args(cwd=tmp)), 0)
+            screen.assert_called_once()
+            self.assertLess(output.getvalue().index('Start session'), output.getvalue().index('FruitFlyAgent interactive'))
             self.assertIn('FruitFlyAgent interactive · model-a', output.getvalue())
             self.assertIn('/config', output.getvalue())
-            for obsolete in ('Start new session', 'unsaved changes', 'Configure', '(next)'):
+            for obsolete in ('Start new session', 'unsaved changes', '(next)'):
                 self.assertNotIn(obsolete, output.getvalue())
             self.assertTrue((root / '.fruitfly/config.yaml').is_file())
             self.assertEqual(provider.calls, [])
@@ -75,12 +80,12 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as tmp:
             _write_catalog(Path(tmp) / '.fruitfly/models.yaml', {'only': 'model-a'})
             setup = Mock()
-            setup.run.return_value = ConfigurationLaunchResult(start=False)
+            setup.run_for_startup.return_value = ConfigurationEditResult()
             with patch.object(cli, 'load_env', return_value={}), patch.object(
                     cli, 'TerminalConfigurationFrontend', return_value=setup), patch.object(
-                    cli, 'AgentApplication') as application:
+                    cli, 'AgentApplication') as application, patch('sys.stdin', io.StringIO('q\n')):
                 self.assertEqual(await cli.run_cli(_args(cwd=tmp, configure=True)), 0)
-            setup.run.assert_called_once_with(configure=True)
+            setup.run_for_startup.assert_called_once_with()
             application.assert_not_called()
 
     async def test_configure_rejects_noninteractive_inputs_before_factory_creation(self):
@@ -95,7 +100,7 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
             _write_catalog(root / '.fruitfly/models.yaml', {'only': 'model-a'})
             output = io.StringIO()
             with patch.dict(os.environ, {}, clear=True), patch.object(cli, 'load_env', return_value={}), patch(
-                    'sys.stdin', io.StringIO('/cancel\n')), patch.object(cli, 'AgentApplication') as application, contextlib.redirect_stdout(output):
+                    'sys.stdin', io.StringIO('2\nback\n/cancel\nq\n')), patch.object(cli, 'AgentApplication') as application, contextlib.redirect_stdout(output):
                 self.assertEqual(await cli.run_cli(_args(cwd=tmp)), 0)
             self.assertIn('Set API key', output.getvalue())
             application.assert_not_called()
@@ -118,18 +123,18 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
             application.assert_not_called()
             frontend.assert_not_called()
 
-    async def test_ready_startup_save_failure_does_not_open_a_menu_or_create_a_session(self):
+    async def test_startup_save_failure_returns_to_panel_without_creating_session(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             _write_catalog(root / '.fruitfly/models.yaml', {'only': 'model-a'})
             factory = RunApplicationFactory(cwd=root, environment={'TEST_API_KEY': 'offline-fixture'}, allow_incomplete=True)
-            errors = io.StringIO()
+            output = io.StringIO()
             with patch.object(cli, 'RunApplicationFactory', return_value=factory), patch.object(
                     factory.configuration, 'save', side_effect=OSError('fixture write failed')), patch.object(
                     cli, 'AgentApplication') as application, patch.object(
-                    cli, 'transient_screen', side_effect=AssertionError('save failure opened menu')), contextlib.redirect_stderr(errors):
-                self.assertEqual(await cli.run_cli(_args(cwd=tmp)), 2)
-            self.assertIn('fixture write failed', errors.getvalue())
+                    cli, 'transient_screen', wraps=cli.transient_screen), patch('sys.stdin', io.StringIO('1\nq\n')), contextlib.redirect_stdout(output):
+                self.assertEqual(await cli.run_cli(_args(cwd=tmp)), 0)
+            self.assertIn('fixture write failed', output.getvalue())
             self.assertTrue(factory.configuration.changed)
             application.assert_not_called()
             self.assertFalse((root / '.fruitfly/sessions').exists())
@@ -150,10 +155,13 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             configuration = Mock()
+            configuration.snapshot.return_value = MockConfiguration(model='offline').snapshot()
 
             class FakeFactory:
                 def __init__(self) -> None:
                     self.configuration = configuration
+                    self.catalog = Mock()
+                    self.tool_service_startup_approval = None
                     self.opens = 0
                     self.reloads = 0
 
@@ -175,11 +183,15 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
             factory = FakeFactory()
 
             startup = Mock()
-            startup.run.return_value = ConfigurationLaunchResult(start=True)
+            startup.run.return_value = 'start'
+            async def wait(task, **kwargs):
+                await task
+                return True
+            startup.wait_for_start.side_effect = wait
             with patch.object(cli, "load_env", return_value={}), patch.object(
                 cli, "RunApplicationFactory", return_value=factory
             ), patch.object(
-                cli, "TerminalConfigurationFrontend", return_value=startup
+                cli, "TerminalStartupFrontend", return_value=startup
             ), patch.object(cli, "TerminalFrontend", FakeFrontend):
                 code = await cli.run_cli(_args(cwd=tmp))
 

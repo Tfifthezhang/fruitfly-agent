@@ -17,7 +17,7 @@ validation.
 In **/config → Tools**, open the settings for **Search the web** or **Fetch web pages** and
 choose **Set up…**. Select the service, optionally enter an API key variable name,
 then enter the key with hidden input. Choose **Stage settings**, then save and apply through `/config`,
-or choose **Save and start** when using `--configure`. Enabling a tool with missing credentials also opens
+or choose **Save and return** when using `--configure`, then **Start session** from the startup panel. Enabling a tool with missing credentials also opens
 setup. Configured tools can be toggled without re-entering their key.
 
 The form resolves credentials from the service and variable selected in that same
@@ -109,10 +109,11 @@ not create separate DeepSeek accounts, balances or account-level rate limits.
 | `web_search` | Required `query` (1–500 characters, at most 60 words; DeepSeek: 128 including filters); `count=5` (1–10); up to 10 `domains`; `freshness=any/day/week/month/year` | Titles, URLs, snippets, source IDs, retrieval time and cache status |
 | `web_fetch` | Required public HTTP(S) `url`; `offset=1`; `limit=100` (1–200) | Source URL (final URL for direct fetch), title, numbered text, body hash, retrieval time and continuation offset |
 
-Each tool's model-facing description declares its own use cases independently:
+Each tool's source-owned usage declares its own use cases independently:
 search discovers information and sources; fetch reads a known URL and verifies
 source details. Neither description requires the other tool to be enabled. Fetch
-services retain their own capability limits in their descriptions. See
+services retain their capability limits in their usage resources. With `read`
+enabled, full usage is loaded on demand through the shared Tool catalog. See
 [tool descriptions](../README.md#describe-visible-operations) for the shared contract.
 
 Domain filters include subdomains and are checked against returned URLs. Results
@@ -141,8 +142,8 @@ Both mechanisms accept these YAML settings; model tool arguments cannot override
 
 | Parameter | Default | Contract |
 |---|---|---|
-| `timeout_seconds` | 20 | Total queue, DNS, attempts, backoff, redirect and streaming deadline; maximum 120 |
-| `max_retries` | 1 | Additional transient-error attempts; 0–2 |
+| `timeout_seconds` | 60 | Total queue, DNS, attempts, backoff, redirect and streaming deadline; maximum 120 |
+| `max_retries` | 2 | Additional transient-error attempts; 0–2 |
 | `max_response_bytes` | 2,000,000 | Decoded response limit; maximum 10,000,000 |
 | `cache_ttl_seconds` | 300 | Successful-response lifetime; 0 disables; maximum 3600 |
 | `cache_entries` | 32 | Runtime-local LRU responses; 0 disables; maximum 128 |

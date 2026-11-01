@@ -60,8 +60,8 @@ class ReliabilityTests(unittest.IsolatedAsyncioTestCase):
         second = search_text(text, query, offset=result['next_offset'])
         self.assertGreater(second['matches'][0]['offset'], result['matches'][-1]['offset'])
 
-    async def test_interrupted_native_execution_keeps_written_files_and_partial_facts(self):
-        from fruitfly_agent.lab.improvement.execution.file_runner import FileTaskRunner
+    async def test_interrupted_registered_execution_keeps_written_files_and_partial_facts(self):
+        from tests.support.task_execution import TaskRunnerFixture
         from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone
         from fruitfly_agent.improvement.workflow.operations import run_stage
         from fruitfly_agent.improvement.contracts.failures import StageFailure
@@ -78,7 +78,7 @@ class ReliabilityTests(unittest.IsolatedAsyncioTestCase):
         artifacts = MemoryArtifacts()
         plan = replace(plan, timeouts={'editor_seconds':.02,'execution_seconds':.02,'evaluator_seconds':.02})
         services = WorkflowServices(plan)
-        runner = FileTaskRunner(AgentLoopConfig(provider=provider), flow.components, artifacts, services)
+        runner = TaskRunnerFixture(AgentLoopConfig(provider=provider), flow.components, artifacts, services)
         with self.assertRaises(StageFailure) as caught:
             await run_stage(services, 'execute', runner.execute(plan, TaskMaterial('task', 'Work'), baseline))
         record = caught.exception.record

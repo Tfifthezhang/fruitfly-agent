@@ -10,6 +10,11 @@ Move large text out of the model projection while keeping a stable way to read i
 | `rlm-ipython` | Also externalize large context into retrievable Session artifacts. |
 | [Programmatic context](programmatic_context/README.md) | Artifact access, IPython execution, and budgeted auxiliary model queries |
 
+IPython cells and auxiliary model queries each default to 300 seconds. Output,
+input and concurrency limits remain bounded. Tool parameters require explicit
+Improvement grants; default searches leave them fixed. Parent operation deadlines
+still apply.
+
 ## Research basis
 
 The design draws on Zhang et al., [Recursive Language Models](https://arxiv.org/abs/2512.24601v3), especially Section 2: keep long inputs in a programmable environment and let the model inspect or transform them through code and sub-model calls.

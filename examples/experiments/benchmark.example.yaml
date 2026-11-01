@@ -3,23 +3,33 @@ baseline:
   profile: baseline
 tasks:
   file: tasks/tb4-smoke.yaml
-comparison:
-  file: comparison.yaml
 edit:
   base_prompt:
     fields:
     - parameters.instructions.system
-  execution-policy:
-    fields:
-    - parameters.settings.tool_execution.max_parallel
-    bounds:
-      parameters.settings.tool_execution.max_parallel:
-        minimum: 1
-        maximum: 16
-trial:
-  concurrency: 1
-  attempts: 1
-timeouts:
+execution:
+  generator: agent-editor-v1
   editor_seconds: 1200
-  execution_seconds: 3600
+  task_seconds: 3600
+  retain_experience: false
+  trial:
+    concurrency: 1
+    attempts: 1
+evidence:
+  read:
+    default_characters: 12000
+    max_characters: 24000
+  catalog:
+    default_entries: 50
+    max_entries: 100
+  search:
+    default_matches: 20
+    max_matches: 50
+    max_characters: 12000
+evaluation:
   evaluator_seconds: 1200
+  scope: task
+stopping:
+  max_rounds: 1
+  no_improvement_rounds: 0
+  consecutive_failures: 0

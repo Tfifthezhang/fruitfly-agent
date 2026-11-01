@@ -28,8 +28,8 @@ Add implementations through [Lab Context manager](../../lab/context_manager/READ
 ## Commit state and measure input
 
 [budget.py](budget.py) defines `InputMeasurement`, `ContextMeter`, request identity
-and transparent Provider capability forwarding. [history.py](history.py) defines
-the injected history reader; [validation.py](validation.py) checks complete tool
+and transparent Provider capability forwarding. [runtime resources](../tool_runtime/resources.py) defines
+the host-owned read-only resource contract; [validation.py](validation.py) checks complete tool
 pairing and optional Provider rebase constraints. [tasks.py](tasks.py) bounds
 external context work and cancellation cleanup. Core contains no estimator or
 summary prompt.

@@ -6,7 +6,7 @@ import unicodedata
 from fruitfly_agent.improvement.contracts.experiments import MaterialOption, PreparedExecution
 from fruitfly_agent.improvement.contracts.versions import canonical_json, content_hash
 from fruitfly_agent.improvement.contracts.failures import IntegrityError
-from fruitfly_agent.lab.improvement.improver.episodes import NativeEpisodeExecutor
+from fruitfly_agent.lab.improvement.improver.episodes import ComparisonEpisodeExecutor
 from fruitfly_agent.lab.improvement.improver.materials import FrozenMaterials
 from fruitfly_agent.lab.improvement.improver.registration import comparison_definition
 from fruitfly_agent.improvement.contracts.experiments import ExecutionRequest
@@ -27,12 +27,12 @@ class BenchmarkEpisode:
         return (self.prepared.task,)
 
 
-class BenchmarkEpisodeExecutor(NativeEpisodeExecutor):
+class BenchmarkEpisodeExecutor(ComparisonEpisodeExecutor):
     feedback = 'scored'
 
     def __init__(self, context, episode, parameters, *, executor=None):
         objective = OfficialMeasurements()
-        def runner_factory(config, registry, artifacts, services):
+        def runner_factory(plan, registry, artifacts, services):
             host = copy(context)
             host.components, host.services = registry, services
             return EvalTaskRunner(host, episode.prepared.private, objective, executor=executor)
@@ -68,7 +68,7 @@ def benchmark_improver(development, verification, *, material_id='benchmark-edit
         for name, definitions in (('development', development), ('verification', verification)):
             episodes = []
             for definition in definitions:
-                request = ExecutionRequest('', (), (target,), definition.execution_id, 'task', 'scored')
+                request = ExecutionRequest('', (), (target,), definition.execution_id, 'task')
                 prepared = definition.prepare(context, request)
                 key = unicodedata.normalize('NFC', prepared.task.instruction).strip()
                 if not key or key in seen:

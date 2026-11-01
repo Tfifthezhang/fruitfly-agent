@@ -50,6 +50,10 @@ class MeasurementService:
         self.raw: dict[str, tuple[tuple, int]] = {}
         self.counts: dict[tuple, int] = {}
 
+    def new_scope(self):
+        """Keep the fixed measurement policy and reset runtime-local observations."""
+        return MeasurementService(self.config)
+
     def validate_provider(self, provider):
         if self.config.strict and not getattr(provider, 'input_count_supported', False):
             raise ValueError('strict input counting is unsupported by this Provider')

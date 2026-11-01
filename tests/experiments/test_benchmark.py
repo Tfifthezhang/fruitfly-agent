@@ -66,7 +66,7 @@ class BenchmarkEntryTests(unittest.TestCase):
 
     def test_eval_ignores_editor_model_selection_and_never_calls_search(self):
         data = yaml.safe_load(self.config_path.read_text())
-        data['comparison']['inline']['scope'] = 'persistent'
+        data['evaluation']['scope'] = 'persistent'
         system_path = self.root / '.fruitfly/default-config.yaml'
         system = yaml.safe_load(system_path.read_text())
         system['profiles']['baseline']['models']['roles']['editor'] = 'editor'

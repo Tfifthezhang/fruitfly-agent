@@ -42,7 +42,7 @@ Improvement registers one shared workflow configuration. Per-job generator facto
 | Installer | Registration checks a synchronous callable accepting `(state, context, parameters)`; assembly checks its `AssemblyState` result. Run only when enabled. |
 | Validation | Disabled selections still validate ID and parameters; dependencies are not automatically enabled. |
 | Unknown mechanism | Raise `ValueError` with available IDs; remove the selection or [register a mechanism](#register-a-mechanism). |
-| Compaction parameters | Configure summarization directly; `compaction.profile` is unsupported even when the selection is disabled. Remove that field. |
+| Reduction parameters | Use the selected owner's strict working-memory instructions and settings. |
 | Ordering | Satisfy ID/capability dependencies, then use `(install_order, mechanism_id)` among eligible mechanisms. |
 | State | Preserve existing capabilities with replacement helpers; mutable hubs must belong exclusively to the candidate runtime. |
 | Context stages | Match declared phases and counts; stage IDs use the mechanism ID or its dotted prefix. |
@@ -165,6 +165,14 @@ Interactive status; Application exposes a replacement only after successful star
 and activation. Backends without a description remain supported and display
 Unavailable. Permission wrappers do not alter this metadata.
 
+`MechanismDefinition.execution_description(parameters, workspace)` optionally
+returns the same description before assembly. This pure callback receives
+normalized non-secret parameters and the local workspace; it must not construct
+resources, resolve credential values or make requests. Run uses it in the offline
+[startup panel](../../interactive/terminal/features/startup/README.md). Missing
+callbacks display the selected environment's label. Local and SSH registrations
+provide descriptions; an offline selection is not an activated runtime or health check.
+
 ## Declare credential requirements
 
 `MechanismDefinition.credential_variables(parameters)` optionally returns a tuple
@@ -211,8 +219,8 @@ Availability is not authorization: experiments explicitly select editable IDs.
 Absent owners provide no editable state. Unsupported explicit selections fail
 rather than enabling mechanisms or silently removing components.
 
-Enabled mechanisms' declared tools supply guidance components generically. Other
-components use `component_specs(parameters, enabled)` returning `ComponentSpec`
+Enabled mechanisms declare the actual tools. One shared Tool catalog owns their
+coordination policy; operation descriptions remain source-owned. Components use `component_specs(parameters, enabled)` returning `ComponentSpec`
 values. The callback is pure and receives normalized enabled parameters; disabled
 owners receive an empty mapping. Owners with no active component return an empty
 tuple. Object-target preparation and this declaration must agree.
@@ -230,3 +238,8 @@ The [execution policy adapter](../execution_policy/README.md) uses these contrac
 ```bash
 .venv/bin/python -m unittest tests.lab.test_harness_inventory tests.experiments.test_harness_validation
 ```
+
+`AssemblyContext.resources` provides read-only runtime references. The host may
+supply an isolated `execution_env` and declare `agent_hooks_from_host` when trial
+setups already own request hooks. Catalog preserves one resource and hook owner
+per runtime; these are host capabilities, not selectable algorithm settings.

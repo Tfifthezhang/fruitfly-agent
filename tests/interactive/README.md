@@ -6,6 +6,7 @@ Verify Application state/lifecycle, resource cleanup, events, menus, commands, a
 
 | Files | Protects |
 |---|---|
+| `test_terminal_startup.py` | Explicit launch choices, readiness feedback, shared offline editing, failed-save retry, startup cancellation and signal restoration |
 | `test_viewport.py` | Optional fullscreen embedding reflow, source/cache preservation, scroll anchors, drafts and menu restoration |
 | `test_authorization.py` | Single/directory/session approval, stale replies, serialization, timeout, and cancellation |
 | `test_run_control.py / test_context_status.py` | Quiet cancellation, complete interrupted tool associations, queue/retirement bounds, live canonical-message counts across compaction/recovery, context usage bars, separate measurements, and restored committed-compaction counts |

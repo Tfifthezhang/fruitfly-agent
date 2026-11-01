@@ -20,7 +20,7 @@ def execution_definition(freeze, settings, *, expected, capabilities, roles=froz
         if context.generator_definitions and not any(d.generator_id == context.plan.generator_id and d.supports_task_sets
                 for d in context.generator_definitions):
             raise ValueError('generator does not declare task-set evidence support')
-        if request.scope != 'task' or request.feedback != 'scored':
+        if request.scope != 'task':
             raise ValueError('task-set search needs scored development scope; independent adoption is not installed')
         if request.material_id != 'task-set' or request.input_paths or request.instruction:
             raise ValueError('select the registered task set without overriding its material')

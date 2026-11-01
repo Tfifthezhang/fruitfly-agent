@@ -14,13 +14,14 @@ from .search import create_web_search_tool
 
 def definitions(registry: WebServiceRegistry | None = None):
     registry = registry or default_service_registry()
+    defaults = WebConfig()
     common = (
-        ParameterDescriptor("timeout_seconds", "number", "Request deadline", "Total seconds including queue, DNS, retries and redirects.", 20, minimum=.01, maximum=120),
-        ParameterDescriptor("max_retries", "integer", "Retries", "Additional attempts after transient HTTP/network failures.", 1, minimum=0, maximum=2),
-        ParameterDescriptor("max_response_bytes", "integer", "Response bytes", "Maximum decoded response bytes.", 2_000_000, minimum=1, maximum=10_000_000),
-        ParameterDescriptor("cache_ttl_seconds", "number", "Cache lifetime", "Seconds before a successful response expires; zero disables caching.", 300, minimum=0, maximum=3600),
-        ParameterDescriptor("cache_entries", "integer", "Cache entries", "Maximum runtime-local responses; zero disables caching.", 32, minimum=0, maximum=128),
-        ParameterDescriptor("max_redirects", "integer", "Redirect limit", "Maximum redirects for public page fetching; search redirects are always disabled.", 5, minimum=0, maximum=10),
+        ParameterDescriptor("timeout_seconds", "number", "Request deadline", "Total seconds including queue, DNS, retries and redirects.", defaults.timeout_seconds, minimum=.01, maximum=120),
+        ParameterDescriptor("max_retries", "integer", "Retries", "Additional attempts after transient HTTP/network failures.", defaults.max_retries, minimum=0, maximum=2),
+        ParameterDescriptor("max_response_bytes", "integer", "Response bytes", "Maximum decoded response bytes.", defaults.max_response_bytes, minimum=1, maximum=10_000_000),
+        ParameterDescriptor("cache_ttl_seconds", "number", "Cache lifetime", "Seconds before a successful response expires; zero disables caching.", defaults.cache_ttl_seconds, minimum=0, maximum=3600),
+        ParameterDescriptor("cache_entries", "integer", "Cache entries", "Maximum runtime-local responses; zero disables caching.", defaults.cache_entries, minimum=0, maximum=128),
+        ParameterDescriptor("max_redirects", "integer", "Redirect limit", "Maximum redirects for public page fetching; search redirects are always disabled.", defaults.max_redirects, minimum=0, maximum=10),
     )
     result = []
     for kind, label, description, order in (

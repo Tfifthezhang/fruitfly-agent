@@ -34,6 +34,7 @@ def definition():
         documentation_path='fruitfly_agent/lab/environment/ssh/README.md',
         input_parameters=('host', 'port', 'cwd', 'username_env', 'password_env', 'known_hosts'),
         validate_parameters=validate,
+        execution_description=describe_execution,
         setup=MechanismSetup(
             fields=('host', 'port', 'cwd', 'known_hosts'),
             required_fields=('host', 'cwd', 'known_hosts'),
@@ -56,6 +57,13 @@ def validate(parameters):
     SshConfig(**{key: value for key, value in parameters.items() if key in known})
 
 
+def describe_execution(parameters, workspace):
+    """Describe selected execution offline, without resolving credentials."""
+    config = SshConfig(**parameters)
+    host = '[' + config.host + ']' if ':' in config.host else config.host
+    return ExecutionEnvironmentDescription('Remote SSH', config.cwd, host + ':' + str(config.port))
+
+
 def install(state, context, parameters):
     config = SshConfig(**parameters)
     secrets = context.secret_resolver
@@ -74,9 +82,8 @@ def install(state, context, parameters):
               '. Sessions, skills and context sources remain on the local host; files are not synchronized.')
     state = replace(state, config=replace(state.config, env=backend,
         system_prompt=(state.config.system_prompt + '\n\n' + prompt).strip()))
-    host = '[' + config.host + ']' if ':' in config.host else config.host
     return state.with_component(EXECUTION_ENVIRONMENT_COMPONENT,
-        ExecutionEnvironmentDescription('Remote SSH', backend.cwd, host + ':' + str(config.port))
+        describe_execution(parameters, context.workspace)
     ).with_component('ssh-environment', backend).with_component(EXPERIMENT_BLOCKERS_COMPONENT,
         (*state.components.get(EXPERIMENT_BLOCKERS_COMPONENT, ()),
          'Remote SSH workspace has no isolated frozen task snapshot'))

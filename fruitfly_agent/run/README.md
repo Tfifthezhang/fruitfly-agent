@@ -16,15 +16,22 @@ Assemble the default runtime from configuration, Providers, Lab, and Interactive
 
 Real tasks call the configured model service and may incur charges. See [Getting started](../../GETTING_STARTED.md) for installation and [Terminal](../interactive/terminal/README.md) for interaction.
 
-Complete interactive configuration enters the welcome and chat directly; no
-startup chooser or alternate-screen menu is shown. Run reads the controller's
-readiness snapshot before lending input. Missing model selection, credentials or
-enabled mechanism settings use the same host-supplied setup forms as `/config`.
-Cancellation creates no Session. Startup saves a synthesized complete baseline;
-user edits and repairs use **Save and start**, Continue or Discard. Save failure
-prevents runtime startup. Invalid configuration reports its path without overwrite.
+Interactive launches open an [offline startup panel](../interactive/terminal/features/startup/README.md)
+with Start session, Configure and Exit. The panel describes selected configuration,
+not connection health. It constructs no Providers, starts no external tool services
+and makes no SSH requests. Incomplete configuration focuses Configure. The shared
+`/config` editor offers **Save and return**, Continue or Discard before startup;
+saving does not start resources. Browsing or exiting the panel creates no Session
+and does not save synthesized defaults. Explicit Start saves a complete synthesized
+baseline when needed, then asks Application to prepare, start and activate resources.
 
-`--configure` opens configuration before chat and can precede `--resume`.
+Startup failures and Ctrl+C cancellation return to the panel after cleanup;
+cleanup failure exits with an error. Each retry creates a fresh Application.
+No automatic environment fallback occurs. Failed attempts can leave empty Session
+files but append no activated runtime snapshot. Malformed configuration reports
+its path without overwrite; raw YAML repair is outside this menu.
+
+`--configure` opens configuration first, then returns to the panel, and can precede `--resume`.
 It rejects task text and image-only task input. Existing task arguments remain
 unchanged. **Restore default configuration** stages default harness settings while
 preserving the daily model and credentials. Application can apply changes to the
@@ -89,6 +96,7 @@ read again at execution. No service capability is inferred from the model name.
 |---|---|
 | [__init__.py](__init__.py) | Stable Run exports |
 | [cli.py](cli.py) | Startup arguments, frontend connection, and process exit |
+| [startup.py](startup.py) | Offline panel projection using owner-declared execution descriptions |
 | [application.py](application.py) | RuntimeFactory interface and concrete service composition |
 | [assembly.py](runtime/assembly.py) | Public assembly/manifest/prompt-resolution exports |
 | [profiles.py](profiles.py) | Configuration controller composed with candidate-backed prompt views |
@@ -173,7 +181,7 @@ or completed without a candidate; reports retain usage, stopping reasons and
 verified journal references. History protects referenced candidates without
 relaxing activation checks.
 
-Component and generator views declare capability availability. Typed workflow requests select materials, component scope, exploration, independent phase times and optional feedback. Adding an implementation does not add algorithm branches to Run or the terminal.
+Component and generator views declare capability availability. Typed workflow requests select materials, component scope, generator, rounds and independent phase times. Adding an implementation does not add algorithm branches to Run or the terminal.
 
 Task selection does not change runtime configuration. Lab owns pack parsing and training edits. Readable `latest.txt` exports are not runtime inputs. Failed replacement retains the active runtime; external writes and effects do not automatically roll back. See [Improvement results](../lab/improvement/README.md#results-and-retention).
 

@@ -2,7 +2,7 @@
 
 [Up: Improvement](../README.md)
 
-Lab supplies concrete strategies, selection, exploration, optional research and
+Lab supplies fixed candidate comparison, selection, shared evidence navigation and
 stop policies to the independent [workflow runtime](../../../improvement/workflow/README.md).
 It owns no second Agent loop.
 
@@ -10,7 +10,7 @@ It owns no second Agent loop.
 |---|---|
 | `assembly.py` | Inject concrete workflow policies |
 | `task_sets.py` | Shared-batch execution and complete-set comparison |
-| `mechanisms.py` | Optional research context and progress stopping |
+| `mechanisms.py` | Shared evidence index and configured round stopping |
 | `adaptive.py` | Translate explicitly injected online control requests |
 
 Task, task-set and fixed-I execution consume the same independent stage times.

@@ -34,6 +34,8 @@ task score. Mixed changes require the runner's actual capabilities.
 H/S/I components from active owners. Execution capabilities and experiment
 permission further restrict them. Inactive state owners do not create S targets.
 A selected component unsupported by any task collection fails before execution.
+Tool parameters remain available for explicit grants but are excluded from
+automatic edit scope. The shared Tool catalog policy is a default target.
 
 `ComponentRegistry.configure` validates component-owned `component_options` and
 enforces them again on each candidate. `RunPlan` freezes these options into
@@ -43,19 +45,20 @@ IDs; other registered baseline components must remain unchanged.
 Bindings include `prompt`, `artifact` and `configuration`. Configuration bindings
 name a supported declarative section; they cannot write arbitrary profile fields.
 [Execution policy](../../execution_policy/README.md) uses `configuration / execution`
-for isolated trials, Eval staging, H version identity and verified activation.
+for fixed runtime conditions and H identity; it has no optimization target.
 
 
 ## Edit owner parameters
 
 `editable_parameters` wraps an owning Catalog definition with an explicit field
 whitelist, strict complete JSON snapshot, numeric bounds and a configuration
-binding. Bash, compaction, Web search/fetch and IPython declare supported parameter
+binding. Bash, working memory, Web search/fetch and IPython declare supported parameter
 fields. Credentials, model roles and undeclared fields remain fixed. Grants use
-`parameters.<field>`; enabling an owner does not authorize editing it.
+`parameters.<category>.<field>`; enabling an owner does not authorize editing it.
 
-Changed values require `configuration-materialization`, supplied by Eval staging.
-The native file runner rejects these edits before model work. Candidate staging,
+Changed values require a registered backend with `configuration-materialization`.
+Tool/Skill catalogs and working memory use their ordinary owner installers; Bash,
+Web and IPython also need their actual tool/backend capabilities. Tool parameters are explicit opt-in targets. Candidate staging,
 ordinary assembly and verified activation consume the same component configuration.
 Unsupported backends fail explicitly. See [Catalog admission](../../catalog/CONFIGURATION.md).
 

@@ -28,6 +28,7 @@ class ConfigurationSurface:
     allow_disabled: bool = False
     default: Callable | None = None
     reference: Callable | None = None
+    standalone: bool = False
 
     def __post_init__(self):
         if (not isinstance(self.id, str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*', self.id)
@@ -44,6 +45,8 @@ class ConfigurationSurface:
             raise TypeError('configuration default must be callable')
         if self.reference is not None and not callable(self.reference):
             raise TypeError('configuration reference must be callable')
+        if type(self.standalone) is not bool:
+            raise TypeError('standalone must be boolean')
 
 
 def configuration_surfaces(catalog):
@@ -142,7 +145,7 @@ def configure_profile(profile, catalog):
                 raise ValueError('unsupported registered configuration binding')
         # A virtual surface may require a real owner; explicit documents never
         # silently enable missing environment/tool dependencies.
-        if surface.binding in {'artifact', 'settings'} and not any(s.mechanism_id == owner for s in result.mechanisms):
+        if not surface.standalone and surface.binding in {'artifact', 'settings'} and not any(s.mechanism_id == owner for s in result.mechanisms):
             result = replace(result, mechanisms=(*result.mechanisms, MechanismSelection(owner, surface.binding != 'settings')))
     catalog.resolve(result.mechanisms)
     return replace(result, configured=True)
@@ -253,7 +256,7 @@ def component_profile(profile, catalog, *, artifact_reader=None):
         documents[selection.mechanism_id] = old if old == fresh else fresh
     active = {item.mechanism_id for item in profile.mechanisms if item.enabled}
     for name, (owner, surface) in surfaces.items():
-        if surface.binding == 'artifact' and owner not in active:
+        if surface.binding == 'artifact' and owner not in active and not surface.standalone:
             documents.pop(name, None)
             continue
         parameters = None
@@ -270,12 +273,14 @@ def component_profile(profile, catalog, *, artifact_reader=None):
             elif reference and surface.binding == 'prompt':
                 from fruitfly_agent.lab.base_prompt import get_builtin
                 parameters = surface.decode(get_builtin(reference).text)
-            elif surface.default is not None and owner in active:
+            elif surface.default is not None and (owner in active or surface.standalone):
                 parameters = surface.default()
         if parameters is not None:
             old = documents.get(name)
             fresh = ComponentConfiguration(name, surface.role, name, parameters,
-                artifacts=(old.artifacts if old and surface.binding == 'artifact' else {}))
+                artifacts=({surface.key: read(profile.artifact_bindings[surface.key])}
+                    if surface.binding == 'artifact' and surface.key in profile.artifact_bindings
+                    else old.artifacts if old and surface.binding == 'artifact' else {}))
             # Keep authored references only when the values actually agree.
             if old and surface.normalize(dict(old.parameters)) == surface.normalize(dict(parameters)):
                 fresh = old
@@ -382,8 +387,8 @@ def materialize_system(profile, destination, *, catalog=None, artifact_reader=No
 def normalize_configuration_binding(key, text, catalog):
     """Normalize a configuration binding for the exact assembled execution identity."""
     if key == 'execution':
-        from fruitfly_agent.lab.execution_policy import parse_policy
-        values = parse_policy(text)
+        from fruitfly_agent.runtime_spec import parse_execution
+        values = parse_execution(text)
     elif key.startswith('component.'):
         from .parameters import decode_parameters
         definition = catalog.get(key.removeprefix('component.'))

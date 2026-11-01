@@ -12,8 +12,6 @@ from .verification import ImproverVerification
 
 
 PARAMETERS = (
-    P('inner_strategy', 'Inner search strategy', 'string', 'harness2',
-      description='Registered strategy used for each fixed-I episode; simple or harness2.'),
     P('inner_components', 'Inner editable components', 'string', 'base_prompt',
       description='Space-separated registered H/S IDs; I is forbidden inside an episode.'),
     P('repetitions', 'Paired repetitions', 'integer', 2, 2, 10),
@@ -25,24 +23,23 @@ PARAMETERS = (
 
 def prepare(context, request, *, execution=None, freeze_materials=freeze, inner_capabilities=None, validate_materials=None):
     params = (execution or definition()).normalize(request.parameters)
-    from ..strategies import builtin_strategies
-    builtin_strategies().get(params['inner_strategy'])
     if (not request.component_ids or any(context.components.snapshot().component(name).role != 'I'
             for name in request.component_ids) or request.input_paths):
         raise ValueError('editor comparison changes only the registered I target; episode packs own inputs')
-    if request.feedback != 'scored':
-        raise ValueError('editor comparison requires measured feedback')
     ids = tuple(params['inner_components'].split())
     baseline = context.components.snapshot()
     capabilities = inner_capabilities(context) if callable(inner_capabilities) else inner_capabilities
+    if capabilities is None:
+        if context.runner_factory is None:
+            raise ValueError('I comparison requires an explicitly registered episode executor or TaskRunner')
+        capabilities = getattr(context.runner_factory, 'capabilities', frozenset())
     for name in ids:
         document = baseline.component(name)
         if document.role == 'I':
             raise ValueError('inner experiments cannot modify I')
         required: frozenset[str] = getattr(context.components.adapters[name], 'required_capabilities', frozenset())
-        from ..execution.file_runner import FileTaskRunner
-        if required - (FileTaskRunner.capabilities if capabilities is None else capabilities):
-            raise ValueError('inner file runner lacks component capabilities')
+        if required - capabilities:
+            raise ValueError('inner runner lacks component capabilities')
     frozen = freeze_materials(context, request.material_id, ids[0] if ids else 'base_prompt')
     if (request.scope == 'persistent' and context.remaining_verification is not None and
             context.remaining_verification(frozen.verification_key, frozen.max_verifications) == 0):
@@ -83,7 +80,7 @@ def definition():
         frozenset({'I'}), ImproverTaskRunner.capabilities, materials, prepare, build, PARAMETERS,
         'Runs bounded nested improvement experiments and private comparisons. Calls may incur charges. '
         'Each editor, execution and evaluator invocation uses its configured independent time.',
-        defaults=(('verification', 'scored'), ('scope', 'persistent')))
+        defaults=(('scope', 'persistent'),))
 
 
 def comparison_definition(*, execution_id, freeze_materials, list_materials, episode_factory,

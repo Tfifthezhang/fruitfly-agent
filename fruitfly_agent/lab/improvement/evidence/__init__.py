@@ -88,7 +88,7 @@ class EvidenceWorkspace:
             for component in candidate.harness.components:
                 for file in component.files:
                     files[f'context/candidates/{index}/{component.component_id}/{file.path}'] = file.text.encode('utf-8')
-        if request.plan.feedback == 'scored' and getattr(request, 'feedback', ()):
+        if getattr(request, 'feedback', ()):
             files['context/measurements.json'] = canonical_json([asdict(m) for m in request.feedback]).encode('utf-8')
         files['INDEX.json'] = canonical_json({'files': sorted((*files, *references)),
             'components': [asdict(c) for c in baseline.components],

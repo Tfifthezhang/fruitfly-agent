@@ -9,7 +9,7 @@ from fruitfly_agent.improvement.contracts.optimization import TargetSnapshot
 from fruitfly_agent.lab.improvement.targets.text import target_edits
 from fruitfly_agent.improvement.contracts.versions import canonical_json
 from fruitfly_agent.lab.base_prompt.target import BasePromptTarget
-from fruitfly_agent.lab.tools.guidance import ToolGuidanceTarget
+from fruitfly_agent.lab.tools.catalog import ToolCatalogTarget
 from fruitfly_agent.lab.tools.read import create_read_tool
 from tests.support.faux_provider import FauxProvider
 
@@ -18,11 +18,11 @@ class ComponentTargetTests(unittest.TestCase):
     def setUp(self):
         self.tool = create_read_tool()
         self.target = ComponentTarget('instructions', 'Instructions',
-            (BasePromptTarget('Original instructions'), ToolGuidanceTarget(self.tool)))
+            (BasePromptTarget('Original instructions'), ToolCatalogTarget()))
 
     def test_single_and_joint_edits_preserve_tools_and_parent(self):
         config = AgentLoopConfig(provider=FauxProvider(), system_prompt='Original instructions', tools=(self.tool,))
-        for keys in (('base_prompt',), ('tool-guidance.read',), ('base_prompt', 'tool-guidance.read')):
+        for keys in (('base_prompt',), ('tool-catalog',), ('base_prompt', 'tool-catalog')):
             with self.subTest(keys=keys):
                 values = json.loads(self.target.snapshot().text)
                 values.update({key: 'Updated ' + key for key in keys})
@@ -38,21 +38,25 @@ class ComponentTargetTests(unittest.TestCase):
 
     def test_invalid_scope_types_and_oversized_guidance_are_rejected(self):
         values = json.loads(self.target.snapshot().text)
-        for data in ({}, {**values, 'unknown': 'x'}, {**values, 'tool-guidance.read': {}},
-                     {**values, 'tool-guidance.read': 'x' * 6001}):
+        for data in ({}, {**values, 'unknown': 'x'}, {**values, 'tool-catalog': {}},
+                     {**values, 'tool-catalog': 'x' * 12001}):
             with self.subTest(data=list(data)), self.assertRaises(ValueError):
                 self.target.validate(canonical_json(data))
         mixed = ComponentTarget('mixed', 'Mixed',
-            (BasePromptTarget('base'), replace_snapshot_role(ToolGuidanceTarget(self.tool))))
+            (BasePromptTarget('base'), replace_snapshot_role(ToolCatalogTarget())))
         self.assertEqual({p.role for p in mixed.snapshot().components}, {'H', 'S'})
 
     def test_candidate_size_limit_does_not_block_runtime_target_registration(self):
         tool = replace(self.tool, description='x' * 30_001)
-        target = ComponentTarget('large', 'Large instructions', (ToolGuidanceTarget(tool),))
-        self.assertEqual(json.loads(target.snapshot().text)['tool-guidance.read'], tool.description)
+        target = ComponentTarget('large', 'Tool catalog policy', (ToolCatalogTarget(),))
+        config = AgentLoopConfig(provider=FauxProvider(), tools=(tool,))
+        trial = target.targets[0].prepare_trial(config, target.targets[0].snapshot().text)
+        self.assertNotIn(tool.description, trial.tools[0].description)
+        prefix = f'resource://{trial.readable_resources.scope}/tools/'
+        self.assertEqual(trial.readable_resources.read(prefix + 'read.txt').decode(), tool.description)
         target.validate(target.snapshot().text)
         with self.assertRaises(ValueError):
-            target.validate(canonical_json({'tool-guidance.read': 'y' * 30001}))
+            target.validate(canonical_json({'tool-catalog': 'y' * 12001}))
 
 
 def replace_snapshot_role(target):

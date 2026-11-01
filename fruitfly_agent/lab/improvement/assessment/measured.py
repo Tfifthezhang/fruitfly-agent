@@ -15,7 +15,7 @@ def measured_selection(records, measurements, *, direction='max'):
 
 class SelectionPolicy:
     async def choose(self, plan, task, records, feedback, *, selector, measurements):
-        if plan.feedback == 'scored':
+        if measurements is not None:
             decision=measured_selection(records,feedback,direction=getattr(measurements,'direction','max'))
             if decision is None:return None
             scores={m.run_id:m.score for m in feedback}

@@ -101,7 +101,7 @@ class ParameterCandidateTests(unittest.IsolatedAsyncioTestCase):
         definition = catalog.get('bash-tool')
         target = ParameterTarget(definition, {}, {'default_timeout_seconds'})
         options = {'editable_fields': ['parameters.settings.default_timeout_seconds'],
-            'bounds': {'parameters.settings.default_timeout_seconds': {'minimum': 1, 'maximum': 240}}}
+            'bounds': {'parameters.settings.default_timeout_seconds': {'minimum': 1, 'maximum': 1200}}}
         target.validate_options(options)
         values = json.loads(target.snapshot().text)
         values['settings']['default_timeout_seconds'] = 7
@@ -164,7 +164,7 @@ class ParameterCandidateTests(unittest.IsolatedAsyncioTestCase):
                 values['instructions']['update'] = 'EXACT candidate prompt\nKeep verified constraints and pending tests.'
                 text = json.dumps(values)
                 target.validate_change(text, grant)
-                baseline = HarnessProfile('default', mechanisms=(MechanismSelection('context-history'), MechanismSelection(name)))
+                baseline = HarnessProfile('default', mechanisms=(MechanismSelection(name),))
                 candidate = apply_profile_binding(baseline, 'configuration', 'component.' + name, target.export_text(text))
                 path = materialize_system(candidate, Path(directory) / 'candidate/config.yaml', catalog=catalog)
                 restored = load_system_config(path).select()
@@ -194,22 +194,10 @@ class ParameterCandidateTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(runtime.config.context_meter, MeasurementService)
         self.assertNotIn('text-target:context-measurement', runtime.components)
 
-    async def test_history_capacity_candidate_changes_actual_artifact_admission(self):
-        from tests.support.faux_provider import FauxProvider
-        catalog = builtin_catalog(); definition = catalog.get('context-history')
-        target = ParameterTarget(definition, {}, {'max_artifact_bytes'})
-        values = json.loads(target.snapshot().text); values['settings']['max_artifact_bytes'] = 1024
-        text = json.dumps(values)
-        target.validate_change(text, {'editable_fields': ['parameters.settings.max_artifact_bytes'],
-            'bounds': {'parameters.settings.max_artifact_bytes': {'minimum': 1024, 'maximum': 16000000}}})
-        profile = HarnessProfile('default', mechanisms=(MechanismSelection('context-history'),))
-        candidate = apply_profile_binding(profile, 'configuration', 'component.context-history', target.export_text(text))
-        with tempfile.TemporaryDirectory() as directory:
-            path = materialize_system(candidate, Path(directory) / 'config.yaml', catalog=catalog)
-            restored = load_system_config(path).select()
-            runtime = assemble_lab(AgentLoopConfig(provider=FauxProvider()), catalog=catalog,
-                selections=restored.mechanisms, context=AssemblyContext(Path(directory), None, 'fake', lambda *a: None))
-            history = runtime.components['context-history']
-            with self.assertRaisesRegex(ValueError, 'max_artifact_bytes'): history.put('x' * 1500)
-            reference = history.put('small archive')
-            self.assertEqual('small archive', history.text(reference))
+    def test_history_has_no_independent_optimization_registration(self):
+        catalog = builtin_catalog()
+        with self.assertRaises(ValueError):
+            catalog.get('context-history')
+        method = catalog.get('working-memory-reduction')
+        self.assertNotIn('context-history', method.descriptor.requires)
+        self.assertIn('readback_instructions', method.parameter_paths)

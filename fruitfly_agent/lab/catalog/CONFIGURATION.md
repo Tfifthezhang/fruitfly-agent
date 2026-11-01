@@ -13,7 +13,7 @@ algorithm-specific parsing to Run, the terminal or Eval.
 |---|---|
 | Tool, environment, context mechanism, retained document | Owning Lab module, composed by Catalog |
 | Candidate generator | Improvement `GeneratorRegistry` |
-| Search and next-seed policy | Improvement strategy/exploration registries |
+| Round flow and incumbent retention | Fixed Improvement engine; stopping conditions remain separate |
 | Completed assessment/comparison | Shared prompt-driven model evaluator |
 | Task execution | Execution registry |
 | Model protocol | Providers |
@@ -62,9 +62,10 @@ execution or I setting surface. A `ConfigurationSurface` declares:
 | `edit_options` | Optional field-grant normalization into the owner's candidate adapter |
 | `restore` | Restore exact artifact-backed settings when applicable |
 | `default`, `reference` | Optional pure derived defaults and canonical built-in text identities |
+| `standalone` | Surface prepared without enabling a separate installer; default false |
 
-A surface does not install its owner twice. Tool guidance uses the tool's owner;
-the owner remains responsible for tool schema, implementation and permissions.
+A surface does not install its owner twice. The shared Tool catalog policy is prepared after tool installation;
+individual owners retain schemas, usage resources, implementation and permissions.
 An explicit surface and a frozen artifact must describe the same effective value.
 Candidate bundles preserve exact artifact bytes as well as readable values.
 
@@ -134,8 +135,8 @@ records their workspace paths and hashes. Live services remain external
 requirements. This callback is separate from pure parameter normalization and runs
 only when explicitly freezing/exporting resources.
 
-A surface may declare a pure `default` callback. Built-in file/shell tools use
-this to expose their actual default description during offline inspection and
+A surface may declare a pure `default` callback. The shared Tool catalog uses
+this to expose its default policy during offline inspection and
 materialization, without creating a runtime or opening a service.
 
 
@@ -153,7 +154,7 @@ public configuration format.
 
 
 [Parameter adapters](../improvement/components/README.md#edit-owner-parameters)
-reuse ordinary normalization and assembly. Built-in Bash, working memory, context history, Web and
+reuse ordinary normalization and assembly. Built-in Bash, working memory, Web and
 IPython owners declare explicit editable parameter whitelists. Discovery still
 constructs no clients. Their targets require `configuration-materialization`;
 unsupported runners reject the edit. I editor/evaluator prompts use fixed-I comparison instead
@@ -170,8 +171,8 @@ the actually assembled runtime.
 ## Enforce algorithm readiness
 
 `LabCatalog.require_optimization()` runs before Run constructs runtime services.
-Every algorithm needs an executable component/parameter declaration or tool
-guidance target. Infrastructure connectors declare a concrete
+Every algorithm needs an executable component/parameter declaration. Tools
+share the Tool catalog policy while keeping individual operation contracts fixed. Infrastructure connectors declare a concrete
 `optimization_exemption` explaining their protected responsibility. This is not
 permission to expose an algorithm without an optimization surface. Assembly
 verifies that declared targets actually exist; component admission also checks
@@ -179,5 +180,10 @@ timing, boundary and runner capabilities through the
 [optimization protocol](../../improvement/contracts/README.md#declare-optimization-surfaces).
 Information retrieval limits, Skill catalog size and programmatic offload
 thresholds have owner-controlled parameter adapters. Their shared configuration
-candidates require configuration materialization; native file trials reject
-unsupported parameter changes before model work.
+candidates require configuration materialization; incompatible or missing backends
+reject unsupported parameter changes before model work.
+
+Owner declarations set `default_selected` on component and optimization metadata.
+Tool parameter owners set it false: discovery still reports availability, while
+automatic experiment/chat selection excludes them. Explicit grants remain valid.
+Assembly checks that declarative and executable defaults agree.

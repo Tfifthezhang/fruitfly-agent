@@ -188,13 +188,7 @@ def render_skills_xml(skills: list[Skill]) -> str:
     visible = [s for s in skills if not s.disable_model_invocation]
     if not visible:
         return ""
-    lines = [
-        "The following skills provide specialized instructions for specific tasks.",
-        "Read the full skill file when the task matches its description.",
-        "When a skill file references a relative path, resolve it against the skill directory.",
-        "",
-        "<available_skills>",
-    ]
+    lines = ["<available_skills>"]
     for skill in visible:
         lines.append("  <skill>")
         lines.append(f"    <name>{escape(skill.name)}</name>")

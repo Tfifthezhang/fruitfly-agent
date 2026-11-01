@@ -5,7 +5,7 @@ from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, Edi
 from fruitfly_agent.improvement.contracts.execution import ExecutionRecord, TaskRunner
 from fruitfly_agent.improvement.contracts.assessment import Measurement, SelectionDecision, Selector, MeasurementSource, VerificationPolicy
 from fruitfly_agent.improvement.contracts.plans import RunPlan, ExperienceEntry
-from fruitfly_agent.improvement.contracts.editing import ProposalRequest, ProposalResult, CompositionRequest, CandidateGenerator, GenerationServices, Composer, Reflector
+from fruitfly_agent.improvement.contracts.editing import ProposalRequest, ProposalResult, CandidateGenerator, GenerationServices, Reflector
 from fruitfly_agent.improvement.contracts.pipeline import ImprovementOutcome, WorkflowController
 from .contracts.facts import ExecutionFacts, UsageFact, ArtifactFact
 from .contracts.evaluation import EvaluationBatch, TrialResult, CandidateEvaluation

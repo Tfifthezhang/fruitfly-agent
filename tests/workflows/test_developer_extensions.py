@@ -8,7 +8,7 @@ import yaml
 
 from fruitfly_agent.extensions import ExtensionContext
 from fruitfly_agent.run.extensions import load_extensions, discover_extensions
-from fruitfly_agent.run import RunApplicationFactory
+from tests.support.task_execution import TaskApplicationFixture as RunApplicationFactory
 from fruitfly_agent.interactive import AgentApplication
 from fruitfly_agent.interactive.contracts.improvement import WorkflowRequest
 from fruitfly_agent.lab.improvement.api import WorkflowBindings
@@ -16,7 +16,7 @@ from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
 from fruitfly_agent.rsi import EvolutionEngine
 from fruitfly_agent.rsi.contracts import VerificationEvidence
 from fruitfly_agent.run.evolution import RunEvolutionHost
-from tests.support.improvers import OfflineGenerator, FirstComposer, FirstSelector, SyntheticVerification
+from tests.support.improvers import OfflineGenerator, FirstSelector, SyntheticVerification
 from tests.support.materials import _write_models
 from tests.support.faux_provider import FauxProvider
 
@@ -45,7 +45,7 @@ class DeveloperExtensionTests(unittest.IsolatedAsyncioTestCase):
             factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=providers,
                 extensions=load_extensions((str(guidance), str(hook)), workspace=root),
                 improvement_bindings=WorkflowBindings(generators=generators,
-                    composer=lambda *args: FirstComposer(), selector=lambda *args: FirstSelector()))
+                     selector=lambda *args: FirstSelector()))
             factory.configuration.set_mechanism('developer-guidance-owner', enabled=True)
             factory.configuration.save(); factory.reload_configuration()
             app = AgentApplication(factory)
@@ -54,12 +54,12 @@ class DeveloperExtensionTests(unittest.IsolatedAsyncioTestCase):
             first = await app.submit('ordinary request')
             self.assertIn('EXTENSION_REQUEST=1', first.messages[-1].text)
             request = WorkflowRequest('Compare task guidance.', component_ids=('developer-guidance',),
-                generator_id='offline-rule', strategy_id='simple', retain_experience=False)
+                generator_id='offline-rule',  retain_experience=False)
             preview = app.workflow_preview(request)
             await app.improve('', preview_token=preview.preview_token)
             records = factory._component_jobs.outcome.records
             self.assertEqual(len(records), 2)
-            self.assertTrue(all('EXTENSION_REQUEST=1' in record.output for record in records))
+            self.assertTrue(all(record.output.count('EXTENSION_REQUEST=1') == 1 for record in records))
             second = await app.submit('ordinary request after trials')
             self.assertIn('EXTENSION_REQUEST=2', second.messages[-1].text)
 
@@ -134,7 +134,7 @@ class DeveloperExtensionTests(unittest.IsolatedAsyncioTestCase):
             generators.register('offline-rule', OfflineGenerator)
             factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=providers,
                 extensions=extensions, improvement_bindings=WorkflowBindings(generators=generators,
-                    composer=lambda *args: FirstComposer(), selector=lambda *args: FirstSelector(),
+                     selector=lambda *args: FirstSelector(),
                     verifier=SyntheticVerification()))
             factory.configuration.set_mechanism('developer-guidance-owner', enabled=True)
             factory.configuration.save()
@@ -148,7 +148,7 @@ class DeveloperExtensionTests(unittest.IsolatedAsyncioTestCase):
             self.addAsyncCleanup(app.close)
             initial = app.runtime_manifest['digest']
             request = WorkflowRequest('Show applied guidance.', component_ids=('developer-guidance',),
-                generator_id='offline-rule', scope='persistent', strategy_id='simple', retain_experience=False)
+                generator_id='offline-rule', scope='persistent',  retain_experience=False)
             async def verify(record, text):
                 return VerificationEvidence(record.candidate_id, record.artifact_id,
                     record.parent_manifest_digest, 'synthetic-extension', True)

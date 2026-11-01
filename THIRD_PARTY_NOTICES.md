@@ -35,7 +35,7 @@ SOFTWARE.
 
 The [Improvement workflow](fruitfly_agent/lab/improvement/README.md) adapts ideas
 from [Harness²: Recursive Agent Harnessing for an Open World](https://arxiv.org/abs/2610.14224):
-evidence-driven component editing, Propose–Probe–Compose, output selection and
+role-separated component editing, output comparison and
 attributed cross-task experience. This is an independently written adaptation with
 explicit H/S/I ownership and host verification/adoption. No upstream code, paper
 figures or datasets are included. Published experiments and performance claims are

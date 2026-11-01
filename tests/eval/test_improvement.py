@@ -54,7 +54,7 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
                      'fruitfly_agent/run/configuration/templates/components/H/execution-policy.yaml', 'fruitfly_agent/runtime_spec/profiles.py', 'fruitfly_agent/runtime_spec/selections.py', 'fruitfly_eval/runtime.py')]
         receipt = {'id': 'prepared-identity', 'runtime': {'installation': {'files': files}},
             'tasks': [{'id': 'external/task', 'path': str(task)}]}
-        plan = RunPlan('experiment', version(), ('base_prompt',), generator_id='rule', feedback='scored')
+        plan = RunPlan('experiment', version(), ('base_prompt',), generator_id='rule')
         services = WorkflowServices(plan)
         context = ExecutionContext(root, artifacts, components, None, None, None, plan=plan, services=services)
         return context, request, host, receipt
@@ -87,7 +87,7 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
                     'metrics': [{'name': 'official_reward', 'value': float(candidate)}]}, path
             definition, host_patch, receipt_patch = self.freeze(context, request, host, receipt, executor)
             with host_patch, receipt_patch:
-                prepared = definition.prepare(context, ExecutionRequest('', (), ('base_prompt',), 'benchmark-task', 'task', 'scored'))
+                prepared = definition.prepare(context, ExecutionRequest('', (), ('base_prompt',), 'benchmark-task', 'task'))
                 ports = definition.build(context, prepared)
                 class Generator:
                     generator_id = 'rule'; required_capabilities = frozenset()
@@ -96,14 +96,12 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
                         candidate = CandidateBundle(request.plan.parent, request.baseline, HarnessSnapshot((document,)), 'rule',
                             (EditReason('base_prompt', 'Evidence-driven proposal', (request.records[0].run_id,), expected_effect='The proposed behavior appears in the subsequent execution.'),))
                         return ProposalResult((candidate,))
-                class Composer:
-                    async def compose(self, request, services): return request.candidates[0]
                 generators = GeneratorRegistry(); generators.register('rule', Generator)
                 flow = ComponentWorkflow(generators=generators, components=context.components, runner=ports.runner,
-                    composer=Composer(), selector=None, measurements=ports.measurements)
+                     selector=None, measurements=ports.measurements)
                 result = await flow.run(context.plan, prepared.task, context.components.snapshot(), context.services)
-                self.assertEqual(calls, [False, True, True, True])
-                self.assertEqual(context.services.used, {'model': 8, 'execution': 4})
+                self.assertEqual(calls, [False, True])
+                self.assertEqual(context.services.used, {'model': 4, 'execution': 2})
                 self.assertEqual(result.harness.components[0].files[0].text, 'candidate')
                 self.assertEqual(result.decision.assurance, 'selected')
                 self.assertTrue(all('PRIVATE' not in context.artifacts.read(a.artifact_id).decode() for r in result.records for a in r.artifacts))
@@ -118,7 +116,7 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
             definition, host_patch, receipt_patch = self.freeze(context, request, host, receipt, forbidden)
             with host_patch, receipt_patch:
                 self.assertFalse(definition.materials(context)[0].error)
-                prepared = definition.prepare(context, ExecutionRequest('', (), ('base_prompt',), 'benchmark-task', 'task', 'scored'))
+                prepared = definition.prepare(context, ExecutionRequest('', (), ('base_prompt',), 'benchmark-task', 'task'))
                 (root / '.fruitfly/models.yaml').write_text('changed')
                 self.assertNotEqual(prepared.current_source(), prepared.source_id)
                 self.assertEqual(context.services.used['model'], 0)
@@ -134,7 +132,7 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
                 finally: cleaned.set()
             definition, host_patch, receipt_patch = self.freeze(context, request, host, receipt, executor)
             with host_patch, receipt_patch:
-                prepared = definition.prepare(context, ExecutionRequest('', (), ('base_prompt',), 'benchmark-task', 'task', 'scored'))
+                prepared = definition.prepare(context, ExecutionRequest('', (), ('base_prompt',), 'benchmark-task', 'task'))
                 runner = definition.build(context, prepared).runner
                 pending = asyncio.create_task(runner.execute(context.plan, prepared.task, context.components.snapshot()))
                 await entered.wait(); pending.cancel()
@@ -204,17 +202,17 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
             development = benchmark_execution(request, host,  execution_id='development')
             independent = benchmark_execution(request, second_host,  execution_id='independent')
             study = benchmark_improver((development,), (independent,), executor=executor)
-            supplied = (('inner_strategy','harness2'),)
+            supplied = ()
             with patch('fruitfly_eval.improvement.registration.HostConfig.read', side_effect=lambda workspace, path:
                     SimpleNamespace(agent_env={'FRUITFLY_MAX_MODEL_CALLS': '2'}, receipt=receipts[str(Path(path).resolve())])), patch(
                     'fruitfly_eval.improvement.registration.load_preparation', side_effect=lambda host, *args: host.receipt):
                 prepared = study.prepare(context, ExecutionRequest('', (), ('improvement-editor',),
-                    'benchmark-editor-study', 'task', 'scored', supplied))
+                    'benchmark-editor-study', 'task', supplied))
                 self.assertFalse(calls)
                 ports = study.build(context, prepared)
                 baseline = context.components.snapshot()
                 document = baseline.component('improvement-editor')
-                values = json.loads(document.files[0].text); values['instructions']['invariant'] += ' STEP'
+                values = json.loads(document.files[0].text); values['instructions']['propose'] += ' STEP'
                 changed = replace(document, files=(ComponentFile('instructions.txt', json.dumps(values)),))
                 candidate = HarnessSnapshot(tuple(changed if d.component_id == changed.component_id else d for d in baseline.components))
                 before = await ports.runner.trial(baseline, 'development')
@@ -246,7 +244,7 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
             context.plan = replace(context.plan, timeouts={'editor_seconds':.01,'execution_seconds':.01,'evaluator_seconds':.01})
             context.services = WorkflowServices(context.plan)
             with host_patch, receipt_patch:
-                prepared = definition.prepare(context, ExecutionRequest('', (), ('base_prompt',), 'benchmark-task', 'task', 'scored'))
+                prepared = definition.prepare(context, ExecutionRequest('', (), ('base_prompt',), 'benchmark-task', 'task'))
                 runner = definition.build(context, prepared).runner
                 with self.assertRaises(StageFailure) as caught:
                     await run_stage(context.services, 'execute', runner.execute(context.plan, prepared.task, context.components.snapshot()))

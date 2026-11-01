@@ -178,7 +178,7 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
                 provider = FauxProvider()
                 observed = []
                 def execute(view, **kwargs):
-                    observed.append(next(t.description for t in view.tools if t.name == 'save_media'))
+                    observed.append(view.system_prompt)
                     async def events():
                         yield StreamDone(AssistantMessage([ToolCallBlock('save', 'save_media',
                             {'resource_id': resource, 'path': 'candidate.png'})], stop_reason='toolUse'))
@@ -188,14 +188,16 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
                 candidate = assemble_lab(AgentLoopConfig(provider=provider), catalog=builtin_catalog(),
                     selections=(MechanismSelection('local-env'), MechanismSelection('save-media-tool')),
                     context=AssemblyContext(root, session, 'offline', lambda *args: None,
-                        artifact_reader=store.read_text, artifact_bindings={'tool-guidance.save_media': binding},
+                        artifact_reader=store.read_text, artifact_bindings={'tool-catalog': binding},
                         media_reader=media.read))
-                target = candidate.components['text-target:tool-guidance.save_media']
+                target = candidate.components['text-target:tool-catalog']
                 self.assertEqual(target.snapshot().text, instructions)
-                self.assertEqual(target.snapshot().binding.key, 'tool-guidance.save_media')
-                result = await run_agent_loop(candidate.config, [UserMessage('save the resource')])
+                self.assertEqual(target.snapshot().binding.key, 'tool-catalog')
+                result = await run_agent_loop(candidate.config, [UserMessage('save the resource')],
+                    context_pipeline=candidate.context_pipeline)
                 self.assertFalse(result.is_error)
-                self.assertEqual(observed, [instructions])
+                self.assertEqual(len(observed), 1)
+                self.assertIn(instructions, observed[0])
                 self.assertEqual((root / 'candidate.png').read_bytes(), png_bytes())
 
     async def test_pending_attachment_draft_survives_rejection_and_clears_on_session_switch(self):

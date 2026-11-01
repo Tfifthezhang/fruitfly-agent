@@ -19,7 +19,7 @@ incompatible with the SSH selection.
 | [write.py](write.py) | `create_write_tool`: file writes |
 | [media.py](media.py) | `create_save_media_tool` using host-granted resources and the shared Core media limits |
 | [ipython.py](ipython.py) | `create_ipython_tool`: explicit Python workspace integration |
-| [guidance.py](guidance.py) | `ToolGuidanceTarget`: validate, trial and bind instruction text independently of tool implementations |
+| [catalog.py](catalog.py) | One editable tool policy; detailed usage through scoped read-only resources |
 | [Web tools](web/README.md) | `web_search` through Brave/Tavily/DeepSeek; `web_fetch` directly or through DeepSeek; disabled by default |
 | [truncate.py](truncate.py) | Head/tail output limits |
 | [path_utils.py](path_utils.py), [file_queue.py](file_queue.py) | Path normalization and in-process mutation ordering |
@@ -35,7 +35,7 @@ Inject `builtin_tools()` into `AgentLoopConfig.tools`. IPython is added explicit
 | Edit | Locate every replacement in the original file before writing; require unique, non-overlapping spans. |
 | Fuzzy edit | Compare whole-line spans; reject tied best matches and empty `oldText`. |
 | Read/bash output | Default body limit: 2000 lines and 51200 UTF-8 bytes; notices are separate. |
-| Long lines | Clip on a complete UTF-8 character boundary. Read offsets cannot retrieve omitted characters from the same line. |
+| Long lines | Clip on a complete UTF-8 character boundary. Character pagination retrieves omitted characters from the same line. |
 | Bash failure/cancellation | Bound output; advertise the complete log only after a successful write. User-signal cancellation propagates as task cancellation; timeout/backend abort without that signal remains an error. |
 | Bash log persistence | Attempt to save truncated output; report save failures without advertising a complete log. |
 | Truncation API | Nonnegative integer budgets; zero gives an empty body; negative, boolean, or noninteger budgets raise `ValueError`. |
@@ -56,12 +56,10 @@ granted resources, verifies content hashes, then writes original bytes (up to
 queue. SSH destinations stay remote; resource storage stays local. IDs are not
 arbitrary artifact paths. The tool does not generate or convert media.
 
-The owner exposes H `tool-guidance.save_media` with ordinary validation, trial and
-binding rules. Configuration/candidate materialization uses the shared Catalog
-path. Trials need a runner declaring `tool:save_media`; the native in-memory
-read/write/edit runner does not acquire this capability implicitly. Media grants
-are Session-owned and restored only after hash checks; no cross-Session grant
-sharing or automatic resource collection is added.
+Media operations retain their fixed schema and implementation. Their detailed usage
+joins the shared Tool catalog. An Improvement backend must explicitly declare
+and supply media-saving capability and its resource grants. Media grants are Session-owned and restored after hash
+checks; no cross-Session sharing or automatic resource collection is added.
 
 ## Add a tool
 
@@ -85,7 +83,7 @@ Built-in tools declare `ToolPermission`: read is a file read, edit/write are fil
 
 Web tools declare `network_read`; host-owned `PermissionPolicy.allow_network` can deny them. See the [web guide](web/README.md) for credentials, HTTP limits and caches. `builtin_tools()` remains the four local file/shell factories; Catalog registers web tools separately.
 
-## Describe visible operations
+## Observe operations
 
 Built-in labels describe the action: Read file, Write file, Edit file, Execute shell
 command, Execute Python code, Search the web and Fetch web page. Parameters supply
@@ -96,46 +94,48 @@ Bash accepts an optional `description` string describing the current command's
 purpose, such as `Run menu tests`. Its `describe_call` callback uses that value only
 for observation; it does not change the command, timeout, authorization or outcome.
 Omission or blank text uses the tool label. Do not include credentials in descriptions.
-The model-facing `description` remains the full tool usage instructions.
+The factory's full `description` is source-owned tool usage. Catalog assembly
+exposes concise API descriptions and demand-loaded details when `read` is enabled.
 
-Each tool owns its use cases, scope and limits in that description. Descriptions
-must stand alone when only that tool is enabled; do not name another tool as a
-required next step. Providers serialize the enabled tools' descriptions into API
-tool definitions. The base prompt does not enumerate tools or prescribe their
-selection. These descriptions guide model choice; they do not enforce routing.
+## Describe visible operations
 
-| Tool | Use cases declared to the model |
+`tool-catalog` is one H optimization target. Its `parameters.instructions.usage`
+coordinates tool selection, composition, failure recovery and verification. Names,
+schemas, permissions, implementations and individual usage documents stay fixed.
+The policy accepts 1–12000 characters. It uses ordinary artifact binding,
+configuration export, isolated trials, verified activation and recovery.
+
+| Model input | Content |
 |---|---|
-| Read | Inspect source, configuration, logs and saved artifacts in the selected local or SSH environment. |
-| Write | Create or replace a complete text file in that environment. |
-| Edit | Make targeted replacements while preserving surrounding content in that environment. |
-| Bash | Inspect the environment, run programs, install, build, test, download files and process API responses there. |
-| IPython | Calculate, analyze data and reuse Python state in a local workspace. |
-| Search | Discover external information, check current facts and locate authoritative sources. |
-| Fetch | Read a known URL and verify details or quotations, within the selected service's capabilities. |
+| System projection | Overall policy, actual tool names/labels and full-usage references |
+| API tool definition | Short operation description and original argument schema |
+| `read(resource://…/tools/<name>.txt)` | Full source-owned usage for the selected tool |
 
-## Bind an instruction candidate
+Details are loaded only when the model calls the existing `read` tool. No loader
+tool is added. Resources are scoped to the runtime, read-only, and independent of
+local/SSH paths. Closing the runtime retires them. Hidden tools are omitted.
+A runtime without visible `read` retains inline descriptions so usage remains
+accessible. Loading is instruction-driven, not an enforced precondition on calls.
 
-The built-in Catalog exposes one H target `tool-guidance.<name>` per enabled tool,
-plus the combined [execution instruction target](../improvement/targets/README.md#improve-multiple-instruction-components).
-An adopted guidance artifact replaces only `AgentTool.description`; it keeps the
-name, parameters, execution function and permission declaration. Each complete
-description must be nonempty and at most 6000 characters. Artifacts are consumed
-at runtime construction and recorded in H identity. Disabling a tool with a bound
-artifact requires clearing that binding; unused bindings fail construction.
+Factories must supply complete, standalone usage and concise labels. New tools,
+including prepared external tools, automatically join the assembled catalog.
+No per-tool optimization slots are registered. The catalog's defaults and exact
+adopted policy are exported by the shared configuration path. Its standalone
+surface requires no separate installer; the instruction owner prepares it after
+all tools exist. Candidate backends must derive references from their own tool
+set and fresh resource scope, without borrowing the daily catalog.
 
-Custom tool definitions can declare the slot returned by `guidance_key(name)` in
-`artifact_slots`. `prepare_guidance` consumes enabled tools' bindings and registers
-their object-owned targets. The built-in composition root supplies those slots
-from its declared tool effects. Installing a description does not invoke the tool
-or make a model request. Native component trials support read/write/edit guidance in their isolated file
-workspace. Bash, web and IPython guidance require a compatible registered runner;
-selecting those tools in the live runtime does not add them to native trials.
+Tool parameter targets remain discoverable, but `default_selected: false` keeps
+them out of automatic CLI and chat edit scope. Explicit experiment grants can
+select supported parameters with an appropriate execution backend. This does not
+change model-supplied arguments such as one Bash call's `timeout`.
 
+Offline checks: `tests.lab.test_tool_catalog`, `tests.lab.test_component_targets`,
+`tests.workflows.test_improvement`, `tests.experiments.test_harness_validation`.
 
 ## Bound and manage shell commands
 
-Bash defaults to a 120-second timeout. A positive finite `timeout` overrides it.
+Bash defaults to a 600-second timeout. A positive finite `timeout` overrides it.
 For long work, call Bash with `action: start`, `command` and optional
 `wait_seconds` (default 0.2, range 0–30); it returns a runtime-owned handle.
 Use `action: poll` with `handle` for bounded output or `action: cancel` to retire
@@ -143,12 +143,18 @@ that command. Omitted action runs synchronously. The initiating task cancellatio
 jobs; closure requires backend cleanup confirmation. Handles are local to that runtime.
 
 The `bash-tool` component declares `default_timeout_seconds` (1–28800),
-`max_active_commands` (default 2, 1–16), `retained_commands` (default 64, 16–256)
+`max_active_commands` (default 4, 1–16), `retained_commands` (default 128, 16–256)
 and `output_characters` (default 12000, 100–24000). Completed old handles can be
 retired when capacity is reached; active work is never evicted to start another.
-These H fields have owner-validated candidate grants on backends supporting
-configuration materialization. A larger command timeout never extends its parent
+`default_timeout_seconds` is the only optimizable Bash parameter. Active-job,
+retained-handle and output-page limits remain fixed experiment conditions.
+Bash candidates require both configuration materialization and Bash execution. A larger command timeout never extends its parent
 operation or experiment deadline. Managed tasks are in-process capabilities, not
 persistent remote jobs or an OS sandbox. All actions retain execution permission.
 
 Offline checks: `tests.lab.test_managed_commands`, `tests.lab.test_parameter_candidates`.
+
+Text reads also support `character_offset` (zero-based) and `character_limit`
+(1–24000, default 12000), mutually exclusive with line offset/limit. This permits
+complete readback of long single-line history through the existing tool. Every
+response retains the tool byte/line bounds and a precise continuation offset.

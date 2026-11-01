@@ -10,6 +10,7 @@ class ComponentRegistry:
         self.adapters = {}
         self.options = {}
         self.trial_setups = ()
+        self.agent_hooks_from_host = False
         for adapter in adapters:
             self.register(adapter)
 

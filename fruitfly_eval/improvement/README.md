@@ -49,7 +49,7 @@ Start an Application with that factory and submit a `WorkflowRequest` selecting
 components and measured feedback. Preview makes no Docker or model request.
 Execution starts containers and models and may incur charges. Discovery reports
 missing preparation instead of silently downloading it. The chat menu is a light
-native-task entry; full experiments use the independent CLI or public API.
+registered-task entry; full experiments use the independent CLI or public API.
 
 ## Interpret scope and evidence
 
@@ -110,7 +110,7 @@ Conflicting executor overrides fail rather than silently changing conditions.
 Optional `task_names`, `partitions`, `groups` and objective ranges describe the
 prepared inventory. Source changes invalidate execution. `eval prepare` on a
 task-set experiment prepares its Eval sources through derived hosts;
-native collections need no Eval preparation. No additional benchmark adapter or
+custom non-Eval sources own their preparation. No additional benchmark adapter or
 package is installed by declaring a collection name.
 
 ## Compare I on prepared benchmarks
@@ -152,7 +152,8 @@ missing external usage remains unknown. Only independently
 verified I is eligible for explicit activation. Inner H/S is never activated by it.
 
 This composition is currently exposed through the public embedding API; the
-experiment file `source: editor` still selects native task-package episodes.
+experiment file `source: editor` selects task-package materials and needs an
+explicitly registered task/episode backend; it provides no local executor.
 Offline injected executors cover nested modification, scoring, partitioning,
 isolation and accounting in `tests.eval.test_improvement`.
 

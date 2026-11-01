@@ -10,11 +10,11 @@ The [configuration overview](../../CONFIGURATION.md#navigate-the-configuration-t
 is the navigation root; this page owns template setup rather than another schema table.
 
 For independent experiments, `fruitfly-agent-lab init` creates the default
-Agent/component files and a minimal experiment from installed templates. It creates
+Agent/component files from installed templates, without an experiment executor. It creates
 the shared `models.yaml` only when absent, preserves daily files and existing
 regular model catalogs/secrets, and rejects other conflicting configuration files.
 Use `--source task-set --benchmark terminal-bench-4` for benchmark request/host
-templates as well. See [native setup](../experiments/README.md#start-a-native-experiment)
+and experiment templates. See [system setup](../experiments/README.md#initialize-system-configuration)
 or the [remote Linux walkthrough](../experiments/TB4_SERVER.md). No model or
 container starts during initialization.
 
@@ -131,7 +131,7 @@ Optional [web tools](../../fruitfly_agent/lab/tools/web/README.md) are disabled 
 
 ## Select reduction and measurement
 
-Keep [context-history](components/H/context-history.yaml) enabled for public
+Working memory owns its history resources and uses ordinary `read` for public
 source retrieval. The default selects [working memory](components/H/working-memory-reduction.yaml).
 Shared request measurement is assembled automatically; it has no component
 selection or optimization grant. [Method behavior](../../fruitfly_agent/lab/context_manager/reduction/README.md)
@@ -149,8 +149,8 @@ edit:
 
 The selected baseline must already enable that method and fit those bounds.
 Candidate prompt text, policy values and isolated execution use the ordinary
-component path. Native file-only trials cannot materialize mechanism changes;
-choose a compatible runner. Configuration inspection is offline. Auxiliary
+component path. Candidate execution requires a registered backend declaring
+configuration materialization. Configuration inspection is offline. Auxiliary
 memory calls and optional Provider input counting can contact services;
 live validation requires explicit invocation and may incur charges.
 

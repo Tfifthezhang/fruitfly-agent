@@ -18,7 +18,7 @@ from fruitfly_agent.run.storage.artifacts import DataArtifactStore
 from fruitfly_agent.run.storage.candidates import CandidateStore
 from fruitfly_agent.run.storage.retention import compact_candidates
 from fruitfly_agent.lab.base_prompt.target import BasePromptTarget
-from fruitfly_agent.lab.context_manager.augmentation.skills.target import SkillGuidanceTarget
+from fruitfly_agent.lab.improvement.targets.retained import RetainedText
 from tests.support.faux_provider import FauxProvider
 from tests.support.materials import _write_models, _write_cases
 from fruitfly_agent.improvement.evidence.reporting import SearchReport, TokenUsage
@@ -55,7 +55,7 @@ class RetentionTests(unittest.TestCase):
             session_owned = create('session text')
             latest = create('latest')
             other = create('other profile', 'other')
-            skill = create('skill latest', target=SkillGuidanceTarget('original guidance',4000).snapshot())
+            skill = create('skill latest', target=RetainedText('skill-document','original guidance','Skill','skill-document-v1',4000).snapshot())
             sessions = root / '.fruitfly/sessions'
             sessions.mkdir()
             (sessions / 'old.jsonl').write_text(json.dumps({'reference':session_owned.artifact_id})+'\n')
@@ -168,30 +168,30 @@ class StartupVersionsTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as tmp:
             app,factory,provider=await self.setup_app(Path(tmp))
             try:
-                factory.configuration.set_mechanism('skill-catalog',enabled=True)
+                factory.configuration.set_mechanism('skill-document',enabled=True)
                 factory.configuration.save()
                 await app.rebuild()
-                record=self.candidate(app,factory,target_id='skill-catalog.guidance')
+                record=self.candidate(app,factory,target_id='skill-document')
                 service=factory.startup_versions()
                 latest=next(v.token for v in service.versions(factory.configuration.snapshot())
-                            if v.target == 'skill-catalog.guidance' and 'Latest' in v.label)
+                            if v.target == 'skill-document' and 'Latest' in v.label)
                 handle=await service.prepare(app.runtime_manifest,(latest,),remember=(latest,))
                 await app.activate_runtime(handle,expected_manifest_digest=app.runtime_manifest['digest'])
-                self.assertEqual(record.artifact_id,factory._resolve().profile.artifact_bindings['skill-catalog.guidance'])
+                self.assertEqual(record.artifact_id,factory._resolve().profile.artifact_bindings['skill-document'])
                 service=factory.startup_versions()
                 default=next(v.token for v in service.versions(factory.configuration.snapshot())
-                             if v.target == 'skill-catalog.guidance' and 'default version' in v.label)
+                             if v.target == 'skill-document' and 'default version' in v.label)
                 handle=await service.prepare(app.runtime_manifest,(default,),remember=(default,))
                 await app.activate_runtime(handle,expected_manifest_digest=app.runtime_manifest['digest'])
-                self.assertNotIn('skill-catalog.guidance',factory._resolve().profile.artifact_bindings)
+                self.assertNotIn('skill-document',factory._resolve().profile.artifact_bindings)
                 service=factory.startup_versions()
                 accepted=next(v.token for v in service.versions(factory.configuration.snapshot())
-                              if v.target == 'skill-catalog.guidance' and 'Latest accepted' in v.label)
+                              if v.target == 'skill-document' and 'Latest accepted' in v.label)
                 handle=await service.prepare(app.runtime_manifest,(accepted,))
                 await app.activate_runtime(handle,expected_manifest_digest=app.runtime_manifest['digest'])
                 self.assertEqual(record.artifact_id, next(a['id'] for a in app.runtime_manifest['data_artifacts']
-                                                         if a['key'] == 'skill-catalog.guidance'))
-                self.assertNotIn('skill-catalog.guidance',factory._resolve().profile.artifact_bindings)
+                                                         if a['key'] == 'skill-document'))
+                self.assertNotIn('skill-document',factory._resolve().profile.artifact_bindings)
                 self.assertEqual([],provider.calls)
             finally: await app.close()
 

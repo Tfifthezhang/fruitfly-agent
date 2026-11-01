@@ -12,7 +12,6 @@ from fruitfly_agent.improvement.execution.facts import ensure_facts,receipt_fact
 from fruitfly_agent.improvement.workflow.services import WorkflowServices
 from fruitfly_agent.lab.improvement.assessment.completed import CompletedAssessmentService
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
-from fruitfly_agent.lab.improvement.strategies.exploration import ExplorationRegistry,ExplorationDefinition
 from tests.support.faux_provider import FauxProvider
 from tests.support.model_evaluation import judgment
 from tests.support.pipeline import build_pipeline,Runner
@@ -109,11 +108,9 @@ class CompletedImprovementTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(values[0].status,'final'if mode=='complete'else'unavailable')
                 self.assertTrue(closed.is_set())
 
-    async def test_invalid_exploration_factory_products_are_owned_before_validation(self):
-        _,_,_,services,_=await self.prepare();closed=[]
-        class Invalid:
-            async def aclose(self):closed.append(self)
-        product=Invalid()
-        registry=ExplorationRegistry((ExplorationDefinition('custom','custom',lambda:product),))
-        with self.assertRaises(ValueError):registry.create('custom',own=services.own)
-        await services.close();self.assertEqual(closed,[product])
+    async def test_comparison_preserves_public_selection_assurance(self):
+        service,record,task,services,provider=await self.prepare()
+        provider.script=[judge_response]
+        decision=await service.compare(task,(record,),record)
+        self.assertEqual(decision.assurance,'selected')
+        self.assertTrue(decision.comparison_id)

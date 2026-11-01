@@ -8,7 +8,6 @@ class SearchProblem:
     begin: Callable
     propose: Callable
     probe: Callable
-    compose: Callable
     select: Callable
     stop: Callable
     advance: Callable

@@ -12,7 +12,7 @@ def material_details(material):
 
 def result_view(outcome):
     if outcome is None:
-        return {'label': 'Official execution', 'id': '', 'output': '', 'assurance': 'unavailable', 'exploration': '', 'evidence': ()}
+        return {'label': 'Official execution', 'id': '', 'output': '', 'assurance': 'unavailable', 'evidence': ()}
     if isinstance(outcome, TaskSetOutcome):
         selected = outcome.selected
         return {'label': 'Official evaluation', 'id': selected.evaluation_id if selected else '',
@@ -22,11 +22,10 @@ def result_view(outcome):
                 'expected': selected.assessment.expected if selected else 0,
                 'completed': selected.assessment.completed if selected else 0}),
             'assurance': outcome.decision.assurance if outcome.decision else 'unavailable',
-            'exploration': outcome.exploration[-1]['evaluation_id'] if outcome.exploration else '',
             'evidence': (('Joint development score', str(selected.assessment.score)),
                 ('Selection coverage', f'{selected.assessment.completed}/{selected.assessment.expected}'),
                 ('Collection scores', json.dumps(dict(selected.assessment.collections)))) if selected else ()}
     return {'label': 'Official execution', 'id': outcome.selected.run_id if outcome.selected else '',
         'output': outcome.selected.output if outcome.selected else '',
         'assurance': outcome.decision.assurance if outcome.decision else 'unavailable',
-        'exploration': outcome.exploration[-1].run_id if outcome.exploration else '', 'evidence': ()}
+        'evidence': ()}

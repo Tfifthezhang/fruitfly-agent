@@ -2,7 +2,7 @@
 from fruitfly_agent.lab.improvement.components.parameters import editable_parameters
 
 
-FIELDS = {'information-context': {'max_chars', 'top_k'}, 'skill-catalog': {'max_chars'}}
+FIELDS = {'information-context': {'max_chars', 'top_k'}}
 
 
 def expose(definition):

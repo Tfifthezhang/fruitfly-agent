@@ -23,7 +23,7 @@ Verify configuration, model selection, assembly, manifest, CLI, candidates, rete
 | `test_web_tools.py` | Search credential injection, network-read policy, offline Application search/fetch, recovery and HTTP resource cleanup |
 | `test_mcp_tools.py` | Optional stdio tool preparation, selected identity, separate approvals, current-config recovery, failed apply and multi-server cleanup |
 | `test_ssh_environment.py` | Distinct local/remote descriptions, draft/save isolation, successful and failed activation, SSH selection, secret-free identity, remote file tools, current-target recovery and failed-resource cleanup |
-| `test_cli.py` | Direct welcome without menu input/model calls, --configure, missing-key repair/cancellation, invalid-file preservation, save failure, one-shot, resume and rebuild |
+| `test_cli.py` | CLI arguments, explicit startup panel choices, --configure, missing-key setup/cancellation, invalid-file preservation, save failure, one-shot, resume and rebuild |
 | `test_improvement_versions.py / test_task_prompt_catalog.py / test_base_prompt_flow.py` | Candidate scope, prompt selection, and recovery |
 
 Fake Providers and temporary files. No model fees or benchmark containers.

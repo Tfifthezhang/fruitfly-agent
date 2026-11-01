@@ -20,14 +20,14 @@ class TaskSetSearchTests(unittest.IsolatedAsyncioTestCase):
     async def execute(self, binding, *, settings=None, rounds=1, model_calls=100):
         components, baseline = fixture()
         snapshot = TaskSetSnapshot(binding.entries)
-        plan = RunPlan('joint-fixture', version(), ('prompt',), generator_id='increment', strategy_id='simple',
-            depth=rounds, feedback='scored', retain_experience=False)
+        plan = RunPlan('joint-fixture', version(), ('prompt',), generator_id='increment', 
+            rounds=rounds,  retain_experience=False)
         services = WorkflowServices(plan)
         context = ExecutionContext(None, MemoryArtifacts(), components, None, None, None, plan=plan, services=services)
         registry = GeneratorRegistry(); registry.register('increment', IncrementGenerator)
         problem = TaskSetProblem(context, snapshot, (binding,), settings or MultiTaskSettings())
         flow = ComponentWorkflow(generators=registry, components=components, runner=None,
-            composer=None, selector=None, problem=problem)
+             selector=None, problem=problem)
         try:
             return await flow.run(plan, snapshot, baseline, services), baseline, services
         finally:
@@ -38,15 +38,15 @@ class TaskSetSearchTests(unittest.IsolatedAsyncioTestCase):
         a, state = collection('a', 4)
         snapshot = TaskSetSnapshot(a.entries)
         settings = MultiTaskSettings.from_dict({'sampling': {'batch_size': 2}, 'execution': {'concurrency': 2}})
-        plan = RunPlan('joint', version(), ('prompt',), generator_id='increment', strategy_id='simple',
-            depth=2, feedback='scored', retain_experience=False)
+        plan = RunPlan('joint', version(), ('prompt',), generator_id='increment', 
+            rounds=2,  retain_experience=False)
         services = WorkflowServices(plan)
         artifacts = MemoryArtifacts()
         context = ExecutionContext(None, artifacts, components, None, None, None, plan=plan, services=services)
         generator = IncrementGenerator()
         registry = GeneratorRegistry(); registry.register('increment', lambda: generator)
         problem = TaskSetProblem(context, snapshot, (a,), settings)
-        flow = ComponentWorkflow(generators=registry, components=components, runner=None, composer=None,
+        flow = ComponentWorkflow(generators=registry, components=components, runner=None, 
             selector=None, problem=problem)
         try:
             result = await flow.run(plan, snapshot, baseline, services)

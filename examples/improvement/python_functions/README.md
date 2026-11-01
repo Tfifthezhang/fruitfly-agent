@@ -34,13 +34,13 @@ These checks make no model requests. See [Task packs](../../../fruitfly_agent/la
 
 | Step | Action |
 |---|---|
-| 1 | Prepare the independent default Agent/model files and credentials. |
-| 2 | Select `source: files` and the pack in the task document referenced by experiment `tasks`. |
-| 3 | For persistent verification, set `scope: persistent` in the referenced comparison document and choose suitable independent phase times. |
-| 4 | Run `fruitfly-agent-lab improvement check`, then explicitly `improvement run`; model calls may incur charges. |
-| 5 | Inspect the linked candidate and evidence. `rsi run` performs verified adoption into its experiment copy. |
+| 1 | Register an execution backend through `WorkflowBindings.runner` in an embedding; the CLI supplies no local executor. |
+| 2 | Prepare the Agent/model files and credentials, and select this pack in the workflow request. |
+| 3 | For persistent verification, set `scope="persistent"` and suitable independent phase times on the request. |
+| 4 | Preview, then invoke the Application workflow explicitly; model calls may incur charges. |
+| 5 | Inspect candidate evidence; use the explicit RSI host for independently verified adoption. |
 
-The active target supplies the baseline; selecting the pack does not load `baseline.txt`. The experiment CLI records progress and supports `stop`. Latest candidates do not guarantee better results. The run retains its separate configuration and evidence for review.
+The active target supplies the baseline; selecting the pack does not load `baseline.txt`. The embedding owns progress and cancellation. Latest candidates do not guarantee better results. The run retains its separate configuration and evidence for review.
 
 ## Test independently
 

@@ -79,7 +79,7 @@ class HarborAdapterTests(unittest.TestCase):
             self.assertIn(name, staged_names)
         for name in ('fruitfly_agent/providers/services.yaml',
                      'fruitfly_agent/run/configuration/templates/default-config.yaml',
-                     'fruitfly_agent/experiments/templates/tasks/native.yaml'):
+                     'fruitfly_agent/experiments/templates/tasks/tb4-smoke.yaml'):
             self.assertIn(name, staged_names)
         self.assertFalse(any("__pycache__" in name or ".env" in name for name in staged_names))
 

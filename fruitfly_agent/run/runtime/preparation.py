@@ -8,6 +8,7 @@ from fruitfly_agent.improvement.contracts.optimization import TextProjection
 from fruitfly_agent.core.extensions.protocols import RecoveryValidator
 from fruitfly_agent.interactive import InteractiveSession
 from fruitfly_agent.interactive.application import RuntimeHandle
+from fruitfly_agent.interactive.contracts.runtime import RuntimeCleanupError
 from fruitfly_agent.lab.improvement.targets.text import TEXT_TARGET_PREFIX
 from fruitfly_agent.run.configuration.resolution import resolve_profile_models
 from fruitfly_agent.run.configuration.profile import HarnessProfile
@@ -163,6 +164,7 @@ class RuntimePreparer:
 
 async def _close_resources(resources: list[object]) -> None:
     seen: set[int] = set()
+    errors: list[Exception] = []
     for resource in reversed(resources):
         if id(resource) in seen:
             continue
@@ -174,8 +176,8 @@ async def _close_resources(resources: list[object]) -> None:
             result = close()
             if isawaitable(result):
                 await result
-        except Exception:
-            # Preserve the assembly error; normal RuntimeHandle.close reports
-            # cleanup failures when a runtime was successfully opened.
-            continue
+        except Exception as exc:
+            errors.append(exc)
+    if errors:
+        raise RuntimeCleanupError(f'runtime cleanup failed: {errors[0]}') from errors[0]
 

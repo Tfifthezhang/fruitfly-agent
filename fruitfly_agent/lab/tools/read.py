@@ -19,7 +19,9 @@ from fruitfly_agent.core.data_model.media import image_type, validate_image, dec
 _READ_SCHEMA: dict = {
     "type": "object",
     "properties": {
-        "path": {"type": "string", "description": "Path to the file to read (relative or absolute)"},
+        "path": {"type": "string", "description": "File path (relative or absolute) or registered read-only resource:// reference"},
+        "character_offset": {"type": "integer", "description": "Zero-based character offset; use with character_limit instead of line offset/limit"},
+        "character_limit": {"type": "integer", "description": "Maximum source characters (1–24000; default 12000)"},
         "offset": {
             "type": "integer",
             "description": "Line number to start reading from (1-indexed)",
@@ -30,19 +32,39 @@ _READ_SCHEMA: dict = {
 }
 
 
-async def _execute(ctx: ToolCallContext, register: Callable[[bytes, str, str], str] | None = None) -> AgentToolResult:
-    if ctx.env is None:
-        raise RuntimeError("read requires an ExecutionEnv")
+def character_page(text, arguments):
+    if 'character_offset' not in arguments and 'character_limit' not in arguments:
+        return None
+    if 'offset' in arguments or 'limit' in arguments:
+        raise ValueError('choose line pagination or character pagination')
+    start, limit = arguments.get('character_offset', 0), arguments.get('character_limit', 12000)
+    if type(start) is not int or not 0 <= start <= len(text) or type(limit) is not int or not 1 <= limit <= 24000:
+        raise ValueError('character pagination requires a source offset and a limit within 1..24000')
+    page = truncate_head(text[start:start + limit]).content
+    end = start + len(page)
+    if end < len(text):
+        page += f'\n[Characters {start}–{end} of {len(text)}. Use character_offset={end}, character_limit={limit} to continue.]'
+    return page
+
+
+async def _execute(ctx: ToolCallContext, register: Callable[[bytes, str, str], str] | None = None, resources=None) -> AgentToolResult:
     path = ctx.args["path"]
     offset = ctx.args.get("offset")
     limit = ctx.args.get("limit")
 
-    resolved = resolve_read_path(ctx.env, path)
-    data = ctx.env.read_binary_file(resolved)
-    if not data.is_ok:
-        raise RuntimeError(f"Could not read file: {path}. {data.error}")
-
-    bytes_data = data.unwrap()
+    from .resources import is_resource
+    if is_resource(path):
+        if resources is None:
+            raise ValueError('resource owner is unavailable')
+        bytes_data = resources.read(path.lstrip('@'))
+    else:
+        if ctx.env is None:
+            raise RuntimeError('read requires an ExecutionEnv')
+        resolved = resolve_read_path(ctx.env, path)
+        data = ctx.env.read_binary_file(resolved)
+        if not data.is_ok:
+            raise RuntimeError(f'Could not read file: {path}. {data.error}')
+        bytes_data = data.unwrap()
     mime = image_type(bytes_data)
     if mime is not None:
         mime = validate_image(bytes_data)
@@ -56,6 +78,9 @@ async def _execute(ctx: ToolCallContext, register: Callable[[bytes, str, str], s
         )
 
     text = decode_text_file(bytes_data)
+    page = character_page(text, ctx.args)
+    if page is not None:
+        return AgentToolResult(content=[TextBlock(text=page)])
     all_lines = text.split("\n")
     total_lines = len(all_lines)
     start = max(0, (offset - 1) if offset else 0)
@@ -74,7 +99,7 @@ async def _execute(ctx: ToolCallContext, register: Callable[[bytes, str, str], s
         if partial_line:
             output += (
                 f"\n\n[Line {end_line} exceeds the byte limit and was clipped."
-                " Line offsets cannot retrieve its omitted characters; use bash to inspect the line.]"
+                " Use character_offset/character_limit to inspect omitted characters.]"
             )
         continuation = f" Use offset={next_offset} to continue." if end_line < total_lines else ""
         output += f"\n\n[Showing lines {start + 1}-{end_line} of {total_lines}.{continuation}]"
@@ -84,21 +109,21 @@ async def _execute(ctx: ToolCallContext, register: Callable[[bytes, str, str], s
     return AgentToolResult(content=[TextBlock(text=output)])
 
 
-def create_read_tool(register_media: Callable[[bytes, str, str], str] | None = None) -> AgentTool:
+def create_read_tool(register_media: Callable[[bytes, str, str], str] | None = None, *, resources=None) -> AgentTool:
     async def execute(ctx: ToolCallContext) -> AgentToolResult:
-        return await _execute(ctx, register_media)
+        return await _execute(ctx, register_media, resources)
 
     return AgentTool(
         permission=ToolPermission("read", ("path",)),
         name="read",
         label="Read file",
         description=(
-            "Read a file in the selected execution environment (local or SSH). "
+            "Read a file in the selected execution environment or a registered resource:// reference. "
             "Use for inspecting source code, configuration, logs and saved artifacts. "
             "Supports text files and images "
             f"(jpg, png, gif, webp; up to 10 MiB per image). Unsupported binary files are rejected. Text output is truncated to {DEFAULT_MAX_LINES} "
             f"lines or {DEFAULT_MAX_BYTES // 1024}KB (whichever is hit first). "
-            "Use offset/limit for large files."
+            "Use line offset/limit or character_offset/character_limit for large text."
         ),
         parameters=_READ_SCHEMA,
         execute=execute,

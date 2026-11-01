@@ -41,7 +41,7 @@ class OperationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(prepared.config_path.read_bytes(), original)
         plan_path = next((self.root / '.fruitfly/improvement/jobs').glob('*/plan.json'))
         plan = json.loads(plan_path.read_text())
-        self.assertEqual(plan['plan']['strategy_id'], 'simple')
+        self.assertNotIn('strategy_id', plan['plan'])
         self.assertEqual(record['links']['Assurance'], 'selected')
         self.assertTrue((self.root / record['links']['Workflow journal']).is_file())
 
@@ -131,7 +131,7 @@ class OperationTests(unittest.IsolatedAsyncioTestCase):
         workspace(self.root, task={'source': 'editor', 'material': 'editor'})
         prepared = prepare_experiment(load_configuration(self.root), 'improvement')
         self.assertEqual(prepared.request.component_ids, ('improvement-editor',))
-        self.assertEqual(dict(prepared.request.execution_parameters)['inner_strategy'], 'simple')
+        self.assertNotIn('inner_strategy', dict(prepared.request.execution_parameters))
         self.registry.create.return_value = provider
         record = self.records.create('improvement', prepared.summary())
         with patch('fruitfly_agent.experiments.operations.improve.application_factory', side_effect=factory_builder(self.registry)):

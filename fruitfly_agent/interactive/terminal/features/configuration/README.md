@@ -13,7 +13,14 @@ Use `TerminalConfigurationFrontend` as the menu entry and `configuration_handler
 | [model_setup.py](model_setup.py) | Model fields, capability forms and review |
 | [mechanism_setup.py](mechanism_setup.py) | Registration-driven guided settings, hidden credentials, per-field retry and review |
 
-`run()` returns launch intent directly for complete configuration without reading
+`run_for_startup()` and `run_for_active_session()` share the same editor, forms,
+draft handling and confirmation loop. Startup offers **Save and return**, saves
+offline, and returns a `ConfigurationEditResult` to the host's
+[startup panel](../startup/README.md). It never requests a session launch.
+Save failure retains the draft for retry. Active-session confirmation retains
+**Save and apply to this conversation** and delegates persistence to Application.
+
+The standalone embedding helper `run()` returns launch intent for complete configuration without reading
 input or rendering a home menu. `run(configure=True)` opens the configuration
 editor before startup. Missing model selection, credentials and enabled mechanism
 inputs invoke injected setup services. Cancellation resets staged changes and
@@ -66,7 +73,7 @@ The command restores the chat screen, then requests the injected
 persistence, replacement and cleanup. A missing operation or application failure
 retains the draft and conversation; `/config` opens them for editing or retry.
 Success prints a short confirmation without repeating the welcome page or saved
-history. Startup retains its separate save-before-start behavior. Model form
+history. The CLI saves offline before returning to its startup panel. Model form
 inspection makes no Provider requests. No algorithm admission or lifecycle checks
 are implemented in the menu.
 

@@ -56,27 +56,16 @@ class ProposalResult:
 
     def __post_init__(self):
         object.__setattr__(self, 'candidates', tuple(self.candidates))
-        if len(self.candidates) > 10 or type(self.stop) is not bool or any(not isinstance(c, CandidateBundle) for c in self.candidates):
-            raise ValueError('a proposal batch needs at most ten candidates and an explicit stop flag')
+        if len(self.candidates) > 1 or type(self.stop) is not bool or any(not isinstance(c, CandidateBundle) for c in self.candidates):
+            raise ValueError('a proposal batch needs at most one candidate and an explicit stop flag')
 
 
-@dataclass(frozen=True)
-class CompositionRequest:
-    plan: RunPlan
-    task: TaskMaterial
-    baseline: HarnessSnapshot
-    candidates: tuple[CandidateBundle, ...]
-    records: tuple[ExecutionRecord, ...]
-    index: int
-    experience: tuple[ExperienceEntry, ...] = ()
-    feedback: tuple[Measurement, ...] = ()
-    context: tuple[Resource, ...] = ()
 
 
 class GenerationServices(Protocol):
     def check(self) -> None: ...
     def record(self, event: str, **fields: object) -> None: ...
-    async def edit(self, stage: str, request: ProposalRequest | CompositionRequest) -> CandidateBundle: ...
+    async def edit(self, stage: str, request: ProposalRequest) -> CandidateBundle: ...
     async def complete(self, system: str, prompt: str) -> str: ...
 
 
@@ -144,8 +133,6 @@ class GeneratorDefinition:
         object.__setattr__(self, 'required_capabilities', frozenset(self.required_capabilities))
 
 
-class Composer(Protocol):
-    async def compose(self, request: CompositionRequest, services: GenerationServices) -> CandidateBundle: ...
 
 
 class Reflector(Protocol):
@@ -159,6 +146,6 @@ class ExperienceRepository(Protocol):
 
 class EditorSession(Protocol):
     implementation_id: str
-    async def edit(self, stage: str, request: ProposalRequest | CompositionRequest,
+    async def edit(self, stage: str, request: ProposalRequest,
                    services: JobServices) -> CandidateBundle: ...
 

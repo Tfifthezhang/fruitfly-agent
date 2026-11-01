@@ -28,8 +28,6 @@ class WorkflowComponentView:
 class WorkflowConfiguration:
     components: tuple[WorkflowComponentView, ...]
     generators: tuple[WorkflowChoice, ...]
-    modes: tuple[WorkflowChoice, ...]
-    verification: tuple[WorkflowChoice, ...]
     scopes: tuple[WorkflowChoice, ...]
     parameters: tuple['ImprovementParameterView', ...] = ()
     materials: tuple[WorkflowChoice, ...] = ()
@@ -53,18 +51,14 @@ class WorkflowRequest:
     input_paths: tuple[str, ...] = ()
     component_ids: tuple[str, ...] = ()
     generator_id: str = 'agent-editor-v1'
-    mode: str = 'parallel'
-    verification: str = 'behavior'
     scope: str = 'task'
-    width: int = 1
-    depth: int = 1
+    rounds: int = 1
     timeouts: dict[str, float] = field(default_factory=lambda: {'editor_seconds':1200,'execution_seconds':3600,'evaluator_seconds':1200})
     direction: str = ''
     task_pack_id: str = ''
-    execution_id: str = 'file-task'
+    execution_id: str = 'agent-task'
     execution_parameters: tuple[tuple[str, object], ...] = ()
-    strategy_id: str = 'harness2'
-    retain_experience: bool = True
+    retain_experience: bool = False
 
 
 @runtime_checkable

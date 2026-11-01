@@ -9,11 +9,8 @@ def configuration():
          WorkflowComponentView('memory', 'Memory', 'memory', 'S'),
          WorkflowComponentView('editor', 'Editor', 'instructions', 'I', False, 'Comparison runner required')),
         (WorkflowChoice('rule', 'Rule generator'), WorkflowChoice('agent', 'Agent editor')),
-        (WorkflowChoice('parallel', 'Parallel'), WorkflowChoice('sequential', 'Sequential')),
-        (WorkflowChoice('behavior', 'Execution evidence'),),
         (WorkflowChoice('task', 'Current task'), WorkflowChoice('persistent', 'Persistent')),
-        (ImprovementParameterView('width', 'Width', 'integer', 1, 1, 10, 'search', 'Exploration width'),
-         ImprovementParameterView('depth', 'Depth', 'integer', 1, 1, 10, 'search', 'Refinement depth'),
+        (ImprovementParameterView('rounds', 'Rounds', 'integer', 1, 1, 10, 'search', 'Maximum rounds'),
          ImprovementParameterView('editor_seconds', 'Editor time', 'number', 1200, 0, None, 'timing', 'Independent editor invocation time')),
         (WorkflowChoice('', 'Current task and input files'), WorkflowChoice('pack', 'Saved package')))
 

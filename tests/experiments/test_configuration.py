@@ -24,7 +24,7 @@ class ConfigurationTests(unittest.TestCase):
         before = {p: p.read_bytes() for p in self.root.rglob('*') if p.is_file()}
         with patch('fruitfly_agent.providers.registry.ProviderRegistry.create', side_effect=AssertionError('Provider constructed')):
             prepared = prepare_experiment(load_configuration(self.root), 'improvement')
-        self.assertEqual(prepared.request.strategy_id, 'simple')
+        self.assertFalse(hasattr(prepared.request, 'strategy_id'))
         self.assertEqual(prepared.request.component_ids, ('base_prompt',))
         self.assertFalse(prepared.request.retain_experience)
         self.assertEqual(prepared.model_roles, dict.fromkeys(('executor', 'editor', 'assessor'), 'executor'))
@@ -57,7 +57,7 @@ class ConfigurationTests(unittest.TestCase):
         config = load_configuration(self.root, overrides={'improvement': {'rounds': 2}})
         prepared = prepare_experiment(config, 'improvement')
         self.assertEqual(prepared.request.input_paths, ('source.txt',))
-        self.assertEqual(prepared.request.depth, 2)
+        self.assertEqual(prepared.request.rounds, 2)
         self.assertEqual(config.sources['improvement.rounds'], 'command line')
 
     def test_missing_explicit_file_and_model_are_actionable(self):
@@ -75,8 +75,11 @@ class ConfigurationTests(unittest.TestCase):
     def test_cli_check_json_and_report_do_not_load_models_or_run_tasks(self):
         output = io.StringIO()
         with redirect_stdout(output):
-            self.assertEqual(main(['improvement', 'check', '--cwd', str(self.root), '--json']), 0)
-        self.assertEqual(json.loads(output.getvalue())['model_roles']['executor'], 'executor')
+            self.assertEqual(main(['improvement', 'check', '--cwd', str(self.root), '--json']), 3)
+        summary = json.loads(output.getvalue())
+        self.assertEqual(summary['model_roles']['executor'], 'executor')
+        self.assertFalse(summary['available'])
+        self.assertIn('No built-in task executor', summary['unavailable_reason'])
         from fruitfly_agent.experiments.records import RunRecords
         records = RunRecords(self.root)
         record = records.create('improvement', {})
@@ -84,6 +87,15 @@ class ConfigurationTests(unittest.TestCase):
         (self.root / '.fruitfly/default-config.yaml').unlink()
         with redirect_stdout(io.StringIO()):
             self.assertEqual(main(['--cwd', str(self.root), 'improvement', 'report', record['id']]), 0)
+
+    def test_missing_task_backend_rejects_run_before_provider_or_run_record(self):
+        output = io.StringIO()
+        with patch('fruitfly_agent.providers.registry.ProviderRegistry.create',
+                   side_effect=AssertionError('Provider constructed')), \
+                redirect_stdout(io.StringIO()), redirect_stderr(output):
+            self.assertEqual(main(['improvement', 'run', '--cwd', str(self.root)]), 3)
+        self.assertIn('No built-in task executor', output.getvalue())
+        self.assertFalse((self.root / '.fruitfly/experiments/runs').exists())
 
     def test_metadata_change_invalidates_frozen_source(self):
         prepared = prepare_experiment(load_configuration(self.root), 'improvement')
@@ -98,3 +110,15 @@ class ConfigurationTests(unittest.TestCase):
         workspace(self.root, task={'source': 'files', 'instruction': 'Read material', 'input_paths': ['../link.txt']})
         with self.assertRaisesRegex(ValueError, 'symlink'):
             prepare_experiment(load_configuration(self.root), 'improvement')
+
+    def test_task_path_shapes_and_inapplicable_comparison_are_rejected(self):
+        for task in ({'source':'files','instruction':'Inspect','input_paths':'a'},
+                     {'source':'files','instruction':'Inspect','input_paths':[False]},
+                     {'source':'eval','request':None,'host':'host.yaml'},
+                     {'source':'task-set','collections':'collection'}):
+            with self.subTest(task=task):
+                workspace(self.root,task=task)
+                with self.assertRaises(ValueError):load_configuration(self.root)
+        workspace(self.root,evaluation={'comparison':{'minimum_gain':.2}})
+        with self.assertRaisesRegex(ValueError,'requires a task-set'):
+            load_configuration(self.root)

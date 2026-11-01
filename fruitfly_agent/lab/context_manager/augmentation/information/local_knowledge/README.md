@@ -21,4 +21,4 @@ Change chunking or ranking through [Information source contracts](../README.md#e
 .venv/bin/python -m unittest tests.lab.test_information_sources.InformationSourcesTest.test_knowledge_reindexes_current_files_and_cites_lines -v
 ```
 
-Catalog registers a bounded workspace text snapshot source for [Improvement](../../../../improvement/README.md) initial-state identity. Native trials do not run this retriever or copy its directory; supply required documents as explicit task inputs. External services and arbitrary plugin state are not frozen.
+Catalog registers a bounded workspace text snapshot source for [Improvement](../../../../improvement/README.md) initial-state identity. A compatible registered backend must restore the frozen directory and assemble retrieval; state identity alone does not execute the retriever. External services and arbitrary plugin state are not frozen.

@@ -130,6 +130,9 @@ async def _execute(ctx: ToolCallContext) -> AgentToolResult:
     if ctx.env is None:
         raise RuntimeError("edit requires an ExecutionEnv")
     path = ctx.args["path"]
+    from .resources import is_resource
+    if is_resource(path):
+        raise ValueError("resources are read-only")
     edits = ctx.args["edits"]
     if not edits:
         raise RuntimeError("Edit tool input is invalid: edits must contain at least one replacement.")

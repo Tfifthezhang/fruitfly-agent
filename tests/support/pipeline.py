@@ -34,24 +34,14 @@ class RuleGenerator:
     async def propose(self, request, services):
         services.check()
         self.requests.append(request)
-        chosen = 'prompt' if request.scope == 'invariant' else 'memory'
+        chosen = request.plan.component_ids[0]
         documents = tuple(replace(c, files=(ComponentFile('instructions.txt', c.files[0].text + ' improved'),))
-                          if c.component_id == chosen else c for c in request.baseline.components)
+                          if c.component_id in request.plan.component_ids else c for c in request.baseline.components)
         candidate = CandidateBundle(request.plan.parent, request.baseline, HarnessSnapshot(documents), self.generator_id,
-            (EditReason(chosen, 'Observed missing behavior', (request.records[0].run_id,), expected_effect='The proposed behavior appears in the subsequent execution.'),))
+            tuple(EditReason(name, 'Observed missing behavior', (request.records[0].run_id,), expected_effect='The proposed behavior appears in the subsequent execution.') for name in request.plan.component_ids))
         return ProposalResult((candidate,))
 
 
-class RuleComposer:
-    async def compose(self, request, services):
-        documents = {c.component_id: c for c in request.baseline.components}
-        for candidate in request.candidates:
-            for name in candidate.changed_ids:
-                documents[name] = candidate.harness.component(name)
-        harness = HarnessSnapshot(tuple(documents.values()))
-        names = [c.component_id for c in harness.components if c != request.baseline.component(c.component_id)]
-        return CandidateBundle(request.plan.parent, request.baseline, harness, 'rule-composer',
-            tuple(EditReason(name, 'Supported composition', (request.records[-1].run_id,), expected_effect='The proposed behavior appears in the subsequent execution.') for name in names))
 
 
 class Runner:
@@ -78,6 +68,6 @@ def build_pipeline(**kwargs):
     generators.register('rule-generator', RuleGenerator)
     runner = Runner()
     flow = ComponentWorkflow(generators=generators, components=components,
-        runner=runner, composer=RuleComposer(), selector=Selector(), **kwargs)
+        runner=runner,  selector=Selector(), **kwargs)
     plan = RunPlan('job', version(), ('prompt', 'memory'), generator_id='rule-generator')
     return flow, plan, baseline, runner

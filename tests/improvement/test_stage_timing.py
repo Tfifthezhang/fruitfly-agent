@@ -49,7 +49,7 @@ class StageTimingTests(unittest.IsolatedAsyncioTestCase):
         from fruitfly_agent.improvement.execution.facts import attach_facts, receipt_facts, read_facts
         from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
         flow, plan, baseline, runner = build_pipeline()
-        plan = replace(plan, strategy_id='simple', component_ids=('prompt',), retain_experience=False,
+        plan = replace(plan,  component_ids=('prompt',), retain_experience=False,
                        timeouts=StageTimeouts(.1, .01, .1))
         flow.artifacts = artifacts = MemoryArtifacts()
         original = runner.execute

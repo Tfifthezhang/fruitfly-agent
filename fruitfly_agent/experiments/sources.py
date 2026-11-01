@@ -1,4 +1,4 @@
-"""Task-source definitions compose native and optional benchmark capabilities."""
+"""Task materials compose explicitly registered and optional benchmark capabilities."""
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -26,7 +26,7 @@ class SourceBinding:
     task_set: Any = None
 
 
-def native(config):
+def task_material(config):
     from fruitfly_agent.lab.improvement.tasks import TaskPackCatalog
     from fruitfly_agent.lab.improvement.materials import WorkspaceTaskSource
     from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
@@ -59,9 +59,9 @@ def native(config):
     else:
         raise ValueError('select task.instruction/input_paths or an installed task.pack in experiment.yaml')
     from fruitfly_agent.lab.improvement.execution import builtin_executions
-    parameters = builtin_executions().get('file-task').normalize(tuple(mapping(
-        task.get('parameters', {}), {'assessment_interval', 'delivery_manifest'}, 'file execution parameters').items()))
-    return SourceBinding('file-task', pack, instruction, relative, tuple(sorted(parameters.items())), bool(pack),
+    parameters = builtin_executions().get('agent-task').normalize(tuple(mapping(
+        task.get('parameters', {}), {'assessment_interval', 'delivery_manifest'}, 'task adapter parameters').items()))
+    return SourceBinding('agent-task', pack, instruction, relative, tuple(sorted(parameters.items())), bool(pack),
         source_identity=identity,
         persistent_policy='task-holdout-v1' if pack and catalog.holdout(pack) else '')
 
@@ -81,7 +81,7 @@ def editor(config):
     params = task.get('parameters', {})
     if not isinstance(params, dict):
         raise ValueError('editor execution parameters must be a mapping')
-    parameters = definition.normalize(tuple({'inner_strategy': 'simple', **params}.items()))
+    parameters = definition.normalize(tuple(params.items()))
     if not parameters['inner_components'].split():
         raise ValueError('declare inner editable components')
     from types import SimpleNamespace
@@ -104,7 +104,7 @@ def benchmark(config):
         adoption_notice='benchmark reward supports search; RSI needs a separately registered independent verifier')
 
 
-SOURCES = {'files': native, 'editor': editor, 'eval': benchmark}
+SOURCES = {'files': task_material, 'editor': editor, 'eval': benchmark}
 
 
 def task_set(config):

@@ -11,7 +11,7 @@ example runs without keys, network or model calls:
 ```
 
 [offline.py](offline.py) registers a rule generator, supplies task execution,
-composition and selection capabilities, and runs the unified workflow. Its
+execution and selection capabilities, and runs the unified workflow. Its
 synthetic output is a contract demonstration, not a measured quality gain.
 
 Task packages provide optional private scoring and independent verification:

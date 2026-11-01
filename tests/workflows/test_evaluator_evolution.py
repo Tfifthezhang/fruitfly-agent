@@ -13,7 +13,7 @@ from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, Edi
 from fruitfly_agent.improvement.contracts.components import ComponentFile, HarnessSnapshot
 from fruitfly_agent.improvement.contracts.editing import ProposalResult
 from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
-from fruitfly_agent.run import RunApplicationFactory
+from tests.support.task_execution import TaskApplicationFixture as RunApplicationFactory
 from tests.support.self_improver import experiment_factory, ProceduralProvider
 from tests.support.model_evaluation import judgment
 
@@ -48,7 +48,7 @@ class EvaluatorEvolutionTests(unittest.IsolatedAsyncioTestCase):
             profile = document['profiles'][document['default_profile']]
             profile['I']['improvement-editor'] = {'inline': {
                 'id': 'improvement-editor', 'role': 'I', 'implementation': 'improvement-editor',
-                'parameters': {'instructions': {'invariant': 'STEP STEP: propose an observed procedure fix.'}}}}
+                'parameters': {'instructions': {'propose': 'STEP STEP: propose an observed procedure fix.'}}}}
             path.write_text(yaml.safe_dump(document))
             factory.reload_configuration()
             generators = GeneratorRegistry(); generators.register('self-rule', EvaluatorRule)

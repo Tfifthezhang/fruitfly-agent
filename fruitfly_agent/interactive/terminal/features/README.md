@@ -6,6 +6,7 @@ Keep each user-facing function's command flow and menus in one package. Features
 
 | Package / file | Responsibility |
 |---|---|
+| [Startup](startup/README.md) | Offline launch choices, failure feedback and cancellable startup waiting |
 | [Configuration](configuration/README.md) | Future-session choices, model forms, and rebuild requests |
 | [Resume](resume/README.md) | Session selection, restoration requests, and history display |
 | [tool_services/approval.py](tool_services/approval.py) | TTY-only external process startup review while ordinary terminal input is suspended |

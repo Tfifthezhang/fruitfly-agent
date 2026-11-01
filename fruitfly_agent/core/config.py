@@ -19,6 +19,7 @@ from .extensions.hooks import HookRegistry
 from .extensions.protocols import PrepareNextTurnResult as _PrepareNextTurnResult, Provider, SessionLike
 from .tool_runtime import AgentTool, ToolCallContext
 from .tool_runtime.authorization import ToolAuthorizer
+from .tool_runtime.resources import ReadableResources
 
 
 @dataclass(frozen=True)
@@ -39,7 +40,7 @@ class AgentLoopConfig:
     context_window: int = 200_000
     max_context_recovery_attempts: int = 6
     max_turns: int | None = 32
-    max_tool_calls_per_turn: int | None = 64
+    max_tool_calls_per_turn: int | None = 512
 
     # --- the research extension points ---
     prepare_next_turn: (
@@ -80,6 +81,7 @@ class AgentLoopConfig:
     context_meter: ContextMeter | None = None
 
     # --- subsystems ---
+    readable_resources: ReadableResources | None = None
     tool_authorizer: ToolAuthorizer | None = None
     tool_execution: ToolExecutionConfig = field(default_factory=ToolExecutionConfig)
     hooks: HookRegistry | None = None

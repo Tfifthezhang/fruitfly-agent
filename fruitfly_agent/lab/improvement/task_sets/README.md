@@ -11,22 +11,21 @@ same queue and search engine; concurrency one also supports a serial multi-task 
 
 Use `task.source: task-set` in the [experiment configuration](../../../experiments/README.md).
 The [annotated template](../../../../examples/experiments/multi-task.example.yaml)
-combines optional Eval collections and native task packs. Paths and IDs are
+combines prepared Eval collections. Other sources require explicit registration. Paths and IDs are
 placeholders. `improvement check` reads material and validates declarations without
 constructing Providers. `improvement run` starts models and may incur charges.
 For Eval collections, explicitly run `eval prepare` first; it can download/build
-and start preparation containers. Native collections require no Eval installation.
+and start preparation containers. Custom sources need no Eval installation.
 
 | Entry | Responsibility |
 |---|---|
 | [registry.py](registry.py) | Versioned `TaskSetSourceDefinition` factories |
-| [files.py](files.py) | Existing task packs; preserve train/selection/holdout |
 | [sampling.py](sampling.py) | All, fixed and deterministic collection-stratified cycles |
 | [configuration.py](configuration.py) | Independent typed sampling, parallel, joint and promotion settings |
 | [execution.py](execution.py) | Public execution definition and frozen preview |
 | [Contracts](../../../improvement/contracts/README.md) | Task entries, snapshots, batch receipts and editing requests |
 | [Execution](../execution/README.md#schedule-task-batches) | One bounded queue and independent leaf phases |
-| [Assessment](../assessment/README.md) | Declared utilities, promotion and process-guided exploration |
+| [Assessment](../assessment/README.md) | Declared utilities, promotion and supported process comparison |
 | [Workflow](../workflow/README.md) | One shared round engine |
 
 ## Freeze tasks and conditions
@@ -39,26 +38,24 @@ selection/confirmation inputs or verifier files. No automatic conversation minin
 or synthetic summary is performed.
 
 Every collection must expose a task objective to participate in joint ranking.
-Native file collections currently select installed task packs, not ungraded
-instructions. Another material format supplies a source and scorer through the
-public ports. Task-set CLI search currently uses `simple`, task scope, no retained
+A custom material format supplies a source, execution backend and scorer through
+the public ports; no local collection executor is installed by default. Task-set CLI search uses the fixed flow, task scope, no retained
 experience, and one candidate per round. Other component kinds and I experiments
 need compatible declared runners; collection registration does not bypass their
 capability checks.
 
 ## Compare batches and promote
 
-Each round evaluates the current exploration seed and its challenger on the same
+Each round evaluates the retained development incumbent and its challenger on the same
 task keys, attempts and conditions. The next seed defaults to the better complete
-result on that shared development batch; supported process comparisons can resolve official-score ties. Optional
-`process-guided` exploration can choose another complete evaluation as a separate next-seed decision. Search scores from different batches are not directly ranked.
+result on that shared development batch; supported process comparisons can resolve official-score ties.  Search scores from different batches are not directly ranked.
 
 Formal selection runs every `promotion.every_rounds` and at search completion,
 using the complete common selection set. For each collection, explicit selection
 entries are used when present; otherwise all its development entries are used.
 Thus a pack's private validation cannot accidentally exclude another benchmark.
 The previous formal harness survives incomplete or worse comparisons. Reports
-distinguish official evaluation, exploration seed, collection utilities and coverage.
+distinguish official evaluation, collection utilities and coverage.
 `selected` is development assurance, not independent verification or adoption.
 
 Final comparison uses fresh evaluator invocations. No-gain patience advances only after a complete comparable promotion. Repeating a harness on another sampled batch does not itself stop search. Leaf process metrics do not implicitly become task-set stop conditions.
@@ -79,8 +76,8 @@ established `TaskRunner.execute(plan, task, harness)` signature.
 
 Each leaf receives fresh services and independent execution/evaluator times. Own resources before fallible construction; borrowed ports remain caller-owned. Missing usage stays unknown. Composite runners report their actual leaf observations and delegate timing to leaf phases.
 
-The experiment composition root registers built-in `files` and optional `eval`
-sources. Adding another backend or task family does not add branches to Core,
+The experiment composition root registers the optional `eval` source. Embeddings
+can provide an explicit registry for other sources. Adding another backend or task family does not add branches to Core,
 Run, the scheduler or joint comparison. Models, host permissions and benchmark
 grading retain their original owners.
 

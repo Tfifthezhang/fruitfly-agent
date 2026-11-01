@@ -35,6 +35,7 @@ _BASH_SCHEMA: dict = {
     "additionalProperties": False,
 }
 
+DEFAULT_TIMEOUT_SECONDS = 600
 _UPDATE_THROTTLE_SECONDS = 0.1
 
 
@@ -110,7 +111,7 @@ def _append_status(output: str, status: str) -> str:
     return f"{output}\n\n{status}" if output else status
 
 
-def create_bash_tool(*, default_timeout_seconds=120, manager=None) -> AgentTool:
+def create_bash_tool(*, default_timeout_seconds=DEFAULT_TIMEOUT_SECONDS, manager=None) -> AgentTool:
     if (isinstance(default_timeout_seconds, bool) or not isinstance(default_timeout_seconds, (int, float))
             or not math.isfinite(default_timeout_seconds) or default_timeout_seconds <= 0):
         raise ValueError('Bash requires a positive finite default timeout')

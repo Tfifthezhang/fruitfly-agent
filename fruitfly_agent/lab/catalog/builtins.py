@@ -31,17 +31,16 @@ from fruitfly_agent.lab.improvement.tasks import TaskPackCatalog, TASK_PACK_COMP
 from fruitfly_agent.lab.improvement.registration import definition as improvement_definition
 from fruitfly_agent.lab.tools.web.registration import definitions as web_definitions
 from fruitfly_agent.lab.context_manager.augmentation.skills.document import definition as skill_document_definition
-from fruitfly_agent.lab.context_manager.augmentation.skills import (
-    SkillCatalogTransformer, load_skills, render_skills_xml,
-)
-from fruitfly_agent.lab.context_manager.augmentation.skills.target import SKILL_CATALOG_GUIDANCE_KEY, SkillGuidanceTarget
+from fruitfly_agent.lab.context_manager.augmentation.skills.registration import definition as skill_catalog_definition
 from fruitfly_agent.lab.improvement.targets.text import TEXT_TARGET_PREFIX
 from fruitfly_agent.improvement.contracts.versions import STATE_SNAPSHOTS_COMPONENT
 from fruitfly_agent.lab.context_manager.augmentation.information.file_memory.snapshots import FileMemorySnapshots
 from fruitfly_agent.lab.improvement.targets.state import WorkspaceTextSnapshots
 from fruitfly_agent.improvement.contracts.versions import EXPERIMENT_BLOCKERS_COMPONENT
 from fruitfly_agent.lab.base_prompt.target import BasePromptTarget, configuration_surface as prompt_surface
-from fruitfly_agent.lab.tools.guidance import prepare_guidance, guidance_key
+from fruitfly_agent.lab.tools.catalog import prepare_catalog, configuration_surface as tool_catalog_surface
+from fruitfly_agent.lab.tools.bash import DEFAULT_TIMEOUT_SECONDS
+from fruitfly_agent.lab.tools.commands import DEFAULT_MAX_ACTIVE, DEFAULT_RETAINED_COMMANDS
 from fruitfly_agent.lab.tools import (
     create_bash_tool,
     create_edit_tool,
@@ -53,7 +52,7 @@ from fruitfly_agent.lab.tools.media import create_save_media_tool
 from .assembly import AssemblyContext, AssemblyState, require_workspace_path
 from .catalog import LabCatalog
 from .components import ComponentSpec
-from fruitfly_agent.lab.execution_policy import validate_component_options, configuration_surface as execution_surface
+from fruitfly_agent.lab.execution_policy import configuration_surface as execution_surface
 from .models import (
     MechanismDefinition,
     MechanismContribution,
@@ -72,11 +71,10 @@ def builtin_catalog() -> LabCatalog:
                 'Expose execution instructions as independently bound improvement components.',
                 contributions=(MechanismContribution('capability', 'tools'),)),
             lambda state, context, parameters: state, visible=False,
-            prepare_targets=_prepare_instruction_components, component_validator=validate_component_options,
-            configuration_surfaces=(prompt_surface(), execution_surface()),
-            component_specs=lambda parameters, enabled: (ComponentSpec('base_prompt'),
-                ComponentSpec('execution-policy', kind='execution-policy', schema='execution-policy-v1',
-                    required_capabilities=frozenset({'execution-config'}))),
+            prepare_targets=_prepare_instruction_components,
+            configuration_surfaces=(prompt_surface(), execution_surface(), tool_catalog_surface()),
+            artifact_slots=frozenset({'tool-catalog'}),
+            component_specs=lambda parameters, enabled: (ComponentSpec('base_prompt'), ComponentSpec('tool-catalog', kind='tool-catalog')),
             implementation_path='fruitfly_agent/lab/improvement/targets/bundle.py',
             documentation_path='fruitfly_agent/lab/improvement/targets/README.md'),
         ssh_definition(),
@@ -84,7 +82,7 @@ def builtin_catalog() -> LabCatalog:
         *web_definitions(),
         _definition(
             "local-env",
-            optimization_exemption='Execution backend binding; optimization belongs to execution policy and tools.',
+            optimization_exemption='Execution backend binding; tool and context owners expose optimization surfaces.',
             layer="capability",
             family="environment",
             label="Local environment",
@@ -96,6 +94,7 @@ def builtin_catalog() -> LabCatalog:
             order=10,
             exclusive_group="environment",
             provides=frozenset({"execution-env"}),
+            execution_description=lambda parameters, workspace: ExecutionEnvironmentDescription('Local', str(workspace)),
         ),
         _definition(
             "read-tool",
@@ -118,9 +117,9 @@ def builtin_catalog() -> LabCatalog:
             label="Run shell commands",
             description="Execute shell commands in the selected environment.",
             install=_install_bash_tool,
-            parameters=(ParameterDescriptor('default_timeout_seconds', 'number', 'Command timeout', 'Default seconds per shell command.', 120, minimum=1, maximum=28800),
-                ParameterDescriptor('max_active_commands', 'integer', 'Active commands', 'Runtime-owned managed shell jobs.', 2, minimum=1, maximum=16),
-                ParameterDescriptor('retained_commands', 'integer', 'Command handles', 'Maximum retained command handles.', 64, minimum=16, maximum=256),
+            parameters=(ParameterDescriptor('default_timeout_seconds', 'number', 'Command timeout', 'Default seconds per shell command.', DEFAULT_TIMEOUT_SECONDS, minimum=1, maximum=28800),
+                ParameterDescriptor('max_active_commands', 'integer', 'Active commands', 'Runtime-owned managed shell jobs.', DEFAULT_MAX_ACTIVE, minimum=1, maximum=16),
+                ParameterDescriptor('retained_commands', 'integer', 'Command handles', 'Maximum retained command handles.', DEFAULT_RETAINED_COMMANDS, minimum=16, maximum=256),
                 ParameterDescriptor('output_characters', 'integer', 'Poll output', 'Maximum characters per managed poll.', 12000, minimum=100, maximum=24000)),
             implementation_path='fruitfly_agent/lab/tools/bash.py',
             documentation_path='fruitfly_agent/lab/tools/README.md',
@@ -185,32 +184,7 @@ def builtin_catalog() -> LabCatalog:
                 cost_notice="IPython execution is local; llm_query may incur Provider cost.",
             ),
         ),
-        _definition(
-            "skill-catalog",
-            configuration_snapshot=lambda parameters, workspace: WorkspaceTextSnapshots(
-                require_workspace_path(workspace, parameters['root'], name='Skill root'), workspace).freeze(),
-            artifact_slots=frozenset({SKILL_CATALOG_GUIDANCE_KEY}),
-            component_specs=lambda parameters, enabled: (ComponentSpec(SKILL_CATALOG_GUIDANCE_KEY),) if enabled else (),
-            layer="online",
-            family="context",
-            context_phase="augmentation",
-            label="Skill catalog",
-            description="Load visible SKILL.md metadata into the system prompt.",
-            install=_install_skill_catalog,
-            implementation_path='fruitfly_agent/lab/context_manager/augmentation/skills/adapter.py',
-            documentation_path='fruitfly_agent/lab/context_manager/augmentation/skills/README.md',
-            input_parameters=('root',),
-            default=True,
-            order=30,
-            parameters=(
-                _path_parameter("root", ".skills", "Skill root"),
-                ParameterDescriptor(
-                    "max_chars", "integer", "Maximum catalog characters",
-                    "Maximum projected catalog size; oversized XML is omitted, not cut.",
-                    16_000, minimum=128, maximum=1_000_000,
-                ),
-            ),
-        ),
+        skill_catalog_definition(),
         _definition(
             "information-context",
             visible=False,
@@ -316,14 +290,6 @@ def builtin_catalog() -> LabCatalog:
         improvement_definition(),
         skill_document_definition(),
     )
-    from fruitfly_agent.lab.tools.guidance import configuration_surface as guidance_surface
-    tool_factories = {'read': create_read_tool, 'bash': create_bash_tool,
-                      'write': create_write_tool, 'edit': create_edit_tool, 'save_media': create_save_media_tool}
-    definitions = tuple(replace(d, artifact_slots=d.artifact_slots | frozenset(
-        guidance_key(name) for name in d.descriptor.effects.tools),
-        configuration_surfaces=(*d.configuration_surfaces,
-            *(guidance_surface(name, tool_factory=tool_factories.get(name))
-              for name in d.descriptor.effects.tools))) for d in definitions)
     from fruitfly_agent.lab.tools.improvement import expose as tool_surfaces
     from fruitfly_agent.lab.context_manager.augmentation.improvement import expose as augmentation_surfaces
     from fruitfly_agent.lab.context_manager.externalization.improvement import expose as externalization_surfaces
@@ -335,11 +301,10 @@ def builtin_catalog() -> LabCatalog:
 
 
 def _prepare_instruction_components(state, context):
-    from fruitfly_agent.lab.execution_policy import ExecutionPolicyTarget
     if TEXT_TARGET_PREFIX + 'base_prompt' not in state.components:
         state = state.with_component(TEXT_TARGET_PREFIX + 'base_prompt', BasePromptTarget(state.config.system_prompt))
-    state = prepare_guidance(state, context)
-    return state.with_component(TEXT_TARGET_PREFIX + "execution-policy", ExecutionPolicyTarget(state.config, fixed_fields=context.execution_owners))
+    state = prepare_catalog(state, context)
+    return state
 
 
 def _definition(
@@ -375,6 +340,7 @@ def _definition(
     validate_parameters=None,
     component_specs=None,
     configuration_snapshot=None,
+    execution_description=None,
 ) -> MechanismDefinition:
     return MechanismDefinition(
         MechanismDescriptor(
@@ -400,6 +366,7 @@ def _definition(
         requires_capabilities=requires_capabilities, validate_parameters=validate_parameters,
         component_specs=component_specs,
         configuration_snapshot=configuration_snapshot,
+        execution_description=execution_description,
         selection_group=selection_group, selection_group_label=selection_group_label,
         selection_group_allow_disabled=selection_group_allow_disabled,
         implementation_path=implementation_path, documentation_path=documentation_path,
@@ -451,7 +418,7 @@ def _ipython_tool_parameters() -> tuple[ParameterDescriptor, ...]:
 
 
 def _install_local_env(state: AssemblyState, context: AssemblyContext, parameters: Mapping[str, Any]) -> AssemblyState:
-    backend = LocalEnv(str(context.workspace))
+    backend = context.execution_env or LocalEnv(str(context.workspace))
     return replace(
         state,
         config=replace(state.config, env=backend),
@@ -460,7 +427,7 @@ def _install_local_env(state: AssemblyState, context: AssemblyContext, parameter
 
 
 def _install_read_tool(state: AssemblyState, context: AssemblyContext, parameters: Mapping[str, Any]) -> AssemblyState:
-    return _append_tool(state, create_read_tool(context.media_writer))
+    return _append_tool(state, create_read_tool(context.media_writer, resources=context.resources))
 
 
 def _install_save_media_tool(state: AssemblyState, context: AssemblyContext, parameters: Mapping[str, Any]) -> AssemblyState:
@@ -486,46 +453,6 @@ def _install_write_tool(state: AssemblyState, context: AssemblyContext, paramete
 
 def _append_tool(state: AssemblyState, tool) -> AssemblyState:
     return replace(state, config=replace(state.config, tools=(*state.config.tools, tool)))
-
-
-def _install_skill_catalog(state: AssemblyState, context: AssemblyContext, parameters: Mapping[str, Any]) -> AssemblyState:
-    artifact_key = SKILL_CATALOG_GUIDANCE_KEY
-    root = require_workspace_path(context.workspace, parameters["root"], name="skill root")
-    state = state.with_component(STATE_SNAPSHOTS_COMPONENT,
-        (*state.components.get(STATE_SNAPSHOTS_COMPONENT, ()), WorkspaceTextSnapshots(root, context.workspace)))
-    artifact_id = context.artifact_bindings.get(artifact_key)
-    if artifact_id is not None:
-        if context.artifact_reader is None:
-            raise ValueError(
-                "skill-catalog artifact binding requires a Run artifact reader"
-            )
-        guidance = context.artifact_reader(artifact_id)
-        block_size = len(
-            f"<!-- fruitfly:skill-catalog:start -->\n{guidance}\n"
-            "<!-- fruitfly:skill-catalog:end -->"
-        )
-        if guidance and block_size > parameters["max_chars"]:
-            raise ValueError(
-                "bound skill-catalog guidance exceeds skill-catalog.max_chars"
-            )
-        artifact = {
-            "key": artifact_key,
-            "id": artifact_id,
-            "media_type": "text/plain; charset=utf-8",
-            "size_bytes": len(guidance.encode("utf-8")),
-        }
-        state = state.with_data_artifact(artifact)
-    else:
-        result = load_skills(root)
-        guidance = render_skills_xml(result.skills)
-    return state.with_component(TEXT_TARGET_PREFIX + SKILL_CATALOG_GUIDANCE_KEY, SkillGuidanceTarget(guidance, parameters["max_chars"])).with_context_stage(
-        ContextStage(
-            "skill-catalog",
-            "augmentation",
-            SkillCatalogTransformer(guidance, max_chars=parameters["max_chars"]),
-            order=30,
-        )
-    )
 
 
 def _install_information_context(state: AssemblyState, context: AssemblyContext, parameters: Mapping[str, Any]) -> AssemblyState:

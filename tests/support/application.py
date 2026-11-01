@@ -48,7 +48,8 @@ async def open_task_app(self, root, algorithm=None):
     provider = FauxProvider()
     registry = Mock()
     registry.create.return_value = provider
-    factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=registry)
+    from tests.support.task_execution import TaskApplicationFixture
+    factory = TaskApplicationFixture(cwd=root, environment={}, provider_registry=registry)
     if algorithm:
         factory.configuration.set_mechanism(algorithm, enabled=True)
         factory.configuration.save()

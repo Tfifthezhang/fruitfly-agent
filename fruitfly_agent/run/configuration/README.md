@@ -19,7 +19,7 @@ the component grammar linked above; it has no flat `prompt`, `execution`,
 | `HarnessConfig` | Default profile and profile mapping |
 | `HarnessProfile` | Model catalog/profile, prompt, execution limits, artifact bindings, and mechanism selections |
 | `execution` | Declared turn/tool/recovery limits and nested tool scheduling; see [shared fields](../../runtime_spec/README.md#configure-execution) |
-| `execution.max_tool_calls_per_turn` | Nonnegative integer, default 64; per outer turn, including detached task trials; 0 prevents tool attempts |
+| `execution.max_tool_calls_per_turn` | Nonnegative integer, default 512 per daily outer turn; Improvement trials remove this count cap; 0 prevents tool attempts |
 | `prompt` | Optional; `assistant-default` or a text artifact ID |
 | `artifact_bindings` | Named slots declared by enabled consumers |
 | `load_harness_config(path)` | Parse and validate configuration. |
@@ -36,8 +36,10 @@ Unknown fields raise `ValueError`. Catalog validates mechanism IDs and parameter
 
 `snapshot().ready` includes main model credentials, including staged credentials,
 and registered mechanism requirements. It remains an offline view; Run uses it to
-choose direct chat or setup without asking the terminal to inspect Providers or
-Catalog. Malformed harness files report their source path and remain untouched.
+enable Start or focus Configure in the offline startup panel without asking the
+terminal to inspect Providers or Catalog. Saving in the shared editor returns to
+the panel without connecting resources. Malformed harness files report their
+source path and remain untouched.
 
 ## Files and ownership
 
@@ -159,6 +161,7 @@ for syntax, registration and experiment grants; this guide owns persistence and
 application behavior.
 
 Daily configuration saves through the same component exporter. Saving
-round-trips built-in prompt identity and derived default tool guidance; disabling
-a tool removes its active guidance binding. No generated default override changes
+round-trips built-in prompt identity and the derived default Tool catalog policy.
+Disabling a tool removes it from the derived directory and usage resources while
+retaining the shared policy. No generated default override changes
 the behavior identity of an unchanged component.

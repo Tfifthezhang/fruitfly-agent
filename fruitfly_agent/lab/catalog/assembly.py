@@ -47,6 +47,9 @@ class AssemblyContext:
     model_metadata: Mapping[str, Any] = field(default_factory=dict)
     media_writer: Callable[[bytes, str, str], str] | None = None
     media_reader: Callable[[str], bytes] | None = None
+    resources: Any = None
+    execution_env: Any = None
+    agent_hooks_from_host: bool = False
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "workspace", self.workspace.resolve())
@@ -120,10 +123,14 @@ def assemble_lab(
 ) -> AssemblyResult:
     """Validate first, then install every enabled mechanism in stable order."""
 
+    from fruitfly_agent.lab.tools.resources import ResourceRegistry
+    resources = context.resources or context.own(ResourceRegistry(scope=str(context.session_path) if context.session_path else None))
+    context = replace(context, resources=resources)
+    base_config = replace(base_config, readable_resources=resources)
     resolved = catalog.resolve(selections)
     context = replace(context, execution_owners={key: item.definition.descriptor.mechanism_id
         for item in resolved for key in item.definition.execution_fields})
-    state = AssemblyState(config=base_config)
+    state = AssemblyState(config=base_config).with_component('readable-resources', resources)
     if catalog.bootstrap is not None:
         state = catalog.bootstrap(state, context)
         if not isinstance(state, AssemblyState):

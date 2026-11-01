@@ -13,6 +13,7 @@ from fruitfly_agent.interactive.contracts.configuration import (
     ConfigurationMechanism,
     ConfigurationSnapshot,
 )
+from fruitfly_agent.interactive.contracts.startup import ConfigurationEditResult
 from fruitfly_agent.interactive.terminal.io.input import LineEditor, create_line_editor, read_field_line, field_prompt, parse_field_value
 from fruitfly_agent.interactive.terminal.io.live import InputInterrupted
 from fruitfly_agent.interactive.terminal.features.configuration.model_setup import (
@@ -141,17 +142,29 @@ class TerminalConfigurationFrontend:
 
     def run_for_active_session(self) -> ConfigurationLaunchResult:
         """Return draft application intent; the host owns saving and assembly."""
-        self._inside_active_session = True
+        return self._edit_configuration(startup=False)
+
+    def run_for_startup(self) -> ConfigurationEditResult:
+        """Use the same editor as /config, saving offline before returning."""
+        result = self._edit_configuration(startup=True)
+        return ConfigurationEditResult(saved=result.saved)
+
+    def _edit_configuration(self, *, startup: bool) -> ConfigurationLaunchResult:
+        self._inside_active_session = not startup
         try:
             if getattr(self.configuration, "read_only", False):
                 self._review_loop(self.configuration.snapshot())
                 return ConfigurationLaunchResult(start=False)
             while True:
-                self._configure_loop(back_detail="Review changes before returning")
+                quit_requested = self._configure_loop(back_detail="Review changes before returning")
+                if startup and not quit_requested and not self.configuration.snapshot().ready:
+                    if not self._repair_startup():
+                        self.configuration.reset()
+                        return ConfigurationLaunchResult(start=False)
                 snapshot = self.configuration.snapshot()
                 if not snapshot.changed:
                     return ConfigurationLaunchResult(start=False)
-                decision = self._confirm_application()
+                decision = self._confirm_application(startup=startup, return_to_panel=startup)
                 if decision == "continue":
                     continue
                 if decision == "discard":
@@ -161,6 +174,11 @@ class TerminalConfigurationFrontend:
                         self.notice = f"Could not discard configuration: {exc}"
                         continue
                     return ConfigurationLaunchResult(start=False)
+                if startup:
+                    saved = self._start(snapshot)
+                    if saved is None:
+                        continue
+                    return ConfigurationLaunchResult(start=False, saved=saved.saved)
                 return ConfigurationLaunchResult(start=True)
         finally:
             self._inside_active_session = False
@@ -256,10 +274,10 @@ class TerminalConfigurationFrontend:
             elif restore is not None:
                 self._call(restore)
 
-    def _confirm_application(self, *, startup: bool = False) -> str:
+    def _confirm_application(self, *, startup: bool = False, return_to_panel: bool = False) -> str:
         selected = 0
         rows = (
-            MenuRow("Save and start" if startup else "Save and apply to this conversation"),
+            MenuRow("Save and return" if return_to_panel else "Save and start" if startup else "Save and apply to this conversation"),
             MenuRow("Continue configuring", help=MenuHelp("Continue configuring", "Return to the configuration menu")),
             MenuRow(
                 "Discard changes",
@@ -268,8 +286,8 @@ class TerminalConfigurationFrontend:
         )
         while True:
             self._render(
-                title="Start session" if startup else "Apply configuration",
-                subtitle="Save the selected settings and start chatting." if startup else "Apply the selected settings and continue this conversation.",
+                title="Save configuration" if return_to_panel else "Start session" if startup else "Apply configuration",
+                subtitle="Save settings and return to the startup panel." if return_to_panel else "Save the selected settings and start chatting." if startup else "Apply the selected settings and continue this conversation.",
                 rows=rows,
                 selected=selected,
             )

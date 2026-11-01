@@ -10,8 +10,8 @@ from fruitfly_agent.improvement.contracts.editing import ProposalRequest
 from fruitfly_agent.lab.improvement.editor import AgentEditor
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts, EvidenceWorkspace
 from fruitfly_agent.lab.improvement.evidence.access import EvidenceAccess
-from fruitfly_agent.lab.improvement.research import ResearchLedger
-from fruitfly_agent.lab.improvement.system_configuration import search_parameters
+from fruitfly_agent.lab.improvement.evidence.rounds import RoundIndex
+from fruitfly_agent.lab.improvement.evidence.configuration import EvidenceSettings
 from fruitfly_agent.lab.improvement.workflow.mechanisms import install_workflow_mechanisms
 from fruitfly_agent.core.config import AgentLoopConfig
 from tests.support.pipeline import build_pipeline, RuleGenerator
@@ -20,10 +20,10 @@ from tests.support.faux_provider import FauxProvider
 
 class KernelTests(unittest.IsolatedAsyncioTestCase):
     async def test_sync_faults_bad_results_and_stop_fault_preserve_prior_executions(self):
-        for target in ('propose', 'execute', 'select', 'stop', 'explore', 'assess'):
+        for target in ('propose', 'execute', 'select', 'stop', 'assess'):
             with self.subTest(stage=target):
                 flow, plan, baseline, runner = build_pipeline()
-                plan = replace(plan, mode='sequential', depth=2)
+                plan = replace(plan,  rounds=2)
                 def broken(*args, **kwargs):
                     raise RuntimeError('synchronous plugin failure')
                 if target == 'propose':
@@ -75,21 +75,21 @@ class KernelTests(unittest.IsolatedAsyncioTestCase):
         services = WorkflowServices(plan)
         saved = []
         context = ExecutionContext('.', artifacts, flow.components, None, None, None,
-            plan=plan, services=services, workflow_settings={'research': {'enabled': True}},
+            plan=plan, services=services, workflow_settings={},
             save_record=lambda path, value: saved.append((path, value)))
         flow.stop_policy = install_workflow_mechanisms(context)
         try:
             await flow.run(plan, TaskMaterial('task', 'Work'), baseline, services)
             request = generator.requests[0]
-            self.assertEqual(request.context[0].path, 'research.json')
+            self.assertEqual(request.context[0].path, 'rounds.json')
             value = json.loads(artifacts.read(request.context[0].artifact_id))
-            self.assertTrue(value['entries'])
-            self.assertEqual(value['entries'][0]['kind'], 'observation')
+            self.assertTrue(value['links'])
+            self.assertIn('run_id', value['links'][0])
             workspace = EvidenceWorkspace.build(request, artifacts)
-            self.assertEqual(json.loads(workspace.read('context/extensions/research.json')), value)
-            self.assertTrue(saved)
-            other = ResearchLedger(replace(context, services=WorkflowServices(plan)))
-            self.assertEqual(list(other.entries), [])
+            self.assertEqual(json.loads(workspace.read('context/extensions/rounds.json')), value)
+            self.assertEqual(saved, [])
+            other = RoundIndex(replace(context, services=WorkflowServices(plan)))
+            self.assertEqual(json.loads(artifacts.read(other.before_proposal(type('Event', (), {'job_id': plan.job_id, 'round_index':0})()).resources[0].artifact_id))['links'], [])
             await other.context.services.close()
         finally:
             await services.close()
@@ -104,7 +104,7 @@ class KernelTests(unittest.IsolatedAsyncioTestCase):
         try:
             result = await flow.run(plan, TaskMaterial('task', 'Work'), baseline, services)
             self.assertIsNotNone(result.selected)
-            self.assertEqual(services.used['execution'], 4)
+            self.assertEqual(services.used['execution'], 2)
             self.assertFalse(hasattr(services, 'budget'))
         finally:
             await services.close()
@@ -130,9 +130,7 @@ class KernelTests(unittest.IsolatedAsyncioTestCase):
         finally:
             await services.close()
 
-    def test_fixed_experiment_policies_reject_unknown_fields(self):
-        value = search_parameters({'research': {'enabled': True}, 'progress': {'patience': 2}})
-        with self.assertRaises(ValueError):
-            search_parameters({'finalization': {'reserve_model_calls': 4}})
-        value['progress']['unknown'] = 1
-        with self.assertRaises(ValueError): search_parameters(value)
+    def test_fixed_evidence_settings_reject_unknown_and_invalid_limits(self):
+        with self.assertRaises(ValueError): EvidenceSettings.from_dict({'research': {}})
+        with self.assertRaises(ValueError): EvidenceSettings.from_dict({'read': {'default_characters': 25000}})
+        with self.assertRaises(ValueError): EvidenceSettings.from_dict({'search': {'max_matches': True}})

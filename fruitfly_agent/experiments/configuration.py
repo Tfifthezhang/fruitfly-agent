@@ -6,7 +6,6 @@ from fruitfly_agent.runtime_spec.documents import DocumentReader, mapping
 
 from fruitfly_agent.lab.improvement.configuration import ImprovementSettings, TaskSetImprovementSettings
 from fruitfly_agent.lab.rsi.configuration import EvolutionSettings
-from fruitfly_agent.lab.improvement.strategies.exploration import ExplorationSettings
 from fruitfly_agent.lab.improvement.task_sets import MultiTaskSettings
 
 
@@ -30,7 +29,6 @@ class ExperimentConfig:
     rsi: EvolutionSettings = field(default_factory=EvolutionSettings)
     stop: dict[str, Any] = field(default_factory=dict)
     sources: dict[str, str] = field(default_factory=dict)
-    exploration: ExplorationSettings = field(default_factory=ExplorationSettings)
     multi_task: MultiTaskSettings = field(default_factory=MultiTaskSettings)
     workflow_settings: dict = field(default_factory=dict)
     evidence_settings: dict = field(default_factory=dict)
@@ -48,7 +46,6 @@ class ExperimentConfig:
             'task': self.task, 'runtime': self.runtime, 'models': self.models,
             'improvement': asdict(self.improvement), 'rsi': asdict(self.rsi),
             'stop': self.stop, 'sources': self.sources,
-            'exploration': asdict(self.exploration),
             'multi_task': asdict(self.multi_task), 'workflow_settings': self.workflow_settings, 'evidence_settings': self.evidence_settings}
 
 
@@ -65,7 +62,7 @@ def load_configuration(workspace, path=None, *, overrides=None, material_only=Fa
         document = reader.read(target)
     elif path is None and (overrides or {}).get('task'):
         document = {'baseline': {'config': 'default-config.yaml'},
-            'tasks': {'inline': overrides['task']}, 'comparison': {'inline': {}}}
+            'tasks': {'inline': overrides['task']}} 
     else:
         raise ValueError('experiment configuration not found: ' + str(target) + '; initialize a workspace first')
     from .comparison import normalize_experiment
@@ -88,6 +85,5 @@ def load_configuration(workspace, path=None, *, overrides=None, material_only=Fa
         settings(TaskSetImprovementSettings if task.get('source') == 'task-set' else ImprovementSettings,
             raw.get('improvement', {}), 'improvement'),
         settings(EvolutionSettings, raw.get('rsi', {}), 'rsi'), stop, sources,
-        settings(ExplorationSettings, raw.get('exploration', {}), 'exploration'),
         MultiTaskSettings.from_dict(raw.get('multi_task', {})),
         raw.get('workflow_settings', {}), raw.get('evidence_settings', {}), source_files)

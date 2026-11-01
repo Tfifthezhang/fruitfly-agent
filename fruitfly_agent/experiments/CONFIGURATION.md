@@ -2,134 +2,121 @@
 
 [Up: Experiments](README.md)
 
-System configuration selects H/S/I components. An experiment selects task material,
-authorized edits and comparison conditions. See [component syntax](../runtime_spec/COMPONENTS.md).
+An experiment chooses a baseline, task material and authorized edits. Its runtime
+conditions have four owners: execution, evidence, evaluation and stopping.
+System H/S/I syntax belongs to the [runtime specification](../runtime_spec/COMPONENTS.md).
 
 ```yaml
 baseline: {config: default-config.yaml, profile: baseline}
-tasks: {file: tasks/native.yaml}
-comparison: {file: comparison.yaml}
-timeouts: {editor_seconds: 1200, execution_seconds: 3600, evaluator_seconds: 1200}
-trial: {attempts: 1, concurrency: 2}
-search: {strategy: simple, rounds: 1}
-```
-
-Paths resolve from the declaring file. `tasks` and `comparison` accept exactly
-one `file` or `inline` reference. Unknown fields and duplicate keys fail. Model
-roles belong to the referenced system configuration.
-
-| Section | Responsibility |
-|---|---|
-| `baseline` | System configuration and profile |
-| `tasks` | Files, installed task package, I study or task collections |
-| `comparison` | Scope, feedback, aggregation, gain and collection regression rules |
-| `edit` | Optional narrowing of automatically discovered legal targets and fields |
-| `timeouts` | Independent positive finite seconds for each editor, execution and evaluator invocation |
-| `trial` | Task-set attempts and task concurrency |
-| `search` | Strategy, generator, rounds, mode, width, exploration, retention, sampling, research and progress |
-| `assessment.evidence` | Evidence response page size (`page_characters`, default 12000) |
-| `rsi`, `stop` | Generation conditions and stopping policies |
-
-## Grant component changes
-
-Omitting `edit` discovers all targets supported by the selected backend, H/S or I
-study, and task material. Component registration provides the owner metadata and
-default legal fields. An explicit `edit` narrows this scope:
-
-```yaml
+tasks: {file: tasks/tb4-smoke.yaml}
 edit:
   working-memory-reduction:
     fields: [parameters.instructions.update, parameters.settings.memory_tokens]
     bounds:
       parameters.settings.memory_tokens: {minimum: 512, maximum: 4096}
+execution:
+  generator: agent-editor-v1
+  editor_seconds: 1200
+  task_seconds: 3600
+  retain_experience: false
+evidence:
+  read: {default_characters: 12000, max_characters: 24000}
+  catalog: {default_entries: 50, max_entries: 100}
+  search: {default_matches: 20, max_matches: 50, max_characters: 12000}
+evaluation:
+  evaluator_seconds: 1200
+  scope: task
+stopping:
+  max_rounds: 1
+  no_improvement_rounds: 0
+  consecutive_failures: 0
 ```
 
-This example requires a backend capable of materializing working memory.
-The baseline must contain the target and fit every bound. Native in-memory
-file execution cannot install context or shell mechanisms. H/S and I cannot mix
-in the same study. A dedicated I study can grant evaluator prompts:
+The baseline must enable each granted component and fit its bounds. Paths resolve
+from the declaring file. `tasks` accepts exactly one `file` or `inline` reference.
+Unknown fields and duplicate keys fail; there is one configuration grammar.
+Model roles belong to the referenced system configuration.
 
-```yaml
-edit:
-  improvement-evaluator:
-    fields: [parameters.instructions.criteria, parameters.instructions.compare]
-```
+| Section | Fields and meaning |
+|---|---|
+| `baseline` | `config`, optional `profile` |
+| `tasks` | File instruction/inputs, installed package, I study or task collections |
+| `edit` | Component IDs mapped to `fields` and optional numeric `bounds`; omission discovers supported default-selected surfaces |
+| `execution` | Generator, editor/task seconds, direction and explicit experience retention |
+| `evidence` | Shared read, directory and search limits; validated by the evidence module and injected into both roles |
+| `evaluation` | Evaluator seconds, `scope: task|persistent` and optional task-set `comparison` |
+| `stopping` | `max_rounds` (1–10); no-improvement/failure round limits (0 disables the condition) |
+| `rsi` | Separate generation and independent activation conditions |
 
-| Category | Examples | Meaning |
+## Grant component changes
+
+| Field category | Examples | Meaning |
 |---|---|---|
-| `parameters.instructions.*` | Base `system`, tool guidance `usage`, memory `update`/`shrink`, editor/evaluator prompts | Model-facing instructions |
-| `parameters.settings.*` | Working-memory sizes, tool timeouts, execution parallelism, history artifact size | Owner-declared algorithm and runtime settings |
-| `parameters.content.*` | Retained Skill `body`; registered multi-file `documents` | Retained editable material |
+| `parameters.instructions.*` | Base `system`, Tool/Skill catalog `usage`, memory `update`/`shrink`/`readback`, editor/evaluator prompts | Model-facing instructions |
+| `parameters.settings.*` | Working-memory sizes, Skill catalog `max_chars`, Bash default timeout | Owner-declared mutable parameters |
+| `parameters.content.*` | Retained Skill `body`, registered multi-file `documents` | Retained editable material |
 
-The same canonical paths appear in owner descriptions, grants and validation.
-`list_targets` pages a frozen target index; `describe_target` loads field meaning,
-type, current/default value, unit, choices, bounds and constraints on demand.
-`context/edit-grants.json` retains the exact experiment scope. The initial editor
-context does not contain every parameter description. Metadata, values and grants
-contribute to frozen conditions. Owners revalidate every candidate.
+`list_targets` pages a frozen target index. `describe_target` supplies field type,
+meaning, current/default value, unit and constraints. Owner validation and the
+experiment grant both apply. Models, permissions, schemas, source locations,
+coverage bookkeeping, official objectives and private verification data remain
+protected. Execution policy is configured in H but has no optimization target.
 
-Models, schemas, credentials, permissions, official objectives and private
-verification material are protected. Improvement imposes no model-request,
-tool-call, turn-count or cumulative token quota. Ordinary daily Agent execution
-may explicitly configure its separate Core count limits.
+Tool parameters are available for explicit grants but excluded from automatic
+selection. Default searches can edit the unified `tool-catalog` policy; individual
+tool usage, schemas and permissions remain protected.
+
+Candidate execution requires a backend declaring the relevant capabilities,
+including configuration materialization for working-memory parameters. The backend
+owns fresh Session/history, resources, hooks, tools and isolation. `files` is a
+material format, not a built-in executor; embeddings must register its runner. H/S and I cannot mix in one study.
 
 ## Supply task and comparison documents
 
-Native tasks use `source: files`, `instruction` and optional `input_paths`, or an
-installed `pack` ID. Eval tasks use `source: eval`, `request` and `host`. Task sets
-use `source: task-set` and `collections`. I studies use `source: editor` and
-disjoint installed study material. See [recipes](../../examples/experiments/README.md).
+Tasks use `source: files`, `eval`, `editor` or `task-set`. See the
+[recipes](../../examples/experiments/README.md). Task sets additionally accept
+`execution.trial: {attempts: 1, concurrency: 1}`, `execution.sampling` and
+`execution.promotion_every_rounds`. Candidate concurrency remains one.
 
-Comparison accepts `scope: task|persistent`, `feedback: auto|behavior|scored`,
-`selection: all`, `adoption: none`, `minimum_gain`, `max_collection_regression`,
+`evaluation.comparison` accepts `minimum_gain`, `max_collection_regression`,
 `aggregation: collection-macro|task-macro` and positive collection `weights`.
-Scored feedback requires a measurement source. Incomplete shared selection
-coverage cannot produce joint utility. Persistent adoption requires independent
-verification and a separate host activation operation.
+Incomplete shared selection coverage cannot produce joint utility. Persistent
+publication requires independent verification and explicit host activation.
 
-## Configure assessment and exploration
+## Configure evaluation and evidence
 
-```yaml
-assessment:
-  evidence: {page_characters: 12000}
-search:
-  strategy: simple
-  rounds: 2
-  exploration: process-guided
-```
-
-One model evaluator assesses completed runs and compares candidates. Its prompts
-define quality, reliability, resources, progress, verification and completion
-criteria. Results contain dimensions, process signals, behavior-hypothesis checks,
-optimization directions, uncertainty and supplied evidence citations. Official
-scores stay separate. Equal scores can use supported process comparison; missing
-or uncertain judgments retain the incumbent. `exploration: incumbent` is the default.
+One shared evaluator assesses the six default dimensions when applicable: quality,
+reliability, resources, progress, verification and completion. It reads execution
+facts and optional authoritative measurements. Unsupported or uncertain judgments
+retain the incumbent; official scores are not rewritten by model opinion.
 See [Assessment](../lab/improvement/assessment/README.md).
 
-Evidence tools navigate deterministic overview, event index and original records.
-Search is literal, cross-file and paginated. Each returned source span has its own
-citation ID. Index listings do not make unread originals available as proof.
+Evidence navigation has three layers: overview, event directory and originals.
+Literal search and exact source-page citations share one
+[evidence service](../lab/improvement/evidence/README.md). Cross-round indexes link
+candidate hypotheses, receipts, assessments and selections; they do not copy facts
+or grant assurance. Merely listing a source does not establish that it was read.
 
-## Fix scheduling and research conditions
+## Fix rounds and stopping
 
-Defaults select `simple`, `agent-editor-v1`, one round, parallel mode, width 1 and
-no experience retention. Simple requires width 1. `harness2` supplies the optional
-parallel/sequential schedule. Task sets require simple/scored/task operation.
-`search.sampling` and `search.promotion_every_rounds` control task-set scheduling.
-[Research](../lab/improvement/research/README.md#configure-and-compare-mechanisms)
-owns strict research/progress configuration. I studies hold candidate I fixed
-inside fresh H/S searches, then compare downstream behavior independently.
+The fixed flow executes a baseline, generates zero or one candidate each round,
+executes it, compares completed results and continues from the retained incumbent.
+No candidate or a generator stop ends search. The default is one round,
+`agent-editor-v1`, no retained experience. Other registered generators implement
+the same proposal contract. I studies hold candidate I fixed during fresh inner
+H/S searches and compare downstream behavior independently.
 
 ## Inspect and retain results
 
-`improvement check --json` reports resolved values, source hashes, capabilities
-and edit bounds without model calls. Candidate configurations live under
-`.fruitfly/improvement/jobs/<job-id>/candidates/<id>/` with component content, model
-catalog and evidence references. The source baseline remains unchanged. Counts,
-reported token usage, role and elapsed phase time are observations, not admission
-controls. Missing usage remains explicit.
+`improvement check --json` reports resolved values, source hashes, backend
+capabilities and edit bounds without model calls. Candidate bundles live under
+`.fruitfly/improvement/jobs/<job-id>/candidates/<id>/`. Generation preserves source
+component files and daily defaults. Experience retention stages attributed lessons
+for explicit review; it does not automatically change S.
 
-Each phase starts its own clock. Nested calls within the same invocation share
-its clock. Composite task sets and I studies delegate timing to leaf phases.
-A phase timeout does not cancel future phases; user cancellation covers the job.
-Unconfirmed cleanup stops further scheduling. Reused receipts remain the same sample.
+Each editor, task and evaluator invocation has an independent positive finite
+time. Nested calls in the same invocation share its clock. Composite studies
+use leaf clocks. Improvement observes requests, tools and reported tokens without
+count quotas. Daily Core execution separately defaults to 512 tool calls per turn.
+Cancellation covers the job; unconfirmed cleanup stops scheduling. Offline fake
+Providers establish covered behavior, not real quality gains.

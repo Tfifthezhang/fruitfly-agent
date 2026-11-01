@@ -32,10 +32,10 @@ def model_completion(config):
 class AgentEditor:
     implementation_id = 'workspace-editor-v1'
 
-    def __init__(self, config, artifacts, components, *, instructions=None, page_characters=12000, reader_factory=None):
+    def __init__(self, config, artifacts, components, *, instructions=None, settings=None, reader_factory=None):
         self.config, self.artifacts, self.components = config, artifacts, components
         self.instructions = instructions or EditorInstructions()
-        self.workspace_session = EvidenceSession(config, artifacts, page_characters=page_characters, reader_factory=reader_factory)
+        self.workspace_session = EvidenceSession(config, artifacts, settings=settings, reader_factory=reader_factory)
 
     async def session(self, mission, workspace, services, *, writable=True, submit=None):
         return await self.workspace_session.session(mission, workspace, services,
@@ -58,7 +58,7 @@ class AgentEditor:
         services.record('component-descriptions',identity=content_hash(description_text),
             conditions_id=request.plan.conditions_id,baseline_id=request.baseline.snapshot_id,
             artifact_id=self.artifacts.put(description_text.encode()))
-        mission = getattr(self.instructions, request.scope) if stage == 'propose' else self.instructions.compose
+        mission = self.instructions.propose
         mission += '\nUse list_targets and describe_target to load parameter semantics on demand. Read context/edit-grants.json for this experiment’s scope.'
         mission += ('\nAfter editing return only JSON {"reasons":[{"component_id":"...",'
             '"explanation":"...","expected_effect":"observable change and disconfirming evidence","evidence_ids":["run-id"]}]}. Each changed component needs a supplied run ID; no changes is valid.')

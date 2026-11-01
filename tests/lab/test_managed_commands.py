@@ -10,6 +10,35 @@ from fruitfly_agent.lab.tools.commands import CommandManager
 
 
 class ManagedCommandsTests(unittest.IsolatedAsyncioTestCase):
+    async def test_default_timeout_reaches_backend_and_managed_capacity_tolerates_four_jobs(self):
+        from fruitfly_agent.lab.catalog import builtin_catalog
+        seen = []
+        async def execute(command, options):
+            seen.append(options.timeout_seconds)
+            return Result.success(ExecResult('done', '', 0))
+        environment = SimpleNamespace(cwd='.', exec=execute)
+        tool = create_bash_tool()
+        await tool.execute(ToolCallContext('call', 'bash', {'command': 'work'}, env=environment))
+        self.assertEqual(seen, [600])
+        parameters = builtin_catalog().get('bash-tool').descriptor.normalize_parameters({})
+        self.assertEqual(parameters['default_timeout_seconds'], 600)
+        manager = CommandManager()
+        started = asyncio.Event()
+        async def block(context):
+            started.set()
+            await asyncio.Event().wait()
+        try:
+            context = ToolCallContext('call', 'bash', {}, env=environment)
+            for _ in range(4):
+                await manager.start_command(block, context, wait_seconds=0)
+            await started.wait()
+            with self.assertRaisesRegex(ValueError, 'active command'):
+                await manager.start_command(block, context, wait_seconds=0)
+            self.assertEqual(parameters['max_active_commands'], manager.max_active)
+            self.assertEqual(parameters['retained_commands'], 128)
+        finally:
+            await manager.aclose()
+
     async def test_start_poll_and_cancel_retire_backend_and_enforce_capacity(self):
         entered, closed = asyncio.Event(), asyncio.Event()
         async def execute(command, options):

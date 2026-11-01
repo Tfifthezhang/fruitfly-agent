@@ -10,7 +10,7 @@ from fruitfly_agent.core.data_model import (ContextItem, ContextSnapshot, UserMe
 from fruitfly_agent.core.loop import run_agent_loop
 from fruitfly_agent.core.session import Session
 from fruitfly_agent.core.context_runtime import restore_context_state
-from fruitfly_agent.lab.context_manager.history import SessionHistory
+from fruitfly_agent.lab.context_manager.resources import SessionHistory
 from fruitfly_agent.lab.context_manager.reduction.methods.working_memory.algorithm import WorkingMemoryReducer
 from fruitfly_agent.lab.context_manager.reduction.methods.working_memory.config import WorkingMemoryConfig
 from fruitfly_agent.lab.context_manager.measurement.budget import MeasurementService, MeasurementConfig

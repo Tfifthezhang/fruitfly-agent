@@ -68,12 +68,12 @@ inspect referenced content in bounded slices."""
 class IpythonToolConfig:
     max_artifact_bytes: int = 64 * 1024 * 1024
     max_cell_output_chars: int = 50_000
-    cell_timeout_seconds: int = 120
+    cell_timeout_seconds: int = 300
     max_query_concurrent: int = 4
     max_query_input_chars: int = 200_000
     max_query_output_tokens: int = 4_096
     max_query_inline_result_chars: int = 100_000
-    query_timeout_seconds: int = 180
+    query_timeout_seconds: int = ModelQueryConfig().timeout_seconds
 
 
 @dataclass(frozen=True)

@@ -19,7 +19,7 @@ User cancellation propagates globally. Timeout retires local work and preserves
 completed records. Unconfirmed cleanup prevents further scheduling.
 
 Usage observations never authorize or reject work. There are no root allocations,
-child quotas or protected finalization reserves. Search schedules and explicit
+child quotas or protected finalization reserves. The fixed candidate-per-round flow and explicit
 stop policies determine when another round starts.
 
 | File | Responsibility |

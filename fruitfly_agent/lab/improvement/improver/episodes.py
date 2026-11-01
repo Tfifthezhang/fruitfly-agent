@@ -15,19 +15,17 @@ from ..assessment.inspection import ReadOnlyInspector
 from ..editor.instructions import EditorInstructions, EditorInstructionTarget
 from fruitfly_agent.lab.improvement.workflow import ImprovementWorkflow
 from fruitfly_agent.improvement.workflow.services import WorkflowServices
-from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry, AgentGenerator, AgentComposer
-from ..execution.file_runner import FileTaskRunner
+from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry, AgentGenerator
 from ..assessment.verification import CaseMeasurements
 
 
-class NativeEpisodeExecutor:
-    feedback: Literal['behavior', 'scored'] = 'behavior'
+class ComparisonEpisodeExecutor:
     def __init__(self, context, episode, parameters, *, generator_factory=AgentGenerator,
-                 composer_factory=AgentComposer, runner_factory=FileTaskRunner, reference_policy=None):
+                 runner_factory, reference_policy=None):
         self.context, self.episode, self.parameters = context, episode, parameters
-        self.generator_factory, self.composer_factory, self.runner_factory = generator_factory, composer_factory, runner_factory
-        from .methods.evaluator_comparison.verification import reference_policy as native_reference
-        self.reference_policy = reference_policy if reference_policy is not None else native_reference(episode)
+        self.generator_factory, self.runner_factory = generator_factory, runner_factory
+        from .methods.evaluator_comparison.verification import reference_policy as task_reference
+        self.reference_policy = reference_policy if reference_policy is not None else task_reference(episode)
 
     async def run(self, request, *, signal):
         context, params = self.context, self.parameters
@@ -41,7 +39,7 @@ class NativeEpisodeExecutor:
         install_candidate(registry, request.improver, settings)
         search = context.workflow_settings or {}
         evidence = context.evidence_settings or {}
-        depth = search.get('rounds', params['inner_depth'])
+        depth = min(search.get('max_rounds', params['inner_depth']), params['inner_depth'])
         if depth > params['inner_depth']:
             raise ValueError('candidate search rounds exceed fixed episode depth allowance')
         if any(registry.snapshot().component(name).role == 'I' for name in request.component_ids):
@@ -50,22 +48,21 @@ class NativeEpisodeExecutor:
             request.improver.snapshot_id if request.improver is not None else content_hash(request.instructions),
             context.plan.parent.state)
         plan = RunPlan(request.episode_id, parent, request.component_ids,
-            generator_id=self.generator_factory.generator_id, mode='sequential', depth=depth,
-            timeouts=context.plan.timeouts, feedback=self.feedback,
-            strategy_id=search.get('strategy', params.get('inner_strategy', 'harness2')), retain_experience=False)
+            generator_id=self.generator_factory.generator_id, rounds=depth,
+            timeouts=context.plan.timeouts,
+            retain_experience=False)
         services = WorkflowServices(plan, signal=signal,
             record=lambda event, **fields: context.services.record(event, episode_id=request.episode_id, **fields))
         services.evidence_builder=context.services.evidence_builder
         try:
             editor = services.own(AgentEditor(context.editor_config, context.artifacts, registry, instructions=instructions,
-                page_characters=evidence.get('page_characters', 12000)))
+                settings=evidence))
             services.editor = editor.edit
             services.completer = model_completion(context.editor_config)
-            runner = services.own(self.runner_factory(context.config, registry, context.artifacts, services))
+            runner = services.own(self.runner_factory(plan, registry, context.artifacts, services))
             generators = GeneratorRegistry()
             generators.register(self.generator_factory.generator_id, self.generator_factory)
             completed = context.completed_assessment_factory(services) if context.completed_assessment_factory else None
-            exploration = context.exploration_factory(services) if context.exploration_factory else None
             if completed is not None:
                 from ..assessment.completed import CompletedAssessmentService
                 completed = CompletedAssessmentService(config=context.assessor_config or context.editor_config, artifacts=context.artifacts, services=services,
@@ -76,9 +73,9 @@ class NativeEpisodeExecutor:
             stop_policy = install_workflow_mechanisms(inner_context)
             flow = ImprovementWorkflow(stop_policy=stop_policy,generators=generators, components=registry, runner=runner,
                 artifacts=context.artifacts,
-                completed_assessment=completed, exploration=exploration,
+                completed_assessment=completed,
                 measurements=getattr(runner, 'measurements', None),
-                composer=services.own(self.composer_factory()), selector=AgentSelector(
+                selector=AgentSelector(
                     ReadOnlyInspector(context.assessor_config or context.editor_config, context.artifacts, instructions=instructions, evaluator_instructions=EvaluatorInstructions(**settings.get('evaluator', {}).get('instructions', {})), evidence_settings=evidence), services))
             baseline = registry.snapshot()
             outcome = await flow.run(plan, request.task, baseline, services, experience=tuple(context.experience))
@@ -92,7 +89,7 @@ class NativeEpisodeExecutor:
             record=lambda event, **fields: context.services.record(event, episode_id=request.episode_id, **fields))
         before, after = [], []
         try:
-            runner = evaluation_services.own(self.runner_factory(context.config, registry, context.artifacts, evaluation_services))
+            runner = evaluation_services.own(self.runner_factory(plan, registry, context.artifacts, evaluation_services))
             for index, case in enumerate(self.episode.evaluations):
                 task = self.evaluation_task(index, case)
                 values = []
@@ -118,7 +115,7 @@ class NativeEpisodeExecutor:
             for kind,amount in evaluation_services.used.items():context.services.observe(kind,amount)
 
     def evaluation_task(self, index, case):
-        return TaskMaterial(f'check-{index}', case.input, environment_id='file-workspace-v1')
+        return TaskMaterial(f'check-{index}', case.input, environment_id=self.episode.adaptation.environment_id)
 
     async def measure(self, runner, task, record, case, services):
         from .methods.evaluator_comparison.verification import measure

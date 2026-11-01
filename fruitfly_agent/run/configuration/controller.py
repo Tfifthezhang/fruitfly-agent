@@ -262,6 +262,9 @@ class RunConfigurationController:
             raise ValueError("unsupported target binding kind")
         profile = self._draft.select(self._selected)
         slots = {slot for item in self._catalog.resolve(profile.mechanisms) for slot in item.definition.artifact_slots}
+        slots.update(surface.key for definition in self._catalog.definitions()
+                     for surface in definition.configuration_surfaces
+                     if surface.standalone and surface.binding == 'artifact')
         if key not in slots:
             raise ValueError("target slot is not enabled")
         self._artifact_store.read_text(reference)

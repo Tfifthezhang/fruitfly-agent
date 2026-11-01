@@ -40,7 +40,9 @@ class AgentRunner:
                         await inner.aclose()
             return AssistantMessageEventStream(events())
         forward_context_capabilities(provider, config.provider)
+        from fruitfly_agent.lab.context_manager.measurement import new_measurement_scope
         invocation = replace(config, provider=provider, tools=tuple(tools), session=None,
+            context_meter=new_measurement_scope(config.context_meter),
             system_prompt=config.system_prompt if system_prompt is None else system_prompt,
             max_turns=None, max_tool_calls_per_turn=None,
             get_follow_up_messages=None, get_steering_messages=None)

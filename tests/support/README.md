@@ -17,6 +17,7 @@ Reusable substitutes and temporary materials. This module contains no TestCases 
 | [materials.py](materials.py), [run.py](run.py) | Models, tasks, CLI input, and temporary sessions |
 | [task_packs.py](task_packs.py) | Text/Python pack fixtures |
 | [task_sets.py](task_sets.py) | Frozen collections, explicit objectives and observable fake parallel execution |
+| [task_execution.py](task_execution.py) | Explicit test-only Agent runner using ordinary Catalog/Core tools; factory and collection registration |
 | [application.py](application.py) | Offline Sessions, RuntimeFactory substitutes, and Applications |
 | [terminal.py](terminal.py), [configuration.py](configuration.py) | Finite input, TTY streams, fixed completion events, and configuration controller substitutes |
 | [pipeline.py](pipeline.py), [self_improver.py](self_improver.py) | Shared deterministic stages and synthetic fixed-depth editor experiments |
@@ -30,7 +31,9 @@ Keep local helpers local unless multiple tests need them. Do not compute reviewe
 `configuration.py` supplies frontend substitutes and current component-document
 fixtures. It builds declarations from typed runtime selections; no fixture reader
 accepts an obsolete configuration grammar. `experiments.py` emits the same
-referenced baseline/task/comparison/edit format used by workspace initialization.
+referenced baseline/task/comparison/edit format used by experiment files.
+Execution tests explicitly register their test backend; production has no local
+task executor.
 
 `TerminalProcess` supports context ownership, resize, visible-prompt waits and
 exit-status checks. `run_terminal` supplies one prompt/submission/exit dialogue.

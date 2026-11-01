@@ -40,8 +40,12 @@ Reading and following a Skill remains model-driven; visibility does not guarante
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `root` | `.skills` | Directory within the active workspace; `--cwd` selects that workspace. |
-| `max_chars` | `16000` | Complete rendered catalog budget; oversized blocks become an explicit omitted notice. |
+| `settings.root` | `.skills` | Directory within the active workspace; `--cwd` selects that workspace. |
+| `settings.max_chars` | `16000` | Complete rendered catalog budget; oversized blocks become an explicit omitted notice. |
+
+`instructions.usage` describes when and how to use discovered Skills. It and
+`settings.max_chars` form one H target, `skill-catalog`. The source root and
+discovered names, paths and metadata remain protected.
 
 ## Loading and limits
 
@@ -72,17 +76,21 @@ Use the actual workspace's Skill path if running elsewhere. Resolve diagnostics 
 |---|---|
 | [catalog.py](catalog.py) | `Skill`, `LoadResult`, discovery, and XML rendering |
 | [adapter.py](adapter.py) | `SkillCatalogTransformer`; bounded augmentation |
-| [target.py](target.py) | `SkillGuidanceTarget`; snapshot, validation, and temporary trials |
+| [configuration.py](configuration.py), [registration.py](registration.py) | Parameters, discovery and shared assembly |
+| [improvement.py](improvement.py) | One target for usage instructions and character allocation |
 | [document.py](document.py) | Explicit retained Skill body, source selection and S target registration |
 
-The named target `skill-catalog.guidance` can replace rendered catalog text through an explicit artifact binding. It does not change or snapshot `SKILL.md` bodies or references. An empty catalog is a valid baseline; published replacement text must be nonempty and fit the projection budget. See [Improvement](../../../improvement/README.md) and [Run artifacts](../../../../run/README.md#text-artifacts).
-
-Catalog registers Skill directory Markdown/text dependencies in [Improvement](../../../improvement/README.md) initial-state identity. Bound guidance uses its immutable artifact. Native trials do not copy the directory: supply required Skill bodies and references as explicit task input files. Catalog-guidance search changes H; use the separate S document target below to optimize a body.
+Catalog candidates change usage policy and projection size together. Metadata is
+rendered deterministically from discovered source files. Registered Markdown/text
+dependencies join initial-state identity and configuration resource export.
+The registered task backend must restore those resources for isolated trials.
+Candidate trials use the same installer; generation never overwrites source files.
+See [Improvement](../../../improvement/README.md).
 
 ## Optimize a Skill body
 
 Enable **Reusable skill document** under **Context → Context augmentation**. This separate mechanism owns one explicitly selected reusable body. Set `source_path` to a workspace-relative `SKILL.md`, such as `.skills/code-review/SKILL.md`; the target label becomes **Skill: code-review**. Its YAML frontmatter stays outside the optimized body. With an empty source path, `initial_text` supplies a standalone procedural document. Both fields use visible text input in configuration. `max_chars=16000` bounds the complete body; oversized input is rejected rather than truncated.
 
-Enable the retained Skill document, then select its S component in [Improvement](../../../improvement/README.md). The original body seeds the candidate; explicit verified adoption installs the immutable body in a new session. Relative references keep their source directory. Native file trials can read only explicitly supplied input files.
+Enable the retained Skill document, then select its S component in [Improvement](../../../improvement/README.md). The original body seeds the candidate; explicit verified adoption installs the immutable body in a new session. Relative references keep their source directory. Candidate execution requires a backend that restores the frozen task inputs and registered text dependencies.
 
 Source files and references are not overwritten. Registered Markdown/text dependencies and the retained body enter initial-state identity; changed dependencies invalidate pending candidates. Non-text resources and arbitrary linked programs are not frozen. An adopted artifact takes precedence over the source body; changing the starting source requires a new configuration/session and clearing the old artifact binding if it should no longer apply. One body per configured mechanism is supported, not simultaneous optimization of a Skill repository. Enabling the mechanism performs no learning or model requests.

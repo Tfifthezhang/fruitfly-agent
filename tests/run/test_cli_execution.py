@@ -11,7 +11,6 @@ from unittest.mock import Mock, patch
 from fruitfly_agent.core.data_model import UserMessage
 from fruitfly_agent.core.context import ContextFrame
 from fruitfly_agent.core.session import Session
-from fruitfly_agent.interactive import ConfigurationLaunchResult
 from fruitfly_agent.run import DataArtifactStore, RunConfigurationController
 from fruitfly_agent.run.application import RunApplicationFactory
 from fruitfly_agent.run import cli
@@ -80,7 +79,7 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
                 environment={},
                 provider_registry=registry,
                 data_artifact_bindings={
-                    "skill-catalog.guidance": ref.artifact_id,
+                    "tool-catalog": ref.artifact_id,
                 },
             )
             initial = await initial_factory.open(
@@ -92,7 +91,7 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
             await initial.session.submit("exercise the bound guidance")
             self.assertIn(
                 "Pinned skill catalog guidance",
-                providers[0].calls[0]["system_prompt"],
+                initial_factory._current_runtime_config.provider.calls[-1]['system_prompt'],
             )
             await initial.close()
 
@@ -113,16 +112,12 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
                 session_path=session_path,
             )
             try:
+                resumed.activate_callback()
                 self.assertNotEqual(resumed.manifest, initial_manifest)
                 self.assertEqual([], resumed.manifest.get("data_artifacts", []))
-                stage = next(
-                    item for item in resumed.components["context-pipeline"].stages
-                    if item.stage_id == "skill-catalog"
-                )
-                transformed = stage.mechanism.transform(
-                    ContextFrame("base", (), (), "offline-model", 32)
-                )
-                self.assertIsNone(transformed)
+                await resumed.session.submit('exercise current guidance')
+                self.assertNotIn('Pinned skill catalog guidance',
+                    resumed_factory._current_runtime_config.provider.calls[-1]['system_prompt'])
             finally:
                 await resumed.close()
 
@@ -240,9 +235,13 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
                     0,
                 )
             startup = Mock()
-            startup.run.return_value = ConfigurationLaunchResult(start=True)
+            startup.run.return_value = 'start'
+            async def wait(task, **kwargs):
+                await task
+                return True
+            startup.wait_for_start.side_effect = wait
             with patch.object(cli, "load_env", return_value={}), patch.object(
-                cli, "TerminalConfigurationFrontend", return_value=startup
+                cli, "TerminalStartupFrontend", return_value=startup
             ), patch(
                 "fruitfly_agent.run.runtime.assembly.default_registry",
                 return_value=registry,
@@ -252,6 +251,7 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
                 )
 
         self.assertEqual(code, 0)
-        startup.run.assert_called_once_with(configure=False)
+        startup.run.assert_called_once()
+        self.assertIn('Resume', startup.run.call_args.args[0].session)
         self.assertEqual(captured[0][0], 2)
         self.assertIsInstance(captured[0][1], RunConfigurationController)

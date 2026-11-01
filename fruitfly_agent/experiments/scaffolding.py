@@ -11,21 +11,17 @@ def _template(name: str) -> str:
     return files('fruitfly_agent.experiments').joinpath('templates', name).read_text(encoding='utf-8')
 
 
-def workspace_templates(*, source: str = 'files', benchmark: str | None = None,
+def workspace_templates(*, source: str | None = None, benchmark: str | None = None,
                         variant: str = 'smoke') -> dict[str, str]:
     """Render inputs without reading local settings, credentials or machine state."""
-    if source not in {'files', 'task-set'}:
-        raise ValueError('init source must be files or task-set')
-    if source == 'files' and (benchmark is not None or variant != 'smoke'):
+    if source not in {None, 'task-set'}:
+        raise ValueError('init supports system configuration or --source task-set')
+    if source is None and (benchmark is not None or variant != 'smoke'):
         raise ValueError('--benchmark and --variant require --source task-set')
-    task = 'tasks/native.yaml' if source == 'files' else 'tasks/tb4-smoke.yaml'
-    result = {
-        **system_templates(),
-        'experiment.yaml': _template('native.yaml' if source == 'files' else 'task-set.yaml'),
-        task: _template(task),
-        'comparison.yaml': _template('comparison.yaml'),
-    }
+    result = dict(system_templates())
     if source == 'task-set':
+        result['experiment.yaml'] = _template('task-set.yaml')
+        result['tasks/tb4-smoke.yaml'] = _template('tasks/tb4-smoke.yaml')
         if not benchmark:
             raise ValueError('--source task-set requires --benchmark with a registered catalog ID')
         # Eval remains optional. Descriptor lookup does not invoke preflight or Harbor.
@@ -45,7 +41,7 @@ def workspace_templates(*, source: str = 'files', benchmark: str | None = None,
     return result
 
 
-def initialize_workspace(workspace: Path, *, source: str = 'files',
+def initialize_workspace(workspace: Path, *, source: str | None = None,
                          benchmark: str | None = None, variant: str = 'smoke') -> dict[str, Any]:
     """Reuse shared models/secrets, refuse config collisions, undo partial writes."""
     workspace = Path(workspace).resolve()
@@ -121,7 +117,6 @@ def initialize_workspace(workspace: Path, *, source: str = 'files',
         raise
     steps = [
         'Review the shared .fruitfly/models.yaml; select its model aliases and H/S/I in default-config.yaml, then edit their component files.',
-        'Review experiment.yaml edit grants, comparison.yaml and the selected tasks file.',
         'Set DEEPSEEK_API_KEY privately in .fruitfly/secrets.env or the process environment.',
     ]
     if source == 'task-set':
@@ -129,9 +124,9 @@ def initialize_workspace(workspace: Path, *, source: str = 'files',
             'Prepare a complete Linux Python and Agent venv; set FRUITFLY_EVAL_PYTHON_ROOT and FRUITFLY_EVAL_VENV for eval-host.yaml.',
             'Run eval prepare --tasks-only, then eval prepare through fruitfly-agent-lab (downloads/containers; no model calls).',
         ]
-    steps += [
-        'Run fruitfly-agent-lab --cwd WORKSPACE improvement check before execution.',
-        'Only an explicit improvement run calls models and may incur charges.',
-    ]
-    return {'workspace': str(workspace), 'source': source,
+    if source == 'task-set':
+        steps.append('Run improvement check, then explicitly improvement run (model/container work; charges may apply).')
+    else:
+        steps.append('System configuration is ready. For Improvement, register a task backend through the embedding API or initialize a separate benchmark workspace with --source task-set --benchmark ID.')
+    return {'workspace': str(workspace), 'source': source or 'system',
         'created': [str(path) for path, _, _ in created], 'preserved': preserved, 'next_steps': steps}

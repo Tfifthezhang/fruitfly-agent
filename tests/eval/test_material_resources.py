@@ -89,7 +89,12 @@ from fruitfly_agent.providers.services import builtin_services
 from fruitfly_agent.experiments.scaffolding import workspace_templates
 assert Path(providers.__file__).is_relative_to(root)
 assert {item.id for item in builtin_services()} >= {'openai', 'anthropic', 'deepseek', 'qwen'}
-assert 'default-config.yaml' in workspace_templates()
+templates = workspace_templates()
+assert 'default-config.yaml' in templates
+assert 'experiment.yaml' not in templates
+assert 'experiment.yaml' in workspace_templates(source='task-set', benchmark='terminal-bench-4')
+from fruitfly_agent.lab.improvement.execution import builtin_executions
+assert {d.execution_id for d in builtin_executions().definitions()} == {'agent-task', 'improver-comparison'}
 from fruitfly_agent.run import main
 sys.argv = ['fruitfly-agent', '--help']
 main()

@@ -17,7 +17,6 @@ algorithm whose instructions support isolated trials and persistent activation.
 |---|---|
 | `register_mechanism(definition)` | Catalog definition, strict configuration, installer and optimization targets |
 | `register_generator(id, factory, **metadata)` | Per-job generator registry |
-| `register_strategy(definition)` | Search strategy registry; kernel validates schedule bounds |
 | `observe_agent(event, handler, timeout=10)` | Private Core event snapshots, bounded optional callbacks |
 | `intercept_agent(event, handler, required=True, timeout=10)` | Active Core handlers; required failures block the operation |
 | `observe_improvement(event, handler)` | Job-local immutable Improvement events and stage deadlines |
@@ -63,8 +62,12 @@ remote package installation and hard process isolation are not implemented.
 ## Preserve trial behavior
 
 Agent observers and interceptors are recreated through `ComponentRegistry.trial_setups`
-for each native execution. Setup resources own their fresh contexts and are closed
+for each compatible registered execution. Setup resources own their fresh contexts and are closed
 at the trial boundary, including failure and cancellation. Live hook registries,
 Session writers and mutable context state are never copied into trials. Runners
 must declare `execution-setup`; an unsupported custom runner rejects the declared
-setup before execution. Nested native editor episodes use the same registry path.
+setup before execution. Nested editor episodes use the same registry path.
+
+Catalog assembly and declared trial setups share one hook owner. Extension
+bindings mark hooks supplied by the host; Catalog then avoids installing them a
+second time. Every trial still gets fresh contexts and retires them independently.

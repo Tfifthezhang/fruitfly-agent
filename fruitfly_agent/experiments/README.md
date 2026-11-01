@@ -16,15 +16,15 @@ fruitfly-agent-lab --cwd /path/to/workspace init --source task-set --benchmark t
 
 The workspace must already exist. Initialization creates a
 `default-config.yaml`, referenced `components/H/` and `components/I/` documents,
-`models.yaml`, `experiment.yaml`, `comparison.yaml`, a task document and an
-empty-key `secrets.env` under `.fruitfly/`. Benchmark recipes add request/host
-files. No empty S documents are created. Existing regular `models.yaml` and
+`models.yaml` and an empty-key `secrets.env` under `.fruitfly/`. Default
+initialization writes system files only. The explicit benchmark recipe adds
+`experiment.yaml`, a task document and request/host files. No empty S documents are created. Existing regular `models.yaml` and
 secret files are reused unchanged; other existing destinations cause an error.
 The daily config stays untouched. New files use 0600
 and new directories use 0700. Ordinary write failures clean up only new files.
 
-Edit model specifications and credentials before checking. Native initialization
-works without Eval. See [native setup](../../examples/experiments/README.md#start-a-native-experiment)
+Edit model specifications and credentials before checking. System initialization
+works without Eval. See [system setup](../../examples/experiments/README.md#initialize-system-configuration)
 and [remote TB4 setup](../../examples/experiments/TB4_SERVER.md).
 
 The configuration guide tree is:
@@ -37,8 +37,8 @@ The configuration guide tree is:
 
 `--cwd` selects a workspace. `--config` selects an experiment file. Paths resolve
 from their declaring documents. Explicit missing files, unknown fields and
-duplicate YAML keys fail. Only the baseline/tasks/comparison/edit format is accepted; obsolete flat
-experiment sections and configuration version markers are rejected.
+duplicate YAML keys fail. The [field guide](CONFIGURATION.md) defines the single accepted grammar.
+Configuration version markers and unknown sections are rejected.
 
 ## Choose operation and source
 
@@ -50,14 +50,15 @@ experiment sections and configuration version markers are rejected.
 
 | Task source | Required material |
 |---|---|
-| `files` | Instruction/files or an installed task package |
-| `task-set` | Collections of registered native/Eval sources |
-| `editor` | Installed disjoint editor-study episodes |
+| `files` | Instruction/files or an installed task package; embedding must register a runner |
+| `task-set` | Prepared Eval collections or explicitly registered sources |
+| `editor` | Disjoint study episodes and an explicitly registered episode/task backend |
 | `eval` | Prepared benchmark request and host |
 
-Task source declarations live in the document referenced by `tasks`. Native file
-execution uses isolated in-memory file tools, without Bash, network or the live
-Session. Ordinary conversations do not automatically create training material.
+Task source declarations live in the document referenced by `tasks`. Material
+formats do not install task executors. CLI `files` and `editor` sources report an
+unavailable backend; `check` exits 3 and `run` rejects them before model work.
+Embeddings supply execution through [public ports](../lab/improvement/execution/README.md). Ordinary conversations do not automatically create training material.
 Eval is optional; `eval run` never starts improvement. Benchmark reward alone
 cannot grant persistent adoption or RSI.
 
@@ -73,9 +74,11 @@ Start from the generated tree and edit the responsible file:
 | Retained Skill | Referenced S component |
 | Editor instructions | Referenced I editor component |
 | Evaluator prompts | Referenced I evaluator component |
-| Strategy, rounds, sampling and next-seed policy | Fixed experiment `search` |
+| Generator, sampling and leaf execution conditions | Experiment `execution` |
+| Read/catalog/search response limits | Experiment `evidence` |
+| Round/failure/no-gain limits | Experiment `stopping` |
 | Optional edit narrowing and independent phase times | `experiment.yaml` |
-| Formal comparison/assurance | `comparison.yaml` |
+| Formal comparison/scope | Experiment `evaluation` |
 | Task source and material | Referenced task document |
 
 Do not copy component values into experiment sections. See the complete
@@ -84,9 +87,9 @@ CLI choices do not activate arbitrary Python or install plugins.
 
 ## Use completed-process feedback
 
-The shared evaluator uses I evaluator prompts and the assessor model role. Configure evidence page size under `assessment.evidence` and the next-seed policy under `search.exploration`. See [the field guide](CONFIGURATION.md#configure-assessment-and-exploration).
+The shared evaluator uses I evaluator prompts and the assessor model role. Configure shared response limits under `evidence`; each round continues from its retained incumbent. See [the field guide](CONFIGURATION.md#configure-evaluation-and-evidence).
 
-Raw execution facts remain immutable. Model judgments report dimensions, process signals and behavior hypotheses with cited source spans. Unknown judgments retain the incumbent. Official scores and independent verification retain their authority. Online file-task assessment remains a separate explicit parameter.
+Raw execution facts remain immutable. Model judgments report dimensions, process signals and behavior hypotheses with cited source spans. Unknown judgments retain the incumbent. Official scores and independent verification retain their authority. Online registered-task assessment remains a separate explicit parameter.
 
 ## Prepare benchmarks
 
@@ -154,12 +157,11 @@ containers. Installed templates are checked outside the source checkout.
 
 Use the [multi-collection recipe](../../examples/experiments/multi-task.example.yaml).
 Task documents preserve collection objectives and private partitions. Experiment
-`search` owns sampling/promotion scheduling; fixed comparison owns aggregation/regression
-rules; `trial` owns attempts/concurrency. Candidate concurrency remains one.
+`execution` owns sampling/promotion scheduling and trial attempts/concurrency;
+`evaluation.comparison` owns aggregation/regression rules. Candidate concurrency remains one.
 
-Each leaf is an attributable execution. Shared-batch exploration and complete
-selection remain separate; incomplete coverage cannot win. Each editor, execution and evaluator invocation has its own time. Task-set search currently requires simple,
-scored, task scope without experience retention. Independent adoption needs a
+Each leaf is an attributable execution. Shared-batch retention and complete
+selection remain separate; incomplete coverage cannot win. Each editor, execution and evaluator invocation has its own time. Task-set search uses the fixed flow and task scope without experience retention. Independent adoption needs a
 separately implemented policy.
 
 ## Check one resolved harness

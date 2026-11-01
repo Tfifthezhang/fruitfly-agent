@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from inspect import isawaitable
 from typing import Any, Awaitable, Callable, Mapping
-from fruitfly_agent.interactive.contracts.runtime import RuntimeSession, RuntimeAuthorization
+from fruitfly_agent.interactive.contracts.runtime import RuntimeSession, RuntimeAuthorization, RuntimeCleanupError
 from fruitfly_agent.interactive.contracts.improvement import ImprovementService
 from fruitfly_agent.interactive.contracts.candidates import CandidateActivationService, CandidateService
 from fruitfly_agent.interactive.contracts.task_packs import TaskPackService
@@ -56,9 +56,12 @@ class RuntimeHandle:
         if self._closed:
             return
         self._closed = True
-        if self.authorization is not None:
-            await self.authorization.close()
         errors: list[BaseException] = []
+        if self.authorization is not None:
+            try:
+                await self.authorization.close()
+            except BaseException as exc:
+                errors.append(exc)
         seen: set[int] = set()
         for component in reversed(tuple(self.components.values())):
             if id(component) in seen:
@@ -76,6 +79,6 @@ class RuntimeHandle:
             except BaseException as exc:
                 errors.append(exc)
         if errors:
-            raise RuntimeError(f"runtime cleanup failed: {errors[0]}") from errors[0]
+            raise RuntimeCleanupError(f"runtime cleanup failed: {errors[0]}") from errors[0]
 
 

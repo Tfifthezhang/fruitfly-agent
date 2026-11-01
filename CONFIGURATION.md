@@ -42,8 +42,8 @@ Unknown fields and obsolete flat profile fields are rejected.
 | Optional MCP services | `.fruitfly/mcp.yaml` | Local stdio commands, selected tool names, limits and secret-variable references |
 | Default configuration | `.fruitfly/default-config.yaml` | Independent baseline; editable manually, read-only in terminal configuration |
 | Eval host settings | `.fruitfly/eval-host.yaml` | Machine-local runtime mounts, task source and dependency/cache preparation; see [Harbor settings](fruitfly_eval/harbor/README.md) |
-| Experiment settings | `.fruitfly/experiment.yaml` | Baseline, referenced tasks/comparison, edit grants, root/trial limits and explicit RSI settings |
-| Comparison and task documents | `.fruitfly/comparison.yaml`, `tasks/` | Fixed comparison conditions and task sources/materials |
+| Experiment settings | `.fruitfly/experiment.yaml` | Baseline/tasks, edit grants, execution, evidence, evaluation, stopping and RSI |
+| Task documents | `.fruitfly/tasks/` | Task sources and material references; comparison settings belong to experiment evaluation |
 | CLI overrides | Startup arguments | Workspace, configuration, profile, and session selection |
 
 `--cwd`, `--config`, and `--profile` select the process's workspace and configuration. `--approve-tools` explicitly answers tool confirmation requests for a fresh non-interactive task in a trusted isolated environment; protected paths remain denied. A relative catalog path resolves from the system config; component/task references resolve from their declaring files. Saving persists choices. An active runtime changes only through explicit Application replacement, including configuration application or recovery.
@@ -60,8 +60,8 @@ alias; an active runtime and frozen experiment inputs retain their loaded values
 
 ## Restore default configuration
 
-The CLI opens chat directly when configuration is complete. Use `/config` or
-`fruitfly-agent --configure` to edit settings. **Restore default configuration**
+The CLI opens an offline startup panel. Choose Configure, use `/config` in chat,
+or run `fruitfly-agent --configure` to edit settings. **Restore default configuration**
 is the final action before Back.
 It reads `.fruitfly/default-config.yaml` and stages its prompt, mechanisms,
 parameters, execution limits and artifact bindings in the selected daily profile. Existing model
@@ -77,17 +77,17 @@ catalog. Each restoration reloads the file so manual edits are available immedia
 Initialize the complete tree, or copy [default-config.example.yaml](examples/configuration/default-config.example.yaml),
 [models.example.yaml](examples/configuration/models.example.yaml) and their
 referenced component files only when absent. The template enables local execution, basic
-read/Bash/edit/write tools and explicitly parameterized compaction. Default files
+read/Bash/edit/write tools, a shared Tool catalog policy and incremental working memory. Default files
 are edited manually. Explicit `--config .fruitfly/default-config.yaml` selections
 have a read-only terminal controller.
 
-Alternatively, `fruitfly-agent-lab init` generates these defaults plus a minimal
-experiment and an empty-key secret file in the selected workspace. Existing
+Alternatively, `fruitfly-agent-lab init` generates these system defaults and an
+empty-key secret file; it does not generate an experiment or task executor. Existing
 regular model catalogs and secrets are reused unchanged; other existing
 configuration destinations are rejected. When reusing a catalog, select its
 actual aliases in `default-config.yaml` before checking the experiment.
-`init --source task-set --benchmark terminal-bench-4` also generates a request and
-host template with explicit Linux runtime path variables. Initialization reads no
+`init --source task-set --benchmark terminal-bench-4` generates a benchmark
+experiment, task collection, request and host template with explicit Linux runtime path variables. Initialization reads no
 private project settings and performs no model, Docker or installation work.
 See [experiment setup](examples/experiments/README.md).
 
@@ -153,7 +153,7 @@ MCP server are not implemented.
 
 ## Configure a model
 
-Run the interactive CLI. **Add model** opens when no models are available; otherwise use **/config → model → Add model…**, or start with `--configure`. Choose a service, choose its protocol, then enter the model ID, documented token limits and hidden API key. The SDK is automatic and appears read-only in review. Custom services need a base URL. Review and stage the settings; **Save and start** saves them before startup, while **Save and apply to this conversation** commits them after candidate startup succeeds.
+Run the interactive CLI and choose **Configure → model → Add model…**. In chat use **/config → model → Add model…**; `--configure` opens the shared editor first. Choose a service, choose its protocol, then enter the model ID, documented token limits and hidden API key. The SDK is automatic and appears read-only in review. Custom services need a base URL. Review and stage the settings; **Save and return** saves them offline and returns to the startup panel, while **Save and apply to this conversation** commits them after candidate startup succeeds.
 
 | Service | Protocol choices |
 |---|---|
@@ -242,7 +242,7 @@ The capability page uses arrows and Space/Enter to toggle, then **Continue** to 
 |---|---|---|
 | Base prompt | `assistant-default`; choose another prompt in **/config → prompt** or `/config`. | [Base prompt](fruitfly_agent/lab/base_prompt/README.md) |
 | Skill catalog | Read `.skills/`; enable in **Context → Context augmentation → Skill catalog** (Space toggles; the phase is a section heading). | [Skills](fruitfly_agent/lab/context_manager/augmentation/skills/README.md) |
-| Reduction | Incremental working memory by default; keep `context-history` enabled. Edit prompts and policy in H component files. | [Reduction](fruitfly_agent/lab/context_manager/reduction/README.md) |
+| Reduction | Incremental working memory with owned history readback through `read`. Edit prompts and policy in H component files. | [Reduction](fruitfly_agent/lab/context_manager/reduction/README.md) |
 | Context measurement | Automatically shared internal service; reports precision, input/output reserves and uncertainty. Exact counting requires a declared Provider capability. | [Measurement](fruitfly_agent/lab/context_manager/measurement/README.md) |
 | Improvement | Edit I component files for editor/evaluator prompts; experiment grants and conditions control edits, phase times, scope and stopping; `/improvement` keeps a small instruction/file flow. | [Improvement](fruitfly_agent/lab/improvement/README.md) |
 | Reusable skill document | Disabled; Context augmentation. Set `settings.source_path` to one workspace-relative Skill or enter `content.body`; `settings.max_chars=16000`. | [Skill body](fruitfly_agent/lab/context_manager/augmentation/skills/README.md#optimize-a-skill-body) |
@@ -280,7 +280,7 @@ parameters:
     max_tool_calls_per_turn: 128
 ```
 
-Daily execution defaults to 64 tool attempts per turn. `settings.max_tool_calls_per_turn` accepts a nonnegative integer or `null` for no count limit; 0 permits none. Daily `settings.max_turns` accepts the same optional count semantics. Improvement uses independent phase times and removes task/editor tool, turn and model-call quotas. Final effective values are recorded in runtime identity.
+Daily execution defaults to 512 tool attempts per turn. `settings.max_tool_calls_per_turn` accepts a nonnegative integer or `null` for no count limit; 0 permits none. Daily `settings.max_turns` accepts the same optional count semantics. Improvement uses independent phase times and removes task/editor tool, turn and model-call quotas. Final effective values are recorded in runtime identity.
 
 ## Configure the complete execution policy
 
@@ -321,7 +321,7 @@ paths. Omit experiment `edit` to discover all legal backend/material targets;
 
 Authored text belongs in component parameters. Typed Python hosts can create immutable text with `DataArtifactStore.put_text`; see the [Run example](fruitfly_agent/run/README.md#text-artifacts). Runtime prompt/artifact bindings are internal projections of the same component configuration. Unknown or unused bindings are rejected; recovery verifies the original contents and manifest. Keep secrets out of artifacts, configuration, sessions, and reports.
 
-`tool-guidance.<name>` replaces an enabled tool description with its owner-validated text. Experiment files select one or more editable components. A joint candidate expands into ordinary prompt/artifact bindings; tool schemas, execution and permissions retain their existing contracts. Preview is offline; execution may incur model and external-runner costs.
+`tool-catalog` owns the overall tool-use policy. Full tool usage loads on demand through `read`; individual schemas and usage resources remain source-owned. Tool parameter targets require explicit selection and are excluded from automatic edit scope. Experiment files select one or more editable components. A joint candidate expands into ordinary prompt/artifact bindings; tool schemas, execution and permissions retain their existing contracts. Preview is offline; execution may incur model and external-runner costs.
 
 `skill-document` retains S content. `improvement-editor` exposes six prompt fields
 and `improvement-evaluator` exposes criteria,
@@ -345,7 +345,7 @@ explicit adoption.
 
 [Secret template](examples/configuration/.env.example) contains public placeholders. Internal IPython subprocess variables are managed by the runtime and are not user settings.
 
-With no initial choice, a sole catalog entry is selected automatically. Multiple entries open provider-free interactive setup; one-shot startup requires an explicit choice. Unknown nonblank names are rejected with available choices. Saved harness selections take precedence over this variable. Optional Eval installation material is configured separately in [Eval](fruitfly_eval/README.md).
+With no initial choice, a sole catalog entry is selected automatically. With multiple entries, the startup panel directs interactive users to Configure; one-shot startup requires an explicit choice. Unknown nonblank names are rejected with available choices. Saved harness selections take precedence over this variable. Optional Eval installation material is configured separately in [Eval](fruitfly_eval/README.md).
 
 ## Results and state
 
@@ -404,16 +404,16 @@ Host-owned `PermissionPolicy.allow_network=True` allows declared network-read to
 
 ### Time registered improvement execution
 
-Set experiment `timeouts.editor_seconds`, `execution_seconds` and `evaluator_seconds` (defaults 1200, 3600, 1200). Each invocation starts a separate clock; nested calls within it share that clock. Composite studies time their leaf phases. Usage is recorded without admission quotas. User cancellation covers the job; unconfirmed cleanup stops further scheduling. External execution still requires a registered compatible runner.
+Set `execution.editor_seconds`, `execution.task_seconds` and `evaluation.evaluator_seconds` (defaults 1200, 3600, 1200). Each invocation starts a separate clock; nested calls within it share that clock. Composite studies time their leaf phases. Usage is recorded without admission quotas. User cancellation covers the job; unconfirmed cleanup stops further scheduling. External execution still requires a registered compatible runner.
 
 ### Assess completed executions
 
-The shared model evaluator assesses completed runs and compares candidates through I evaluator prompts. It reports dimensions, process signals, candidate-hypothesis checks, uncertainty and exact supplied citations. Overview/event indexes navigate to immutable originals. Official scores remain unchanged; supported process evidence can resolve ties. Configure evidence page size under `assessment.evidence` and next-seed policy under `search.exploration`. See [Assessment](fruitfly_agent/lab/improvement/assessment/README.md) and [experiment configuration](fruitfly_agent/experiments/CONFIGURATION.md).
+The shared model evaluator assesses completed runs and compares candidates through I evaluator prompts. It reports dimensions, process signals, candidate-hypothesis checks, uncertainty and exact supplied citations. Overview/event indexes navigate to immutable originals. Official scores remain unchanged; supported process evidence can resolve ties. Configure shared read/catalog/search limits under `evidence`; the retained incumbent seeds the next round. See [Assessment](fruitfly_agent/lab/improvement/assessment/README.md) and [experiment configuration](fruitfly_agent/experiments/CONFIGURATION.md).
 
 ## Choose a candidate generator
 
 The [experiment CLI](fruitfly_agent/experiments/README.md) composes a system config,
-referenced tasks/comparison, optional narrowing grants and independent phase times. Experiment `search` supplies the strategy and generator. The CLI currently composes
+referenced tasks, optional narrowing grants and four condition modules. Experiment `execution` supplies the generator. The CLI currently composes
 `agent-editor-v1`; other registered generators use the embedding composition API.
 The [single-task](examples/experiments/benchmark.example.yaml) and
 [joint task-set](examples/experiments/multi-task.example.yaml) examples share the
@@ -421,16 +421,16 @@ The [single-task](examples/experiments/benchmark.example.yaml) and
 It uses the built-in Agent editor; embeddings can replace generation through
 `GeneratorRegistry`, which declares factories and capabilities;
 `WorkflowRequest` freezes each job. Discovery and previews make no model requests.
-Retired algorithm selections are rejected, including disabled YAML entries. Remove
-them explicitly; there is no automatic equivalence to the new generator contract.
+Unknown generator IDs and unsupported component fields are rejected before execution.
 
 ## Configure the component editor
 
 Select editor/assessor aliases in `models.roles`. I editor and evaluator components expose model-facing instructions. Fixed experiment configuration owns scheduling, independent phase times and evidence page size. See [component grammar](fruitfly_agent/runtime_spec/COMPONENTS.md). Both roles compose the shared Lab Agent runner with separate tools and histories.
 
 Python embeddings inject `WorkflowBindings` into `RunApplicationFactory` to replace
-stages. Changing an execution backend requires a compatible `TaskRunner`; the
-native improvement file workspace does not inherit the active SSH/Bash environment.
+stages. Task execution requires a compatible explicitly registered `TaskRunner`
+or episode backend. Material declarations do not inherit the active environment
+or provide a built-in local executor.
 No dedicated search-tool API key is needed for component editing; web search/fetch
 credentials remain independent tool settings.
 

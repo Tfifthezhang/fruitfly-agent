@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-from fruitfly_agent.interactive import ConfigurationLaunchResult
+from tests.support.configuration import MockConfiguration
 from fruitfly_agent.providers.config import load_env
 from fruitfly_agent.providers.workspace import WorkspacePaths
 from fruitfly_agent.run.application import RunApplicationFactory
@@ -26,11 +26,12 @@ class ConfigurationPathsTest(unittest.IsolatedAsyncioTestCase):
         (self.root / '.env').write_text('OLD_ONLY=fixture\nFAKE_KEY=old-fixture\n')
         self.paths.secrets.write_text('FAKE_KEY=current-fixture\nNEW_ONLY=value\n')
         frontend = Mock()
-        frontend.run.return_value = ConfigurationLaunchResult(start=False)
+        frontend.run.return_value = 'exit'
         errors = io.StringIO()
         with patch.dict(os.environ, {'FAKE_KEY': ''}, clear=True), patch.object(
             cli, 'RunApplicationFactory'
-        ) as factory, patch.object(cli, 'TerminalConfigurationFrontend', return_value=frontend), contextlib.redirect_stderr(errors):
+        ) as factory, patch.object(cli, 'TerminalStartupFrontend', return_value=frontend), contextlib.redirect_stderr(errors):
+            factory.return_value.configuration.snapshot.return_value = MockConfiguration(model='offline').snapshot()
             self.assertEqual(await cli.run_cli(_args(cwd=str(self.root))), 0)
         env = factory.call_args.kwargs['environment']
         self.assertEqual(env['FAKE_KEY'], '')

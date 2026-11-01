@@ -15,13 +15,14 @@ class ParameterTarget:
     component_kind = 'mechanism-parameters'
     required_capabilities = frozenset({'configuration-materialization'})
 
-    def __init__(self, definition, parameters, fields):
+    def __init__(self, definition, parameters, fields, *, default_selected=True):
+        self.required_capabilities = type(self).required_capabilities | frozenset('tool:' + name for name in definition.descriptor.effects.tools)
         self.definition = definition
         self.values = definition.descriptor.normalize_parameters(parameters)
         self.editable = frozenset(fields)
         self.label = definition.descriptor.label + ' parameters'
         self.optimization = OptimizationSpec(definition.configuration_role, 'parameters',
-            required_capabilities=self.required_capabilities)
+            required_capabilities=self.required_capabilities, default_selected=default_selected)
 
     def snapshot(self):
         name = self.definition.descriptor.mechanism_id
@@ -91,7 +92,7 @@ class ParameterTarget:
         return config
 
 
-def editable_parameters(definition, fields):
+def editable_parameters(definition, fields, *, default_selected=True):
     """Declare, validate and install a parameter target for an existing owner."""
     from fruitfly_agent.lab.catalog.components import ComponentSpec
     name = definition.descriptor.mechanism_id
@@ -105,10 +106,10 @@ def editable_parameters(definition, fields):
     def specs(parameters, enabled):
         old = original_specs(parameters, enabled) if original_specs else ()
         return (*old, ComponentSpec(name, definition.configuration_role, 'mechanism-parameters',
-            'mechanism-parameters-v1', ParameterTarget.required_capabilities)) if enabled else old
+            'mechanism-parameters-v1', ParameterTarget.required_capabilities | frozenset('tool:' + tool for tool in definition.descriptor.effects.tools), default_selected)) if enabled else old
     def install(state, context, parameters):
         return definition.install(state, context, parameters).with_component(
-            TEXT_TARGET_PREFIX + name, ParameterTarget(definition, parameters, fields))
+            TEXT_TARGET_PREFIX + name, ParameterTarget(definition, parameters, fields, default_selected=default_selected))
     def options(selected,bounds):
         allowed={'parameters.'+definition.parameter_paths[name] for name in fields}
         if set(selected)-allowed:raise ValueError('parameter grant includes a protected or unknown field')

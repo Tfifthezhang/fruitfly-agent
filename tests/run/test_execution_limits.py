@@ -8,7 +8,7 @@ from unittest.mock import Mock
 from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.core.session import Session
 from fruitfly_agent.lab.catalog import builtin_catalog
-from fruitfly_agent.lab.improvement.execution.file_runner import FileTaskRunner
+from tests.support.task_execution import TaskRunnerFixture
 from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
 from fruitfly_agent.improvement.workflow.services import WorkflowServices
 from fruitfly_agent.improvement.execution.facts import read_facts
@@ -39,7 +39,7 @@ class ExecutionLimitTests(unittest.IsolatedAsyncioTestCase):
                 default = build_runtime(replace(profile, execution={}), config_path=path, catalog=builtin_catalog(),
                     environment={}, session=session, cwd=root, provider_registry=providers)
             self.assertEqual(changed.config.max_tool_calls_per_turn, 128)
-            self.assertEqual(default.config.max_tool_calls_per_turn, 64)
+            self.assertEqual(default.config.max_tool_calls_per_turn, 512)
             self.assertEqual(changed.manifest.to_dict()['execution'], {
                 'max_tool_calls_per_turn': 128, 'max_turns': 32, 'max_context_recovery_attempts': 6,
                 'tool_execution': {'max_parallel': 8, 'default_execution_mode': 'parallel'}})
@@ -58,7 +58,7 @@ class ExecutionLimitTests(unittest.IsolatedAsyncioTestCase):
         provider.respond_text('done')
         plan = RunPlan('limits', version(), ('prompt',))
         services = WorkflowServices(plan)
-        runner = FileTaskRunner(AgentLoopConfig(provider=provider, max_tool_calls_per_turn=1), registry, artifacts, services)
+        runner = TaskRunnerFixture(AgentLoopConfig(provider=provider, max_tool_calls_per_turn=1), registry, artifacts, services)
         try:
             result = await runner.execute(plan, TaskMaterial('task', 'Create an answer.'), baseline)
             facts = read_facts(result, artifacts)

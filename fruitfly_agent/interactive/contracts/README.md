@@ -8,7 +8,10 @@ Define the data and capabilities shared by hosts, Application, Session, and fron
 from the host's draft for the same conversation. Its handle's activation callback
 owns persistence; preparation/startup failure must retain the draft and saved
 configuration. `ConfigurationLaunchResult.start` requests that operation in an
-active session without frontend saving. Startup retains save-before-start intent.
+active session without frontend saving. `ConfigurationEditResult.saved` reports
+an offline edit without launch intent. `StartupSnapshot` and `StartupAction`
+separate panel presentation from the host's explicit startup operation.
+`RuntimeCleanupError` reports unsuccessful resource retirement and prevents retry.
 
 `ModelSetupService.defaults(option_id, values)` supplies non-secret JSON mappings
 for model review, including `service`, `parameters` and `transport`. Hosts use the
@@ -26,6 +29,7 @@ IDs, map protocols to SDKs or construct SDK clients.
 | File | Public entries / responsibility |
 |---|---|
 | [runtime.py](runtime.py) | RuntimeFactory, RuntimeSession, RuntimeAuthorization, and the RuntimeHandle protocol |
+| [startup.py](startup.py) | Offline panel snapshot, launch choices and configuration edit result |
 | [inputs.py](inputs.py) | `UserContent`, `ImageAttachment`, bounded input normalization and image-message construction for frontends |
 | [commands.py](commands.py) | CommandDescription and help formatting, InteractiveCommand, CommandResult, optional read-only panels, CommandContext and CommandHandler |
 | [events.py](events.py), [models.py](models.py) | Event envelopes, EventSink, status, history, and session views |

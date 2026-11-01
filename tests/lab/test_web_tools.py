@@ -271,7 +271,7 @@ class HttpBoundaryTests(unittest.IsolatedAsyncioTestCase):
         return client
 
     async def test_transient_retry_is_bounded_but_permanent_errors_never_retry(self):
-        for status, expected_attempts, expected in ((503, 2, "http_error"), (429, 2, "rate_limit"),
+        for status, expected_attempts, expected in ((503, 3, "http_error"), (429, 3, "rate_limit"),
                                                    (401, 1, "authentication"), (403, 1, "forbidden"),
                                                    (404, 1, "not_found"), (402, 1, "quota_exceeded"), (432, 1, "quota_exceeded")):
             with self.subTest(status=status):

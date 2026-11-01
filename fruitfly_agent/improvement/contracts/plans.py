@@ -27,15 +27,11 @@ class RunPlan:
     parent: SystemVersion
     component_ids: tuple[str, ...]
     generator_id: str = 'agent-editor-v1'
-    mode: Literal['parallel', 'sequential'] = 'parallel'
-    width: int = 1
-    depth: int = 1
+    rounds: int = 1
     purpose: Literal['task', 'persistent'] = 'task'
-    feedback: Literal['behavior', 'scored'] = 'behavior'
     timeouts: StageTimeouts = field(default_factory=StageTimeouts)
     direction: str = ''
-    strategy_id: str = 'harness2'
-    retain_experience: bool = True
+    retain_experience: bool = False
     component_options: dict = field(default_factory=dict)
     component_description_id: str = ''
 
@@ -46,7 +42,6 @@ class RunPlan:
             raise ValueError('component options must name selected components')
         identifier(self.job_id)
         identifier(self.generator_id)
-        identifier(self.strategy_id)
         if type(self.retain_experience) is not bool:
             raise ValueError('retain_experience must be boolean')
         object.__setattr__(self, 'component_ids', tuple(self.component_ids))
@@ -54,11 +49,9 @@ class RunPlan:
             raise ValueError('declare a distinct nonempty component scope')
         for component_id in self.component_ids:
             identifier(component_id)
-        if self.mode not in {'parallel', 'sequential'} or self.purpose not in {'task', 'persistent'}:
+        if self.purpose not in {'task', 'persistent'}:
             raise ValueError('invalid improvement mode or purpose')
-        if self.feedback not in {'behavior', 'scored'}:
-            raise ValueError('invalid feedback capability')
-        for value, maximum in ((self.width, 10), (self.depth, 10)):
+        for value, maximum in ((self.rounds, 10),):
             if type(value) is not int or value < 1 or maximum is not None and value > maximum:
                 raise ValueError('improvement allocation exceeds its bound')
         if isinstance(self.timeouts, dict):

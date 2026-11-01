@@ -1,4 +1,4 @@
-"""Replaceable generation and composition registration."""
+"""Replaceable candidate generation through one proposal contract."""
 from fruitfly_agent.improvement.contracts.editing import ProposalResult, GeneratorDefinition
 from fruitfly_agent.improvement.contracts.validation import identifier
 
@@ -13,9 +13,6 @@ class AgentGenerator:
         return ProposalResult((candidate,))
 
 
-class AgentComposer:
-    async def compose(self, request, services):
-        return await services.edit('compose', request)
 
 
 class GeneratorRegistry:

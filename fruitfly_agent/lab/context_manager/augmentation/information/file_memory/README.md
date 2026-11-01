@@ -22,5 +22,5 @@ Extend through [Information source contracts](../README.md#extend-a-source). Pre
 .venv/bin/python -m unittest tests.lab.test_information_sources.InformationSourcesTest.test_file_memory_reflects_normal_file_edits -v
 ```
 
-[snapshots.py](snapshots.py) exposes `FileMemorySnapshots(root, workspace)` for [Improvement state identity](../../../../improvement/README.md). It captures complete direct-child Markdown files up to 128 KB each, records an empty root explicitly, and rejects symlink roots/files. The snapshot adapter is registered during assembly but reads no files until explicitly frozen. Native trials receive only explicit task inputs; they do not copy this memory directory or run live retrieval. Adopting a text candidate does not adopt trial file mutations.
+[snapshots.py](snapshots.py) exposes `FileMemorySnapshots(root, workspace)` for [Improvement state identity](../../../../improvement/README.md). It captures complete direct-child Markdown files up to 128 KB each, records an empty root explicitly, and rejects symlink roots/files. The snapshot adapter is registered during assembly but reads no files until explicitly frozen. Snapshot identity alone does not restore retrieval state; a compatible registered backend must restore frozen resources explicitly. Adopting a text candidate does not adopt trial file mutations.
 

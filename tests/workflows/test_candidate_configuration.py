@@ -19,18 +19,18 @@ from fruitfly_agent.improvement.contracts.components import HarnessSnapshot, Com
 from fruitfly_agent.improvement.contracts.editing import ProposalResult
 from fruitfly_agent.improvement.contracts.assessment import Measurement
 from fruitfly_agent.improvement.execution.facts import read_facts
-from fruitfly_agent.run import RunApplicationFactory
+from tests.support.task_execution import TaskApplicationFixture as RunApplicationFactory
 from tests.support.model_evaluation import RoleProvider as FauxProvider
 
 
 class CandidateConfigurationTests(unittest.IsolatedAsyncioTestCase):
-    async def test_candidate_parallelism_and_exported_config_match_without_changing_baseline(self):
+    async def test_candidate_prompt_and_exported_config_match_without_changing_baseline(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             initialize_workspace(root)
-            execution = root / '.fruitfly/components/H/execution-policy.yaml'
+            execution = root / '.fruitfly/components/H/base-prompt.yaml'
             value = yaml.safe_load(execution.read_text())
-            value['parameters']['settings']['tool_execution']['max_parallel'] = 1
+            value['parameters']['instructions']['system'] = 'BASELINE'
             execution.write_text(yaml.safe_dump(value))
             original = execution.read_bytes()
             provider = FauxProvider()
@@ -42,10 +42,8 @@ class CandidateConfigurationTests(unittest.IsolatedAsyncioTestCase):
                 generator_id = 'limit-rule'
                 required_capabilities = frozenset()
                 async def propose(self, request, services):
-                    old = request.baseline.component('execution-policy')
-                    value = json.loads(old.files[0].text)
-                    value['settings']['tool_execution']['max_parallel'] = 2
-                    changed = replace(old, files=(ComponentFile('instructions.txt', json.dumps(value)),))
+                    old = request.baseline.component('base_prompt')
+                    changed = replace(old, files=(ComponentFile('instructions.txt', 'CANDIDATE'),))
                     harness = HarnessSnapshot(tuple(changed if d.component_id == changed.component_id else d
                                                     for d in request.baseline.components))
                     return ProposalResult((CandidateBundle(request.plan.parent, request.baseline, harness, self.generator_id,
@@ -53,8 +51,7 @@ class CandidateConfigurationTests(unittest.IsolatedAsyncioTestCase):
             class Measurements:
                 async def measure(self, task, record):
                     facts = read_facts(record, Artifacts())
-                    reference=next(r.artifact_id for r in record.artifacts if r.path=='runtime-execution.json')
-                    return Measurement(record.run_id,'parallelism-fixture',json.loads(Artifacts().read(reference))['tool_execution']['max_parallel'])
+                    return Measurement(record.run_id,'prompt-fixture', 1 if record.harness_id != factory._component_jobs.registry().snapshot().snapshot_id else 0)
             # The scorer reads only the public artifact interface provided by the host.
             class Artifacts:
                 def read(self, reference):
@@ -63,22 +60,21 @@ class CandidateConfigurationTests(unittest.IsolatedAsyncioTestCase):
             factory = RunApplicationFactory(cwd=root, config_path=str(root / '.fruitfly/default-config.yaml'),
                 environment={}, provider_registry=providers,
                 improvement_bindings=WorkflowBindings(generators=generators, measurements=Measurements(),
-                    component_options={'execution-policy': {'editable_fields': ['parameters.settings.tool_execution.max_parallel'],
-                        'bounds': {'parameters.settings.tool_execution.max_parallel': {'minimum': 1, 'maximum': 2}}}}))
+                    component_options={}))
             app = AgentApplication(factory)
             await app.start()
             try:
-                request = WorkflowRequest('Write a and b.', component_ids=('execution-policy',), generator_id='limit-rule',
-                    strategy_id='simple', depth=1, verification='scored', retain_experience=False)
+                request = WorkflowRequest('Write a and b.', component_ids=('base_prompt',), generator_id='limit-rule',
+                     rounds=1,  retain_experience=False)
                 preview = app.workflow_preview(request)
                 await app.improve('', preview_token=preview.preview_token)
                 candidates = list((root / '.fruitfly/improvement/jobs').glob('*/candidates/*/config.yaml'))
                 self.assertEqual(len(candidates), 1)
                 selected = load_system_config(candidates[0]).select()
-                self.assertEqual(selected.execution['tool_execution']['max_parallel'], 2)
+                self.assertEqual(factory.artifact_store.read_text(selected.prompt) if selected.prompt not in selected.artifact_contents else selected.artifact_contents[selected.prompt], 'CANDIDATE')
                 result = json.loads(next((root / '.fruitfly/improvement/jobs').glob('*/result.json')).read_text())
                 self.assertEqual([record['model_calls'] for record in result['records']], [3, 3])
                 self.assertEqual(execution.read_bytes(), original)
-                self.assertEqual(app.runtime_manifest['execution']['tool_execution']['max_parallel'], 1)
+                self.assertEqual(factory._current_runtime_config.system_prompt, 'BASELINE')
             finally:
                 await app.close()

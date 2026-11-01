@@ -46,11 +46,11 @@ Editable installation keeps source changes visible without reinstalling. To inst
 
 | Step | Action |
 |---|---|
-| 1 | In **Add model**, choose OpenAI Responses, Anthropic Messages, or a custom service using one of those protocols. The wizard opens automatically when no models are available. |
+| 1 | From the startup panel, choose **Configure → model → Add model…**, then choose OpenAI Responses, Anthropic Messages, or a custom service using one of those protocols. |
 | 2 | Enter a menu label, model ID, and the token limits documented by your service. Official services may leave the API address blank; custom services require it. |
 | 3 | Leave the existing-key-variable field blank to create a variable for this model, then enter the API key with hidden input. To reuse a key, enter its environment variable name and leave the key input blank. |
 | 4 | On **capabilities**, toggle verified optional support; keep required rows checked and choose Continue. |
-| 5 | Review the non-secret settings and choose **Stage model**, then **Save and start** to save. Cancellation writes no model or credential files. |
+| 5 | Review the non-secret settings and choose **Stage model**, then **Save and return** to save. Select **Start session** from the panel when ready. Cancellation writes no model or credential files. |
 
 For additional models, use **/config → model → Add model…**, or run `fruitfly-agent --configure`. **Set API key…** supplies a missing key for the selected model. The wizard performs offline checks only; it does not test credentials, model access, or remote API compatibility. Enter `/cancel` at a field to return. Starting a session does not send a model request until you submit a task.
 
@@ -81,11 +81,11 @@ After initial configuration:
 
 | Action | Behavior |
 |---|---|
-| Start without a task | Enter welcome and chat directly when configuration is complete. |
-| Use `--configure` | Edit configuration before startup; Save and start or discard. |
+| Start without a task | Open the offline startup panel; choose Configure or Start session. |
+| Use `--configure` | Open the shared configuration editor first; save or discard, then return to the panel. |
 | Supply a task | Run a single task. |
-| Use `--resume` | Restore the latest non-empty session after validation and display saved chat in interactive mode. |
-| Use `--resume --session PATH` | Restore a specific session at startup. |
+| Use `--resume` | Show recovery intent in the panel; Start session validates and restores the latest non-empty session. |
+| Use `--resume --session PATH` | Show the selected session in the panel; Start session validates and restores it. |
 | Enter `/resume` | Choose a compatible session from the idle terminal and display saved chat. |
 | Supply a task with `--resume` | Continue saved context for one task without printing old chat; model requests may incur charges. |
 | Change configuration | Use `/config` while idle to save and apply to this conversation. |
@@ -111,41 +111,34 @@ This uses a temporary workspace and a fixed Provider, with no keys or network. S
 
 ## Try improvement
 
-Experiments have independent file settings and do not need a chat session.
-From the checkout after installation, initialize an existing workspace whose
-experiment/default configuration files do not yet exist:
+The [remote Linux TB4 walkthrough](examples/experiments/TB4_SERVER.md) covers an
+executable experiment. In an existing workspace, generate its files:
 
 ```bash
-.venv/bin/fruitfly-agent-lab init
+.venv/bin/fruitfly-agent-lab init --source task-set --benchmark terminal-bench-4
 ```
 
-Review the shared `.fruitfly/models.yaml`, select its aliases in
-`.fruitfly/default-config.yaml`, put the selected model's key privately in
-`.fruitfly/secrets.env`, and edit the instruction in `.fruitfly/tasks/native.yaml`.
-Daily interaction selects its own aliases in `.fruitfly/config.yaml`. Existing
-regular model catalogs and secrets are preserved; other existing experiment/default
-destinations cause an error rather than being overwritten.
-Initialization does not invoke models, install dependencies or start containers.
+Review `.fruitfly/models.yaml`, choose its aliases in `default-config.yaml`, and
+put keys privately in `secrets.env` or the process environment. Configure the host
+runtime as described in the walkthrough. Initialization starts no models,
+downloads or containers. Existing regular model catalogs and secrets are preserved;
+other generated destinations must not exist.
 
 ```bash
+# Preparation can download/build/start containers; it makes no task model calls.
+.venv/bin/fruitfly-agent-lab eval prepare --tasks-only
+.venv/bin/fruitfly-agent-lab eval prepare
 .venv/bin/fruitfly-agent-lab improvement check
-# Model requests; may incur charges.
+# Model requests and benchmark execution; charges may apply.
 .venv/bin/fruitfly-agent-lab improvement run --events jsonl
 ```
 
-The minimal native example exercises candidate search with detached file tools
-and behavioral feedback; it has no objective task score. For scored tasks and
-independent verification, follow the [Python pack setup](examples/improvement/python_functions/README.md#install-and-check)
-and its [search configuration](examples/improvement/python_functions/README.md#search-and-review).
-`rsi run` additionally requires independent verification material. `/improvement`
-retains a small instruction/file entry for daily interaction; experiment settings
-stay in files.
-
-For a remote Linux TB4 experiment, follow the [server walkthrough](examples/experiments/TB4_SERVER.md).
-It covers controller/Agent runtime setup, `init --source task-set --benchmark
-terminal-bench-4`, preparation and explicit execution. See
-[experiment templates](examples/experiments/README.md) for file responsibilities,
-model roles and larger task collections.
+Plain `init` creates system configuration only. Instruction/file and task-package
+materials require an embedding with a registered task backend; no local task
+executor is bundled. `/improvement` uses the same execution requirement. RSI also
+requires independent verification material. See [experiment templates](examples/experiments/README.md)
+for file ownership and [execution registration](fruitfly_agent/lab/improvement/execution/README.md)
+for embedding contracts.
 
 | Next step | Guide |
 |---|---|

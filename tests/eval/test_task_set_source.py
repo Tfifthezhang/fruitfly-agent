@@ -52,7 +52,7 @@ class EvalCollectionTests(unittest.IsolatedAsyncioTestCase):
              'fruitfly_agent/runtime_spec/profiles.py', 'fruitfly_agent/runtime_spec/selections.py', 'fruitfly_eval/runtime.py')]
             prepared = {'id': 'prepared-fixture', 'tasks': tasks, 'runtime': {'installation': {'files': files}}}
             components = ComponentRegistry((TextComponentAdapter(BasePromptTarget('baseline'), 'system-prompt'),))
-            plan = RunPlan('joint-eval', version(), ('base_prompt',), feedback='scored')
+            plan = RunPlan('joint-eval', version(), ('base_prompt',))
             services = WorkflowServices(plan)
             context = ExecutionContext(root, MemoryArtifacts(), components, None, None, None, plan=plan, services=services)
             context.runtime_config, context.runtime_profile = config, None

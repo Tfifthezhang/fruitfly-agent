@@ -11,7 +11,7 @@ from fruitfly_agent.improvement.contracts.experiments import ExecutionRequest
 from fruitfly_agent.improvement.workflow.services import WorkflowServices
 from fruitfly_agent.improvement.contracts.tasks import TaskMaterial, Resource
 from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
-from fruitfly_agent.lab.improvement.execution import files
+from fruitfly_agent.lab.improvement.execution import tasks
 from fruitfly_agent.lab.improvement.execution.deliverables import DeliverySpec, DeliveryBundle
 from fruitfly_agent.lab.improvement.verification.delivery import (CommandDeliveryBackend, DeliveryValidationRunner)
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
@@ -79,13 +79,13 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as directory:
             (Path(directory) / 'delivery.json').write_text(json.dumps({'entrypoint': 'answer.txt'}))
             context = ExecutionContext(directory, artifacts, flow.components, None, None, None,
-                plan=plan, services=services)
-            request = ExecutionRequest('Write a deliverable.', ('delivery.json',), ('prompt',), '', 'task', 'behavior',
+                plan=plan, services=services, runner_factory=lambda *args: Runner())
+            request = ExecutionRequest('Write a deliverable.', ('delivery.json',), ('prompt',), '', 'task',
                 (('delivery_manifest', 'delivery.json'),))
             with self.assertRaisesRegex(ValueError, 'backend'):
-                files.prepare(context, request)
+                tasks.prepare(context, request)
             context.delivery_backend = CommandDeliveryBackend(('/bin/cat',))
-            prepared = files.prepare(context, request)
+            prepared = tasks.prepare(context, request)
             class Runner:
                 capabilities = frozenset()
                 async def execute(self, plan, task, harness):
@@ -93,7 +93,7 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
                         plan.parent.state, plan.conditions_id, 'completed', artifacts=(Resource('deliverables/answer.txt',
                             artifacts.put(b'answer'), 'text/plain', 'deliverable'),))
             context.runner_factory = lambda *args: Runner()
-            ports = files.build(context, prepared)
+            ports = tasks.build(context, prepared)
             self.assertIn('delivery-validation', ports.runner.capabilities)
             record = await ports.runner.execute(plan, prepared.task, baseline)
             self.assertEqual(record.status, 'completed')

@@ -18,7 +18,6 @@ from fruitfly_agent.improvement.contracts.evaluation import EvaluationBatch
 from fruitfly_agent.lab.improvement.task_sets import MultiTaskSettings
 from fruitfly_agent.improvement.contracts.plans import RunPlan
 from fruitfly_agent.improvement.contracts.task_sets import TaskSetSnapshot
-from fruitfly_agent.lab.improvement.strategies.exploration import builtin_explorations
 from fruitfly_agent.lab.improvement.assessment.joint import assess_batch
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
 from fruitfly_agent.lab.improvement.workflow.task_sets import TaskSetProblem
@@ -81,8 +80,8 @@ class TaskSetLifecycleTests(unittest.IsolatedAsyncioTestCase):
         binding, _ = collection('tasks', 1, score=lambda task, harness: 0)
         snapshot = TaskSetSnapshot(binding.entries)
         settings = MultiTaskSettings()
-        plan = RunPlan('judged-batch', version(), ('prompt',), generator_id='increment', strategy_id='simple',
-            depth=2, feedback='scored', retain_experience=False)
+        plan = RunPlan('judged-batch', version(), ('prompt',), generator_id='increment', 
+            rounds=2,  retain_experience=False)
         services = WorkflowServices(plan)
         artifacts = MemoryArtifacts()
         context = ExecutionContext(None, artifacts, components, None, None, None, plan=plan, services=services)
@@ -98,8 +97,8 @@ class TaskSetLifecycleTests(unittest.IsolatedAsyncioTestCase):
         assessment = CompletedAssessmentService(config=AgentLoopConfig(provider=provider), artifacts=artifacts, services=services)
         generator = IncrementGenerator()
         registry = GeneratorRegistry(); registry.register('increment', lambda: generator, supports_task_sets=True)
-        flow = ComponentWorkflow(generators=registry, components=components, runner=None, composer=None, selector=None,
-            completed_assessment=assessment, exploration=builtin_explorations().create('process-guided'),
+        flow = ComponentWorkflow(generators=registry, components=components, runner=None,  selector=None,
+            completed_assessment=assessment, 
             problem=TaskSetProblem(context, snapshot, (binding,), settings))
         try:
             return await flow.run(plan, snapshot, baseline, services), baseline, generator, services, provider

@@ -2,24 +2,28 @@
 import hashlib
 import json
 from dataclasses import asdict
+from .configuration import EvidenceSettings
 
 from fruitfly_agent.core.data_model.media import decode_text_file
 from fruitfly_agent.improvement.contracts.evidence import EvidenceSpan
 
 
 class WorkspaceEvidence:
-    def __init__(self, workspace, *, page_characters=12000):
-        self.workspace, self.page_characters = workspace, page_characters
+    def __init__(self, workspace, *, settings=None):
+        self.workspace = workspace
+        self.settings = EvidenceSettings.from_dict(settings)
 
-    def catalog(self, *, prefix='', cursor=0, limit=50):
-        if type(cursor) is not int or cursor < 0 or type(limit) is not int or not 1 <= limit <= 100:
+    def catalog(self, *, prefix='', cursor=0, limit=None):
+        limit = self.settings.catalog.default_entries if limit is None else limit
+        if type(cursor) is not int or cursor < 0 or type(limit) is not int or not 1 <= limit <= self.settings.catalog.max_entries:
             raise ValueError('catalog needs a nonnegative cursor and page size 1..100')
         paths = tuple(p for p in self.workspace.paths() if p.startswith(prefix))
         return {'files': list(paths[cursor:cursor+limit]), 'total': len(paths),
             'next_cursor': cursor+limit if cursor+limit < len(paths) else None}
 
-    def read(self, path, *, offset=0, limit=12000):
-        if type(offset) is not int or offset < 0 or type(limit) is not int or not 1 <= limit <= 24000:
+    def read(self, path, *, offset=0, limit=None):
+        limit = self.settings.read.default_characters if limit is None else limit
+        if type(offset) is not int or offset < 0 or type(limit) is not int or not 1 <= limit <= self.settings.read.max_characters:
             raise ValueError('read needs a nonnegative offset and page size 1..24000')
         self.workspace.access.grant(self.workspace.paths())
         try:
@@ -41,8 +45,9 @@ class WorkspaceEvidence:
         self.workspace.record('evidence-page', **{k:v for k,v in value.items() if k!='text'})
         return value
 
-    def search(self, query, *, paths=(), cursor='', limit=20):
-        if not isinstance(query, str) or not 1 <= len(query) <= 500 or type(limit) is not int or not 1 <= limit <= 50:
+    def search(self, query, *, paths=(), cursor='', limit=None):
+        limit = self.settings.search.default_matches if limit is None else limit
+        if not isinstance(query, str) or not 1 <= len(query) <= 500 or type(limit) is not int or not 1 <= limit <= self.settings.search.max_matches:
             raise ValueError('search requires literal query and page size 1..50')
         available = self.workspace.paths()
         selected = tuple(sorted(paths or (p for p in available if not p.startswith('harness/'))))
@@ -72,8 +77,10 @@ class WorkspaceEvidence:
             if found < 0:
                 index, offset = index+1, 0
                 continue
-            start, end = max(0, found-80), min(len(text), found+len(query)+160)
-            if matches and (len(matches) >= limit or characters + end-start > 12000):
+            budget = min(self.settings.search.max_characters, self.settings.read.max_characters)
+            start = max(0, found-min(80, budget//4))
+            end = min(len(text), found+len(query)+160, start+budget)
+            if matches and (len(matches) >= limit or characters + end-start > self.settings.search.max_characters):
                 break
             match = self.read(path, offset=start, limit=max(1,end-start))
             match['match_offset'] = found

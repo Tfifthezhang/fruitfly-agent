@@ -86,5 +86,5 @@ def benchmark_execution(request_path, host_path, *, execution_id='benchmark-task
     return ExecutionDefinition(execution_id, 'Prepared benchmark execution', 'benchmark-improvement-v1',
         frozenset({'H', 'S'}), EvalTaskRunner.capabilities, materials, prepare, build,
         notice='Runs prepared task environments and models. Official rewards are development evidence, not independent assurance.',
-        defaults=(('verification', 'scored'), ('scope', 'task')),
+        defaults=(('scope', 'task'),),
         uses_configured_tools=True)

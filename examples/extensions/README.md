@@ -52,4 +52,5 @@ Synthetic verification establishes binding, not model quality.
 
 `--help` loads no code and requests no model. Actual Agent commands require a
 configured Provider and may incur cost. Source declarations in the system profile
-also work in native experiments. Container source staging is unsupported.
+also work with compatible explicitly registered experiment backends. The offline
+tests register their own task runner; production provides no local task executor. Container source staging is unsupported.

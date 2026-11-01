@@ -20,12 +20,12 @@ class ScaffoldingTests(unittest.TestCase):
     def setUp(self):
         self.root = Path(self.enterContext(tempfile.TemporaryDirectory())).resolve()
 
-    def test_native_init_and_check_work_without_eval_or_providers(self):
+    def test_system_init_needs_no_eval_provider_or_implicit_execution_backend(self):
         original_import = builtins.__import__
 
         def without_eval(name, *args, **kwargs):
             if name == 'fruitfly_eval' or name.startswith('fruitfly_eval.'):
-                raise AssertionError('native init imported Eval')
+                raise AssertionError('system init imported Eval')
             return original_import(name, *args, **kwargs)
 
         output = io.StringIO()
@@ -38,9 +38,9 @@ class ScaffoldingTests(unittest.TestCase):
             self.assertEqual(len(initialized['created']), len(workspace_templates()) + 1)
             self.assertEqual(initialized['preserved'], [])
             output.seek(0); output.truncate()
-            self.assertEqual(main(['improvement', 'check', '--cwd', str(self.root), '--json']), 0)
-        summary = json.loads(output.getvalue())
-        self.assertEqual(summary['model_roles'], dict.fromkeys(('executor', 'editor', 'assessor'), 'deepseek-flash-openai'))
+            with redirect_stderr(io.StringIO()):
+                self.assertEqual(main(['improvement', 'check', '--cwd', str(self.root), '--json']), 2)
+        self.assertFalse((self.root / '.fruitfly/experiment.yaml').exists())
         self.assertNotIn('offline-placeholder', output.getvalue())
         self.assertEqual((self.root / '.fruitfly/secrets.env').stat().st_mode & 0o777, 0o600)
         self.assertEqual((self.root / '.fruitfly').stat().st_mode & 0o777, 0o700)
@@ -112,7 +112,7 @@ class ScaffoldingTests(unittest.TestCase):
             self.assertIn('base_prompt', summary['request']['component_ids'])
             self.assertIn('working-memory-reduction', summary['request']['component_ids'])
             self.assertNotIn('improvement-editor', summary['request']['component_ids'])
-            self.assertEqual(summary['execution']['max_tool_calls_per_turn'], 64)
+            self.assertEqual(summary['execution']['max_tool_calls_per_turn'], 512)
             # Relative paths must still be inside the declared experiment workspace.
             request_path = config.resolve(collection['request'])
             request = json.loads(request_path.read_text())
@@ -217,11 +217,11 @@ class ScaffoldingTests(unittest.TestCase):
         for name in ('models.yaml', 'secrets.env'):
             (directory / name).write_text('existing offline fixture\n')
         original_open = os.open
-        def fail_on_experiment(path, *args, **kwargs):
-            if Path(path).name == 'experiment.yaml':
+        def fail_on_configuration(path, *args, **kwargs):
+            if Path(path).name == 'default-config.yaml':
                 raise OSError('offline simulated failure')
             return original_open(path, *args, **kwargs)
-        with patch('fruitfly_agent.experiments.scaffolding.os.open', side_effect=fail_on_experiment):
+        with patch('fruitfly_agent.experiments.scaffolding.os.open', side_effect=fail_on_configuration):
             with self.assertRaisesRegex(OSError, 'simulated failure'):
                 initialize_workspace(self.root)
         self.assertEqual({p.name for p in directory.iterdir()}, {'models.yaml', 'secrets.env'})
@@ -237,7 +237,7 @@ class ScaffoldingTests(unittest.TestCase):
             initialize_workspace(self.root)
         self.assertEqual(list(elsewhere.iterdir()), [])
         state.unlink(); state.mkdir()
-        target = state / 'experiment.yaml'
+        target = state / 'default-config.yaml'
         target.symlink_to(elsewhere / 'missing.yaml')
         with self.assertRaisesRegex(ValueError, 'will not overwrite'):
             initialize_workspace(self.root)
@@ -250,12 +250,12 @@ class ScaffoldingTests(unittest.TestCase):
     def test_write_failure_rolls_back_only_created_files(self):
         original_open = os.open
 
-        def fail_on_experiment(path, *args, **kwargs):
-            if Path(path).name == 'experiment.yaml':
+        def fail_on_configuration(path, *args, **kwargs):
+            if Path(path).name == 'default-config.yaml':
                 raise OSError('offline simulated failure')
             return original_open(path, *args, **kwargs)
 
-        with patch('fruitfly_agent.experiments.scaffolding.os.open', side_effect=fail_on_experiment):
+        with patch('fruitfly_agent.experiments.scaffolding.os.open', side_effect=fail_on_configuration):
             with self.assertRaisesRegex(OSError, 'simulated failure'):
                 initialize_workspace(self.root)
         self.assertEqual(list(self.root.iterdir()), [])
@@ -272,7 +272,6 @@ class ScaffoldingTests(unittest.TestCase):
         expected = {
             'default-config.yaml': 'examples/configuration/default-config.example.yaml',
             'models.yaml': 'examples/configuration/models.example.yaml',
-            'experiment.yaml': 'examples/experiments/native.example.yaml',
         }
         for name, path in expected.items():
             self.assertEqual(templates[name], (project / path).read_text())

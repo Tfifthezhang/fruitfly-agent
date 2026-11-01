@@ -57,3 +57,10 @@ remains necessary. Exact counting does not prove content quality.
 ```bash
 .venv/bin/python -m unittest tests.lab.test_context_measurement tests.providers.test_token_counting -v
 ```
+
+`MeasurementService.new_scope()` preserves its fixed policy and resets calibration,
+request observations and exact-count caches. Independent Agent role invocations
+use this entry through `new_measurement_scope`. Registered candidate backends
+must likewise reset measurement state between independent trials. Custom
+meters may provide the same method; otherwise their initial object state is copied.
+These lifecycle operations do not add a configuration or optimization target.

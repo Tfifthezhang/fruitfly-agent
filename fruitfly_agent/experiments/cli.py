@@ -29,7 +29,7 @@ def parser():
     initialize = operations.add_parser('init', help='create editable workspace templates without running tasks')
     initialize.add_argument('--cwd', default=argparse.SUPPRESS)
     initialize.add_argument('--json', action='store_true', default=argparse.SUPPRESS)
-    initialize.add_argument('--source', choices=('files', 'task-set'), default='files')
+    initialize.add_argument('--source', choices=('task-set',), default=None)
     initialize.add_argument('--benchmark', help='registered benchmark ID; required for task-set')
     initialize.add_argument('--variant', choices=('smoke', 'no_gpu', 'full'), default='smoke')
     for operation in ('eval', 'improvement', 'rsi'):
@@ -120,7 +120,9 @@ def dispatch(args):
         raise ValueError('experiment conditions changed; cannot resume this run')
     if command == 'check':
         print_json(summary) if args.json else show_summary(summary)
-        return 0
+        return 0 if summary['available'] else 3
+    if not summary['available']:
+        raise PreparationUnavailable(summary['unavailable_reason'])
     def emit(event):
         if args.events:
             print(json.dumps(event, ensure_ascii=False, separators=(',', ':')), flush=True)

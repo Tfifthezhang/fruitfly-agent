@@ -6,8 +6,12 @@ from uuid import uuid4
 from fruitfly_agent.core.data_model import AgentToolResult, TextBlock
 
 
+DEFAULT_MAX_ACTIVE = 4
+DEFAULT_RETAINED_COMMANDS = 128
+
+
 class CommandManager:
-    def __init__(self, *, max_active=2, retained_commands=64, output_characters=12000):
+    def __init__(self, *, max_active=DEFAULT_MAX_ACTIVE, retained_commands=DEFAULT_RETAINED_COMMANDS, output_characters=12000):
         self.max_active, self.retained_commands = max_active, retained_commands
         self.output_characters = output_characters
         self.jobs = {}

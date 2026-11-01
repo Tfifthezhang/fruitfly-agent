@@ -6,7 +6,7 @@ import hashlib
 import json
 from fruitfly_agent.core.data_model import ContextDecision, CustomMessage, UserMessage, CUSTOM_KIND_COMPACTION, ProviderView
 from fruitfly_agent.core.context.validation import valid_tool_links
-from ....history import SessionHistory, public_message
+from ....resources import SessionHistory, public_message
 from ....measurement.budget import MeasurementService, MeasurementConfig
 from ...inference import AuxiliaryText
 from .config import WorkingMemoryConfig
@@ -117,7 +117,7 @@ class WorkingMemoryReducer:
         if switch and snapshot.rebase_allowed and covered == len(items) and not offset:
             task = next((item.message for item in items if isinstance(item.message, UserMessage)), None)
             anchors = (task,) if task is not None else ()
-            candidate = (CustomMessage(CUSTOM_KIND_COMPACTION, memory + '\n[Context artifact ' + reference + ']'), *anchors)
+            candidate = (CustomMessage(CUSTOM_KIND_COMPACTION, memory + '\n[Context artifact ' + reference + ']' + ('\n' + self.config.readback_instructions + '\nHistory index: ' + self.history.resource_prefix + 'index' if getattr(self.history, 'resource_prefix', '') else '')), *anchors)
             after = self.estimate(replace(snapshot, messages=candidate))
             if after >= self.estimate(snapshot) or after > allowance:
                 candidate = None
@@ -128,6 +128,10 @@ class WorkingMemoryReducer:
         return ContextDecision(messages=candidate, state=state, retry=force and candidate is not None,
             mechanism_id=self.mechanism_id, base_revision=snapshot.revision,
             estimated_tokens_before=self.estimate(snapshot), metadata={'covered': covered, 'offset': offset})
+
+    def execution_artifacts(self):
+        """Public, immutable diagnostic material owned by this memory method."""
+        return self.history.execution_artifacts()
 
     def validate_recovery(self, messages):
         self.history.validate_recovery(messages)

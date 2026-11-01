@@ -55,7 +55,8 @@ def validate_harness(config, profile, source, *, operation, environment, catalog
         except ValueError as exc:
             reason = str(exc)
         rows.append({'id': component.component_id, 'role': component.role, 'owner': dict(inventory.owners)[component.component_id],
-            'available': not reason, 'selected': component.component_id in selected, 'reason': reason})
+            'available': not reason, 'default_selected': component.default_selected,
+            'selected': component.component_id in selected, 'reason': reason})
     configuration = configuration_inventory(profile, catalog,
         artifact_reader=lambda reference: (Path(config.workspace) / '.fruitfly/artifacts' / reference[7:]).read_text(encoding='utf-8'))
     for component in configuration:

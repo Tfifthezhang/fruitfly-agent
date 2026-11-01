@@ -22,7 +22,7 @@ class FrozenEpisode:
     @property
     def adaptation(self):
         from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
-        return TaskMaterial('adaptation', self.suite.train[0].input, environment_id='file-workspace-v1')
+        return TaskMaterial('adaptation', self.suite.train[0].input, environment_id='registered-task-v1')
 
     @property
     def evaluations(self):
@@ -102,6 +102,8 @@ def freeze(context, experiment_id, target_id):
 
 
 def materials(context):
+    if context.runner_factory is None:
+        return (MaterialOption('', 'Registered I comparison', error='Register a TaskRunner or an episode execution definition.'),)
     root = Path(context.workspace) / '.fruitfly/improvement/experiments'
     if not root.exists():
         return ()

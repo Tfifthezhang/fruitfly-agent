@@ -19,7 +19,7 @@ from fruitfly_agent.core.model_stream import AssistantMessageEventStream
 class EditorEvolutionTests(unittest.IsolatedAsyncioTestCase):
     async def test_configured_i_candidate_activates_and_reloads_with_matching_identity(self):
         import yaml
-        from fruitfly_agent.run.application import RunApplicationFactory
+        from tests.support.task_execution import TaskApplicationFixture as RunApplicationFactory
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             factory, provider, request = experiment_factory(root)
@@ -43,19 +43,19 @@ class EditorEvolutionTests(unittest.IsolatedAsyncioTestCase):
             restored = AgentApplication(fresh)
             await restored.start()
             try:
-                self.assertEqual(fresh._current_components['component-improvement-editor-instructions'].invariant.count('STEP'), 1)
+                self.assertEqual(fresh._current_components['component-improvement-editor-instructions'].propose.count('STEP'), 1)
             finally:
                 await restored.close()
 
-    async def test_file_runner_override_does_not_change_editor_execution_capabilities(self):
-        from fruitfly_agent.lab.improvement.execution.file_runner import FileTaskRunner
-        class FileOverride:
-            capabilities = FileTaskRunner.capabilities
+    async def test_task_runner_override_does_not_change_editor_execution_capabilities(self):
+        from tests.support.task_execution import TaskRunnerFixture
+        class TaskOverride:
+            capabilities = TaskRunnerFixture.capabilities
             def __call__(self, *args):
                 raise AssertionError('discovery must not construct a runner')
         with tempfile.TemporaryDirectory() as directory:
             factory, provider, request = experiment_factory(Path(directory))
-            factory._component_jobs.runner_factory = FileOverride()
+            factory._component_jobs.runner_factory = TaskOverride()
             app = AgentApplication(factory)
             await app.start()
             self.addAsyncCleanup(app.close)
@@ -103,7 +103,7 @@ class EditorEvolutionTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(provider.calls, [])
 
     async def test_saved_default_reconciles_exact_editor_bytes_after_fresh_start(self):
-        from fruitfly_agent.run.application import RunApplicationFactory
+        from tests.support.task_execution import TaskApplicationFixture as RunApplicationFactory
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             factory, provider, request = experiment_factory(root)
@@ -121,7 +121,7 @@ class EditorEvolutionTests(unittest.IsolatedAsyncioTestCase):
             await restored.start()
             try:
                 self.assertEqual(restored_factory.candidate_store.read(candidate.candidate_id).status, 'adopted')
-                self.assertEqual(restored_factory._current_components['component-improvement-editor-instructions'].invariant.count('STEP'), 1)
+                self.assertEqual(restored_factory._current_components['component-improvement-editor-instructions'].propose.count('STEP'), 1)
             finally:
                 await restored.close()
 
@@ -216,7 +216,7 @@ class EditorEvolutionTests(unittest.IsolatedAsyncioTestCase):
             result = await EvolutionEngine().evolve(host, job_id='editors', policy_id='improver-paired-v1',
                 direction='Improve editing procedures', max_steps=2)
             self.assertEqual((result.phase, result.steps), ('complete', 2))
-            self.assertEqual(factory._current_components['component-improvement-editor-instructions'].invariant.count('STEP'), 2)
+            self.assertEqual(factory._current_components['component-improvement-editor-instructions'].propose.count('STEP'), 2)
             counts = [json.loads(p.read_text())['uses'] for p in (Path(directory) / '.fruitfly/improvement').glob('verification-uses.json')]
             self.assertEqual(list(counts[0].values()), [2])
             calls = len(provider.calls)
@@ -260,7 +260,7 @@ class EditorEvolutionTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual((current.harness, current.state), (initial.harness, initial.state))
                 self.assertNotEqual(current.improver, before.improver)
                 instructions = factory._current_components['component-improvement-editor-instructions']
-                self.assertEqual(instructions.invariant.count('STEP'), generation)
+                self.assertEqual(instructions.propose.count('STEP'), generation)
                 self.assertEqual(factory._current_runtime_config.system_prompt, original_prompt)
             self.assertEqual(len(app.improvement_history()), 2)
             self.assertEqual(factory.improvement_usage()['model'], len(provider.calls))
@@ -271,7 +271,7 @@ class EditorEvolutionTests(unittest.IsolatedAsyncioTestCase):
             app = AgentApplication(factory)
             await app.start()
             self.addAsyncCleanup(app.close)
-            for invalid in (replace(request, verification='behavior'), replace(request, timeouts={'editor_seconds': 0}),
+            for invalid in (replace(request, scope='unsupported'), replace(request, timeouts={'editor_seconds': 0}),
                             replace(request, component_ids=('base_prompt', 'improvement-editor')),
                             replace(request, execution_parameters=(('inner_components', 'improvement-editor'),))):
                 with self.subTest(invalid=invalid), self.assertRaises(ValueError):

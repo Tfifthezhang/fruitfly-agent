@@ -43,18 +43,17 @@ class ProcessConfigurationTests(unittest.IsolatedAsyncioTestCase):
         workspace(self.root)
         old = prepare_experiment(load_configuration(self.root), 'improvement')
         self.assertNotIn('process_assessment', old.summary())
-        self.assertEqual(old.summary()['execution']['max_tool_calls_per_turn'], 64)
-        workspace(self.root, assessment={'evidence': {'page_characters': 8000}}, exploration={'policy': 'process-guided'})
+        self.assertEqual(old.summary()['execution']['max_tool_calls_per_turn'], 512)
+        workspace(self.root, evidence={'read': {'default_characters': 8000}})
         new = prepare_experiment(load_configuration(self.root), 'improvement')
         self.assertNotEqual(old.summary(), new.summary())
-        self.assertEqual(new.summary()['exploration']['policy'], 'process-guided')
+        self.assertEqual(new.summary()['evidence_settings']['read']['default_characters'], 8000)
 
     async def test_cli_composition_drives_all_zero_search_with_a_separate_assessor_and_isolated_defaults(self):
         pack = package()
         install(self.root, pack)
         workspace(self.root, task={'source': 'files', 'pack': pack['id']},
-            models={'assessor': 'assessor'}, improvement={'rounds': 2},
-            exploration={'policy': 'process-guided'})
+            models={'assessor': 'assessor'}, improvement={'rounds': 2})
         provider = FauxProvider()
         def answer(view, signal=None):
             if view.model == 'offline-assessor':
@@ -71,17 +70,18 @@ class ProcessConfigurationTests(unittest.IsolatedAsyncioTestCase):
         record = records.create('improvement', prepared.summary())
         original = prepared.config_path.read_bytes()
         def build(prepared, runtime_path):
-            factory = application_factory(prepared, runtime_path, provider_registry=registry)
+            initial = application_factory(prepared, runtime_path, provider_registry=registry)
+            from tests.support.task_execution import TaskApplicationFixture
             generators = GeneratorRegistry(); generators.register('agent-editor-v1', Rule)
-            return type(factory)(cwd=self.root, environment=prepared.environment, config_path=str(runtime_path),
-                provider_registry=registry, improvement_bindings=replace(factory.improvement_bindings, generators=generators))
+            return TaskApplicationFixture(cwd=self.root, environment=prepared.environment, config_path=str(runtime_path),
+                provider_registry=registry, improvement_bindings=replace(initial.improvement_bindings, generators=generators))
         with patch('fruitfly_agent.experiments.operations.improve.application_factory', side_effect=build):
             result = await run(prepared, record, records, lambda event: None)
-        self.assertEqual(result['status'], 'completed')
-        self.assertEqual(result['usage'], {'model': 9, 'execution': 3})
+        self.assertEqual(result['status'], 'completed', result)
+        self.assertEqual(result['usage'], {'model': 8, 'execution': 3})
         self.assertEqual(prepared.config_path.read_bytes(), original)
         outcome = json.loads(next((self.root / '.fruitfly/improvement/jobs').glob('*/result.json')).read_text())
         self.assertEqual(outcome['selected']['run_id'], outcome['records'][-1]['run_id'])
-        self.assertEqual(outcome['exploration'][0]['run_id'], outcome['records'][1]['run_id'])
-        self.assertIn('Exploration seed', result['links'])
-        self.assertEqual(sum(c['model'] == 'offline-assessor' for c in provider.calls), 6)
+        self.assertNotIn('exploration', outcome)
+        self.assertNotIn('Exploration seed', result['links'])
+        self.assertEqual(sum(c['model'] == 'offline-assessor' for c in provider.calls), 5)

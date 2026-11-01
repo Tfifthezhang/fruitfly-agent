@@ -18,8 +18,8 @@ profiles:
         file: components/H/tools/edit-tool.yaml
       write-tool:
         file: components/H/tools/write-tool.yaml
-      context-history:
-        file: components/H/context-history.yaml
+      tool-catalog:
+        file: components/H/tool-catalog.yaml
       working-memory-reduction:
         file: components/H/working-memory-reduction.yaml
       base_prompt:

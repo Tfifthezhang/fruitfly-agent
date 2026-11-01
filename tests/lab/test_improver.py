@@ -21,12 +21,12 @@ class BudgetTests(unittest.IsolatedAsyncioTestCase):
     def test_editor_candidate_cannot_change_fixed_fields(self):
         instructions = EditorInstructions()
         target = EditorInstructionTarget(instructions)
-        target.validate(EditorInstructionTarget(replace(instructions, invariant='Use a different proposal procedure')).snapshot().text)
+        target.validate(EditorInstructionTarget(replace(instructions, propose='Use a different proposal procedure')).snapshot().text)
         for field in ('system', 'reflect'):
             text = EditorInstructionTarget(replace(instructions, **{field: 'Mutated field'})).snapshot().text
             target.validate_change(text, {'editable_fields': ['parameters.instructions.'+field]})
             with self.subTest(field=field), self.assertRaisesRegex(ValueError, 'fixed'):
-                target.validate_change(text, {'editable_fields': ['parameters.instructions.invariant']})
+                target.validate_change(text, {'editable_fields': ['parameters.instructions.propose']})
         formatted = json.dumps(json.loads(target.snapshot().text), indent=2)
         self.assertEqual(EditorInstructionTarget(instructions, text=formatted).snapshot().text, formatted)
         with self.assertRaisesRegex(ValueError, 'duplicate'):
@@ -43,7 +43,7 @@ class RetentionTests(unittest.IsolatedAsyncioTestCase):
     def build(self, **kwargs):
         return build_pipeline(**kwargs)
 
-    async def test_baseline_competes_even_when_a_composition_succeeds(self):
+    async def test_baseline_competes_after_a_candidate_succeeds(self):
         flow, plan, baseline, runner = self.build()
         seen = []
         async def select(task, records):
@@ -51,13 +51,13 @@ class RetentionTests(unittest.IsolatedAsyncioTestCase):
             return SelectionDecision(records[0].run_id, 'Baseline satisfies the requirements')
         flow.selector.select = select
         outcome = await flow.run(plan, TaskMaterial('task', 'Do work'), baseline, WorkflowServices(plan))
-        self.assertEqual(len(seen), 4)
+        self.assertEqual(len(seen), 2)
         self.assertEqual(outcome.harness, baseline)
         self.assertEqual(outcome.decision.assurance, 'selected')
 
     async def test_sequential_round_uses_retained_baseline_after_bad_candidates(self):
         flow, plan, baseline, _ = self.build()
-        plan = replace(plan, mode='sequential', depth=2, feedback='scored')
+        plan = replace(plan,  rounds=2)
         flow.measurements = type('Scores', (), {'measure': AsyncMock(side_effect=lambda task, record:
             Measurement(record.run_id, 'fixed', 1 if record.harness_id == baseline.snapshot_id else 0))})()
         requests = []

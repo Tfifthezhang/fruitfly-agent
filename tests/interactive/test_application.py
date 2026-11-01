@@ -359,6 +359,22 @@ class AgentApplicationTest(unittest.IsolatedAsyncioTestCase):
 
 
 class RuntimeHandleTest(unittest.IsolatedAsyncioTestCase):
+    async def test_authorization_close_failure_still_retires_resources_and_releases_session(self):
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock, Mock
+        from fruitfly_agent.interactive.contracts.runtime import RuntimeCleanupError
+        authorization = SimpleNamespace(close=AsyncMock(side_effect=RuntimeError('authorization cleanup failed')))
+        component = SimpleNamespace(close=AsyncMock())
+        release = Mock()
+        handle = RuntimeHandle(offline_session(), {}, {'resource': component},
+            close_callback=release, authorization=authorization)
+        with self.assertRaisesRegex(RuntimeCleanupError, 'authorization cleanup failed'):
+            await handle.close()
+        component.close.assert_awaited_once()
+        release.assert_called_once()
+        await handle.close()
+        release.assert_called_once()
+
     async def test_components_start_health_and_close_in_reverse_order(self) -> None:
         calls: list[str] = []
 

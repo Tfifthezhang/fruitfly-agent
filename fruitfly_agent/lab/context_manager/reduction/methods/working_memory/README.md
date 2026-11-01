@@ -3,13 +3,13 @@
 [Up: Reduction](../../README.md)
 
 `WorkingMemoryReducer` implements `ContextReducer`. Select
-`working-memory-reduction` instead of `compaction`. `WorkingMemoryConfig` declares
+`working-memory-reduction` in the reduction slot. `WorkingMemoryConfig` declares
 strict defaults; `registration.py` registers the method and H candidate fields.
 
 After `update_every_messages` new canonical messages, or at `switch_ratio` of the
 input budget, merge previous memory with sequential new evidence pages. Prompts
-`update_instructions` and `shrink_instructions` are editable from the first
-version. Memory is limited by `memory_tokens`; an oversized update gets one
+`instructions.update`, `instructions.shrink` and `instructions.readback` are
+editable through the same working-memory H target. Memory is limited by `memory_tokens`; an oversized update gets one
 bounded shortening operation. Only normal, nonblank, final text is accepted.
 
 The code owns `(covered, offset)` and a hash of the canonical source prefix.
@@ -28,8 +28,12 @@ before continuation. A changed policy rebuilds from canonical evidence rather
 than attributing old state to the candidate. Fresh trials use fresh Session and
 artifact scopes. Memory is task-local execution state, never automatically S.
 
-H candidates may tune both prompts, memory size, update frequency, switch ratio,
+H candidates may tune the prompts, memory size, update frequency, switch ratio,
 pages, auxiliary output/attempt limits and timeout. Outer budgets, coverage and
 integrity rules remain protected. Counting is conservative unless a supported
 exact Provider counter is selected; bounded text does not prove factual fidelity.
 See [shared checks](../../README.md#optimize-policy).
+
+The method owns its history service and mounts a deterministic index plus original
+messages/artifacts through ordinary `read`. It adds no historical tools. See
+[memory resources](../../../resources/README.md) for scope and recovery.

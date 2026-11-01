@@ -1,7 +1,0 @@
-id: context-history
-role: H
-implementation: context-history
-enabled: true
-parameters:
-  settings:
-    max_artifact_bytes: 16000000

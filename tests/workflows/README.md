@@ -6,6 +6,7 @@ Exercise actual Application, Run assembly, and terminal paths with offline model
 
 | Files | Protects |
 |---|---|
+| `test_startup_recovery.py / test_startup_terminal.py` | Unreachable remote recovery through the shared editor, offline panel exit, unchanged failed-recovery history, cleanup failure, Ctrl+C/SIGINT and terminal restoration |
 | [test_multimodal.py](test_multimodal.py) | Attachment submission, queue/steering copies, resource saving, nonvision preflight, CLI, terminal and recovery hash checks |
 | `test_execution_policy.py` | Isolated configuration candidates, effective native limits and verified H-only activation |
 | `test_terminal_reflow.py` | Actual TTY resize retains completed table output and redraws drafts without another model request |
@@ -34,3 +35,6 @@ across successive host jobs. No model service is contacted.
 `test_candidate_configuration.py` executes changed tool parallelism through the
 native Core loop, exports the complete candidate, reloads it through ordinary
 configuration, and verifies unchanged baseline files.
+
+`test_working_memory_improvement.py` verifies two generations of actual memory
+candidate execution, activation and recovery using a fake Provider.

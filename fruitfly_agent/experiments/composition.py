@@ -10,7 +10,6 @@ import yaml
 from fruitfly_agent.lab.catalog import builtin_catalog, MechanismSelection, materialize_system, configuration_resources
 from fruitfly_agent.lab.improvement.api import WorkflowBindings
 from fruitfly_agent.lab.improvement.execution import builtin_executions
-from fruitfly_agent.lab.improvement.strategies.exploration import builtin_explorations, validate_exploration
 from fruitfly_agent.providers.config import load_env
 from fruitfly_agent.providers.registry import load_model_specs
 from fruitfly_agent.providers.workspace import WorkspacePaths
@@ -50,7 +49,9 @@ class PreparedExperiment:
         snapshot.update({'operation': self.operation, 'runtime_source': str(self.config_path),
             'profile': self.profile.profile_id, 'model_catalog': str(self.model_path),
             'model_roles': self.model_roles, 'request': asdict(self.request), 'policy_id': self.policy_id,
-            'available': True, 'model_connectivity': 'not checked'})
+            'available': self.source.execution_id not in {'agent-task', 'improver-comparison'}, 'model_connectivity': 'not checked'})
+        if not snapshot['available']:
+            snapshot['unavailable_reason'] = 'No built-in task executor. Use prepared Eval execution or register TaskRunner/episode ports through the embedding API.'
         from fruitfly_agent.runtime_spec import execution_values
         snapshot['execution'] = execution_values(self.profile.execution)
         snapshot['harness'] = self.harness
@@ -101,7 +102,6 @@ class PreparedExperiment:
 
 
 def prepare_experiment(config, operation, *, require_prepared=True, environment=None, require_credentials=True):
-    validate_exploration(config.exploration, builtin_explorations())
     source = resolve_source(config, default_source='eval' if operation == 'eval' else 'files')
     from fruitfly_agent.lab.improvement.task_sets import MultiTaskSettings
     if source.task_set is None and config.multi_task != MultiTaskSettings():
@@ -110,14 +110,14 @@ def prepare_experiment(config, operation, *, require_prepared=True, environment=
             row['source'] == 'eval' for row in source.task_set.specifications):
         raise ValueError('select the shared executor in the Agent configuration; benchmark collections cannot use models.executor')
     if operation == 'eval' and source.benchmark is None:
-        raise ValueError('Eval needs task.source: eval; use improvement for native tasks')
+        raise ValueError('Eval needs task.source: eval; use a registered Improvement backend for task materials')
     if source.benchmark is not None and operation != 'eval':
         execution = source.benchmark.request.execution
         if execution.attempts != 1 or execution.concurrency != 1:
             raise ValueError('benchmark improvement requires one attempt and concurrency one')
     if source.benchmark is not None:
         if 'executor' in config.models:
-            raise ValueError('select the benchmark executor in its Agent configuration; models.executor is for native tasks')
+            raise ValueError('select the benchmark executor in its Agent configuration; models.executor is for registered task backends')
         config_path = Path(source.config_path or '.fruitfly/default-config.yaml')
         if not config_path.is_absolute():
             config_path = config.workspace / config_path
@@ -182,10 +182,10 @@ def prepare_experiment(config, operation, *, require_prepared=True, environment=
         capabilities=execution.capabilities_for(inventory.tools)
         allowed_roles=execution.roles
     if not config.improvement.components:
-        legal=tuple(c.component_id for c in inventory.components if c.role in allowed_roles and not c.required_capabilities-capabilities)
+        legal=tuple(c.component_id for c in inventory.components if c.default_selected and c.role in allowed_roles and not c.required_capabilities-capabilities)
         from fruitfly_agent.lab.improvement.tasks import TaskPackCatalog
-        packs=[row['pack'] for row in config.task.get('collections',()) if row.get('source')=='files' and row.get('pack')]
-        if source.execution_id=='file-task' and source.material_id:packs.append(source.material_id)
+        packs=[]
+        if source.execution_id=='agent-task' and source.material_id:packs.append(source.material_id)
         for pack in packs:
             legal=tuple(name for name in legal if name in TaskPackCatalog(config.workspace).compatible_targets(pack))
         if not legal:raise ValueError('no legal optimization targets for this execution and material')
@@ -213,12 +213,11 @@ def prepare_experiment(config, operation, *, require_prepared=True, environment=
             raise ValueError('the execution requires components: ' + ', '.join(source.required_components))
         if set(options.components) & set(source.forbidden_components):
             raise ValueError('I changes require task.source: editor and downstream comparisons')
-    feedback = ('scored' if source.measured else 'behavior') if options.feedback == 'auto' else options.feedback
     request = WorkflowRequest(source.instruction, source.input_paths, options.components,
-        generator_id=options.generator, mode=options.mode, width=options.width, depth=options.rounds,
-        verification=feedback, scope='persistent' if persistent else 'task', timeouts=asdict(options.timeouts), direction=options.direction,
+        generator_id=options.generator,   rounds=options.rounds,
+         scope='persistent' if persistent else 'task', timeouts=asdict(options.timeouts), direction=options.direction,
         task_pack_id=source.material_id, execution_id=source.execution_id, execution_parameters=source.parameters,
-        strategy_id=options.strategy, retain_experience=options.retain_experience)
+         retain_experience=options.retain_experience)
     stop_policy(config.stop.get('improvement'))
     stop_policy(config.stop.get('rsi'))
     if source.benchmark is not None:
@@ -253,7 +252,7 @@ def application_factory(prepared, runtime_path, *, provider_registry=None):
             runtime_override=benchmark.request.runtime))
     bindings = WorkflowBindings(executions=executions,
         stop_policy=stop_policy(prepared.config.stop.get('improvement')),
-        exploration=prepared.config.exploration,
+        
         component_options=prepared.config.improvement.component_options,
         workflow_settings=prepared.config.workflow_settings, evidence_settings=prepared.config.evidence_settings)
     return RunApplicationFactory(cwd=prepared.config.workspace, environment=prepared.environment,

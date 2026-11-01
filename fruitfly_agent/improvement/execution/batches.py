@@ -29,7 +29,10 @@ class BatchEvaluator:
         save = getattr(self.context, 'save_record', None)
         if save is not None:
             save(kind + '/' + name + '.json', value)
-        self.context.services.record(kind.rstrip('s') + '-saved', id=name, evidence=reference)
+        identity = {}
+        if kind == 'executions' and value.get('record') is not None:
+            identity = {'run_id': value['record']['run_id']}
+        self.context.services.record(kind.rstrip('s') + '-saved', id=name, evidence=reference, **identity)
         return reference
 
     async def evaluate(self, plan, harness, batch, *, fresh=False):

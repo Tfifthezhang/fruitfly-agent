@@ -44,10 +44,11 @@ python3 -m venv .venv
 .venv/bin/python -m fruitfly_agent
 ```
 
-With no configured models, **Add model** collects service settings and a hidden
-API key. Review, stage, then choose **Save and start**. With complete settings,
-the CLI enters the welcome and chat directly. Use `/config` during chat or
-`fruitfly-agent --configure` before startup to edit settings. Setup validates locally;
+The CLI opens an offline startup panel. Choose **Configure** to select a model
+and environment; **model → Add model…** collects service settings and a hidden
+API key. Review, stage, then choose **Save and return**. Choose **Start session**
+when ready. Connection failures return to the panel so settings remain accessible.
+Use `/config` during chat or `fruitfly-agent --configure` to open the same editor. Setup validates locally;
 submitted tasks contact the service and may incur charges. Local shell tools run
 with your user permissions. See [Getting started](GETTING_STARTED.md) for setup,
 permissions and session recovery.
@@ -61,11 +62,11 @@ For an offline extension with a fake Provider:
 Expected output: `Offline response: example-guidance is active.`
 See the [walkthrough](examples/extensions/README.md).
 
-For independent experiments, generate editable defaults with
-`.venv/bin/fruitfly-agent-lab init`, configure the model/key, then run
-`improvement check` before `improvement run` (model charges may apply).
-See [native setup](examples/experiments/README.md#start-a-native-experiment) or
-the [remote Linux TB4 walkthrough](examples/experiments/TB4_SERVER.md).
+For a benchmark experiment, use
+`.venv/bin/fruitfly-agent-lab init --source task-set --benchmark terminal-bench-4`,
+configure models/credentials and prepare Eval before running `improvement check`
+and `improvement run` (model charges may apply). Plain `init` creates system files
+only. See the [remote Linux TB4 walkthrough](examples/experiments/TB4_SERVER.md).
 
 ## Choose your mechanisms
 
@@ -81,8 +82,8 @@ external server or native analysis engine is bundled.
 
 Context mechanisms include Skill catalogs, file memory, local knowledge,
 summarization and optional [programmatic context externalization](fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md).
-Bash/file tools can use a local or SSH environment. These runtime choices do not
-expand the isolated environment used by native improvement trials.
+Bash/file tools can use a local or SSH environment. Improvement execution uses the tool set and isolation declared by its
+explicitly registered backend.
 
 Welcome, `/lab` and `/status` show the local workspace separately from the active
 file/Bash environment, including the SSH server and remote directory when used.
@@ -94,18 +95,18 @@ Chat uses native terminal scrollback; temporary menus restore it on return.
 |---|---|---|
 | Improvement runtime | Independent stage kernel with injected algorithms, accounting, failure boundaries and evidence retention | [Runtime](fruitfly_agent/improvement/README.md) |
 | H/S improvement | Propose, execute and compare registered instructions, permitted execution parameters or retained documents; keep the baseline selectable | [Improvement](fruitfly_agent/lab/improvement/README.md) |
-| I experiments | Compare supported editor, feedback and search changes by downstream H/S behavior, then verify on separate task packages | [Editor experiments](fruitfly_agent/lab/improvement/improver/README.md) |
+| I experiments | Compare editor/evaluator instructions by downstream H/S behavior, then verify on separate task packages | [Editor experiments](fruitfly_agent/lab/improvement/improver/README.md) |
 | Persistent adoption | Publish verified text candidates for explicit review and activation | [Improvement host](fruitfly_agent/run/improvement/README.md) |
 | Experience | Stage attributed lessons; commit or reject separately while idle | [Experience](fruitfly_agent/lab/improvement/experience/README.md) |
 | RSI | An explicitly invoked host repeats verified adoption and loads the adopted version for the next generation | [RSI](fruitfly_agent/lab/rsi/README.md) |
 | Benchmark execution | Run the native Agent in Harbor containers and collect official results | [Eval](fruitfly_eval/README.md) |
 
 Use the independent [experiment CLI](fruitfly_agent/experiments/README.md) for Eval,
-Improvement and RSI. File settings have bounded defaults; `simple` proposes one
-candidate, while Harness² remains optional. `/improvement` retains a small explicit
+Improvement and RSI. File settings have bounded defaults; each round proposes at
+most one candidate through a fixed comparison flow. `/improvement` retains a small explicit
 task/material entry and result review. Preview is offline; execution may incur
-charges. Native trials use in-memory file tools, without Bash, network tools or a
-live Session. I experiments edit only registered fields at fixed nesting
+charges. Task execution requires an explicitly registered backend; prepared Eval
+experiments use the configured Agent tools inside benchmark environments. I experiments edit only registered fields at fixed nesting
 depth. They do not train model weights or replace arbitrary source code.
 
 Output selection is not independent verification. Tests with fake Providers prove
@@ -153,7 +154,7 @@ FruitFlyAgent is released under the [MIT License](LICENSE). See [Third-party not
 | Source | Contribution |
 |---|---|
 | [Pi](https://github.com/earendil-works/pi) | Runtime design and adapted Agent loop, Session, and tool infrastructure; code attribution and the upstream license are recorded in [Third-party notices](THIRD_PARTY_NOTICES.md). |
-| [Harness²](https://arxiv.org/abs/2610.14224) | Evidence-driven component editing, Propose–Probe–Compose and cross-task experience; [implemented scope](fruitfly_agent/lab/improvement/README.md). |
+| [Harness²](https://arxiv.org/abs/2610.14224) | Role-separated candidate editing, comparison and attributed experience; [implemented scope](fruitfly_agent/lab/improvement/README.md). |
 | [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) | Inspiration for externalizing context into a programmable Python environment; see [Programmatic context](fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md). |
 
 Research sources and the scope of each adaptation are documented in the corresponding algorithm modules.

@@ -8,7 +8,7 @@ from fruitfly_agent.improvement.contracts.assessment import Measurement
 from fruitfly_agent.improvement.contracts.tasks import Resource, TaskMaterial
 from fruitfly_agent.improvement.contracts.versions import canonical_json
 from fruitfly_agent.improvement.contracts.versions import content_hash
-from .episodes import NativeEpisodeExecutor
+from .episodes import ComparisonEpisodeExecutor
 from fruitfly_agent.improvement.contracts.failures import IntegrityError
 from fruitfly_agent.improvement.execution.facts import attach_facts, receipt_facts
 from fruitfly_agent.improvement.contracts.facts import UsageFact
@@ -18,8 +18,13 @@ class ImproverTaskRunner:
     capabilities = frozenset({'improver-comparison'})
     execution_charge = 0
 
-    def __init__(self, context, frozen, parameters, spec, *, episode_factory=NativeEpisodeExecutor):
+    def __init__(self, context, frozen, parameters, spec, *, episode_factory=None):
         self.context, self.materials, self.parameters, self.spec = context, frozen, parameters, spec
+        if episode_factory is None:
+            if context.runner_factory is None:
+                raise ValueError('I comparison requires an explicitly registered episode executor or TaskRunner')
+            episode_factory = lambda context, episode, parameters: ComparisonEpisodeExecutor(
+                context, episode, parameters, runner_factory=context.runner_factory)
         self.episode_factory = episode_factory
         self.reports = {}
         self.trials = 0

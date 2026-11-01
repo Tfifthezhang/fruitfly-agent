@@ -64,8 +64,7 @@ class CatalogTest(unittest.TestCase):
                     AgentLoopConfig(provider=FauxProvider()),
                     catalog=catalog,
                     selections=(
-                        MechanismSelection("context-history"),
-                        MechanismSelection(
+                                                MechanismSelection(
                             "working-memory-reduction",
                             parameters={},
                         ),
@@ -79,7 +78,7 @@ class CatalogTest(unittest.TestCase):
                 )
 
                 self.assertIsNotNone(result.context_pipeline)
-                self.assertEqual(("context-history", "working-memory-reduction"), result.mechanism_ids)
+                self.assertEqual(("working-memory-reduction",), result.mechanism_ids)
                 self.assertEqual(expected_provider_calls, len(calls))
 
     def test_assembly_is_stable_and_rejects_non_state_installers(self) -> None:
@@ -113,7 +112,8 @@ class CatalogTest(unittest.TestCase):
 
         self.assertEqual(observed, ["first", "later"])
         self.assertEqual(result.mechanism_ids, ("first", "later"))
-        self.assertEqual(result.components, {"first": 2, "later": 2})
+        self.assertEqual({k:v for k,v in result.components.items() if k != "readable-resources"}, {"first": 2, "later": 2})
+        self.assertIs(result.config.readable_resources, result.components["readable-resources"])
 
         invalid = LabCatalog((mechanism_definition("invalid", install=lambda *args: None),))
         with self.assertRaisesRegex(TypeError, "expected AssemblyState"):

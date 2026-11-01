@@ -154,7 +154,6 @@ def build_runtime(
     )
     bindings = dict(profile.artifact_bindings if artifact_bindings is None else artifact_bindings)
     supported_bindings = {slot for definition in catalog.definitions() for slot in definition.artifact_slots}
-    supported_bindings.update('tool-guidance.' + tool.name for provider in prepared.values() for tool in provider.tools)
     unsupported_bindings = sorted(set(bindings) - supported_bindings)
     if unsupported_bindings:
         raise ValueError(

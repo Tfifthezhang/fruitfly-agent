@@ -1,4 +1,4 @@
-"""Outer composition of native and optional Eval task collection sources."""
+"""Outer composition of explicitly registered and optional Eval collection sources."""
 from __future__ import annotations
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 from fruitfly_agent.improvement.contracts.task_sets import TaskSetSnapshot
 from fruitfly_agent.lab.improvement.task_sets import TaskSetSourceRegistry, sample_batch
 from fruitfly_agent.lab.improvement.task_sets.execution import execution_definition as task_set_execution
-from fruitfly_agent.lab.improvement.task_sets.files import definition as files_definition
 from fruitfly_agent.lab.improvement.tasks import TaskPackCatalog
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
 from fruitfly_agent.improvement.contracts.validation import identifier
@@ -86,7 +85,7 @@ def prepare_collections(config, *, tasks_only=False, progress=None):
 
 
 def registry_for(rows):
-    registry = TaskSetSourceRegistry((files_definition(),))
+    registry = TaskSetSourceRegistry()
     if any(row['source'] == 'eval' for row in rows):
         from fruitfly_eval.improvement.task_sets import definition
         registry.register(definition())
@@ -115,10 +114,8 @@ def resolve(config):
     batch = sample_batch(snapshot, config.multi_task.sampling, 0, attempts=config.multi_task.execution.attempts)
     from fruitfly_agent.lab.improvement.assessment.joint import assess_batch
     assess_batch(snapshot, batch, (), config.multi_task.evaluation)
-    if config.improvement.strategy != 'simple' or config.improvement.retain_experience:
+    if config.improvement.retain_experience:
         raise ValueError('task-set search currently needs simple search without experience retention')
-    if config.improvement.feedback == 'behavior':
-        raise ValueError('joint task-set search needs declared task objectives')
     return SourceBinding('task-set', 'task-set', measured=True, source_identity=snapshot.snapshot_id,
         adoption_notice='joint development scores need an independently registered adoption verifier',
         config_path=path, profile=profile,

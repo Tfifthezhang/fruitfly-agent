@@ -12,7 +12,7 @@ from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
 from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, EditReason
 from fruitfly_agent.improvement.contracts.components import HarnessSnapshot, ComponentFile
 from fruitfly_agent.improvement.contracts.editing import ProposalResult
-from fruitfly_agent.run.application import RunApplicationFactory
+from tests.support.task_execution import TaskApplicationFixture as RunApplicationFactory
 from tests.support.model_evaluation import RoleProvider as FauxProvider
 from tests.support.materials import _write_models
 from tests.support.task_packs import install
@@ -32,9 +32,6 @@ class LocalRule:
                   for name in request.plan.component_ids)),))
 
 
-class ComposeFirst:
-    async def compose(self, request, services):
-        return request.candidates[0]
 
 
 class NoEntry:
@@ -50,31 +47,26 @@ def evaluation_response(view, signal=None):
 
 
 class ApplicationPipelineTests(unittest.IsolatedAsyncioTestCase):
-    async def test_host_installs_research_and_custom_hooks_and_persists_entries(self):
+    async def test_host_installs_evidence_index_and_custom_hooks(self):
         import json
         from tests.support.improvers import offline_factory
-        observed = []
+        observed=[]
         def install_hooks(context):
-            context.services.hooks.register('before_run_end', lambda event: observed.append(event.job_id))
-        install_hooks.configuration = {'observer': 'offline-test'}
+            context.services.hooks.register('before_run_end',lambda event:observed.append(event.job_id))
+        install_hooks.configuration={'observer':'offline-test'}
         with tempfile.TemporaryDirectory() as directory:
-            factory = offline_factory(Path(directory))
-            jobs = factory._component_jobs
-            jobs.workflow_settings = {'research': {'enabled': True}}
-            jobs.hooks_factory = install_hooks
-            app = AgentApplication(factory)
-            await app.start()
+            factory=offline_factory(Path(directory));jobs=factory._component_jobs
+            jobs.hooks_factory=install_hooks
+            app=AgentApplication(factory);await app.start()
             try:
-                preview = app.workflow_preview(factory.test_request)
-                await app.improve('', preview_token=preview.preview_token)
-                self.assertEqual(observed, [jobs.outcome.plan.job_id])
-                records = list((Path(directory) / '.fruitfly/improvement/jobs' / observed[0] / 'research').glob('*.json'))
-                self.assertTrue(records)
-                kinds = {json.loads(path.read_text())['kind'] for path in records}
-                self.assertIn('observation', kinds)
-                self.assertIn('hypothesis', kinds)
-            finally:
-                await app.close()
+                await app.improve('',preview_token=app.workflow_preview(factory.test_request).preview_token)
+                self.assertEqual(observed,[jobs.outcome.plan.job_id])
+                path=Path(directory)/'.fruitfly/improvement/jobs'/observed[0]
+                self.assertFalse((path/'research').exists())
+                events=[json.loads(line) for line in (path/'events.jsonl').read_text().splitlines()]
+                self.assertTrue(any(e['event']=='selection-decision' for e in events))
+                self.assertTrue(any('evidence-round-index' in str(e) for e in events))
+            finally:await app.close()
 
     async def test_persistent_candidate_verifies_adopts_and_recovers_exact_version(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -82,7 +74,7 @@ class ApplicationPipelineTests(unittest.IsolatedAsyncioTestCase):
             _write_models(root)
             install(root)
             provider = FauxProvider()
-            for output in ('wrong', 'A', 'A', 'A', 'wrong', 'A', 'wrong', 'B', 'wrong', 'SECRET_ANSWER'):
+            for output in ('wrong', 'A', 'wrong', 'A', 'wrong', 'B', 'wrong', 'SECRET_ANSWER'):
                 provider.respond_text(output)
             providers = Mock()
             providers.create.return_value = provider
@@ -90,7 +82,7 @@ class ApplicationPipelineTests(unittest.IsolatedAsyncioTestCase):
             generators.register('local-rule', LocalRule)
             factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=providers,
                 improvement_bindings=WorkflowBindings(generators=generators,
-                    composer=lambda plan, services: ComposeFirst(), reflector=lambda plan, services: NoEntry()))
+                     reflector=lambda plan, services: NoEntry()))
             factory.configuration.save()
             factory.reload_configuration()
             app = AgentApplication(factory)
@@ -98,7 +90,7 @@ class ApplicationPipelineTests(unittest.IsolatedAsyncioTestCase):
             try:
                 parent = factory.system_version()
                 request = WorkflowRequest(component_ids=('base_prompt',), generator_id='local-rule',
-                    task_pack_id='project', scope='persistent', verification='scored')
+                    task_pack_id='project', scope='persistent')
                 preview = app.workflow_preview(request)
                 records = await app.improve('', preview_token=preview.preview_token)
                 self.assertEqual(len(records), 1)
@@ -125,7 +117,7 @@ class ApplicationPipelineTests(unittest.IsolatedAsyncioTestCase):
             _write_models(root)
             (root / 'input.txt').write_text('Original task source')
             provider = FauxProvider()
-            for text in ('reference output', 'candidate output', 'candidate output', 'composed output'):
+            for text in ('reference output', 'candidate output'):
                 provider.respond_tool_call('read', {'path': 'input.txt'})
                 provider.respond_text(text)
             providers = Mock()
@@ -134,7 +126,7 @@ class ApplicationPipelineTests(unittest.IsolatedAsyncioTestCase):
             generators.register('local-rule', LocalRule)
             factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=providers,
                 improvement_bindings=WorkflowBindings(generators=generators,
-                    composer=lambda plan, services: ComposeFirst(), reflector=lambda plan, services: NoEntry()))
+                     reflector=lambda plan, services: NoEntry()))
             factory.configuration.save()
             factory.reload_configuration()
             original = factory.selection.config_path.read_bytes()
@@ -144,19 +136,19 @@ class ApplicationPipelineTests(unittest.IsolatedAsyncioTestCase):
                 parent = factory.system_version()
                 options = app.workflow_configuration()
                 self.assertEqual([g.choice_id for g in options.generators], ['local-rule'])
-                self.assertFalse(next(c for c in options.components if c.component_id == 'tool-guidance.bash').available)
+                self.assertTrue(next(c for c in options.components if c.component_id == 'bash-tool').available)
                 request = WorkflowRequest('Read input.txt and complete the task.', ('input.txt',), ('base_prompt',),
                                           generator_id='local-rule')
                 preview = app.workflow_preview(request)
                 self.assertEqual(provider.calls, [])
                 self.assertEqual(await app.improve('', preview_token=preview.preview_token), ())
-                self.assertEqual(factory._component_jobs.outcome.selected.output.strip(), 'composed output')
+                self.assertEqual(factory._component_jobs.outcome.selected.output.strip(), 'candidate output')
                 self.assertEqual(factory.system_version(), parent)
                 self.assertEqual(factory.selection.config_path.read_bytes(), original)
                 self.assertEqual((root / 'input.txt').read_text(), 'Original task source')
                 result = app.improvement_history()[0]
-                self.assertIn('composed output', next(s.text for s in result.sections if s.title == 'Task output'))
-                self.assertEqual(len(provider.calls), 13)
+                self.assertIn('candidate output', next(s.text for s in result.sections if s.title == 'Task output'))
+                self.assertEqual(len(provider.calls), 7)
                 for call in [c for c in provider.calls if 'Evaluate granted evidence' not in c['system_prompt']][1:8:2]:
                     self.assertIn('Original task source', repr(call['messages']))
                 with self.assertRaisesRegex(ValueError, 'unknown|consumed'):
@@ -209,17 +201,17 @@ class ApplicationPipelineTests(unittest.IsolatedAsyncioTestCase):
             generators.register('local-rule', RecordRule)
             factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=providers,
                 improvement_bindings=WorkflowBindings(generators=generators,
-                    composer=lambda *args: ComposeFirst(), reflector=lambda *args: Remember()))
+                     reflector=lambda *args: Remember()))
             app = AgentApplication(factory)
             await app.start()
             try:
                 initial = factory.system_version()
                 original = factory._current_runtime_config.system_prompt
                 for index in range(2):
-                    for text in ('reference', 'probe', 'probe', 'final'):
+                    for text in ('reference', 'probe'):
                         provider.respond_text(text)
                     preview = app.workflow_preview(WorkflowRequest('Complete a file task.',
-                        component_ids=('base_prompt',), generator_id='local-rule'))
+                        component_ids=('base_prompt',), generator_id='local-rule', retain_experience=True))
                     await app.improve('', preview_token=preview.preview_token)
                     if index == 0:
                         self.assertEqual(factory.system_version(), initial)
@@ -232,8 +224,8 @@ class ApplicationPipelineTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(len(factory._experience_store.snapshot()), 1)
                 self.assertEqual(len(app.pending_experience()), 1)
                 self.assertEqual(len(requests[0].experience), 0)
-                self.assertEqual(len(requests[2].experience), 1)
-                self.assertEqual(requests[2].baseline.component('base_prompt').files[0].text, original)
+                self.assertEqual(len(requests[1].experience), 1)
+                self.assertEqual(requests[1].baseline.component('base_prompt').files[0].text, original)
                 self.assertEqual(factory._current_runtime_config.system_prompt, original)
             finally:
                 await app.close()
@@ -245,19 +237,19 @@ class ApplicationPipelineTests(unittest.IsolatedAsyncioTestCase):
             async def aclose(self):
                 closed.append('runner')
         def fail(*args):
-            raise RuntimeError('Composer construction failed')
+            raise RuntimeError('Selector construction failed')
         with tempfile.TemporaryDirectory() as directory:
             factory = offline_factory(Path(directory))
             factory._component_jobs.runner_factory = lambda *args: ResourceRunner()
-            factory._component_jobs.composer_factory = fail
+            factory._component_jobs.selector_factory = fail
             app = AgentApplication(factory)
             await app.start()
             try:
                 preview = app.workflow_preview(factory.test_request)
-                with self.assertRaisesRegex(RuntimeError, 'Composer construction failed'):
+                with self.assertRaisesRegex(RuntimeError, 'Selector construction failed'):
                     await app.improve('', preview_token=preview.preview_token)
                 self.assertEqual(closed, ['runner'])
-                self.assertIn('Composer construction failed', '\n'.join(s.text for s in app.improvement_history()[0].sections))
+                self.assertIn('Selector construction failed', '\n'.join(s.text for s in app.improvement_history()[0].sections))
                 self.assertIsNone(factory._component_jobs.services)
             finally:
                 await app.close()

@@ -112,7 +112,6 @@ class ExecutionRequest:
     component_ids: tuple[str, ...]
     material_id: str
     scope: str
-    feedback: str
     parameters: tuple[tuple[str, Any], ...] = ()
 
 

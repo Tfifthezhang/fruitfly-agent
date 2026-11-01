@@ -14,9 +14,6 @@ class EditorInstructions:
         'Only granted harness paths may be edited. Ground claims in supplied execution records. '
         'Do not invent scores, answers or evidence. Preserve working components. '
         'Task-local facts must be labelled and rechecked on reuse.')
-    invariant: str = 'Diagnose procedure, tool use, completion and repeated mechanical work. Propose the smallest supported changes.'
-    domain: str = 'Diagnose domain reasoning, source fidelity, constraints and workspace facts. Verify facts against this task.'
-    compose: str = 'Compare baseline and candidate executions. Adopt, revise or reject edits using behavioral contrasts. Resolve conflicts and include required dependencies.'
     reflect: str = ('Inspect all edits and execution contrasts. Adoption alone proves no improvement. '
         'Mark confounded effects and unsupported attribution. Return NO_ENTRY if evidence is insufficient, '
         'otherwise JSON {"cue":"situation shape","lesson":"component operation",'
@@ -69,9 +66,6 @@ class EditorInstructionTarget:
         descriptions = {
             'system':'Overall editor analysis, evidence use and candidate procedure.',
             'propose':'Form a testable behavioral hypothesis from observed evidence.',
-            'invariant':'Diagnose procedure, repeated work, recovery and completion.',
-            'domain':'Diagnose domain reasoning, constraints and source fidelity.',
-            'compose':'Combine executed changes and resolve conflicting hypotheses.',
             'reflect':'Derive reusable lessons with limitations from executed contrasts.'}
         return tuple(OptimizationField('parameters.instructions.'+name,'string',descriptions[name],value,
             getattr(EditorInstructions(),name),unit='characters',minimum=1,maximum=16000) for name,value in asdict(instructions).items())

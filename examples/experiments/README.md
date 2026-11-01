@@ -2,52 +2,39 @@
 
 [Up: Examples](../README.md)
 
-Use one small experiment file and referenced component/task/comparison documents.
+Use one small experiment file and referenced component/task documents.
 Read [the field guide](../../fruitfly_agent/experiments/CONFIGURATION.md) for the
 schema and [component syntax](../../fruitfly_agent/runtime_spec/COMPONENTS.md) for
 H/S/I files. All recipes use the same format without version markers.
 
 | Recipe | Required material |
 |---|---|
-| [Native](native.example.yaml) | Generated system and [native task](tasks/native.yaml) |
 | [Benchmark smoke](benchmark-smoke.example.yaml) | Prepared [Eval collection](tasks/tb4-smoke.yaml) |
-| [Benchmark with execution edits](benchmark.example.yaml) | Same collection, explicit tool-parallelism grant |
-| [Editor study](editor.example.yaml) | Installed [editor material](tasks/editor.yaml), disjoint private packages |
+| [Benchmark with prompt edits](benchmark.example.yaml) | Same collection, explicit prompt grant |
+| [Editor study](editor.example.yaml) | Embedding with registered backend, [editor material](tasks/editor.yaml) and disjoint private packages |
 | [Multiple collections](multi-task.example.yaml) | Prepared requests/hosts referenced by [multi-task material](tasks/multi.yaml) |
 | [TB4 request](tb4-smoke-request.example.json) | Benchmark smoke and the [Linux walkthrough](TB4_SERVER.md) |
 
 These YAMLs reference additional files; copying one experiment alone is not a
 complete workspace. Initialization writes the installed matching tree safely.
 
-## Start a native experiment
+## Initialize system configuration
 
-Install using [Getting started](../../GETTING_STARTED.md#install), then run inside
-an existing empty workspace:
+Run inside an existing workspace:
 
 ```bash
 fruitfly-agent-lab init
 ```
 
-Edit `.fruitfly/models.yaml` for your account and place the key privately
-in `secrets.env` or the process environment. Model declarations contain key
-variable names only. Select aliases in `default-config.yaml`. Edit your task in
-`.fruitfly/tasks/native.yaml`, and component values under `.fruitfly/components/`.
+This generates the system/model/component files and an empty-key secret file.
+It makes no external requests and does not generate an experiment or task executor.
+Existing regular model catalogs and secrets are preserved; other destinations
+must not exist. Choose actual model aliases from the shared catalog.
 
-```bash
-fruitfly-agent-lab improvement check
-# Model requests and task execution; charges may apply.
-fruitfly-agent-lab improvement run --events jsonl
-fruitfly-agent-lab improvement list
-fruitfly-agent-lab improvement report '<RUN_ID>' --json
-```
-
-The native instruction recipe has behavioral feedback and no independent holdout.
-For measured search/RSI, install the [Python function pack](../improvement/python_functions/README.md#search-and-review)
-and select it in the task document. Native file trials do not inherit a shell,
-network tools or production files. Initialization preserves existing daily files,
-regular model catalogs and secrets, rejects other config collisions and makes no
-external requests. When a catalog already exists, select its actual aliases in
-`default-config.yaml` before checking.
+For task execution, use the benchmark recipe below or an embedding that explicitly
+registers [TaskRunner/episode ports](../../fruitfly_agent/lab/improvement/execution/README.md).
+The `files` material format and editor-study YAML do not supply a backend. CLI
+checks report these sources unavailable and execution stops before model work.
 
 ## Start a remote Linux benchmark experiment
 
@@ -83,15 +70,14 @@ Benchmark development reward alone cannot authorize persistent adoption.
 │   ├── S/                     # Optional retained documents
 │   └── I/                     # Editor and evaluator prompts
 ├── experiment.yaml            # Baseline, task reference, optional edit narrowing, phase times
-├── comparison.yaml            # Fixed comparison conditions
 ├── tasks/                     # Task sources and material references
 ├── eval-request.json          # Optional benchmark request
 └── eval-host.yaml             # Optional machine/runtime host
 ```
 
 Only selected components need files. Model roles live in config; experiment
-`search` fixes scheduling; `assessment` fixes evidence page size; `timeouts` fixes independent phase times. Daily execution limits live in H execution; permitted
-changes in experiment. Paths resolve from the file that declares each reference.
+`execution`, `evidence`, `evaluation` and `stopping` group fixed experiment
+conditions. Daily execution limits live in H execution and are not optimization targets. Paths resolve from the file that declares each reference.
 Daily `.fruitfly/config.yaml` uses the same system schema and shared `models.yaml`.
 Daily and baseline configs select their own model aliases and component documents.
 Copying values does not keep different workspaces in sync.
@@ -101,8 +87,7 @@ Copying values does not keep different workspaces in sync.
 Use [the experiment field guide](../../fruitfly_agent/experiments/CONFIGURATION.md)
 and [the component guide](../../fruitfly_agent/runtime_spec/COMPONENTS.md).
 `benchmark.example.yaml` is a compact runnable recipe, not a duplicate catalog of
-every field. [Comparison](comparison.yaml) and [task documents](tasks/native.yaml)
-are independently editable. A component's own guide defines its parameter limits.
+every field. Evaluation conditions and [task documents](tasks/tb4-smoke.yaml) are independently editable. A component's own guide defines its parameter limits.
 
 ## Select models by role
 
@@ -128,31 +113,21 @@ startup. Official benchmark grading is independent of the model assessor.
 
 Use [multiple collections](multi-task.example.yaml), configure its placeholder
 request/host paths and select one shared baseline. Each collection retains its
-objective, partitions and source identity. Experiment `search` configures `sampling` and
-`promotion_every_rounds`; experiment `trial` controls concurrency and attempts.
-Comparison owns aggregation and regression limits. Edit grants must be supported
+objective, partitions and source identity. Experiment `execution` owns sampling/promotion scheduling and `trial`
+attempts/concurrency. `evaluation.comparison` owns aggregation and regression limits. Edit grants must be supported
 by every selected execution backend. Each editor, leaf execution and evaluator starts its own configured phase clock. Usage is observed without count quotas.
 
 `check --json` lists task keys, coverage, effective values and capabilities.
 Use the actual keys for fixed sampling. Confirmation inputs remain private.
 Candidate concurrency is one. See [task-set contracts](../../fruitfly_agent/lab/improvement/task_sets/README.md).
 
-## Enable task-local research
+## Navigate evidence across rounds
 
-In fixed experiment `search`, this example enables a
-task-local research ledger:
-
-```yaml
-search:
-  research: {enabled: true, max_entries: 128, retrieve_entries: 8}
-  progress: {patience: 3, failure_patience: 2}
-```
-
-Merge these fields into fixed experiment `search`. Research is scheduling
-infrastructure and cannot be edited by I candidates.
-Actual runs call models; configuration checking remains offline.
+`evidence` defines shared read/catalog/search limits. Overview and event indexes
+lead to originals; a cross-round index links hypotheses, receipts, assessments
+and retained selections without a second ledger. Set `stopping.max_rounds` and
+optional no-improvement/failure round limits in the experiment.
 
 For command deliverables, an embedding must explicitly supply a delivery backend
-and a frozen `delivery_manifest` input. The ordinary CLI's in-memory file runner
-has no command backend. See [delivery admission](../../fruitfly_agent/lab/improvement/execution/README.md#validate-declared-task-outputs)
+and a frozen `delivery_manifest` input, in addition to the task runner. See [delivery admission](../../fruitfly_agent/lab/improvement/execution/README.md#validate-declared-task-outputs)
 for the manifest contract and [clean-directory limits](../../fruitfly_agent/lab/improvement/verification/README.md#validate-delivery-bundles).

@@ -41,29 +41,27 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
         task = TaskMaterial('task', 'Complete the supplied work without an answer key')
         services = WorkflowServices(plan)
         outcome = await flow.run(plan, task, baseline, services)
-        self.assertEqual(len(runner.calls), 4)
+        self.assertEqual(len(runner.calls), 2)
         self.assertEqual(outcome.decision.assurance, 'selected')
         self.assertTrue(all('improved' in c.files[0].text for c in outcome.harness.components))
-        self.assertEqual(services.used, {'execution': 4, 'model': 0})
+        self.assertEqual(services.used, {'execution': 2, 'model': 0})
         self.assertEqual(outcome.plan.parent, version())
         self.assertEqual([c.files[0].text for c in baseline.components], ['memory', 'prompt'])
 
-    async def test_parallel_width_and_sequential_depth_have_explicit_evidence(self):
-        for mode in ('parallel', 'sequential'):
-            with self.subTest(mode=mode):
+    async def test_each_round_executes_one_candidate_with_prior_evidence(self):
+        for rounds in (1, 2):
+            with self.subTest(rounds=rounds):
                 flow, plan, baseline, runner = self.build()
-                plan = replace(plan, mode=mode, width=2 if mode == 'parallel' else 1,
-                               depth=2 if mode == 'sequential' else 1)
+                plan = replace(plan, rounds=rounds)
                 outcome = await flow.run(plan, TaskMaterial('task', 'Do work'), baseline, WorkflowServices(plan))
-                self.assertEqual(len(runner.calls), 8 if mode == 'parallel' else 7)
-                self.assertEqual(len(outcome.candidates), 6)
-                if mode == 'sequential':
-                    self.assertTrue(all(c.files[0].text.endswith('improved improved') for c in outcome.harness.components))
+                self.assertEqual(len(runner.calls), rounds + 1)
+                self.assertEqual(len(outcome.candidates), rounds)
+                self.assertTrue(all(c.files[0].text.endswith('improved' if rounds == 1 else 'improved improved') for c in outcome.harness.components))
 
     async def test_feedback_generator_receives_measurements_only_when_declared(self):
         source = type('Scores', (), {'measure': AsyncMock(side_effect=lambda task, record:
             Measurement(record.run_id, 'private-policy', 0.5, 'Measured feedback'))})()
-        flow, plan, baseline, runner = self.build(measurements=source)
+        flow, plan, baseline, runner = self.build()
         generated = RuleGenerator()
         generated.required_capabilities = frozenset({'measurements'})
         flow.generators = GeneratorRegistry()
@@ -71,7 +69,7 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(ValueError, 'capabilities'):
             await flow.run(plan, TaskMaterial('task', 'Do work'), baseline, WorkflowServices(plan))
         self.assertEqual(runner.calls, [])
-        plan = replace(plan, feedback='scored')
+        flow.measurements = source
         await flow.run(plan, TaskMaterial('task', 'Do work'), baseline, WorkflowServices(plan))
         self.assertEqual(generated.requests[0].feedback[0].score, 0.5)
 
@@ -103,6 +101,10 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(outcome.decision.assurance, 'selected')
         self.assertIsNotNone(outcome.selected)
         plan = replace(plan, component_ids=('prompt',))
+        class OutsideGrant(RuleGenerator):
+            async def propose(self, request, services):
+                return await super().propose(replace(request, plan=replace(request.plan, component_ids=('prompt','memory'))), services)
+        flow.generators.factories['rule-generator'] = OutsideGrant
         guarded = WorkflowServices(plan)
         rejected = await flow.run(plan, task, baseline, guarded)
         self.assertTrue(all(set(c.changed_ids) <= {'prompt'} for c in rejected.candidates))
@@ -174,10 +176,10 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
         generator = RuleGenerator()
         flow.generators = GeneratorRegistry()
         flow.generators.register('rule-generator', lambda: generator)
-        plan = replace(plan, width=2)
+        plan = replace(plan)
         await flow.run(plan, TaskMaterial('task', 'Do work'), baseline, WorkflowServices(plan))
-        self.assertEqual(len(generator.requests), 4)
-        self.assertEqual({tuple(r.run_id for r in q.records) for q in generator.requests}, {('run-1', 'run-2')})
+        self.assertEqual(len(generator.requests), 1)
+        self.assertEqual({tuple(r.run_id for r in q.records) for q in generator.requests}, {('run-1',)})
         self.assertTrue(all(q.history == () for q in generator.requests))
 
     async def test_model_based_algorithm_can_use_budgeted_completion_without_editor(self):
@@ -194,8 +196,8 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
         services = WorkflowServices(plan, complete=completion)
         result = await flow.run(plan, TaskMaterial('task', 'Do work'), baseline, services)
         self.assertEqual(result.stop_reason, 'completed')
-        self.assertEqual(completion.await_count, 2)
-        self.assertEqual(services.used['model'], 2)
+        self.assertEqual(completion.await_count, 1)
+        self.assertEqual(services.used['model'], 1)
         self.assertIsNone(services.editor)
 
     def test_discovery_does_not_construct_generators_and_instances_are_job_local(self):
@@ -234,6 +236,6 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
             await services.operation(blocking())
         self.assertTrue(closed.is_set())
         flow.selector.select = AsyncMock(return_value=SelectionDecision('invented', 'No real result'))
-        plan = replace(plan, width=2)
+        plan = replace(plan)
         with self.assertRaisesRegex(ValueError, 'existing completed execution'):
             await flow.run(plan, TaskMaterial('task', 'Do work'), baseline, WorkflowServices(plan))

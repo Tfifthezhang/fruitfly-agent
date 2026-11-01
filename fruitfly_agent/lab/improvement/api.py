@@ -4,11 +4,11 @@ from typing import Any, Callable, Protocol, runtime_checkable
 
 from fruitfly_agent.improvement.contracts.execution import TaskRunner
 from fruitfly_agent.improvement.contracts.assessment import Selector, MeasurementSource, VerificationPolicy
-from fruitfly_agent.improvement.contracts.editing import Composer, Reflector, EditorSession, EvidenceInspector
+from fruitfly_agent.improvement.contracts.editing import Reflector, EditorSession, EvidenceInspector
 from fruitfly_agent.improvement.contracts.pipeline import WorkflowController
 from .components import ComponentRegistry, component_registry, bundle_target, bundle_text
 from fruitfly_agent.lab.improvement.workflow import ImprovementWorkflow as ComponentWorkflow
-from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry, AgentGenerator, AgentComposer
+from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry, AgentGenerator
 from fruitfly_agent.lab.improvement.editor import AgentEditor, model_completion
 from fruitfly_agent.lab.improvement.assessment.selection import AgentSelector
 from fruitfly_agent.lab.improvement.experience.reflection import AgentReflector
@@ -16,12 +16,9 @@ from .assessment.inspection import ReadOnlyInspector
 from fruitfly_agent.lab.improvement.termination.composition import policy_spec
 from .assessment.completed import CompletedAssessmentService
 from .evidence.indexing import organize_evidence
-from .strategies.exploration import ExplorationSettings, ExplorationRegistry, builtin_explorations, validate_exploration
 from .registration import SETTINGS, EDITOR_CONFIG, ASSESSOR_CONFIG, EDITOR_INSTRUCTIONS, SYSTEM_SETTINGS
-from .system_configuration import exploration_settings
 from .experience import entry_to_dict, entry_from_dict, experience_id
 from .execution import ExecutionContext, ExecutionRegistry, builtin_executions
-from .strategies import StrategyRegistry, builtin_strategies
 from .workflow.mechanisms import install_workflow_mechanisms, extension_spec
 from fruitfly_agent.improvement.contracts.stopping import StopPolicy
 from fruitfly_agent.improvement.evidence.reporting import SearchReport, TokenUsage
@@ -31,7 +28,6 @@ class WorkflowBindings:
     """Replace stage implementations with factories owning one job's state."""
     generators: GeneratorRegistry | None = None
     runner: Callable[..., TaskRunner] | None = None
-    composer: Callable[..., Composer] | None = None
     selector: Callable[..., Selector] | None = None
     reflector: Callable[..., Reflector] | None = None
     verifier: VerificationPolicy | None = None
@@ -42,9 +38,6 @@ class WorkflowBindings:
     components: Callable[..., ComponentRegistry] | None = None
     executions: ExecutionRegistry | None = None
     stop_policy: StopPolicy | None = None
-    strategies: StrategyRegistry | None = None
-    exploration: ExplorationSettings | None = None
-    explorations: ExplorationRegistry | None = None
     component_options: dict | None = None
     hooks: Callable[[ExecutionContext], None] | None = None
     delivery_backend: Any = None
@@ -81,7 +74,6 @@ class SearchCompletionSource(Protocol):
 
 __all__ = [
     'ASSESSOR_CONFIG',
-    'AgentComposer',
     'AgentEditor',
     'AgentGenerator',
     'AgentReflector',
@@ -91,7 +83,6 @@ __all__ = [
     'EDITOR_CONFIG',
     'EDITOR_INSTRUCTIONS',
     'ExecutionContext',
-    'ExplorationSettings',
     'GeneratorRegistry',
     'ReadOnlyInspector',
     'SETTINGS',
@@ -102,8 +93,6 @@ __all__ = [
     'SearchCompletionSource',
     'WorkflowBindings',
     'builtin_executions',
-    'builtin_explorations',
-    'builtin_strategies',
     'bundle_target',
     'bundle_text',
     'component_registry',
@@ -112,12 +101,12 @@ __all__ = [
     'experience_id',
     'extension_spec',
     'install_workflow_mechanisms',
-    'model_completion',
+    'model_completion', 'evaluator_instructions',
     'policy_spec',
-    'validate_exploration', 'evaluator_instructions', 'exploration_settings',
 ]
 
 
 def evaluator_instructions(settings):
     from .assessment.instructions import EvaluatorInstructions
     return EvaluatorInstructions(**settings.get('evaluator', {}).get('instructions', {}))
+

@@ -7,7 +7,7 @@ import unittest
 from fruitfly_agent.lab.improvement.assessment.online import AssessedRunner
 from fruitfly_agent.improvement.contracts.live import Assessment, ControlRequest, EvidencePosition, ExecutionEvent, Metric
 from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
-from fruitfly_agent.lab.improvement.execution.file_runner import FileTaskRunner
+from tests.support.task_execution import TaskRunnerFixture
 from fruitfly_agent.lab.improvement.assessment.metrics import ProcessMetrics
 from fruitfly_agent.improvement.contracts.plans import RunPlan
 from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
@@ -37,7 +37,7 @@ class LiveExecutionTests(unittest.IsolatedAsyncioTestCase):
         provider = FauxProvider()
         provider.respond_tool_call('write', {'path': 'answer.txt', 'content': 'delivered'})
         provider.respond_text('done')
-        runner = FileTaskRunner(AgentLoopConfig(provider=provider), registry, artifacts, services)
+        runner = TaskRunnerFixture(AgentLoopConfig(provider=provider), registry, artifacts, services)
         assessed = AssessedRunner(runner, artifacts=artifacts, services=services,
             assessors=(ProcessMetrics,), interval=3)
         record = await assessed.execute(plan, task, baseline)
@@ -87,7 +87,7 @@ class LiveExecutionTests(unittest.IsolatedAsyncioTestCase):
         class Broken:
             assessor_id = 'broken'
             async def assess(self, event): raise RuntimeError('judge unavailable')
-        runner = AssessedRunner(FileTaskRunner(AgentLoopConfig(provider=provider), registry, artifacts, services),
+        runner = AssessedRunner(TaskRunnerFixture(AgentLoopConfig(provider=provider), registry, artifacts, services),
             artifacts=artifacts, services=services, assessors=(Broken,))
         result = await runner.execute(plan, task, baseline)
         self.assertEqual(result.status, 'completed')
@@ -100,7 +100,7 @@ class LiveExecutionTests(unittest.IsolatedAsyncioTestCase):
             assessor_id = 'exhausted'
             async def assess(self, event): raise asyncio.CancelledError
         provider = FauxProvider(); provider.respond_text('answer')
-        runner = AssessedRunner(FileTaskRunner(AgentLoopConfig(provider=provider), registry, artifacts, services),
+        runner = AssessedRunner(TaskRunnerFixture(AgentLoopConfig(provider=provider), registry, artifacts, services),
             artifacts=artifacts, services=services, assessors=(Exhausted,))
         with self.assertRaises(asyncio.CancelledError):
             await runner.execute(plan, task, baseline)

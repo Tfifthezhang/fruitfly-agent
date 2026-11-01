@@ -8,6 +8,7 @@ from .prompts import UPDATE, SHRINK
 class WorkingMemoryConfig:
     update_instructions: str = field(default=UPDATE, metadata={'description': 'Merge new evidence into task memory: preserve requirements, corrections, decisions, failures, and unresolved work.', 'advanced': False})
     shrink_instructions: str = field(default=SHRINK, metadata={'description': 'Shorten oversized task memory while preserving necessary facts and explicit uncertainty.', 'advanced': False})
+    readback_instructions: str = field(default='Use read on the supplied history index and original message references to verify omitted details before relying on memory.', metadata={'description': 'Guide when to read original evidence after context reduction.', 'advanced': False})
     memory_tokens: int = field(default=2048, metadata={'description': 'Target task-memory token capacity; larger memory retains more content but consumes request context.', 'advanced': False, 'minimum': 1, 'maximum': 32000})
     update_every_messages: int = field(default=8, metadata={'description': 'New canonical messages between memory updates; frequent updates can increase auxiliary model work.', 'advanced': False, 'minimum': 1, 'maximum': 1024})
     switch_ratio: float = field(default=.85, metadata={'description': 'Input-capacity ratio that triggers an update or projection switch; integrity and coverage checks still apply.', 'advanced': False, 'minimum': 0.1, 'maximum': 1})
@@ -18,7 +19,7 @@ class WorkingMemoryConfig:
     auxiliary_timeout_seconds: float = field(default=60.0, metadata={'description': 'Seconds allowed for one auxiliary update; cannot extend the task deadline.', 'advanced': True, 'minimum': 0.01, 'maximum': 600})
 
     def __post_init__(self):
-        for name in ('update_instructions', 'shrink_instructions'):
+        for name in ('update_instructions', 'shrink_instructions', 'readback_instructions'):
             value = getattr(self, name)
             if not isinstance(value, str) or not 1 <= len(value.strip()) <= 12000:
                 raise ValueError(name + ' must contain 1 to 12000 characters')

@@ -79,7 +79,7 @@ contribute observed usage. Model roles are outside ordinary edit grants.
 | `base_prompt` (H) | `instructions.system` | [Base prompt](../lab/base_prompt/README.md) |
 | `execution-policy` (H) | `settings`: daily optional tool/turn limits, recovery and tool execution | [Execution policy](../lab/execution_policy/README.md) |
 | Tool/environment/context mechanism (H) | Its registered descriptors | [Catalog](../lab/catalog/CONFIGURATION.md) |
-| `tool-guidance.<tool>` (H) | `instructions.usage`; enabled tool must exist | [Tools](../lab/tools/README.md) |
+| `tool-catalog` (H) | `instructions.usage`; source-owned tool details load through existing `read` | [Tools](../lab/tools/README.md) |
 | `skill-document` (S) | `content.body`, `settings.max_chars`, optional `settings.source_path` | [Retained targets](../lab/improvement/targets/README.md) |
 | `improvement-editor` (I) | `instructions.{system,propose,invariant,domain,compose,reflect}` | [Editor](../lab/improvement/editor/README.md) |
 | `improvement-evaluator` (I) | `instructions.criteria`, `instructions.assess`, `instructions.compare` | [Assessment](../lab/improvement/assessment/README.md) |

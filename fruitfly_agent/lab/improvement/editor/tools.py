@@ -4,7 +4,7 @@ from fruitfly_agent.core.data_model import AgentToolResult, TextBlock
 from fruitfly_agent.core.tool_runtime import AgentTool
 
 
-def editing_tools(workspace, *, submit=None):
+def editing_tools(workspace, *, submit=None, settings=None):
     async def write(ctx):
         workspace.write(ctx.args['path'],ctx.args['content'])
         return AgentToolResult(content=[TextBlock('Candidate file saved')])
@@ -30,7 +30,7 @@ def editing_tools(workspace, *, submit=None):
         row=next((r for r in rows if r['component_id']==ctx.args['component_id']),None)
         if row is None:raise ValueError('component is outside the resolved target set')
         from ..evidence.catalog import WorkspaceEvidence
-        value=WorkspaceEvidence(workspace).read(row['details_path'],offset=ctx.args.get('offset',0),limit=ctx.args.get('limit',12000))
+        value=WorkspaceEvidence(workspace, settings=settings).read(row['details_path'],offset=ctx.args.get('offset',0),limit=ctx.args.get('limit'))
         return AgentToolResult(content=[TextBlock(json.dumps(value,ensure_ascii=False))])
     tools.extend((AgentTool(name='list_targets',label='Discover optimization targets',description='Page the frozen legal target index. Details are loaded only when requested.',
         parameters={'type':'object','properties':{'cursor':{'type':'integer'},'limit':{'type':'integer'}}},execute=targets),

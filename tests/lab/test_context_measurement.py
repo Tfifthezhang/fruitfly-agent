@@ -122,3 +122,18 @@ class ContextMeasurementTests(unittest.IsolatedAsyncioTestCase):
         reset = await meter.measure(view(), provider)
         self.assertEqual(first.input_tokens, reset.input_tokens)
         self.assertNotEqual(first.request_id, reset.request_id)
+
+    async def test_trial_scope_keeps_policy_and_resets_observations_and_count_cache(self):
+        from fruitfly_agent.lab.context_manager.measurement import new_measurement_scope
+        service=MeasurementService(MeasurementConfig(margin_tokens=17,margin_ratio=.1))
+        provider=NS(context_usage_tokens=lambda usage:usage.input_tokens)
+        original=await service.measure(view(),provider)
+        service.observe(original,Usage(input_tokens=original.input_tokens*3),provider)
+        service.counts[('original',)]=99
+        fresh=new_measurement_scope(service)
+        self.assertIsNot(fresh,service)
+        self.assertEqual(fresh.config,service.config)
+        self.assertEqual((fresh.raw,fresh.ratios,fresh.counts),({},{},{}))
+        self.assertEqual((await fresh.measure(view(),provider)).input_tokens,original.input_tokens)
+        self.assertTrue(service.ratios)
+        self.assertTrue(service.counts)

@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from fruitfly_agent.core.session import Session
-from fruitfly_agent.interactive import AgentApplication, ConfigurationLaunchResult, TerminalFrontend
+from fruitfly_agent.interactive import AgentApplication, TerminalFrontend
 from fruitfly_agent.run import cli
 from fruitfly_agent.run.application import RunApplicationFactory
 from tests.support.faux_provider import FauxProvider
@@ -202,7 +202,11 @@ class ResumeHistoryTest(unittest.IsolatedAsyncioTestCase):
             path = await self._seed(root, registry)
             provider.respond_text("new answer")
             setup = Mock()
-            setup.run.return_value = ConfigurationLaunchResult(start=True)
+            setup.run.return_value = 'start'
+            async def wait(task, **kwargs):
+                await task
+                return True
+            setup.wait_for_start.side_effect = wait
             output = io.StringIO()
             frontend_type = TerminalFrontend
 
@@ -211,13 +215,14 @@ class ResumeHistoryTest(unittest.IsolatedAsyncioTestCase):
                                      line_editor=ScriptedLines("new question", "/exit"), **kwargs)
 
             with patch.object(cli, "load_env", return_value={}), patch.object(
-                cli, "TerminalConfigurationFrontend", return_value=setup
+                cli, "TerminalStartupFrontend", return_value=setup
             ), patch("fruitfly_agent.run.runtime.assembly.default_registry", return_value=registry), patch.object(
                 cli, "TerminalFrontend", side_effect=frontend
             ), contextlib.redirect_stdout(output):
                 code = await cli.run_cli(_args(cwd=tmp, session=str(path), resume=True))
             self.assertEqual(code, 0)
-            setup.run.assert_called_once_with(configure=False)
+            setup.run.assert_called_once()
+            self.assertIn('Resume', setup.run.call_args.args[0].session)
             self.assertEqual(len(provider.calls), 2)
             context = provider.calls[1]["messages"]
             self.assertEqual([m.role for m in context], ["user", "assistant", "user"])

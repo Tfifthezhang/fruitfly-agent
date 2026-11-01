@@ -13,7 +13,7 @@ Application, filesystem store or activation service.
 |---|---|
 | Improvement | Stage transitions, evidence identity, independent stage times, scheduling, lifecycle hooks and result retention |
 | [Core](../core/README.md) | Existing messages, tools, Provider and Agent loop contracts |
-| [Lab](../lab/improvement/README.md) | Editors, assessors, selection/exploration/soft stopping, research, delivery validation, strategies and adapters |
+| [Lab](../lab/improvement/README.md) | Editors, assessors, selection, soft stopping, evidence navigation, delivery validation and adapters |
 | [Catalog](../lab/catalog/README.md) | Configuration, supported fields, dependencies and assembly |
 | [Run](../run/improvement/README.md) / Application | Composition, durable records, publication and explicit activation |
 | [Eval](../../fruitfly_eval/improvement/README.md) | Optional benchmark runners and benchmark episode adapters |
@@ -26,9 +26,9 @@ existing Core Agent loop supplied by Lab, rather than a second model loop here.
 ## Use the public ports
 
 [api.py](api.py) exposes immutable values and runtime services. Construct
-`ImprovementWorkflow` with an explicit strategy registry, selection and stop policies,
-components, generators, runner and composition ports. Optional measurement, assessment,
-exploration, reflection and verification ports retain separate responsibilities.
+`ImprovementWorkflow` with selection/stop policies, components, generators and a
+runner. The engine executes one reference, then at most one candidate per round.
+Optional measurement, assessment, reflection and verification retain separate responsibilities.
 Lab's workflow assembly supplies built-in defaults. Use `async with WorkflowServices`
 or close it explicitly; borrowed ports remain caller-owned.
 
@@ -42,14 +42,13 @@ or close it explicitly; borrowed ports remain caller-owned.
 | [Extensions](extensions/README.md) | Immutable lifecycle snapshots and bounded context contributions |
 
 [Lab termination](../lab/improvement/termination/README.md) supplies concrete soft
-stop conditions. [Lab research](../lab/improvement/research/README.md) supplies
-research context and progress analysis; none belongs in
-the kernel merely because it affects task success.
+stop conditions. [Lab evidence](../lab/improvement/evidence/README.md) supplies navigation and
+cross-round references. Concrete retrieval policy stays outside the kernel.
 
 ## Handle failure without inventing success
 
 Ordinary stage exceptions and local operation timeouts become attributable
-`StageFailure` records. Proposal/composition failure preserves earlier candidates;
+`StageFailure` records. Proposal failure preserves earlier candidates;
 execution failure preserves a failed receipt; missing measurement prevents an
 unsupported promotion; failed selection retains the incumbent. A failed reference
 can support diagnosis only when its granted facts explicitly mark useful observed

@@ -96,17 +96,17 @@ ENV_CONTRACT_PUBLIC_API = {
 LAB_ENV_PUBLIC_API = {"LocalEnv"}
 
 LAB_HOST_PUBLIC_API = {
-    "ASSESSOR_CONFIG", "AgentComposer", "AgentEditor", "AgentGenerator",
+    "ASSESSOR_CONFIG", "AgentEditor", "AgentGenerator",
     "AgentReflector", "AgentSelector", "CompletedAssessmentService", "ComponentWorkflow",
-    "EDITOR_CONFIG", "EDITOR_INSTRUCTIONS", "ExecutionContext", "ExplorationSettings",
+    "EDITOR_CONFIG", "EDITOR_INSTRUCTIONS", "ExecutionContext",
     "GeneratorRegistry",  "ReadOnlyInspector", "SETTINGS",
     "SYSTEM_SETTINGS", "SearchActivity", "SearchActivitySource", "SearchCompletion",
     "SearchCompletionSource", "WorkflowBindings", 
-    "builtin_executions", "builtin_explorations", "builtin_strategies", "bundle_target",
+    "builtin_executions", "bundle_target",
     "bundle_text", "component_registry", "entry_from_dict", "entry_to_dict", "experience_id",
     "extension_spec", "install_workflow_mechanisms", "model_completion", "policy_spec",
       "evaluator_instructions",
-    'validate_exploration', 'exploration_settings', 'organize_evidence',
+    'organize_evidence',
 
 }
 

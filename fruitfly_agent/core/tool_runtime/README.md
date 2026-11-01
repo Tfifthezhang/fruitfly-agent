@@ -62,3 +62,7 @@ associate concurrent results; callbacks do not guarantee completion order.
 `AgentTool.requires_exclusive_batch` rejects every call in a mixed batch before
 execution. A batch ends the loop only when every result has `terminate=True`.
 See [runtime rules](../README.md#runtime-rules) for other termination conditions.
+
+[resources.py](resources.py) defines the host-owned `ReadableResources` contract.
+Concrete Lab routing lets the existing `read` tool access scoped immutable
+resources without treating their references as filesystem paths.

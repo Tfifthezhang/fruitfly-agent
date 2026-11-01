@@ -32,9 +32,11 @@ Harbor task environments, then collects official verifier results. Shared
 preparation and lifecycle stay in Eval; benchmark declarations do not configure
 runtime interfaces. Shared and independent verifiers reuse the same Harbor
 integration; only Agent environments receive the Agent runtime and credentials.
-Removing Eval leaves normal Agent use and generic improvement intact.
+Removing Eval leaves normal Agent use and generic Improvement intact.
+Improvement task execution then needs an explicitly registered backend; the
+framework supplies no local task executor.
 
-The [Improvement runtime](improvement/README.md), with [Lab implementations](lab/improvement/README.md), separates candidate generation, execution, composition, selection, verification and reflection through public ports. Object-owned component adapters expose legal changes; Run and Application retain persistence and activation.
+The [Improvement runtime](improvement/README.md), with [Lab implementations](lab/improvement/README.md), separates candidate generation, execution, selection, verification and reflection through public ports. Object-owned component adapters expose legal changes; Run and Application retain persistence and activation.
 
 [Instruction components](lab/improvement/targets/README.md#improve-multiple-instruction-components) retain separate H/S/I ownership. A candidate can modify multiple executable components; unregistered bindings and missing runner capabilities fail explicitly.
 
@@ -59,6 +61,11 @@ A prompt-driven model evaluator supplies dimension judgments, process signals an
 Run separates [configuration](run/configuration/README.md), [runtime preparation](run/runtime/README.md), [storage](run/storage/README.md), [improvement hosting](run/improvement/README.md), and [adapters](run/adapters/README.md). Its Factory composes these services; leaf services receive explicit capabilities and own their local state.
 
 Interactive separates Contracts, Application, Session, Interaction, and Terminal. It keeps lifecycle authority in Application and exposes independent search, candidate, and task material contracts. Its terminal uses [registered command handlers](interactive/terminal/README.md#register-a-command); feature flows consume explicit capabilities and share one input owner.
+
+Interactive CLI launches first show an offline [startup panel](interactive/terminal/features/startup/README.md).
+Configuration uses the same editor as `/config`; only explicit Start constructs
+and connects runtime resources. Failed startup returns to the panel after cleanup.
+Application remains the resource lifecycle owner.
 
 Built-in chat appends completed output to native terminal scrollback; menus borrow
 an alternate screen. Lab publishes execution descriptions through Catalog, and
@@ -104,7 +111,7 @@ declarations without vendor-specific branches. Model Providers remain independen
 | Live events | Frontend observation; not a complete persisted request trace |
 
 Core enforces per-turn tool allowances and bounds consecutive truncated responses;
-Run and Eval share the declarative execution configuration (tool limit default 64).
+Run and Eval share the declarative execution configuration (tool limit default 512).
 Manifest schema 7 records effective execution parameters and the resolved harness
 inventory. Historical manifests remain validated against their original contents. Terminal loop diagnostics distinguish
 budget stops from normal completion without granting task success. See
@@ -161,8 +168,8 @@ handles support scoped stop; live code/state replacement is not implied.
 
 The Improvement [extension contract](improvement/extensions/README.md) supplies
 immutable lifecycle snapshots and bounded proposal context. Research state,
-progress analysis and task-output validation remain
-[replaceable Lab mechanisms](lab/improvement/research/README.md). They share
+evidence navigation and task-output validation remain
+[Lab responsibilities](lab/improvement/evidence/README.md). They share
 ordinary and candidate configuration paths without adding a second Agent loop.
 
 Request measurement is a separate Lab capability from reduction. Core's generic

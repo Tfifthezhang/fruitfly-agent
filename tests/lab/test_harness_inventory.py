@@ -7,7 +7,7 @@ from unittest.mock import Mock
 
 from fruitfly_agent.lab.catalog import (builtin_catalog, resolve_harness, ComponentSpec,
     MechanismDefinition, MechanismDescriptor, MechanismContribution, MechanismEffects, MechanismSelection)
-from fruitfly_agent.lab.execution_policy import ExecutionPolicyTarget
+from fruitfly_agent.lab.improvement.components.parameters import ParameterTarget
 from fruitfly_agent.runtime_spec import HarnessProfile, execution_kwargs
 
 
@@ -29,7 +29,7 @@ class HarnessInventoryTests(unittest.TestCase):
         self.assertEqual(inventory.tools, ('read',))
         self.assertEqual({c.component_id for c in inventory.components if c.role == 'S'}, {'skill-document'})
         with self.assertRaisesRegex(ValueError, 'backend'):
-            inventory.select(('tool-guidance.read',), frozenset(), frozenset({'H'}))
+            inventory.select(('tool-catalog',), frozenset(), frozenset({'I'}))
         selected = inventory.select(('base_prompt',), frozenset(), frozenset({'H'}))
         self.assertEqual([c.component_id for c in selected], ['base_prompt'])
 
@@ -43,22 +43,27 @@ class HarnessInventoryTests(unittest.TestCase):
         catalog = builtin_catalog().extended((definition,))
         enabled = resolve_harness(HarnessProfile('baseline', mechanisms=(MechanismSelection('fixture-owner'),)), catalog)
         disabled = resolve_harness(HarnessProfile('baseline'), catalog)
-        self.assertIn('tool-guidance.fixture-operation', {c.component_id for c in enabled.components})
+        self.assertIn('tool-catalog', {c.component_id for c in enabled.components})
+        self.assertFalse(any(c.component_id.startswith('tool-guidance.') for c in enabled.components))
         self.assertIn('fixture-state', {c.component_id for c in enabled.components})
         self.assertNotIn('fixture-state', {c.component_id for c in disabled.components})
+        from fruitfly_agent.lab.catalog import LabCatalog
+        tool_only = replace(definition, component_specs=None)
+        with self.assertRaisesRegex(ValueError, 'no optimization component'):
+            resolve_harness(HarnessProfile('baseline', mechanisms=(MechanismSelection('fixture-owner'),)),
+                LabCatalog((tool_only,)))
         installer.assert_not_called()
 
-    def test_execution_policy_respects_field_permissions_ranges_and_other_owners(self):
-        config=SimpleNamespace(**execution_kwargs({}))
-        target=ExecutionPolicyTarget(config)
-        field='parameters.settings.tool_execution.max_parallel'
-        options={'editable_fields':[field],'bounds':{field:{'minimum':1,'maximum':16}}}
+    def test_owner_parameter_grants_respect_fields_ranges_and_protected_values(self):
+        target=ParameterTarget(builtin_catalog().get('bash-tool'), {}, {'default_timeout_seconds'})
+        field='parameters.settings.default_timeout_seconds'
+        options={'editable_fields':[field],'bounds':{field:{'minimum':1,'maximum':1200}}}
         target.validate_options(options)
-        value=json.loads(target.snapshot().text);value['settings']['tool_execution']['max_parallel']=2
+        value=json.loads(target.snapshot().text);value['settings']['default_timeout_seconds']=2
         target.validate_change(json.dumps(value),options)
-        value['settings']['tool_execution']['max_parallel']=32
+        value['settings']['default_timeout_seconds']=1250
         with self.assertRaisesRegex(ValueError,'bounds'):target.validate_change(json.dumps(value),options)
-        value=json.loads(target.snapshot().text);value['settings']['max_turns']=8
+        value=json.loads(target.snapshot().text);value['settings']['output_characters']=200
         with self.assertRaisesRegex(ValueError,'fixed'):target.validate_change(json.dumps(value),options)
-        for field in ('parameters.settings.max_turns','parameters.settings.max_tool_calls_per_turn'):
+        for field in ('parameters.settings.max_active_commands','parameters.settings.output_characters'):
             with self.assertRaises(ValueError):target.validate_options({'editable_fields':[field]})

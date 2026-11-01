@@ -13,7 +13,7 @@ class WorkflowPanel:
         self.execute, self.history = execute, history
         generators = tuple(c.choice_id for c in configuration.generators if c.available)
         self.request = WorkflowRequest(generator_id=generators[0] if generators else "", direction=direction,
-            strategy_id="simple", retain_experience=False)
+             retain_experience=False)
 
     async def run(self):
         while True:

@@ -45,7 +45,7 @@ class CompletedAssessmentService:
         from .evaluator import ModelEvaluator
         self.config, self.artifacts, self.services = config, artifacts, services
         self.instructions = instructions if isinstance(instructions, EvaluatorInstructions) else EvaluatorInstructions(**(instructions or {}).get('instructions', {}))
-        self.evaluator = ModelEvaluator(config, artifacts, instructions=self.instructions, **(evidence_settings or {}))
+        self.evaluator = ModelEvaluator(config, artifacts, instructions=self.instructions, settings=evidence_settings)
         self.values = {}
 
     async def assess(self, task, record):
@@ -69,11 +69,11 @@ class CompletedAssessmentService:
         return replace(record, artifacts=(*record.artifacts, Resource('assessment.json', reference, 'application/json', 'diagnostic'))), (assessment,)
 
     async def compare(self, task, records, incumbent):
-        from fruitfly_agent.improvement.contracts.search import ExplorationDecision
+        from fruitfly_agent.improvement.contracts.assessment import SelectionDecision
         eligible = tuple(r for r in records if r.status == 'completed')
         inputs = tuple(completed_input(task, r, self.artifacts) for r in eligible)
         data, reference = await self.evaluator.evaluate(task, eligible, self.services, inputs=inputs, incumbent=incumbent.run_id)
-        return ExplorationDecision(data['choice'] or incumbent.run_id, data['reason'], tuple(data['evidence_ids']), 'process-guided')
+        return SelectionDecision(data['choice'] or incumbent.run_id, data['reason'], evidence_ids=tuple(data['evidence_ids']), comparison_id=reference)
 
     async def compare_batches(self, groups, incumbent):
         votes, evidence, reasons, references = [], [], [], []

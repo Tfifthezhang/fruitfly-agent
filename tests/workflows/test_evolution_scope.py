@@ -29,6 +29,6 @@ class EvolutionScopeTests(unittest.IsolatedAsyncioTestCase):
                 preview=app.workflow_preview(factory.test_request)
                 await app.improve('',preview_token=preview.preview_token)
                 totals.append(factory.improvement_usage()['execution'])
-                self.assertEqual(factory._component_jobs.completion().report.trial_calls, 4)
-            self.assertEqual(totals,[4,8])
+                self.assertEqual(factory._component_jobs.completion().report.trial_calls, 2)
+            self.assertEqual(totals,[2,4])
             self.assertFalse(hasattr(factory,'improvement_budget_scope'))

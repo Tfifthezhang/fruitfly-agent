@@ -1,55 +1,33 @@
-# Execution Policy Component
+# Configure Execution Policy
 
 [Up: Lab](../README.md)
 
-Expose declared scalar Core execution parameters as one H component. Runtime
-configuration, candidate execution and publication share the
-[runtime specification](../../runtime_spec/README.md). Core supplies generic execution settings; this module owns their optimization surface.
-Improvement protects tool/turn count fields and runs without those quotas. Recovery attempts and tool ordering/parallelism remain editable.
+`execution-policy` is an H configuration surface for fixed Core runtime settings.
+It has no Improvement optimization target. Configuration does not imply editable
+experiment scope or a replaceable execution algorithm.
 
-| Entry | Responsibility |
-|---|---|
-| `ExecutionPolicyTarget` in `__init__.py` | Snapshot effective values as JSON, validate changes and project isolated trials |
-| `validate_component_options` | Pure validation of experiment field permissions and bounds |
-| Catalog instruction registration | Declare component metadata and prepare the object-owned adapter |
-
-The component ID is `execution-policy`, its schema is `execution-policy-v1`, and
-its publication binding is `configuration / execution`. An execution backend must
-declare `execution-config`. No arbitrary YAML file or Python callback is editable.
+| Setting | Default | Behavior |
+|---|---:|---|
+| `max_tool_calls_per_turn` | 512 | Daily per-turn tool allowance; 0 prevents calls |
+| `max_turns` | 32 | Daily assistant-turn allowance |
+| `max_context_recovery_attempts` | 6 | Consecutive context recovery allowance |
+| `tool_execution.max_parallel` | 8 | Concurrent calls in an eligible tool batch |
+| `tool_execution.default_execution_mode` | parallel | Default tool-batch execution mode |
 
 ## Permit selected changes
 
-Add the component explicitly in the experiment configuration:
+Change `parameters.settings` in the system component document through the ordinary
+[runtime specification](../../runtime_spec/COMPONENTS.md). Unknown fields fail.
+These settings are fixed conditions during Improvement. Editor, evaluator and
+trial invocations remove tool/turn count caps and use independent stage times.
+Mechanism-owned execution fields retain their declared owner checks.
 
-```yaml
-edit:
-  execution-policy:
-    fields: [parameters.settings.tool_execution.max_parallel]
-    bounds:
-      parameters.settings.tool_execution.max_parallel: {minimum: 1, maximum: 16}
-```
-
-Omitting experiment `edit` discovers legal fields automatically. Explicit grants narrow that set. Nested fields use dotted paths such
-as `parameters.settings.tool_execution.max_parallel`. Typed embedding requests may use the adapter defaults; enabled mechanism owners exclude
-fields they control. Options for unselected, absent or unsupported
-components fail. A fixed field cannot change, and every proposal must also satisfy
-the base parameter schema. The initial value must fit the declared bounds.
-
-Mechanisms declare `execution_fields` when they control scalar settings. Shared
-fields cannot have competing mechanism owners. The policy does not edit these
-fields or rewrite their controlling algorithms. Mechanism enablement, model
-selection, permissions, phase times and grading remain fixed.
-
-Candidates are constructed in isolation. Run records full effective execution
-settings in manifest schema 7 and H identity. Native trials also save
-`runtime-execution.json`. Existing verification and activation guards still apply;
-development selection does not grant persistent adoption.
+Run records effective settings in RuntimeManifest; compatible task backends can
+also retain `runtime-execution.json`. Neither configuration nor selection grants
+activation of arbitrary code.
 
 ## Verify offline
 
-```bash
-.venv/bin/python -m unittest tests.lab.test_harness_inventory tests.workflows.test_execution_policy tests.run.test_execution_limits
-```
-
-Synthetic verification tests demonstrate construction, isolation and H-only
-activation. They establish no quality improvement or real model compatibility.
+`tests.run.test_execution_limits` checks live configuration and fixed trial
+settings. `tests.workflows.test_execution_policy` checks rejected optimization
+grants, continuation isolation and the separate Bash timeout surface.

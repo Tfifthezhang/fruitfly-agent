@@ -256,7 +256,9 @@ class RlmAssemblyTest(unittest.TestCase):
             self.assertEqual(["ipython"], [tool.name for tool in result.config.tools])
             self.assertIn("Persistent IPython workspace", result.config.system_prompt)
             self.assertIs(result.config.provider, main)
-            self.assertIsNone(result.context_pipeline)
+            self.assertEqual(result.context_pipeline.profile.externalization, ())
+            self.assertEqual(result.context_pipeline.profile.reduction, ())
+            self.assertEqual(result.context_pipeline.profile.augmentation, ('instruction-components.tool-catalog',))
             self.assertIn("ipython-tool", result.components)
             self.assertEqual([(None, 4096)], resolver_calls)
 
@@ -295,7 +297,7 @@ class RlmAssemblyTest(unittest.TestCase):
 
 
 class StandaloneIpythonToolTest(unittest.IsolatedAsyncioTestCase):
-    async def test_selected_tool_executes_without_context_pipeline(self) -> None:
+    async def test_selected_tool_executes_without_externalization_or_reduction(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             result = assemble_lab(
@@ -317,7 +319,8 @@ class StandaloneIpythonToolTest(unittest.IsolatedAsyncioTestCase):
                 second = await component.runtime.execute("value + 2")
             finally:
                 await component.close()
-            self.assertIsNone(result.context_pipeline)
+            self.assertEqual(result.context_pipeline.profile.externalization, ())
+            self.assertEqual(result.context_pipeline.profile.reduction, ())
             self.assertEqual("ok", first.status)
             self.assertEqual("42", second.result)
 
@@ -339,8 +342,7 @@ class RlmPipelineTest(unittest.IsolatedAsyncioTestCase):
                 ),
                 catalog=builtin_catalog(),
                 selections=(
-                    MechanismSelection("context-history"),
-                    MechanismSelection(
+                                        MechanismSelection(
                         "working-memory-reduction",
                         parameters={},
                     ),

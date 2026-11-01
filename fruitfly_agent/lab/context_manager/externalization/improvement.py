@@ -7,4 +7,4 @@ FIELDS = {'rlm-ipython': {'offload_threshold_chars'}, 'ipython-tool': {'max_quer
 
 def expose(definition):
     fields = FIELDS.get(definition.descriptor.mechanism_id)
-    return editable_parameters(definition, fields) if fields else definition
+    return editable_parameters(definition, fields, default_selected=not bool(definition.descriptor.effects.tools)) if fields else definition

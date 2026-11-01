@@ -22,6 +22,6 @@ current_stage: ContextVar[StageClock | None] = ContextVar('improvement_stage', d
 def stage_role(stage):
     if stage in {'execute', 'execution'}:
         return 'execution'
-    if stage in {'propose', 'compose', 'reflect', 'editor'}:
+    if stage in {'propose', 'reflect', 'editor'}:
         return 'editor'
     return 'evaluator'

@@ -31,7 +31,7 @@ class RetainedTargetTests(unittest.IsolatedAsyncioTestCase):
         from fruitfly_agent.lab.improvement.components import component_registry
         from fruitfly_agent.improvement.contracts.plans import RunPlan
         from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
-        from fruitfly_agent.lab.improvement.execution.file_runner import FileTaskRunner
+        from tests.support.task_execution import TaskRunnerFixture
         from fruitfly_agent.improvement.workflow.services import WorkflowServices
         from fruitfly_agent.improvement.contracts.components import HarnessSnapshot, ComponentFile
         from fruitfly_agent.improvement.contracts.versions import SystemVersion, content_hash
@@ -41,7 +41,7 @@ class RetainedTargetTests(unittest.IsolatedAsyncioTestCase):
             if c.component_id == changed else c for c in registry.snapshot().components))
         plan = RunPlan('test', SystemVersion(*(content_hash(v) for v in ('H', 'I', 'S'))), (changed,))
         services = WorkflowServices(plan)
-        record = await FileTaskRunner(config, registry, MemoryArtifacts(), services).execute(
+        record = await TaskRunnerFixture(config, registry, MemoryArtifacts(), services).execute(
             plan, TaskMaterial('task', 'select'), harness)
         return record, services
 

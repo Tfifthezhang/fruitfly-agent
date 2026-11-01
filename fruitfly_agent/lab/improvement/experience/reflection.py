@@ -1,6 +1,6 @@
 """Evidence-grounded pending lessons; no publication authority."""
 import json
-from fruitfly_agent.improvement.contracts.editing import CompositionRequest
+from fruitfly_agent.improvement.contracts.editing import ProposalRequest
 from fruitfly_agent.improvement.contracts.plans import ExperienceEntry
 from ..evidence import EvidenceWorkspace
 
@@ -9,9 +9,9 @@ class AgentReflector:
         self.inspector, self.services = editor, services
 
     async def reflect(self, outcome):
-        request = CompositionRequest(outcome.plan, outcome.task,
+        request = ProposalRequest(outcome.plan, outcome.task,
             outcome.candidates[0].base if outcome.candidates else outcome.harness,
-            outcome.candidates, outcome.records, 0)
+            outcome.records, 'propose', 0, history=outcome.candidates)
         workspace = EvidenceWorkspace.build(request, self.inspector.artifacts, record=self.services.record)
         response = await self.inspector.session(
             self.inspector.instructions.reflect,

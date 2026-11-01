@@ -21,7 +21,7 @@ class ModelQueryConfig:
     max_input_chars: int = 200_000
     max_output_tokens: int = 4_096
     max_inline_result_chars: int = 100_000
-    timeout_seconds: int = 180
+    timeout_seconds: int = 300
 
 
 class ModelQueryBroker:

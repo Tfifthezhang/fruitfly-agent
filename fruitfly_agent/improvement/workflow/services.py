@@ -14,7 +14,7 @@ from fruitfly_agent.core.extensions.operations import OperationSupervisor, consu
 from ..contracts.failures import PersistenceError, CleanupError
 
 from fruitfly_agent.improvement.contracts.candidates import CandidateBundle
-from fruitfly_agent.improvement.contracts.editing import CompositionRequest, ProposalRequest
+from fruitfly_agent.improvement.contracts.editing import ProposalRequest
 from fruitfly_agent.improvement.contracts.components import HarnessSnapshot
 from fruitfly_agent.improvement.contracts.pipeline import ImprovementOutcome
 from fruitfly_agent.improvement.contracts.assessment import SelectionDecision, Measurement
@@ -190,7 +190,7 @@ class GeneratorServices:
         self.services.record(event, **fields)
 
     async def edit(self, stage, request):
-        if stage not in {'propose', 'compose'}:
+        if stage != 'propose':
             raise ValueError('candidate editing stage is required')
         return await self.services.edit(stage, request)
 

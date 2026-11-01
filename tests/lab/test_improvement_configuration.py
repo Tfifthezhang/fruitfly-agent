@@ -21,7 +21,8 @@ from fruitfly_agent.improvement.contracts.experiments import EpisodeRequest
 from fruitfly_agent.lab.improvement.assessment.instructions import EvaluatorInstructionTarget, EvaluatorInstructions
 from fruitfly_agent.lab.improvement.evidence import EvidenceWorkspace, MemoryArtifacts
 from fruitfly_agent.lab.improvement.evidence.session import EvidenceSession
-from fruitfly_agent.lab.improvement.improver.episodes import NativeEpisodeExecutor
+from fruitfly_agent.lab.improvement.improver.episodes import ComparisonEpisodeExecutor
+from tests.support.task_execution import TaskRunnerFixture
 from tests.support.faux_provider import FauxProvider
 from tests.support.pipeline import version
 
@@ -36,7 +37,7 @@ class ImprovementConfigurationTests(unittest.IsolatedAsyncioTestCase):
         provider.respond_text('done')
         services = WorkflowServices(RunPlan('pages', version(), ('base_prompt',)))
         try:
-            await EvidenceSession(AgentLoopConfig(provider=provider), artifacts, page_characters=7).session(
+            await EvidenceSession(AgentLoopConfig(provider=provider), artifacts, settings={'read': {'default_characters':7}}).session(
                 'Inspect the evidence.', workspace, services)
             pages = [fields for event, fields in services.events if event == 'evidence-page']
             self.assertEqual(len(pages), 1)
@@ -68,7 +69,7 @@ class ImprovementConfigurationTests(unittest.IsolatedAsyncioTestCase):
         services = WorkflowServices(outer)
         config = AgentLoopConfig(provider=provider)
         context = ExecutionContext('.', artifacts, components, None, config, config, plan=outer, services=services,
-                                   workflow_settings={'research': {'enabled': True}})
+                                   workflow_settings={})
         class Generator:
             generator_id = 'inner-fixture'
             required_capabilities = frozenset()
@@ -85,18 +86,17 @@ class ImprovementConfigurationTests(unittest.IsolatedAsyncioTestCase):
         class Policy:
             async def score(self, output, case):
                 return SimpleNamespace(score=float(output == 'answer'))
-        episode = SimpleNamespace(evaluations=(SimpleNamespace(input='Private check.'),),
+        episode = SimpleNamespace(adaptation=TaskMaterial('adaptation', 'Adapt'), evaluations=(SimpleNamespace(input='Private check.'),),
                                   suite=SimpleNamespace(evaluation_policy=Policy()))
-        parameters = {'inner_depth': 3, 'inner_model_calls': 32, 'inner_executions': 16, 'evaluation_model_calls': 1,
-                      'inner_strategy': 'simple'}
+        parameters = {'inner_depth': 3, 'inner_model_calls': 32, 'inner_executions': 16, 'evaluation_model_calls': 1}
         try:
-            executor = NativeEpisodeExecutor(context, episode, parameters, generator_factory=Generator)
+            executor = ComparisonEpisodeExecutor(context, episode, parameters, generator_factory=Generator, runner_factory=lambda plan, registry, artifacts, services: TaskRunnerFixture(context.config, registry, artifacts, services))
             request = EpisodeRequest('episode', baseline.component('improvement-editor').files[0].text, baseline,
                                      ('base_prompt',), TaskMaterial('adaptation', 'Do the task.'), 0, candidate)
             result = await executor.run(request, signal=services.signal)
             self.assertEqual(Generator.count, 3)
-            self.assertEqual([r.path for r in Generator.contexts], ['research.json', 'research.json', 'research.json'])
-            self.assertTrue(all(json.loads(artifacts.read(r.artifact_id))['entries'] for r in Generator.contexts))
+            self.assertEqual([r.path for r in Generator.contexts], ['rounds.json', 'rounds.json', 'rounds.json'])
+            self.assertTrue(all(json.loads(artifacts.read(r.artifact_id))['links'] for r in Generator.contexts))
             self.assertEqual(result.episode_id, 'episode')
             self.assertLessEqual(services.used['model'], 40)
             self.assertNotIn('EVALUATOR_CANDIDATE', evaluator.instructions.compare)
@@ -125,7 +125,7 @@ class ImprovementConfigurationTests(unittest.IsolatedAsyncioTestCase):
         context=ExecutionContext('.',artifacts,components,None,config,config,plan=plan,services=services)
         class Policy:
             def score(self,output,case):return SimpleNamespace(score=float(output=='A'))
-        episode=SimpleNamespace(evaluations=(SimpleNamespace(input='Private check.'),),suite=SimpleNamespace(evaluation_policy=Policy()))
+        episode=SimpleNamespace(adaptation=TaskMaterial('adaptation', 'Adapt'), evaluations=(SimpleNamespace(input='Private check.'),),suite=SimpleNamespace(evaluation_policy=Policy()))
         results=[]
         try:
             for index,mission in enumerate(('STEP: improve from observed evidence','Keep the original procedure')):
@@ -133,7 +133,7 @@ class ImprovementConfigurationTests(unittest.IsolatedAsyncioTestCase):
                 value['instructions']['propose']=mission
                 changed=replace(old,files=(ComponentFile('instructions.txt',json.dumps(value)),))
                 candidate=HarnessSnapshot(tuple(changed if d.component_id==changed.component_id else d for d in baseline.components))
-                result=await NativeEpisodeExecutor(context,episode,{'inner_depth':1,'inner_strategy':'simple'}).run(
+                result=await ComparisonEpisodeExecutor(context,episode,{'inner_depth':1}, runner_factory=lambda plan, registry, artifacts, services: TaskRunnerFixture(context.config, registry, artifacts, services)).run(
                     EpisodeRequest('episode-'+str(index),changed.files[0].text,baseline,('base_prompt',),TaskMaterial('adaptation','Do work'),0,candidate),signal=services.signal)
                 results.append(result)
             self.assertEqual(results[0].scores_after,(1,))

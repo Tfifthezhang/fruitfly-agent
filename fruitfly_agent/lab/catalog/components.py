@@ -13,10 +13,13 @@ class ComponentSpec:
     kind: str = 'instructions'
     schema: str = 'text-v1'
     required_capabilities: frozenset[str] = frozenset()
+    default_selected: bool = True
 
     def __post_init__(self):
         if self.role not in {'H', 'S', 'I'} or not self.component_id:
             raise ValueError('component declaration needs an ID and H/S/I role')
+        if type(self.default_selected) is not bool:
+            raise ValueError('default_selected must be boolean')
 
 
 @dataclass(frozen=True)
@@ -76,11 +79,6 @@ def resolve_harness(profile, catalog, *, tool_providers=None):
                 if tool in tools:
                     raise ValueError('duplicate tool declaration: ' + tool)
                 tools.add(tool)
-                key = 'tool-guidance.' + tool
-                if key in components:
-                    raise ValueError('duplicate component declaration: ' + key)
-                components[key] = ComponentSpec(key, kind='tool-guidance', required_capabilities=frozenset({'tool:' + tool}))
-                owners[key] = name
             for field in definition.execution_fields:
                 if field in controlled:
                     raise ValueError('multiple mechanisms control execution field: ' + field)
@@ -94,8 +92,10 @@ def resolve_harness(profile, catalog, *, tool_providers=None):
                 if key in components:
                     raise ValueError('duplicate component declaration: ' + key)
                 components[key], owners[key] = component, name
+    shared_tool_policy = any(component.kind == 'tool-catalog' for component in components.values())
     for name, item in enabled.items():
-        if not item.definition.optimization_exemption and name not in owners.values():
+        tool_policy = shared_tool_policy and bool(item.definition.descriptor.effects.tools)
+        if not item.definition.optimization_exemption and name not in owners.values() and not tool_policy:
             raise ValueError('active algorithm exposes no optimization component: ' + name)
     mechanisms = tuple({'id': item.definition.descriptor.mechanism_id, 'parameters': dict(item.parameters),
         'implementation_id': item.definition.implementation_id} for item in resolved)
@@ -133,5 +133,7 @@ def verify_runtime(inventory, config, targets):
         snapshot = target.snapshot()
         if snapshot.role != spec.role:
             raise ValueError('assembled component role differs from declaration: ' + key)
+        if target.optimization.default_selected != spec.default_selected:
+            raise ValueError('assembled default edit selection differs from declaration: ' + key)
         components.append(replace(spec, schema=snapshot.schema))
     return replace(inventory, execution=values, components=tuple(components))

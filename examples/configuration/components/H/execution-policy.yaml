@@ -4,7 +4,7 @@ implementation: execution-policy
 enabled: true
 parameters:
   settings:
-    max_tool_calls_per_turn: 64
+    max_tool_calls_per_turn: 512
     max_turns: 32
     max_context_recovery_attempts: 6
     tool_execution:

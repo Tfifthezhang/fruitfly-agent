@@ -21,7 +21,7 @@ Outer current editor -> propose candidate editor I'
 ```
 
 Candidate I changes editor or evaluator prompts through registered configuration.
-All six editor prompts and three evaluator prompts are eligible under explicit
+All three editor prompts and three evaluator prompts are eligible under explicit
 grants. Each role uses an independent invocation time. Schemas,
 permissions, independent objectives, thresholds and private material stay fixed.
 Inner search cannot edit I. Each episode has fresh H/S and frozen experience.
@@ -77,14 +77,14 @@ fresh suites for later research. This limit does not establish statistical valid
 Use the [experiment CLI](../../../experiments/README.md) with a referenced task
 document containing `source: editor` and `material: editor-study`. Grant the selected
 I fields in experiment `edit`. The [editor recipe](../../../../examples/experiments/editor.example.yaml)
-selects measured feedback and independent phase times. Run `improvement check`, then explicitly
-`improvement run` or `rsi run`; real requests may incur charges. Public embedding
-requests remain available below.
+declares grants and independent phase times. It requires an embedding with
+`WorkflowBindings.runner` or an explicitly registered episode executor; the CLI
+does not provide a local episode backend. Real requests may incur charges.
+Public embedding requests are shown below.
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `inner_strategy` | `harness2` in embeddings; `simple` in CLI | Registered inner search schedule |
-| `inner_components` | `base_prompt` | Space-separated registered H/S IDs; must be runnable in the file environment |
+| `inner_components` | `base_prompt` | Space-separated registered H/S IDs; must be runnable by the registered backend |
 | `repetitions` | 2 | Independent fresh episodes per package, 2–10 |
 | `inner_depth` | 1 | Sequential inner search depth, 1–3 |
 | `min_gain` | 0 | Candidate paired mean gain must strictly exceed this value |
@@ -102,7 +102,6 @@ request = WorkflowRequest(
     component_ids=("improvement-editor",),
     execution_id="improver-comparison",
     task_pack_id="editor-study",
-    verification="scored",
     scope="persistent",
     direction="Improve proposal procedures",
     execution_parameters=(("inner_components", "base_prompt"), ("repetitions", 2)),
@@ -139,7 +138,7 @@ or published capability gains follows from passing this policy.
 ## Preserve isolation and lifecycle
 
 Each episode creates fresh component adapters, generator/editor state, history
-and file workspace. Both branches start from the same H/S and experience. Inner
+and backend-owned task environment. Both branches start from the same H/S and experience. Inner
 experience has no production writer. H/S experiment artifacts are never activated
 by adopting I. The experiment uses Lab directly, not recursive Application jobs.
 
@@ -166,7 +165,10 @@ integration experiments. No new secret environment variables are introduced.
 Embedding hosts can supply another `EpisodeExecutor` through
 `ImproverTaskRunner(..., episode_factory=...)` and register the enclosing execution
 definition. The public request/result contracts keep timing, source identity and
-private comparison separate from the task backend. The bundled native material catalog uses task packages. The optional
+private comparison separate from the task backend. `ComparisonEpisodeExecutor`
+composes a supplied `runner_factory(plan, components, artifacts, services)` for
+task-package episodes. It has no default
+Agent executor; the material catalog only supplies task packages. The optional
 [Eval episode composition](../../../../fruitfly_eval/improvement/README.md#compare-i-on-prepared-benchmarks)
 registers benchmark-backed comparisons through `comparison_definition`; Lab does
 not import Eval. A task runner alone does not install an episode study.

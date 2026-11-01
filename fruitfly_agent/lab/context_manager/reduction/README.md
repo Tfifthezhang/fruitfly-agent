@@ -3,7 +3,7 @@
 [Up: Context Manager](../README.md)
 
 The default [working-memory method](methods/working_memory/README.md) maintains
-bounded task memory incrementally. `context-history` supplies original evidence.
+bounded task memory incrementally and owns its original-evidence readback service.
 Core validates and durably commits projections and checkpoints. Canonical Session
 messages remain intact. A failed checkpoint write stops requests until recovery.
 
@@ -15,20 +15,21 @@ projection reset. Main and auxiliary requests use shared
 
 ## Retrieve evidence and recover
 
-[SessionHistory](../history.py) supplies `context_read` and `context_search`.
-They expose public message sources and immutable artifacts with bounded offsets.
+[Memory resources](../resources/README.md) expose a deterministic directory,
+original public messages and immutable artifacts through ordinary `read`.
+The model receives a scoped history-index reference after compression.
 Tool arguments/results remain available; private thinking, opaque replay and
 image bytes are excluded. Inspect original images when needed.
 
 Run stores artifacts beside Session in `SESSION.jsonl.artifacts/reduction`.
 Recovery checks required hashes and coverage. Direct in-memory construction has
 no cross-process recovery. Uncommitted artifacts never become active state.
-`context-history.parameters.max_artifact_bytes` defaults to 16 MiB, within
-1024–67108864 bytes, and can be granted to Improvement.
+The internal immutable-artifact allocation is fixed at 16 MB per artifact;
+it is not a separately selectable or optimizable mechanism.
 
 ## Optimize policy
 
-The working-memory owner exposes prompts, memory capacity, update frequency,
+The working-memory owner exposes update/shrink/readback prompts, memory capacity, update frequency,
 switch ratio, page limits and auxiliary request limits through ordinary H
 parameter targets. Each field has owner descriptions and bounds. A candidate
 requires `configuration-materialization`, isolated state and actual execution.

@@ -7,7 +7,10 @@ In **/config → Environment**, use Space to enable **Remote environment**, or o
 and choose **Set up…**. The guided form asks for the server address, port, remote
 directory, local host-key file, hidden account and hidden password, then shows
 a review. Choose **Stage settings**, then save and apply through `/config`, or choose
-**Save and start** when using `--configure`.
+**Save and return** when using `--configure`, then **Start session** from the panel.
+The panel and configuration editor make no SSH requests. If startup cannot connect,
+it returns to the panel after cleanup so you can edit settings or switch to a local
+environment. Ctrl+C cancels startup; no automatic local fallback occurs.
 Selection disables the local environment, local IPython and file memory only
 after staging. Cancelling the form preserves the previous environment.
 Configuration and construction are offline; Application startup opens the

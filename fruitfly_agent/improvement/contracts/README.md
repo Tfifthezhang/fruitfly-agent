@@ -15,7 +15,7 @@ selection decisions and attributed experience. Stage protocols are exported thro
 | `ExecutionRecord` | Task, material, harness, initial state and conditions identities |
 | `SelectionDecision` | Existing run ID; output selection differs from verification |
 | `JobServices` / `JobResource` | Observed usage, cancellation, operations and optional asynchronous cleanup |
-| `RunPlan` | Exact component scope, generator, modes and independent phase times |
+| `RunPlan` | Exact component scope, generator, rounds and independent phase times |
 | `ExperienceEntry` | Task attribution, lesson, limitations, evidence and reusable snapshot |
 
 [Versions](versions.py) bind H/I/S separately. [Candidates](candidates.py) declare
@@ -33,14 +33,14 @@ Run uses the same version contracts for persistent publication and recovery.
 `EpisodeResult`, `EpisodeExecutor` and `TrialReport`. Experiment identity binds
 source, initial harness/state and conditions. Reports retain per-case gains,
 failures, exact episode/evidence identities and actual usage. Private scorer data
-is not part of `ProposalRequest` or `CompositionRequest`.
+is not part of `ProposalRequest`.
 
 `ExecutionDefinition`, `ExecutionRequest`, `PreparedExecution` and `ExecutionPorts`
 separate discovery, validation and construction. Typed parameter declarations
 reject unknown or duplicate fields. Run converts these public values to frontend
 views rather than exposing Lab implementations to Interactive.
 
-`CompositionRequest.feedback` supplies permitted development measurements. `ImprovementOutcome.verification` references independent proof when available. Job plan schema 2 records execution identity and normalized request. A preview never authorizes replay of uncertain work.
+`ProposalRequest.feedback` supplies permitted development measurements. `ImprovementOutcome.verification` references independent proof when available. Job plan schema 2 records execution identity and normalized request. A preview never authorizes replay of uncertain work.
 
 See [execution](../../lab/improvement/execution/README.md), [editor experiments](../../lab/improvement/improver/README.md)
 and [time/stop behavior](../../lab/improvement/workflow/README.md).
@@ -53,11 +53,10 @@ and [time/stop behavior](../../lab/improvement/workflow/README.md).
 | `tasks.py` | Materials, resources and private acceptance-case values |
 | `execution.py` | Final execution records and established TaskRunner signature |
 | `facts.py` | Immutable facts, usage scope and artifact collection status |
-| `search.py` | Attributed exploration decisions |
 | `task_sets.py` | Frozen collection identities, task objectives and private source construction ports |
 | `evaluation.py` | Expected batches, leaf trials, candidate evaluations and joint selection outcomes |
 | `live.py` | Immutable event positions, assessments, metrics and controls |
-| `editing.py` | Proposal/composition requests and bounded editing services |
+| `editing.py` | Proposal requests and bounded editing services |
 | `assessment.py` | Measurements, selection and verification ports |
 | `plans.py` | Plans and attributed experience |
 | `stopping.py` | Shared cycle state and structured decisions |
@@ -87,6 +86,8 @@ remain explicitly owned by the backend.
 `optimization.py` defines `OptimizationSpec` and `OptimizationAdapter`. Each
 component adapter declares H/S/I ownership, representation, legal operations,
 update timing, activation boundary, state semantics and required capabilities.
+`default_selected` declares automatic selection preference, independently of
+availability and explicit grants. Tool parameters default to opt-in.
 Numeric configuration, text and retained documents share admission and candidate
 validation. Search algorithms remain independent of target representation.
 `ComponentRegistry.admit` intersects these declarations with execution support;
@@ -97,7 +98,7 @@ grants continue through owner validators; metadata grants no editing permission.
 
 `TrialSetup` supplies fresh Core hooks and asynchronous retirement. A component
 registry's `trial_setups` factories create execution-local mechanisms using the
-injected job services. Native runners declare `execution-setup`, own each setup
+injected job services. Supporting runners declare `execution-setup`, own each setup
 before use and retire it after every trial. This contract recreates developer
 extensions without borrowing live callbacks or Session state.
 

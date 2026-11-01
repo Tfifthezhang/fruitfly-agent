@@ -9,11 +9,13 @@ Build the model's request context through three Core stages. Canonical Session m
 | [Augmentation](augmentation/README.md) | Add bounded instructions or retrieved information | Skills and Information spaces |
 | [Externalization](externalization/README.md) | Replace large content with retrievable references | Programmatic context |
 | [Reduction](reduction/README.md) | Fit the projection to the request budget | Incremental working memory |
-| [Measurement](measurement/README.md) | Measure request occupancy and uncertainty | Shared internal service, optional Provider count and heuristic calibration |
 
 ```text
 canonical messages → augmentation → externalization → reduction → model projection
 ```
+
+[Measurement](measurement/README.md) is shared infrastructure used by those stages.
+It is neither a context stage nor a selectable/optimizable mechanism.
 
 ## Extend a stage
 
@@ -33,5 +35,5 @@ Use [Core contracts](../../core/context/README.md) and [Catalog registration](..
 .venv/bin/python -m unittest tests.lab.test_context_pipeline tests.lab.test_information_sources tests.lab.test_rlm tests.lab.test_reduction_safety -v
 ```
 
-[history.py](history.py) owns session-scoped public source/artifact retrieval shared by reduction methods.
+[Memory resources](resources/README.md) provide session-scoped public history and immutable artifacts for working memory. They are infrastructure, not a selectable context stage.
 [registration.py](registration.py) supplies typed parameter declarations without a discovery registry.

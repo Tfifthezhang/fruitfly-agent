@@ -42,7 +42,7 @@ def collection(name, count=2, *, limit=2, score=None, partition='development', s
         async def measure(self, task, record):
             return Measurement(record.run_id, 'fixture-score', float(record.output))
     class Runner:
-        capabilities = frozenset({'file-workspace'})
+        capabilities = frozenset()
         def __init__(self, context): self.context = context
         async def execute(self, plan, task, harness):
             state.active += 1

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from inspect import iscoroutinefunction, signature
 import re
 from typing import Any, Callable, Mapping, TYPE_CHECKING
@@ -28,6 +28,7 @@ _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 
 
 from fruitfly_agent.runtime_spec.selections import MechanismSelection
+from fruitfly_agent.lab.environment.description import ExecutionEnvironmentDescription
 
 
 MechanismInstaller = Callable[["AssemblyState", "AssemblyContext", Mapping[str, Any]], "AssemblyState"]
@@ -83,6 +84,7 @@ class MechanismDefinition:
     configuration_snapshot: Callable | None = None
     optimization_exemption: str = ''
     parameter_paths: Mapping[str, str] = field(default_factory=dict)
+    execution_description: Callable[[Mapping[str, Any], Path], ExecutionEnvironmentDescription] | None = None
 
     def __post_init__(self) -> None:
         if self.parameter_paths:
@@ -91,6 +93,8 @@ class MechanismDefinition:
                 raise ValueError('owner must declare distinct categorized paths for every parameter')
         if not isinstance(self.optimization_exemption, str):
             raise TypeError('optimization exemption must explain an infrastructure invariant')
+        if self.execution_description is not None and not callable(self.execution_description):
+            raise TypeError('execution_description must be callable')
         if self.configuration_role not in {'H', 'S', 'I'}:
             raise ValueError('configuration role must be H/S/I')
         if self.configuration_edit is not None and not callable(self.configuration_edit):

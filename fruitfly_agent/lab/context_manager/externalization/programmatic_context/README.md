@@ -17,7 +17,7 @@ Inspect long context through a persistent IPython workspace, Session artifacts, 
 | `context.read/search` | Read or search stored content |
 | `context.put` | Store content |
 | `context.save_state/load_state` | Persist and restore explicit JSON state |
-| `llm_query` | Query an injected auxiliary Provider; depth 1, with call/token budgets |
+| `llm_query` | Query an injected auxiliary Provider; depth 1, with per-request input/output limits and recorded usage |
 
 Run injects Providers and Session paths; this library does not read keys. IPython runs with local user permissions and is not a sandbox. `llm_query` uses the network and may incur charges. No user-facing module-specific environment variables.
 
@@ -51,7 +51,7 @@ Based on Zhang et al., [Recursive Language Models](https://arxiv.org/abs/2512.24
 | Cancellation | Hard-cancel and host-request task cleanup are not unified. |
 | Query timeout | Does not include semaphore queue time. |
 | Non-final query response | Rejected; call and available usage stay charged, with no hidden continuation requests. |
-| Token budget | Estimate/reservation with actual-usage reconciliation. |
+| Query limits | Input characters and output tokens are bounded per request; usage is recorded without aggregate call/token quotas. |
 | Reduction composition | Working memory reads canonical public evidence and retains its coverage mapping; source artifacts remain available. |
 
 Register subprocess resources immediately with `context.own` and expose them in assembly components. Define schema, serialization errors, reset, and cancellation for added state. See [Catalog](../../../catalog/README.md) and [Known limitations](../../../ALGORITHM_AUDIT.md).

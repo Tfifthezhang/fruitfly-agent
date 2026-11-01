@@ -10,7 +10,7 @@ from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
 from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, EditReason
 from fruitfly_agent.improvement.contracts.components import ComponentFile, HarnessSnapshot
 from fruitfly_agent.improvement.contracts.editing import ProposalResult
-from fruitfly_agent.run import RunApplicationFactory
+from tests.support.task_execution import TaskApplicationFixture as RunApplicationFactory
 from tests.support.improvers import FirstSelector
 
 
@@ -28,8 +28,9 @@ def workspace(root, *, task=None, **sections):
     component_ids = values.get('components', ['improvement-editor'] if task.get('source') == 'editor' else ['base_prompt'])
     field_defaults = {
         'base_prompt': ['parameters.instructions.system'],
+        'tool-catalog': ['parameters.instructions.usage'],
         'skill-document': ['parameters.content.body'],
-        'improvement-editor': ['parameters.instructions.' + key for key in ('propose', 'invariant', 'domain', 'compose')]}
+        'improvement-editor': ['parameters.instructions.' + key for key in ('propose', 'system', 'reflect')]}
     edit = {}
     options = values.get('component_options', {})
     for name in component_ids:
@@ -37,38 +38,30 @@ def workspace(root, *, task=None, **sections):
             from fruitfly_agent.runtime_spec.execution import flatten_execution
             default = ['parameters.settings.'+key for key in flatten_execution({}) if key not in {'max_turns','max_tool_calls_per_turn'}]
         else:
-            default = field_defaults.get(name,['parameters.instructions.usage'] if name.startswith('tool-guidance.') else ['parameters.instructions.system'])
+            default = field_defaults.get(name, ['parameters.instructions.system'])
         option = options.get(name, {})
         edit[name] = {'fields': list(option['editable_fields'])
                       if 'editable_fields' in option else default}
         if 'bounds' in option:
             edit[name]['bounds'] = dict(option['bounds'])
-    comparison = {key: values[key] for key in ('scope', 'feedback') if key in values}
-    search = {key: values[key] for key in ('strategy', 'generator', 'rounds', 'mode', 'width', 'retain_experience') if key in values}
-    if 'exploration' in sections:
-        search['exploration'] = sections.pop('exploration')['policy']
     multi = sections.pop('multi_task', {})
-    trial = {key: values[key] for key in ()}
-    trial.update(multi.get('execution', {}))
+    times = values.get('timeouts', {'editor_seconds':1200, 'execution_seconds':3600, 'evaluator_seconds':1200})
+    execution = {key: values[key] for key in ('generator', 'retain_experience', 'direction') if key in values}
+    execution.update(editor_seconds=times['editor_seconds'], task_seconds=times['execution_seconds'])
+    if multi.get('execution'):
+        execution['trial'] = multi['execution']
     if multi.get('sampling'):
-        search['sampling'] = multi['sampling']
+        execution['sampling'] = multi['sampling']
     promotion = dict(multi.get('promotion', {}))
     if 'every_rounds' in promotion:
-        search['promotion_every_rounds'] = promotion.pop('every_rounds')
-    comparison.update(multi.get('evaluation', {})); comparison.update(promotion)
-    def settings_document(name, parameters):
-        return {'inline': {'id': name, 'role': 'I', 'implementation': name, 'parameters': parameters}}
-    if search:
-        sections['search'] = search
-    if 'process_assessment' in sections:
-        sections['assessment'] = {'process_assessment': sections.pop('process_assessment')}
+        execution['promotion_every_rounds'] = promotion.pop('every_rounds')
+    evaluation = {'evaluator_seconds':times['evaluator_seconds'], 'scope':values.get('scope', 'task'),
+        'comparison': {**multi.get('evaluation', {}), **promotion}}
     config = {'default_profile': 'baseline', 'profiles': {'baseline': profile}}
     (directory / 'default-config.yaml').write_text(yaml.safe_dump(config))
     (directory / 'secrets.env').write_text('EXPERIMENT_TEST_KEY=offline-placeholder\n')
-    document = {'baseline': {'config': 'default-config.yaml'}, 'tasks': {'inline': task},
-        'comparison': {'inline': comparison}, 'edit': edit,
-        'timeouts':values.get('timeouts',{'editor_seconds':1200,'execution_seconds':3600,'evaluator_seconds':1200}),
-        'trial': trial, **sections}
+    document = {'baseline': {'config': 'default-config.yaml'}, 'tasks': {'inline': task}, 'edit': edit,
+        'execution':execution, 'evaluation':evaluation, 'stopping':{'max_rounds':values.get('rounds', 1)}, **sections}
     path = directory / 'experiment.yaml'
     path.write_text(yaml.safe_dump(document))
     return path

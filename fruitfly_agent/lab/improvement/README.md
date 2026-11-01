@@ -4,10 +4,10 @@
 
 The independent [Improvement runtime](../../improvement/README.md) owns the reliable
 stage kernel. This package supplies concrete editors, algorithms, assessments,
-component adapters and native execution; Run supplies persistence and activation.
+component adapters and execution composition; Run supplies persistence and activation.
 
 Refine registered Agent components using task execution evidence. The [runtime contracts](../../improvement/contracts/README.md) separate candidate
-generation, execution, composition, selection,
+generation, execution, selection,
 verification, reflection and activation. Run persists jobs; Application owns
 execution and adoption. Container benchmark evaluation belongs to the separate Eval consumer.
 
@@ -26,33 +26,20 @@ Freeze plan, task, H/I/S and experience
 |---|---|---|
 | Materials | `TaskSource`, `TaskMaterial`, `ArtifactAccess` | Freeze explicitly selected workspace inputs as immutable bytes |
 | Components | `OptimizationAdapter`, `HarnessSnapshot`, `CandidateBundle` | Object-owned text adapters; complete named file sets |
-| Propose | `CandidateGenerator`, `ProposalRequest`, `ProposalResult` | Tool-using editor with a strategy-declared mission |
-| Probe | `TaskRunner`, `ExecutionRecord`, `ExecutionFacts` | Detached read/write/edit file workspace with attributable facts |
+| Propose | `CandidateGenerator`, `ProposalRequest`, `ProposalResult` | Tool-using editor with a fixed proposal mission |
+| Probe | `TaskRunner`, `ExecutionRecord`, `ExecutionFacts` | Explicitly registered backend; optional Eval integration |
 | Assess | Shared model evaluator | Prompt-driven dimension, process and hypothesis judgments |
-| Compose | `Composer`, `CompositionRequest` | Editor compares executions and resolves component changes |
 | Select | `Selector`, `SelectionDecision` | Shared read-only per-dimension evaluator |
-| Explore | `ExplorationRegistry`, `ExplorationDecision` | Continue from the official incumbent; optional process-guided seed |
 | Verify | `VerificationPolicy`, optional `MeasurementSource` | Independent task-package comparison when provided |
 | Reflect | `Reflector`, `ExperienceEntry` | Evidence-grounded lesson or no entry |
 | Retain | `ExperienceRepository` | Host stages lessons; explicit review precedes an S library update |
-| Orchestrate | `WorkflowController`, `StrategyRegistry` | Shared validation/accounting; a separately registered search schedule |
+| Orchestrate | `WorkflowController` | Fixed baseline, proposal, trial and comparison flow |
 
-The independent [experiment CLI](../../experiments/README.md) defaults to
-`simple`: one reference and one candidate per round, no composition and no
-reflection. [Search strategies](strategies/README.md) keep Harness² optional.
-`RunPlan` defaults to Harness²; experiment settings select their strategy explicitly.
-
-Parallel width `k` uses `k` references, `2k` proposals, and `k` compositions when
-each proposal returns one candidate. All proposals in one round receive the same
-reference evidence and prior history. They cannot inspect their peers. Probes
-start after the proposal pool is complete. Sequential mode performs invariant and
-domain proposals and one composition per depth. By default the selected incumbent
-becomes the next editing baseline. Optional process-guided exploration can choose
-another completed execution as the next seed without changing the official winner.
-Every composition is executed, including an unchanged one.
-Generators may return no candidates or request an early stop. The built-in
-`parallel` pool is independent but currently awaited sequentially. All successful
-executions, including original references and probes, remain selectable.
+The [experiment CLI](../../experiments/README.md) and embeddings share one flow:
+one baseline, zero or one candidate per round, execution, evaluation, selection
+and stopping. The retained incumbent seeds the next round. No candidate or a
+generator stop ends search. Defaults use `agent-editor-v1`, one round and no
+experience retention. Completed reference evidence remains selectable.
 
 ## Separate feedback, stopping and assurance
 
@@ -61,7 +48,6 @@ executions, including original references and probes, remain selectable.
 | Propose | Task requirements, declared guidance, trajectories and optional measured feedback supply hypotheses. |
 | Stop | `StopPolicy` records round limits, repeated candidates, no candidate or generator stop. Phase timeouts retain their own reasons. |
 | Select | Consider original and candidate outputs. Measured selection follows declared utility. Equal official scores can use supported process comparison; unknown judgments retain the incumbent. |
-| Explore | The next editing seed is a separate decision; default to the official incumbent, or use declared completed-process comparison. |
 | Verify | Only an independent policy can grant `verified`; selected outputs remain `selected`. |
 
 A phase timeout is not convergence. Unsupported or malformed comparison retains the incumbent. Each phase starts its own timer; selection has a fresh evaluator invocation. Missing references do not produce invented deliverables.
@@ -75,7 +61,7 @@ A phase timeout is not convergence. Unsupported or malformed comparison retains 
 | I | Candidate generation and improvement instructions | Registered [editor comparison](improver/README.md); ordinary task trials reject I edits |
 
 Component kind and H/S/I axis are independent. Existing owners expose the base
-prompt, enabled tool guidance, Skill catalog guidance, execution policy,
+prompt, unified Tool catalog policy, Skill catalog policy, working memory,
 retained Skill/memory documents and I editor/evaluator instructions. A candidate can change
 multiple H/S components when its runner supports them. IDs, owners and schemas
 cannot change within a job. Subagents are not a component category.
@@ -94,13 +80,13 @@ and origin. An `ExecutionRecord` contains status, output, trajectory/deliverable
 references and available invocation counts. Neither requires a score. Original
 binary inputs are preserved. Text evidence is paginated; PNG/JPEG/GIF/WebP can be
 read visually, using shared container checks and a 10 MiB image limit. Other
-binary formats need an explicit reader. Native task and editor readers do not
+binary formats need an explicit reader. Task-material and editor readers do not
 decode unsupported binary containers as text.
 
 Every hosted execution also carries `execution-facts.json` as an immutable
 diagnostic resource: identities, termination cause, scoped usage, counters,
 artifact collection status and granted evidence references. Unknown stays unknown;
-collection failure does not prove absence. Native, benchmark and nested editor
+collection failure does not prove absence. Registered task, benchmark and nested editor
 executions share this contract without requiring containers. Existing editors read
 it through their ordinary evidence workspace; no auxiliary summary is generated.
 
@@ -113,16 +99,16 @@ grading outside the behavior-based editing path.
 
 ## Start improvement
 
-1. Edit `.fruitfly/experiment.yaml`; choose explicit file material, a task package,
-   an editor experiment or an optional Eval source.
+1. Prepare an Eval experiment or register a compatible backend in an embedding.
+   File/package materials and editor studies do not supply a built-in executor.
 2. Run `fruitfly-agent-lab improvement check` to inspect resolved defaults and inputs.
 3. Run `fruitfly-agent-lab improvement run` explicitly. Calls may incur model cost.
 4. Inspect the run report, evidence and stopping reason. Use `rsi run` for verified
    adoption across generations; benchmark development reward alone is insufficient.
 
 `/improvement [DIRECTION]` retains a light explicit instruction/file/package flow
-and result review. It discovers legal targets and uses `simple`; there is no experiment
-configuration editor in chat. Advanced component, strategy, feedback, scope and
+and result review when a compatible backend is registered. It discovers legal targets and uses the fixed flow; there is no experiment
+configuration editor in chat. Advanced component, generator, scope and
 timing choices belong to experiment files or the public embedding API.
 
 Current-task output selection does not prove improvement or change profile
@@ -134,10 +120,12 @@ to S identity and is frozen for each task. Later tasks start from the common
 configured harness and the latest committed library, rather than inheriting all
 previous task-local edits.
 
-The native runner provides fresh in-memory read/write/edit files, no Bash,
-network tools, live Session or production filesystem. Full runtime/SSH/container
-execution requires a declared runner. Tool descriptions, schemas and permissions retain their
-normal owner contracts.
+The registered backend must apply candidate components through their public
+projection or shared Catalog configuration path. It owns fresh Session,
+memory/history, hooks, tools and isolation. Prepared Eval uses the configured Agent
+tool set. Tool usage resources, schemas and permissions retain their normal owner
+contracts; tool parameters require explicit selection. Missing task backends fail
+before model work. See [execution registration](execution/README.md).
 
 ## Extend search
 
@@ -192,22 +180,20 @@ History verifies journal hashes before reading. Retention follows job, experienc
 |---|---|
 | [Execution definitions](execution/README.md) | Material and runner registration without host algorithm branches |
 | [Task sets](task_sets/README.md) | Shared candidates, bounded task parallelism, sampling and joint selection |
-| [Search strategies](strategies/README.md) | Simple candidate comparison and optional Harness² schedules |
 | [Assessment](assessment/README.md) | Read-only completed/online judgments and independent verification |
-| [Research](research/README.md) | Task-local ledger, selective retrieval and progress stopping |
 | [Termination](termination/README.md) | Composable iteration, resource, score and process conditions |
 | [Editor experiments](improver/README.md) | Fixed-depth I comparison and private paired verification |
 | [Contracts](../../improvement/contracts/README.md) | Immutable values and public stage protocols |
-| [Workflow](workflow/README.md) | Orchestration, accounting and native file execution |
+| [Workflow](workflow/README.md) | Orchestration, accounting and injected execution |
 | [Editor](editor/README.md) | Tool workspace editing, output selection and reflection |
 | [Materials](materials/README.md) | Explicit workspace input freezing |
-| [Evidence](evidence/README.md) | Detached workspace, official receipts and historical reports |
+| [Evidence](evidence/README.md) | Shared three-layer navigation, limits and cross-round references |
 | [Verification](verification/README.md) | Optional private measurements and holdout policy |
 | [Experience](experience/README.md) | Attributed lesson serialization and snapshot identity |
 | [Task packages](tasks/README.md) | Authoring, validation and independent scoring |
 
-The workflow adapts Propose–Probe–Compose, role-separated editing, output selection
-and cross-task experience from [Harness²: Recursive Agent Harnessing for an Open
+The project draws role-separated editing, output selection
+and attributed cross-task experience from [Harness²: Recursive Agent Harnessing for an Open
 World](https://arxiv.org/abs/2610.14224). This implementation adds explicit H/S/I
 ownership and host verification/adoption. It does not reproduce published scores,
 train model weights or claim autonomous unrestricted source rewriting. Editor
@@ -235,7 +221,7 @@ metrics, comparison and verification. [Termination](termination/README.md) owns
 composable stopping. The editor diagnoses supplied evidence; task-specific fixes
 are not hard-coded into the framework. Existing public stage signatures remain.
 
-File execution can optionally supply online assessment through `assessment_interval`. Completed evaluation uses the shared model evaluator. Judgments do not change live task components or grant activation.
+The registered-task adapter can optionally supply online assessment through `assessment_interval`. Completed evaluation uses the shared model evaluator. Judgments do not change live task components or grant activation.
 
 ## Use owning public interfaces
 

@@ -23,7 +23,6 @@ class ExecutionContext:
     remaining_verification: Any = None
     assessor_config: Any = None
     completed_assessment_factory: Any = None
-    exploration_factory: Any = None
     save_record: Any = None
     component_ids: tuple[str, ...] = ()
     generator_definitions: tuple = ()
@@ -56,6 +55,6 @@ class ExecutionRegistry:
 
 
 def builtin_executions():
-    from .files import definition
+    from .tasks import definition
     from ..improver.registration import definition as improver_definition
     return ExecutionRegistry((definition(), improver_definition()))

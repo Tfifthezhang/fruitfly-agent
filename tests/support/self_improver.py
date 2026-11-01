@@ -12,7 +12,7 @@ from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, Edi
 from fruitfly_agent.improvement.contracts.components import ComponentFile, HarnessSnapshot
 from fruitfly_agent.improvement.contracts.editing import ProposalResult
 from fruitfly_agent.interactive.contracts.improvement import WorkflowRequest
-from fruitfly_agent.run.application import RunApplicationFactory
+from tests.support.task_execution import TaskApplicationFixture as RunApplicationFactory
 from tests.support.faux_provider import FauxProvider
 from tests.support.materials import _write_models
 from tests.support.task_packs import install, package
@@ -25,16 +25,13 @@ class SelfRule:
     async def propose(self, request, services):
         document = request.baseline.component('improvement-editor')
         value = json.loads(document.files[0].text)
-        value['instructions']['invariant'] += ' STEP'
+        value['instructions']['propose'] += ' STEP'
         updated = replace(document, files=(ComponentFile('instructions.txt', json.dumps(value)),))
         harness = HarnessSnapshot(tuple(updated if c.component_id == updated.component_id else c for c in request.baseline.components))
         return ProposalResult((CandidateBundle(request.plan.parent, request.baseline, harness, self.generator_id,
             (EditReason(updated.component_id, 'Synthetic supported editor edit', (request.records[0].run_id,), expected_effect='The proposed behavior appears in the subsequent execution.'),)),))
 
 
-class LastComposition:
-    async def compose(self, request, services):
-        return request.candidates[-1]
 
 
 class ProceduralProvider(FauxProvider):
@@ -103,9 +100,9 @@ def experiment_factory(root, *, uses=2):
     generators = GeneratorRegistry()
     generators.register(SelfRule.generator_id, SelfRule)
     factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=providers,
-        improvement_bindings=WorkflowBindings(generators=generators, composer=lambda *args: LastComposition()))
+        improvement_bindings=WorkflowBindings(generators=generators))
     factory.configuration.save()
     factory.reload_configuration()
     request = WorkflowRequest(component_ids=('improvement-editor',), generator_id=SelfRule.generator_id,
-        execution_id='improver-comparison', task_pack_id='editor', verification='scored', scope='persistent')
+        execution_id='improver-comparison', task_pack_id='editor',  scope='persistent')
     return factory, provider, request

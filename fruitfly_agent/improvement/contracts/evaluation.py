@@ -139,6 +139,5 @@ class TaskSetOutcome:
     records: tuple[CandidateEvaluation, ...]
     decision: JointSelection | None
     stop_reason: str = 'completed'
-    exploration: tuple[dict[str, str], ...] = ()
     experience: tuple = ()
     verification: str = ''

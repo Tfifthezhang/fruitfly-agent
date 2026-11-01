@@ -40,9 +40,6 @@ class Executor:
             harness.components[0].files[0].text, model_calls=0)
 
 
-class Compose:
-    async def compose(self, request, services):
-        return request.candidates[0]
 
 
 class Select:
@@ -59,7 +56,7 @@ async def main():
     plan = RunPlan('offline', SystemVersion(*(content_hash(v) for v in ('H', 'I', 'S'))),
                    ('prompt',), generator_id='example-rule')
     workflow = ComponentWorkflow(generators=generators, components=components,
-        runner=Executor(), composer=Compose(), selector=Select())
+        runner=Executor(),  selector=Select())
     async with WorkflowServices(plan) as services:
         outcome = await workflow.run(plan, TaskMaterial('task', 'Create a deliverable.'),
                                      components.snapshot(), services)

@@ -44,7 +44,7 @@ class RuntimeStagingTests(unittest.TestCase):
     def fixture(self, root):
         state = root / ".fruitfly"
         state.mkdir()
-        profile = profile_document(catalog="models.yaml", executor="main", mechanisms=[{"id": n} for n in ("local-env", "read-tool", "bash-tool", "context-history", "working-memory-reduction")])
+        profile = profile_document(catalog="models.yaml", executor="main", mechanisms=[{"id": n} for n in ("local-env", "read-tool", "bash-tool", "working-memory-reduction")])
         (state / "default-config.yaml").write_text(yaml.safe_dump({
             "default_profile": "baseline", "profiles": {"baseline": profile}}))
         spec = {'sdk': 'openai', 'protocol': 'responses', "model": "fixture", "context_window": 32768,
@@ -222,7 +222,7 @@ class RuntimeStagingTests(unittest.TestCase):
             config = root / "config.yaml"
             profile = profile_document(catalog="models.yaml", executor="fake",
                 mechanisms=[{'id': 'local-env'}, {'id': 'read-tool'}], prompt=reference,
-                artifact_bindings={'tool-guidance.read': reference},
+                artifact_bindings={'tool-catalog': reference},
                 artifact_reader=lambda value: (artifacts / value[7:]).read_text())
             config.write_text(yaml.safe_dump({"default_profile": "default", "profiles": {"default": profile}}))
             output = root / "runtime"
@@ -231,15 +231,15 @@ class RuntimeStagingTests(unittest.TestCase):
                                                        "working_directory": str(root)}, output_dir=output)
             staged = load_system_config(generated).select()
             self.assertEqual(staged.prompt, reference)
-            self.assertEqual(staged.artifact_bindings['tool-guidance.read'], reference)
+            self.assertEqual(staged.artifact_bindings['tool-catalog'], reference)
             self.assertEqual([p.name for p in (output / "artifacts").iterdir()], [digest])
             self.assertEqual((output / "artifacts" / digest).read_bytes(), body)
             (artifacts / digest).write_text("tampered")
             # The authored component contains the frozen text; the old artifact
             # store is no longer an input. Conflicting component values still fail.
-            profile['H']['read-tool']['inline']['artifacts']['tool-guidance.read'] = 'tampered'
+            profile['H']['tool-catalog']['inline']['parameters']['instructions']['usage'] = 'tampered'
             config.write_text(yaml.safe_dump({'default_profile': 'default', 'profiles': {'default': profile}}))
-            with self.assertRaisesRegex(ValueError, "conflicting configured artifact"):
+            with self.assertRaisesRegex(ValueError, "component artifact differs from its configured value"):
                 prepare_runtime(runtime={"config_path": str(config), "profile": "default",
                                          "working_directory": str(root)}, output_dir=output)
 

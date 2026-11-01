@@ -45,7 +45,7 @@ class ReliabilityTests(unittest.IsolatedAsyncioTestCase):
     async def test_missing_scores_cannot_promote_a_candidate(self):
         flow, plan, baseline, _ = build_pipeline()
         flow.measurements = type('BrokenScores', (), {'measure': AsyncMock(side_effect=OSError('unavailable'))})()
-        plan = replace(plan, feedback='scored')
+        plan = replace(plan)
         result = await flow.run(plan, TaskMaterial('task', 'Work'), baseline, WorkflowServices(plan))
         self.assertEqual(result.harness, baseline)
         self.assertIsNotNone(result.selected)

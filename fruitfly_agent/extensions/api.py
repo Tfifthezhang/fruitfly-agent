@@ -10,7 +10,6 @@ from fruitfly_agent.core.extensions.operations import OperationSupervisor
 from fruitfly_agent.lab.catalog import LabCatalog
 from fruitfly_agent.lab.improvement.api import WorkflowBindings
 from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
-from fruitfly_agent.lab.improvement.strategies import StrategyRegistry, builtin_strategies
 
 
 class ExtensionContext:
@@ -106,7 +105,6 @@ class ExtensionAPI:
     identity: str
     mechanisms: list = field(default_factory=list)
     generators: list = field(default_factory=list)
-    strategies: list = field(default_factory=list)
     commands: dict = field(default_factory=dict)
     agent_observers: list = field(default_factory=list)
     improvement_observers: list = field(default_factory=list)
@@ -125,9 +123,6 @@ class ExtensionAPI:
         self.check()
         self.generators.append((identity, factory, metadata))
 
-    def register_strategy(self, definition):
-        self.check()
-        self.strategies.append(definition)
 
     def register_command(self, name, handler, *, summary=''):
         self.check()
@@ -168,7 +163,7 @@ class ExtensionSet:
             if commands & api.commands.keys():
                 raise ValueError('extension command collision')
             commands.update(api.commands)
-            api.mechanisms, api.generators, api.strategies = tuple(api.mechanisms), tuple(api.generators), tuple(api.strategies)
+            api.mechanisms, api.generators = tuple(api.mechanisms), tuple(api.generators)
             api.commands = MappingProxyType(dict(api.commands))
             api.agent_observers = tuple(api.agent_observers)
             api.agent_interceptors = tuple(api.agent_interceptors)
@@ -184,6 +179,8 @@ class ExtensionSet:
         def bootstrap(state, context):
             self.validate()
             state = original(state, context) if original else state
+            if context.agent_hooks_from_host:
+                return state
             hooks = state.config.hooks.clone() if state.config.hooks else HookRegistry()
             for api in self.registrations:
                 scope = context.own(ExtensionContext(api.identity,
@@ -206,12 +203,9 @@ class ExtensionSet:
         else:
             from fruitfly_agent.lab.improvement.editor.generators import AgentGenerator
             generators.register('agent-editor-v1', AgentGenerator)
-        strategies = StrategyRegistry((base.strategies or builtin_strategies()).definitions())
         for api in self.registrations:
             for identity, factory, metadata in api.generators:
                 generators.register(identity, factory, **metadata)
-            for definition in api.strategies:
-                strategies.register(definition)
         component_factory = base.components
         from fruitfly_agent.lab.improvement.components import component_registry
         def setup(services):
@@ -228,6 +222,7 @@ class ExtensionSet:
             registry = (component_factory or component_registry)(targets)
             if any(api.agent_observers or api.agent_interceptors for api in self.registrations):
                 registry.trial_setups = (*registry.trial_setups, setup)
+                registry.agent_hooks_from_host = True
             return registry
         previous = base.hooks
         def hooks(context):
@@ -245,7 +240,7 @@ class ExtensionSet:
                     context.services.hooks.on(event, observe)
         from fruitfly_agent.lab.improvement.workflow.mechanisms import extension_spec
         hooks.configuration = {'extensions': list(self.identities), 'host': extension_spec(previous)}
-        return replace(base, generators=generators, strategies=strategies, hooks=hooks, components=components)
+        return replace(base, generators=generators, hooks=hooks, components=components)
 
     def command_entries(self):
         return {name: entry for api in self.registrations for name, entry in api.commands.items()}

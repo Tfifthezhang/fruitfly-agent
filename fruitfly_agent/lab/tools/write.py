@@ -22,6 +22,9 @@ async def _execute(ctx: ToolCallContext) -> AgentToolResult:
     if ctx.env is None:
         raise RuntimeError("write requires an ExecutionEnv")
     path = ctx.args["path"]
+    from .resources import is_resource
+    if is_resource(path):
+        raise ValueError("resources are read-only")
     content = ctx.args["content"]
     resolved = ctx.env.absolute_path(normalize_tool_path(path))
     if not resolved.is_ok:

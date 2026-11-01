@@ -32,6 +32,8 @@ outside development grants.
 
 | File | Responsibility |
 |---|---|
+| `configuration.py` | Strict read/catalog/search limits shared by editor and evaluator |
+| `rounds.py` | Cross-round references to hypotheses, receipts, assessments and selections |
 | `indexing.py` | Deterministic overview and event extraction |
 | `catalog.py`, `query.py` | Paged navigation and literal retrieval |
 | `resources.py`, `access.py` | Immutable access and supply receipts |
@@ -40,7 +42,7 @@ outside development grants.
 
 The public `EvidenceReader` contract is in
 [Improvement contracts](../../../improvement/contracts/evidence.py). Retrieval can
-be replaced through `reader_factory(workspace, page_characters=...)` on
+be replaced through `reader_factory(workspace, settings=EvidenceSettings(...))` on
 `AgentEditor` or `ModelEvaluator`, without changing evaluator policy. The reader
 must preserve grant checks, exact source spans and supply receipts. The bundled
 reader loads source files in host memory; a disk index is not implemented. The bundled implementation uses
@@ -48,3 +50,7 @@ no vector database, generated summary or extra retrieval Agent.
 
 Offline checks: `tests.lab.test_evidence_index`, `tests.lab.test_search_reporting`,
 `tests.lab.test_improvement_configuration`.
+
+Cross-round navigation contains relationships and references, not a second ledger
+of copied observations. Existing candidate manifests retain `expected_effect`;
+assessment and selection artifacts retain their own judgments and assurance.

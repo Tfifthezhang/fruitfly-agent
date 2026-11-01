@@ -43,8 +43,11 @@ class OptimizationSpec:
     boundary: str = 'task'
     state: str = 'frozen'
     required_capabilities: frozenset[str] = frozenset()
+    default_selected: bool = True
 
     def __post_init__(self):
+        if type(self.default_selected) is not bool:
+            raise ValueError('default_selected must be boolean')
         choices = {
             'role': {'H', 'S', 'I'},
             'representation': {'parameters', 'text', 'documents', 'structure', 'learning-state'},

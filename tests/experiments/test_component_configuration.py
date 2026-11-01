@@ -17,6 +17,10 @@ class ComponentExperimentTests(unittest.TestCase):
         self.root = Path(self.enterContext(tempfile.TemporaryDirectory())).resolve()
         initialize_workspace(self.root)
         self.directory = self.root / '.fruitfly'
+        (self.directory / 'experiment.yaml').write_text(yaml.safe_dump({
+            'baseline': {'config': 'default-config.yaml'},
+            'tasks': {'inline': {'source': 'files', 'instruction': 'Inspect the controlled task.'}},
+        }))
 
     def change(self, name, update):
         path = self.directory / name
@@ -25,25 +29,32 @@ class ComponentExperimentTests(unittest.TestCase):
         path.write_text(yaml.safe_dump(value, sort_keys=False))
 
     def prepare(self):
-        with patch('fruitfly_agent.providers.registry.ProviderRegistry.create', side_effect=AssertionError('Provider')):
+        from dataclasses import replace
+        from fruitfly_agent.lab.improvement.execution import builtin_executions, ExecutionRegistry
+        from tests.support.task_execution import TaskRunnerFixture
+        definition = builtin_executions().get('agent-task')
+        executions = ExecutionRegistry((replace(definition, capabilities=TaskRunnerFixture.capabilities),))
+        with patch('fruitfly_agent.experiments.composition.builtin_executions', return_value=executions), \
+                patch('fruitfly_agent.experiments.validation.builtin_executions', return_value=executions), \
+                patch('fruitfly_agent.providers.registry.ProviderRegistry.create', side_effect=AssertionError('Provider')):
             return prepare_experiment(load_configuration(self.root), 'improvement', require_credentials=False)
 
     def test_component_search_and_feedback_are_consumed_and_grants_are_visible(self):
-        self.change('experiment.yaml', lambda value: value.update(search={'rounds': 2},
-            assessment={'evidence': {'page_characters': 8000}}))
-        self.change('experiment.yaml', lambda value: value.setdefault('edit', {}).update({'execution-policy': {
-            'fields': ['parameters.settings.tool_execution.max_parallel'],
-            'bounds': {'parameters.settings.tool_execution.max_parallel': {'minimum': 1, 'maximum': 16}}}}))
+        self.change('experiment.yaml', lambda value: value.update(stopping={'max_rounds': 2},
+            evidence={'read': {'default_characters': 8000}}))
+        self.change('experiment.yaml', lambda value: value.setdefault('edit', {}).update({'working-memory-reduction': {
+            'fields': ['parameters.settings.memory_tokens'],
+            'bounds': {'parameters.settings.memory_tokens': {'minimum': 64, 'maximum': 4096}}}}))
         prepared = self.prepare()
-        self.assertEqual(prepared.request.depth, 2)
-        self.assertEqual(prepared.config.evidence_settings['page_characters'], 8000)
-        self.assertIn('execution-policy', prepared.request.component_ids)
-        self.assertEqual(prepared.config.improvement.component_options['execution-policy']['editable_fields'],
-                         ['parameters.settings.tool_execution.max_parallel'])
+        self.assertEqual(prepared.request.rounds, 2)
+        self.assertEqual(prepared.config.evidence_settings['read']['default_characters'], 8000)
+        self.assertIn('working-memory-reduction', prepared.request.component_ids)
+        self.assertEqual(prepared.config.improvement.component_options['working-memory-reduction']['editable_fields'],
+                         ['parameters.settings.memory_tokens'])
         self.assertNotIn('offline-placeholder', json.dumps(prepared.summary()))
 
     def test_referenced_component_and_comparison_changes_invalidate_prepared_inputs(self):
-        for name in ('components/H/execution-policy.yaml', 'components/I/improvement-evaluator.yaml', 'comparison.yaml'):
+        for name in ('components/H/execution-policy.yaml', 'components/I/improvement-evaluator.yaml', 'experiment.yaml'):
             with self.subTest(name=name):
                 prepared = self.prepare()
                 path = self.directory / name

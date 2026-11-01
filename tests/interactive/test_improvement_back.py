@@ -10,7 +10,7 @@ class WorkflowPanelTests(unittest.IsolatedAsyncioTestCase):
         await view.run()
         self.assertEqual([row.label for row in frames[0][1]],
             ["Task", "Input files", "Start improvement", "Results and history"])
-        self.assertEqual(view.request.strategy_id, "simple")
+        self.assertFalse(hasattr(view.request, "strategy_id"))
         self.assertFalse(view.request.retain_experience)
         self.assertEqual(view.request.component_ids, ())  # Host discovers legal material/backend targets.
         client.workflow_preview.assert_not_called()

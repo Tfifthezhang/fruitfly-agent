@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-from contextlib import nullcontext
 import json
 import os
 from pathlib import Path
@@ -13,6 +12,10 @@ import sys
 from fruitfly_agent.core.errors import SessionCorruptError
 from fruitfly_agent.interactive import AgentApplication, TerminalConfigurationFrontend, TerminalFrontend, TerminalRenderer
 from fruitfly_agent.interactive.terminal import transient_screen
+from fruitfly_agent.interactive.terminal.features.startup import TerminalStartupFrontend
+from fruitfly_agent.interactive.contracts.runtime import RuntimeCleanupError
+from fruitfly_agent.interactive.terminal.io.live import InputInterrupted
+from fruitfly_agent.run.startup import describe_startup
 from fruitfly_agent.providers.config import load_env
 from fruitfly_agent.providers.workspace import WorkspacePaths
 
@@ -24,6 +27,7 @@ from fruitfly_agent.run.runtime.usage import ModelUsage, ObservedProviderRegistr
 from fruitfly_agent.core.data_model import TextBlock
 from fruitfly_agent.core.data_model.media import UserContent
 from fruitfly_agent.interactive.terminal.features.tool_services.approval import approve_start
+from fruitfly_agent.interactive.contracts.tool_services import ToolServiceStartPlan
 
 
 async def run_cli(args: argparse.Namespace) -> int:
@@ -64,25 +68,18 @@ async def run_cli(args: argparse.Namespace) -> int:
             extensions=extensions if extensions.registrations else None,
         )
         if not single_task:
-            needs_menu = configure or not factory.configuration.snapshot().ready
-            scope = transient_screen(sys.stdin, sys.stdout) if needs_menu else nullcontext()
-            with scope:
-                launch = TerminalConfigurationFrontend(factory.configuration).run(configure=configure)
-            if not launch.start:
+            application = await _start_interactive(args, factory, cwd)
+            if application is None:
                 return 0
-            if launch.saved:
-                factory.reload_configuration()
-
-        session_path = resolve_session_path(args, cwd)
-        application = AgentApplication(factory)
+        else:
+            session_path = resolve_session_path(args, cwd)
+            application = AgentApplication(factory)
         if args.approve_tools:
             async def approve_tool(prompt):
                 return "once"
             application.set_authorization_handler(approve_tool)
-        await application.start(
-            resume=bool(args.resume),
-            session_path=session_path,
-        )
+        if single_task:
+            await application.start(resume=bool(args.resume), session_path=session_path)
         if args.resume and single_task:
             print(
                 f"[resumed {application.status.message_count} messages "
@@ -146,6 +143,70 @@ def resolve_session_path(args: argparse.Namespace, cwd: Path) -> Path:
     )
 
 
+async def _start_interactive(args: argparse.Namespace, factory: RunApplicationFactory,
+                             cwd: Path) -> AgentApplication | None:
+    notice = ''
+    configure = getattr(args, 'configure', False)
+    with transient_screen(sys.stdin, sys.stdout):
+        panel = TerminalStartupFrontend()
+        async def start(application: AgentApplication, session_path: Path) -> None:
+            approval = factory.tool_service_startup_approval
+            async def approve(plan: ToolServiceStartPlan) -> bool:
+                if approval is None:
+                    return False
+                async with panel.lend_input():
+                    return await approval(plan)
+            factory.tool_service_startup_approval = approve
+            try:
+                await application.start(resume=bool(args.resume), session_path=session_path)
+            finally:
+                factory.tool_service_startup_approval = approval
+        while True:
+            if configure:
+                try:
+                    result = TerminalConfigurationFrontend(factory.configuration).run_for_startup()
+                    if result.saved:
+                        factory.reload_configuration()
+                        notice = 'Configuration saved. Select Start session when ready.'
+                except (KeyboardInterrupt, InputInterrupted):
+                    factory.configuration.reset()
+                    notice = 'Configuration edits discarded.'
+                configure = False
+            snapshot = describe_startup(factory.configuration.snapshot(), catalog=factory.catalog,
+                workspace=cwd, resume=bool(args.resume), session=args.session)
+            action = panel.run(snapshot, notice=notice)
+            if action == 'exit':
+                return None
+            if action == 'configure':
+                configure = True
+                continue
+            application = None
+            started = False
+            try:
+                # The explicit Start choice also persists a synthesized first-run baseline.
+                if factory.configuration.snapshot().changed and not factory.read_only_configuration:
+                    saved = factory.configuration.save()
+                    if not saved.saved:
+                        raise ValueError(saved.message)
+                    factory.reload_configuration()
+                session_path = resolve_session_path(args, cwd)
+                application = AgentApplication(factory)
+                task = asyncio.create_task(start(application, session_path))
+                if await panel.wait_for_start(task, environment=snapshot.environment):
+                    started = True
+                    return application
+                notice = 'Startup cancelled. No session was activated.'
+            except RuntimeCleanupError:
+                raise
+            except (ValueError, OSError, RuntimeError, SessionCorruptError) as exc:
+                notice = f'Startup failed: {exc}'
+            finally:
+                # Application.start retires failed handles; close also covers cancellation
+                # just after activation but before the waiting frontend returns.
+                if application is not None and not started:
+                    await application.close()
+
+
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="fruitfly-agent",
@@ -165,7 +226,7 @@ def create_parser() -> argparse.ArgumentParser:
         help="resume the latest non-empty session, or select a path with --session",
     )
     parser.add_argument('--configure', action='store_true',
-                        help='edit configuration before entering interactive chat')
+                        help='edit configuration before returning to the startup panel')
     parser.add_argument("--approve-tools", action="store_true",
                         help="approve tool confirmation requests for a new task in a trusted isolated environment")
     parser.add_argument("--unrestricted", action="store_true",

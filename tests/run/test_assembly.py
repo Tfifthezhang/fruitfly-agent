@@ -57,37 +57,22 @@ class RuntimeAssemblyTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "hash check"):
                 self.workspace.assemble(candidate, session, catalog=catalog, artifact_store=store)
 
-    def test_skill_guidance_artifact_is_bound_to_runtime_manifest_and_context(self) -> None:
+    def test_skill_usage_and_projection_size_share_one_runtime_component(self):
         root = self.workspace.root
-        model_path = self.workspace.model_path
-        store = DataArtifactStore(root / ".fruitfly" / "artifacts")
-        ref = store.put_text("Candidate guidance version A")
+        skill = root / '.skills/example/SKILL.md'
+        skill.parent.mkdir(parents=True); skill.write_text('---\nname: example\ndescription: Read source evidence\n---\nSteps')
         catalog = builtin_catalog()
-        profile = HarnessProfile(
-            "default",
-            model_catalog=str(model_path),
-            model_profile="offline",
-            mechanisms=catalog.default_selections(),
-        )
-        with Session(root / "candidate.jsonl") as session:
-            runtime = self.workspace.assemble(
-                profile, session, catalog=catalog, artifact_store=store,
-                artifact_bindings={'skill-catalog.guidance': ref.artifact_id},
-            )
-
-        self.assertEqual(runtime.manifest.schema_version, 7)
-        self.assertEqual(
-            runtime.manifest.data_artifacts[0]["id"], ref.artifact_id
-        )
-        stage = next(
-            item for item in runtime.context_pipeline.stages
-            if item.stage_id == "skill-catalog"
-        )
-        transformed = stage.mechanism.transform(
-            ContextFrame("base", (), (), "offline-model", 32)
-        )
-
-        self.assertIn("Candidate guidance version A", transformed.frame.system_prompt)
+        selections = tuple(replace(s, parameters={'usage':'Candidate usage policy','max_chars':4000})
+            if s.mechanism_id == 'skill-catalog' else s for s in catalog.default_selections())
+        profile = HarnessProfile('default', str(self.workspace.model_path), 'offline', selections)
+        with Session(root/'candidate.jsonl') as session:
+            runtime = self.workspace.assemble(profile,session,catalog=catalog)
+        stage = next(s for s in runtime.context_pipeline.stages if s.stage_id == 'skill-catalog')
+        text = stage.mechanism.transform(ContextFrame('base',(),(),'offline-model',32)).frame.system_prompt
+        self.assertIn('Candidate usage policy',text)
+        self.assertIn('<name>example</name>',text)
+        self.assertIn('text-target:skill-catalog',runtime.components)
+        self.assertNotIn('text-target:skill-catalog.guidance',runtime.components)
 
     def test_oversized_guidance_artifact_fails_runtime_assembly(self) -> None:
         root = self.workspace.root
@@ -102,7 +87,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
             mechanisms=catalog.default_selections(),
         )
         with Session(root / "oversized.jsonl") as session:
-            with self.assertRaisesRegex(ValueError, "exceeds.*max_chars"):
+            with self.assertRaisesRegex(ValueError, "unsupported runtime data"):
                 self.workspace.assemble(
                     profile, session, catalog=catalog, artifact_store=store,
                     artifact_bindings={'skill-catalog.guidance': ref.artifact_id},
@@ -124,7 +109,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
             ),
         )
         with Session(root / "disabled.jsonl") as session:
-            with self.assertRaisesRegex(ValueError, "not consumed"):
+            with self.assertRaisesRegex(ValueError, "unsupported runtime data"):
                 self.workspace.assemble(
                     profile, session, catalog=catalog, artifact_store=store,
                     artifact_bindings={'skill-catalog.guidance': ref.artifact_id},
@@ -251,7 +236,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
 
         self.assertEqual(
             [tool.name for tool in runtime.config.tools],
-            ["read", "edit", "write", "context_read", "context_search"],
+            ["read", "edit", "write"],
         )
         self.assertNotIn("bash-tool", runtime.mechanism_ids)
 

@@ -19,11 +19,11 @@ Verify algorithms and components through Core contracts and Catalog assembly.
 | `test_task_packs.py / test_pack_format.py / test_coding_tasks.py` | Task material, catalog discovery and dangling-link rejection, policy, and restricted scoring |
 | `test_rlm.py` | Local IPython and artifact behavior |
 | `test_improvement_pipeline.py / test_improver.py` | Stage contracts, result retention, stopping, hierarchical budgets and frozen editor fields |
-| `test_improvement_mechanisms.py` | Synchronous faults, invalid results, hook isolation, missing evidence, research wiring and bounded long sequences |
+| `test_improvement_mechanisms.py` | Synchronous faults, invalid results, hook isolation, missing evidence, evidence-index wiring and bounded long sequences |
 | `test_improvement_delivery.py` | Declared outputs, missing sidecars, clean-directory validation and unsupported backend admission |
 | `test_task_sets.py / test_task_set_search.py` | Frozen task identity, deterministic coverage, common full-set selection and incomplete candidates |
 | `test_joint_assessment.py` | Bounded task parallelism, cancellation, explicit objective aggregation and missing-result rejection |
-| `test_completed_improvement.py` | Zero-reward official selection versus exploration seed, granted facts, independent judgments, failure fallback and stopping |
+| `test_completed_improvement.py` | Completed comparisons and official selection, granted facts, independent judgments, failure fallback and stopping |
 | `test_algorithm_audit.py` | Edit spans, rendered budgets, and environment regressions |
 
 Use temporary materials, fake Providers, and injected HTTP callbacks. RLM tests start local IPython processes; none prove real model gains.
@@ -47,7 +47,7 @@ guidance and immutable local allowances. These are wiring tests, not quality gai
 
 
 [Improvement runtime tests](../improvement/README.md) own loop fault injection;
-`test_editor_execution.py` covers native editing and partial execution;
+`test_editor_execution.py` covers editor execution and interrupted registered task execution;
 `test_parameter_candidates.py` checks actual isolated parameter application and
 `test_managed_commands.py` checks polling, capacity and cancellation.
 
@@ -59,3 +59,9 @@ Provider scope calibration, exact-count fallback and auxiliary preflight.
 `test_long_context.py` completes 80 tool batches with repeated reduction and
 valid measured requests. These fake episodes establish covered runtime behavior,
 not model quality or benchmark gains.
+
+`test_tool_catalog.py` checks demand-loaded usage, protected tool contracts and
+isolated policy candidates. `test_execution_registration.py` covers explicit
+backend requirements and rejection before model calls. Catalog assembly and
+resource-materialization tests cover cleanup and frozen dependencies. `test_context_history.py` checks ordinary
+read routing, long-line pagination and session isolation.

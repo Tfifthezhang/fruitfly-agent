@@ -23,8 +23,6 @@ from fruitfly_agent.lab.improvement.assessment.scorers.policies import python_ca
 from fruitfly_agent.interactive import TerminalConfigurationFrontend
 from fruitfly_agent.run import RunApplicationFactory
 from fruitfly_agent.experiments.scaffolding import initialize_workspace
-from fruitfly_agent.experiments.configuration import load_configuration
-from fruitfly_agent.experiments.composition import prepare_experiment
 from fruitfly_agent.providers.registry import load_model_specs
 
 
@@ -107,9 +105,10 @@ async def check(wheel: Path) -> None:
         experiment = root / 'experiment'
         experiment.mkdir()
         initialize_workspace(experiment)
-        prepared = prepare_experiment(load_configuration(experiment), 'improvement',
-            environment={'DEEPSEEK_API_KEY': 'offline-placeholder'})
-        assert prepared.model_roles['executor'] == 'deepseek-flash-openai'
+        from fruitfly_agent.run.configuration.inspection import inspect_configuration
+        inspected = inspect_configuration(experiment / '.fruitfly/default-config.yaml')
+        assert inspected['models']['executor']['alias'] == 'deepseek-flash-openai'
+        assert not (experiment / '.fruitfly/experiment.yaml').exists()
         benchmark = root / 'benchmark'
         benchmark.mkdir()
         initialize_workspace(benchmark, source='task-set', benchmark='terminal-bench-4')

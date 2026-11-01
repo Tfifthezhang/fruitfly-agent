@@ -8,7 +8,7 @@ Use FruitFlyAgent through stdin/stdout, menus, and live events. Application owns
 
 | Need | Action |
 |---|---|
-| Start | Run `python -m fruitfly_agent`; complete configuration opens welcome and chat directly. |
+| Start | Run `python -m fruitfly_agent`; the offline startup panel offers Start session, Configure and Exit. |
 | Configure | `/config`; apply the draft to this conversation, continue configuring, or discard changes. |
 | Select a prompt | **/config → prompt** or `/config`; preview and confirm. |
 | Complete a command | Type `/` or a prefix, use ↑↓ to select and Tab to fill it; Enter submits the current text, Esc hides suggestions. |
@@ -73,9 +73,11 @@ Cancelled or failed restoration keeps the current session and does not display t
 
 ## Configure
 
-Use `/config` in chat or `--configure` before startup. Missing required inputs
-open their setup flow automatically; complete configuration needs no startup menu.
-Standalone edits offer **Save and start**, Continue or Discard. **Restore default
+Use Configure in the [startup panel](features/startup/README.md), `/config` in chat,
+or `--configure` to open the shared editor first. Missing required inputs use the
+host-supplied setup forms. Startup edits offer **Save and return**, Continue or
+Discard; saving makes no connections. Start session connects resources, and startup
+failure or cancellation returns to the panel after cleanup. **Restore default
 configuration** appears immediately before Back in configuration. It
 stages the default prompt, mechanisms and bindings while preserving the current
 model and credentials. Review and apply the draft to this conversation,
@@ -85,7 +87,7 @@ Default files are edited manually. No permission configuration page is supplied.
 | Menu | Behavior |
 |---|---|
 | `model` / `prompt` | Stage the model and prompt for review and explicit application. |
-| Add model… | Collect host-provided service fields, hidden API key, and review; stage until configuration save. Opens on first startup when no models exist. |
+| Add model… | Collect host-provided service fields, hidden API key, and review; stage until configuration save. Available through Configure before any session starts. |
 | Set API key… | Stage a missing credential for the selected model; the menu shows only set/missing status. |
 | Tools → Set up… | Select a web service and optional key variable, enter a hidden API key, and stage until configuration save. Direct fetch skips key input. |
 | Context, Tools, Environment | One row per mechanism; focused descriptions appear in a fixed bottom area. Enter opens settings or algorithm choices; Space on a mechanism row enables/disables. |

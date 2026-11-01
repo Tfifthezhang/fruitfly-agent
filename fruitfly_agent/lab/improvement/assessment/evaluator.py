@@ -25,11 +25,11 @@ SCHEMA = ('Return exactly JSON {"evaluations":[{"run_id":"existing-id","dimensio
 class ModelEvaluator:
     implementation_id = 'model-evaluator'
 
-    def __init__(self, config, artifacts, *, instructions=None, page_characters=12000, reader_factory=None):
+    def __init__(self, config, artifacts, *, instructions=None, settings=None, reader_factory=None):
         self.config = config
         self.artifacts=artifacts
         self.instructions=instructions or EvaluatorInstructions()
-        self.session=EvidenceSession(config,artifacts,page_characters=page_characters,reader_factory=reader_factory)
+        self.session=EvidenceSession(config,artifacts,settings=settings,reader_factory=reader_factory)
 
     async def evaluate(self, task, records, services, *, inputs=(), incumbent=None):
         if not records or len({r.run_id for r in records}) != len(records):
@@ -61,6 +61,8 @@ class ModelEvaluator:
             for resource in record.artifacts:
                 references[prefix + resource.path] = resource.artifact_id
             rows.append(row)
+        from ..evidence.rounds import round_navigation
+        files['context/rounds.json'] = canonical_json(round_navigation(services, (r.run_id for r in records))).encode()
         files['context/task.md'] = task.instruction.encode()
         files['context/executions.json'] = canonical_json(rows).encode()
         index = {'references': references, 'inline_files': sorted(files), 'executions': rows, 'incumbent': incumbent}

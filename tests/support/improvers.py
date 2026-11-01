@@ -52,9 +52,6 @@ class OfflineGenerator:
                   for name in request.plan.component_ids)),))
 
 
-class FirstComposer:
-    async def compose(self, request, services):
-        return request.candidates[-1]
 
 
 class FirstSelector:
@@ -73,7 +70,7 @@ class SyntheticVerification:
 
 
 class OfflineRunner:
-    capabilities = frozenset({'file-workspace', 'tool:read', 'tool:write', 'tool:edit'})
+    capabilities = frozenset({'tool:read', 'tool:write', 'tool:edit'})
 
     async def execute(self, plan, task, harness):
         return ExecutionRecord('run-' + uuid4().hex, task.task_id, task.material_id,
@@ -88,7 +85,7 @@ def offline_factory(root, target='base_prompt'):
     generators.register('offline-rule', OfflineGenerator)
     factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=providers,
         improvement_bindings=WorkflowBindings(generators=generators,
-            runner=lambda *args: OfflineRunner(), composer=lambda *args: FirstComposer(),
+            runner=lambda *args: OfflineRunner(), 
             selector=lambda *args: FirstSelector(), reflector=lambda *args: NoReflection(),
             verifier=SyntheticVerification()))
     factory.test_request = WorkflowRequest('Complete the synthetic task.', component_ids=(target,),

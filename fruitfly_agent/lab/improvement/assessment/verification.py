@@ -30,7 +30,7 @@ class HoldoutVerification:
     """Compare unchanged original selection and holdout tasks once after editing.
 
     The executor is a separately timed host capability. Verification tasks and answers
-    are not supplied to generators, composers or reflection.
+    are not supplied to generators or reflection.
     """
     policy_id = 'task-holdout-v1'
     manages_stage_times = True
