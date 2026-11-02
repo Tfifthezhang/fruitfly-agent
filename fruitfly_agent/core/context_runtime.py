@@ -14,7 +14,7 @@ from .context.validation import valid_tool_links, can_rebase_context
 from .data_model.runtime import ProviderView
 from typing import Any
 
-from .data_model.context import ContextDecision, ContextItem, ContextSnapshot, ContextTrigger
+from .data_model.context import ContextDecision, ContextItem, ContextSnapshot, ContextTrigger, ContextActivity, ContextActivitySink
 from .data_model.messages import (
     AgentMessage,
     AssistantMessage,
@@ -24,7 +24,7 @@ from .data_model.messages import (
 )
 from .data_model.runtime import AgentLoopContext
 from .errors import FatalError, OverflowError
-from .extensions.hooks import BEFORE_COMPACTION, BeforeCompactionEvent, HookRegistry
+from .extensions.hooks import BEFORE_COMPACTION, CONTEXT_ACTIVITY, BeforeCompactionEvent, HookRegistry
 from .context import ContextReducer
 
 logger = logging.getLogger(__name__)
@@ -72,7 +72,7 @@ def append_message(ctx: AgentLoopContext, message: AgentMessage) -> None:
     ctx.canonical_items.append(ContextItem(id=item_id, message=message))
 
 
-def snapshot(ctx: AgentLoopContext, trigger: ContextTrigger) -> ContextSnapshot:
+def snapshot(ctx: AgentLoopContext, trigger: ContextTrigger, *, report: ContextActivitySink | None = None) -> ContextSnapshot:
     """Freeze the current canonical transcript and model projection."""
 
     return ContextSnapshot(
@@ -91,6 +91,7 @@ def snapshot(ctx: AgentLoopContext, trigger: ContextTrigger) -> ContextSnapshot:
         context_state=deepcopy(ctx.context_state),
         revision=ctx.revision,
         rebase_allowed=can_rebase_context(ctx.provider, ctx.messages, []),
+        report_activity=report,
     )
 
 
@@ -103,7 +104,7 @@ async def check_budget(
 
     if reducer is None or ctx.overflow_attempt > 0:
         return
-    current = snapshot(ctx, "budget")
+    current = snapshot(ctx, "budget", report=_activity_reporter(ctx, hooks))
     decision = await _call_reducer(
         reducer.check_budget,
         current,
@@ -145,7 +146,7 @@ async def recover_from_overflow(
     if ctx.overflow_attempt >= ctx.max_context_recovery_attempts:
         return _overflow_details(ctx, str(error), recovery="attempt_limit")
     ctx.overflow_attempt += 1
-    current = snapshot(ctx, "overflow")
+    current = snapshot(ctx, "overflow", report=_activity_reporter(ctx, hooks))
     decision = await _call_reducer(
         reducer.react_to_overflow,
         current,
@@ -285,6 +286,29 @@ async def _call_reducer(fn: Any, *args: Any, label: str, default: Any) -> Any:
             raise
         logger.warning("%s failed (isolated): %s", label, exc)
         return default
+
+
+def _activity_reporter(ctx: AgentLoopContext, hooks: HookRegistry) -> ContextActivitySink:
+    async def report(event: ContextActivity) -> None:
+        from dataclasses import asdict
+        import re
+        import math
+        if (not isinstance(event, ContextActivity)
+                or any(not isinstance(v, str) or not re.fullmatch(r'[A-Za-z0-9_.-]{1,80}', v)
+                       for v in (event.mechanism_id, event.stage, event.outcome))
+                or not isinstance(event.reason, str) or event.reason and not re.fullmatch(r'[A-Za-z0-9_.-]{1,80}', event.reason)
+                or isinstance(event.elapsed_seconds, bool) or not isinstance(event.elapsed_seconds, (int, float))
+                or not math.isfinite(event.elapsed_seconds) or event.elapsed_seconds < 0
+                or any(type(v) is not int or v < 0 for v in (event.input_tokens, event.output_tokens))):
+            return
+        if ctx.session is not None and ctx.session_run_id is not None:
+            try:
+                ctx.session.append('meta', {'kind': 'runRecord', 'schema_version': 1,
+                    'run_id': ctx.session_run_id, 'event': 'context_activity', 'data': asdict(event)})
+            except Exception:
+                logger.warning('context activity persistence failed')
+        await hooks.emit(CONTEXT_ACTIVITY, event)
+    return report
 
 
 def _overflow_details(

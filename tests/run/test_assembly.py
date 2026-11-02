@@ -32,7 +32,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
         catalog = builtin_catalog()
         store = DataArtifactStore(root / ".fruitfly" / "artifacts")
         ref = store.put_text("A distinct base prompt")
-        baseline = HarnessProfile("default", str(model_path), "offline", tuple(s for s in catalog.default_selections() if s.mechanism_id != "working-memory-reduction"))
+        baseline = HarnessProfile("default", str(model_path), "offline", tuple(s for s in catalog.default_selections() if s.mechanism_id != "layered-compaction"))
         candidate = HarnessProfile("default", str(model_path), "offline", baseline.mechanisms, ref.artifact_id)
         with Session(root / ".fruitfly" / "sessions" / "first.jsonl") as session:
             original = self.workspace.assemble(baseline, session, catalog=catalog, artifact_store=store)
@@ -140,7 +140,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
         )
         self.assertEqual(
             runtime.mechanism_ids,
-            ("skill-catalog", "information-context", "working-memory-reduction", "component-improvement"),
+            ("skill-catalog", "information-context", "layered-compaction", "component-improvement"),
         )
         self.assertEqual(runtime.manifest.schema_version, 7)
         self.assertEqual(runtime.manifest.data_artifacts, ())
@@ -173,7 +173,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
         second = assemble(root / "config.yaml", root / "second.jsonl")
 
         self.assertEqual(first.manifest.digest, second.manifest.digest)
-        self.assertEqual(set(first.manifest.models), {"main", "auxiliary-1"})
+        self.assertEqual(set(first.manifest.models), {"main"})
 
     def test_runtime_overview_includes_capabilities_and_preserves_experimental_ids(self) -> None:
         catalog = builtin_catalog()
@@ -187,7 +187,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
         self.assertEqual('environment', views['local-env'].category)
         self.assertEqual('tools', views['read-tool'].category)
         self.assertEqual(('read',), views['read-tool'].tool_names)
-        self.assertEqual('reduction', views['working-memory-reduction'].display_section)
+        self.assertEqual('reduction', views['layered-compaction'].display_section)
         self.assertNotIn('information-context', views)
         self.assertNotIn('web-search-tool', views)
         self.assertEqual('tools', tool_categories['read'])
@@ -268,7 +268,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
                     environment={'TEST_API_KEY': 'placeholder'},
                 )
 
-            self.assertEqual(registry.create.call_count, 2)
+            self.assertEqual(registry.create.call_count, 1)
             self.assertFalse(any(
                 tool.name.startswith("memory_") for tool in runtime.config.tools
             ))
@@ -306,12 +306,12 @@ class RuntimeAssemblyTest(unittest.TestCase):
             .is_dir()
         )
 
-        self.assertEqual(3, registry.create.call_count)
+        self.assertEqual(2, registry.create.call_count)
         self.assertIn("rlm-ipython", runtime.mechanism_ids)
         self.assertIn("ipython-tool", runtime.components)
         self.assertIn("ipython", [tool.name for tool in runtime.config.tools])
         self.assertEqual(
-            {"main", "auxiliary-1", "auxiliary-2"},
+            {"main", "auxiliary-1"},
             set(runtime.manifest.models),
         )
         self.assertTrue(artifact_exists)

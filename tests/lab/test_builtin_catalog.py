@@ -76,6 +76,7 @@ class CatalogTest(unittest.TestCase):
                 "knowledge-files",
                 "live-http",
                 "working-memory-reduction",
+                "layered-compaction",
                                 "rlm-ipython",
                 "skill-document",
                 "component-improvement",

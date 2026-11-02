@@ -20,8 +20,8 @@ profiles:
         file: components/H/tools/write-tool.yaml
       tool-catalog:
         file: components/H/tool-catalog.yaml
-      working-memory-reduction:
-        file: components/H/working-memory-reduction.yaml
+      layered-compaction:
+        file: components/H/layered-compaction.yaml
       base_prompt:
         file: components/H/base-prompt.yaml
       execution-policy:

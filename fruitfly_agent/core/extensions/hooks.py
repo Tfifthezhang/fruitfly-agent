@@ -30,6 +30,7 @@ from ..data_model.messages import (
 BEFORE_RUN = "before_run"
 BEFORE_REQUEST = "before_request"
 REQUEST_PREPARED = "request_prepared"
+CONTEXT_ACTIVITY = "context_activity"
 AFTER_RESPONSE = "after_response"
 BEFORE_TOOL = "before_tool"
 AFTER_TOOL = "after_tool"
@@ -40,6 +41,7 @@ HOOK_NAMES = (
     BEFORE_RUN,
     BEFORE_REQUEST,
     REQUEST_PREPARED,
+    CONTEXT_ACTIVITY,
     AFTER_RESPONSE,
     BEFORE_TOOL,
     AFTER_TOOL,
@@ -144,8 +146,8 @@ class HookRegistry:
         """Register an ACTIVE hook: may mutate or block via the event object."""
         if type(required) is not bool:
             raise TypeError('required must be boolean')
-        if name == REQUEST_PREPARED:
-            raise ValueError("request_prepared is observation-only; use on()")
+        if name in {REQUEST_PREPARED, CONTEXT_ACTIVITY}:
+            raise ValueError(name + " is observation-only; use on()")
         if name not in self._handlers:
             raise ValueError(f"unknown hook name {name!r}; known: {', '.join(HOOK_NAMES)}")
         self._handlers[name].append(_Handler(fn=fn, active=True, priority=priority, required=required, timeout=timeout))
@@ -232,6 +234,7 @@ __all__ = [
     "BEFORE_RUN",
     "BEFORE_REQUEST",
     "REQUEST_PREPARED",
+    "CONTEXT_ACTIVITY",
     "AFTER_RESPONSE",
     "BEFORE_TOOL",
     "AFTER_TOOL",

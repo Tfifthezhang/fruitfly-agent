@@ -470,6 +470,8 @@ def _format_activity_label(event: RunActivityChanged) -> str:
         )
     elif event.phase == "compacting":
         label = "Compacting context"
+    elif event.phase == 'processing_context':
+        label = 'Context: ' + subject
     elif event.phase == "finalizing":
         label = "Finalizing"
     else:

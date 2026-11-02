@@ -47,3 +47,10 @@ are restored by mechanism identity, separately from immutable canonical messages
 `rebase_allowed` capability. Lab methods control policy; Core revalidates actual
 final output. Preflight budget failures do not call the Provider. Heuristic
 measurements retain their uncertainty and cannot guarantee remote acceptance.
+
+`ContextSnapshot.report_activity` is an optional asynchronous observer sink.
+Algorithms emit immutable `ContextActivity` values containing bounded identifiers,
+stage/outcome, elapsed seconds and token counts. Core drops invalid metadata,
+persists valid activity as ordinary run records and emits the passive
+`CONTEXT_ACTIVITY` hook. Activity neither commits a projection nor increments
+compaction counts. It contains no source messages or prompts.

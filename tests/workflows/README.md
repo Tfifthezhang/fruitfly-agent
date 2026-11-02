@@ -38,3 +38,7 @@ configuration, and verifies unchanged baseline files.
 
 `test_working_memory_improvement.py` verifies two generations of actual memory
 candidate execution, activation and recovery using a fake Provider.
+
+`test_layered_compaction_improvement.py` verifies both deterministic readback-policy
+and hybrid summary-prompt candidates through real isolated execution, trial
+artifacts, independent fake verification, activation and Session recovery.

@@ -18,6 +18,42 @@ from tests.support.faux_provider import FauxProvider
 
 
 class ContextStatusTests(unittest.IsolatedAsyncioTestCase):
+    async def test_context_activity_is_passive_persisted_and_does_not_count_as_compaction(self):
+        from fruitfly_agent.core.data_model import ContextActivity
+        from fruitfly_agent.core.extensions.hooks import CONTEXT_ACTIVITY, HookRegistry
+
+        class Reduce:
+            def estimate(self, snapshot): return 25
+            async def check_budget(self, snapshot):
+                await snapshot.report_activity(ContextActivity('fixture', 'summarizing_history'))
+                await snapshot.report_activity(ContextActivity('fixture', 'summarizing_history',
+                    'failed', .01, 20, 3, 'timeout'))
+                await snapshot.report_activity(ContextActivity('fixture', 'unsafe\ncontent'))
+                return None
+            async def react_to_overflow(self, snapshot, error): return None
+
+        hooks = HookRegistry()
+        with self.assertRaisesRegex(ValueError, 'observation'):
+            hooks.add(CONTEXT_ACTIVITY, lambda event: event)
+        def broken(event): raise RuntimeError('offline observer failure')
+        hooks.on(CONTEXT_ACTIVITY, broken)
+        provider = FauxProvider(); provider.respond_text('answer')
+        events = []
+        with tempfile.TemporaryDirectory() as directory, Session(Path(directory) / 'session.jsonl') as durable:
+            session = InteractiveSession(AgentLoopConfig(provider=provider, hooks=hooks, session=durable),
+                context_pipeline=Reduce(), event_sink=events.append)
+            await session.submit('original question')
+            activity = [e for e in events if isinstance(e, RunActivityChanged) and e.phase == 'processing_context']
+            self.assertEqual(len(activity), 2)
+            self.assertIn('summarizing history', activity[0].subject)
+            self.assertIn('timeout', activity[1].subject)
+            self.assertEqual(session.status.compaction_count, 0)
+            records = [e.payload['data'] for e in durable.read_all() if e.payload.get('event') == 'context_activity']
+            self.assertEqual([r['outcome'] for r in records], ['running', 'failed'])
+            self.assertEqual((records[1]['input_tokens'], records[1]['output_tokens']), (20, 3))
+            self.assertNotIn('original question', str(records))
+            self.assertEqual(len(provider.calls), 1)
+
     def test_request_prepared_only_accepts_passive_observers(self):
         from fruitfly_agent.core.extensions.hooks import HookRegistry, REQUEST_PREPARED
         hooks = HookRegistry()

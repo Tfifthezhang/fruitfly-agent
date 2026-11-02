@@ -42,15 +42,15 @@ class ComponentExperimentTests(unittest.TestCase):
     def test_component_search_and_feedback_are_consumed_and_grants_are_visible(self):
         self.change('experiment.yaml', lambda value: value.update(stopping={'max_rounds': 2},
             evidence={'read': {'default_characters': 8000}}))
-        self.change('experiment.yaml', lambda value: value.setdefault('edit', {}).update({'working-memory-reduction': {
-            'fields': ['parameters.settings.memory_tokens'],
-            'bounds': {'parameters.settings.memory_tokens': {'minimum': 64, 'maximum': 4096}}}}))
+        self.change('experiment.yaml', lambda value: value.setdefault('edit', {}).update({'layered-compaction': {
+            'fields': ['parameters.settings.tail_tokens'],
+            'bounds': {'parameters.settings.tail_tokens': {'minimum': 256, 'maximum': 16384}}}}))
         prepared = self.prepare()
         self.assertEqual(prepared.request.rounds, 2)
         self.assertEqual(prepared.config.evidence_settings['read']['default_characters'], 8000)
-        self.assertIn('working-memory-reduction', prepared.request.component_ids)
-        self.assertEqual(prepared.config.improvement.component_options['working-memory-reduction']['editable_fields'],
-                         ['parameters.settings.memory_tokens'])
+        self.assertIn('layered-compaction', prepared.request.component_ids)
+        self.assertEqual(prepared.config.improvement.component_options['layered-compaction']['editable_fields'],
+                         ['parameters.settings.tail_tokens'])
         self.assertNotIn('offline-placeholder', json.dumps(prepared.summary()))
 
     def test_referenced_component_and_comparison_changes_invalidate_prepared_inputs(self):

@@ -92,7 +92,7 @@ class ParameterTarget:
         return config
 
 
-def editable_parameters(definition, fields, *, default_selected=True):
+def editable_parameters(definition, fields, *, default_selected=True, available_fields=None):
     """Declare, validate and install a parameter target for an existing owner."""
     from fruitfly_agent.lab.catalog.components import ComponentSpec
     name = definition.descriptor.mechanism_id
@@ -102,6 +102,12 @@ def editable_parameters(definition, fields, *, default_selected=True):
         raise ValueError('editable parameters must be declared by their owner')
     if not definition.parameter_paths:
         definition=replace(definition,parameter_paths={p.name:'settings.'+p.name for p in definition.descriptor.parameters})
+    def eligible(parameters):
+        normalized = definition.descriptor.normalize_parameters(parameters)
+        result = frozenset(available_fields(normalized)) if available_fields is not None else fields
+        if not result or result - fields:
+            raise ValueError('conditional parameter fields must be a nonempty subset of the owner whitelist')
+        return result
     original_specs = definition.component_specs
     def specs(parameters, enabled):
         old = original_specs(parameters, enabled) if original_specs else ()
@@ -109,7 +115,7 @@ def editable_parameters(definition, fields, *, default_selected=True):
             'mechanism-parameters-v1', ParameterTarget.required_capabilities | frozenset('tool:' + tool for tool in definition.descriptor.effects.tools), default_selected)) if enabled else old
     def install(state, context, parameters):
         return definition.install(state, context, parameters).with_component(
-            TEXT_TARGET_PREFIX + name, ParameterTarget(definition, parameters, fields, default_selected=default_selected))
+            TEXT_TARGET_PREFIX + name, ParameterTarget(definition, parameters, eligible(parameters), default_selected=default_selected))
     def options(selected,bounds):
         allowed={'parameters.'+definition.parameter_paths[name] for name in fields}
         if set(selected)-allowed:raise ValueError('parameter grant includes a protected or unknown field')
@@ -120,6 +126,6 @@ def editable_parameters(definition, fields, *, default_selected=True):
                 raise ValueError('unknown parameter component')
             return definition.component_validator(component, options, inventory)
         values: dict[str, Any] = next((m['parameters'] for m in inventory.mechanisms if m['id'] == name), {})
-        ParameterTarget(definition, values, fields).validate_options(options)
+        ParameterTarget(definition, values, eligible(values)).validate_options(options)
     return replace(definition, install=install, component_specs=specs,
         component_validator=validate, configuration_edit=options)

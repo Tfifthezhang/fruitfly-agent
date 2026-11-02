@@ -38,3 +38,6 @@ task executor.
 `TerminalProcess` supports context ownership, resize, visible-prompt waits and
 exit-status checks. `run_terminal` supplies one prompt/submission/exit dialogue.
 Both retire children on failures and use bounded waits.
+
+`compaction.py` supplies mounted temporary history and deterministic evidence for
+context tests; it owns no behavior assertions or TestCases.

@@ -77,7 +77,7 @@ catalog. Each restoration reloads the file so manual edits are available immedia
 Initialize the complete tree, or copy [default-config.example.yaml](examples/configuration/default-config.example.yaml),
 [models.example.yaml](examples/configuration/models.example.yaml) and their
 referenced component files only when absent. The template enables local execution, basic
-read/Bash/edit/write tools, a shared Tool catalog policy and incremental working memory. Default files
+read/Bash/edit/write tools, a shared Tool catalog policy and deterministic layered compaction. Default files
 are edited manually. Explicit `--config .fruitfly/default-config.yaml` selections
 have a read-only terminal controller.
 
@@ -242,7 +242,7 @@ The capability page uses arrows and Space/Enter to toggle, then **Continue** to 
 |---|---|---|
 | Base prompt | `assistant-default`; choose another prompt in **/config → prompt** or `/config`. | [Base prompt](fruitfly_agent/lab/base_prompt/README.md) |
 | Skill catalog | Read `.skills/`; enable in **Context → Context augmentation → Skill catalog** (Space toggles; the phase is a section heading). | [Skills](fruitfly_agent/lab/context_manager/augmentation/skills/README.md) |
-| Reduction | Incremental working memory with owned history readback through `read`. Edit prompts and policy in H component files. | [Reduction](fruitfly_agent/lab/context_manager/reduction/README.md) |
+| Reduction | Layered compaction by default; optional working memory. Both read original history through `read`. Edit policy in H component files. | [Reduction](fruitfly_agent/lab/context_manager/reduction/README.md) |
 | Context measurement | Automatically shared internal service; reports precision, input/output reserves and uncertainty. Exact counting requires a declared Provider capability. | [Measurement](fruitfly_agent/lab/context_manager/measurement/README.md) |
 | Improvement | Edit I component files for editor/evaluator prompts; experiment grants and conditions control edits, phase times, scope and stopping; `/improvement` keeps a small instruction/file flow. | [Improvement](fruitfly_agent/lab/improvement/README.md) |
 | Reusable skill document | Disabled; Context augmentation. Set `settings.source_path` to one workspace-relative Skill or enter `content.body`; `settings.max_chars=16000`. | [Skill body](fruitfly_agent/lab/context_manager/augmentation/skills/README.md#optimize-a-skill-body) |

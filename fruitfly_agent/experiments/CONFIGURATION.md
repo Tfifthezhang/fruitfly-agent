@@ -53,7 +53,7 @@ Model roles belong to the referenced system configuration.
 | Field category | Examples | Meaning |
 |---|---|---|
 | `parameters.instructions.*` | Base `system`, Tool/Skill catalog `usage`, memory `update`/`shrink`/`readback`, editor/evaluator prompts | Model-facing instructions |
-| `parameters.settings.*` | Working-memory sizes, Skill catalog `max_chars`, Bash default timeout | Owner-declared mutable parameters |
+| `parameters.settings.*` | Layered-compaction policy, working-memory sizes, Skill catalog `max_chars`, Bash default timeout | Owner-declared mutable parameters |
 | `parameters.content.*` | Retained Skill `body`, registered multi-file `documents` | Retained editable material |
 
 `list_targets` pages a frozen target index. `describe_target` supplies field type,

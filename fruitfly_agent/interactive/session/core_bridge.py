@@ -17,6 +17,7 @@ from fruitfly_agent.core.extensions.hooks import (
     AFTER_RESPONSE,
     BEFORE_RUN_END,
     REQUEST_PREPARED,
+    CONTEXT_ACTIVITY,
     BEFORE_COMPACTION,
     BEFORE_TOOL,
     HookRegistry,
@@ -194,6 +195,7 @@ class CoreEventBridge:
             else HookRegistry(session=config.session)
         )
         hooks.on(REQUEST_PREPARED, self._on_request_prepared)
+        hooks.on(CONTEXT_ACTIVITY, self._on_context_activity)
         hooks.on(AFTER_RESPONSE, self._on_response)
         hooks.on(BEFORE_RUN_END, self._on_run_end)
         if config.session is not None:
@@ -258,6 +260,14 @@ class CoreEventBridge:
 
     def _on_request_prepared(self, event):
         self._context(dataclasses.asdict(event))
+
+    async def _on_context_activity(self, event):
+        label = event.stage.replace('_', ' ')
+        if event.outcome != 'running':
+            label += ' · ' + event.outcome
+        if event.reason:
+            label += ' · ' + event.reason.replace('_', ' ')
+        await self._dispatcher.emit(RunActivityChanged(run_id='', phase='processing_context', subject=label))
 
     def _on_response(self, event):
         self._receipt({"input_tokens": event.assistant.usage.input_tokens if event.assistant.usage else None,

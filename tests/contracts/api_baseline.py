@@ -36,6 +36,8 @@ CORE_PUBLIC_API = {
     "ContextItem",
     "ContextSnapshot",
     "ContextDecision",
+    "ContextActivity",
+    "ContextActivitySink",
     "ParameterKind",
     "MechanismLayer",
     "MechanismFamily",
@@ -82,6 +84,8 @@ DATA_MODEL_PUBLIC_API = {
     "ContextItem",
     "ContextSnapshot",
     "ContextDecision",
+    "ContextActivity",
+    "ContextActivitySink",
 }
 
 ENV_CONTRACT_PUBLIC_API = {
@@ -228,6 +232,8 @@ MODULE_EXPORTS = {
         "ContextItem",
         "ContextSnapshot",
         "ContextDecision",
+        "ContextActivity",
+        "ContextActivitySink",
     },
     "fruitfly_agent.core.model_stream": {
         "AssistantMessageEventStream",
@@ -258,6 +264,7 @@ MODULE_EXPORTS = {
         "BEFORE_RUN",
         "BEFORE_REQUEST",
         "REQUEST_PREPARED",
+        "CONTEXT_ACTIVITY",
         "AFTER_RESPONSE",
         "BEFORE_TOOL",
         "AFTER_TOOL",

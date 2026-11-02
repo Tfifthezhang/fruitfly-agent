@@ -110,7 +110,7 @@ class ScaffoldingTests(unittest.TestCase):
             self.assertEqual(summary['task_set']['collections'][0]['tasks'], 1)
             self.assertEqual(summary['multi_task']['execution']['concurrency'], 1)
             self.assertIn('base_prompt', summary['request']['component_ids'])
-            self.assertIn('working-memory-reduction', summary['request']['component_ids'])
+            self.assertIn('layered-compaction', summary['request']['component_ids'])
             self.assertNotIn('improvement-editor', summary['request']['component_ids'])
             self.assertEqual(summary['execution']['max_tool_calls_per_turn'], 512)
             # Relative paths must still be inside the declared experiment workspace.

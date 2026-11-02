@@ -47,3 +47,6 @@ session discovery have separate `test_cli_execution.py`,
 interaction, persistence and declaration validation use `test_model_setup.py`,
 `test_model_persistence.py` and `test_model_configuration.py`, sharing an explicit
 workspace fixture rather than importing test classes.
+
+`test_layered_compaction.py` checks default assembly without auxiliary Providers,
+explicit hybrid roles, conditional H grants and exclusive reducer/reader selection.

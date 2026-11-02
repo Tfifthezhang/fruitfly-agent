@@ -24,3 +24,8 @@ Core invokes active handlers before passive observers. Optional ordinary failure
 
 `HookRegistry.add(..., required=True, timeout=10)` declares a required guard.
 The default remains an optional handler; observers receive private snapshots.
+
+`CONTEXT_ACTIVITY` is observation-only through `HookRegistry.on`. It carries
+`ContextActivity` from the public data model during request preparation. Observers
+cannot authorize a projection or alter algorithm policy. Ordinary observer errors
+are isolated through the same hook contract.

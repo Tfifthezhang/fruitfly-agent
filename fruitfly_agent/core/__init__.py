@@ -57,7 +57,7 @@ from .data_model.messages import (
     Usage,
     UserMessage,
 )
-from .data_model.context import ContextDecision, ContextItem, ContextSnapshot, ContextTrigger
+from .data_model.context import ContextDecision, ContextItem, ContextSnapshot, ContextTrigger, ContextActivity, ContextActivitySink
 
 __all__ = [
     "run_agent_loop",
@@ -95,6 +95,8 @@ __all__ = [
     "ContextItem",
     "ContextSnapshot",
     "ContextDecision",
+    "ContextActivity",
+    "ContextActivitySink",
     "ContextPipeline",
     "ContextPipelineProfile",
     "ContextPhase",

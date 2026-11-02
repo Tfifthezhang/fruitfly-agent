@@ -130,21 +130,24 @@ class SessionHistory:
                 if len(result) >= limit: break
         return result
 
-    def execution_artifacts(self):
+    def execution_artifacts(self, *, prefix='memory', mechanism=None):
+        if not isinstance(prefix, str) or not prefix or '/' in prefix or prefix in {'.', '..'}:
+            raise ValueError('execution artifact prefix must be a single namespace')
         references = set(self.values)
         if self.root is not None and self.root.exists():
             if self.root.is_symlink():
                 raise ValueError('context artifact root cannot be a symlink')
             references.update('sha256:' + path.stem for path in self.root.glob('*.txt'))
-        result = {'memory/' + reference[7:] + '.txt': self._bytes(reference)
+        result = {prefix + '/' + reference[7:] + '.txt': self._bytes(reference)
                   for reference in sorted(references)}
         if self.session is not None:
             checkpoints = [{'sequence': entry.id, 'mechanism': entry.payload.get('mechanismId'),
                             'state': entry.payload['state']}
                 for entry in self.session.read_all()
                 if (entry.type == 'compaction' or entry.type == 'meta' and entry.payload.get('kind') == 'context_state')
-                and 'state' in entry.payload]
-            result['memory/checkpoints.json'] = json.dumps(checkpoints, ensure_ascii=False).encode()
+                and 'state' in entry.payload
+                and (mechanism is None or entry.payload.get('mechanismId') == mechanism)]
+            result[prefix + '/checkpoints.json'] = json.dumps(checkpoints, ensure_ascii=False).encode()
         return result
 
     def validate_state(self, state):

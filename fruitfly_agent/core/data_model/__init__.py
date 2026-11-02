@@ -26,7 +26,7 @@ from .messages import (
     encode_image_bytes,
     message_from_dict,
 )
-from .context import ContextDecision, ContextItem, ContextSnapshot, ContextTrigger
+from .context import ContextDecision, ContextItem, ContextSnapshot, ContextTrigger, ContextActivity, ContextActivitySink
 from .runtime import (
     AgentLoopContext,
     BeforeToolCallResult,
@@ -61,4 +61,6 @@ __all__ = [
     "ContextItem",
     "ContextSnapshot",
     "ContextDecision",
+    "ContextActivity",
+    "ContextActivitySink",
 ]

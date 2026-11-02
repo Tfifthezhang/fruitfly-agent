@@ -154,7 +154,7 @@ public configuration format.
 
 
 [Parameter adapters](../improvement/components/README.md#edit-owner-parameters)
-reuse ordinary normalization and assembly. Built-in Bash, working memory, Web and
+reuse ordinary normalization and assembly. Built-in Bash, layered compaction, working memory, Web and
 IPython owners declare explicit editable parameter whitelists. Discovery still
 constructs no clients. Their targets require `configuration-materialization`;
 unsupported runners reject the edit. I editor/evaluator prompts use fixed-I comparison instead

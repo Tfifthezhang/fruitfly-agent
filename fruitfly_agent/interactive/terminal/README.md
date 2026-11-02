@@ -238,6 +238,12 @@ I/O does not import rendering or feature modules. Rendering consumes I/O primiti
 
 Waiting/retry/timeout activity includes request and adapter attempt identities. Timeout text describes an exceeded waiting deadline; it does not assert server overload. `/status` prefers the latest prepared-input estimate for context usage, with a same-model Provider receipt as fallback. A 20-cell ASCII occupancy bar accompanies the percentage, source and last-request scope; it works without ANSI or color. The bar stops at full, while percentages above 100% remain visible. Reported input receipts can exclude cached input according to the Provider convention. Estimates do not guarantee tokenizer accuracy and can be stale after new input. Missing measurements or configured capacity display `unknown` without a bar. Compactions count committed reductions across the session, including restored records; budget checks and cancelled proposals do not increment the count. The `messages` field counts original committed Session messages, including user, assistant and tool results, even while work is running. Context reduction does not reduce this conversation total; metadata and streamed fragments are excluded. See [Interactive status semantics](../README.md#state-and-events) for the in-memory embedding fallback.
 
+Context preparation can publish `processing_context` activity through the passive
+Core hook. The terminal renders `Context: <stage>` with outcome/reason labels when
+available, including archive and summary work. These observations do not add
+compactions; only committed projections count. Stage content and policy belong
+to the selected Lab component.
+
 ## Respond to permission requests
 
 The real interactive terminal presents the tool, operation, canonical targets, command/code when applicable, and the scope of session approval. The ANSI permission frame shows English options with a moving `❯` and a highlighted current row; NO_COLOR keeps the marker. Up/Down moves the selection and Enter confirms the selected option. The initial selection is Allow once. Numeric shortcuts **1**, **2**, and **3** choose Allow once, the displayed scope for this runtime session, and Deny respectively; Esc also denies. The menu clears after resolution. Ctrl+C cancels the run.

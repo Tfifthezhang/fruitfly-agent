@@ -52,12 +52,12 @@ for fixed runtime conditions and H identity; it has no optimization target.
 
 `editable_parameters` wraps an owning Catalog definition with an explicit field
 whitelist, strict complete JSON snapshot, numeric bounds and a configuration
-binding. Bash, working memory, Web search/fetch and IPython declare supported parameter
+binding. Bash, layered compaction, working memory, Web search/fetch and IPython declare supported parameter
 fields. Credentials, model roles and undeclared fields remain fixed. Grants use
 `parameters.<category>.<field>`; enabling an owner does not authorize editing it.
 
 Changed values require a registered backend with `configuration-materialization`.
-Tool/Skill catalogs and working memory use their ordinary owner installers; Bash,
+Tool/Skill catalogs and reduction methods use their ordinary owner installers; Bash,
 Web and IPython also need their actual tool/backend capabilities. Tool parameters are explicit opt-in targets. Candidate staging,
 ordinary assembly and verified activation consume the same component configuration.
 Unsupported backends fail explicitly. See [Catalog admission](../../catalog/CONFIGURATION.md).
@@ -69,3 +69,9 @@ no frozen response source. Such a component needs an explicitly supplied
 reproducible service/backend before an end-to-end comparison can run; a visible
 adapter alone is not runnable support. Catalog reports backend capabilities
 separately from grants. Existing external-dependency guards remain enforced.
+
+Owners may pass `available_fields` to `editable_parameters` to restrict the
+whitelist using normalized active parameters. Discovery validation and the
+installed target enforce the same subset. Layered compaction uses this to reject
+summary grants in deterministic mode while preserving complete protected
+configuration in candidate snapshots.

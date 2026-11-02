@@ -131,28 +131,36 @@ Optional [web tools](../../fruitfly_agent/lab/tools/web/README.md) are disabled 
 
 ## Select reduction and measurement
 
-Working memory owns its history resources and uses ordinary `read` for public
-source retrieval. The default selects [working memory](components/H/working-memory-reduction.yaml).
-Shared request measurement is assembled automatically; it has no component
-selection or optimization grant. [Method behavior](../../fruitfly_agent/lab/context_manager/reduction/README.md)
-owns coverage, recovery and policy limits.
+The default selects [layered compaction](components/H/layered-compaction.yaml)
+in deterministic mode. It abbreviates old tool results and archives earlier
+complete groups with original-message references through `read`.
+[Working memory](components/H/working-memory-reduction.yaml) remains optional in
+the same Reduction slot. Shared request measurement is automatic and has no
+component selection or optimization grant.
+
+To enable hybrid summaries, set `parameters.settings.mode: hybrid` in the selected
+layered-compaction component and bind an existing catalog alias at
+`profiles.<profile>.models.roles.context_summary`. This role is required; there is
+no implicit executor binding. Hybrid calls use the network and may incur charges.
 
 A materializing experiment can grant, for example:
 
 ```yaml
 edit:
-  working-memory-reduction:
-    fields: [parameters.instructions.update, parameters.settings.memory_tokens]
+  layered-compaction:
+    fields: [parameters.instructions.readback, parameters.settings.preview_chars]
     bounds:
-      parameters.settings.memory_tokens: {minimum: 512, maximum: 4096}
+      parameters.settings.preview_chars: {minimum: 256, maximum: 2048}
 ```
 
-The selected baseline must already enable that method and fit those bounds.
-Candidate prompt text, policy values and isolated execution use the ordinary
-component path. Candidate execution requires a registered backend declaring
-configuration materialization. Configuration inspection is offline. Auxiliary
-memory calls and optional Provider input counting can contact services;
-live validation requires explicit invocation and may incur charges.
+Hybrid mode additionally admits `parameters.instructions.summary` and the
+`summary_*` size/timeout settings. Deterministic mode rejects those inactive
+grants. Mode and model bindings are protected. The baseline must already enable
+the method and satisfy grant bounds. Candidate trials require a registered
+backend declaring configuration materialization, and receive isolated history.
+See [method behavior](../../fruitfly_agent/lab/context_manager/reduction/README.md)
+for recovery, cancellation and information-retention limits. Parsing and
+configuration inspection are offline; live validation requires explicit invocation.
 
 Default measurement is heuristic with explicit uncertainty and reported-usage
 calibration. Embeddings can inject a configured `MeasurementService`; precision

@@ -65,3 +65,7 @@ isolated policy candidates. `test_execution_registration.py` covers explicit
 backend requirements and rejection before model calls. Catalog assembly and
 resource-materialization tests cover cleanup and frozen dependencies. `test_context_history.py` checks ordinary
 read routing, long-line pagination and session isolation.
+
+`test_layered_compaction.py` covers deterministic previews, archive readback, source
+identity and artifact recovery. `test_layered_compaction_failures.py` covers bounded
+hybrid inference, rejection, cancellation, retry admission and evidence ledgers.

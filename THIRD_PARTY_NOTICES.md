@@ -40,3 +40,13 @@ attributed cross-task experience. This is an independently written adaptation wi
 explicit H/S/I ownership and host verification/adoption. No upstream code, paper
 figures or datasets are included. Published experiments and performance claims are
 not reproduced.
+
+## Context compaction references
+
+Layered compaction is independently implemented against FruitFlyAgent's context,
+resource and configuration contracts. Its stage ordering and six-section summary
+were informed by the user-supplied `learning harness/compact` directory and
+`s08_context_compact` in [Learn Claude Code](https://github.com/shareAI-lab/learn-claude-code).
+No upstream source files or SDK adapters are included. This implements readable
+canonical archives, optional bounded summaries and editable H policy; it does not
+reproduce upstream model-quality claims. See [implemented behavior](fruitfly_agent/lab/context_manager/reduction/methods/layered_compaction/README.md).

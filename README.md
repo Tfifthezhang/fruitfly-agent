@@ -156,6 +156,7 @@ FruitFlyAgent is released under the [MIT License](LICENSE). See [Third-party not
 | [Pi](https://github.com/earendil-works/pi) | Runtime design and adapted Agent loop, Session, and tool infrastructure; code attribution and the upstream license are recorded in [Third-party notices](THIRD_PARTY_NOTICES.md). |
 | [Harness²](https://arxiv.org/abs/2610.14224) | Role-separated candidate editing, comparison and attributed experience; [implemented scope](fruitfly_agent/lab/improvement/README.md). |
 | [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) | Inspiration for externalizing context into a programmable Python environment; see [Programmatic context](fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md). |
+| [Learn Claude Code](https://github.com/shareAI-lab/learn-claude-code) and the user-supplied `learning harness/compact` reference | Inspiration for cheap previews before history summaries and structured continuity sections; [implemented scope](fruitfly_agent/lab/context_manager/reduction/methods/layered_compaction/README.md). |
 
 Research sources and the scope of each adaptation are documented in the corresponding algorithm modules.
 

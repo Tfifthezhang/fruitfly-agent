@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, Awaitable, Callable
 
 from .messages import AgentMessage
 
@@ -16,6 +16,22 @@ if TYPE_CHECKING:
     from ..tool_runtime import AgentTool
 
 ContextTrigger = Literal["budget", "overflow"]
+
+
+@dataclass(frozen=True)
+class ContextActivity:
+    """Bounded public context-work telemetry; never includes source content."""
+
+    mechanism_id: str
+    stage: str
+    outcome: str = 'running'
+    elapsed_seconds: float = 0.0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    reason: str = ''
+
+
+ContextActivitySink = Callable[[ContextActivity], Awaitable[None]]
 
 
 @dataclass(frozen=True)
@@ -45,6 +61,7 @@ class ContextSnapshot:
     context_state: dict[str, Any] = field(default_factory=dict)
     revision: int = 0
     rebase_allowed: bool = True
+    report_activity: ContextActivitySink | None = field(default=None, repr=False, compare=False)
 
 
 @dataclass(frozen=True)
@@ -65,4 +82,4 @@ class ContextDecision:
     base_revision: int | None = None
 
 
-__all__ = ["ContextTrigger", "ContextItem", "ContextSnapshot", "ContextDecision"]
+__all__ = ["ContextTrigger", "ContextItem", "ContextSnapshot", "ContextDecision", "ContextActivity", "ContextActivitySink"]

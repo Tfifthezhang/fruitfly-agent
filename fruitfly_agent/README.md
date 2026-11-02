@@ -184,3 +184,9 @@ Agent, Improvement and RSI retain separate state machines. Core's bounded
 operation supervisor provides shared cooperative timeout/cancellation behavior;
 search decisions stay in Lab. Optimization representation, update timing,
 activation boundary and state scope use the [optimization contract](improvement/contracts/README.md#declare-optimization-surfaces).
+
+Default reduction uses [layered compaction](lab/context_manager/reduction/methods/layered_compaction/README.md)
+in deterministic mode: old result previews and readable history archives without
+auxiliary model requests. Hybrid summarization requires an explicit summary role.
+Working memory remains an alternative in the same exclusive reduction slot.
+Context preparation publishes passive stage activity to Session and the terminal.
