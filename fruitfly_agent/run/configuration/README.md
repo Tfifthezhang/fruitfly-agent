@@ -160,8 +160,29 @@ Follow [the configuration tree](../../../CONFIGURATION.md#navigate-the-configura
 for syntax, registration and experiment grants; this guide owns persistence and
 application behavior.
 
-Daily configuration saves through the same component exporter. Saving
-round-trips built-in prompt identity and the derived default Tool catalog policy.
-Disabling a tool removes it from the derived directory and usage resources while
-retaining the shared policy. No generated default override changes
-the behavior identity of an unchanged component.
+Daily saves preserve default intent through the shared component exporter.
+`{default: true}` remains symbolic; explicit values remain explicit even when
+equal to a default. Disabling a tool removes it from the derived directory and
+usage resources while retaining the policy. Freeze/export uses complete typed
+values and exact bindings rather than ordinary save semantics.
+
+Configuration inspection also lists owner-declared model requirements: purpose,
+active condition, selected alias, explicit fallback and lazy status. It creates
+no model clients. Active bindings without an allowed fallback fail before runtime assembly; inactive
+conditional roles do not add execution dependencies. See
+[Catalog role admission](../../lab/catalog/README.md#declare-auxiliary-model-dependencies).
+
+## Check loaded sources
+
+Inspection reports each component's H/S/I role, default/explicit source kind,
+normalized parameter hash and package or authored origin. The active manifest's
+`harness.configuration_sources` records the loaded view;
+`harness.tool_contracts` records usage/schema fingerprints. These receipts do not
+snapshot executable source or prove quality.
+
+Default-package changes invalidate stale preparation and commit. Reload
+configuration, then start or apply a fresh runtime. Python source changes require
+a new process. Ordinary saving does not rewrite the active runtime. Skill
+catalogs and their readable text resources share one runtime snapshot.
+Initialization creates `default-config.yaml` and models, without a components tree.
+Custom file references remain supported when independent maintenance is useful.

@@ -16,6 +16,8 @@ class ParameterTarget:
     required_capabilities = frozenset({'configuration-materialization'})
 
     def __init__(self, definition, parameters, fields, *, default_selected=True):
+        from fruitfly_agent.lab.catalog.defaults import declared_defaults
+        definition = declared_defaults(definition)
         self.required_capabilities = type(self).required_capabilities | frozenset('tool:' + name for name in definition.descriptor.effects.tools)
         self.definition = definition
         self.values = definition.descriptor.normalize_parameters(parameters)
@@ -28,6 +30,19 @@ class ParameterTarget:
         name = self.definition.descriptor.mechanism_id
         return TargetSnapshot(name, canonical_json(encode_parameters(self.definition,self.values)),
             TargetBinding('configuration', 'component.' + name), 'mechanism-parameters-v1', self.definition.configuration_role)
+
+    def parameter_values(self, text):
+        values = self.parse(text)
+        roles = {requirement.parameter for requirement in self.definition.model_role_parameters.values()}
+        return encode_parameters(self.definition, {key: value for key, value in values.items() if key not in roles})
+
+    def parameter_text(self, parameters):
+        values = decode_parameters(self.definition, parameters)
+        roles = {requirement.parameter for requirement in self.definition.model_role_parameters.values()}
+        if roles & values.keys():
+            raise ValueError('model roles are protected system bindings')
+        values.update({key: self.values[key] for key in roles})
+        return canonical_json(encode_parameters(self.definition, values))
 
     def describe_fields(self, text=None):
         values = self.values if text is None else self.parse(text)
@@ -102,6 +117,8 @@ def editable_parameters(definition, fields, *, default_selected=True, available_
         raise ValueError('editable parameters must be declared by their owner')
     if not definition.parameter_paths:
         definition=replace(definition,parameter_paths={p.name:'settings.'+p.name for p in definition.descriptor.parameters})
+    from fruitfly_agent.lab.catalog.defaults import declared_defaults
+    definition = declared_defaults(definition)
     def eligible(parameters):
         normalized = definition.descriptor.normalize_parameters(parameters)
         result = frozenset(available_fields(normalized)) if available_fields is not None else fields

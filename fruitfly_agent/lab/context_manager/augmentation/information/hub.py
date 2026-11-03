@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from fruitfly_agent.runtime_spec.documents import parameter_default
+
 from .application import TextInformationApplicator
 from .lexical import BudgetedPostProcessor
 from .models import InformationDescriptor
@@ -12,7 +14,9 @@ from .spaces import InformationSpace, InformationSpaceCatalog
 class InformationHub:
     """Register a source without coupling it to storage or another source."""
 
-    def __init__(self, *, top_k: int = 5, max_chars: int = 4_000) -> None:
+    def __init__(self, *, top_k: int | None = None, max_chars: int | None = None) -> None:
+        top_k = parameter_default(__package__, 'information-context.yaml', 'settings.top_k') if top_k is None else top_k
+        max_chars = parameter_default(__package__, 'information-context.yaml', 'settings.max_chars') if max_chars is None else max_chars
         self.catalog = InformationSpaceCatalog()
         self.guidance = ""
         self.query_builder = LatestUserQueryBuilder(top_k=top_k, max_chars=max_chars)

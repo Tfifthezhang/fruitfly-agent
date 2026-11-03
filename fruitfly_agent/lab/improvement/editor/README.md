@@ -37,3 +37,11 @@ fixed-I inner searches; instructions do not replace themselves during a call.
 
 Offline checks: `tests.lab.test_improvement_pipeline`,
 `tests.lab.test_improvement_configuration`, `tests.workflows.test_editor_evolution`.
+
+## Maintain I parameter defaults
+
+[defaults.yaml](defaults.yaml) is the single default I instruction document.
+Typed instruction constructors derive values from it. Isolated editors modify
+`parameters.yaml` with a protected `role: I`; ordinary H/S task execution cannot
+supply I acceptance. Frozen comparisons and verified activation retain the
+existing I execution and recovery contracts.

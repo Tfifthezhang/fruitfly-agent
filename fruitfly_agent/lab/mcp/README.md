@@ -140,3 +140,5 @@ unsupported server requests; no host credentials or model callback is supplied.
 
 Tests use a local standard-library JSON-RPC peer and fake Providers. Protocol tests
 skip when the optional extra is absent. No external MCP server or model is called.
+
+[defaults.yaml](defaults.yaml) owns the mechanism's service-config path. Server declarations, startup approval and frozen tool schemas retain their separate existing contracts.

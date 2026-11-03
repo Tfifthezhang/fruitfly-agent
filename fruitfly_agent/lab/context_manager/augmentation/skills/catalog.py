@@ -33,6 +33,7 @@ class Skill:
     content: str
     file_path: str  # absolute
     disable_model_invocation: bool = False
+    source_text: str = ''
 
 
 @dataclass
@@ -94,6 +95,7 @@ def _load_skill_file(path: Path, *, parent_name: str | None, byte_budget: int) -
             content=body,
             file_path=str(path.resolve()),
             disable_model_invocation=bool(meta.get("disable-model-invocation")),
+            source_text=text,
         ),
         diagnostics,
         consumed,
@@ -184,7 +186,7 @@ def load_skills(root: str | Path) -> LoadResult:
     return result
 
 
-def render_skills_xml(skills: list[Skill]) -> str:
+def render_skills_xml(skills: list[Skill], *, locations=None) -> str:
     visible = [s for s in skills if not s.disable_model_invocation]
     if not visible:
         return ""
@@ -193,7 +195,8 @@ def render_skills_xml(skills: list[Skill]) -> str:
         lines.append("  <skill>")
         lines.append(f"    <name>{escape(skill.name)}</name>")
         lines.append(f"    <description>{escape(skill.description)}</description>")
-        lines.append(f"    <location>{escape(skill.file_path)}</location>")
+        location = locations[skill.file_path] if locations is not None else skill.file_path
+        lines.append(f"    <location>{escape(location)}</location>")
         lines.append("  </skill>")
     lines.append("</available_skills>")
     return "\n".join(lines)

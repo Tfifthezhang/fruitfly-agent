@@ -17,7 +17,10 @@ profiles:
       roles:
         executor: offline
     H:
-      execution-policy: {file: components/H/execution.yaml}
+      base_prompt: {default: true}
+      layered-compaction: {default: true}
+      local-env: {default: true}
+      read-tool: {default: true}
     S: {}
     I: {}
 ```
@@ -38,8 +41,10 @@ parameters:
 ```
 
 The component ID and role must match its position and registered definition.
-Paths resolve from the declaring file. `{inline: ...}` may contain the complete
-component document instead of `{file: ...}`; exactly one is required. Unknown
+File paths resolve from the declaring file. A reference selects exactly one of
+`{default: true}`, `{file: path}` or `{inline: document}`. Default references
+optionally accept `enabled: false`; other keys and non-boolean flags fail.
+Registered defaults resolve through Catalog, not an import path from YAML. Unknown
 fields and duplicate YAML keys fail. Moving a file does not change its role.
 
 Use a `base_prompt` document with `parameters.instructions.system: |` for inline instructions.
@@ -55,8 +60,8 @@ automatically component configuration fields.
 | S | Registered retained Skill content | [Algorithm targets](../lab/improvement/targets/README.md) |
 | I | Editor and evaluator prompts | [Improvement](../lab/improvement/README.md) |
 
-The pure `runtime_spec.load_harness_config` reads documents and records source
-hashes. `lab.catalog.load_system_config` also validates registered owners and
+The pure `runtime_spec.load_harness_config` reads explicit documents, retains
+unresolved default references and records file hashes. `lab.catalog.load_system_config` also validates registered owners and
 projects values for runtime assembly. Run's public loader uses this registered
 path. Neither loader constructs Providers or writes artifacts.
 
@@ -66,11 +71,35 @@ has no version marker or alternative flat profile reader.
 
 ## Bind models once
 
-`profiles.<id>.models.roles` maps role names to aliases in `models.catalog`.
-The executor is the task model; editor and assessor select separate services.
-Missing editor/assessor choices inherit the executor. Unused I services are lazy
-and do not construct auxiliary clients during daily startup. Actual calls still
-contribute observed usage. Model roles are outside ordinary edit grants.
+`profiles.<id>.models.roles` selects model catalog aliases or explicit executor
+inheritance. Templates and generated configuration retain a position for every
+registered role that defaults to executor. Configure the task model once:
+
+```yaml
+models:
+  catalog: models.yaml
+  roles:
+    executor: main
+    editor: {inherit: executor}
+    assessor: {inherit: executor}
+    working_memory: {inherit: executor}
+    context_query: {inherit: executor}
+    context_summary: {inherit: executor}
+```
+
+`main` is a placeholder catalog alias. Replace an inherited value with another
+catalog alias to use an independent model, for example `working_memory: small`.
+A string always names a catalog entry, including the string `executor`;
+`{inherit: executor}` explicitly follows the current executor after model changes.
+Unknown inheritance fields, other reference targets, null/empty bindings and
+executor self-reference are rejected. Omitted auxiliary roles use their registered
+executor fallback. Owners may explicitly disable fallback for a strict requirement.
+
+Inheritance remains symbolic through configuration saves, candidate materialization
+and container staging. Providers bind after the executor is selected. Conditional
+roles only call models when their mechanism needs them. Unused I services are lazy
+and require no separate clients or keys during daily startup. Actual calls retain
+their role and resolved model identity. Model roles are outside ordinary edit grants.
 
 ## Describe supported H/S/I content
 
@@ -81,7 +110,7 @@ contribute observed usage. Model roles are outside ordinary edit grants.
 | Tool/environment/context mechanism (H) | Its registered descriptors | [Catalog](../lab/catalog/CONFIGURATION.md) |
 | `tool-catalog` (H) | `instructions.usage`; source-owned tool details load through existing `read` | [Tools](../lab/tools/README.md) |
 | `skill-document` (S) | `content.body`, `settings.max_chars`, optional `settings.source_path` | [Retained targets](../lab/improvement/targets/README.md) |
-| `improvement-editor` (I) | `instructions.{system,propose,invariant,domain,compose,reflect}` | [Editor](../lab/improvement/editor/README.md) |
+| `improvement-editor` (I) | `instructions.{system,propose,reflect}` | [Editor](../lab/improvement/editor/README.md) |
 | `improvement-evaluator` (I) | `instructions.criteria`, `instructions.assess`, `instructions.compare` | [Assessment](../lab/improvement/assessment/README.md) |
 
 Search scheduling, evidence page size and independent phase times belong to the
@@ -103,10 +132,27 @@ surface, the artifact and readable parameters must describe the same value.
 Normal authoring should use parameters and let candidate/export code create these
 exact bindings. Secret values never belong in either representation.
 
-The editor's detached workspace may use internal `instructions.txt` files for
-text or JSON payloads. Those files are generated by component adapters; they are
-not additional authored configuration. [Experiment field grants](../experiments/CONFIGURATION.md#grant-component-changes)
-map public component fields to the corresponding owner-validated payloads.
+The editor's detached workspace uses `parameters.yaml` with `id`, `role`,
+`implementation` and typed `parameters`. Identity, role, implementation, model
+bindings and protected fields cannot be changed. String and numeric fields use
+the same owner adapter and grant paths. [Experiment field grants](../experiments/CONFIGURATION.md#grant-component-changes)
+authorize changes; the owner codec derives the existing execution binding.
+A file editing capability alone does not grant execution or adoption.
+
+## Preserve default intent
+
+Default values live in registered owner YAML resources. Types, descriptions and
+constraints remain in the owner declaration. No working-directory components
+hierarchy is required. Normal saves keep default/file references when unchanged;
+changed components become explicit documents. Explicit text equal to the default
+remains explicit. There is no per-field inheritance or automatic merge language.
+
+Candidate/export materialization writes complete effective values, including
+numeric defaults, I instructions and fixed execution settings. Its output uses
+the same component format and contains no unresolved default references.
+Adoption fixes each changed component's parameter version. Other components keep
+their original references. Package-source receipts reject stale default expansion;
+hosts retain configuration transactions and parent-version checks.
 
 ## Inspect and extend
 

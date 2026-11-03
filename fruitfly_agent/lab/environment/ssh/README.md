@@ -196,3 +196,17 @@ snapshot. Offline checks do not establish real server compatibility.
 
 Tests use fake SSH/SFTP connections and local subprocesses for the transmitted
 supervisor. They make no network connections and use no real credentials.
+
+## Inspect phase evidence
+
+SSH records `environment.ssh.host_keys`, `environment.ssh.connect`,
+`environment.ssh.sftp`, `environment.ssh.channel_open` and
+`environment.ssh.execute`. The Paramiko connect call includes transport, banner
+and authentication negotiation; separate durations are unavailable. Structural
+classification distinguishes authentication, host-key, DNS, refusal/reset,
+channel, timeout and protocol failures without retaining exception text.
+Unknown transport details remain unknown. Ordinary nonzero remote exit is a
+completed command; deadline termination carries a typed timeout reason. Real
+server behavior and partition cleanup require separate integration verification.
+
+[defaults.yaml](defaults.yaml) owns non-secret mechanism defaults. Parameter declarations and `SshConfig` derive values from it; credentials remain in the host secret environment.

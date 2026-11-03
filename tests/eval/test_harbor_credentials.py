@@ -38,8 +38,12 @@ class HarborAdapterTests(unittest.TestCase):
             "fruitfly_eval.benchmarks.harbor.HostConfig.read", return_value=host
         ), patch("fruitfly_eval.benchmarks.harbor.load_preparation", return_value=preparation), patch(
             "fruitfly_eval.benchmarks.harbor.inspect_preparation", return_value={"available": True}):
-            with self.assertRaisesRegex(RuntimeError, "offline stop"):
-                adapter.run(request_path=request, result_path=root / "result.json", variant="smoke")
+            adapter.run(request_path=request, result_path=root / "result.json", variant="smoke")
+        result = json.loads((root / 'result.json').read_text())
+        self.assertEqual('failed', result['status'])
+        self.assertIn('offline stop', result['errors']['runner'])
+        self.assertEqual([], result['metrics'])
+        self.assertTrue(result['coverage']['missing_results'])
         env = job.call_args.kwargs["environment"]
         self.assertEqual(env["TEST_API_KEY"], "process-placeholder")
         self.assertEqual(env["NEW_ONLY"], "present")
@@ -52,7 +56,7 @@ class HarborAdapterTests(unittest.TestCase):
             models_path = root / "models.yaml"
             config_path.write_text(yaml.safe_dump({'default_profile': 'default', 'profiles': {
                 'default': profile_document(catalog='models.yaml', executor='test',
-                    mechanisms=[{'id': 'working-memory-reduction', 'enabled': True, 'parameters': {}}])}}))
+                    mechanisms=[{'id': 'working-memory-reduction', 'enabled': True, 'parameters': {'memory_model_profile': 'test'}}])}}))
             models_path.write_text(
                 'models:\n  test:\n    sdk: openai\n    protocol: responses\n    api_key_env: TEST_API_KEY\n    model: test-model\n    context_window: 8192\n    max_output_tokens: 1024\n',
                 encoding="utf-8",

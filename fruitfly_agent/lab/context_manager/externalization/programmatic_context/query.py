@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from fruitfly_agent.runtime_spec.documents import parameter_default
 import time
 import uuid
 from typing import Any
@@ -17,11 +18,13 @@ from .artifacts import SessionArtifactStore
 
 @dataclass(frozen=True)
 class ModelQueryConfig:
-    max_concurrent: int = 4
-    max_input_chars: int = 200_000
-    max_output_tokens: int = 4_096
-    max_inline_result_chars: int = 100_000
-    timeout_seconds: int = 300
+    max_concurrent: int = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.context_manager.externalization', 'ipython-tool.yaml', 'settings.max_query_concurrent'))
+    max_input_chars: int = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.context_manager.externalization', 'ipython-tool.yaml', 'settings.max_query_input_chars'))
+    max_output_tokens: int = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.context_manager.externalization', 'ipython-tool.yaml', 'settings.max_query_output_tokens'))
+    max_inline_result_chars: int = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.context_manager.externalization', 'ipython-tool.yaml', 'settings.max_query_inline_result_chars'))
+    timeout_seconds: int = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.context_manager.externalization', 'ipython-tool.yaml', 'settings.query_timeout_seconds'))
+    instructions: str = field(default_factory=lambda: parameter_default(
+        'fruitfly_agent.lab.context_manager.externalization', 'ipython-tool.yaml', 'instructions.query'))
 
 
 class ModelQueryBroker:
@@ -67,6 +70,7 @@ class ModelQueryBroker:
             )
         if not isinstance(system_prompt, str):
             raise ValueError("model.query system_prompt must be a string")
+        system_prompt = system_prompt or self.config.instructions
         input_chars = len(prompt) + len(system_prompt)
         if input_chars > self.config.max_input_chars:
             raise ValueError(
@@ -91,10 +95,7 @@ class ModelQueryBroker:
         started = time.monotonic()
         async with self._semaphore:
             view = ProviderView(
-                system_prompt=system_prompt or (
-                    "Answer the supplied subproblem directly. Return text only; "
-                    "do not call tools or assume access to the parent conversation."
-                ),
+                system_prompt=system_prompt,
                 messages=[UserMessage(content=prompt)],
                 tools=[],
                 model=self.model,

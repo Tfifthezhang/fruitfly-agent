@@ -1,4 +1,5 @@
 """Retained state and workflow adapters execute their exact frozen candidates."""
+from tests.support.configuration import component_parameters, with_component_parameters, with_component_text, parameter_payload
 from dataclasses import replace
 import json
 from pathlib import Path
@@ -37,7 +38,7 @@ class RetainedTargetTests(unittest.IsolatedAsyncioTestCase):
         from fruitfly_agent.improvement.contracts.versions import SystemVersion, content_hash
         from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
         registry = component_registry(targets)
-        harness = HarnessSnapshot(tuple(replace(c, files=(ComponentFile('instructions.txt', text),))
+        harness = HarnessSnapshot(tuple(with_component_text(c, text)
             if c.component_id == changed else c for c in registry.snapshot().components))
         plan = RunPlan('test', SystemVersion(*(content_hash(v) for v in ('H', 'I', 'S'))), (changed,))
         services = WorkflowServices(plan)

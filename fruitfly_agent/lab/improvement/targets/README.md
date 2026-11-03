@@ -16,8 +16,8 @@ component names or H/S/I roles.
 | [retained.py](retained.py) | Identical production and isolated-trial projections for retained documents |
 | [state.py](state.py) | Bounded snapshots of registered workspace text dependencies |
 
-`ComponentDocument` and `HarnessSnapshot` identify candidate content. Text snapshots
-and bundles are projections; they cannot register a new owner or grant activation.
+`ComponentDocument` and `HarnessSnapshot` identify candidate content. Typed YAML snapshots
+and text bundles are projections; they cannot register a new owner or grant activation.
 State and implementation identity belong to the existing Catalog and lifecycle
 contracts; no algorithm base class is required.
 
@@ -74,3 +74,11 @@ source replacement is not installed.
 ```bash
 .venv/bin/python -m unittest tests.lab.test_experiment_contracts -v
 ```
+
+## Keep parameter authority singular
+
+Candidate adapters expose `parameters.yaml`, including H/S/I role and typed
+fields. Existing text targets remain execution codecs over those parameters.
+Structured and scalar owners share the same candidate-file validation; protected
+identity and role cannot change. `bundle_text` derives publication payloads from
+the validated YAML rather than maintaining another editable text copy.

@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from typing import Awaitable, Callable, Sequence
 
 from .context.budget import ContextMeter
+from .observation import ObservationSink
 from .data_model.messages import AgentMessage, AgentToolResult, ToolResultMessage
 from .data_model.runtime import AgentLoopContext, BeforeToolCallResult as _BeforeToolCallResult
 from .env.protocols import ExecutionEnv
@@ -88,6 +89,9 @@ class AgentLoopConfig:
     env: ExecutionEnv | None = None
     session: SessionLike | None = None
     tools: Sequence[AgentTool] | None = None
+
+    on_observation: ObservationSink | None = None
+    on_tool_output: Callable[[str, str], Awaitable[None] | None] | None = None
 
     # --- display ---
     on_partial: Callable[[str], Awaitable[None] | None] | None = None  # tool streaming updates

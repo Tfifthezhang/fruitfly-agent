@@ -116,7 +116,7 @@ def initialize_workspace(workspace: Path, *, source: str | None = None,
                 pass
         raise
     steps = [
-        'Review the shared .fruitfly/models.yaml; select its model aliases and H/S/I in default-config.yaml, then edit their component files.',
+        'Review the shared .fruitfly/models.yaml; select its model aliases and H/S/I in default-config.yaml. Registered defaults are owner resources; use an explicit component document for customization.',
         'Set DEEPSEEK_API_KEY privately in .fruitfly/secrets.env or the process environment.',
     ]
     if source == 'task-set':

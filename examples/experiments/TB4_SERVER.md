@@ -65,7 +65,7 @@ not overwrite defaults, reuse old candidate results or start Docker/model work.
 |---|---|
 | `models.yaml` | Shared daily/experiment model ID, protocol, endpoint, capabilities, token limits and key variable name |
 | `default-config.yaml` | Executor profile, enabled mechanisms and tool-call limit, initially 512 per turn |
-| `components/H/`, `components/I/` | Execution/tool values, editor/evaluator prompts |
+| H/S/I groups in `default-config.yaml` | Registered defaults or explicit component documents; no copied components tree |
 | `tasks/tb4-smoke.yaml` | Task material and fixed comparison rules |
 | `experiment.yaml` | Baseline/task references, editable fields, fixed search/assessment settings and independent phase times |
 | `secrets.env` | Fill the empty model key privately, or use the process environment; never commit it |
@@ -127,9 +127,9 @@ scores select results. The shared model evaluator assesses completed evidence. T
 [experiment guide](../../fruitfly_agent/experiments/README.md#use-completed-process-feedback)
 explains dimensions, evidence and authoritative score handling.
 
-Edit model-role selections in `default-config.yaml`, execution values in
-`components/H/execution-policy.yaml`, and editor/evaluator prompts in their I component
-files. `experiment.yaml` selects the baseline, task document and comparison,
+Edit model-role selections and H/S/I references in `default-config.yaml`.
+Use an explicit inline or custom file component for execution settings or I
+instructions; `{default: true}` keeps following the registered owner document. `experiment.yaml` selects the baseline, task document and comparison,
 grants changes and bounds the job. The [field guide](../../fruitfly_agent/experiments/CONFIGURATION.md)
 describes the complete configuration tree. Refresh preparation after runtime changes.
 

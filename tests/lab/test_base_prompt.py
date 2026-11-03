@@ -22,14 +22,13 @@ class BasePromptTest(unittest.TestCase):
             DEFAULT_PROMPT.content_hash,
             "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest(),
         )
-        self.assertIs(get_builtin(DEFAULT_PROMPT_ID), DEFAULT_PROMPT)
+        self.assertEqual(get_builtin(DEFAULT_PROMPT_ID), DEFAULT_PROMPT)
 
-    def test_default_instructions_are_only_general_assistance(self) -> None:
-        self.assertEqual(
-            DEFAULT_PROMPT.text,
-            "You are FruitFlyAgent, a general-purpose assistant. Help the user understand, "
-            "create, and solve problems. Use available tools when useful; be concise.",
-        )
+    def test_default_guidance_defines_scope_progress_and_closeout(self) -> None:
+        for text in ('goal, scope, evidence', 'analysis-only', 'later corrections',
+                     'meaningful findings', 'premature claims', 'managed background', 'unresolved limits'):
+            self.assertIn(text, DEFAULT_PROMPT.text)
+        self.assertLess(len(DEFAULT_PROMPT.text.split()), 150)
 
     def test_only_project_default_is_bundled(self) -> None:
         self.assertEqual((DEFAULT_PROMPT,), builtins())

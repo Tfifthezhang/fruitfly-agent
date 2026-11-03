@@ -71,3 +71,18 @@ Within `Session.transaction()`, successful rollback restores the confirmed prefi
 and permits further appends. A rollback failure keeps the writer poisoned. This
 scope does not roll back tools or other external effects and does not provide
 crash atomicity across Session and configuration files.
+
+## Read operation evidence
+
+[Operation observations](../observation/README.md) use `meta` records with
+`kind="operation"` and schema 1. `read_observations` and `summarize_observations` in
+[observations.py](observations.py) supply the shared reader and aggregation for
+frontends, Improvement and Eval. Missing historical records stay unknown. Start
+records survive interrupted work; a missing completion never invents elapsed time.
+These passive records follow the existing diagnostic-write policy and cannot repair
+or bypass a poisoned Session writer.
+
+`read_observation_files(paths)` combines explicitly selected observation files
+through this same codec. It imposes no directory policy. Run may retain rejected
+or idle lifecycle facts in adjacent observation sidecars; those files never
+participate in canonical conversation or recovery decisions.

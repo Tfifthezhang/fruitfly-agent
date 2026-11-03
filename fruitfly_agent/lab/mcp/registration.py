@@ -1,4 +1,5 @@
 """Catalog declaration and asynchronous preparation of optional MCP services."""
+from fruitfly_agent.runtime_spec.documents import parameter_default
 from dataclasses import replace
 from pathlib import Path
 import hashlib
@@ -16,9 +17,9 @@ def definition():
         'Use explicitly selected tools from local stdio MCP services.',
         contributions=(MechanismContribution('capability', 'tools'),), install_order=25,
         parameters=(ParameterDescriptor('config', 'path', 'Service configuration',
-            'Workspace-local YAML file declaring stdio servers and selected tools.', '.fruitfly/mcp.yaml'),),
+            'Workspace-local YAML file declaring stdio servers and selected tools.', parameter_default('fruitfly_agent.lab.mcp', 'defaults.yaml', 'config')),),
         effects=MechanismEffects(uses_network=True, writes_files=True, cost_notice='Starts configured local processes; external tools may have independent effects and costs.')),
-        install, implementation_id='mcp-stdio-v1', optimization_exemption='External tool transport and schemas are protected service bindings.', tool_provider=prepare,
+        install, implementation_id='mcp-stdio-v1', default_resource=(__package__, 'defaults.yaml'), optimization_exemption='External tool transport and schemas are protected service bindings.', tool_provider=prepare,
         implementation_path='fruitfly_agent/lab/mcp/client.py', documentation_path='fruitfly_agent/lab/mcp/README.md',
         input_parameters=('config',))
 

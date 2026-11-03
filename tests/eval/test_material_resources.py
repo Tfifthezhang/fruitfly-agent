@@ -91,10 +91,16 @@ assert Path(providers.__file__).is_relative_to(root)
 assert {item.id for item in builtin_services()} >= {'openai', 'anthropic', 'deepseek', 'qwen'}
 templates = workspace_templates()
 assert 'default-config.yaml' in templates
-assert 'components/H/layered-compaction.yaml' in templates
+assert set(templates) == {'default-config.yaml', 'models.yaml'}
+assert (root / 'fruitfly_agent/lab/context_manager/reduction/methods/layered_compaction/defaults.yaml').is_file()
 assert 'layered-compaction:' in templates['default-config.yaml']
 from fruitfly_agent.lab.context_manager.reduction import LayeredCompactionConfig
 assert LayeredCompactionConfig().mode == 'deterministic'
+from fruitfly_agent.lab.catalog import builtin_catalog
+from fruitfly_agent.lab.catalog.defaults import read_default
+assert read_default(builtin_catalog(), 'base_prompt')[0].role == 'H'
+assert read_default(builtin_catalog(), 'skill-document')[0].role == 'S'
+assert read_default(builtin_catalog(), 'improvement-editor')[0].role == 'I'
 assert Path(__import__('fruitfly_agent.lab.context_manager.reduction', fromlist=['']).__file__).is_relative_to(root)
 assert 'experiment.yaml' not in templates
 assert 'experiment.yaml' in workspace_templates(source='task-set', benchmark='terminal-bench-4')

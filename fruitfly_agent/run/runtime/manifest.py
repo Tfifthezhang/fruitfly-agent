@@ -21,6 +21,7 @@ class RuntimeManifest:
     execution: Mapping[str, Any] | None = None
     harness: Mapping[str, Any] | None = None
     tool_services: tuple[Mapping[str, Any], ...] = ()
+    model_roles: Mapping[str, Mapping[str, Any]] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         result = {
@@ -35,6 +36,8 @@ class RuntimeManifest:
             "base_prompt": dict(self.base_prompt),
             "digest": self.digest,
         }
+        if self.model_roles is not None:
+            result['model_roles'] = {key: dict(value) for key, value in self.model_roles.items()}
         if self.harness is not None:
             result["harness"] = dict(self.harness)
         if self.permissions is not None:

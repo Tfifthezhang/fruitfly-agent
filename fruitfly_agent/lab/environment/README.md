@@ -86,3 +86,12 @@ execution inside Harbor/Docker; it is independent of Agent YAML and never inferr
 from Docker detection. The manifest records `unrestricted-execution-v1` and the
 inherited environment. External isolation must bound its effects. See
 [host execution](../../../CONFIGURATION.md#host-execution-policies).
+
+## Observe environment failures
+
+[failures.py](failures.py) classifies structural environment exceptions independently
+of Providers. Local process spawn and command execution publish phase events;
+`ExecResult.termination_reason` distinguishes `timeout` from ordinary `exited`
+without parsing output or exit-code conventions. SSH adds source-owned connection,
+SFTP and channel phases. See [SSH limits](ssh/README.md).
+Operation metadata excludes command text, credentials and remote banners.

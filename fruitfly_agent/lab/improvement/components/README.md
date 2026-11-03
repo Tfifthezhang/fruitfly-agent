@@ -8,7 +8,7 @@ of editing, scoring and execution backends.
 | Entry | Behavior |
 |---|---|
 | [Runtime registry](../../../improvement/components/README.md) | Distinct ownership, complete snapshots, schema validation and nonconflicting exports |
-| `text.py` | Reuse object-owned H/S/I instruction adapters and prompt/artifact bindings |
+| `text.py` | One typed `parameters.yaml` view over object-owned H/S/I execution codecs |
 | `files.py` | Explicit multi-file component validation; no implied execution support |
 | `parameters.py` | Owner-declared mechanism parameter grants and shared configuration materialization |
 | `changes.py` | Add/replace/remove UTF-8 files with parent/content preconditions |
@@ -51,7 +51,7 @@ for fixed runtime conditions and H identity; it has no optimization target.
 ## Edit owner parameters
 
 `editable_parameters` wraps an owning Catalog definition with an explicit field
-whitelist, strict complete JSON snapshot, numeric bounds and a configuration
+whitelist, strict complete typed parameter snapshot, numeric bounds and a configuration
 binding. Bash, layered compaction, working memory, Web search/fetch and IPython declare supported parameter
 fields. Credentials, model roles and undeclared fields remain fixed. Grants use
 `parameters.<category>.<field>`; enabling an owner does not authorize editing it.
@@ -75,3 +75,16 @@ whitelist using normalized active parameters. Discovery validation and the
 installed target enforce the same subset. Layered compaction uses this to reject
 summary grants in deterministic mode while preserving complete protected
 configuration in candidate snapshots.
+
+## Edit typed candidate files
+
+The shared adapter exposes one `parameters.yaml` per component. It contains the
+protected ID, implementation and H/S/I role plus typed parameter values. Text,
+integer, number and choice edits share owner validation and grant enforcement.
+A candidate cannot change role, model bindings, activation metadata or protected
+fields. Owner codecs translate the document into the existing execution binding;
+no second prompt or numeric publication pipeline is created.
+
+Default definitions remain in Lab. Editors write isolated candidate workspaces.
+Validated content enters immutable artifacts; adoption changes the selected
+version after independent verification. Source defaults are not edited by trials.

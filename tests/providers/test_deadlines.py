@@ -35,6 +35,22 @@ class DeadlineTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual('connection_refused', diagnostics['causes'][-1]['category'])
                 self.assertEqual(2, request.call_count)
 
+    async def test_attempt_children_are_correlated_and_backoff_is_outside_attempt(self):
+        from fruitfly_agent.core.observation import ObservationContext, bind_observation, operation
+        events = []
+        provider, _ = adapter('openai', [SDKStream([ConnectionError('connection failure')]), SDKStream([])], retry_max=1)
+        with bind_observation(ObservationContext(sink=events.append, run_id='run', request_id='request')):
+            with operation('model.request') as request:
+                await provider(view()).result()
+        attempts = [event for event in events if event.stage == 'provider.attempt' and event.state == 'started']
+        self.assertEqual(2, len(attempts))
+        phases = [event for event in events if event.stage in {'provider.prepare', 'provider.connect_or_headers', 'provider.stream', 'provider.assemble', 'provider.cleanup'}]
+        self.assertTrue(phases)
+        self.assertTrue(all(event.parent_operation_id in {attempt.operation_id for attempt in attempts} for event in phases))
+        backoff = next(event for event in events if event.stage == 'provider.backoff')
+        self.assertEqual(request.event.operation_id, backoff.parent_operation_id)
+        self.assertTrue(all(event.request_id == 'request' for event in events))
+
     async def test_signal_interrupts_headers_and_quiet_chunks_and_closes_acquired_stream(self):
         for kind in ('openai', 'anthropic'):
             for headers in (False, True):

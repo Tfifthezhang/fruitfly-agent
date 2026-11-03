@@ -1,5 +1,6 @@
 """Non-secret SSH settings; authentication values belong to the host."""
-from dataclasses import dataclass
+from fruitfly_agent.runtime_spec.documents import parameter_default
+from dataclasses import dataclass, field
 import ipaddress
 import math
 import posixpath
@@ -8,14 +9,14 @@ import re
 
 @dataclass(frozen=True)
 class SshConfig:
-    host: str = ''
-    port: int = 22
-    cwd: str = '/srv/workspace'
-    username_env: str = 'FRUITFLY_SSH_USERNAME'
-    password_env: str = 'FRUITFLY_SSH_PASSWORD'
-    known_hosts: str = '~/.ssh/known_hosts'
-    connect_timeout_seconds: float = 15
-    operation_timeout_seconds: float = 30
+    host: str = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.environment.ssh', 'defaults.yaml', 'host'))
+    port: int = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.environment.ssh', 'defaults.yaml', 'port'))
+    cwd: str = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.environment.ssh', 'defaults.yaml', 'cwd'))
+    username_env: str = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.environment.ssh', 'defaults.yaml', 'username_env'))
+    password_env: str = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.environment.ssh', 'defaults.yaml', 'password_env'))
+    known_hosts: str = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.environment.ssh', 'defaults.yaml', 'known_hosts'))
+    connect_timeout_seconds: float = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.environment.ssh', 'defaults.yaml', 'connect_timeout_seconds'))
+    operation_timeout_seconds: float = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.environment.ssh', 'defaults.yaml', 'operation_timeout_seconds'))
 
     def __post_init__(self):
         if not isinstance(self.host, str) or any(c.isspace() or ord(c) < 32 for c in self.host) or any(c in self.host for c in '@/'):

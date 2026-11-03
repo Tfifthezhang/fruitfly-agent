@@ -38,7 +38,7 @@ Unknown fields and obsolete flat profile fields are rejected.
 | Shared model catalog | `.fruitfly/models.yaml` in the working directory | Daily and experiment model definitions: SDK, API protocol, model ID, endpoint, capabilities, limits, and key variable name |
 | Secrets | `.fruitfly/secrets.env` or process environment | API keys and SSH account/password values |
 | Harness configuration | `.fruitfly/config.yaml` | Profiles, model roles and selected H/S/I component documents |
-| Component documents | `.fruitfly/components/H/`, `S/`, `I/` | Registered implementations, enabled state, text and parameters |
+| Component defaults | Owner YAML resources in `fruitfly_agent/lab/` | One registered default document per parameterized component, including its H/S/I role |
 | Optional MCP services | `.fruitfly/mcp.yaml` | Local stdio commands, selected tool names, limits and secret-variable references |
 | Default configuration | `.fruitfly/default-config.yaml` | Independent baseline; editable manually, read-only in terminal configuration |
 | Eval host settings | `.fruitfly/eval-host.yaml` | Machine-local runtime mounts, task source and dependency/cache preparation; see [Harbor settings](fruitfly_eval/harbor/README.md) |
@@ -53,7 +53,8 @@ The Agent CLI reads `.fruitfly/secrets.env` from the selected workspace, includi
 Model discovery uses `.fruitfly/models.yaml`. An explicitly selected catalog path takes precedence. Secrets use `.fruitfly/secrets.env` and the process environment; root `.env` and root `models.yaml` are not implicit inputs. Explicit custom catalog paths remain supported.
 
 Daily and experiment configs reference the shared `models.yaml`. Each profile's
-`models.roles` independently selects executor, editor and assessor aliases. To use
+`models.roles` selects the executor alias and auxiliary aliases or
+`{inherit: executor}` references. Auxiliary roles inherit executor by default. To use
 different parameters for the same API model, define distinct aliases in the shared
 catalog. Editing an entry affects subsequent loads of every config selecting that
 alias; an active runtime and frozen experiment inputs retain their loaded values.
@@ -74,9 +75,8 @@ active runtime unchanged. Missing/invalid defaults
 leave the draft unchanged; declared auxiliary models must exist in the daily
 catalog. Each restoration reloads the file so manual edits are available immediately.
 
-Initialize the complete tree, or copy [default-config.example.yaml](examples/configuration/default-config.example.yaml),
-[models.example.yaml](examples/configuration/models.example.yaml) and their
-referenced component files only when absent. The template enables local execution, basic
+Initialize the system files, or copy [default-config.example.yaml](examples/configuration/default-config.example.yaml),
+[models.example.yaml](examples/configuration/models.example.yaml) only when absent. Registered defaults stay in their owning modules; initialization does not copy a components tree. The template enables local execution, basic
 read/Bash/edit/write tools, a shared Tool catalog policy and deterministic layered compaction. Default files
 are edited manually. Explicit `--config .fruitfly/default-config.yaml` selections
 have a read-only terminal controller.
@@ -269,7 +269,7 @@ Source paths resolve within the workspace. All three sources require `informatio
 Set the limit in the Agent configuration selected for execution, usually
 `.fruitfly/default-config.yaml` for experiments:
 
-Edit the referenced `components/H/execution-policy.yaml`:
+Use an inline H `execution-policy` document or an explicitly selected custom file:
 
 ```yaml
 id: execution-policy
@@ -299,8 +299,8 @@ Provider and authorization objects cannot be supplied in this mapping. Runtime
 manifest schema 7 records the final effective execution values and configured
 component inventory; old manifests retain their original identities.
 
-Use experiment `edit` grants to select component fields and bounds. The [execution policy component](fruitfly_agent/lab/execution_policy/README.md)
-provides the parameter adapter. Enabled mechanisms determine available components;
+Use experiment `edit` grants to select registered optimizable parameters and bounds.
+[Execution policy](fruitfly_agent/lab/execution_policy/README.md) remains protected infrastructure, not an optimization target. Enabled mechanisms determine available components;
 backend capabilities and experiment permissions further restrict them. Absent
 state owners do not expose editable S components. Invalid explicit selections fail.
 The experiment check prints the resolved inventory and exercises Eval staging
@@ -449,3 +449,37 @@ from `selected` or `verified` assurance. A task-local result changes no default.
 Lessons remain pending until **Results and history → Pending experience** explicitly
 commits or rejects them. A library change invalidates a stale pending commit.
 Persistent I experiments cannot write production experience.
+
+Auxiliary model admission belongs to the owning mechanism's
+[Catalog role declaration](fruitfly_agent/lab/catalog/README.md#declare-auxiliary-model-dependencies).
+All built-in auxiliary roles default to executor. Templates and generated files
+retain each role as `{inherit: executor}`; a catalog alias overrides that role.
+Inheritance follows executor changes and survives saving/export/staging. See the
+[model-binding grammar](fruitfly_agent/runtime_spec/COMPONENTS.md#bind-models-once).
+Conditional roles remain inactive until needed; editor/assessor remain lazy.
+See [examples](examples/configuration/README.md#select-reduction-and-measurement)
+for operational selection. Model-role aliases contain no credential values.
+
+## Follow component sources and activation
+
+Use `{default: true}` to follow a registered component's owner YAML. H/S/I remain
+explicit profile groups and every component document declares the same `role`.
+Text, numbers, booleans and choices share typed parameter validation and grants.
+An explicit file or inline document keeps its authored values; equality with a
+default never changes its source intent. Default references may specify
+`enabled: false` without copying their parameter values.
+
+Ordinary saving retains default references. Export and candidate materialization
+freeze complete effective parameters and exact retained bindings. Improvement
+edits isolated `parameters.yaml` documents, then validates protected metadata,
+field grants and owner constraints before execution. Verified adoption fixes the
+changed component version; unrelated default references stay symbolic.
+
+Use the existing configuration inspection command to see each component's role,
+source kind, normalized values and content hash. Active manifests retain compact
+configuration-source and tool-contract fingerprints. Python changes require a
+new process; parameter and Skill resource changes require a fresh runtime.
+Pending default-source changes block stale preparation/application until reload.
+Frozen trials do not follow later working-copy defaults. See
+[component syntax](fruitfly_agent/runtime_spec/COMPONENTS.md) and
+[Run configuration](fruitfly_agent/run/configuration/README.md).

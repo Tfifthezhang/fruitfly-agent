@@ -1,4 +1,5 @@
 """Deterministic component-stage fixtures shared by pipeline behavior tests."""
+from tests.support.configuration import component_text, with_component_text
 from fruitfly_agent.improvement.contracts.optimization import OptimizationSpec
 from dataclasses import replace
 from fruitfly_agent.improvement.contracts.components import ComponentDocument, ComponentFile, HarnessSnapshot
@@ -35,7 +36,7 @@ class RuleGenerator:
         services.check()
         self.requests.append(request)
         chosen = request.plan.component_ids[0]
-        documents = tuple(replace(c, files=(ComponentFile('instructions.txt', c.files[0].text + ' improved'),))
+        documents = tuple((with_component_text(c, component_text(c) + ' improved') if c.files[0].path == 'parameters.yaml' else replace(c, files=(ComponentFile('instructions.txt', c.files[0].text + ' improved'),)))
                           if c.component_id in request.plan.component_ids else c for c in request.baseline.components)
         candidate = CandidateBundle(request.plan.parent, request.baseline, HarnessSnapshot(documents), self.generator_id,
             tuple(EditReason(name, 'Observed missing behavior', (request.records[0].run_id,), expected_effect='The proposed behavior appears in the subsequent execution.') for name in request.plan.component_ids))

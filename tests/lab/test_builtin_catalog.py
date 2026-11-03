@@ -15,7 +15,7 @@ class CatalogTest(unittest.TestCase):
             with self.subTest(method=definition.descriptor.mechanism_id):
                 self.assertTrue((root / definition.implementation_path).is_file())
                 self.assertTrue((root / definition.documentation_path).is_file())
-        self.assertEqual(builtin_catalog().get('working-memory-reduction').input_parameters, ())
+        self.assertEqual(builtin_catalog().get('working-memory-reduction').input_parameters, ('memory_model_profile',))
         self.assertEqual(builtin_catalog().get('live-http').input_parameters, ('endpoint',))
 
     def test_builtin_descriptors_use_two_dimensional_architecture(self) -> None:

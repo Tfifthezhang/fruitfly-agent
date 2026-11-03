@@ -4,20 +4,13 @@ from functools import partial
 
 from fruitfly_agent.core.mechanisms import MechanismDescriptor, MechanismContribution, MechanismEffects
 from fruitfly_agent.lab.catalog.models import MechanismDefinition
+from fruitfly_agent.lab.catalog.model_roles import ModelRoleRequirement
 from ....registration import parameters, validate
 from .config import LayeredCompactionConfig
 from .algorithm import LayeredCompactionReducer
 from .improvement import register
 from .resources import install_history
 from .summary import HistorySummarizer
-
-
-def required_models(values):
-    if values['mode'] == 'deterministic':
-        return ()
-    if not values['summary_model_profile']:
-        raise ValueError('hybrid compaction requires models.roles.context_summary')
-    return (values['summary_model_profile'],)
 
 
 def definition():
@@ -35,9 +28,10 @@ def definition():
         install, implementation_id='layered-compaction-v1', configuration_role='H',
         implementation_path=root + 'algorithm.py', documentation_path=root + 'README.md',
         selection_group='reduction', selection_group_label='Reduction',
-        input_parameters=('mode', 'summary_model_profile'),
+        input_parameters=('mode', 'summary_model_profile'), default_resource=(__package__, 'defaults.yaml'),
         validate_parameters=partial(validate, LayeredCompactionConfig),
-        model_profiles=required_models, model_role_parameters={'context_summary': 'summary_model_profile'})
+        model_role_parameters={'context_summary': ModelRoleRequirement('summary_model_profile',
+            'Summarize supplied archived evidence.', required_when=lambda values: values['mode'] == 'hybrid')})
     value = replace(value, parameter_paths={f.name: 'instructions.summary' if f.name == 'summary_instructions' else
         'instructions.readback' if f.name == 'readback_instructions' else 'settings.' + f.name
         for f in fields(LayeredCompactionConfig)})
@@ -48,8 +42,7 @@ def install(state, context, values):
     config = LayeredCompactionConfig(**values)
     summarizer = None
     if config.mode == 'hybrid':
-        alias = required_models(values)[0]
-        binding = context.provider_resolver(alias, config.summary_max_output_tokens)
+        binding = context.provider_for_role('context_summary', config.summary_max_output_tokens)
         summarizer = HistorySummarizer(binding.provider, model=binding.model,
             context_window=binding.context_window, output_limit=binding.max_output_tokens,
             meter=state.config.context_meter)

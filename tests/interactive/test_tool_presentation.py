@@ -156,6 +156,59 @@ class ToolPresentationTests(unittest.IsolatedAsyncioTestCase):
         await renderer.close()
         self.assertNotIn('/tools', output.getvalue())
 
+    async def test_structured_summary_and_output_ids_use_only_the_original_model_turns(self):
+        from fruitfly_agent.core.tool_runtime.presentation import ToolPresentation
+        async def execute(context):
+            await context.on_update('source output')
+            return AgentToolResult(content=[TextBlock('source result')])
+        tool = self.tool(execute=execute,
+            present_call=lambda args: ToolPresentation('read', target=args['path']),
+            present_result=lambda result: ToolPresentation('read', summary='One file read', items=1))
+        _, events, _ = await self.submit(tool)
+        started = next(event for event in events if isinstance(event, ToolStarted))
+        finished = next(event for event in events if isinstance(event, ToolFinished))
+        fragment = next(event for event in events if isinstance(event, ToolOutput))
+        self.assertEqual('read', started.presentation['operation'])
+        self.assertEqual('README.md', started.presentation['target'])
+        self.assertEqual('One file read', finished.presentation['summary'])
+        self.assertEqual(started.tool_call_id, fragment.tool_call_id)
+        self.assertEqual(finished, event_from_dict(finished.to_dict()))
+
+    async def test_background_start_displays_running_without_claiming_completion(self):
+        from fruitfly_agent.core.tool_runtime.presentation import ToolPresentation
+        tool = self.tool(execute=lambda context: AgentToolResult(content=[TextBlock('handle')]),
+            present_result=lambda result: ToolPresentation('execute', summary='command handle', execution_state='running'))
+        _, events, _ = await self.submit(tool)
+        output = io.StringIO(); renderer = TerminalRenderer(output)
+        for event in events:
+            if isinstance(event, (ToolStarted, ToolFinished)):
+                await renderer.render(event)
+        await renderer.close()
+        self.assertIn('Running', output.getvalue())
+        self.assertNotIn('Completed', output.getvalue())
+
+    async def test_operations_command_lists_and_cancels_through_optional_binding(self):
+        from types import SimpleNamespace
+        from fruitfly_agent.interactive.contracts.operations import OperationStatus
+        from fruitfly_agent.interactive.terminal.bindings import TerminalBindings
+        values = [OperationStatus('command-test', 'running', 2., 'initiator', 'call')]
+        async def cancel(handle):
+            if handle != 'command-test':
+                raise ValueError('unknown handle')
+            values[0] = replace(values[0], state='cancelled')
+            return values[0]
+        session = InteractiveSession(AgentLoopConfig(provider=FauxProvider(), tools=()))
+        bindings = replace(TerminalBindings.from_session(session), operations=lambda: SimpleNamespace(
+            statuses=lambda: tuple(values), cancel=cancel))
+        output = io.StringIO()
+        frontend = TerminalFrontend(session, bindings=bindings, output_stream=output, input_stream=io.StringIO(),
+            line_editor=ScriptedLines('/operations', '/operations cancel missing', '/operations cancel command-test', '/exit'))
+        await frontend.run()
+        self.assertIn('command-test · running · 2.0s', output.getvalue())
+        self.assertIn('unknown handle', output.getvalue())
+        self.assertIn('command-test: cancelled', output.getvalue())
+        self.assertEqual('cancelled', values[0].state)
+
     async def test_removed_tools_command_is_rejected_without_replaying_results(self):
         body = 'retained output\n' * 100
         session, events, _ = await self.submit(self.tool(execute=lambda ctx: AgentToolResult(content=[TextBlock(body)])))

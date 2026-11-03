@@ -77,3 +77,9 @@ state, with `/config`, `/resume` and `/help` hints. It omits Prompt hashes, comp
 counts and configuration drafts. Detailed runtime identity stays in `/status` and
 `/lab`. Long model labels and hints wrap to the supplied width. Welcome never
 opens setup or reads configuration files.
+
+Tool-owned `ToolPresentation` supplies deterministic operation, target and result
+summaries. The renderer retains category/status colors and output bounds; it adds
+no classifier model. Managed starts display Running. `ManagedOperationChanged`
+reports terminal background state with a handle and elapsed time, without changing
+Agent control flow or generating a conclusion.

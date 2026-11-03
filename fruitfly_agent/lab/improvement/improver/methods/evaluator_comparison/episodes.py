@@ -9,7 +9,7 @@ def install_candidate(registry, candidate, settings):
     if candidate is None or name not in registry.adapters:
         return
     document = candidate.component(name)
-    text = document.files[0].text
+    text = registry.adapters[name].to_text(document)
     instructions = EvaluatorInstructionTarget.parse(text)
     target = EvaluatorInstructionTarget(instructions, text=text)
     registry.adapters[name] = TextComponentAdapter(target, 'evaluator-instructions')

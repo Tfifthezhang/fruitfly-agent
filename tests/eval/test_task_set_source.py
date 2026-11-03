@@ -1,4 +1,5 @@
 """Benchmark collections pass single selected tasks through existing Eval lifecycle."""
+from fruitfly_eval.installation import installation_identity
 from tests.support.configuration import profile_document
 import hashlib
 import json
@@ -42,14 +43,7 @@ class EvalCollectionTests(unittest.IsolatedAsyncioTestCase):
                 path = root / name; path.mkdir(); (path / 'instruction.md').write_text('Complete fixture ' + name)
                 tasks.append({'id': 'fixture/' + name, 'path': str(path)})
             source = Path(__file__).resolve().parents[2]
-            files = [(name, hashlib.sha256((source / name).read_bytes()).hexdigest()) for name in (
-                'fruitfly_agent/run/runtime/usage.py', 'fruitfly_agent/run/cli.py', 'fruitfly_eval/harbor_agent.py',
-                'fruitfly_agent/core/loop.py', 'fruitfly_agent/run/configuration/profile.py',
-                'fruitfly_agent/run/runtime/assembly.py', 'fruitfly_agent/runtime_spec/execution.py',
-             'fruitfly_agent/core/config.py', 'fruitfly_agent/lab/catalog/configuration.py',
-             'fruitfly_agent/lab/catalog/parameters.py', 'fruitfly_agent/lab/execution_policy/__init__.py',
-             'fruitfly_agent/run/configuration/templates/components/H/execution-policy.yaml',
-             'fruitfly_agent/runtime_spec/profiles.py', 'fruitfly_agent/runtime_spec/selections.py', 'fruitfly_eval/runtime.py')]
+            files = installation_identity(source)['files']
             prepared = {'id': 'prepared-fixture', 'tasks': tasks, 'runtime': {'installation': {'files': files}}}
             components = ComponentRegistry((TextComponentAdapter(BasePromptTarget('baseline'), 'system-prompt'),))
             plan = RunPlan('joint-eval', version(), ('base_prompt',))

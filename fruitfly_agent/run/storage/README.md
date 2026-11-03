@@ -49,3 +49,10 @@ do not validate model quality or grant activation authority.
 including phase, strategy identity, charged root usage and deadline. Schema-1 jobs
 remain readable; writes normalize updated jobs. Storage does not score or adopt.
 
+## Include parameter resources in source identity
+
+`capture_source_tree` includes Python and the build-declared package resources,
+using the shared Runtime specification inventory. Owner default YAML, Provider
+services and initialization templates therefore enter H/I source snapshots.
+Unregistered workspace files and secrets are excluded. Materialized source trees
+contain the resources required by their own imports, without checkout fallback.

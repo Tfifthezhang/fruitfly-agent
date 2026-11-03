@@ -283,7 +283,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
         catalog = builtin_catalog()
         mechanisms = (
             *catalog.default_selections(),
-            MechanismSelection("ipython-tool"),
+            MechanismSelection("ipython-tool", parameters={"query_model_profile": "offline"}),
             MechanismSelection("rlm-ipython"),
         )
         profile = HarnessProfile(

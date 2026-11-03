@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from fruitfly_agent.core.data_model import LoopDiagnostics
+from fruitfly_agent.core.session.observations import read_observation_files, summarize_observations
 from fruitfly_agent.improvement.contracts.facts import ArtifactFact, UsageFact
 from fruitfly_agent.improvement.contracts.tasks import Resource
 from fruitfly_agent.improvement.execution.facts import attach_facts, loop_fact_values, receipt_facts
@@ -45,6 +46,16 @@ def attach_benchmark_facts(record, root, artifacts, *, interrupted=False):
         values = loop_fact_values(diagnostics)
         if interrupted and diagnostics is None:
             values.update(termination_reason='execution_interrupted', diagnosable=tool_results > 0)
+        try:
+            paths = [session, *(path for path in sorted(session.with_name(session.name + '.operations').glob('*.jsonl'))
+                if path.is_file() and not path.is_symlink() and path.resolve().is_relative_to(Path(root).resolve()))]
+            observations = summarize_observations(read_observation_files(paths, allow_incomplete=interrupted))
+            evidence.append(Resource('agent/0/operations.json', artifacts.put(json.dumps(observations).encode()),
+                'application/json', 'diagnostic'))
+        except (ValueError, OSError):
+            if not interrupted:
+                raise
+            collected.append(ArtifactFact('operation observations', 'collection_failed', 'Interrupted operation records'))
         agent = session.parent
         for name in ('model-usage.json',):
             path = agent / name

@@ -1,6 +1,8 @@
 """Content-addressed text trees and fresh owned materialization directories."""
 from pathlib import Path
 import json
+import tomllib
+from fruitfly_agent.runtime_spec.resources import declared_resource_files
 from fruitfly_agent.improvement.contracts.versions import StateSnapshot
 from fruitfly_agent.improvement.contracts.versions import SnapshotFile
 
@@ -11,6 +13,10 @@ def capture_source_tree(root: Path) -> StateSnapshot:
         for path in sorted((root / package).rglob("*.py")):
             if "__pycache__" not in path.parts and not path.is_symlink():
                 files.append(SnapshotFile(path.relative_to(root).as_posix(), path.read_text(encoding="utf-8")))
+    project = tomllib.loads((root / 'pyproject.toml').read_text(encoding='utf-8'))
+    for name in declared_resource_files(root, project.get('tool', {}).get('setuptools', {}).get('package-data', {}),
+                                       ('fruitfly_agent', 'fruitfly_eval')):
+        files.append(SnapshotFile(name, (root / name).read_text(encoding='utf-8')))
     for name in ("pyproject.toml", "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md"):
         files.append(SnapshotFile(name, (root / name).read_text(encoding="utf-8")))
     return StateSnapshot(tuple(files), "immutable-source")

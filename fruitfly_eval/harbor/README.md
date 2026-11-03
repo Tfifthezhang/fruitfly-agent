@@ -262,3 +262,28 @@ still requires a smoke trial on the evaluation host.
 
 These tests are offline. The real `/proc` process test runs only on Linux;
 macOS runs the ownership doubles and local host-process tests.
+
+## Inspect allowances and incomplete coverage
+
+[budget.py](budget.py) compares declared Agent allowances, attempts and concurrency
+with the job timeout before launch. `execution-budget.json` reports sum, per-worker
+capacity, longest allowance and tasks with unknown limits. This is allowance
+capacity, not a runtime prediction; setup, verification, cleanup and scheduling
+imbalance are additional. The report never changes a timeout automatically.
+
+Results retain exact expected/observed/missing/unexpected attempt coverage.
+Missing results can be unstarted or interrupted. `resume-requests.json` contains
+review-required request drafts grouped by missing attempt count. It launches no
+jobs and never merges new scores into the old official result. Review task and
+configuration identities before explicitly running a draft.
+
+[diagnostics.py](diagnostics.py) consumes Core's Session observation reader for
+Agent stages and failures, separately from Harbor setup/execution/verifier times.
+A missing observation is unknown; failed evidence collection has its own state.
+A torn final Session line does not manufacture a completion. Official rewards
+and their denominators remain independent of diagnostic evidence.
+
+Adjacent `agent/session.jsonl.operations/*.jsonl` retain startup/idle lifecycle
+facts without mutating rejected history. Evidence collection reads these alongside
+Agent Session observations using the same Core codec, including when no Agent
+turn started. Both remain diagnostic evidence, separate from official scores.

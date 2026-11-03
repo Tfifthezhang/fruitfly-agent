@@ -21,3 +21,5 @@ Extensions follow [Information source contracts](../README.md#extend-a-source) a
 ```bash
 .venv/bin/python -m unittest tests.lab.test_information_sources.InformationSourcesTest.test_live_source_fetches_query_on_demand_and_is_read_only -v
 ```
+
+[defaults.yaml](defaults.yaml) owns endpoint and timeout defaults. External-service reproducibility requirements still apply before experiments.

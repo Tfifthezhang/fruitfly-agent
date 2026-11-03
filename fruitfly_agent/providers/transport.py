@@ -1,5 +1,6 @@
 """Shared adapter deadlines, cancellation, and retry activity (no SDK imports)."""
 from __future__ import annotations
+from dataclasses import replace
 
 import asyncio
 from dataclasses import asdict, dataclass
@@ -8,6 +9,7 @@ import random
 import time
 
 from fruitfly_agent.core.errors import FatalError, RetryableError, TaggedError
+from fruitfly_agent.core.observation import FailureInfo, bind_observation, current_observation, operation, start_operation
 from fruitfly_agent.core.model_stream import StreamActivity, StreamDone, StreamError
 
 
@@ -31,13 +33,34 @@ class TransportPolicy:
 
 
 class AttemptDeadline:
-    def __init__(self, policy, total_deadline):
+    def __init__(self, policy, total_deadline, *, context=None):
+        self.context = context or current_observation()
         self.policy = policy
         self.total_deadline = total_deadline
         self.progress_deadline = time.monotonic() + policy.first_progress_timeout
         self.saw_progress = False
+        self.phase = 'prepare'
+        with bind_observation(self.context):
+            self.observed = start_operation('provider.' + self.phase, origin='provider')
+            self.first_progress = start_operation('provider.first_progress', origin='provider')
+
+    def switch_phase(self, phase):
+        self.observed.finish()
+        self.phase = phase
+        with bind_observation(self.context):
+            self.observed = start_operation('provider.' + phase, origin='provider')
+
+    def note_error(self, exc):
+        details = dict(exc.details) if isinstance(exc.details, dict) else {}
+        diagnostics = dict(details.get('diagnostics', {}))
+        diagnostics.setdefault('phase', self.phase)
+        failure = details.get('failure')
+        self.observed.fail(FailureInfo.from_dict(failure) if isinstance(failure, dict) else
+            FailureInfo('provider', self.phase, details.get('timeout_kind', 'unknown'), 'runtime_rule'))
+        exc.details = {**details, 'diagnostics': diagnostics}
 
     def progress(self):
+        self.first_progress.finish()
         self.saw_progress = True
         self.progress_deadline = time.monotonic() + self.policy.stall_timeout
 
@@ -85,9 +108,21 @@ def _consume(task):
         task.exception()
 
 
-async def close_transport(operation, timeout):
-    # Cleanup has a separate, bounded allowance even after the request expires.
-    await bounded_wait(operation, None, time.monotonic() + timeout, "cleanup_timeout", timeout)
+async def close_transport(awaitable, timeout, *, deadline=None):
+    # Cleanup has its own interval and allowance after the request expires.
+    if deadline is not None:
+        deadline.observed.finish()
+    with operation("provider.cleanup", origin="provider") as observed:
+        try:
+            await bounded_wait(awaitable, None, time.monotonic() + timeout, "cleanup_timeout", timeout)
+        except TaggedError as exc:
+            failure = FailureInfo('provider', 'cleanup', 'cleanup_timeout', 'runtime_rule', effect_state='unknown')
+            observed.fail(failure, state='cleanup_unconfirmed')
+            exc.details = {**(exc.details or {}), 'failure': failure.to_dict(),
+                'diagnostics': {'phase': 'cleanup', 'failure_category': 'cleanup_timeout', 'evidence_kind': 'runtime_rule'}}
+            if deadline is not None:
+                deadline.phase = 'cleanup'
+            raise
 
 
 async def attempts(provider, view, signal):
@@ -100,25 +135,63 @@ async def attempts(provider, view, signal):
         delivered = False
         started = time.monotonic()
         yield StreamActivity("waiting_model", attempt + 1, provider.retry_max + 1)
-        producer = provider._stream_once(view, signal, deadline=AttemptDeadline(policy, total_deadline))
+        attempt_scope = start_operation('provider.attempt', origin='provider')
+        context = replace(current_observation(), parent_operation_id=attempt_scope.event.operation_id)
+        deadline = AttemptDeadline(policy, total_deadline, context=context)
+        terminal = False
+        producer = provider._stream_once(view, signal, deadline=deadline)
         try:
-            async for event in producer:
+            while True:
+                try:
+                    with bind_observation(context):
+                        event = await anext(producer)
+                except StopAsyncIteration:
+                    break
+                terminal = isinstance(event, StreamDone)
+                if terminal and not deadline.saw_progress:
+                    deadline.first_progress.state = 'skipped'
                 if (not isinstance(event, (StreamActivity, StreamDone, StreamError))
                         or isinstance(event, StreamActivity) and bool(event.tool_name)):
                     delivered = True
                 yield event
+            if not deadline.saw_progress:
+                deadline.first_progress.state = 'skipped'
             return
-        except asyncio.CancelledError:
+        except (asyncio.CancelledError, GeneratorExit):
+            if terminal:
+                raise
+            attempt_scope.state = deadline.observed.state = 'cancelled'
+            if not deadline.saw_progress:
+                deadline.first_progress.state = 'cancelled'
             raise
         except TaggedError as exc:
             details = exc.details if isinstance(exc.details, dict) else {}
             diagnostics = dict(details.get('diagnostics', {}))
-            failures.append({'attempt': attempt + 1, 'elapsed_seconds': time.monotonic() - started,
+            diagnostics.setdefault('phase', deadline.phase)
+            diagnostics.setdefault('failure_category', details.get('timeout_kind', 'unknown'))
+            failure = FailureInfo('provider', diagnostics['phase'], diagnostics['failure_category'],
+                diagnostics.get('evidence_kind', 'runtime_rule' if details.get('timeout_kind') else 'unknown'),
+                'partial_delivery' if delivered else 'non_retryable' if not isinstance(exc, RetryableError) else 'retryable',
+                'unknown')
+            source_failure = details.get('failure')
+            if isinstance(source_failure, dict):
+                source = FailureInfo.from_dict(source_failure)
+                failure = replace(failure, causes=source.causes, http_status=source.http_status, exception_type=source.exception_type)
+            details['failure'] = failure.to_dict()
+            attempt_scope.fail(failure)
+            deadline.observed.fail(failure)
+            if not deadline.saw_progress:
+                deadline.first_progress.fail(failure)
+            failures.append({'attempt': attempt + 1, 'operation_id': attempt_scope.event.operation_id, 'elapsed_seconds': time.monotonic() - started,
                              'error_kind': type(exc).__name__, 'status_code': details.get('status_code'),
-                             'content_delivered': delivered, 'causes': diagnostics.get('causes', [])})
+                             'content_delivered': delivered, 'causes': diagnostics.get('causes', []),
+                             'phase': diagnostics['phase'], 'failure_category': diagnostics['failure_category']})
             failures = failures[-8:]
             diagnostics.update(attempt_count=attempt + 1, attempts=list(failures))
             exc.details = {**details, 'diagnostics': diagnostics}
+            deadline.observed.finish()
+            deadline.first_progress.finish()
+            attempt_scope.finish()
             kind = details.get("timeout_kind", type(exc).__name__)
             if details.get("timeout_kind"):
                 yield StreamActivity("provider_timeout", attempt + 1, provider.retry_max + 1, error_kind=kind)
@@ -134,18 +207,33 @@ async def attempts(provider, view, signal):
             yield StreamActivity("provider_retrying", attempt + 1, provider.retry_max + 1,
                                  delay, kind, details.get("status_code"))
             try:
-                await bounded_wait(provider._sleep(delay, signal), signal, total_deadline,
-                                   "total_timeout", policy.cleanup_timeout)
+                with operation("provider.backoff", origin="provider"):
+                    await bounded_wait(provider._sleep(delay, signal), signal, total_deadline,
+                                       "total_timeout", policy.cleanup_timeout)
             except RetryableError as timeout:
-                timeout.details = {**(timeout.details or {}), 'diagnostics': diagnostics}
+                timeout.details = {**(timeout.details or {}), 'diagnostics': {**diagnostics, 'phase': 'backoff'},
+                    'failure': FailureInfo('provider', 'backoff', 'total_timeout', 'runtime_rule', 'exhausted', 'unknown').to_dict()}
                 yield StreamActivity("provider_timeout", attempt + 1, provider.retry_max + 1, error_kind="total_timeout")
                 yield StreamError(timeout)
                 return
         except Exception as exc:
-            yield StreamError(FatalError(f"{type(exc).__name__}: {exc}"))
+            from .error_classification import classify_provider_error
+            classified = classify_provider_error(exc)
+            failure = replace(FailureInfo.from_dict(classified.details['failure']), stage=deadline.phase)
+            attempt_scope.fail(failure)
+            deadline.observed.fail(failure)
+            if not deadline.saw_progress:
+                deadline.first_progress.fail(failure)
+            yield StreamError(FatalError(f"{type(exc).__name__}: {exc}", details={'failure': failure.to_dict()}))
             return
         finally:
-            await producer.aclose()
+            try:
+                with bind_observation(context):
+                    await producer.aclose()
+            finally:
+                deadline.observed.finish()
+                deadline.first_progress.finish()
+                attempt_scope.finish()
 
 
 def retry_details(exc: Exception, error: TaggedError):

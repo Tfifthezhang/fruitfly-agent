@@ -1,6 +1,7 @@
 """Immutable base prompts; Run resolves selection and owns artifact storage."""
 
 from __future__ import annotations
+from fruitfly_agent.runtime_spec.documents import parameter_default
 
 from dataclasses import dataclass
 import hashlib
@@ -20,17 +21,17 @@ class BasePrompt:
         return "sha256:" + hashlib.sha256(self.text.encode("utf-8")).hexdigest()
 
 
-DEFAULT_PROMPT = BasePrompt(
-    DEFAULT_PROMPT_ID,
-    "Assistant default",
-    "You are FruitFlyAgent, a general-purpose assistant. Help the user understand, "
-    "create, and solve problems. Use available tools when useful; be concise.",
-)
+def _default_prompt():
+    return BasePrompt(DEFAULT_PROMPT_ID, 'Assistant default',
+        parameter_default(__package__, 'defaults.yaml', 'instructions.system'))
+
+
+DEFAULT_PROMPT = _default_prompt()
 
 
 def builtins() -> tuple[BasePrompt, ...]:
-    """Return the project's own default without reading external resources."""
-    return (DEFAULT_PROMPT,)
+    """Return the project's own default from its registered parameter document."""
+    return (_default_prompt(),)
 
 
 def get_builtin(prompt_id: str) -> BasePrompt:

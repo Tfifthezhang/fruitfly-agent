@@ -50,7 +50,7 @@ def prepare_runtime(
             raise ValueError("select one model profile for evaluation")
         selected_model = next(iter(source_models))
     required_models = {selected_model, *catalog.required_model_profiles(selections)}
-    declared_models = required_models | set(selected.model_roles.values())
+    declared_models = required_models | set(selected.resolved_model_roles(selected_model).values())
     if declared_models - source_models.keys():
         raise ValueError("unknown model profiles: " + ", ".join(sorted(declared_models - source_models.keys())))
     staged_models = {}

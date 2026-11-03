@@ -8,6 +8,7 @@ Throttle live stdout updates to about 100ms.
 
 from __future__ import annotations
 
+from fruitfly_agent.runtime_spec.documents import parameter_default
 import time
 import asyncio
 import math
@@ -15,9 +16,20 @@ from dataclasses import replace
 
 from fruitfly_agent.core.data_model import AgentToolResult, TextBlock
 from fruitfly_agent.core.env import ExecOptions
+from fruitfly_agent.core.observation import FailureInfo
 from fruitfly_agent.core.tool_runtime import AgentTool, ToolCallContext
 from fruitfly_agent.core.tool_runtime.authorization import ToolPermission
+from .presentation import text_result
+from fruitfly_agent.core.tool_runtime.presentation import ToolPresentation
 from .truncate import DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, truncate_tail
+
+class CommandTimeoutError(RuntimeError):
+    """Preserve the tool RuntimeError contract with structural timeout evidence."""
+    def __init__(self, message):
+        super().__init__(message)
+        self.details = {'failure': FailureInfo('environment', 'environment.execute', 'timeout',
+            'runtime_rule', effect_state='completed').to_dict()}
+
 
 _BASH_SCHEMA: dict = {
     "type": "object",
@@ -35,7 +47,7 @@ _BASH_SCHEMA: dict = {
     "additionalProperties": False,
 }
 
-DEFAULT_TIMEOUT_SECONDS = 600
+DEFAULT_TIMEOUT_SECONDS = parameter_default(__package__, 'bash-tool.yaml', 'settings.default_timeout_seconds')
 _UPDATE_THROTTLE_SECONDS = 0.1
 
 
@@ -70,8 +82,6 @@ async def _execute(ctx: ToolCallContext) -> AgentToolResult:
     output = exec_result.stdout
     if exec_result.stderr:
         output = (output + "\n" if output else "") + exec_result.stderr
-    if not exec_result.cancelled and timeout is not None and not output and exec_result.exit_code == -9:
-        raise RuntimeError(_append_status(output, f"Command timed out after {timeout} seconds"))
 
     truncation = truncate_tail(output)
     text = truncation.content
@@ -93,6 +103,8 @@ async def _execute(ctx: ToolCallContext) -> AgentToolResult:
         else:
             text += "\n\n[Output truncated; full output could not be saved.]"
 
+    if exec_result.termination_reason == 'timeout':
+        raise CommandTimeoutError(_append_status(text, f'Command timed out after {timeout} seconds'))
     if exec_result.cancelled:
         if ctx.signal is not None and ctx.signal.is_set():
             raise asyncio.CancelledError
@@ -111,7 +123,9 @@ def _append_status(output: str, status: str) -> str:
     return f"{output}\n\n{status}" if output else status
 
 
-def create_bash_tool(*, default_timeout_seconds=DEFAULT_TIMEOUT_SECONDS, manager=None) -> AgentTool:
+def create_bash_tool(*, default_timeout_seconds=None, manager=None) -> AgentTool:
+    if default_timeout_seconds is None:
+        default_timeout_seconds = parameter_default(__package__, 'bash-tool.yaml', 'settings.default_timeout_seconds')
     if (isinstance(default_timeout_seconds, bool) or not isinstance(default_timeout_seconds, (int, float))
             or not math.isfinite(default_timeout_seconds) or default_timeout_seconds <= 0):
         raise ValueError('Bash requires a positive finite default timeout')
@@ -141,6 +155,9 @@ def create_bash_tool(*, default_timeout_seconds=DEFAULT_TIMEOUT_SECONDS, manager
     return AgentTool(
         permission=ToolPermission("execute", ()),
         name="bash",
+        present_call=lambda args: ToolPresentation("execute",
+            target=str(args.get("command", args.get("handle", "")))[:800]),
+        present_result=lambda result: text_result("execute", result),
         label="Execute shell command",
         describe_call=lambda args: args.get("description", ""),
         description=(

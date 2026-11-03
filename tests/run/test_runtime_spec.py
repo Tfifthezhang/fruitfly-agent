@@ -38,3 +38,25 @@ class RuntimeSpecTests(unittest.TestCase):
                      '{"provider":"arbitrary"}', '{"max_tool_calls_per_turn":1.5}'):
             with self.subTest(text=text), self.assertRaises(ValueError):
                 parse_execution(text)
+
+    def test_explicit_inheritance_round_trips_and_follows_the_current_executor(self):
+        from dataclasses import replace
+        from fruitfly_agent.runtime_spec import HarnessConfig, load_harness_config, save_harness_config
+        roles = {'executor': 'main', 'working_memory': {'inherit': 'executor'}, 'editor': 'executor'}
+        profile = HarnessProfile('default', model_profile='main', model_roles=roles)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'config.yaml'
+            save_harness_config(path, HarnessConfig('default', {'default': profile}))
+            restored = load_harness_config(path).select()
+            self.assertEqual(roles, restored.to_dict()['models']['roles'])
+            selected = replace(restored, model_profile='next')
+            self.assertEqual({'executor': 'next', 'working_memory': 'next', 'editor': 'executor'},
+                selected.resolved_model_roles('next'))
+            self.assertEqual({'inherit': 'executor'}, selected.to_dict()['models']['roles']['working_memory'])
+            self.assertEqual('main', HarnessProfile('default', model_roles={'executor': 'main'}).to_dict()['models']['roles']['executor'])
+
+    def test_model_role_inheritance_rejects_unknown_fields_and_self_references(self):
+        for role, binding in (('executor', {'inherit': 'executor'}), ('memory', {'inherit': 'editor'}),
+                ('memory', {'inherit': 'executor', 'alias': 'main'}), ('memory', {}), ('memory', None)):
+            with self.subTest(role=role, binding=binding), self.assertRaises(ValueError):
+                HarnessProfile('default', model_roles={role: binding})

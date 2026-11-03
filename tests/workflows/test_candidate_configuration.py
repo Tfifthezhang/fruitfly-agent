@@ -1,4 +1,5 @@
 """A component candidate changes actual file execution and exports an ordinary config."""
+from tests.support.configuration import component_parameters, with_component_parameters, with_component_text, parameter_payload
 from dataclasses import replace
 import json
 from pathlib import Path
@@ -28,9 +29,11 @@ class CandidateConfigurationTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             initialize_workspace(root)
-            execution = root / '.fruitfly/components/H/base-prompt.yaml'
+            execution = root / '.fruitfly/default-config.yaml'
             value = yaml.safe_load(execution.read_text())
-            value['parameters']['instructions']['system'] = 'BASELINE'
+            value['profiles']['baseline']['H']['base_prompt'] = {'inline': {
+                'id': 'base_prompt', 'role': 'H', 'implementation': 'base_prompt',
+                'parameters': {'instructions': {'system': 'BASELINE'}}}}
             execution.write_text(yaml.safe_dump(value))
             original = execution.read_bytes()
             provider = FauxProvider()
@@ -43,7 +46,7 @@ class CandidateConfigurationTests(unittest.IsolatedAsyncioTestCase):
                 required_capabilities = frozenset()
                 async def propose(self, request, services):
                     old = request.baseline.component('base_prompt')
-                    changed = replace(old, files=(ComponentFile('instructions.txt', 'CANDIDATE'),))
+                    changed = with_component_text(old, 'CANDIDATE')
                     harness = HarnessSnapshot(tuple(changed if d.component_id == changed.component_id else d
                                                     for d in request.baseline.components))
                     return ProposalResult((CandidateBundle(request.plan.parent, request.baseline, harness, self.generator_id,

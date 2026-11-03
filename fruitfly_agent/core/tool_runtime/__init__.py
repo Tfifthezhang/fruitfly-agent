@@ -15,6 +15,7 @@ from ..data_model.messages import AgentToolResult
 from ..env.protocols import ExecutionEnv
 from .authorization import ToolPermission
 from ..errors import Result
+from .presentation import ToolPresentation
 
 
 @dataclass(frozen=True)
@@ -40,6 +41,9 @@ class AgentTool:
     permission: ToolPermission | None = None
     describe_call: Callable[[dict[str, Any]], str] | None = None
     validate_arguments: Callable[[dict[str, Any]], Result[dict[str, Any]]] | None = None
+
+    present_call: Callable[[dict[str, Any]], ToolPresentation] | None = None
+    present_result: Callable[[AgentToolResult], ToolPresentation] | None = None
 
     requires_exclusive_batch: bool = False
 

@@ -69,3 +69,8 @@ read routing, long-line pagination and session isolation.
 `test_layered_compaction.py` covers deterministic previews, archive readback, source
 identity and artifact recovery. `test_layered_compaction_failures.py` covers bounded
 hybrid inference, rejection, cancellation, retry admission and evidence ledgers.
+
+`test_model_roles` checks declared conditional model admission, explicit fallbacks
+and attributed execution. Working-memory safety tests cover threshold gating,
+failed-attempt cooldown, successful-prefix retention and total update deadlines.
+Managed-command tests cover independent work, isolated listeners and retirement.

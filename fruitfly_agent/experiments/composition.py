@@ -148,7 +148,8 @@ def prepare_experiment(config, operation, *, require_prepared=True, environment=
     parameters = dict(existing.parameters) if existing is not None else {}
     for role in ('editor', 'assessor'):
         if role in profile.model_roles:
-            parameters[role + '_profile'] = profile.model_roles[role]
+            binding = profile.model_roles[role]
+            parameters[role + '_profile'] = binding if isinstance(binding, str) else ''
     for role in ('editor', 'assessor') if operation != 'eval' else ():
         if role in config.models:
             parameters[role + '_profile'] = config.models[role]

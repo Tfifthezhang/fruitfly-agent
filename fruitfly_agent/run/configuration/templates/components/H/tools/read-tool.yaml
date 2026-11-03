@@ -1,5 +1,0 @@
-id: read-tool
-role: H
-implementation: read-tool
-enabled: true
-parameters: {}

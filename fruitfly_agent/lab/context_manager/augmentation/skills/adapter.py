@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, replace, field
+from fruitfly_agent.runtime_spec.documents import parameter_default
 
 from fruitfly_agent.core.context import ContextFrame, ContextTransform
 
@@ -19,7 +20,7 @@ class SkillCatalogTransformer:
     """
 
     guidance: str
-    max_chars: int = 16_000
+    max_chars: int = field(default_factory=lambda: parameter_default(__package__, 'skill-catalog.yaml', 'settings.max_chars'))
 
     def __post_init__(self) -> None:
         if isinstance(self.max_chars, bool) or not isinstance(self.max_chars, int) or self.max_chars < 128:

@@ -89,3 +89,26 @@ contains no permission preference.
 ## Observe fresh-task model requests
 
 `usage.py` supplies `ModelUsage`, `ObservedProvider` and `ObservedProviderRegistry`. Main and auxiliary requests are observed without admission limits. `FRUITFLY_MODEL_USAGE_PATH` writes atomic request receipts, reported usage and interruption status. Unknown usage stays unknown. SDK-internal retries and shell-issued calls remain outside this harness invocation count.
+
+## Attribute auxiliary models and lifecycle
+
+Run supplies Catalog's role resolver with exact non-secret model specifications.
+Bindings carry a stable identity used by working-memory checkpoints; observations
+and usage receipts retain model role, component and request IDs. Alias and inheritance bindings
+are validated offline and resolved against the selected executor before assembly. I editor/assessor roles stay lazy until used, with their
+owner-declared executor fallback. Model role metadata is separate from credentials.
+Fallback slots and component-source ordering are normalized before hashing, so
+saving equivalent configuration does not change runtime identity.
+
+Preparation and recovery acquire the Session before binding observation. New-path
+admission precedes diagnostic writes. Startup, close and queued submissions use
+the same public facts as normal Agent phases. Session observation cannot authorize
+replay of unknown requests or restore live background tasks.
+
+[observations.py](observations.py) buffers preparation/startup facts until safe
+publication. New sessions record the manifest first. Recovered sessions flush
+lifecycle facts on the first actual Agent run; idle recovery leaves history intact.
+Rejected startup and idle-only lifecycle facts use adjacent
+`SESSION.jsonl.operations/*.jsonl`, encoded through the same Core Session codec.
+The sidecar holds observations only and grants no recovery authority. Archive
+failures are isolated from the primary startup/cleanup outcome.

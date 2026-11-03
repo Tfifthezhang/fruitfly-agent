@@ -24,6 +24,7 @@ class ExecResult:
     stderr: str
     exit_code: int
     cancelled: bool = False
+    termination_reason: str = ""
 
 
 @dataclass(frozen=True)

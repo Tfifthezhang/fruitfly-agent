@@ -79,12 +79,14 @@ class ToolStarted(FrontendEvent):
     arguments: dict[str, Any]
     category: str = "tools"
     description: str = ""
+    presentation: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
 class ToolOutput(FrontendEvent):
     event_type: ClassVar[str] = "tool_output"
     text: str
+    tool_call_id: str = ""
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -96,6 +98,7 @@ class ToolFinished(FrontendEvent):
     terminate: bool
     category: str = "tools"
     description: str = ""
+    presentation: dict[str, Any] | None = None
     status: str = "unknown"
     elapsed_seconds: float | None = None
 
@@ -138,7 +141,19 @@ class AuthorizationResolved(FrontendEvent):
     operation: str
     choice: str
 
+@dataclass(frozen=True, kw_only=True)
+class ManagedOperationChanged(FrontendEvent):
+    event_type: ClassVar[str] = 'managed_operation_changed'
+    handle: str
+    state: str
+    elapsed_seconds: float
+    initiating_run_id: str = ''
+    tool_call_id: str = ''
+
+
 InteractiveEvent = (
+    ManagedOperationChanged
+    |
     AuthorizationRequested
     | AuthorizationResolved
     | RunStarted
@@ -156,6 +171,7 @@ InteractiveEvent = (
 _EVENT_TYPES = {
     event.event_type: event
     for event in (
+        ManagedOperationChanged,
         AuthorizationRequested,
         AuthorizationResolved,
         RunStarted,
@@ -195,6 +211,7 @@ __all__ = [
     "ToolStarted",
     "ToolOutput",
     "ToolFinished",
+    "ManagedOperationChanged",
     "CompactionStarted",
     "RunFinished",
     "InteractiveEvent",

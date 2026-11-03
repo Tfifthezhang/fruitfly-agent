@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
+from fruitfly_agent.core.observation import current_observation
+
 from fruitfly_agent.lab.catalog import PermissionPolicy, apply_permission_policy, ProviderToolAuthorizer
 from fruitfly_agent.interactive.interaction.authorization import AuthorizationService
 from fruitfly_agent.run.runtime.permissions import default_permission_policy
@@ -67,6 +71,9 @@ def build_runtime(
     """Build a fresh runtime; no result is applied until all installers succeed."""
 
     profile = configure_profile(profile, catalog)
+    for source in profile.source_files:
+        if source.path.startswith('package:'):
+            source.check()
     prepared = dict(tool_providers or {})
     enabled = catalog.resolve(profile.mechanisms)
     expected_providers = {item.definition.descriptor.mechanism_id for item in enabled if item.definition.tool_provider is not None}
@@ -87,6 +94,8 @@ def build_runtime(
         config_path,
         model_specs=model_specs,
     )
+    model_roles = catalog.resolve_model_roles(profile.mechanisms,
+        profile.resolved_model_roles(selected_model_profile))
     policy = permission_policy or default_permission_policy(cwd, config_path)
     if policy.workspace != cwd.resolve():
         raise ValueError("permission workspace must match runtime workspace")
@@ -124,6 +133,12 @@ def build_runtime(
             "profile": profile_id,
             **asdict(spec),
         }
+        observation = current_observation()
+        if observation.model_role:
+            resolved_model_specs[binding_key]['model_role'] = observation.model_role
+            resolved_model_specs[binding_key]['component_id'] = observation.component_id
+        elif binding_key == 'main':
+            resolved_model_specs[binding_key]['model_role'] = 'executor'
         provider = registry.create(spec, environment)
         transport_parameters = getattr(provider, "transport_parameters", None)
         if isinstance(transport_parameters, dict):
@@ -137,6 +152,7 @@ def build_runtime(
             profile=profile_id,
             context_window=spec.context_window,
             max_output_tokens=spec.max_output_tokens,
+            identity=hashlib.sha256(json.dumps(resolved_model_specs[binding_key], sort_keys=True).encode()).hexdigest(),
         )
 
     main = resolve_provider(selected_model_profile, None)
@@ -178,7 +194,7 @@ def build_runtime(
             secret_resolver=environment.get,
             tool_providers=prepared,
             component_settings=profile.component_settings,
-            model_roles=profile.model_roles,
+            model_roles=model_roles,
             model_metadata={name: {'model': spec.model, 'context_window': spec.context_window,
                                    'max_tokens': spec.max_output_tokens} for name, spec in models.items()},
             media_writer=media.put,
@@ -225,14 +241,22 @@ def build_runtime(
         tuple(value for key, value in assembled.components.items() if key.startswith(TEXT_TARGET_PREFIX)))
     service_identity = tuple(dict(entry) for provider in prepared.values() for entry in provider.identity)
     manifest_version = 8 if service_identity else 7
+    from fruitfly_agent.lab.catalog import configuration_inventory
+    configuration_sources = tuple({key: row[key] for key in
+        ('id', 'role', 'source_kind', 'content_sha256')}
+        for row in sorted(configuration_inventory(profile, catalog, artifact_reader=store.read_text),
+                          key=lambda row: (row['role'], row['id'])))
     manifest_payload: dict[str, Any] = {
         "schema_version": manifest_version,
-        "harness": inventory.to_dict(),
+        "harness": {**inventory.to_dict(), 'configuration_sources': list(configuration_sources),
+                    'tool_contracts': list(assembled.components.get('tool-contracts', ()))},
         "profile": profile.profile_id,
         "model_profile": selected_model_profile,
         "models": {
             key: resolved_model_specs[key] for key in sorted(resolved_model_specs)
         },
+        "model_roles": {role: {'profile': alias, **asdict(models[alias])}
+            for role, alias in sorted(model_roles.items())},
         "components": component_entries,
         "context_pipeline": (
             assembled.context_pipeline.profile.to_dict()
@@ -253,6 +277,7 @@ def build_runtime(
         profile=profile.profile_id,
         model_profile=selected_model_profile,
         models=manifest_payload["models"],
+        model_roles=manifest_payload["model_roles"],
         components=component_entries,
         context_pipeline=manifest_payload["context_pipeline"],
         data_artifacts=data_artifacts,

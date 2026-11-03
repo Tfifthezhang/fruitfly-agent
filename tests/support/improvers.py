@@ -1,4 +1,5 @@
 """Explicit offline component ports; synthetic verification makes no quality claim."""
+from tests.support.configuration import component_text, component_parameters, with_component_parameters, with_component_text, parameter_payload
 from dataclasses import replace
 from queue import Queue
 from uuid import uuid4
@@ -43,8 +44,7 @@ class OfflineGenerator:
     required_capabilities = frozenset()
 
     async def propose(self, request, services):
-        documents = tuple(replace(c, files=(ComponentFile('instructions.txt',
-            c.files[0].text + '\nUse exact answers.'),)) if c.component_id in request.plan.component_ids else c
+        documents = tuple(with_component_text(c, component_text(c) + '\nUse exact answers.') if c.component_id in request.plan.component_ids else c
             for c in request.baseline.components)
         return ProposalResult((CandidateBundle(request.plan.parent, request.baseline,
             HarnessSnapshot(documents), self.generator_id,

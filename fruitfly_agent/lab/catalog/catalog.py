@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Sequence, Mapping
 from typing import Callable, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -61,8 +61,9 @@ class LabCatalog:
                 raise ValueError('algorithm has no executable optimization declaration: ' + definition.descriptor.mechanism_id)
 
     def definitions(self) -> tuple[MechanismDefinition, ...]:
+        from .defaults import declared_defaults
         return tuple(
-            self._definitions[key]
+            declared_defaults(self._definitions[key])
             for key in sorted(self._definitions)
         )
 
@@ -71,7 +72,8 @@ class LabCatalog:
 
     def get(self, mechanism_id: str) -> MechanismDefinition:
         try:
-            return self._definitions[mechanism_id]
+            from .defaults import declared_defaults
+            return declared_defaults(self._definitions[mechanism_id])
         except KeyError as exc:
             available = ", ".join(sorted(self._definitions)) or "none"
             raise ValueError(
@@ -97,7 +99,7 @@ class LabCatalog:
                 },
             )
             for definition in sorted(
-                self._definitions.values(),
+                self.definitions(),
                 key=lambda item: (
                     item.descriptor.install_order,
                     item.descriptor.mechanism_id,
@@ -224,6 +226,22 @@ class LabCatalog:
         """Resolve enabled declarations without constructing runtime resources."""
         return tuple(sorted({name for item in self.resolve(selections)
                              for name in item.definition.required_credentials(item.parameters)}))
+
+    def resolve_model_roles(self, selections: Sequence[MechanismSelection],
+                            roles: Mapping[str, str]) -> dict[str, str]:
+        """Normalize declared fallback slots, then resolve enabled owners."""
+        from .model_roles import role_alias
+        result = {role: roles[requirement.fallback_role]
+                  for definition in self.definitions()
+                  for role, requirement in definition.model_role_parameters.items()
+                  if requirement.fallback_role is not None and requirement.fallback_role in roles}
+        result.update(roles)
+        for item in self.resolve(selections):
+            for role, requirement in item.definition.model_role_parameters.items():
+                alias = role_alias(role, requirement, item.parameters, roles)
+                if alias is not None:
+                    result[role] = alias
+        return result
 
     def required_model_profiles(self, selections: Sequence[MechanismSelection]) -> tuple[str, ...]:
         """Discover auxiliary model dependencies without constructing Providers."""

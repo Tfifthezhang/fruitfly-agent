@@ -12,6 +12,8 @@ from fruitfly_agent.core.extensions.protocols import Provider, SessionLike
 
 from .catalog import LabCatalog
 from .models import MechanismSelection
+from .model_roles import ModelRoleRequirement, RoleProvider, role_alias
+from fruitfly_agent.core.observation import bind_observation, current_observation
 
 
 @dataclass(frozen=True)
@@ -21,6 +23,7 @@ class ProviderBinding:
     profile: str
     context_window: int | None = None
     max_output_tokens: int | None = None
+    identity: str = ''
 
 
 ProviderResolver = Callable[[str | None, int | None], ProviderBinding]
@@ -50,6 +53,9 @@ class AssemblyContext:
     resources: Any = None
     execution_env: Any = None
     agent_hooks_from_host: bool = False
+    model_requirements: Mapping[str, ModelRoleRequirement] = field(default_factory=dict)
+    model_parameters: Mapping[str, Any] = field(default_factory=dict)
+    component_id: str = ''
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "workspace", self.workspace.resolve())
@@ -57,6 +63,16 @@ class AssemblyContext:
             object.__setattr__(self, "session_path", self.session_path.resolve())
         object.__setattr__(self, "artifact_bindings", dict(self.artifact_bindings))
 
+
+    def provider_for_role(self, role, max_output_tokens=None):
+        if role not in self.model_requirements:
+            raise ValueError('undeclared mechanism model role: ' + role)
+        alias = role_alias(role, self.model_requirements[role], self.model_parameters, self.model_roles)
+        if alias is None:
+            raise ValueError('inactive mechanism model role: ' + role)
+        with bind_observation(replace(current_observation(), component_id=self.component_id, model_role=role)):
+            binding = self.provider_resolver(alias, max_output_tokens)
+        return replace(binding, provider=RoleProvider(binding.provider, self.component_id, role))
 
     def own(self, resource):
         """Register constructor ownership before any later operation can fail.
@@ -139,7 +155,8 @@ def assemble_lab(
     reduction_stage_id: str | None = None
     for item in resolved:
         descriptor = item.definition.descriptor
-        item_context = context
+        item_context = replace(context, model_requirements=item.definition.model_role_parameters,
+            model_parameters=item.parameters, component_id=descriptor.mechanism_id)
         if item.definition.tool_provider is not None and descriptor.mechanism_id not in context.tool_providers:
             raise ValueError('tool provider requires asynchronous preparation: ' + descriptor.mechanism_id)
         names = item.definition.required_credentials(item.parameters)
@@ -148,7 +165,7 @@ def assemble_lab(
             missing = [name for name, value in secrets.items() if not value]
             if missing:
                 raise ValueError("missing required credentials: " + ", ".join(missing))
-            item_context = replace(context, secret_resolver=secrets.get)
+            item_context = replace(item_context, secret_resolver=secrets.get)
         previous_stages = state.context_stages
         previous_reducer = state.reducer
         candidate = item.definition.install(state, item_context, item.parameters)

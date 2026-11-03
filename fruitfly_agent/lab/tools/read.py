@@ -10,6 +10,7 @@ import base64
 from typing import Callable
 
 from fruitfly_agent.core.data_model import AgentToolResult, ImageBlock, TextBlock
+from .presentation import file_call, text_result
 from fruitfly_agent.core.tool_runtime import AgentTool, ToolCallContext
 from fruitfly_agent.core.tool_runtime.authorization import ToolPermission
 from .path_utils import resolve_read_path
@@ -116,6 +117,8 @@ def create_read_tool(register_media: Callable[[bytes, str, str], str] | None = N
     return AgentTool(
         permission=ToolPermission("read", ("path",)),
         name="read",
+        present_call=lambda args: file_call("read", args),
+        present_result=lambda result: text_result("read", result),
         label="Read file",
         description=(
             "Read a file in the selected execution environment or a registered resource:// reference. "

@@ -44,6 +44,7 @@ class TerminalBindings:
     apply_configuration: Callable[[], Awaitable[None]] | None = None
     load_attachment: Callable[[str], ImageAttachment] | None = None
     validate_input: Callable[[UserContent], UserContent] | None = None
+    operations: Callable | None = None
 
     @classmethod
     def from_session(cls, session: Any) -> TerminalBindings:
@@ -68,6 +69,7 @@ class TerminalBindings:
             load_attachment=(getattr(session, 'load_attachment', None)
                              if getattr(session, 'attachments_available', True) else None),
             validate_input=getattr(session, 'validate_input', None),
+            operations=lambda: getattr(session, 'operations', None),
         )
 
 

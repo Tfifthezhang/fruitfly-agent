@@ -45,6 +45,7 @@ class RuntimeStagingTests(unittest.TestCase):
         state = root / ".fruitfly"
         state.mkdir()
         profile = profile_document(catalog="models.yaml", executor="main", mechanisms=[{"id": n} for n in ("local-env", "read-tool", "bash-tool", "working-memory-reduction")])
+        profile["models"]["roles"]["working_memory"] = "main"
         (state / "default-config.yaml").write_text(yaml.safe_dump({
             "default_profile": "baseline", "profiles": {"baseline": profile}}))
         spec = {'sdk': 'openai', 'protocol': 'responses', "model": "fixture", "context_window": 32768,
@@ -258,3 +259,18 @@ class RuntimeStagingTests(unittest.TestCase):
             self.assertEqual(first, installation_identity(root))
             (root / "fruitfly_agent/__init__.py").write_text("VERSION = '0.1'\n")
             self.assertNotEqual(first["sha256"], installation_identity(root)["sha256"])
+
+    def test_inherited_roles_survive_staging_and_require_only_the_executor_key(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state, profile, output = self.fixture(root)
+            profile['models']['roles'] = {'executor': 'main', **{role: {'inherit': 'executor'}
+                for role in ('working_memory', 'editor', 'assessor', 'context_query', 'context_summary')}}
+            (state / 'default-config.yaml').write_text(yaml.safe_dump({'default_profile': 'baseline', 'profiles': {'baseline': profile}}))
+            generated, models, names = prepare_runtime(runtime={'working_directory': str(root)}, output_dir=output,
+                environment={'SHARED_KEY': 'fixture'})
+            staged = load_system_config(generated).select()
+            self.assertEqual({'inherit': 'executor'}, staged.model_roles['working_memory'])
+            self.assertEqual({'main'}, set(staged.resolved_model_roles('main').values()))
+            self.assertEqual({'main'}, set(yaml.safe_load(models.read_text())['models']))
+            self.assertEqual(('SHARED_KEY',), names)

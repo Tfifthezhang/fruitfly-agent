@@ -40,3 +40,11 @@ pages as needed. Missing evidence remains unknown; timeout is unavailable judgme
 
 Offline checks: `tests.lab.test_evaluator`, `tests.lab.test_completed_improvement`,
 `tests.workflows.test_evaluator_evolution`.
+
+## Maintain I parameter defaults
+
+[defaults.yaml](defaults.yaml) is the single default I instruction document.
+Typed instruction constructors derive values from it. Isolated editors modify
+`parameters.yaml` with a protected `role: I`; ordinary H/S task execution cannot
+supply I acceptance. Frozen comparisons and verified activation retain the
+existing I execution and recovery contracts.

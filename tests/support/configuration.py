@@ -141,3 +141,41 @@ def profile_document(*, catalog='models.yaml', executor=None, mechanisms=(),
     profile = HarnessProfile('fixture', catalog, executor, selections, prompt,
         artifact_bindings or {}, execution or {})
     return component_profile(profile, lab, artifact_reader=artifact_reader).to_dict(references=False)
+
+
+def component_parameters(document):
+    """Read the public candidate YAML without depending on an owner's text codec."""
+    import yaml
+    return yaml.safe_load(document.files[0].text)['parameters']
+
+
+def with_component_parameters(document, parameters):
+    import yaml
+    from fruitfly_agent.improvement.contracts.components import ComponentFile
+    value = yaml.safe_load(document.files[0].text)
+    value['parameters'] = parameters
+    return replace(document, files=(ComponentFile('parameters.yaml', yaml.safe_dump(value, sort_keys=False)),))
+
+
+def with_component_text(document, text):
+    """Edit the single scalar field of a text/document parameter fixture."""
+    parameters = component_parameters(document)
+    group = next(iter(parameters))
+    field = next(iter(parameters[group]))
+    if len(parameters) != 1 or len(parameters[group]) != 1:
+        raise ValueError('fixture must have exactly one text field')
+    parameters[group][field] = text
+    return with_component_parameters(document, parameters)
+
+
+def component_text(document):
+    parameters = component_parameters(document)
+    group, = parameters.values()
+    text, = group.values()
+    return text
+
+
+def parameter_payload(document):
+    """Encode the structured parameters supplied to an I episode fixture."""
+    from fruitfly_agent.improvement.contracts.versions import canonical_json
+    return canonical_json(component_parameters(document))

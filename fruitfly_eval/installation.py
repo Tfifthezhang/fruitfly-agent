@@ -13,6 +13,8 @@ import stat
 import tomllib
 from typing import Any, Iterator
 import zipfile
+from fruitfly_agent.runtime_spec.resources import (safe_resource_path as _safe_path,
+    excluded_resource as _excluded, validate_resource_file as _source_file, declared_resource_files)
 
 
 SOURCE_FILES = ("pyproject.toml", "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md")
@@ -20,29 +22,13 @@ SOURCE_PACKAGES = ("fruitfly_agent", "fruitfly_eval")
 INSTALLATION_SCHEMA = 2
 
 
-def _safe_path(name: str) -> PurePosixPath:
-    path = PurePosixPath(name)
-    if not name or not path.parts or path.is_absolute() or '..' in path.parts or '\\' in name or str(path) != name:
-        raise ValueError('installation file must have a canonical relative path: ' + name)
-    return path
 
 
-def _excluded(path: PurePosixPath) -> bool:
-    return (any(part.startswith('.') or part == '__pycache__' for part in path.parts)
-            or path.suffix in {'.pyc', '.pyo'} or path.name == 'secrets.env'
-            or (path.name == 'models.yaml' and
-                path.as_posix() != 'fruitfly_agent/run/configuration/templates/models.yaml'))
 
 
-def _source_file(root: Path, name: str) -> None:
-    relative = _safe_path(name)
-    current = root
-    for part in relative.parts:
-        current = current / part
-        if current.is_symlink():
-            raise ValueError('installation material cannot contain symlinks: ' + name)
-    if not current.is_file():
-        raise ValueError('incomplete FruitFlyAgent source: ' + name)
+
+
+
 
 
 def _source_files(root: Path, project: dict[str, Any]) -> tuple[str, ...]:
@@ -53,34 +39,7 @@ def _source_files(root: Path, project: dict[str, Any]) -> tuple[str, ...]:
             if not _excluded(PurePosixPath(name)):
                 selected.add(name)
     data = project.get('tool', {}).get('setuptools', {}).get('package-data', {})
-    if not isinstance(data, dict):
-        raise ValueError('package-data must declare package resource patterns')
-    for package, patterns in data.items():
-        if not isinstance(patterns, list) or not patterns or any(not isinstance(p, str) for p in patterns):
-            raise ValueError('package-data requires nonempty resource pattern lists')
-        if package == '*':
-            directories = tuple(path.parent for name in SOURCE_PACKAGES
-                                for path in (root / name).rglob('__init__.py')
-                                if not _excluded(PurePosixPath(path.relative_to(root).as_posix())))
-        else:
-            if (not re.fullmatch(r'[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*', package)
-                    or package.split('.')[0] not in SOURCE_PACKAGES):
-                raise ValueError('package-data must belong to FruitFlyAgent or Eval')
-            directories = (root.joinpath(*package.split('.')),)
-        for pattern in patterns:
-            _safe_path(pattern)
-            matched = []
-            for directory in directories:
-                for path in directory.glob(pattern):
-                    if not path.is_file() and not path.is_symlink():
-                        continue
-                    name = path.relative_to(root).as_posix()
-                    if _excluded(PurePosixPath(name)):
-                        raise ValueError('package resource selects excluded local state: ' + name)
-                    matched.append(name)
-            if not matched and not any(character in pattern for character in '*?['):
-                raise ValueError(f'missing declared package resource: {package}/{pattern}')
-            selected.update(matched)
+    selected.update(declared_resource_files(root, data, SOURCE_PACKAGES))
     for name in selected:
         _source_file(root, name)
     return tuple(sorted(selected))

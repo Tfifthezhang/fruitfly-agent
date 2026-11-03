@@ -77,6 +77,20 @@ class EvaluationReport:
                     lines.append(f"- {key}: {value}")
         else:
             lines.append("None.")
+        if self.readiness.get('coverage'):
+            coverage = self.readiness['coverage']
+            lines += ['', '## Coverage', '',
+                f"- Observed results: {coverage.get('observed_results')} / {coverage.get('expected_attempts')}",
+                f"- Missing results: {coverage.get('missing_results')}",
+                f"- Unexpected results: {coverage.get('unexpected_results')}",
+                '- Missing results do not establish whether an attempt started.']
+        if self.readiness.get('budget'):
+            budget = self.readiness['budget']
+            lines += ['', '## Time Budget', '',
+                f"- Job timeout: {budget.get('job_timeout_seconds')} seconds",
+                f"- Agent allowance per worker: {budget.get('agent_allowance_per_worker_seconds')} seconds",
+                f"- Shorter than declared Agent allowance capacity: {budget.get('shorter_than_agent_allowances')}",
+                '- Allowances are not runtime predictions. Setup, verification and cleanup are additional.']
         lines += ["", "## Artifacts", "", "- Request and execution options: `request.json`"]
         lines.extend(f"- `{item.get('path')}` ({item.get('kind', 'artifact')})" for item in self.artifacts)
         return "\n".join(lines) + "\n"
@@ -113,6 +127,10 @@ def report_from_runner_result(
     readiness = {"observed": len(execution_records),
                  "completed": sum(r.get("state") == "completed" for r in execution_records),
                  "errors": sum(r.get("state") == "error" for r in execution_records)}
+    if result.get('coverage'):
+        readiness['coverage'] = result['coverage']
+    if result.get('budget'):
+        readiness['budget'] = result['budget']
     return EvaluationReport(evaluation_id, status, started_at, completed_at, benchmark,
         runtime, asdict(request.execution), tuple(MetricRecord.from_dict(item) for item in metrics),
         reported_errors, tuple(dict(item) for item in artifacts if isinstance(item, Mapping)), readiness)

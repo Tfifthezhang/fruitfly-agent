@@ -1,0 +1,5 @@
+id: memory-files
+role: H
+implementation: memory-files
+parameters:
+  root: .fruitfly/memory

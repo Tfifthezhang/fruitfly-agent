@@ -1,0 +1,36 @@
+id: ipython-tool
+role: H
+implementation: ipython-tool
+parameters:
+  settings:
+    max_artifact_bytes: 67108864
+    max_cell_output_chars: 50000
+    cell_timeout_seconds: 300
+    max_query_concurrent: 4
+    max_query_input_chars: 200000
+    max_query_output_tokens: 4096
+    max_query_inline_result_chars: 100000
+    query_timeout_seconds: 300
+  instructions:
+    usage: "## Persistent IPython workspace\n\nThis Session has an opt-in persistent\
+      \ IPython workspace. Use the `ipython`\ntool for programmatic inspection, filtering,\
+      \ aggregation and verification.\nVariables and imports persist across ipython\
+      \ calls while this Runtime is open.\nTop-level `await` is supported.\n\nUse\
+      \ the preloaded synchronous `context` object to manage artifacts:\n\n- `context.list()`\
+      \ and `context.stat(reference)`\n- `context.read(reference, offset=0, limit=20000)`\n\
+      - `context.search(reference, query, limit=20)`\n- `context.put(text)` for large\
+      \ intermediate text\n- `context.save_state(name, json_value)` and `context.load_state(name)`\
+      \ for\n  explicit state that must survive `/resume`\n\nDo not print a whole\
+      \ large artifact merely to inspect it. Search or read\nbounded slices and keep\
+      \ intermediate values in Python.\n\nFor semantic work that deterministic Python\
+      \ cannot perform, call the bounded,\ntext-only auxiliary model from IPython:\n\
+      \n`reply = await llm_query(prompt, max_output_tokens=2048)`\n\nThe returned\
+      \ dict contains `text`, model identity, usage and an optional\n`reference` when\
+      \ the full result was stored externally. Calls incur network\ncost and have\
+      \ reported usage and bounded per-request inputs, outputs, time and concurrency.\
+      \ The auxiliary\ncall has no tools and cannot recursively invoke `llm_query`.\n\
+      \nThe IPython process uses the current workspace permissions and is not a\n\
+      security sandbox. Important resume state must be saved explicitly as JSON or\n\
+      context artifacts; arbitrary live Python objects are not restored."
+    query: Answer the supplied subproblem directly. Return text only; do not call
+      tools or assume access to the parent conversation.

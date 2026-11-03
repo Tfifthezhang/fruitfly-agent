@@ -235,3 +235,20 @@ Owners supply `OptimizationSpec` explicitly. Text adapters reject a missing
 declaration; file adapters require it at construction. Runner admission checks
 capabilities, update timing and activation boundary before trials. Declarations
 do not grant edits; experiment grants and protected owner fields still apply.
+
+Editor and assessor models use Catalog `ModelRoleRequirement` declarations with
+an explicit executor fallback. Bind `models.roles.editor` and
+`models.roles.assessor` for independent models. Client construction is lazy;
+ordinary Agent startup needs no unused I credentials. Calls retain their I role
+attribution even when the executor model is reused. Model bindings are protected
+from candidate prompt grants.
+
+## Use one parameter path
+
+Owners keep default text and numeric values in their registered Lab YAML.
+The [parameter adapter](components/README.md#edit-typed-candidate-files) exposes
+isolated `parameters.yaml` documents with protected H/S/I identity. The same owner
+validation applies before ordinary assembly, candidate execution and adoption.
+Normal saves preserve default references; trial/export materialization freezes
+complete effective values. Verified adoption fixes changed components without
+rewriting unrelated defaults or production source files.

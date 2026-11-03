@@ -10,7 +10,7 @@ The [configuration overview](../../CONFIGURATION.md#navigate-the-configuration-t
 is the navigation root; this page owns template setup rather than another schema table.
 
 For independent experiments, `fruitfly-agent-lab init` creates the default
-Agent/component files from installed templates, without an experiment executor. It creates
+system/model files from installed templates, without an experiment executor. It creates
 the shared `models.yaml` only when absent, preserves daily files and existing
 regular model catalogs/secrets, and rejects other conflicting configuration files.
 Use `--source task-set --benchmark terminal-bench-4` for benchmark request/host
@@ -25,11 +25,11 @@ container starts during initialization.
 | [.env.example](.env.example) | `.fruitfly/secrets.env` | Empty model/search keys and optional SSH account/password variables |
 | [ssh.example.yaml](ssh.example.yaml) | `.fruitfly/config.yaml` | Minimal remote profile; addresses are placeholders, credentials stay in the secret file |
 | [mcp.example.yaml](mcp.example.yaml) | `.fruitfly/mcp.yaml` | Optional local stdio servers, explicit selected tools and limits; edit placeholders before enabling `mcp-tools` |
-| [default-config.example.yaml](default-config.example.yaml) | `.fruitfly/default-config.yaml` | Baseline selecting model roles and referenced H/S/I component files |
+| [default-config.example.yaml](default-config.example.yaml) | `.fruitfly/default-config.yaml` | Single baseline file selecting model roles and registered H/S/I defaults |
 | [eval-host.example.yaml](eval-host.example.yaml) | `.fruitfly/eval-host.yaml` | Machine-local Linux runtime mounts and dependency/cache settings; configure path variables before use |
 
-Copy the default configuration and referenced `components/` tree only when their
-destinations are absent. Reuse `.fruitfly/models.yaml`, or create it from the model
+Copy the single default configuration only when its destination is absent.
+Registered defaults resolve through installed owner resources. Reuse `.fruitfly/models.yaml`, or create it from the model
 template if missing. Select aliases separately in daily and baseline
 `models.roles`. **/config → Restore default configuration** stages the
 default harness settings while retaining the daily model and credentials. Save
@@ -38,10 +38,10 @@ unless explicitly overridden, using its aliases from the shared model catalog.
 It passes `--unrestricted` inside task containers; no permission configuration
 belongs in either Agent file.
 
-The generated tree includes H prompt/execution/environment/context/tool files and
-I editor/evaluator files. S is optional; examples include
-[Skill content](components/S/skill-document.yaml).
-Select those files under the profile's S mapping before use. Initialization does
+The default system file retains H and I groups without copied parameter files.
+S is optional. To select a retained [Skill document](../../fruitfly_agent/lab/context_manager/augmentation/skills/README.md#optimize-a-skill-body),
+add `skill-document: {default: true}` under S, then use an explicit inline or file
+document to configure its source/content. Initialization does
 not create placeholder S state. Candidate editing additionally needs an explicit
 [experiment grant](../../fruitfly_agent/experiments/CONFIGURATION.md#grant-component-changes).
 
@@ -131,17 +131,17 @@ Optional [web tools](../../fruitfly_agent/lab/tools/web/README.md) are disabled 
 
 ## Select reduction and measurement
 
-The default selects [layered compaction](components/H/layered-compaction.yaml)
+The default selects [layered compaction](../../fruitfly_agent/lab/context_manager/reduction/methods/layered_compaction/README.md)
 in deterministic mode. It abbreviates old tool results and archives earlier
 complete groups with original-message references through `read`.
-[Working memory](components/H/working-memory-reduction.yaml) remains optional in
+[Working memory](../../fruitfly_agent/lab/context_manager/reduction/methods/working_memory/README.md) remains optional in
 the same Reduction slot. Shared request measurement is automatic and has no
 component selection or optimization grant.
 
 To enable hybrid summaries, set `parameters.settings.mode: hybrid` in the selected
-layered-compaction component and bind an existing catalog alias at
-`profiles.<profile>.models.roles.context_summary`. This role is required; there is
-no implicit executor binding. Hybrid calls use the network and may incur charges.
+layered-compaction component. `profiles.<profile>.models.roles.context_summary`
+defaults to `{inherit: executor}`; replace it with a catalog alias for an independent
+summary model. Hybrid calls use the network and may incur charges.
 
 A materializing experiment can grant, for example:
 
@@ -165,3 +165,15 @@ configuration inspection are offline; live validation requires explicit invocati
 Default measurement is heuristic with explicit uncertainty and reported-usage
 calibration. Embeddings can inject a configured `MeasurementService`; precision
 controls are outside model edit grants. See [measurement](../../fruitfly_agent/lab/context_manager/measurement/README.md).
+
+To select working memory, replace the Reduction selection with
+`working-memory-reduction: {default: true}` under H, removing or disabling layered compaction. Retain `{inherit: executor}` at
+`profiles.<profile>.models.roles.working_memory`, or set an independent catalog alias.
+Maintenance starts at 50% of the
+available input budget, then normally waits 32 new messages; each update has a
+20-second total auxiliary budget and two-page limit. It remains optional.
+IPython uses `models.roles.context_query`, which also defaults to
+`{inherit: executor}`. All five auxiliary role positions are present in the default
+configuration. Replace a reference with a catalog alias only when an independent
+model is needed. Auxiliary calls may use the network and incur model charges. See
+[role admission](../../fruitfly_agent/lab/catalog/README.md#declare-auxiliary-model-dependencies).

@@ -187,3 +187,18 @@ Frozen launches use safe-path mode and verify both runtime package origins, so
 task directories cannot shadow the installed Agent or Eval packages. Native
 Session records retain structured Provider connection diagnostics. Launch and
 cleanup exceptions preserve separate types and the original failure cause.
+
+Harbor reports include [allowance capacity and incomplete coverage](harbor/README.md#inspect-allowances-and-incomplete-coverage).
+Agent stage evidence uses the same Core Session codec as ordinary interaction;
+Eval adds benchmark lifecycle facts without redefining Agent timing semantics.
+Resume request drafts require explicit review and execution and do not alter the
+original result or score denominator.
+
+## Bind installed parameter resources
+
+Preparation inventories declared package resources through the shared Runtime
+specification service. Owner default YAML participates in validation, hashing and
+copying for both source and wheel material. Improvement rejects prepared inputs
+that differ from the current declared installation before task/model execution.
+System staging freezes complete effective H/S/I parameters using the ordinary
+Catalog path. Later owner-default changes do not alter an already staged config.

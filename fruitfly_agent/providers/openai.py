@@ -214,7 +214,9 @@ class OpenAIProvider(MediaInput):
         completed: Any = None
         stream = None
         try:
+            deadline.switch_phase('connect_or_headers')
             stream = await deadline.wait(self._client.responses.create(**request, stream=True), signal)
+            deadline.switch_phase('stream')
             iterator = stream.__aiter__()
             while True:
                 try:
@@ -288,14 +290,20 @@ class OpenAIProvider(MediaInput):
                 elif event_type in ("response.failed", "error"):
                     detail = getattr(event, "error", None) or getattr(event, "response", None)
                     raise FatalError(f"OpenAI response failed: {detail}")
-        except TaggedError:
+        except TaggedError as exc:
+            deadline.note_error(exc)
             raise
         except Exception as exc:  # noqa: BLE001
             status = getattr(exc, "status_code", None)
-            raise retry_details(exc, classify_error(exc, status_code=status)) from exc
+            error = classify_error(exc, status_code=getattr(exc, 'status_code', None))
+            error.details['diagnostics']['phase'] = deadline.phase
+            error.details['failure']['stage'] = deadline.phase
+            deadline.note_error(error)
+            raise retry_details(exc, error) from exc
         finally:
             if stream is not None:
-                await close_transport(stream.close(), self._policy.cleanup_timeout)
+                await close_transport(stream.close(), self._policy.cleanup_timeout, deadline=deadline)
+        deadline.switch_phase('assemble')
         # StreamDone ends consumption; close the transport before emitting it.
         if completed is None:
             raise FatalError('Responses stream ended without a terminal response')

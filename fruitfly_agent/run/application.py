@@ -25,6 +25,7 @@ from .storage.improvement_runs import ImprovementRunStore
 from .runtime.assembly import build_runtime
 from .runtime.manifest import RuntimeManifest
 from .runtime.preparation import RuntimePreparer, PreparedRuntime
+from .adapters.operations import ManagedOperationAdapter
 from .runtime.recovery import (check_session_manifest, discover_resumable_sessions,
     new_session_path, record_session_manifest, resolve_session_path)
 from .improvement.candidates import RunCandidates
@@ -119,6 +120,7 @@ class RunApplicationFactory:
             describe=lambda runtime: describe_runtime(runtime, self.catalog),
             describe_environment=describe_execution_environment,
             describe_services=describe_tool_services,
+            adapt_operations=ManagedOperationAdapter,
             approve_start=self._approve_tool_service,
             build=lambda *args, **kwargs: build_runtime(
                 *args, **{**kwargs, "provider_registry": self.provider_registry}),

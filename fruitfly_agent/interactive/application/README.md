@@ -40,3 +40,13 @@ reader. Cancellation clears queued content without committing it to history.
 ```
 
 Checks use fake Providers and owned local resources.
+
+## Measure lifecycle and queued work
+
+A host can inject a Core `ObservationContext` through RuntimeHandle. Application
+records queue residence and submission-lock waiting independently of Agent work.
+Removed pending items finish as cancelled. The concrete handle records component
+startup and close; Run records preparation or recovery. These are passive facts,
+not lifecycle authority. Cleanup finishes before its Session writer is released.
+Optional `operations` exposes background work independently of the active Agent
+turn; closing its owning runtime still retires that work.

@@ -1,4 +1,5 @@
 """Configured I values reach bounded inner execution and exact evidence pages."""
+from tests.support.configuration import component_parameters, with_component_parameters, with_component_text, parameter_payload
 from dataclasses import replace
 import json
 from types import SimpleNamespace
@@ -56,8 +57,8 @@ class ImprovementConfigurationTests(unittest.IsolatedAsyncioTestCase):
             TextComponentAdapter(evaluator, 'evaluator-instructions')))
         baseline = components.snapshot()
         old = baseline.component('improvement-evaluator')
-        changed_values = json.loads(old.files[0].text); changed_values['instructions']['compare'] = 'Prefer verified task completion. EVALUATOR_CANDIDATE'
-        changed = replace(old, files=(ComponentFile('instructions.txt', json.dumps(changed_values)),))
+        changed_values = component_parameters(old); changed_values['instructions']['compare'] = 'Prefer verified task completion. EVALUATOR_CANDIDATE'
+        changed = with_component_parameters(old, changed_values)
         candidate = HarnessSnapshot(tuple(changed if doc.component_id == changed.component_id else doc for doc in baseline.components))
         provider = FauxProvider()
         def response(view, *, signal=None):
@@ -79,7 +80,7 @@ class ImprovementConfigurationTests(unittest.IsolatedAsyncioTestCase):
                 type(self).count += 1
                 type(self).contexts.extend(request.context)
                 old = request.baseline.component('base_prompt')
-                changed = replace(old, files=(ComponentFile('instructions.txt', 'variant ' + str(type(self).count)),))
+                changed = with_component_text(old, 'variant ' + str(type(self).count))
                 harness = HarnessSnapshot(tuple(changed if d.component_id == changed.component_id else d for d in request.baseline.components))
                 return ProposalResult((CandidateBundle(request.plan.parent, request.baseline, harness, self.generator_id,
                     (EditReason('base_prompt', 'Synthetic wiring check.', (request.records[0].run_id,),expected_effect='Change the observed task response.'),)),))
@@ -91,7 +92,7 @@ class ImprovementConfigurationTests(unittest.IsolatedAsyncioTestCase):
         parameters = {'inner_depth': 3, 'inner_model_calls': 32, 'inner_executions': 16, 'evaluation_model_calls': 1}
         try:
             executor = ComparisonEpisodeExecutor(context, episode, parameters, generator_factory=Generator, runner_factory=lambda plan, registry, artifacts, services: TaskRunnerFixture(context.config, registry, artifacts, services))
-            request = EpisodeRequest('episode', baseline.component('improvement-editor').files[0].text, baseline,
+            request = EpisodeRequest('episode', parameter_payload(baseline.component('improvement-editor')), baseline,
                                      ('base_prompt',), TaskMaterial('adaptation', 'Do the task.'), 0, candidate)
             result = await executor.run(request, signal=services.signal)
             self.assertEqual(Generator.count, 3)
@@ -129,12 +130,12 @@ class ImprovementConfigurationTests(unittest.IsolatedAsyncioTestCase):
         results=[]
         try:
             for index,mission in enumerate(('STEP: improve from observed evidence','Keep the original procedure')):
-                old=baseline.component('improvement-editor');value=json.loads(old.files[0].text)
+                old=baseline.component('improvement-editor');value=component_parameters(old)
                 value['instructions']['propose']=mission
-                changed=replace(old,files=(ComponentFile('instructions.txt',json.dumps(value)),))
+                changed=with_component_parameters(old, value)
                 candidate=HarnessSnapshot(tuple(changed if d.component_id==changed.component_id else d for d in baseline.components))
                 result=await ComparisonEpisodeExecutor(context,episode,{'inner_depth':1}, runner_factory=lambda plan, registry, artifacts, services: TaskRunnerFixture(context.config, registry, artifacts, services)).run(
-                    EpisodeRequest('episode-'+str(index),changed.files[0].text,baseline,('base_prompt',),TaskMaterial('adaptation','Do work'),0,candidate),signal=services.signal)
+                    EpisodeRequest('episode-'+str(index),parameter_payload(changed),baseline,('base_prompt',),TaskMaterial('adaptation','Do work'),0,candidate),signal=services.signal)
                 results.append(result)
             self.assertEqual(results[0].scores_after,(1,))
             self.assertEqual(results[1].scores_after,(0,))

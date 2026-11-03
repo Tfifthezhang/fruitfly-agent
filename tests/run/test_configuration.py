@@ -63,7 +63,7 @@ class HarnessSelectionTest(unittest.TestCase):
         _write_catalog(root / ".fruitfly/models.yaml", {"only": "model-a"})
         original = builtin_catalog()
         working_memory = original.get("working-memory-reduction")
-        alternative = replace(working_memory, descriptor=replace(
+        alternative = replace(working_memory, default_resource=None, descriptor=replace(
             working_memory.descriptor, mechanism_id="alternative-reducer",
             label="Alternative reducer", default_enabled=False,
         ))

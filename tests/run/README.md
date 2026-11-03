@@ -8,7 +8,8 @@ Verify configuration, model selection, assembly, manifest, CLI, candidates, rete
 
 | Files | Protects |
 |---|---|
-| `test_component_configuration.py` | Schema-2 parsing/assembly, exact text, derived configuration, portable candidate reload, registered resource capture and source integrity |
+| `test_component_configuration.py` | Shared H/S/I parsing/assembly, exact text, derived configuration, portable candidate reload, registered resource capture and source integrity |
+| `test_parameter_defaults.py` | Default intent, text/number updates in actual requests, complete frozen parameters, protected H/S/I and stale-source rejection |
 | `test_runtime_spec.py` | Shared profile types, Core defaults, explicit reference conflicts and strict scalar candidates |
 | `test_configuration_application.py` | Same-Session model changes, original history, empty-session application, failed startup recovery and exclusive writer lease lifetime |
 | `test_configuration.py / test_profiles.py` | Selection drafts, YAML, and persistence |
@@ -50,3 +51,7 @@ workspace fixture rather than importing test classes.
 
 `test_layered_compaction.py` checks default assembly without auxiliary Providers,
 explicit hybrid roles, conditional H grants and exclusive reducer/reader selection.
+
+Lifecycle observation regressions verify manifest-first startup, lazy role model
+metadata, byte-preserving failed/idle recovery and separate observation archives.
+The usual Application configuration tests retain ownership of activation rollback.

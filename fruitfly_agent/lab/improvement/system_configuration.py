@@ -32,9 +32,9 @@ def evaluator_parameters(parameters):
 def configuration_surfaces():
     return (
         ConfigurationSurface('improvement-editor', 'I', 'settings', 'editor', editor_parameters,
-                             edit_options=editor_edit_options, restore=restore_editor),
+                             edit_options=editor_edit_options, restore=restore_editor, default_resource=('fruitfly_agent.lab.improvement.editor', 'defaults.yaml')),
         ConfigurationSurface('improvement-evaluator', 'I', 'settings', 'evaluator', evaluator_parameters,
-                             edit_options=settings_edit_options,
+                             edit_options=settings_edit_options, default_resource=('fruitfly_agent.lab.improvement.assessment', 'defaults.yaml'),
                              restore=lambda parameters, text: {'instructions': asdict(EvaluatorInstructionTarget.parse(text))}))
 
 

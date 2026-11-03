@@ -67,3 +67,11 @@ charges them to its host-tool counter. Actual billing remains service-specific.
 The loop keeps turn/tool budgets and termination decisions in one control flow. Request preparation commits hook changes, applies context stages, checks the reduction budget, and records the final projection before calling the Provider. Response recording persists the hook-adjusted assistant and receipt, updates cumulative usage, and then notifies observers. Cancellation after budgeting or request observation prevents the next Provider call.
 
 `AgentLoopConfig.tool_authorizer` is an execution-scoped generic authorization seam. It runs after final tool argument validation and does not use ordinary fail-open Hook callbacks. See [Tool authorization](tool_runtime/README.md#authorize-final-calls). Direct Core callers without an authorizer remain unrestricted; standard Run installs a policy.
+
+## Observe operation failures and time
+
+[Observation](observation/README.md) defines passive, correlated operation facts.
+The loop persists them separately from canonical messages and concise run records.
+Context stages, authorization wait, execution and Provider work retain separate
+intervals. Consumers must distinguish overlapping stage totals, interval-union wall
+time and unfinished operations. Observation is not execution or retry policy.

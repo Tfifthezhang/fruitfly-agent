@@ -10,4 +10,5 @@ def configuration_surface():
             raise ValueError('execution policy requires settings')
         return validate_execution(value.get('settings', {}))
     return ConfigurationSurface('execution-policy', 'H', 'configuration', 'execution', normalize,
-        encode=lambda values: json.dumps(values), decode=lambda text: {'settings': json.loads(text)})
+        encode=lambda values: json.dumps(values), decode=lambda text: {'settings': json.loads(text)},
+        default=lambda: {'settings': {}})

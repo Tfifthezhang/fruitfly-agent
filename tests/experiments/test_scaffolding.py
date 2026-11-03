@@ -89,10 +89,8 @@ class ScaffoldingTests(unittest.TestCase):
         instruction.mkdir()
         (instruction / 'instruction.md').write_text('Offline fixture task, without private grading.')
         project = Path(__file__).resolve().parents[2]
-        source_files = [(str(path.relative_to(project)), hashlib.sha256(path.read_bytes()).hexdigest())
-            for package in ('fruitfly_agent', 'fruitfly_eval') for path in (project / package).rglob('*.py')]
-        resource = 'fruitfly_agent/run/configuration/templates/components/H/execution-policy.yaml'
-        source_files.append((resource, hashlib.sha256((project / resource).read_bytes()).hexdigest()))
+        from fruitfly_eval.installation import installation_identity
+        source_files = installation_identity(project)['files']
         prepared = {'id': 'offline-prepared-fixture',
             'tasks': [{'id': 'terminal-bench/interleaved-vigenere', 'path': str(instruction)}],
             'runtime': {'installation': {'files': source_files}}}

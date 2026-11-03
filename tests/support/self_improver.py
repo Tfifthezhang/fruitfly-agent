@@ -1,7 +1,9 @@
 """Synthetic editor experiments with real Lab loops and zero network requests."""
+from tests.support.configuration import component_parameters, with_component_parameters, with_component_text, parameter_payload
 from dataclasses import replace
 import json
 import re
+import yaml
 from unittest.mock import Mock
 
 from fruitfly_agent.core.data_model import AssistantMessage, TextBlock, ToolCallBlock, ToolResultMessage
@@ -24,9 +26,9 @@ class SelfRule:
 
     async def propose(self, request, services):
         document = request.baseline.component('improvement-editor')
-        value = json.loads(document.files[0].text)
+        value = component_parameters(document)
         value['instructions']['propose'] += ' STEP'
-        updated = replace(document, files=(ComponentFile('instructions.txt', json.dumps(value)),))
+        updated = with_component_parameters(document, value)
         harness = HarnessSnapshot(tuple(updated if c.component_id == updated.component_id else c for c in request.baseline.components))
         return ProposalResult((CandidateBundle(request.plan.parent, request.baseline, harness, self.generator_id,
             (EditReason(updated.component_id, 'Synthetic supported editor edit', (request.records[0].run_id,), expected_effect='The proposed behavior appears in the subsequent execution.'),)),))
@@ -70,7 +72,9 @@ class ProceduralProvider(FauxProvider):
                 if records is None:
                     result = tool('read', {'path': 'context/executions.json'})
                 elif level and 'Candidate file saved' not in contents:
-                    result = tool('write_file', {'path': 'harness/base_prompt/instructions.txt', 'content': f'PROCEDURE_LEVEL={level}'})
+                    result = tool('write_file', {'path': 'harness/base_prompt/parameters.yaml', 'content': yaml.safe_dump({
+                        'id': 'base_prompt', 'role': 'H', 'implementation': 'base_prompt',
+                        'parameters': {'instructions': {'system': f'PROCEDURE_LEVEL={level}'}}})})
                 else:
                     reasons = ([{'component_id': 'base_prompt', 'explanation': 'Synthetic observed contrast',
                                  'evidence_ids': [records[0]['run_id']], 'expected_effect':'The proposed behavior appears in the subsequent execution.'}] if level else [])

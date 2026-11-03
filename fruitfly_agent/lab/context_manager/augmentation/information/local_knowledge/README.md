@@ -22,3 +22,5 @@ Change chunking or ranking through [Information source contracts](../README.md#e
 ```
 
 Catalog registers a bounded workspace text snapshot source for [Improvement](../../../../improvement/README.md) initial-state identity. A compatible registered backend must restore the frozen directory and assemble retrieval; state identity alone does not execute the retriever. External services and arbitrary plugin state are not frozen.
+
+[defaults.yaml](defaults.yaml) owns the workspace knowledge root. Registered text dependencies retain their snapshot and isolated-execution requirements.

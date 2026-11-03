@@ -4,4 +4,4 @@ from .config import WorkingMemoryConfig
 
 
 def register(definition):
-    return expose(definition, WorkingMemoryConfig)
+    return expose(definition, WorkingMemoryConfig, protected=('memory_model_profile',))

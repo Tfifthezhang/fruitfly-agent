@@ -5,30 +5,38 @@ profiles:
       catalog: models.yaml
       roles:
         executor: deepseek-flash-openai
-        editor: deepseek-flash-openai
-        assessor: deepseek-flash-openai
+        editor:
+          inherit: executor
+        assessor:
+          inherit: executor
+        working_memory:
+          inherit: executor
+        context_query:
+          inherit: executor
+        context_summary:
+          inherit: executor
     H:
       local-env:
-        file: components/H/local-env.yaml
+        default: true
       read-tool:
-        file: components/H/tools/read-tool.yaml
+        default: true
       bash-tool:
-        file: components/H/tools/bash-tool.yaml
+        default: true
       edit-tool:
-        file: components/H/tools/edit-tool.yaml
+        default: true
       write-tool:
-        file: components/H/tools/write-tool.yaml
+        default: true
       tool-catalog:
-        file: components/H/tool-catalog.yaml
+        default: true
       layered-compaction:
-        file: components/H/layered-compaction.yaml
+        default: true
       base_prompt:
-        file: components/H/base-prompt.yaml
+        default: true
       execution-policy:
-        file: components/H/execution-policy.yaml
+        default: true
     S: {}
     I:
       improvement-editor:
-        file: components/I/improvement-editor.yaml
+        default: true
       improvement-evaluator:
-        file: components/I/improvement-evaluator.yaml
+        default: true

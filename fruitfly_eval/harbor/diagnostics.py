@@ -4,7 +4,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import re
+from datetime import datetime
 from typing import Any, Mapping
+from fruitfly_agent.core.session.observations import read_observation_files, summarize_observations
 
 
 PHASES = ("environment_setup", "agent_setup", "agent_execution", "verifier")
@@ -26,7 +28,7 @@ def trial_diagnostics(trial: Mapping[str, Any], *, reward: float | None) -> dict
     if not isinstance(exception, Mapping) and reward is None:
         errors.insert(0, {"type": "MissingOfficialReward", "message": "no unambiguous official reward was reported",
                           "source": "verifier_result"})
-    phases = {}
+    phases: dict[str, Any] = {}
     for name in PHASES:
         timing = trial.get(name)
         phases[name] = {"state": "unobserved"}
@@ -38,9 +40,17 @@ def trial_diagnostics(trial: Mapping[str, Any], *, reward: float | None) -> dict
         if phase is not None and (error["source"] == "exception_info" or str(error["type"]).startswith("harbor.trial.errors.")):
             phases[phase]["state"] = "error"
             fatal = True
+    for timing_phase in phases.values():
+        if timing_phase.get('started_at') and timing_phase.get('finished_at'):
+            try:
+                timing_phase['elapsed_seconds'] = max(0., (datetime.fromisoformat(str(timing_phase['finished_at']).replace('Z', '+00:00'))
+                    - datetime.fromisoformat(str(timing_phase['started_at']).replace('Z', '+00:00'))).total_seconds())
+            except ValueError:
+                timing_phase['timing_state'] = 'invalid'
     return {"state": "error" if fatal else "completed", "phases": phases, "exceptions": errors,
             "official_reward": reward, "evidence": trial.get("_evidence", []),
             "agent_process": trial.get("_agent_process"),
+            "agent_operations": trial.get('_agent_operations', {'collection_state': 'unobserved'}),
             "note": "phase end timestamps alone do not establish success"}
 
 
@@ -71,3 +81,13 @@ def attach_evidence(trial: dict[str, Any], directory: Path) -> None:
             trial["_agent_process"] = {"state": "unreadable"}
     trial["_additional_exceptions"] = additional
     trial["_evidence"] = evidence
+    session = directory / 'agent/session.jsonl'
+    paths = ([session] if session.is_file() and not session.is_symlink() else [])
+    paths.extend(path for path in sorted((directory / 'agent/session.jsonl.operations').glob('*.jsonl'))
+        if path.is_file() and not path.is_symlink() and path.resolve().is_relative_to(directory.resolve()))
+    if paths:
+        try:
+            trial['_agent_operations'] = {'collection_state': 'collected',
+                **summarize_observations(read_observation_files(paths, allow_incomplete=True))}
+        except (ValueError, TypeError, OSError):
+            trial['_agent_operations'] = {'collection_state': 'collection_failed'}

@@ -69,8 +69,14 @@ individual owners retain schemas, usage resources, implementation and permission
 An explicit surface and a frozen artifact must describe the same effective value.
 Candidate bundles preserve exact artifact bytes as well as readable values.
 
-Model-role parameter mappings are declared with `model_role_parameters`.
-They bind aliases selected in the config's `models.roles`; they are not credentials.
+Model-role dependencies use `model_role_parameters` with `ModelRoleRequirement`
+values. Declare the parameter, purpose, condition, explicit fallback and lazy
+construction in one owner definition. They bind catalog aliases or `{inherit: executor}` references in `models.roles`; they
+are not credentials and cannot appear in component parameter documents. See
+[auxiliary model admission](README.md#declare-auxiliary-model-dependencies).
+Declared fallback slots are normalized before manifest recording even when their
+owners are disabled; this does not construct auxiliary Providers. Ordinary saves
+retain these slots so developers can assign a model without discovering hidden fields.
 Keep Provider-specific validation in Providers and component-specific validation
 in the owning module.
 
@@ -187,3 +193,31 @@ Owner declarations set `default_selected` on component and optimization metadata
 Tool parameter owners set it false: discovery still reports availability, while
 automatic experiment/chat selection excludes them. Explicit grants remain valid.
 Assembly checks that declarative and executable defaults agree.
+
+## Register one default parameter document
+
+`MechanismDefinition.default_resource` and `ConfigurationSurface.default_resource`
+select an explicit `(package, YAML resource name)` owned by the registration.
+The document uses the public component envelope with its fixed H/S/I `role`.
+Keep each parameter's default value there once. Constructor factories and
+parameter descriptors derive those values; schema types and constraints stay in
+Python. Model aliases remain system roles, outside parameter documents.
+Owners without parameters can use an empty derived document without a YAML file.
+
+[defaults.py](defaults.py) resolves registered defaults and records package
+receipts. It verifies component identity and role, and requires every non-model
+mechanism parameter exactly once. Catalog refreshes descriptor defaults from the
+owner resource; it neither executes installers nor creates Providers.
+Configuration parsing never imports a package named by user YAML.
+
+Normal saving preserves source intent. `component_profile(..., freeze=True)` and
+`materialize_system` expand complete parameters for isolated execution. Candidate
+`parameters.yaml` files retain protected identity and role. String and numeric
+changes use the same typed owner validation and existing grants. A single
+canonical document supplies each version; text projections and artifact bindings
+are derived execution representations, not independent editing locations.
+
+When deriving a new mechanism from an existing definition, register its own
+`default_resource` or explicitly clear that field and supply descriptor defaults.
+A resource declaring another component ID or role is rejected; cloning a Python
+dataclass does not transfer ownership of the original component document.

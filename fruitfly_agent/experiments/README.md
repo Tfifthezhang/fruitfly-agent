@@ -15,8 +15,9 @@ fruitfly-agent-lab --cwd /path/to/workspace init --source task-set --benchmark t
 ```
 
 The workspace must already exist. Initialization creates a
-`default-config.yaml`, referenced `components/H/` and `components/I/` documents,
-`models.yaml` and an empty-key `secrets.env` under `.fruitfly/`. Default
+`default-config.yaml`, `models.yaml` and an empty-key `secrets.env` under
+`.fruitfly/`. H/S/I remain in the system file; registered default parameter
+documents stay in their Lab owners. No components directory is generated. Default
 initialization writes system files only. The explicit benchmark recipe adds
 `experiment.yaml`, a task document and request/host files. No empty S documents are created. Existing regular `models.yaml` and
 secret files are reused unchanged; other existing destinations cause an error.

@@ -26,7 +26,8 @@ Run inside an existing workspace:
 fruitfly-agent-lab init
 ```
 
-This generates the system/model/component files and an empty-key secret file.
+This generates the system/model files and an empty-key secret file. Registered
+component defaults stay in their owner modules.
 It makes no external requests and does not generate an experiment or task executor.
 Existing regular model catalogs and secrets are preserved; other destinations
 must not exist. Choose actual model aliases from the shared catalog.
@@ -65,17 +66,15 @@ Benchmark development reward alone cannot authorize persistent adoption.
 ├── default-config.yaml        # Select models and H/S/I documents
 ├── models.yaml                # Shared daily and experiment model specifications
 ├── secrets.env
-├── components/
-│   ├── H/                     # Prompt, execution, environment, tools, context
-│   ├── S/                     # Optional retained documents
-│   └── I/                     # Editor and evaluator prompts
 ├── experiment.yaml            # Baseline, task reference, optional edit narrowing, phase times
 ├── tasks/                     # Task sources and material references
 ├── eval-request.json          # Optional benchmark request
 └── eval-host.yaml             # Optional machine/runtime host
 ```
 
-Only selected components need files. Model roles live in config; experiment
+H/S/I are explicit groups in the system file and protected roles in component
+YAML. `{default: true}` follows a registered owner; custom files are optional.
+Model roles live in config; experiment
 `execution`, `evidence`, `evaluation` and `stopping` group fixed experiment
 conditions. Daily execution limits live in H execution and are not optimization targets. Paths resolve from the file that declares each reference.
 Daily `.fruitfly/config.yaml` uses the same system schema and shared `models.yaml`.
@@ -104,8 +103,9 @@ models:
 ```
 
 The three names are placeholders for entries in the same catalog. The remote API
-ID remains inside each catalog entry. Generated defaults use
-`deepseek-flash-openai` for all three roles. Missing editor/assessor choices inherit
+ID remains inside each catalog entry. Generated defaults select
+`deepseek-flash-openai` as executor and retain all auxiliary role positions as
+`{inherit: executor}`. Missing editor/assessor choices inherit
 the executor. A declared unused I role does not create a client during ordinary
 startup. Official benchmark grading is independent of the model assessor.
 

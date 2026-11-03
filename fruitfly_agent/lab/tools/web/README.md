@@ -251,3 +251,5 @@ Offline tests cover behavior and integration, not live API compatibility, search
 quality or model quality. Protocol references:
 [Brave Web Search](https://api-dashboard.search.brave.com/api-reference/web/search/get),
 [Tavily Search](https://docs.tavily.com/documentation/api-reference/endpoint/search).
+
+[web-search-tool.yaml](web-search-tool.yaml) and [web-fetch-tool.yaml](web-fetch-tool.yaml) own their typed defaults. The shared WebConfig fallback derives from the fetch document; each registered service mechanism resolves its own document. Grants and live-service snapshot requirements remain unchanged.

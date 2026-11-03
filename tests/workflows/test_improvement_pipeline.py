@@ -1,4 +1,5 @@
 """Normal Application and menu consume the same replaceable component workflow."""
+from tests.support.configuration import component_parameters, with_component_parameters, with_component_text, parameter_payload
 from dataclasses import replace
 from pathlib import Path
 import tempfile
@@ -24,7 +25,7 @@ class LocalRule:
     label = 'Local rule editor'
 
     async def propose(self, request, services):
-        documents = tuple(replace(c, files=(ComponentFile('instructions.txt', 'Read the input before completing the task.'),))
+        documents = tuple(with_component_text(c, 'Read the input before completing the task.')
             if c.component_id in request.plan.component_ids else c for c in request.baseline.components)
         return ProposalResult((CandidateBundle(request.plan.parent, request.baseline,
             HarnessSnapshot(documents), self.generator_id,
@@ -225,7 +226,7 @@ class ApplicationPipelineTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(len(app.pending_experience()), 1)
                 self.assertEqual(len(requests[0].experience), 0)
                 self.assertEqual(len(requests[1].experience), 1)
-                self.assertEqual(requests[1].baseline.component('base_prompt').files[0].text, original)
+                self.assertEqual(component_parameters(requests[1].baseline.component('base_prompt'))['instructions']['system'], original)
                 self.assertEqual(factory._current_runtime_config.system_prompt, original)
             finally:
                 await app.close()

@@ -1,4 +1,5 @@
 """Unified policy changes execution; detailed tool usage stays source-owned."""
+from tests.support.configuration import component_parameters, with_component_parameters, with_component_text, parameter_payload
 from dataclasses import replace
 from pathlib import Path
 import tempfile
@@ -65,12 +66,12 @@ class ToolCatalogTests(unittest.IsolatedAsyncioTestCase):
             registry = component_registry(tuple(v for k, v in original.components.items() if k.startswith('text-target:')))
             baseline = registry.snapshot()
             old = baseline.component('tool-catalog')
-            changed = replace(old, files=(ComponentFile('instructions.txt', 'CANDIDATE_POLICY: verify before completion.'),))
+            changed = with_component_text(old, 'CANDIDATE_POLICY: verify before completion.')
             candidate = HarnessSnapshot(tuple(changed if d.component_id == old.component_id else d for d in baseline.components))
             scopes = []
             for harness in (baseline, candidate):
                 owned = []
-                policy = harness.component('tool-catalog').files[0].text
+                policy = component_parameters(harness.component('tool-catalog'))['instructions']['usage']
                 trial = assemble_lab(AgentLoopConfig(provider), catalog=catalog, selections=profile.mechanisms,
                     context=AssemblyContext(Path(directory), None, 'fake', lambda *a: ProviderBinding(provider, 'fake', 'fake'),
                         resource_sink=owned, artifact_bindings={'tool-catalog': policy}, artifact_reader=lambda key: key))

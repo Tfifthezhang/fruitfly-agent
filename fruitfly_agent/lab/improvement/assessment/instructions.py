@@ -1,5 +1,6 @@
 """Editable evaluation prompts; evidence authority and output validation stay in code."""
-from dataclasses import asdict, dataclass
+from fruitfly_agent.runtime_spec.documents import parameter_default
+from dataclasses import asdict, dataclass, field
 import json
 from fruitfly_agent.improvement.contracts.optimization import OptimizationSpec, OptimizationField, TargetSnapshot, TargetBinding
 from fruitfly_agent.improvement.contracts.versions import canonical_json
@@ -8,26 +9,11 @@ from fruitfly_agent.improvement.contracts.versions import canonical_json
 @dataclass(frozen=True)
 class EvaluatorInstructions:
     criteria: str = (
-        'Derive concrete task-specific criteria for these dimensions when applicable: '
-        'task quality (correctness, completeness and constraints); execution reliability (failures, repeated errors and recovery); '
-        'resource efficiency (reported tokens, cache, model/tool/wait time); progress efficiency (useful steps, repetition and rework); '
-        'verification and evidence quality (valid checks, hidden command failures, source support); '
-        'completion efficiency (value of actions after sufficient completion evidence). '
-        'A saturated outcome score still permits process improvement. Action counts alone are not quality. '
-        'Distinguish installed candidate changes from observed behavioral improvements. Missing facts are unknown.')
+        field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'instructions.criteria')))
     assess: str = (
-        'Inspect the overview and event catalog, then search and read relevant original spans. '
-        'Judge each applicable dimension with reasons, uncertainty and precise citations. '
-        'A successful tool status does not establish success of every enclosed command. '
-        'Explain observed process signals and concrete next modification hypotheses, including evidence that would refute them. '
-        'Check supplied expected effects against behavior; do not infer causation from one run. '
-        'Distinguish infrastructure failures from task failures. Do not invent a total numeric score or unreported cost.')
+        field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'instructions.assess')))
     compare: str = (
-        'Compare existing runs with identical dimensions and criteria. Respect official measurements and fixed regression requirements. '
-        'Prioritize task quality and reliability before efficiency. When quality is supported as equal, consider resource, progress and '
-        'completion efficiency with uncertainty. Fewer model calls do not establish lower token use or elapsed time. '
-        'Explain tradeoffs, hypothesis outcomes and next optimization directions with source citations. '
-        'Retain the incumbent or report no clear choice when evidence is insufficient. Selection does not grant independent adoption.')
+        field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'instructions.compare')))
 
     def __post_init__(self):
         for value in asdict(self).values():
@@ -36,6 +22,7 @@ class EvaluatorInstructions:
 
 
 class EvaluatorInstructionTarget:
+    structured_parameters = True
     optimization = OptimizationSpec('I', 'parameters', required_capabilities=frozenset({'improver-comparison'}))
     component_kind = 'evaluator-instructions'
     required_capabilities = frozenset({'improver-comparison'})

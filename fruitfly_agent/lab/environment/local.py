@@ -24,6 +24,8 @@ from pathlib import Path
 
 from fruitfly_agent.core.env import ExecOptions, ExecResult, FileInfo
 from fruitfly_agent.core.errors import Result
+from fruitfly_agent.core.observation import FailureInfo, operation
+from .failures import environment_operation
 
 
 class LocalEnv:
@@ -181,17 +183,27 @@ class LocalEnv:
     # -- shell -----------------------------------------------------------
 
     async def exec(self, command: str, options: ExecOptions | None = None) -> Result[ExecResult]:
+        with operation('environment.execute', origin='environment') as observed:
+            result = await self._exec(command, options)
+            if not result.is_ok:
+                observed.fail(FailureInfo('environment', 'environment.execute', 'execution.failed', 'runtime_rule'))
+            elif result.unwrap().termination_reason == 'timeout':
+                observed.fail(FailureInfo('environment', 'environment.execute', 'timeout', 'runtime_rule', effect_state='completed'))
+            return result
+
+    async def _exec(self, command: str, options: ExecOptions | None = None) -> Result[ExecResult]:
         opts = options or ExecOptions()
         try:
-            process = await asyncio.create_subprocess_shell(
-                command,
-                cwd=opts.cwd if opts.cwd is not None else self.cwd,
-                env=self._merge_env(opts),
-                stdin=asyncio.subprocess.DEVNULL,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                start_new_session=True,
-            )
+            with environment_operation('environment.local.spawn'):
+                process = await asyncio.create_subprocess_shell(
+                    command,
+                    cwd=opts.cwd if opts.cwd is not None else self.cwd,
+                    env=self._merge_env(opts),
+                    stdin=asyncio.subprocess.DEVNULL,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    start_new_session=True,
+                )
         except Exception as exc:  # noqa: BLE001
             return Result.failure(f"spawn failed: {exc}")
 
@@ -222,7 +234,8 @@ class LocalEnv:
             stdout, stderr = await drain
             exit_code = await process.wait()
             return Result.success(
-                ExecResult(stdout=stdout, stderr=stderr, exit_code=exit_code, cancelled=cancelled)
+                ExecResult(stdout=stdout, stderr=stderr, exit_code=exit_code, cancelled=cancelled,
+                    termination_reason="timeout" if cancelled else "exited")
             )
         except asyncio.CancelledError:
             self._kill_group(process)

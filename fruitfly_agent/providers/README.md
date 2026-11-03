@@ -108,3 +108,27 @@ optional public capabilities. Transparent wrappers must preserve them using
 Core's forwarding helper. Responses counting reuses the actual prepared payload;
 unsupported service/protocol combinations do not guess a remote endpoint.
 See [measurement precision and limits](../lab/context_manager/measurement/README.md).
+
+## Inspect failure causes and time
+
+Adapters publish `provider.attempt`, `provider.prepare`,
+`provider.connect_or_headers`, `provider.first_progress`, `provider.stream`,
+`provider.final_response` where supported, `provider.assemble`, `provider.backoff`
+and `provider.cleanup` through [Core observation](../core/observation/README.md).
+First progress means meaningful model content; keepalives do not satisfy it.
+The SDK does not expose separate TCP, TLS and response-header durations, so their
+combined interval remains explicit rather than estimated.
+
+[error_classification.py](error_classification.py) records a bounded structural
+cause chain and classifies DNS, connection refusal/reset, TLS/certificate, proxy,
+connect/read/write/pool timeout, protocol, JSON parsing, response schema and HTTP
+status failures. Evidence distinguishes exception types, status codes and weaker
+message-pattern inference. Unsupported causes remain unknown. Error bodies,
+URLs and headers are absent from operation events. Classification does not change
+the existing overflow/retry/fatal control policy. No delivered content does not
+prove that the remote request had no effect or cost.
+
+Completed intervals use a monotonic clock. Attempt time excludes retry backoff;
+attempt children have explicit parent operation IDs. Nested stages can overlap
+and must not be summed as wall time. Interrupted
+operations without a completion record retain unknown duration.

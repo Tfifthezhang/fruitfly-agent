@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from fruitfly_agent.runtime_spec.documents import parameter_default
 from typing import Any, Mapping
 
 from fruitfly_agent.lab.context_manager.reduction.registration import definitions as reduction_definitions
@@ -39,8 +40,6 @@ from fruitfly_agent.lab.improvement.targets.state import WorkspaceTextSnapshots
 from fruitfly_agent.improvement.contracts.versions import EXPERIMENT_BLOCKERS_COMPONENT
 from fruitfly_agent.lab.base_prompt.target import BasePromptTarget, configuration_surface as prompt_surface
 from fruitfly_agent.lab.tools.catalog import prepare_catalog, configuration_surface as tool_catalog_surface
-from fruitfly_agent.lab.tools.bash import DEFAULT_TIMEOUT_SECONDS
-from fruitfly_agent.lab.tools.commands import DEFAULT_MAX_ACTIVE, DEFAULT_RETAINED_COMMANDS
 from fruitfly_agent.lab.tools import (
     create_bash_tool,
     create_edit_tool,
@@ -53,6 +52,7 @@ from .assembly import AssemblyContext, AssemblyState, require_workspace_path
 from .catalog import LabCatalog
 from .components import ComponentSpec
 from fruitfly_agent.lab.execution_policy import configuration_surface as execution_surface
+from .model_roles import ModelRoleRequirement
 from .models import (
     MechanismDefinition,
     MechanismContribution,
@@ -117,16 +117,17 @@ def builtin_catalog() -> LabCatalog:
             label="Run shell commands",
             description="Execute shell commands in the selected environment.",
             install=_install_bash_tool,
-            parameters=(ParameterDescriptor('default_timeout_seconds', 'number', 'Command timeout', 'Default seconds per shell command.', DEFAULT_TIMEOUT_SECONDS, minimum=1, maximum=28800),
-                ParameterDescriptor('max_active_commands', 'integer', 'Active commands', 'Runtime-owned managed shell jobs.', DEFAULT_MAX_ACTIVE, minimum=1, maximum=16),
-                ParameterDescriptor('retained_commands', 'integer', 'Command handles', 'Maximum retained command handles.', DEFAULT_RETAINED_COMMANDS, minimum=16, maximum=256),
-                ParameterDescriptor('output_characters', 'integer', 'Poll output', 'Maximum characters per managed poll.', 12000, minimum=100, maximum=24000)),
+            parameters=(ParameterDescriptor('default_timeout_seconds', 'number', 'Command timeout', 'Default seconds per shell command.', parameter_default('fruitfly_agent.lab.tools', 'bash-tool.yaml', 'settings.default_timeout_seconds'), minimum=1, maximum=28800),
+                ParameterDescriptor('max_active_commands', 'integer', 'Active commands', 'Runtime-owned managed shell jobs.', parameter_default('fruitfly_agent.lab.tools', 'bash-tool.yaml', 'settings.max_active_commands'), minimum=1, maximum=16),
+                ParameterDescriptor('retained_commands', 'integer', 'Command handles', 'Maximum retained command handles.', parameter_default('fruitfly_agent.lab.tools', 'bash-tool.yaml', 'settings.retained_commands'), minimum=16, maximum=256),
+                ParameterDescriptor('output_characters', 'integer', 'Poll output', 'Maximum characters per managed poll.', parameter_default('fruitfly_agent.lab.tools', 'bash-tool.yaml', 'settings.output_characters'), minimum=100, maximum=24000)),
             implementation_path='fruitfly_agent/lab/tools/bash.py',
             documentation_path='fruitfly_agent/lab/tools/README.md',
             default=True,
             order=21,
             requires_capabilities=frozenset({"execution-env"}),
             effects=MechanismEffects(tools=("bash",)),
+            default_resource=('fruitfly_agent.lab.tools', 'bash-tool.yaml'),
         ),
         _definition(
             "edit-tool",
@@ -176,6 +177,12 @@ def builtin_catalog() -> LabCatalog:
             documentation_path='fruitfly_agent/lab/context_manager/externalization/README.md',
             order=24,
             parameters=_ipython_tool_parameters(),
+            validate_parameters=lambda values: IpythonToolConfig(**values),
+            parameter_paths={name: 'instructions.usage' if name == 'usage_instructions' else
+                'instructions.query' if name == 'query_instructions' else 'settings.' + name
+                for name in IpythonToolConfig.__dataclass_fields__},
+            model_role_parameters={'context_query': ModelRoleRequirement('query_model_profile', 'Answer bounded IPython model queries.')},
+            input_parameters=('query_model_profile',),
             effects=MechanismEffects(
                 uses_provider=True,
                 uses_network=True,
@@ -183,6 +190,7 @@ def builtin_catalog() -> LabCatalog:
                 tools=("ipython",),
                 cost_notice="IPython execution is local; llm_query may incur Provider cost.",
             ),
+            default_resource=('fruitfly_agent.lab.context_manager.externalization', 'ipython-tool.yaml'),
         ),
         skill_catalog_definition(),
         _definition(
@@ -199,9 +207,10 @@ def builtin_catalog() -> LabCatalog:
             default=True,
             order=35,
             parameters=(
-                ParameterDescriptor("top_k", "integer", "Maximum hits", "Maximum snippets per request.", 5, minimum=1),
-                ParameterDescriptor("max_chars", "integer", "Context characters", "Maximum injected information characters.", 4_000, minimum=1),
+                ParameterDescriptor("top_k", "integer", "Maximum hits", "Maximum snippets per request.", parameter_default('fruitfly_agent.lab.context_manager.augmentation.information', 'information-context.yaml', 'settings.top_k'), minimum=1),
+                ParameterDescriptor("max_chars", "integer", "Context characters", "Maximum injected information characters.", parameter_default('fruitfly_agent.lab.context_manager.augmentation.information', 'information-context.yaml', 'settings.max_chars'), minimum=1),
             ),
+            default_resource=('fruitfly_agent.lab.context_manager.augmentation.information', 'information-context.yaml'),
         ),
         _definition(
             "memory-files",
@@ -219,7 +228,8 @@ def builtin_catalog() -> LabCatalog:
             default=True,
             order=40,
             requires=frozenset({"information-context"}),
-            parameters=(_path_parameter("root", ".fruitfly/memory", "Memory directory"),),
+            parameters=(_path_parameter("root", parameter_default('fruitfly_agent.lab.context_manager.augmentation.information.file_memory', 'defaults.yaml', 'root'), "Memory directory"),),
+            default_resource=('fruitfly_agent.lab.context_manager.augmentation.information.file_memory', 'defaults.yaml'),
         ),
         _definition(
             "knowledge-files",
@@ -236,7 +246,8 @@ def builtin_catalog() -> LabCatalog:
             input_parameters=('root',),
             order=41,
             requires=frozenset({"information-context"}),
-            parameters=(_path_parameter("root", ".fruitfly/knowledge", "Knowledge directory"),),
+            parameters=(_path_parameter("root", parameter_default('fruitfly_agent.lab.context_manager.augmentation.information.local_knowledge', 'defaults.yaml', 'root'), "Knowledge directory"),),
+            default_resource=('fruitfly_agent.lab.context_manager.augmentation.information.local_knowledge', 'defaults.yaml'),
         ),
         _definition(
             "live-http",
@@ -252,10 +263,11 @@ def builtin_catalog() -> LabCatalog:
             order=42,
             requires=frozenset({"information-context"}),
             parameters=(
-                ParameterDescriptor("endpoint", "string", "HTTPS endpoint", "HTTPS URL containing one {query} placeholder.", ""),
-                ParameterDescriptor("timeout_seconds", "number", "Timeout", "Maximum seconds for one request.", 5.0, minimum=0.1, maximum=30.0),
+                ParameterDescriptor("endpoint", "string", "HTTPS endpoint", "HTTPS URL containing one {query} placeholder.", parameter_default('fruitfly_agent.lab.context_manager.augmentation.information.live_http', 'defaults.yaml', 'endpoint')),
+                ParameterDescriptor("timeout_seconds", "number", "Timeout", "Maximum seconds for one request.", parameter_default('fruitfly_agent.lab.context_manager.augmentation.information.live_http', 'defaults.yaml', 'timeout_seconds'), minimum=0.1, maximum=30.0),
             ),
             effects=MechanismEffects(uses_network=True, cost_notice="The configured endpoint may have its own charges."),
+            default_resource=('fruitfly_agent.lab.context_manager.augmentation.information.live_http', 'defaults.yaml'),
         ),
         *reduction_definitions(),
         _definition(
@@ -271,6 +283,7 @@ def builtin_catalog() -> LabCatalog:
                 "Externalize large context for inspection through the IPython tool."
             ),
             install=install_rlm_ipython,
+            validate_parameters=lambda values: RlmIpythonConfig(**values),
             implementation_path='fruitfly_agent/lab/context_manager/externalization/adapter.py',
             documentation_path='fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md',
             requires=frozenset({"ipython-tool"}),
@@ -279,13 +292,18 @@ def builtin_catalog() -> LabCatalog:
                 ParameterDescriptor(
                     "offload_threshold_chars", "integer", "Offload threshold",
                     "Minimum characters before content is stored as an artifact.",
-                    RlmIpythonConfig().offload_threshold_chars,
+                    parameter_default('fruitfly_agent.lab.context_manager.externalization', 'rlm-ipython.yaml', 'settings.offload_threshold_chars'),
                     minimum=1, advanced=True,
                 ),
+                ParameterDescriptor('usage_instructions', 'string', 'Reference guidance',
+                    'How to read externalized context references.', RlmIpythonConfig().usage_instructions),
             ),
             effects=MechanismEffects(
                 writes_files=True,
             ),
+            default_resource=('fruitfly_agent.lab.context_manager.externalization', 'rlm-ipython.yaml'),
+            parameter_paths={'offload_threshold_chars': 'settings.offload_threshold_chars',
+                             'usage_instructions': 'instructions.usage'},
         ),
         improvement_definition(),
         skill_document_definition(),
@@ -293,7 +311,8 @@ def builtin_catalog() -> LabCatalog:
     from fruitfly_agent.lab.tools.improvement import expose as tool_surfaces
     from fruitfly_agent.lab.context_manager.augmentation.improvement import expose as augmentation_surfaces
     from fruitfly_agent.lab.context_manager.externalization.improvement import expose as externalization_surfaces
-    definitions = tuple(tool_surfaces(augmentation_surfaces(externalization_surfaces(d))) for d in definitions)
+    from .defaults import declared_defaults
+    definitions = tuple(declared_defaults(tool_surfaces(augmentation_surfaces(externalization_surfaces(d)))) for d in definitions)
     return LabCatalog(definitions, bootstrap=lambda state, context: (
         install_measurement(state, context).with_component(TEXT_TARGET_PREFIX + "base_prompt", BasePromptTarget(state.config.system_prompt))
         .with_component(TASK_PACK_COMPONENT, TaskPackCatalog(context.workspace, context.task_pack_sources))
@@ -341,6 +360,9 @@ def _definition(
     component_specs=None,
     configuration_snapshot=None,
     execution_description=None,
+    model_role_parameters=None,
+    default_resource=None,
+    parameter_paths=None,
 ) -> MechanismDefinition:
     return MechanismDefinition(
         MechanismDescriptor(
@@ -371,6 +393,8 @@ def _definition(
         selection_group_allow_disabled=selection_group_allow_disabled,
         implementation_path=implementation_path, documentation_path=documentation_path,
         input_parameters=input_parameters,
+        model_role_parameters=model_role_parameters or {}, default_resource=default_resource,
+        parameter_paths=parameter_paths or {},
     )
 
 
@@ -414,7 +438,12 @@ def _ipython_tool_parameters() -> tuple[ParameterDescriptor, ...]:
         ("max_query_inline_result_chars", "Maximum inline result characters"),
         ("query_timeout_seconds", "Model query timeout seconds"),
     )
-    return _integer_parameters(defaults, fields)
+    return (*_integer_parameters(defaults, fields), ParameterDescriptor('query_model_profile', 'string',
+        'Query model', 'Model role alias; default inherits executor.', ''),
+        ParameterDescriptor('usage_instructions', 'string', 'Workspace guidance',
+            'How to use the persistent workspace and its artifacts.', defaults.usage_instructions),
+        ParameterDescriptor('query_instructions', 'string', 'Query guidance',
+            'Default system instructions for bounded text subproblems.', defaults.query_instructions))
 
 
 def _install_local_env(state: AssemblyState, context: AssemblyContext, parameters: Mapping[str, Any]) -> AssemblyState:
@@ -440,7 +469,8 @@ def _install_bash_tool(state: AssemblyState, context: AssemblyContext, parameter
     from fruitfly_agent.lab.tools.commands import CommandManager
     manager = context.own(CommandManager(max_active=parameters['max_active_commands'],
         retained_commands=parameters['retained_commands'], output_characters=parameters['output_characters']))
-    return _append_tool(state, create_bash_tool(default_timeout_seconds=parameters['default_timeout_seconds'], manager=manager))
+    return _append_tool(state, create_bash_tool(default_timeout_seconds=parameters['default_timeout_seconds'], manager=manager)).with_component(
+        'managed-operations', manager.operations)
 
 
 def _install_edit_tool(state: AssemblyState, context: AssemblyContext, parameters: Mapping[str, Any]) -> AssemblyState:

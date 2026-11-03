@@ -18,3 +18,12 @@ The [experiment host](../../experiments/README.md) activates into its experiment
 ```
 
 Offline fixtures establish orchestration behavior, not real model quality.
+
+## Preserve parameter versions between generations
+
+Every candidate parameter document retains its protected H/S/I role. Each
+generation compares frozen effective parameters and initial state; owner-default
+changes cannot silently enter an existing trial. Text and numeric edits use the
+same declared grants and execution path. Verified activation selects immutable
+changed component content while unrelated default references remain unchanged.
+Parameter editing does not authorize implementation replacement or role changes.

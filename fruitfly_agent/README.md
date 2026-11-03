@@ -7,7 +7,9 @@ FruitFlyAgent separates the Agent loop, model adapters, Application lifecycle, a
 System configuration selects H/S/I component documents through one shared
 [runtime specification](runtime_spec/COMPONENTS.md). Daily config, experiment
 baseline and generated candidate use the same loader/projection and runtime
-assembly. [Catalog declarations](lab/catalog/CONFIGURATION.md) own supported
+assembly. Every component retains its protected H/S/I role. Registered owner YAML
+supplies text and numeric defaults once; ordinary saves preserve references,
+while candidate/export materialization freezes complete effective parameters. [Catalog declarations](lab/catalog/CONFIGURATION.md) own supported
 fields and adapters; [experiment grants](experiments/CONFIGURATION.md) authorize
 bounded changes. See the [configuration navigation tree](../CONFIGURATION.md#navigate-the-configuration-tree).
 
@@ -187,6 +189,11 @@ activation boundary and state scope use the [optimization contract](improvement/
 
 Default reduction uses [layered compaction](lab/context_manager/reduction/methods/layered_compaction/README.md)
 in deterministic mode: old result previews and readable history archives without
-auxiliary model requests. Hybrid summarization requires an explicit summary role.
+auxiliary model requests. Hybrid summarization uses a declared summary role that defaults to executor.
 Working memory remains an alternative in the same exclusive reduction slot.
 Context preparation publishes passive stage activity to Session and the terminal.
+
+[Core observation](core/observation/README.md) records correlated operation phases,
+classified failures and monotonic durations for ordinary interaction and external
+consumers. Source owners classify their own errors. Nested/concurrent stage totals
+are separate from observed wall time, and unfinished operations remain unknown.

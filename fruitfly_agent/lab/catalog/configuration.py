@@ -11,6 +11,7 @@ from typing import Callable
 from fruitfly_agent.runtime_spec import HarnessConfig, MechanismSelection
 from fruitfly_agent.runtime_spec.components import ComponentConfiguration
 from .parameters import encode_parameters, decode_parameters
+from fruitfly_agent.runtime_spec.model_roles import ModelRoleBinding
 from fruitfly_agent.runtime_spec.profiles import load_harness_config, DEFAULT_PROMPT_ID
 
 
@@ -29,8 +30,12 @@ class ConfigurationSurface:
     default: Callable | None = None
     reference: Callable | None = None
     standalone: bool = False
+    default_resource: tuple[str, str] | None = None
 
     def __post_init__(self):
+        if self.default_resource is not None:
+            from fruitfly_agent.runtime_spec.documents import validate_default_resource
+            validate_default_resource(self.default_resource)
         if (not isinstance(self.id, str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*', self.id)
                 or self.role not in {'H', 'S', 'I'}
                 or self.binding not in {'prompt', 'artifact', 'configuration', 'settings'}):
@@ -60,12 +65,14 @@ def configuration_surfaces(catalog):
 
 
 def configure_profile(profile, catalog):
+    from .defaults import resolve_defaults
     missing_extensions = set(profile.extensions) - {row['source'] for row in catalog.extension_identities}
     if missing_extensions:
         raise ValueError('configuration requires loaded extensions: ' + ', '.join(sorted(missing_extensions)))
     """Validate and project documents without constructing clients or writing files."""
     if not profile.component_documents or profile.configured:
         return profile
+    profile = resolve_defaults(profile, catalog)
     surfaces = configuration_surfaces(catalog)
     selections, deferred = [], []
     result = replace(profile, artifact_contents={}, artifact_bindings={}, component_settings={},
@@ -77,17 +84,24 @@ def configure_profile(profile, catalog):
         definition = catalog.get(document.implementation)
         if document.id != document.implementation or document.role != definition.configuration_role:
             raise ValueError('component does not match its registered ID/role: ' + document.id)
-        if set(document.parameters) & set(definition.model_role_parameters.values()):
+        if set(document.parameters) & {r.parameter for r in definition.model_role_parameters.values()}:
             raise ValueError('bind component model aliases through system models.roles: ' + document.id)
         parameters = decode_parameters(definition,dict(document.parameters))
+        authored_parameters = dict(parameters)
+        if set(parameters) & {r.parameter for r in definition.model_role_parameters.values()}:
+            raise ValueError('bind component model aliases through system models.roles: ' + document.id)
         if definition.validate_parameters:
             definition.validate_parameters(parameters)
-        definition.descriptor.normalize_parameters(parameters)
-        for role, field in definition.model_role_parameters.items():
+        parameters = definition.descriptor.normalize_parameters(parameters)
+        for role, requirement in definition.model_role_parameters.items():
+            field = requirement.parameter
             if role in profile.model_roles:
-                if field in parameters and parameters[field] != profile.model_roles[role]:
+                binding = profile.model_roles[role]
+                alias = binding if isinstance(binding, str) else ''
+                if field in authored_parameters and authored_parameters[field] != alias:
                     raise ValueError('conflicting model role binding: ' + role)
-                parameters[field] = profile.model_roles[role]
+                # Preserve inheritance through edits and materialization; bind at assembly.
+                parameters[field] = alias
         selections.append(MechanismSelection(document.implementation, document.enabled, parameters))
         if set(document.artifacts) - definition.artifact_slots:
             raise ValueError('component artifacts have no registered owner: ' + document.id)
@@ -207,7 +221,7 @@ def configuration_inventory(profile, catalog, *, artifact_reader=None):
             return {key: entry for name, item in value.items()
                 for key, entry in (fields(item, prefix + '.' + name).items() if isinstance(item, dict)
                                    else [(prefix + '.' + name, item)])}
-        authored = fields(dict(document.parameters))
+        authored = {} if document.reference.get('default') is True else fields(dict(document.parameters))
         origin = document.source or 'generated inline configuration'
         definition = catalog.get(owner)
         provenance = {key: {'effective': value, 'configured': key in authored,
@@ -217,6 +231,9 @@ def configuration_inventory(profile, catalog, *, artifact_reader=None):
                        'owner': owner, 'enabled': document.enabled,
                        'configured': dict(document.parameters), 'effective': effective,
                        'source': origin, 'fields': provenance,
+                       'source_kind': 'default' if document.reference.get('default') is True else 'explicit',
+                       'content_sha256': 'sha256:' + hashlib.sha256(json.dumps(effective,
+                           sort_keys=True, separators=(',', ':'), allow_nan=False).encode()).hexdigest(),
                        'implementation_id': definition.implementation_id,
                        'resource_capture': 'registered' if definition.configuration_snapshot else 'no local resource capture declared',
                        'field_editing_declared': editable, 'authorized': False,
@@ -225,7 +242,7 @@ def configuration_inventory(profile, catalog, *, artifact_reader=None):
     return result
 
 
-def component_profile(profile, catalog, *, artifact_reader=None):
+def component_profile(profile, catalog, *, artifact_reader=None, freeze=False):
     """Express current effective bindings as the same public component documents."""
     surfaces = configuration_surfaces(catalog)
     documents = {d.id: d for d in profile.component_documents}
@@ -239,13 +256,18 @@ def component_profile(profile, catalog, *, artifact_reader=None):
         if 'sha256:' + hashlib.sha256(text.encode('utf-8')).hexdigest() != reference:
             raise ValueError('component artifact content differs from reference: ' + reference)
         return text
-    roles = dict(profile.model_roles)
+    roles: dict[str, ModelRoleBinding] = {role: {'inherit': 'executor'} for definition in catalog.definitions()
+        for role, requirement in definition.model_role_parameters.items()
+        if requirement.fallback_role == 'executor'}
+    roles.update(profile.model_roles)
     for selection in profile.mechanisms:
         definition = catalog.get(selection.mechanism_id)
         artifacts = {key: read(profile.artifact_bindings[key]) for key in definition.artifact_slots
                      if key in profile.artifact_bindings and (selection.enabled or definition.prepare_targets)}
-        parameters = dict(selection.parameters)
-        for role, field in definition.model_role_parameters.items():
+        parameters = (definition.descriptor.normalize_parameters(selection.parameters)
+                      if freeze else dict(selection.parameters))
+        for role, requirement in definition.model_role_parameters.items():
+            field = requirement.parameter
             alias = parameters.pop(field, None)
             if alias:
                 roles[role] = alias
@@ -253,7 +275,15 @@ def component_profile(profile, catalog, *, artifact_reader=None):
             definition.configuration_role, selection.mechanism_id, encode_parameters(definition,parameters), selection.enabled,
             artifacts=artifacts)
         old = documents.get(selection.mechanism_id)
-        documents[selection.mechanism_id] = old if old == fresh else fresh
+        unchanged = (old is not None and old.artifacts == fresh.artifacts
+            and definition.descriptor.normalize_parameters(decode_parameters(definition, dict(old.parameters)))
+                == definition.descriptor.normalize_parameters(decode_parameters(definition, dict(fresh.parameters))))
+        if unchanged and not freeze and old.reference.get('default') is True:
+            reference = {'default': True, **({'enabled': False} if not selection.enabled else {})}
+            fresh = replace(old, enabled=selection.enabled, reference=reference)
+        elif unchanged and not freeze and old.enabled == fresh.enabled:
+            fresh = old
+        documents[selection.mechanism_id] = fresh
     active = {item.mechanism_id for item in profile.mechanisms if item.enabled}
     for name, (owner, surface) in surfaces.items():
         if surface.binding == 'artifact' and owner not in active and not surface.standalone:
@@ -261,11 +291,19 @@ def component_profile(profile, catalog, *, artifact_reader=None):
             continue
         parameters = None
         if surface.binding == 'configuration':
-            parameters = surface.decode(json.dumps(dict(getattr(profile,surface.key))))
+            value = dict(getattr(profile, surface.key))
+            if freeze and surface.key == 'execution':
+                from fruitfly_agent.runtime_spec.execution import execution_values
+                value = execution_values(value)
+            parameters = surface.decode(json.dumps(value))
         elif surface.binding == 'settings':
             parameters = profile.component_settings.get(surface.key)
             if parameters is not None and name in profile.artifact_bindings:
                 parameters = surface.restore(parameters or {}, read(profile.artifact_bindings[name]))
+            elif freeze and parameters is None and surface.default_resource is not None:
+                from .defaults import read_default
+                default, _ = read_default(catalog, name)
+                parameters = dict(default.parameters)
         else:
             reference = profile.prompt if surface.binding == 'prompt' else profile.artifact_bindings.get(surface.key)
             if reference and reference.startswith('sha256:'):
@@ -284,6 +322,15 @@ def component_profile(profile, catalog, *, artifact_reader=None):
             # Keep authored references only when the values actually agree.
             if old and surface.normalize(dict(old.parameters)) == surface.normalize(dict(parameters)):
                 fresh = old
+            elif old is None and surface.default_resource is not None and not fresh.artifacts:
+                # Only an absent authored value may acquire default intent.
+                # Never infer inheritance for explicit text by equality.
+                from .defaults import read_default
+                default, _ = read_default(catalog, name)
+                if surface.normalize(dict(default.parameters)) == surface.normalize(dict(parameters)):
+                    fresh = replace(fresh, reference={'default': True})
+            if freeze:
+                fresh = replace(fresh, reference={}, source='')
             documents[name] = fresh
     roles.update({'executor': profile.model_profile} if profile.model_profile else {})
     return replace(profile, component_documents=tuple(documents.values()), model_roles=roles)
@@ -339,7 +386,13 @@ def materialize_system(profile, destination, *, catalog=None, artifact_reader=No
     import yaml
     destination = Path(destination)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    projected = component_profile(profile, catalog, artifact_reader=artifact_reader)
+    # Hosts own mutable configuration preconditions. Owner package receipts guard
+    # default expansion here; adopted chat profiles may retain old file receipts.
+    from fruitfly_agent.runtime_spec.documents import PackageDocumentSource
+    for source in profile.source_files:
+        if isinstance(source, PackageDocumentSource):
+            source.check()
+    projected = component_profile(profile, catalog, artifact_reader=artifact_reader, freeze=True)
     configure_profile(replace(projected, configured=False), catalog)
     if model_source is not None:
         model_path = destination.parent / 'models.yaml'

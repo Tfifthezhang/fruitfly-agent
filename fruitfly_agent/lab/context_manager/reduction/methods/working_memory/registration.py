@@ -3,6 +3,7 @@ from dataclasses import replace
 from functools import partial
 from fruitfly_agent.core.mechanisms import MechanismDescriptor, MechanismContribution, MechanismEffects
 from fruitfly_agent.lab.catalog.models import MechanismDefinition
+from fruitfly_agent.lab.catalog.model_roles import ModelRoleRequirement
 from ....registration import parameters, validate
 from .improvement import register
 from .algorithm import WorkingMemoryReducer
@@ -20,17 +21,19 @@ def definition():
             cost_notice='Memory updates and shortening requests may incur Provider charges.')),
         install, implementation_id='working-memory-v1', implementation_path=root + 'algorithm.py',
         documentation_path=root + 'README.md', selection_group='reduction', selection_group_label='Reduction',
-        validate_parameters=partial(validate, WorkingMemoryConfig))
+        validate_parameters=partial(validate, WorkingMemoryConfig),
+        input_parameters=('memory_model_profile',), default_resource=(__package__, 'defaults.yaml'),
+        model_role_parameters={'working_memory': ModelRoleRequirement('memory_model_profile', 'Maintain bounded incremental task memory.')})
     value=replace(value,parameter_paths={name: ('instructions.update' if name=='update_instructions' else 'instructions.shrink' if name=='shrink_instructions' else 'instructions.readback' if name=='readback_instructions' else 'settings.'+name) for name in WorkingMemoryConfig.__dataclass_fields__})
     return register(value)
 
 
 def install(state, context, values):
     config = WorkingMemoryConfig(**values)
-    binding = context.provider_resolver(None, config.auxiliary_max_tokens)
+    binding = context.provider_for_role('working_memory', config.auxiliary_max_tokens)
     from .resources import install_history
     history = install_history(context)
     reducer = WorkingMemoryReducer(config, binding.provider, memory_model=binding.model,
         memory_context_window=binding.context_window, memory_output_limit=binding.max_output_tokens, history=history,
-        meter=state.config.context_meter)
+        meter=state.config.context_meter, memory_identity=binding.identity)
     return replace(state, reducer=reducer).with_component('working-memory-checkpoint', reducer)

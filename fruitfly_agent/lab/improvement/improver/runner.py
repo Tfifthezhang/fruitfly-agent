@@ -35,7 +35,7 @@ class ImproverTaskRunner:
         baseline = context.components.snapshot()
         if any(c != baseline.component(c.component_id) for c in harness.components if c.role != 'I'):
             raise ValueError('I trials must preserve all H/S components')
-        instructions = harness.component('improvement-editor').files[0].text
+        instructions = context.components.adapters['improvement-editor'].to_text(harness.component('improvement-editor'))
         i_documents = tuple(c for c in harness.components if c.role == 'I')
         instructions_id = (content_hash(instructions) if len(i_documents) == 1
                            else content_hash(canonical_json([asdict(c) for c in i_documents])))

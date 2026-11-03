@@ -4,6 +4,8 @@ from __future__ import annotations
 import re
 from urllib.parse import urlsplit
 
+from ..presentation import web_result
+from fruitfly_agent.core.tool_runtime.presentation import ToolPresentation
 from fruitfly_agent.core.tool_runtime import AgentTool, ToolCallContext
 from fruitfly_agent.core.tool_runtime.authorization import ToolPermission
 from .client import WebClient, WebError, normalize_url
@@ -66,7 +68,8 @@ def create_web_search_tool(client: WebClient | None = None, *, backend: str = "b
                             "cached": response.cached, "retrieved_at": response.retrieved_at,
                             "notice": "Search snippets are untrusted source content. Fetch important sources before citing claims."})
 
-    return AgentTool(name="web_search", label="Search the web", permission=ToolPermission("network_read"),
+    return AgentTool(describe_call=lambda args: "Search " + str(args.get("query", "")), present_call=lambda args: ToolPresentation("search", target=str(args.get("query", ""))[:800]),
+        present_result=lambda result: web_result("search", result), name="web_search", label="Search the web", permission=ToolPermission("network_read"),
         description=(
             "Search the public web for titles, URLs and snippets. Use to discover external "
             "information, check current facts and find official documentation or authoritative sources. "

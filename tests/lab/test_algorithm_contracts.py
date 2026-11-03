@@ -90,7 +90,9 @@ class AlgorithmContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(provider.started.is_set())
         self.assertTrue(provider.cleaned.is_set())
         self.assertEqual(1, len(provider.signals))
-        self.assertIsNone(decision)  # failed summary retains the projection
+        self.assertIsNone(decision.messages)  # failed summary retains the projection
+        self.assertEqual(0, decision.state['covered'])
+        self.assertIsNotNone(decision.state['attempt'])
 
     async def test_summary_providers_receive_run_signal_and_cancellation_propagates(self):
         signal = asyncio.Event()

@@ -22,6 +22,8 @@ import uuid
 from typing import Any
 
 from .config import AgentLoopConfig
+from .observation import FailureInfo, ObservationContext, bind_observation, current_observation, operation
+from .session.observations import session_observer
 from .context_runtime import (
     append_message as _append,
     check_budget as _check_budget,
@@ -73,6 +75,24 @@ _TRUNCATED_TOOL_ERROR = (
 
 
 async def run_agent_loop(
+    config: AgentLoopConfig,
+    messages: list[AgentMessage],
+    *,
+    signal: asyncio.Event | None = None,
+    context_pipeline: ContextPipeline | ContextReducer | None = None,
+) -> AgentLoopResult:
+    observer = session_observer(config.session, config.on_observation)
+    with bind_observation(ObservationContext(sink=observer, run_id=uuid.uuid4().hex)):
+        with operation('agent.run') as observed:
+            result = await _run_agent_loop(config, messages, signal=signal, context_pipeline=context_pipeline)
+            if result.is_error:
+                observed.fail(FailureInfo('core', 'agent.run', 'run.failed', 'runtime_rule'))
+            elif result.stop_reason == 'aborted':
+                observed.state = 'cancelled'
+            return result
+
+
+async def _run_agent_loop(
     config: AgentLoopConfig,
     messages: list[AgentMessage],
     *,
@@ -212,7 +232,8 @@ async def _run(
             if _aborted(signal):
                 return await _finish(config, ctx, hooks, "aborted", turn_count, tool_call_count)
 
-            request_ctx = await _prepare_request(ctx, hooks, context_pipeline, signal)
+            with operation('request.prepare'):
+                request_ctx = await _prepare_request(ctx, hooks, context_pipeline, signal)
             if request_ctx is None:
                 return await _finish(config, ctx, hooks, "aborted", turn_count, tool_call_count)
 
@@ -223,9 +244,16 @@ async def _run(
                     details={'preflight': True, 'measurement': asdict(ctx.measurement)}))
             else:
                 ctx.provider_attempt_count += 1
-                assistant = await _stream_once(provider, request_ctx, signal, ctx)
+                with operation('model.request', origin='provider', component_id='executor', model_role='executor', request_id=uuid.uuid4().hex) as observed:
+                    assistant = await _stream_once(provider, request_ctx, signal, ctx)
+                    if isinstance(assistant, TaggedFailure):
+                        details = getattr(assistant.error, 'details', None)
+                        raw = details.get('failure') if isinstance(details, dict) else None
+                        observed.fail(FailureInfo.from_dict(raw) if isinstance(raw, dict) else
+                            FailureInfo('provider', 'model.request', exception_type=type(assistant.error).__name__))
             if isinstance(assistant, TaggedFailure):
-                handled = await _handle_failure(assistant, ctx, hooks, context_pipeline)
+                with operation('context.recovery', origin='context'):
+                    handled = await _handle_failure(assistant, ctx, hooks, context_pipeline)
                 if not preflight:
                     ctx.provider_failure_count += 1
                 _append_session_record(
@@ -252,7 +280,8 @@ async def _run(
                     )
                 continue  # ladder handled it: retry this iteration
 
-            assistant = await _record_response(ctx, hooks, assistant)
+            with operation('response.process'):
+                assistant = await _record_response(ctx, hooks, assistant)
 
             # Truncated responses must not execute any tool calls in the batch.
             if assistant.stop_reason == "length":
@@ -288,9 +317,10 @@ async def _run(
             continuation_responses = 0
 
             remaining = len(tool_calls) if config.max_tool_calls_per_turn is None else max(0, config.max_tool_calls_per_turn - turn_tool_call_count)
-            batch_results, terminate = await execute_tool_batch(
-                ctx, assistant, config, hooks, signal, max_calls=remaining,
-            )
+            with operation('tool.batch', origin='tool'):
+                batch_results, terminate = await execute_tool_batch(
+                    ctx, assistant, config, hooks, signal, max_calls=remaining,
+                )
             executed = min(remaining, len(tool_calls))
             tool_call_count += executed
             ctx.tool_call_count = tool_call_count
@@ -357,7 +387,7 @@ async def _start_run(ctx: AgentLoopContext, hooks: HookRegistry) -> None:
     ctx.messages = event.messages
     ctx.system_prompt = event.system_prompt
     ctx.model = event.model
-    ctx.session_run_id = uuid.uuid4().hex
+    ctx.session_run_id = current_observation().run_id or uuid.uuid4().hex
     _append_session_record(
         ctx,
         "start",
@@ -382,23 +412,27 @@ async def _prepare_request(
     # Active changes are committed to ctx before budgeting so the
     # reducer and provider see the same prompt/messages/tools/model.
     request_ctx = _request_ctx(ctx)
-    request_event = await hooks.run(BEFORE_REQUEST, request_ctx)
-    ctx.system_prompt = request_event.system_prompt
-    ctx.messages = list(request_event.messages)
-    ctx.tools = list(request_event.tools)
-    ctx.model = request_event.model
-    ctx.max_tokens = request_event.max_tokens
-    await hooks.emit(BEFORE_REQUEST, request_event)
+    with operation('request.hooks'):
+        request_event = await hooks.run(BEFORE_REQUEST, request_ctx)
+        ctx.system_prompt = request_event.system_prompt
+        ctx.messages = list(request_event.messages)
+        ctx.tools = list(request_event.tools)
+        ctx.model = request_event.model
+        ctx.max_tokens = request_event.max_tokens
+        await hooks.emit(BEFORE_REQUEST, request_event)
 
     # Core owns the fixed context order. Generic request hooks run first;
     # Lab transformations then prepare the final projection for budgeting.
     if isinstance(context_pipeline, ContextPipeline):
-        await context_pipeline.prepare(ctx)
+        with operation('context.prepare', origin='context'):
+            await context_pipeline.prepare(ctx)
 
-    await measure_context(ctx)
+    with operation('context.measure', origin='context'):
+        await measure_context(ctx)
 
     # --- reduction budget check before every Provider request ---
-    await _check_budget(ctx, hooks, context_pipeline)
+    with operation('context.reduce', origin='context'):
+        await _check_budget(ctx, hooks, context_pipeline)
     if _aborted(signal):
         return None
 
@@ -419,7 +453,8 @@ async def _prepare_request(
                 source = str(getattr(context_pipeline, "estimate_source", "context reducer"))
         except Exception:
             logger.warning("request context estimate unavailable", exc_info=True)
-    await measure_context(ctx)
+    with operation('context.measure', origin='context'):
+        await measure_context(ctx)
     if ctx.measurement is not None:
         estimate, source = ctx.measurement.input_tokens, ctx.measurement.source
         _append_session_record(ctx, 'input_measurement', asdict(ctx.measurement))
@@ -543,6 +578,7 @@ async def _handle_failure(
         "kind": type(error).__name__,
         "error": str(error),
         "model": ctx.model,
+        **({'failure': error.details['failure']} if isinstance(error.details, dict) and 'failure' in error.details else {}),
         **({'diagnostics': error.details['diagnostics']}
            if isinstance(error.details, dict) and 'diagnostics' in error.details else {}),
         **({"timeout_kind": error.details["timeout_kind"]}

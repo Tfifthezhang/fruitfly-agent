@@ -1,0 +1,12 @@
+id: skill-catalog
+role: H
+implementation: skill-catalog
+parameters:
+  settings:
+    root: .skills
+    max_chars: 16000
+  instructions:
+    usage: The following skills provide specialized instructions for specific tasks.
+      Read the full Skill resource when the task matches its description. Resolve
+      relative text references against the resource location's parent. Resource locations
+      are read-only text, not script execution paths.

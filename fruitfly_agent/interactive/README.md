@@ -124,3 +124,13 @@ already authorized work. Hosts selecting unrestricted execution do not invoke
 this confirmation service.
 
 Single approval belongs to one call. Session file approvals cover the displayed directories and operation; a read grant does not authorize writes. Local-execution session approval explicitly grants current-user code execution. Grants exist only in the runtime service, are absent from Session records, and are cleared on close; replacement/restoration constructs a fresh service. Embedded hosts can observe configured roots and grant/pending state through `Application.status` without authorizing anything; the terminal `/status` omits these details.
+
+## Observe background work
+
+A RuntimeHandle may expose an independent `operations: OperationService` and
+`observation_context`. Application queues and lock waits use passive operation
+facts; preparation/startup/recovery/close are measured at their owning boundary.
+The operation service exposes bounded statuses and scoped cancellation without
+importing Lab. `ManagedOperationChanged` carries initiating run and tool-call IDs,
+state and elapsed time. Frontends may display completion while normal input
+continues. Observation does not resume a model or infer a task conclusion.

@@ -1,4 +1,5 @@
 """Layered compaction candidates alter isolated execution, activation and recovery."""
+from tests.support.configuration import component_parameters, with_component_parameters, with_component_text, parameter_payload
 import json
 from dataclasses import replace
 from pathlib import Path
@@ -46,10 +47,10 @@ class CompactionGenerator:
     required_capabilities = frozenset()
     async def propose(self, request, services):
         source = request.baseline.component('layered-compaction')
-        value = json.loads(source.files[0].text)
+        value = component_parameters(source)
         mode = value['settings']['mode']
         value['instructions']['summary' if mode == 'hybrid' else 'readback'] += ' OPTIMIZED'
-        updated = replace(source, files=(ComponentFile('instructions.txt', json.dumps(value)),))
+        updated = with_component_parameters(source, value)
         harness = HarnessSnapshot(tuple(updated if c.component_id == source.component_id else c for c in request.baseline.components))
         return ProposalResult((CandidateBundle(request.plan.parent, request.baseline, harness, self.generator_id,
             (EditReason(source.component_id, 'Synthetic compaction behavior.', (request.records[0].run_id,),

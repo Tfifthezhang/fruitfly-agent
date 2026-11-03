@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+from contextlib import AsyncExitStack
 from typing import Any
 
 from ..config import AgentLoopConfig
@@ -13,12 +14,17 @@ from ..extensions.callbacks import call_extension
 from ..extensions.hooks import AFTER_TOOL, BEFORE_TOOL, AfterToolEvent, HookRegistry, ToolEvent
 from ..context_runtime import append_message
 from ..errors import Result
+from ..observation import FailureInfo, operation
 from . import ToolCallContext
 from .schema import validate_tool_arguments
 from .authorization import AuthorizationRequest, AuthorizationDecision, unrestricted_authorization
 
 
-def _error_result(call_id: str, message: str, *, terminate: bool = False) -> ToolResultMessage:
+def _error_result(call_id: str, message: str, *, terminate: bool = False, code: str = 'argument.validation', effect_state: str = 'not_started') -> ToolResultMessage:
+    stage = 'tool.rejected' if effect_state == 'not_started' else 'tool.result'
+    with operation(stage, origin='tool', tool_call_id=call_id) as observed:
+        observed.fail(FailureInfo('tool', stage, code, 'runtime_rule', effect_state=effect_state),
+            state='cancelled' if code == 'cancelled' else 'failed')
     return ToolResultMessage(tool_call_id=call_id, content=[TextBlock(message)],
                              is_error=True, terminate=terminate)
 
@@ -35,7 +41,7 @@ async def execute_tool_batch(
     exclusive_conflict = len(assistant.tool_calls) > 1 and any(
         t.requires_exclusive_batch for t in ctx.tools if t.name in {c.name for c in assistant.tool_calls})
     if exclusive_conflict:
-        results = [_error_result(c.id, 'Exclusive tool must be the only call in its batch; no calls were executed.')
+        results = [_error_result(c.id, 'Exclusive tool must be the only call in its batch; no calls were executed.', code='batch.exclusive')
                    for c in assistant.tool_calls]
         ctx.tool_error_count += len(results)
         ctx.tool_call_count += len(results)
@@ -64,17 +70,24 @@ async def execute_tool_batch(
                                  label="on_tool_result", default=None)
 
     async def run_one(tc) -> ToolResultMessage:
-        async with semaphore:
+        with operation('tool.queue', origin='tool', tool_call_id=tc.id, tool_name=tc.name):
+            await semaphore.acquire()
+        try:
             if signal is not None and signal.is_set():
                 raise asyncio.CancelledError
             started.add(tc.id)
             ctx.tool_call_count += 1
             ctx.turn_tool_call_count += 1
-            result = await _execute_one(ctx, tc, config, hooks, signal)
+            with operation('tool.call', origin='tool', tool_call_id=tc.id, tool_name=tc.name) as observed:
+                result = await _execute_one(ctx, tc, config, hooks, signal)
+                if result.is_error:
+                    observed.fail(FailureInfo('tool', 'tool.call', 'result.error', 'runtime_rule'))
             ctx.tool_error_count += int(result.is_error)
             completed[tc.id] = result
             await report(tc.name, result)
             return result
+        finally:
+            semaphore.release()
 
     tasks: list[asyncio.Task] = []
     try:
@@ -94,16 +107,12 @@ async def execute_tool_batch(
             if result is None:
                 detail = ("Tool interrupted; its effects may have occurred and the outcome is unknown. Do not automatically replay."
                           if call.id in started else "Tool was not executed: run cancelled.")
-                result = _error_result(call.id, detail)
+                result = _error_result(call.id, detail, code='cancelled', effect_state='unknown' if call.id in started else 'not_started')
             append_message(ctx, result)
             await report(call.name, result, cancelled=call.id not in completed)
         raise
     results.extend(
-        ToolResultMessage(
-            tool_call_id=call.id,
-            content=[TextBlock(f"Tool call budget exceeded ({config.max_tool_calls_per_turn}); tool was not executed.")],
-            is_error=True,
-        )
+        _error_result(call.id, f"Tool call budget exceeded ({config.max_tool_calls_per_turn}); tool was not executed.", code='budget.exhausted')
         for call in assistant.tool_calls[max_calls:]
     )
     for call, result in zip(assistant.tool_calls, results):
@@ -120,7 +129,7 @@ async def _execute_one(
 ) -> ToolResultMessage:
     tool = next((t for t in ctx.tools if t.name == tc.name), None)
     if tool is None:
-        return _error_result(tc.id, f'Tool {tc.name} not found')
+        return _error_result(tc.id, f'Tool {tc.name} not found', code='tool.not_found')
 
     args = dict(tc.input)
     if tool.prepare_arguments is not None:
@@ -172,10 +181,12 @@ async def _execute_one(
     tool_event.args = args
     await hooks.emit(BEFORE_TOOL, tool_event)
     if tool_event.block:
-        return _error_result(tc.id, tool_event.reason or f'Tool {tool.name} execution was blocked', terminate=tool_event.terminate)
+        return _error_result(tc.id, tool_event.reason or f'Tool {tool.name} execution was blocked', terminate=tool_event.terminate, code='hook.blocked')
 
     # Ordinary execution exceptions become error results; cancellation propagates.
     async def on_update(text: str) -> None:
+        if config.on_tool_output is not None:
+            await call_extension(config.on_tool_output, tc.id, text, label='on_tool_output', default=None)
         if config.on_partial is not None:
             await call_extension(config.on_partial, text, label="on_partial", default=None)
 
@@ -184,26 +195,31 @@ async def _execute_one(
         request = AuthorizationRequest(tc.id, tool.name, copy.deepcopy(args), tool.permission)
         scope = (config.tool_authorizer.authorize(request, signal=signal)
                  if config.tool_authorizer is not None else unrestricted_authorization())
-        async with scope as decision:
+        async with AsyncExitStack() as stack:
+            with operation('tool.authorize', origin='tool'):
+                decision = await stack.enter_async_context(scope)
             if not isinstance(decision, AuthorizationDecision) or decision.allowed is not True:
                 ctx.tool_denied_count += 1
                 reason = decision.reason if isinstance(decision, AuthorizationDecision) else "invalid authorization decision"
-                return _error_result(tc.id, f"Permission denied: {reason}")
+                return _error_result(tc.id, f"Permission denied: {reason}", code="authorization.denied")
             if request.arguments != args:
-                return _error_result(tc.id, "Permission denied: authorized arguments changed")
+                return _error_result(tc.id, "Permission denied: authorized arguments changed", code="authorization.arguments_changed")
             if signal is not None and signal.is_set():
                 raise asyncio.CancelledError
             execution_started = True
             ctx.tool_started_count += 1
-            result = tool.execute(ToolCallContext(tc.id, tool.name, args, ctx.env, on_update, signal))
-            if hasattr(result, "__await__"):
-                result = await result
+            with operation('tool.execute', origin='tool') as observed:
+                result = tool.execute(ToolCallContext(tc.id, tool.name, args, ctx.env, on_update, signal))
+                if hasattr(result, "__await__"):
+                    result = await result
+                if isinstance(result, AgentToolResult) and result.is_error:
+                    observed.fail(FailureInfo('tool', 'tool.execute', 'result.error', 'runtime_rule', effect_state='completed'))
     except Exception as exc:  # noqa: BLE001
         if not execution_started:
-            return _error_result(tc.id, 'Authorization failed; tool was not executed')
-        return _error_result(tc.id, f'{type(exc).__name__}: {exc}')
+            return _error_result(tc.id, 'Authorization failed; tool was not executed', code='authorization.failed')
+        return _error_result(tc.id, f'{type(exc).__name__}: {exc}', code='execution.failed', effect_state='unknown')
     if not isinstance(result, AgentToolResult):
-        return _error_result(tc.id, f'Tool {tool.name} returned {type(result).__name__}; expected AgentToolResult')
+        return _error_result(tc.id, f'Tool {tool.name} returned {type(result).__name__}; expected AgentToolResult', code='result.invalid', effect_state='unknown')
 
     # --- after_tool: rewrite hooks ---
     # failure default: None → keep the original result

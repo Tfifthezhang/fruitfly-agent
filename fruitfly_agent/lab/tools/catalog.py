@@ -1,19 +1,15 @@
 """One editable tool policy with source-owned, demand-loaded usage resources."""
+from fruitfly_agent.runtime_spec.documents import parameter_default
 from dataclasses import dataclass, replace
 import json
+import hashlib
 
 from fruitfly_agent.core.context import ContextStage, ContextTransform
 from fruitfly_agent.improvement.contracts.optimization import OptimizationSpec, TargetBinding, TargetSnapshot
 from fruitfly_agent.lab.improvement.targets.text import TEXT_TARGET_PREFIX, validate_text
 from .resources import ResourceRegistry
 
-DEFAULT_USAGE = (
-    'Select tools by the task and available evidence. Read a tool\'s full usage reference before first use '
-    'or when its behavior is unclear. Inspect relevant inputs before making changes. '
-    'Combine independent inspections when useful; sequence dependent changes. '
-    'Diagnose failures before retrying, and avoid repeating commands with unknown side effects. '
-    'Verify outcomes with appropriate checks and original evidence. Stop when the task is complete.'
-)
+
 _START = '<!-- fruitfly:tool-catalog:start -->'
 _END = '<!-- fruitfly:tool-catalog:end -->'
 
@@ -49,7 +45,8 @@ def configuration_surface():
     return ConfigurationSurface('tool-catalog', 'H', 'artifact', 'tool-catalog', normalize,
         encode=lambda value: value['instructions']['usage'],
         decode=lambda text: {'instructions': {'usage': text}}, edit_options=options,
-        default=lambda: {'instructions': {'usage': DEFAULT_USAGE}}, standalone=True)
+        default=lambda: {'instructions': {'usage': parameter_default(__package__, 'tool-catalog.yaml', 'instructions.usage')}},
+        default_resource=(__package__, 'tool-catalog.yaml'), standalone=True)
 
 
 class ToolCatalogTarget:
@@ -59,7 +56,8 @@ class ToolCatalogTarget:
     label = 'Tool catalog policy'
     description = 'Overall tool selection, composition, failure recovery and verification policy. Tool identities, usage resources, schemas, permissions and implementations remain protected.'
 
-    def __init__(self, usage=DEFAULT_USAGE):
+    def __init__(self, usage=None):
+        usage = parameter_default(__package__, 'tool-catalog.yaml', 'instructions.usage') if usage is None else usage
         self.validate(usage)
         self.usage = usage
 
@@ -104,8 +102,14 @@ class ToolCatalogTarget:
 
 
 def prepare_catalog(state, context):
+    contracts = tuple({'name': tool.name,
+        'usage_sha256': 'sha256:' + hashlib.sha256(tool.description.encode()).hexdigest(),
+        'schema_sha256': 'sha256:' + hashlib.sha256(json.dumps(tool.parameters,
+            sort_keys=True, separators=(',', ':'), allow_nan=False).encode()).hexdigest()}
+        for tool in state.config.tools if not tool.hide_from_model)
+    state = state.with_component('tool-contracts', contracts)
     reference = context.artifact_bindings.get('tool-catalog')
-    text = context.artifact_reader(reference) if reference else DEFAULT_USAGE
+    text = context.artifact_reader(reference) if reference else parameter_default(__package__, 'tool-catalog.yaml', 'instructions.usage')
     target = ToolCatalogTarget(text)
     config = target.prepare_trial(state.config, text)
     if config.tools:

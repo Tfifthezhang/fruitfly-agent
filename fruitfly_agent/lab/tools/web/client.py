@@ -1,9 +1,10 @@
 """Bounded asynchronous HTTP and runtime-local successful-response caching."""
 from __future__ import annotations
+from fruitfly_agent.runtime_spec.documents import parameter_default
 
 import asyncio
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import hashlib
 import ipaddress
 import json
@@ -28,12 +29,12 @@ class WebError(RuntimeError):
 
 @dataclass(frozen=True)
 class WebConfig:
-    timeout_seconds: float = 60
-    max_retries: int = 2
-    max_response_bytes: int = 2_000_000
-    cache_ttl_seconds: float = 300
-    cache_entries: int = 32
-    max_redirects: int = 5
+    timeout_seconds: float = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.tools.web', 'web-fetch-tool.yaml', 'settings.timeout_seconds'))
+    max_retries: int = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.tools.web', 'web-fetch-tool.yaml', 'settings.max_retries'))
+    max_response_bytes: int = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.tools.web', 'web-fetch-tool.yaml', 'settings.max_response_bytes'))
+    cache_ttl_seconds: float = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.tools.web', 'web-fetch-tool.yaml', 'settings.cache_ttl_seconds'))
+    cache_entries: int = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.tools.web', 'web-fetch-tool.yaml', 'settings.cache_entries'))
+    max_redirects: int = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.tools.web', 'web-fetch-tool.yaml', 'settings.max_redirects'))
 
     def __post_init__(self):
         for name, low, high in (("timeout_seconds", .01, 120), ("cache_ttl_seconds", 0, 3600)):

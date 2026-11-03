@@ -65,7 +65,7 @@ class PersistenceContractTests(unittest.TestCase):
     def test_environment_value_objects_remain_frozen_with_portable_fields(self):
         expected = {
             FileInfo: ('name', 'path', 'kind', 'size', 'mtime_ms'),
-            ExecResult: ('stdout', 'stderr', 'exit_code', 'cancelled'),
+            ExecResult: ('stdout', 'stderr', 'exit_code', 'cancelled', 'termination_reason'),
             ExecOptions: ('cwd', 'env', 'inherit_env', 'timeout_seconds', 'on_stdout', 'on_stderr'),
         }
         for value_type, names in expected.items():

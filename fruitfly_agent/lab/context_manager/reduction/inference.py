@@ -74,44 +74,24 @@ class AuxiliaryText:
         from dataclasses import replace
         return replace(result, elapsed_seconds=time.monotonic() - started)
 
-    async def request(self, snapshot, *, system, prompt, max_tokens, timeout, attempts, estimate):
-        output = min(max_tokens, self.output_limit or max_tokens)
-        if self.context_window is not None and estimate(system + prompt) + output + 32 > self.context_window:
-            return None
-        view = ProviderView(system, [UserMessage(prompt)], [], self.model or snapshot.model, output)
-        measurement = None
-        if self.meter is not None:
-            measurement = await self.meter.measure(view, self.provider, signal=snapshot.signal)
-            if self.context_window is not None and not measurement.fits(self.context_window):
-                return None
-        async def consume():
-            stream = self.provider(view, signal=snapshot.signal)
-            try:
-                async for _ in stream:
-                    pass
-                final = await stream.result()
-                observe = getattr(self.meter, 'observe', None)
-                if callable(observe) and measurement is not None:
-                    try:
-                        observe(measurement, final.usage, self.provider)
-                    except Exception:
-                        logger.warning('auxiliary usage calibration failed', exc_info=True)
-                if final.stop_reason != 'stop' or final.tool_calls or final.continue_turn:
-                    return None
-                return final.text.strip() or None
-            finally:
-                await stream.aclose()
+    async def request_bounded(self, snapshot, *, deadline, timeout, attempts, **request):
+        started = time.monotonic()
+        result = AuxiliaryResult(reason='maintenance_deadline')
         for _ in range(attempts):
-            try:
-                return await bounded_call(consume(), timeout=timeout, signal=snapshot.signal)
-            except asyncio.CancelledError:
-                raise
-            except FatalError:
-                # Outer model allowance and unconfirmed effects cannot be retried here.
-                raise
-            except Exception as exc:
-                logger.warning('auxiliary context request failed: %s', type(exc).__name__)
-        return None
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            result = await self.request_once(snapshot, timeout=min(timeout, remaining), **request)
+            if result.outcome == 'succeeded' or result.reason not in {'provider_error', 'timeout'}:
+                break
+        from dataclasses import replace
+        return replace(result, elapsed_seconds=time.monotonic() - started)
+
+    async def request(self, snapshot, *, system, prompt, max_tokens, timeout, attempts, estimate):
+        result = await self.request_bounded(snapshot, deadline=time.monotonic() + timeout,
+            timeout=timeout, attempts=attempts, system=system, prompt=prompt,
+            max_tokens=max_tokens, estimate=estimate, input_limit=2**63-1)
+        return result.text if result.outcome == 'succeeded' else None
 
     def page_size(self, text, *, system, build_prompt, max_chars, max_tokens, estimate):
         """Largest complete character prefix that fits; never omit a middle range."""

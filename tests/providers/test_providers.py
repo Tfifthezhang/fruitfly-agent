@@ -43,6 +43,27 @@ class ProviderTests(unittest.TestCase):
                     self.assertEqual(cause.errno, rows[-1]['errno'])
                     self.assertNotIn('offline-private', json.dumps(result.details))
 
+    def test_structural_parse_schema_and_timeout_categories_keep_evidence_strength(self) -> None:
+        from fruitfly_agent.providers.error_classification import classify_provider_error
+        from fruitfly_agent.core.observation import FailureInfo
+        for name, category in (('ConnectTimeout', 'connect_timeout'), ('ReadTimeout', 'read_timeout'),
+                ('WriteTimeout', 'write_timeout'), ('PoolTimeout', 'pool_timeout'),
+                ('ProxyError', 'proxy'), ('RemoteProtocolError', 'response_protocol'),
+                ('APIResponseValidationError', 'response_schema')):
+            with self.subTest(name=name):
+                error = classify_provider_error(type(name, (Exception,), {})('private detail'))
+                failure = FailureInfo.from_dict(error.details['failure'])
+                self.assertEqual(category, failure.code)
+                self.assertEqual('exception_type', failure.evidence_kind)
+                self.assertEqual(name, failure.causes[0].exception_type)
+                self.assertNotIn('private detail', str(failure.to_dict()))
+        parsed = classify_provider_error(json.JSONDecodeError('private detail', 'private body', 0))
+        self.assertEqual('response_parse', parsed.details['failure']['code'])
+        inferred = classify_provider_error(Exception('Invalid JSON'))
+        self.assertEqual('message_pattern', inferred.details['failure']['evidence_kind'])
+        unknown = classify_provider_error(Exception('an unfamiliar failure'))
+        self.assertEqual('unknown', unknown.details['failure']['code'])
+
     def test_public_model_template_loads_without_live_credentials(self) -> None:
         specs = load_model_specs(Path(__file__).resolve().parents[2] / "examples/configuration/models.example.yaml")
         self.assertEqual({"deepseek-flash-openai", "deepseek-flash-anthropic"}, set(specs))

@@ -45,8 +45,9 @@ shows mode selection and field grants.
 | Mode and `models.roles.context_summary` | User configuration; protected from candidates |
 | Source coverage/hash, artifact references, pairing, retry interval and outer budgets | Fixed integrity policy |
 
-Hybrid mode requires an explicit existing alias at `models.roles.context_summary`.
-It never implicitly borrows the executor. Its auxiliary output is capped by both
+In hybrid mode, `models.roles.context_summary` defaults to `{inherit: executor}`.
+Set a catalog alias there for an independent summary model.
+The inherited binding follows the current executor. Auxiliary output is capped by both
 component policy and the model binding. Hybrid inference and optional Provider
 counting can use the network and incur charges; deterministic compaction itself
 makes no auxiliary model requests.
@@ -92,3 +93,12 @@ Offline fake Providers establish covered execution and isolation, not factual
 summary quality. Deterministic archives require later retrieval of details;
 heuristic token estimates and head/tail previews do not preserve every fact in
 the active projection. There is no semantic retrieval or background memory job.
+
+## Maintain one parameter definition
+
+[defaults.yaml](defaults.yaml) owns this method's H text and numeric defaults.
+Typed constructors and Catalog descriptors read that document. Ordinary default
+references follow it on fresh assembly; complete frozen candidates keep their
+selected values. Improvement edits `parameters.yaml` through the same grants and
+owner validation for prompts and numbers. Model roles, integrity checks and
+state/reset/recovery rules retain their existing protected owners.

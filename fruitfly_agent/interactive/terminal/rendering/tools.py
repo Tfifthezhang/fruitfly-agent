@@ -38,6 +38,8 @@ def _summarize_value(key: str, value: object) -> str:
     if isinstance(value, str):
         lines = value.count("\n") + 1
         if len(value) > 120 or lines > 1:
+            if key.casefold() in {'path', 'command', 'query', 'url', 'pattern', 'handle'}:
+                return truncate_cells(' '.join(safe_terminal_text(value).split()), 160)
             return f"<{len(value):,} chars, {lines:,} lines>"
         return json.dumps(value, ensure_ascii=False)
     if isinstance(value, dict):
@@ -53,6 +55,9 @@ def summarize_result(output: str) -> str:
         return ""
     lines = stripped.count("\n") + 1
     if len(stripped) > 500 or lines > 3:
-        return f"<{len(stripped):,} chars, {lines:,} lines>"
+        rows = [row.strip() for row in safe_terminal_text(stripped).splitlines() if row.strip()]
+        first = truncate_cells(' '.join(rows[0].split()), 140) if rows else ''
+        last = ' … ' + truncate_cells(' '.join(rows[-1].split()), 70) if len(rows) > 1 else ''
+        return f"{first}{last} [{len(stripped):,} chars, {lines:,} lines]"
     return truncate_cells(" ".join(safe_terminal_text(stripped).split()), _TOOL_ARGUMENT_CELLS)
 

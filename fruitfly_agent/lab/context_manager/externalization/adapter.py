@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, replace, field
 from pathlib import Path
+from fruitfly_agent.runtime_spec.documents import parameter_default
 from typing import Any, Mapping
 
 from fruitfly_agent.lab.tools import create_ipython_tool
@@ -23,62 +24,39 @@ from fruitfly_agent.lab.context_manager.externalization.programmatic_context.run
 
 CONTEXT_ARTIFACT_STORE = "context-artifact-store"
 
-IPYTHON_TOOL_PROMPT = """
-## Persistent IPython workspace
 
-This Session has an opt-in persistent IPython workspace. Use the `ipython`
-tool for programmatic inspection, filtering, aggregation and verification.
-Variables and imports persist across ipython calls while this Runtime is open.
-Top-level `await` is supported.
 
-Use the preloaded synchronous `context` object to manage artifacts:
 
-- `context.list()` and `context.stat(reference)`
-- `context.read(reference, offset=0, limit=20000)`
-- `context.search(reference, query, limit=20)`
-- `context.put(text)` for large intermediate text
-- `context.save_state(name, json_value)` and `context.load_state(name)` for
-  explicit state that must survive `/resume`
-
-Do not print a whole large artifact merely to inspect it. Search or read
-bounded slices and keep intermediate values in Python.
-
-For semantic work that deterministic Python cannot perform, call the bounded,
-text-only auxiliary model from IPython:
-
-`reply = await llm_query(prompt, max_output_tokens=2048)`
-
-The returned dict contains `text`, model identity, usage and an optional
-`reference` when the full result was stored externally. Calls incur network
-cost and have reported usage and bounded per-request inputs, outputs, time and concurrency. The auxiliary
-call has no tools and cannot recursively invoke `llm_query`.
-
-The IPython process uses the current workspace permissions and is not a
-security sandbox. Important resume state must be saved explicitly as JSON or
-context artifacts; arbitrary live Python objects are not restored.
-""".strip()
-
-RLM_IPYTHON_PROMPT = """Large messages may be replaced in model context by a
-`context://sha256/...` reference. The original content remains in the Session
-artifact store. Use the `ipython` tool and its preloaded `context` object to
-inspect referenced content in bounded slices."""
 
 
 @dataclass(frozen=True)
 class IpythonToolConfig:
-    max_artifact_bytes: int = 64 * 1024 * 1024
-    max_cell_output_chars: int = 50_000
-    cell_timeout_seconds: int = 300
-    max_query_concurrent: int = 4
-    max_query_input_chars: int = 200_000
-    max_query_output_tokens: int = 4_096
-    max_query_inline_result_chars: int = 100_000
-    query_timeout_seconds: int = ModelQueryConfig().timeout_seconds
+    query_model_profile: str = ""
+    max_artifact_bytes: int = field(default_factory=lambda: parameter_default(__package__, 'ipython-tool.yaml', 'settings.max_artifact_bytes'))
+    max_cell_output_chars: int = field(default_factory=lambda: parameter_default(__package__, 'ipython-tool.yaml', 'settings.max_cell_output_chars'))
+    cell_timeout_seconds: int = field(default_factory=lambda: parameter_default(__package__, 'ipython-tool.yaml', 'settings.cell_timeout_seconds'))
+    max_query_concurrent: int = field(default_factory=lambda: parameter_default(__package__, 'ipython-tool.yaml', 'settings.max_query_concurrent'))
+    max_query_input_chars: int = field(default_factory=lambda: parameter_default(__package__, 'ipython-tool.yaml', 'settings.max_query_input_chars'))
+    max_query_output_tokens: int = field(default_factory=lambda: parameter_default(__package__, 'ipython-tool.yaml', 'settings.max_query_output_tokens'))
+    max_query_inline_result_chars: int = field(default_factory=lambda: parameter_default(__package__, 'ipython-tool.yaml', 'settings.max_query_inline_result_chars'))
+    query_timeout_seconds: int = field(default_factory=lambda: parameter_default(__package__, 'ipython-tool.yaml', 'settings.query_timeout_seconds'))
+    usage_instructions: str = field(default_factory=lambda: parameter_default(__package__, 'ipython-tool.yaml', 'instructions.usage'))
+    query_instructions: str = field(default_factory=lambda: parameter_default(__package__, 'ipython-tool.yaml', 'instructions.query'))
+
+    def __post_init__(self):
+        for value in (self.usage_instructions, self.query_instructions):
+            if not isinstance(value, str) or not 1 <= len(value.strip()) <= 12000:
+                raise ValueError('IPython instructions must contain 1..12000 characters')
 
 
 @dataclass(frozen=True)
 class RlmIpythonConfig:
-    offload_threshold_chars: int = 50_000
+    offload_threshold_chars: int = field(default_factory=lambda: parameter_default(__package__, 'rlm-ipython.yaml', 'settings.offload_threshold_chars'))
+    usage_instructions: str = field(default_factory=lambda: parameter_default(__package__, 'rlm-ipython.yaml', 'instructions.usage'))
+
+    def __post_init__(self):
+        if not isinstance(self.usage_instructions, str) or not 1 <= len(self.usage_instructions.strip()) <= 12000:
+            raise ValueError('RLM instructions must contain 1..12000 characters')
 
 
 class RlmIpythonComponent:
@@ -114,7 +92,7 @@ def install_ipython_tool(
         artifact_root,
         max_artifact_bytes=config.max_artifact_bytes,
     )
-    binding = context.provider_resolver(None, config.max_query_output_tokens)
+    binding = context.provider_for_role('context_query', config.max_query_output_tokens)
     broker = ModelQueryBroker(
         binding.provider,
         model=binding.model,
@@ -126,6 +104,7 @@ def install_ipython_tool(
             max_output_tokens=config.max_query_output_tokens,
             max_inline_result_chars=config.max_query_inline_result_chars,
             timeout_seconds=config.query_timeout_seconds,
+            instructions=config.query_instructions,
         ),
     )
 
@@ -141,7 +120,7 @@ def install_ipython_tool(
         process_environment=dict(context.process_environment) if context.process_environment is not None else None,
     )
     prompt = state.config.system_prompt
-    prompt = f"{prompt}\n\n{IPYTHON_TOOL_PROMPT}" if prompt else IPYTHON_TOOL_PROMPT
+    prompt = f"{prompt}\n\n{config.usage_instructions}" if prompt else config.usage_instructions
     assembled = replace(
         state,
         config=replace(
@@ -168,7 +147,8 @@ def install_rlm_ipython(
         threshold_chars=parameters["offload_threshold_chars"],
     )
     prompt = state.config.system_prompt
-    prompt = f"{prompt}\n\n{RLM_IPYTHON_PROMPT}" if prompt else RLM_IPYTHON_PROMPT
+    usage = parameters["usage_instructions"]
+    prompt = f"{prompt}\n\n{usage}" if prompt else usage
     assembled = replace(state, config=replace(state.config, system_prompt=prompt))
     return assembled.with_context_stage(
         ContextStage(
@@ -185,9 +165,7 @@ def _artifact_root(session_path: Path) -> Path:
 
 
 __all__ = [
-    "IPYTHON_TOOL_PROMPT",
     "IpythonToolConfig",
-    "RLM_IPYTHON_PROMPT",
     "RlmIpythonComponent",
     "RlmIpythonConfig",
     "install_ipython_tool",

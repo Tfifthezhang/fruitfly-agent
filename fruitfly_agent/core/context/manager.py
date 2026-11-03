@@ -9,6 +9,7 @@ import logging
 from typing import Sequence
 
 from ..data_model import ContextDecision, ContextSnapshot
+from ..observation import operation
 from ..data_model.runtime import AgentLoopContext
 from .models import (
     ContextFrame, ContextPipelineProfile, ContextProvenance, ContextReducer,
@@ -45,9 +46,10 @@ class ContextPipeline:
             try:
                 mechanism = stage.mechanism
                 assert isinstance(mechanism, ContextTransformer)
-                candidate = mechanism.transform(frame)
-                if inspect.isawaitable(candidate):
-                    candidate = await candidate
+                with operation('context.' + stage.phase, origin='context', component_id=stage.stage_id):
+                    candidate = mechanism.transform(frame)
+                    if inspect.isawaitable(candidate):
+                        candidate = await candidate
                 if candidate is None:
                     continue
                 metadata = {}

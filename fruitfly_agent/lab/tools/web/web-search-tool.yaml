@@ -1,0 +1,13 @@
+id: web-search-tool
+role: H
+implementation: web-search-tool
+parameters:
+  settings:
+    timeout_seconds: 60
+    max_retries: 2
+    max_response_bytes: 2000000
+    cache_ttl_seconds: 300
+    cache_entries: 32
+    max_redirects: 5
+    backend: brave
+    api_key_env: ''

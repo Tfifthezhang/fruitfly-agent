@@ -64,3 +64,5 @@ transformer. Authorized `top_k` and `max_chars` candidates therefore affect the
 actual retrieval query and rendered context. The owner's parameter adapter uses
 shared configuration materialization. Offline regression:
 `tests.lab.test_parameter_candidates` compares Provider-visible retrieval results.
+
+[information-context.yaml](information-context.yaml) owns retrieval count and character defaults. Text and numeric candidates use ordinary owner validation and shared configuration materialization.

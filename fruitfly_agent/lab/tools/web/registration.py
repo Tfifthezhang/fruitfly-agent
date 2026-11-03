@@ -1,5 +1,6 @@
 """Catalog definitions; credential lookup stays with the injecting host."""
 from dataclasses import replace
+from fruitfly_agent.runtime_spec.documents import parameter_default
 import re
 from functools import partial
 
@@ -32,16 +33,17 @@ def definitions(registry: WebServiceRegistry | None = None):
         params += (
             ParameterDescriptor("backend", "choice", "Search service" if kind == "search" else "Fetch service",
                 "Web service; API requests may incur charges.",
-                "brave" if kind == "search" else "direct",
+                parameter_default(__package__, 'web-' + kind + '-tool.yaml', 'settings.backend'),
                 choices=registry.choices(kind)),
-            ParameterDescriptor("api_key_env", "string", "API key variable", "Secret variable name; blank uses the selected service default. Credential-free services ignore it.", ""),
+            ParameterDescriptor("api_key_env", "string", "API key variable", "Secret variable name; blank uses the selected service default. Credential-free services ignore it.", parameter_default(__package__, 'web-' + kind + '-tool.yaml', 'settings.api_key_env')),
         )
         result.append(MechanismDefinition(
             MechanismDescriptor("web-" + kind + "-tool", label, description,
                 contributions=(MechanismContribution("capability", "tools"),), parameters=params,
                 install_order=order, effects=MechanismEffects(uses_network=True, tools=("web_" + kind,),
                     cost_notice="Queries are sent to the selected search service and may incur charges." if kind == "search" else "Source URLs are sent to the configured fetch service; API requests may incur charges.")),
-            partial(_install, kind=kind, registry=registry),
+            partial(_install, kind=kind, registry=registry), default_resource=(__package__, 'web-' + kind + '-tool.yaml'),
+            parameter_paths={p.name: 'settings.' + p.name for p in params},
             implementation_id="web-" + kind + "-v3", implementation_path="fruitfly_agent/lab/tools/web/" + kind + ".py",
             documentation_path="fruitfly_agent/lab/tools/web/README.md",
             input_parameters=("backend", "api_key_env"),

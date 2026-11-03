@@ -143,7 +143,7 @@ class TaskBatchTests(unittest.TestCase):
                          ("repo/task-1",))
 
     def test_official_results_must_cover_selected_tasks_and_attempts(self):
-        for names, attempts, passes in ((TASKS, 1, True), ((*TASKS, *TASKS), 2, True),
+        for names, attempts, passes in (((), 1, False), (TASKS, 1, True), ((*TASKS, *TASKS), 2, True),
                                        (TASKS, 2, False), (TASKS[:-1], 1, False),
                                        ((*TASKS[:-1], "unexpected"), 1, False), ((*TASKS, TASKS[0]), 1, False)):
             with self.subTest(names=names, attempts=attempts), tempfile.TemporaryDirectory() as directory:
@@ -179,3 +179,12 @@ class TaskBatchTests(unittest.TestCase):
                     self.assertIn("prepared task set", result["errors"]["coverage"])
                     self.assertEqual(len(result["trials"]), len(names))
                     self.assertEqual(result["metrics"], [])
+                self.assertEqual(len(TASKS) * attempts, result['coverage']['expected_attempts'])
+                drafts = json.loads((root / 'harbor/resume-requests.json').read_text())['requests']
+                if passes:
+                    self.assertEqual([], drafts)
+                elif len(names) < len(TASKS) * attempts:
+                    self.assertTrue(drafts)
+                    self.assertTrue(all(draft['requires_configuration_review'] for draft in drafts))
+                    for draft in drafts:
+                        EvaluationRequest.from_dict(draft['request'])

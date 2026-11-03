@@ -7,7 +7,7 @@ import json
 import re
 
 from fruitfly_agent.core.data_model import ContextDecision, CustomMessage, ProviderView, CUSTOM_KIND_COMPACTION
-from fruitfly_agent.core.data_model.context import ContextActivity
+from ...activity import report_activity
 from fruitfly_agent.core.context.validation import valid_tool_links
 from ....measurement.budget import MeasurementService, MeasurementConfig
 from ....resources import SessionHistory, public_message
@@ -40,11 +40,8 @@ class LayeredCompactionReducer:
     async def react_to_overflow(self, snapshot, error):
         return await self._prepare(snapshot, force=True)
 
-    async def _report(self, snapshot, stage, *, outcome='running', reason='', result=None):
-        if snapshot.report_activity is not None:
-            await snapshot.report_activity(ContextActivity(self.mechanism_id, stage, outcome,
-                result.elapsed_seconds if result else 0., result.input_tokens if result else 0,
-                result.output_tokens if result else 0, reason))
+    async def _report(self, snapshot, stage, **values):
+        await report_activity(snapshot, self.mechanism_id, stage, **values)
 
     async def _prepare(self, snapshot, *, force):
         if snapshot.signal is not None and snapshot.signal.is_set():

@@ -1,0 +1,11 @@
+id: tool-catalog
+role: H
+implementation: tool-catalog
+parameters:
+  instructions:
+    usage: Select tools by the task and available evidence. Read a tool's full usage
+      reference before first use or when its behavior is unclear. Inspect relevant
+      inputs before making changes. Combine independent inspections when useful; sequence
+      dependent changes. Diagnose failures before retrying, and avoid repeating commands
+      with unknown side effects. Verify outcomes with appropriate checks and original
+      evidence. Stop when the task is complete.

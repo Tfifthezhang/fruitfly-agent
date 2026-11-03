@@ -1,4 +1,5 @@
 """Owner parameter grants project into independently assembled candidate runtimes."""
+from tests.support.configuration import component_parameters, with_component_parameters, with_component_text, parameter_payload
 from dataclasses import replace
 import json
 from pathlib import Path
@@ -20,6 +21,36 @@ from fruitfly_agent.runtime_spec.execution import apply_profile_binding
 
 
 class ParameterCandidateTests(unittest.IsolatedAsyncioTestCase):
+    def test_yaml_candidate_unifies_text_and_number_and_protects_role_and_model_bindings(self):
+        import yaml
+        from fruitfly_agent.lab.improvement.components import TextComponentAdapter
+        from fruitfly_agent.improvement.contracts.components import ComponentFile
+        definition = builtin_catalog().get('working-memory-reduction')
+        target = ParameterTarget(definition, {}, {'memory_tokens', 'update_instructions'})
+        adapter = TextComponentAdapter(target, 'mechanism-parameters')
+        original = adapter.snapshot()
+        self.assertEqual(original.files[0].path, 'parameters.yaml')
+        values = component_parameters(original)
+        self.assertNotIn('memory_model_profile', values['settings'])
+        values['settings']['memory_tokens'] = 3072
+        values['instructions']['update'] = 'Keep verified evidence and pending work.'
+        changed = with_component_parameters(original, values)
+        adapter.validate_change(changed, {'editable_fields': [
+            'parameters.settings.memory_tokens', 'parameters.instructions.update']})
+        exported = json.loads(adapter.export(changed).text)
+        self.assertEqual(exported['memory_tokens'], 3072)
+        self.assertEqual(exported['update_instructions'], values['instructions']['update'])
+        payload = yaml.safe_load(changed.files[0].text)
+        payload['role'] = 'S'
+        tampered = replace(changed, files=(ComponentFile('parameters.yaml', yaml.safe_dump(payload)),))
+        with self.assertRaisesRegex(ValueError, 'role'):
+            adapter.validate(tampered)
+        values['settings']['memory_model_profile'] = 'another-model'
+        with self.assertRaisesRegex(ValueError, 'model roles'):
+            adapter.validate(with_component_parameters(original, values))
+        with self.assertRaisesRegex(ValueError, 'formatting'):
+            adapter.validate(replace(original, files=(ComponentFile('parameters.yaml', original.files[0].text + '\n'),)))
+
     def test_owned_parameter_descriptions_include_semantics_defaults_bounds_and_grants(self):
         from fruitfly_agent.lab.improvement.components import ComponentRegistry, TextComponentAdapter
         from fruitfly_agent.improvement.contracts.versions import canonical_json, content_hash
@@ -38,8 +69,8 @@ class ParameterCandidateTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('parameters.instructions.update', fields)
         from fruitfly_agent.improvement.contracts.components import ComponentFile, HarnessSnapshot
         document = registry.snapshot().component('working-memory-reduction')
-        values = json.loads(document.files[0].text); values['settings']['memory_tokens'] = 3072
-        candidate = HarnessSnapshot((replace(document, files=(ComponentFile('instructions.txt', json.dumps(values)),)),))
+        values = component_parameters(document); values['settings']['memory_tokens'] = 3072
+        candidate = HarnessSnapshot((with_component_parameters(document, values),))
         actual = registry.descriptions(('working-memory-reduction',), snapshot=candidate)
         updated = next(f for f in actual['working-memory-reduction']['fields'] if f['path'] == 'parameters.settings.memory_tokens')
         self.assertEqual((updated['current'], updated['default']), (3072, 2048))
@@ -157,14 +188,14 @@ class ParameterCandidateTests(unittest.IsolatedAsyncioTestCase):
         for name, field in (('working-memory-reduction', 'update_instructions'),):
             with self.subTest(method=name), tempfile.TemporaryDirectory() as directory:
                 catalog = builtin_catalog(); definition = catalog.get(name)
-                target = ParameterTarget(definition, {}, {field})
+                target = ParameterTarget(definition, {'memory_model_profile': 'fake'}, {field})
                 grant = {'editable_fields': ['parameters.instructions.update']}
                 target.validate_options(grant)
                 values = json.loads(target.snapshot().text)
                 values['instructions']['update'] = 'EXACT candidate prompt\nKeep verified constraints and pending tests.'
                 text = json.dumps(values)
                 target.validate_change(text, grant)
-                baseline = HarnessProfile('default', mechanisms=(MechanismSelection(name),))
+                baseline = HarnessProfile('default', mechanisms=(MechanismSelection(name, parameters={'memory_model_profile': 'fake'}),))
                 candidate = apply_profile_binding(baseline, 'configuration', 'component.' + name, target.export_text(text))
                 path = materialize_system(candidate, Path(directory) / 'candidate/config.yaml', catalog=catalog)
                 restored = load_system_config(path).select()
@@ -182,7 +213,7 @@ class ParameterCandidateTests(unittest.IsolatedAsyncioTestCase):
                 installed = runtime.components['text-target:' + name].snapshot()
                 self.assertNotEqual(target.snapshot().content_hash, installed.content_hash)
                 self.assertEqual(values['instructions']['update'], json.loads(installed.text)['instructions']['update'])
-                self.assertEqual({}, baseline.mechanisms[-1].parameters)
+                self.assertEqual({'memory_model_profile': 'fake'}, baseline.mechanisms[-1].parameters)
 
     async def test_measurement_is_shared_without_a_selectable_or_editable_component(self):
         from fruitfly_agent.lab.context_manager.measurement.budget import MeasurementService

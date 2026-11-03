@@ -4,6 +4,7 @@ from dataclasses import replace
 from fruitfly_agent.core.mechanisms import MechanismDescriptor, MechanismContribution, MechanismEffects, ParameterDescriptor as P
 from fruitfly_agent.lab.improvement.targets.text import TEXT_TARGET_PREFIX
 from .editor.instructions import EditorInstructions, EditorInstructionTarget
+from fruitfly_agent.lab.catalog.model_roles import ModelRoleRequirement, RoleProvider
 
 
 SETTINGS = 'component-improvement-settings'
@@ -25,11 +26,11 @@ def definition():
             P('assessor_profile', 'string', 'Assessment model', 'Model catalog profile; empty reuses the active model.', '')),
         install_order=76, effects=MechanismEffects(uses_provider=True, uses_network=True, writes_files=True,
             cost_notice="Explicit improvement runs call models and execute tasks; registration makes no requests.")),
-        _install, visible=False, implementation_id='component-workflow-v1', configuration_role='I',
+        _install, visible=False, default_resource=(__package__, 'defaults.yaml'), implementation_id='component-workflow-v1', configuration_role='I',
         configuration_surfaces=configuration_surfaces(),
-        model_role_parameters={'editor': 'editor_profile', 'assessor': 'assessor_profile'},
+        model_role_parameters={'editor': ModelRoleRequirement('editor_profile', 'Generate candidates.', fallback_role='executor', lazy=True),
+            'assessor': ModelRoleRequirement('assessor_profile', 'Assess candidate evidence.', fallback_role='executor', lazy=True)},
         component_validator=validate_component_options,
-        model_profiles=lambda parameters: tuple(parameters[name] for name in ('editor_profile', 'assessor_profile') if parameters[name]),
         artifact_slots=frozenset({'improvement-editor', 'improvement-evaluator'}), prepare_targets=_prepare_targets,
         component_specs=lambda parameters, enabled: (ComponentSpec('improvement-editor', 'I', kind='improvement-instructions', schema='editor-instructions',
             required_capabilities=frozenset({'improver-comparison'})),
@@ -40,20 +41,9 @@ def definition():
 
 
 def _install(state, context, parameters):
-    config = state.config
-    if parameters['editor_profile']:
-        binding = context.provider_resolver(parameters['editor_profile'], None)
-        config = replace(config, provider=binding.provider, model=binding.model,
-            context_window=binding.context_window or config.context_window,
-            max_tokens=binding.max_output_tokens or config.max_tokens)
-    assessor = state.config
-    if parameters['assessor_profile']:
-        binding = context.provider_resolver(parameters['assessor_profile'], None)
-        assessor = replace(assessor, provider=binding.provider, model=binding.model,
-            context_window=binding.context_window or assessor.context_window,
-            max_tokens=binding.max_output_tokens or assessor.max_tokens)
-    return (state.with_component(SETTINGS, dict(parameters)).with_component(EDITOR_CONFIG, config)
-        .with_component(ASSESSOR_CONFIG, assessor))
+    return (state.with_component(SETTINGS, dict(parameters))
+        .with_component(EDITOR_CONFIG, _lazy_role_config(state.config, context, 'editor'))
+        .with_component(ASSESSOR_CONFIG, _lazy_role_config(state.config, context, 'assessor')))
 
 
 def _prepare_targets(state, context):
@@ -96,7 +86,7 @@ def _prepare_targets(state, context):
 def _lazy_role_config(config, context, role):
     alias = context.model_roles.get(role)
     if alias is None or alias == context.model_roles.get('executor'):
-        return config
+        return replace(config, provider=RoleProvider(config.provider, 'component-improvement', role))
     if alias not in context.model_metadata:
         raise ValueError('unknown model role profile: ' + alias)
     metadata = context.model_metadata[alias]
@@ -113,7 +103,7 @@ def _lazy_role_config(config, context, role):
         def __call__(self, view, *, signal=None):
             if self.binding is None:
                 self.binding = context.provider_resolver(alias, None)
-            return self.binding.provider(replace(view, model=self.binding.model), signal=signal)
+            return RoleProvider(self.binding.provider, 'component-improvement', role)(replace(view, model=self.binding.model), signal=signal)
         async def aclose(self):
             from inspect import isawaitable
             if self.binding is not None:

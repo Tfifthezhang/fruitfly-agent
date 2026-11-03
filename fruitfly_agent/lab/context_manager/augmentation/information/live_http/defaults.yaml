@@ -1,0 +1,6 @@
+id: live-http
+role: H
+implementation: live-http
+parameters:
+  endpoint: ''
+  timeout_seconds: 5.0

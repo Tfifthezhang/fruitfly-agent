@@ -8,7 +8,7 @@ from unittest.mock import Mock
 import yaml
 
 from fruitfly_agent.core.session import Session
-from fruitfly_agent.lab.catalog import builtin_catalog, load_system_config, materialize_system
+from fruitfly_agent.lab.catalog import builtin_catalog, component_profile, load_system_config, materialize_system
 from fruitfly_agent.run import build_runtime
 from fruitfly_agent.runtime_spec import load_harness_config
 from tests.support.faux_provider import FauxProvider
@@ -50,6 +50,8 @@ class ComponentConfigurationTests(unittest.TestCase):
         self.assertEqual(runtime.config.system_prompt, 'Use the supplied evidence.\nKeep exact text.\n')
         self.assertEqual(runtime.manifest.execution['max_tool_calls_per_turn'], 128)
         self.assertEqual(registry.create.call_count, 1, 'unused I must not create auxiliary clients')
+        self.assertEqual('editor-model', runtime.manifest.model_roles['editor']['model'])
+        self.assertEqual('assessor-model', runtime.manifest.model_roles['assessor']['model'])
 
     def test_candidate_bundle_reloads_without_original_component_files(self):
         self.write()
@@ -135,3 +137,29 @@ class ComponentConfigurationTests(unittest.TestCase):
                 (self.root / 'execution.yaml').write_text(yaml.safe_dump(component))
                 with self.assertRaises(ValueError):
                     load_system_config(self.path)
+
+    def test_inherited_memory_model_follows_executor_and_explicit_override_stays_independent(self):
+        from fruitfly_agent.core.data_model import ContextItem, ContextSnapshot, UserMessage
+        import asyncio
+        _write_catalog(self.root / 'models.yaml', {'offline': 'original-model', 'next': 'next-model', 'small': 'memory-model'})
+        self.config['profiles']['baseline']['H']['working-memory-reduction'] = {'inline': {
+            'id': 'working-memory-reduction', 'role': 'H', 'implementation': 'working-memory-reduction', 'parameters': {}}}
+        for binding, expected in (({'inherit': 'executor'}, 'next-model'), ('small', 'memory-model')):
+            with self.subTest(binding=binding):
+                self.config['profiles']['baseline']['models']['roles']['working_memory'] = binding
+                self.write()
+                original = load_system_config(self.path).select()
+                profile = replace(original, model_profile='next')
+                provider = FauxProvider(); provider.respond_text('memory')
+                registry = Mock(); registry.create.return_value = provider
+                with Session(self.root / ('session-' + expected + '.jsonl')) as session:
+                    runtime = build_runtime(profile, config_path=self.path, catalog=builtin_catalog(),
+                        environment={}, session=session, cwd=self.root, provider_registry=registry)
+                    reducer = runtime.components['working-memory-checkpoint']
+                    message = UserMessage('evidence ' * 1000)
+                    snapshot = ContextSnapshot((ContextItem('one', message),), (message,), '', (), 1024, 'next-model', 32, 'budget')
+                    asyncio.run(reducer.check_budget(snapshot))
+                    self.assertEqual(expected, provider.calls[0]['model'])
+                    self.assertEqual(expected, runtime.manifest.model_roles['working_memory']['model'])
+                projected = component_profile(profile, builtin_catalog())
+                self.assertEqual(binding, projected.to_dict()['models']['roles']['working_memory'])

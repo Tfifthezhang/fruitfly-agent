@@ -17,9 +17,10 @@ Start with [configuration responsibilities](../../CONFIGURATION.md). The guide t
 
 | File | Public entry points and responsibility |
 |---|---|
+| `model_roles.py` | Strict alias/inheritance grammar and pure late binding |
 | `profiles.py` | `HarnessProfile`, `HarnessConfig`, `load_harness_config`, `save_harness_config` |
 | `components.py` | Serializable H/S/I instance envelopes and explicit references |
-| `documents.py` | Strict duplicate-key rejection, relative references and source hashes |
+| `documents.py` | Strict YAML parsing, explicit references, bounded owner-resource reads and file/package receipts |
 | `selections.py` | `MechanismSelection`; Catalog validates registered IDs and dependencies |
 | `execution.py` | Validation, effective defaults, Core keyword projection and configuration bindings |
 | `references.py` | One baseline path/profile; conflicting explicit references fail |
@@ -36,12 +37,13 @@ id: execution-policy
 role: H
 implementation: execution-policy
 parameters:
-  max_tool_calls_per_turn: 256
-  max_turns: 32
-  max_context_recovery_attempts: 6
-  tool_execution:
-    max_parallel: 8
-    default_execution_mode: parallel
+  settings:
+    max_tool_calls_per_turn: 256
+    max_turns: 32
+    max_context_recovery_attempts: 6
+    tool_execution:
+      max_parallel: 8
+      default_execution_mode: parallel
 ```
 
 Defaults come from the existing Core dataclasses. Turn/tool limits accept
@@ -57,7 +59,7 @@ allowances remain independent fixed comparison conditions.
 
 Run assembles the configuration and [Catalog](../lab/catalog/README.md) checks
 component availability. [Execution policy](../lab/execution_policy/README.md)
-provides the optional H editing adapter. [Eval](../../fruitfly_eval/README.md) uses the same
+owns fixed runtime settings; these are not Improvement targets. [Eval](../../fruitfly_eval/README.md) uses the same
 profile parser before staging a selected runtime.
 
 ```bash
@@ -65,3 +67,10 @@ profile parser before staging a selected runtime.
 ```
 
 These checks use temporary files and fake Providers; they make no model requests.
+
+## Inventory declared package resources
+
+[resources.py](resources.py) expands build-declared resource patterns with path,
+secret-state and symlink checks. Run source snapshots and Eval installation
+material share this inventory. Registered owner YAML joins hashing and copying;
+frozen imports require those resources and never fall back to the checkout.

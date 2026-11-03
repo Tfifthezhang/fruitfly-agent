@@ -66,3 +66,16 @@ See [runtime rules](../README.md#runtime-rules) for other termination conditions
 [resources.py](resources.py) defines the host-owned `ReadableResources` contract.
 Concrete Lab routing lets the existing `read` tool access scoped immutable
 resources without treating their references as filesystem paths.
+
+Optional `AgentTool.present_call` and `present_result` callbacks return bounded
+[ToolPresentation](presentation.py) facts. They are presentation contracts, separate
+from the model schema, authorization and result rewriting. Source owners classify
+operations; Core has no concrete command parser. Interactive isolates ordinary
+callback errors and uses the existing labels/output as fallback.
+`AgentLoopConfig.on_tool_output(call_id, text)` attributes live fragments while
+preserving the original `on_partial(text)` callback for embeddings.
+
+Queue, authorization and execution publish separate operation facts. A rejected
+call has not started; an execution exception can leave effects unknown. Passive
+correlation IDs are bounded; invalid or oversized external IDs use stable opaque
+hashes rather than rejecting otherwise valid work.

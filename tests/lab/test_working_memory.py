@@ -28,7 +28,7 @@ def snapshot(messages=None, **changes):
 
 def reducer(provider, history=None, **changes):
     return WorkingMemoryReducer(WorkingMemoryConfig(memory_tokens=64, auxiliary_max_tokens=128,
-        update_every_messages=1, **changes), provider, history=history)
+        update_every_messages=1, maintenance_ratio=0., **changes), provider, history=history)
 
 
 class WorkingMemoryTests(unittest.IsolatedAsyncioTestCase):
@@ -82,14 +82,20 @@ class WorkingMemoryTests(unittest.IsolatedAsyncioTestCase):
         current = replace(original, context_state={method.mechanism_id: checkpoint})
         for final in ('', 'a' * 1000):
             provider.respond_text(final); provider.respond_text('b' * 1000)
-            self.assertIsNone(await method.check_budget(current))
+            decision = await method.check_budget(current)
+            self.assertIsNone(decision.messages)
+            self.assertEqual(checkpoint['covered'], decision.state['covered'])
+            self.assertEqual(checkpoint['offset'], decision.state['offset'])
+            self.assertIsNotNone(decision.state['attempt'])
             self.assertEqual(checkpoint, current.context_state[method.mechanism_id])
             provider.script.clear()
 
     async def test_invalid_model_output_and_signal_never_commit(self):
         for reason in ('length', 'error'):
             provider = FauxProvider(); provider.respond_text('memory', stop_reason=reason)
-            self.assertIsNone(await reducer(provider).check_budget(snapshot()))
+            decision = await reducer(provider).check_budget(snapshot())
+            self.assertIsNone(decision.messages)
+            self.assertEqual(0, decision.state['covered'])
         import asyncio
         signal = asyncio.Event(); signal.set()
         with self.assertRaises(asyncio.CancelledError):

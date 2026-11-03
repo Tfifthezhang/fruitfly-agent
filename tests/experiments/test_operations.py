@@ -54,8 +54,9 @@ class OperationTests(unittest.IsolatedAsyncioTestCase):
         application = AgentApplication(factory)
         await application.start()
         try:
-            components = application.runtime_manifest['models']
+            components = application.runtime_manifest['model_roles']
             self.assertEqual({entry['profile'] for entry in components.values()}, {'executor', 'editor', 'assessor'})
+            self.assertEqual(self.registry.create.call_count, 1, 'unused I clients stay lazy')
             # Public assembly config components are carried by the runtime handle contract.
             handle = await factory.open(resume=False, session_path=None)
             try:

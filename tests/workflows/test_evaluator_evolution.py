@@ -1,4 +1,5 @@
 """Evaluator candidates affect inner choices but never their own acceptance proof."""
+from tests.support.configuration import component_parameters, with_component_parameters, with_component_text, parameter_payload
 from dataclasses import replace
 import json
 from pathlib import Path
@@ -24,9 +25,9 @@ class EvaluatorRule:
 
     async def propose(self, request, services):
         document = request.baseline.component('improvement-evaluator')
-        value = json.loads(document.files[0].text)
+        value = component_parameters(document)
         value['instructions']['compare'] = 'PREFER_VERIFIED_OUTPUT: inspect completed task outputs.'
-        changed = replace(document, files=(ComponentFile('instructions.txt', json.dumps(value, indent=2)),))
+        changed = with_component_parameters(document, value)
         harness = HarnessSnapshot(tuple(changed if c.component_id == changed.component_id else c for c in request.baseline.components))
         return ProposalResult((CandidateBundle(request.plan.parent, request.baseline, harness, self.generator_id,
             (EditReason(changed.component_id, 'Synthetic downstream choice contrast.', (request.records[0].run_id,), expected_effect='The proposed behavior appears in the subsequent execution.'),)),))
@@ -64,8 +65,8 @@ class EvaluatorEvolutionTests(unittest.IsolatedAsyncioTestCase):
                 outcome = factory._component_jobs.outcome
                 self.assertEqual('verified', outcome.decision.assurance)
                 self.assertEqual(before, factory.system_version())
-                stored = outcome.harness.component('improvement-evaluator').files[0].text
-                self.assertIn('\n', stored)
+                stored = parameter_payload(outcome.harness.component('improvement-evaluator'))
+                self.assertIn('PREFER_VERIFIED_OUTPUT', stored)
                 await app.adopt_candidate(results[0].candidate_id)
                 self.assertNotEqual(before.improver, factory.system_version().improver)
                 self.assertTrue(any('PREFER_VERIFIED_OUTPUT' in call['system_prompt'] for call in provider.calls))

@@ -32,7 +32,7 @@ The description helps the model decide when to read the full file. Use UTF-8, st
 | Action | Behavior |
 |---|---|
 | Enable **/config → Context → Skill catalog** | Keep **Read files** enabled, then save and apply the configuration. |
-| Submit a matching task | The model sees names, descriptions, and paths, then may use `read` to load instructions. |
+| Submit a matching task | The model sees names, descriptions, and scoped resource locations, then may use `read` to load frozen instructions. |
 | Modify a Skill | Start a new session to rescan. |
 | Set `disable-model-invocation: true` | Hide it from the model; there is no separate manual Skill command. |
 
@@ -55,7 +55,7 @@ discovered names, paths and metadata remain protected.
 | Nested Skills | Once a Skill directory is found, its nested `SKILL.md` files are not separate entries. |
 | Hidden entries / symlinks | Hidden entries skipped; all descendant symlinks skipped. |
 | Scan budget | 4096 enumerated entries including hidden entries; depth 32; 1 MiB/file; 8 MiB total read |
-| Invalid files | Per-file I/O/UTF-8 diagnostics; malformed frontmatter may fall back to an empty description. |
+| Invalid files | Per-file I/O/UTF-8 diagnostics are retained; malformed frontmatter may fall back to an empty description. |
 | Over-limit enumeration | Retain loaded entries; selection can depend on filesystem enumeration order. |
 | Rendered context | XML-escaped metadata, not full Skill text; repeated requests replace the owned block. |
 
@@ -94,3 +94,22 @@ Enable **Reusable skill document** under **Context → Context augmentation**. T
 Enable the retained Skill document, then select its S component in [Improvement](../../../improvement/README.md). The original body seeds the candidate; explicit verified adoption installs the immutable body in a new session. Relative references keep their source directory. Candidate execution requires a backend that restores the frozen task inputs and registered text dependencies.
 
 Source files and references are not overwritten. Registered Markdown/text dependencies and the retained body enter initial-state identity; changed dependencies invalidate pending candidates. Non-text resources and arbitrary linked programs are not frozen. An adopted artifact takes precedence over the source body; changing the starting source requires a new configuration/session and clearing the old artifact binding if it should no longer apply. One body per configured mechanism is supported, not simultaneous optimization of a Skill repository. Enabling the mechanism performs no learning or model requests.
+
+## Read a consistent runtime snapshot
+
+Catalog assembly captures metadata, complete Skill text and bounded Markdown/text
+references once. Locations use scoped `resource://` references through the normal
+`read` tool, including with SSH selected. Relative text references resolve from
+the resource location's parent. These are read-only text resources, not script
+execution paths or synchronized remote programs.
+
+The snapshot retains at most 512 files and 8 MiB, with bounded enumeration and
+per-file reads. Changed content during capture fails assembly. Later disk edits
+do not change the active catalog or its bodies; a new runtime captures them.
+Diagnostics enter Session metadata and bounded guidance. [resources.py](resources.py)
+provides the same frozen text set for execution and registered state capture.
+Non-text assets and executable dependencies require separate backend support.
+
+[skill-catalog.yaml](skill-catalog.yaml) owns H usage and numeric defaults;
+[skill-document.yaml](skill-document.yaml) owns the separate S document defaults.
+Adopted S bodies keep their existing immutable precedence and recovery rules.

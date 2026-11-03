@@ -39,3 +39,7 @@ excludes private verifier files and tests cancellation without Docker or models.
 
 `test_improvement_process.py` checks controller launch, private-log forwarding
 and cancellation during process creation with process doubles.
+
+`test_operation_evidence` checks allowance-capacity analysis, missing/unexpected
+coverage and common Agent observation collection without changing official rewards.
+Task-batch checks include zero-result reports and review-required resume drafts.

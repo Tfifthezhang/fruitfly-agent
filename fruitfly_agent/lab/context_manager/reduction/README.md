@@ -53,3 +53,12 @@ Offline checks: `tests.lab.test_layered_compaction`,
 `tests.lab.test_layered_compaction_failures`, `tests.lab.test_working_memory`,
 `tests.workflows.test_layered_compaction_improvement` and
 `tests.workflows.test_working_memory_improvement`.
+
+## Reuse shared services
+
+[activity.py](activity.py), [identity.py](identity.py) and [retry.py](retry.py) own
+passive activity, stable digests and retry admission shared by reduction methods.
+[inference.py](inference.py) owns output validation and bounded auxiliary calls.
+It reuses Core's operation supervisor for cancellation retirement. Methods retain
+their prompts, source coverage, thresholds and state semantics; shared services
+do not decide when to reduce context or grant an overflow retry.

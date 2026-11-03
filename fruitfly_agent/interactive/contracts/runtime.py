@@ -2,6 +2,7 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Mapping, Protocol
+from fruitfly_agent.core.observation import ObservationContext
 from fruitfly_agent.core.data_model import AgentLoopResult, ContextItem, ImageBlock
 from fruitfly_agent.core.data_model.media import UserContent
 from fruitfly_agent.core.tool_runtime.authorization import AuthorizationPrompt
@@ -15,6 +16,7 @@ from fruitfly_agent.interactive.contracts.models import (
 from fruitfly_agent.interactive.contracts.improvement import ImprovementService
 from fruitfly_agent.interactive.contracts.candidates import CandidateActivationService, CandidateService
 from fruitfly_agent.interactive.contracts.task_packs import TaskPackService
+from fruitfly_agent.interactive.contracts.operations import OperationService
 
 
 class RuntimeCleanupError(RuntimeError):
@@ -64,6 +66,10 @@ class RuntimeHandle(Protocol):
     def candidate_activation(self) -> CandidateActivationService | None: ...
     @property
     def authorization(self) -> RuntimeAuthorization | None: ...
+    @property
+    def operations(self) -> OperationService | None: ...
+    @property
+    def observation_context(self) -> ObservationContext | None: ...
     @property
     def activate_callback(self) -> Callable[[], None] | None: ...
     async def start(self) -> None: ...

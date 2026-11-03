@@ -10,6 +10,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from fruitfly_agent.core.config import AgentLoopConfig
+from fruitfly_agent.core.tool_runtime.presentation import ToolPresentation
 from fruitfly_agent.core.context.budget import forward_context_capabilities
 from fruitfly_agent.core.data_model import AssistantMessage, CustomMessage, ToolResultMessage, UserMessage
 from fruitfly_agent.core.extensions.hooks import (
@@ -20,6 +21,7 @@ from fruitfly_agent.core.extensions.hooks import (
     CONTEXT_ACTIVITY,
     BEFORE_COMPACTION,
     BEFORE_TOOL,
+    AFTER_TOOL,
     HookRegistry,
 )
 from fruitfly_agent.core.context import ContextPipeline
@@ -176,10 +178,12 @@ class CoreEventBridge:
         self.last_result = None
         self._tools: dict[str, Any] = {}
         self._tool_calls: dict[str, tuple[str, float]] = {}
+        self._presentations: dict[str, dict[str, Any]] = {}
 
     def begin_run(self) -> None:
         self.last_result = None
         self._tool_calls.clear()
+        self._presentations.clear()
         if self._observable_provider is not None:
             self._observable_provider.begin_run()
 
@@ -214,6 +218,7 @@ class CoreEventBridge:
                     usage = data.get("usage", {})
                     self.context_status.update(run_input_tokens=usage.get("inputTokens", 0),
                                                run_output_tokens=usage.get("outputTokens", 0))
+        hooks.on(AFTER_TOOL, self._on_tool_presented)
         hooks.on(BEFORE_TOOL, self._on_tool_started)
         self._tools = {tool.name: tool for tool in config.tools or ()}
         hooks.on(BEFORE_REQUEST, self._on_tools_prepared)
@@ -221,7 +226,7 @@ class CoreEventBridge:
 
         observable = _ObservableProvider(config.provider, self._dispatcher)
         self._observable_provider = observable
-        previous_partial = config.on_partial
+        previous_output = config.on_tool_output
         previous_result = config.on_tool_result
 
         async def on_tool_result(name: str, result: ToolResultMessage, cancelled: bool) -> None:
@@ -231,18 +236,18 @@ class CoreEventBridge:
                 if hasattr(observed, '__await__'):
                     await observed
 
-        async def on_partial(text: str) -> None:
-            await self._dispatcher.emit(ToolOutput(run_id="", text=text))
-            if previous_partial is not None:
-                result = previous_partial(text)
-                if hasattr(result, "__await__"):
+        async def on_tool_output(call_id: str, text: str) -> None:
+            await self._dispatcher.emit(ToolOutput(run_id="", text=text, tool_call_id=call_id))
+            if previous_output is not None:
+                result = previous_output(call_id, text)
+                if hasattr(result, '__await__'):
                     await result
 
         observed_config = dataclasses.replace(
             config,
             provider=observable,
             hooks=hooks,
-            on_partial=on_partial,
+            on_tool_output=on_tool_output,
             on_tool_result=on_tool_result,
         )
         return observed_config, context_pipeline
@@ -296,6 +301,26 @@ class CoreEventBridge:
                 pass  # Presentation metadata cannot affect execution.
         return fallback
 
+    def _call_presentation(self, name, arguments):
+        tool = self._tools.get(name)
+        if tool is not None and tool.present_call is not None:
+            try:
+                value = tool.present_call(copy.deepcopy(arguments))
+                return value.to_dict() if isinstance(value, ToolPresentation) else None
+            except Exception:
+                pass
+        return None
+
+    def _on_tool_presented(self, event):
+        tool = self._tools.get(event.tool_name)
+        if tool is not None and tool.present_result is not None:
+            try:
+                value = tool.present_result(copy.deepcopy(event.result))
+                if isinstance(value, ToolPresentation):
+                    self._presentations[event.tool_call_id] = value.to_dict()
+            except Exception:
+                pass
+
     async def _on_tool_started(self, event: Any) -> None:
         description = self._describe_tool(event.tool_name, event.args)
         self._tool_calls[event.tool_call_id] = (description, time.monotonic())
@@ -305,6 +330,7 @@ class CoreEventBridge:
                 tool_call_id=event.tool_call_id,
                 tool_name=event.tool_name,
                 arguments=dict(event.args),
+                presentation=self._call_presentation(event.tool_name, event.args),
                 category=self._tool_categories.get(event.tool_name, "tools"),
                 description=description,
             )
@@ -330,6 +356,7 @@ class CoreEventBridge:
                 tool_call_id=result.tool_call_id,
                 tool_name=name,
                 output=output,
+                presentation=self._presentations.pop(result.tool_call_id, None),
                 terminate=result.terminate,
                 category=self._tool_categories.get(name, "tools"),
                 description=description,

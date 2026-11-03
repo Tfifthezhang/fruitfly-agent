@@ -38,12 +38,10 @@ class LayeredConfigurationTests(unittest.TestCase):
             value['settings']['mode'] = 'hybrid'
             with self.assertRaises(ValueError): target.validate_change(json.dumps(value), {})
 
-    def test_hybrid_requires_explicit_binding_and_admits_summary_grants(self):
+    def test_hybrid_inherits_executor_and_admits_summary_grants(self):
         with Session(self.workspace.root / 'session.jsonl') as session:
-            with self.assertRaisesRegex(ValueError, 'context_summary'):
-                self.workspace.assemble(self.profile(mode='hybrid'), session, catalog=self.catalog)
-            runtime = self.workspace.assemble(self.profile(mode='hybrid', summary_model_profile='offline'),
-                session, catalog=self.catalog)
+            runtime = self.workspace.assemble(self.profile(mode='hybrid'), session, catalog=self.catalog)
+            self.assertEqual('offline-model', runtime.manifest.models['auxiliary-1']['model'])
             target = runtime.components['text-target:layered-compaction']
             target.validate_options({'editable_fields': ['parameters.instructions.summary']})
             self.assertIn('parameters.instructions.summary', target.field_names())

@@ -23,7 +23,7 @@ class ImprovementBoundaryTests(unittest.TestCase):
         root = ROOT / 'fruitfly_agent/lab/improvement/assessment'
         forbidden = ('fruitfly_agent.lab.improvement.editor', 'fruitfly_agent.run', 'fruitfly_agent.interactive', 'fruitfly_eval')
         violations = [f'{p.name}: {target}' for p in root.rglob('*.py') for target in _project_imports(p)
-            if target.startswith(forbidden)]
+            if any(target == name or target.startswith(name + '.') for name in forbidden)]
         self.assertEqual(violations, [])
 
     def test_editing_implementation_does_not_import_assessment_implementation(self):

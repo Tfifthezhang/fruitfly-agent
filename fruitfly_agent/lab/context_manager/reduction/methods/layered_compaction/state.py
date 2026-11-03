@@ -1,11 +1,9 @@
 """Code-owned source identity, active artifact dependencies and retry admission."""
-import hashlib
-import json
 import re
 
 
-def digest(value):
-    return hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+from ...identity import digest
+from ...retry import may_summarize
 
 
 def source_hash(items):
@@ -38,12 +36,3 @@ def validate_state(value, items, history):
         raise ValueError('invalid layered-compaction summary attempt')
     return value
 
-
-def may_summarize(previous, policy, fingerprint, source_count):
-    if previous is None or previous['policy'] != policy or previous['attempt'] is None:
-        return True
-    attempt = previous['attempt']
-    if attempt['fingerprint'] == fingerprint:
-        return False
-    # Fixed integrity policy: no repeated requests for unchanged/near-identical evidence.
-    return source_count - attempt['source_count'] >= 8

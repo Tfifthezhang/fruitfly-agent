@@ -1,21 +1,16 @@
 """Materialize owner-declared text bindings without changing the source profile."""
 from pathlib import Path
-import hashlib
 from fruitfly_agent.lab.catalog import load_system_config, bind_component_changes, materialize_system
 
 
 def validate_prepared_runtime(receipt):
     files = dict(receipt['runtime']['installation'].get('files', ()))
     source_root = Path(__file__).resolve().parents[2]
-    for relative in ('fruitfly_agent/run/runtime/usage.py', 'fruitfly_agent/run/cli.py', 'fruitfly_eval/harbor_agent.py',
-                     'fruitfly_agent/core/loop.py', 'fruitfly_agent/run/configuration/profile.py',
-                     'fruitfly_agent/run/runtime/assembly.py', 'fruitfly_agent/runtime_spec/execution.py',
-                     'fruitfly_agent/core/config.py', 'fruitfly_agent/lab/catalog/configuration.py',
-                     'fruitfly_agent/lab/catalog/parameters.py', 'fruitfly_agent/lab/execution_policy/__init__.py',
-                     'fruitfly_agent/run/configuration/templates/components/H/execution-policy.yaml', 'fruitfly_agent/runtime_spec/profiles.py', 'fruitfly_agent/runtime_spec/selections.py', 'fruitfly_eval/runtime.py'):
-        current = hashlib.sha256((source_root / relative).read_bytes()).hexdigest()
-        if files.get(relative) != current:
-            raise ValueError('prepared runtime lacks matching execution limits or facts; prepare current source again')
+    from fruitfly_eval.installation import installation_identity
+    expected = installation_identity(source_root)['files']
+    if any(files.get(relative) != digest for relative, digest in expected):
+        raise ValueError('prepared runtime lacks matching execution limits or facts (including declared parameter resources); prepare current source again')
+
 
 
 class RuntimeConfigBuilder:

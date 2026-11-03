@@ -24,3 +24,4 @@ Extend through [Information source contracts](../README.md#extend-a-source). Pre
 
 [snapshots.py](snapshots.py) exposes `FileMemorySnapshots(root, workspace)` for [Improvement state identity](../../../../improvement/README.md). It captures complete direct-child Markdown files up to 128 KB each, records an empty root explicitly, and rejects symlink roots/files. The snapshot adapter is registered during assembly but reads no files until explicitly frozen. Snapshot identity alone does not restore retrieval state; a compatible registered backend must restore frozen resources explicitly. Adopting a text candidate does not adopt trial file mutations.
 
+[defaults.yaml](defaults.yaml) owns the workspace memory root. Retained editable state remains separately owned by S; this source binding does not become an optimization grant.

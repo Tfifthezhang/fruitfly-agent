@@ -45,3 +45,22 @@ Recovery restores artifacts and explicit JSON state, not arbitrary Python object
 ```bash
 .venv/bin/python -m unittest tests.lab.test_rlm -v
 ```
+
+## Bind the query model
+
+`models.roles.context_query` defaults to `{inherit: executor}`. Set a catalog
+alias there for an independent query model. Both direct `ipython-tool` use and
+`rlm-ipython` consume the binding through Catalog's declared model-role contract. It controls `llm_query`;
+IPython execution itself does not call that model. Model bindings remain fixed
+experiment conditions, separate from editable query limits and instructions.
+
+## Configure instructions and numeric parameters together
+
+[ipython-tool.yaml](ipython-tool.yaml) owns `instructions.usage`,
+`instructions.query` and numeric workspace/query defaults.
+[rlm-ipython.yaml](rlm-ipython.yaml) owns `instructions.usage` and the offload
+threshold. Registered owner fields use the same typed parameter adapter and
+explicit experiment grants. Query guidance supplies the fallback system message;
+explicit `llm_query` system instructions retain their existing behavior. Input
+limits count both prompt and the effective system instructions. No extra model
+request is used to select, load or display these instructions.

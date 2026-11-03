@@ -5,6 +5,11 @@ profiles:
       catalog: models.yaml
       roles:
         executor: deepseek-flash-openai
+        editor: {inherit: executor}
+        assessor: {inherit: executor}
+        working_memory: {inherit: executor}
+        context_query: {inherit: executor}
+        context_summary: {inherit: executor}
     H:
       ssh-env:
         inline:

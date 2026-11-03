@@ -75,14 +75,14 @@ class Rule:
         documents = []
         for document in request.baseline.components:
             if document.component_id in request.plan.component_ids:
-                text = document.files[0].text
+                from tests.support.configuration import component_parameters, component_text, with_component_parameters, with_component_text
+                values = component_parameters(document)
                 if document.role == 'I':
-                    value = json.loads(text)
-                    value['instructions']['propose'] += ' STEP'
-                    text = json.dumps(value)
+                    values['instructions']['propose'] += ' STEP'
+                    document = with_component_parameters(document, values)
                 else:
-                    text += '\nSynthetic revision'
-                document = replace(document, files=(ComponentFile('instructions.txt', text),))
+                    text = component_text(document) + '\nSynthetic revision'
+                    document = with_component_text(document, text)
             documents.append(document)
         return ProposalResult((CandidateBundle(request.plan.parent, request.baseline, HarnessSnapshot(tuple(documents)),
             self.generator_id, tuple(EditReason(name, 'Synthetic observed difference', (request.records[0].run_id,), expected_effect='The proposed behavior appears in the subsequent execution.')

@@ -153,7 +153,8 @@ class ToolTestCase(unittest.IsolatedAsyncioTestCase):
     async def test_bash_timeout_raises_and_kills(self):
         with self.assertRaises(RuntimeError) as cm:
             await self.run_tool(create_bash_tool(), {"command": "sleep 30", "timeout": 1})
-        self.assertIn("aborted", str(cm.exception))
+        self.assertIn("timed out", str(cm.exception))
+        self.assertEqual("timeout", cm.exception.details["failure"]["code"])
 
     async def test_bash_truncation_persists_full_output(self):
         command = "python3 -c 'print(\"\\n\".join(str(i) for i in range(5000)))'"

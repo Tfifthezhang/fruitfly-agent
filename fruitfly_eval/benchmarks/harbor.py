@@ -24,7 +24,8 @@ from fruitfly_eval.harbor.host import HostConfig
 from fruitfly_eval.harbor.preparation import inspect as inspect_preparation, job_environment, load_preparation
 from fruitfly_eval.harbor.dependencies import dependency_environment
 from fruitfly_eval.harbor.material import write_json
-from fruitfly_eval.harbor.tasks import validate_coverage
+from fruitfly_eval.harbor.tasks import validate_coverage, coverage_report
+from fruitfly_eval.harbor.budget import execution_budget
 
 
 HARBOR_AGENT_IMPORT = "fruitfly_eval.harbor_agent:FruitFlyHarborAgent"
@@ -198,6 +199,11 @@ class HarborBenchmarkAdapter:
             variant=variant, execution=execution, jobs_dir=job_root, job_name=job_name,
             config_path=config_path, model_catalog=model_catalog,
             profile=selected_profile, secret_names=secret_names, host=host, preparation=preparation)
+        budget = execution_budget(preparation['tasks'], request.execution.attempts,
+            request.execution.concurrency, request.execution.timeout_seconds)
+        write_json(job_root / 'execution-budget.json', budget)
+        if progress is not None:
+            progress({'type': 'execution_budget', **budget})
         if progress is not None:
             progress({"type": "job_started", "job_id": job_name, "artifacts_path": str(job_root)})
         runner_error = None
@@ -210,23 +216,41 @@ class HarborBenchmarkAdapter:
         except (RuntimeError, KeyboardInterrupt) as exc:
             runner_error = str(exc) or "evaluation interrupted"
         job_result_path = job_root / job_name / "result.json"
+        errors = {"runner": runner_error} if runner_error else {}
         if not job_result_path.parent.is_dir():
             candidates = tuple(job_root.glob("*/result.json"))
-            if len(candidates) != 1:
-                raise RuntimeError((runner_error or "Harbor did not create a unique job result")
-                                   + f"\nFull runner log: {job_root / 'harbor.log'}")
-            job_result_path = candidates[0]
-        data = load_harbor_job_result(job_result_path, allow_partial=True)
-        trials, metrics = parse_harbor_job_result(data, job_id=job_name)
-        errors = {"runner": runner_error} if runner_error else {}
+            if len(candidates) == 1:
+                job_result_path = candidates[0]
+            else:
+                errors['results'] = 'Harbor did not create a unique job result; inspect harbor.log'
+        trials: list[dict[str, Any]] = []
+        metrics: list[dict[str, Any]] = []
+        if 'results' not in errors:
+            try:
+                data = load_harbor_job_result(job_result_path, allow_partial=True)
+                trials, metrics = parse_harbor_job_result(data, job_id=job_name)
+            except (OSError, ValueError) as exc:
+                errors['results'] = str(exc)
         try:
             validate_coverage(preparation["tasks"], trials, request.execution.attempts)
         except ValueError as exc:
             errors["coverage"] = str(exc)
             metrics = []  # Partial samples cannot establish a full selection score.
+        coverage = coverage_report(preparation['tasks'], trials, request.execution.attempts)
+        resume_requests = []
+        for missing in sorted(set(coverage['missing_results'].values())):
+            names = [task['name'] for task in preparation['tasks'] if coverage['missing_results'].get(task['id']) == missing]
+            draft = request.to_dict()
+            draft['benchmark']['task_names'] = names
+            draft['execution']['attempts'] = missing
+            resume_requests.append({'request': draft, 'requires_configuration_review': True})
+        write_json(job_root / 'resume-requests.json', {'requests': resume_requests,
+            'note': 'Review runtime source/model identities before executing. Drafts do not resume or combine scores automatically.'})
         payload: dict[str, Any] = {"schema_version": RESULT_SCHEMA_VERSION, "status": "failed" if errors else "completed", "metrics": metrics,
-            "errors": errors, "trials": trials,
-            "artifacts": [{"kind": "harbor_job", "path": str(job_result_path.parent)},
+            "errors": errors, "trials": trials, "coverage": coverage, "budget": budget,
+            "artifacts": [{"kind": "execution_budget", "path": str(job_root / "execution-budget.json")},
+                          {"kind": "resume_requests", "path": str(job_root / "resume-requests.json")},
+                          {"kind": "harbor_job", "path": str(job_result_path.parent)},
                           {"kind": "harbor_log", "path": str(job_root / "harbor.log")},
                           {"kind": "runtime_config", "path": str(config_path)},
                           {"kind": "model_catalog", "path": str(model_catalog)},

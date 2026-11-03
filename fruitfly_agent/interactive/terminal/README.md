@@ -268,3 +268,11 @@ cancelled calls have distinct markers, including when no success hook ran.
 
 Live tool output and final summaries have display bounds. Omitted live output has
 an explicit marker. These bounds do not alter stored messages or model context.
+
+Structured tool summaries come from owner-declared deterministic callbacks, with
+bounded fallback output. They add no model requests and keep the existing colors.
+Live fragments include their tool-call identity. Background starts remain Running;
+`/operations` lists retained handles and elapsed time, and
+`/operations cancel HANDLE` requests scoped cancellation. Completion notifications
+report observed state and do not generate assistant conclusions or restart a turn.
+Assistant intent and progress wording belongs to the configured base prompt.

@@ -103,7 +103,10 @@ class RunConfigurationController:
         self._replace_profile(replace(current, prompt=baseline.prompt, mechanisms=baseline.mechanisms,
             artifact_bindings=baseline.artifact_bindings, execution=baseline.execution,
             artifact_contents=baseline.artifact_contents, component_settings=baseline.component_settings,
-            component_documents=tuple(replace(d, reference={}) for d in baseline.component_documents),
+            component_documents=tuple(replace(d, reference=d.reference if d.reference.get('default') is True else {})
+                                      for d in baseline.component_documents),
+            source_files=tuple(source for source in current.source_files if not source.path.startswith('package:'))
+                + tuple(source for source in baseline.source_files if source.path.startswith('package:')),
             configured=baseline.configured))
         return _changed("restored default harness settings in the draft; model settings and credentials retained; save, then apply or start a session")
 
@@ -119,6 +122,13 @@ class RunConfigurationController:
         profile = self._draft.select(self._selected)
         warnings: list[str] = []
         ready = True
+        for source in profile.source_files:
+            if source.path.startswith('package:'):
+                try:
+                    source.check()
+                except (OSError, ValueError) as exc:
+                    warnings.append(str(exc) + '; reload configuration before applying')
+                    ready = False
         try:
             models = self._models(profile)
             selected_model = profile.model_profile
@@ -485,6 +495,9 @@ class RunConfigurationController:
             profiles=self._draft.profiles,
         )
         for profile in candidate.profiles.values():
+            for source in profile.source_files:
+                if source.path.startswith('package:'):
+                    source.check()
             self._catalog.resolve(profile.mechanisms)
             if self.mechanism_setup is not None:
                 for item in profile.mechanisms:
@@ -513,6 +526,9 @@ class RunConfigurationController:
         selected = self._selected
 
         def commit(activate):
+            for source in profile.source_files:
+                if source.path.startswith('package:'):
+                    source.check()
             if (self._draft != draft or self._selected != selected or
                     setup is not None and (setup.payloads() != payloads or setup.credentials.values != secrets)):
                 raise ValueError('configuration draft changed while preparing; retry application')

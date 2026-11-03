@@ -150,7 +150,7 @@ class ModelQueryBrokerTest(unittest.IsolatedAsyncioTestCase):
                 config=ModelQueryConfig(
                     
                     max_concurrent=1,
-                    max_input_chars=100,
+                    max_input_chars=256,
                     max_output_tokens=20,
                     
                     max_inline_result_chars=100,
@@ -242,7 +242,7 @@ class RlmAssemblyTest(unittest.TestCase):
             result = assemble_lab(
                 AgentLoopConfig(provider=main, model="main-model"),
                 catalog=builtin_catalog(),
-                selections=(MechanismSelection("ipython-tool"),),
+                selections=(MechanismSelection("ipython-tool", parameters={"query_model_profile": "child-profile"}),),
                 context=AssemblyContext(
                     workspace=root,
                     session=object(),
@@ -260,7 +260,7 @@ class RlmAssemblyTest(unittest.TestCase):
             self.assertEqual(result.context_pipeline.profile.reduction, ())
             self.assertEqual(result.context_pipeline.profile.augmentation, ('instruction-components.tool-catalog',))
             self.assertIn("ipython-tool", result.components)
-            self.assertEqual([(None, 4096)], resolver_calls)
+            self.assertEqual([("child-profile", 4096)], resolver_calls)
 
     def test_rlm_reuses_single_ipython_runtime(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -286,14 +286,14 @@ class RlmAssemblyTest(unittest.TestCase):
             result = assemble_lab(
                 AgentLoopConfig(provider=FauxProvider(), model="main-model"),
                 catalog=builtin_catalog(),
-                selections=(MechanismSelection("ipython-tool"), MechanismSelection("rlm-ipython")),
+                selections=(MechanismSelection("ipython-tool", parameters={"query_model_profile": "child-profile"}), MechanismSelection("rlm-ipython")),
                 context=context,
             )
             self.assertEqual(["ipython"], [tool.name for tool in result.config.tools])
             self.assertEqual(("rlm-ipython",), result.context_pipeline.profile.externalization)
             self.assertIn("ipython-tool", result.components)
             self.assertNotIn("rlm-ipython", result.components)
-            self.assertEqual([(None, 4096)], resolver_calls)
+            self.assertEqual([("child-profile", 4096)], resolver_calls)
 
 
 class StandaloneIpythonToolTest(unittest.IsolatedAsyncioTestCase):
@@ -303,7 +303,7 @@ class StandaloneIpythonToolTest(unittest.IsolatedAsyncioTestCase):
             result = assemble_lab(
                 AgentLoopConfig(provider=FauxProvider(), model="main-model"),
                 catalog=builtin_catalog(),
-                selections=(MechanismSelection("ipython-tool"),),
+                selections=(MechanismSelection("ipython-tool", parameters={"query_model_profile": "child-profile"}),),
                 context=AssemblyContext(
                     workspace=root, session=object(), main_model="main-model",
                     provider_resolver=lambda *_: ProviderBinding(
@@ -344,13 +344,13 @@ class RlmPipelineTest(unittest.IsolatedAsyncioTestCase):
                 selections=(
                                         MechanismSelection(
                         "working-memory-reduction",
-                        parameters={},
+                        parameters={"memory_model_profile": "child-profile"},
                     ),
                     MechanismSelection(
                         "rlm-ipython",
                         parameters={"offload_threshold_chars": 1_000},
                     ),
-                    MechanismSelection("ipython-tool"),
+                    MechanismSelection("ipython-tool", parameters={"query_model_profile": "child-profile"}),
                 ),
                 context=AssemblyContext(
                     workspace=root,

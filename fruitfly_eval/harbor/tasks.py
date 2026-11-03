@@ -139,6 +139,15 @@ def validate_coverage(tasks: list[dict[str, Any]], trials: list[dict[str, Any]],
         raise ValueError("Harbor results do not match the prepared task set and attempt count")
 
 
+def coverage_report(tasks: list[dict[str, Any]], trials: list[dict[str, Any]], attempts: int) -> dict[str, Any]:
+    by_name = {task['name']: task['id'] for task in tasks}
+    expected = Counter({task['id']: attempts for task in tasks})
+    observed = Counter(by_name.get(t['task_id'], t['task_id']) for t in trials)
+    return {'expected_attempts': sum(expected.values()), 'observed_results': len(trials),
+        'missing_results': dict(expected - observed), 'unexpected_results': dict(observed - expected),
+        'note': 'Missing results can be unstarted or interrupted attempts; no task success is inferred.'}
+
+
 def preparation_key(descriptor: BenchmarkDescriptor, variant: str) -> str:
     selection = next(item for item in descriptor.variants if item.variant_id == variant)
     return digest({"selection_contract": 2, "dataset": descriptor.dataset, "version": descriptor.version,

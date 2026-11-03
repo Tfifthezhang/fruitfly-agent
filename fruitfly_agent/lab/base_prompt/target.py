@@ -41,4 +41,4 @@ def configuration_surface():
         return {}
     return ConfigurationSurface('base_prompt','H','prompt','',normalize,
         encode=lambda p:p['instructions']['system'], decode=lambda text:{'instructions':{'system':text}},
-        edit_options=options,reference=reference)
+        edit_options=options,reference=reference, default_resource=(__package__, 'defaults.yaml'))

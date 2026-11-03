@@ -66,7 +66,7 @@ class CatalogTest(unittest.TestCase):
                     selections=(
                                                 MechanismSelection(
                             "working-memory-reduction",
-                            parameters={},
+                            parameters={"memory_model_profile": "summary"},
                         ),
                     ),
                     context=AssemblyContext(

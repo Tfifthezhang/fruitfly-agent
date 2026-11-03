@@ -1,4 +1,6 @@
 """Optional benchmark adapters use real stage contracts without Docker or models."""
+from tests.support.configuration import component_parameters, with_component_parameters, with_component_text, component_text
+from fruitfly_eval.installation import installation_identity
 from tests.support.configuration import profile_document
 import asyncio
 from dataclasses import replace
@@ -45,13 +47,7 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
         host = root / 'host.yaml'; host.write_text('prepared host identity')
         task = root / 'task'; task.mkdir(); (task / 'instruction.md').write_text('Complete an external task.')
         source = Path(__file__).resolve().parents[2]
-        files = [(name, hashlib.sha256((source / name).read_bytes()).hexdigest()) for name in
-            ('fruitfly_agent/run/runtime/usage.py', 'fruitfly_agent/run/cli.py', 'fruitfly_eval/harbor_agent.py',
-             'fruitfly_agent/core/loop.py', 'fruitfly_agent/run/configuration/profile.py',
-             'fruitfly_agent/run/runtime/assembly.py', 'fruitfly_agent/runtime_spec/execution.py',
-             'fruitfly_agent/core/config.py', 'fruitfly_agent/lab/catalog/configuration.py',
-                     'fruitfly_agent/lab/catalog/parameters.py', 'fruitfly_agent/lab/execution_policy/__init__.py',
-                     'fruitfly_agent/run/configuration/templates/components/H/execution-policy.yaml', 'fruitfly_agent/runtime_spec/profiles.py', 'fruitfly_agent/runtime_spec/selections.py', 'fruitfly_eval/runtime.py')]
+        files = installation_identity(source)['files']
         receipt = {'id': 'prepared-identity', 'runtime': {'installation': {'files': files}},
             'tasks': [{'id': 'external/task', 'path': str(task)}]}
         plan = RunPlan('experiment', version(), ('base_prompt',), generator_id='rule')
@@ -92,7 +88,7 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
                 class Generator:
                     generator_id = 'rule'; required_capabilities = frozenset()
                     async def propose(self, request, services):
-                        document = replace(request.baseline.components[0], files=(ComponentFile('instructions.txt', 'candidate'),))
+                        document = with_component_text(request.baseline.components[0], 'candidate')
                         candidate = CandidateBundle(request.plan.parent, request.baseline, HarnessSnapshot((document,)), 'rule',
                             (EditReason('base_prompt', 'Evidence-driven proposal', (request.records[0].run_id,), expected_effect='The proposed behavior appears in the subsequent execution.'),))
                         return ProposalResult((candidate,))
@@ -102,7 +98,7 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
                 result = await flow.run(context.plan, prepared.task, context.components.snapshot(), context.services)
                 self.assertEqual(calls, [False, True])
                 self.assertEqual(context.services.used, {'model': 4, 'execution': 2})
-                self.assertEqual(result.harness.components[0].files[0].text, 'candidate')
+                self.assertEqual(component_text(result.harness.components[0]), 'candidate')
                 self.assertEqual(result.decision.assurance, 'selected')
                 self.assertTrue(all('PRIVATE' not in context.artifacts.read(a.artifact_id).decode() for r in result.records for a in r.artifacts))
                 self.assertTrue(all('reward' not in r.output for r in result.records))
@@ -212,8 +208,8 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
                 ports = study.build(context, prepared)
                 baseline = context.components.snapshot()
                 document = baseline.component('improvement-editor')
-                values = json.loads(document.files[0].text); values['instructions']['propose'] += ' STEP'
-                changed = replace(document, files=(ComponentFile('instructions.txt', json.dumps(values)),))
+                values = component_parameters(document); values['instructions']['propose'] += ' STEP'
+                changed = with_component_parameters(document, values)
                 candidate = HarnessSnapshot(tuple(changed if d.component_id == changed.component_id else d for d in baseline.components))
                 before = await ports.runner.trial(baseline, 'development')
                 after = await ports.runner.trial(candidate, 'development')

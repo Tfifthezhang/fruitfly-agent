@@ -13,6 +13,7 @@ from typing import Any, Mapping
 
 import yaml
 
+from .model_roles import ModelRoleBinding, normalize_model_roles, resolve_model_roles
 from .selections import MechanismSelection
 from .execution import validate_execution
 from .components import ComponentConfiguration
@@ -35,7 +36,7 @@ class HarnessProfile:
     artifact_bindings: Mapping[str, str] = field(default_factory=dict)
     execution: Mapping[str, Any] = field(default_factory=dict)
     component_documents: tuple[ComponentConfiguration, ...] = ()
-    model_roles: Mapping[str, str] = field(default_factory=dict)
+    model_roles: Mapping[str, ModelRoleBinding] = field(default_factory=dict)
     source_files: tuple = field(default=(), compare=False, repr=False)
     artifact_contents: Mapping[str, str] = field(default_factory=dict, repr=False)
     configured: bool = field(default=False, compare=False, repr=False)
@@ -64,13 +65,14 @@ class HarnessProfile:
         object.__setattr__(self, 'component_documents', tuple(self.component_documents))
         if len({d.id for d in self.component_documents}) != len(self.component_documents):
             raise ValueError('component IDs must be distinct across H/S/I')
-        if not isinstance(self.model_roles, Mapping) or any(not isinstance(k, str) or not k or
-                not isinstance(v, str) or not v for k, v in self.model_roles.items()):
-            raise ValueError('model roles must map role names to catalog aliases')
-        object.__setattr__(self, 'model_roles', dict(self.model_roles))
+        object.__setattr__(self, 'model_roles', normalize_model_roles(self.model_roles))
         object.__setattr__(self, 'artifact_contents', dict(self.artifact_contents))
         if not isinstance(self.prompt, str) or not self.prompt.strip():
             raise ValueError("harness profile prompt must be a non-empty reference")
+
+    def resolved_model_roles(self, executor: str) -> dict[str, str]:
+        """Resolve inherited bindings against the current executor without pinning them."""
+        return resolve_model_roles(self.model_roles, executor)
 
     @property
     def profile_hash(self) -> str:
@@ -111,8 +113,12 @@ class HarnessProfile:
         for document in self.component_documents:
             groups[document.role][document.id] = (dict(document.reference) if references and document.reference
                                                 else {'inline': document.to_dict()})
+        roles = {**self.model_roles, **({'executor': self.model_profile} if self.model_profile else {})}
+        ordered = ({'executor': roles['executor']} if 'executor' in roles else {})
+        ordered.update({role: binding for role, binding in roles.items() if role != 'executor'})
         return {'models': {'catalog': self.model_catalog,
-                           'roles': {**self.model_roles, **({'executor': self.model_profile} if self.model_profile else {})}},
+                           'roles': {role: dict(binding) if isinstance(binding, Mapping) else binding
+                                     for role, binding in ordered.items()}},
                 **groups, **({'extensions': list(self.extensions)} if self.extensions else {})}
 
 
@@ -197,7 +203,15 @@ def _component_profile(profile_id, raw, target, reader):
         if not isinstance(entries, dict):
             raise ValueError(role + ' components must be a mapping')
         for name, reference in entries.items():
-            value, origin = reader.reference(reference, target)
+            if isinstance(reference, dict) and 'default' in reference:
+                mapping(reference, {'default', 'enabled'}, 'default component reference')
+                if reference['default'] is not True or type(reference.get('enabled', True)) is not bool:
+                    raise ValueError('default component reference requires true and an optional boolean enabled')
+                value = {'id': name, 'role': role, 'implementation': name,
+                         'enabled': reference.get('enabled', True), 'parameters': {}}
+                origin = target
+            else:
+                value, origin = reader.reference(reference, target)
             document = ComponentConfiguration.from_dict(value, source=str(origin), reference=reference)
             if document.id != name or document.role != role:
                 raise ValueError('component ID/role differs from its configuration position: ' + str(name))

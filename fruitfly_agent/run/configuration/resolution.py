@@ -144,6 +144,9 @@ def resolve_profile_models(
         raise ValueError(
             f"unknown model profile {selected!r} (available: {available})"
         ) from exc
+    for alias in profile.resolved_model_roles(selected).values():
+        if alias not in models:
+            raise ValueError('unknown model role profile: ' + alias)
     return models, selected, spec
 
 

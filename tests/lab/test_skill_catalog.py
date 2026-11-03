@@ -155,5 +155,95 @@ class TestSkills(unittest.TestCase):
             SkillCatalogTransformer("", max_chars=True)
 
 
+class SkillResourceTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        from tests.support.assembly import AssemblyWorkspace
+        self.root = Path(self.enterContext(tempfile.TemporaryDirectory())).resolve()
+        self.workspace = AssemblyWorkspace(self.root)
+        self.path = self.root / '.skills/example/SKILL.md'
+        self.path.parent.mkdir(parents=True)
+        self.path.write_text('---\nname: example\ndescription: Original description\n---\nOriginal body')
+        references = self.path.parent / 'references'
+        references.mkdir()
+        (references / 'guide.md').write_text('Original reference')
+
+    def assemble(self, session):
+        from fruitfly_agent.lab.catalog import builtin_catalog, PermissionPolicy, MechanismSelection
+        from fruitfly_agent.runtime_spec import HarnessProfile
+        profile = HarnessProfile('test', str(self.workspace.model_path), 'offline',
+            tuple(MechanismSelection(name) for name in ('local-env', 'read-tool', 'skill-catalog')))
+        return self.workspace.assemble(profile, session, catalog=builtin_catalog(),
+            permission_policy=PermissionPolicy.unrestricted(self.root))
+
+    async def test_provider_directory_body_and_relative_text_use_one_snapshot_until_reassembly(self):
+        from fruitfly_agent.core.session import Session
+        from fruitfly_agent.core.loop import run_agent_loop
+        from fruitfly_agent.core.data_model import UserMessage
+        with Session(self.root / 'first.jsonl') as session:
+            runtime = self.assemble(session)
+            provider = runtime.config.provider
+            prefix = f'resource://{runtime.config.readable_resources.scope}/skills/.skills/example/'
+            self.path.write_text('---\nname: example\ndescription: Updated description\n---\nUpdated body')
+            (self.path.parent / 'references/guide.md').write_text('Updated reference')
+            provider.respond_tool_call('read', {'path': prefix + 'SKILL.md'})
+            provider.respond_tool_call('read', {'path': prefix + 'references/guide.md'})
+            provider.respond_text('done')
+            try:
+                result = await run_agent_loop(runtime.config, [UserMessage('Inspect the skill')],
+                                              context_pipeline=runtime.context_pipeline)
+                self.assertFalse(result.is_error)
+                self.assertIn('Original description', provider.calls[0]['system_prompt'])
+                self.assertNotIn('Updated description', provider.calls[0]['system_prompt'])
+                self.assertIn(prefix + 'SKILL.md', provider.calls[0]['system_prompt'])
+                texts = [m.text for m in result.messages if m.role == 'toolResult']
+                self.assertIn('Original body', texts[0])
+                self.assertEqual('Original reference', texts[1])
+            finally:
+                runtime.config.readable_resources.close()
+        with Session(self.root / 'second.jsonl') as session:
+            runtime = self.assemble(session)
+            try:
+                snapshot = runtime.components['skill-catalog-resources']
+                self.assertEqual('Updated description', snapshot.skills[0].description)
+                self.assertIn('Updated body', snapshot.skills[0].content)
+            finally:
+                runtime.config.readable_resources.close()
+
+    async def test_skill_read_does_not_use_the_selected_remote_filesystem_and_retired_resources_fail(self):
+        from fruitfly_agent.core.session import Session
+        from fruitfly_agent.core.tool_runtime import ToolCallContext
+        class RemoteFilesystem:
+            def __getattr__(self, name):
+                raise AssertionError('Skill text must stay on the host resource path')
+        with Session(self.root / 'ssh.jsonl') as session:
+            runtime = self.assemble(session)
+            resources = runtime.config.readable_resources
+            uri = f'resource://{resources.scope}/skills/.skills/example/SKILL.md'
+            read = next(t for t in runtime.config.tools if t.name == 'read')
+            result = await read.execute(ToolCallContext('read-skill', 'read', {'path': uri}, RemoteFilesystem()))
+            self.assertIn('Original body', result.content[0].text)
+            resources.close()
+            with self.assertRaisesRegex(ValueError, 'retired'):
+                await read.execute(ToolCallContext('retired', 'read', {'path': uri}, RemoteFilesystem()))
+
+    def test_diagnostics_are_retained_and_changes_during_capture_are_rejected(self):
+        from fruitfly_agent.lab.context_manager.augmentation.skills.resources import capture_skills
+        from fruitfly_agent.core.session import Session
+        self.path.write_text('---\nname: example\n---\nbody')
+        with Session(self.root / 'diagnostics.jsonl') as session:
+            runtime = self.assemble(session)
+            try:
+                captured = runtime.components['skill-catalog-resources']
+                self.assertTrue(any('description' in item for item in captured.diagnostics))
+                self.assertTrue(any(entry.payload.get('kind') == 'contextSourceDiagnostics' for entry in session.read_all()))
+            finally:
+                runtime.config.readable_resources.close()
+        stale = load_skills(self.root / '.skills')
+        self.path.write_text('Concurrent edit')
+        with patch('fruitfly_agent.lab.context_manager.augmentation.skills.resources.load_skills', return_value=stale):
+            with self.assertRaisesRegex(ValueError, 'changed during assembly'):
+                capture_skills(self.root / '.skills', self.root)
+
+
 if __name__ == "__main__":
     unittest.main()

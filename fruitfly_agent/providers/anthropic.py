@@ -200,8 +200,10 @@ class AnthropicProvider(MediaInput):
         manager = self._client.messages.stream(**request)
         entered = False
         try:
+            deadline.switch_phase('connect_or_headers')
             sdk_stream = await deadline.wait(manager.__aenter__(), signal)
             entered = True
+            deadline.switch_phase('stream')
             iterator = sdk_stream.__aiter__()
             while True:
                 try:
@@ -219,17 +221,24 @@ class AnthropicProvider(MediaInput):
                     if meaningful:
                         deadline.progress()
                         yield mapped
+            deadline.switch_phase('final_response')
             final = await deadline.wait(sdk_stream.get_final_message(), signal)
-        except TaggedError:
+        except TaggedError as exc:
+            deadline.note_error(exc)
             raise
         except Exception as exc:
             status = getattr(exc, "status_code", None)
-            raise retry_details(exc, classify_error(exc, status_code=status)) from exc
+            error = classify_error(exc, status_code=getattr(exc, 'status_code', None))
+            error.details['diagnostics']['phase'] = deadline.phase
+            error.details['failure']['stage'] = deadline.phase
+            deadline.note_error(error)
+            raise retry_details(exc, error) from exc
         finally:
             if entered:
-                await close_transport(manager.__aexit__(None, None, None), self._policy.cleanup_timeout)
+                await close_transport(manager.__aexit__(None, None, None), self._policy.cleanup_timeout, deadline=deadline)
         if final is None:
             raise FatalError('Messages stream ended without a final message')
+        deadline.switch_phase('assemble')
         message = self._assemble(final)
         items = [{'role': 'assistant', 'content': wire_value(final.content)}]
         yield StreamDone(result=self._replay.attach(message, effective, tools, prefix, items))

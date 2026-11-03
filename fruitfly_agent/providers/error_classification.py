@@ -11,6 +11,8 @@ import json
 import re
 import socket
 import ssl
+import errno
+from fruitfly_agent.core.observation import FailureCause, FailureInfo
 from typing import Any
 
 from fruitfly_agent.core.errors import FatalError, OverflowError, RetryableError, TaggedError
@@ -94,8 +96,20 @@ def classify_provider_error(
     resolved_status = _status_code(exc, status_code)
     text = _classification_text(exc)
     non_overflow = any(pattern.search(text) for pattern in _NON_OVERFLOW_PATTERNS)
-    details: dict[str, Any] = {"status_code": resolved_status,
-                               "diagnostics": {"causes": _exception_causes(exc)}}
+    causes = _exception_causes(exc)
+    code = next((row['category'] for row in reversed(causes) if row['category'] != 'unknown'), 'unknown')
+    evidence = 'exception_type' if code != 'unknown' else 'unknown'
+    if code == 'unknown' and re.search(r'Unterminated string|Invalid JSON|Expecting (?:value|property name)', text, re.I):
+        code, evidence = 'response_parse', 'message_pattern'
+    if code == 'unknown' and resolved_status is not None:
+        code = ('authentication' if resolved_status in {401, 403} else 'rate_limit' if resolved_status == 429
+            else 'service_unavailable' if resolved_status >= 500 else 'http_error')
+        evidence = 'http_status'
+    details: dict[str, Any] = {'status_code': resolved_status,
+        'diagnostics': {'causes': causes, 'failure_category': code, 'evidence_kind': evidence},
+        'failure': FailureInfo('provider', 'request', code, evidence, exception_type=type(exc).__name__,
+            causes=tuple(FailureCause(row['type'], row['category'], row.get('errno')) for row in causes),
+            http_status=resolved_status).to_dict()}
 
     if not non_overflow and any(pattern.search(text) for pattern in _OVERFLOW_PATTERNS):
         return OverflowError(str(exc), details=details)
@@ -136,10 +150,23 @@ def _exception_causes(exc: BaseException) -> list[dict[str, Any]]:
             category = 'connection_reset'
         elif isinstance(current, ConnectionError):
             category = 'connection'
+        if category == 'unknown':
+            category = {'ConnectTimeout': 'connect_timeout', 'ReadTimeout': 'read_timeout',
+                'WriteTimeout': 'write_timeout', 'PoolTimeout': 'pool_timeout',
+                'ConnectError': 'connection', 'ReadError': 'connection_read', 'WriteError': 'connection_write',
+                'ProxyError': 'proxy', 'RemoteProtocolError': 'response_protocol',
+                'LocalProtocolError': 'request_protocol', 'JSONDecodeError': 'response_parse',
+                'APIResponseValidationError': 'response_schema', 'APITimeoutError': 'timeout',
+                'APIConnectionError': 'connection'}.get(type(current).__name__, 'unknown')
+        if isinstance(current, json.JSONDecodeError):
+            category = 'response_parse'
         row: dict[str, Any] = {'type': type(current).__name__[:80], 'category': category}
         number = getattr(current, 'errno', None)
         if type(number) is int:
             row['errno'] = number
+            row['category'] = {errno.ECONNREFUSED: 'connection_refused', errno.ECONNRESET: 'connection_reset',
+                errno.ENETUNREACH: 'network_unreachable', errno.EHOSTUNREACH: 'host_unreachable',
+                errno.ETIMEDOUT: 'connect_timeout'}.get(number, category)
         result.append(row)
         current = current.__cause__ or (None if current.__suppress_context__ else current.__context__)
     return result

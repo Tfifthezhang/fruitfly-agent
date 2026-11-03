@@ -1,9 +1,10 @@
 """A compact reusable Skill body, independent of catalog guidance and source files."""
+from fruitfly_agent.runtime_spec.documents import parameter_default
 from fruitfly_agent.core.mechanisms import MechanismDescriptor, MechanismContribution, ParameterDescriptor
 from fruitfly_agent.lab.improvement.targets.retained import install_retained, configuration_edit
-from fruitfly_agent.lab.improvement.targets.state import WorkspaceTextSnapshots
 from fruitfly_agent.improvement.contracts.versions import STATE_SNAPSHOTS_COMPONENT
 from .catalog import load_skill_document
+from .resources import capture_skills
 
 SKILL_DOCUMENT = 'skill-document'
 
@@ -16,13 +17,13 @@ def definition():
         contributions=(MechanismContribution('online', 'context', 'augmentation'),),
         parameters=(ParameterDescriptor('initial_text', 'string', 'Initial skill text',
             'Starting procedural document. Adopted artifacts take precedence; source Skill files are unchanged.',
-            '# Reusable skill\nNo validated procedures recorded yet.'),
+            parameter_default('fruitfly_agent.lab.context_manager.augmentation.skills', 'skill-document.yaml', 'content.body')),
             ParameterDescriptor('source_path', 'string', 'Source Skill file',
-                'Optional workspace-relative SKILL.md. Its body seeds the target; relative references keep its directory.', ''),
+                'Optional workspace-relative SKILL.md. Its body seeds the target; relative references keep its directory.', parameter_default('fruitfly_agent.lab.context_manager.augmentation.skills', 'skill-document.yaml', 'settings.source_path')),
             ParameterDescriptor('max_chars', 'integer', 'Document characters',
-                'Maximum complete Skill body projected into context.', 16000, minimum=128, maximum=30000)),
+                'Maximum complete Skill body projected into context.', parameter_default('fruitfly_agent.lab.context_manager.augmentation.skills', 'skill-document.yaml', 'settings.max_chars'), minimum=128, maximum=30000)),
         install_order=32), _install, implementation_id='retained-skill-v1',
-        artifact_slots=frozenset({SKILL_DOCUMENT}), configuration_role='S',
+        artifact_slots=frozenset({SKILL_DOCUMENT}), configuration_role='S', default_resource=(__package__, 'skill-document.yaml'),
         configuration_edit=configuration_edit,
         parameter_paths={'initial_text':'content.body','source_path':'settings.source_path','max_chars':'settings.max_chars'},
         configuration_snapshot=_snapshot,
@@ -41,7 +42,7 @@ def _snapshot(parameters, workspace):
     if path.is_absolute() or not (workspace / path).resolve().is_relative_to(workspace):
         raise ValueError('source Skill must be workspace-relative')
     load_skill_document(workspace / path)
-    return WorkspaceTextSnapshots((workspace / path).parent, workspace).freeze()
+    return capture_skills((workspace / path).parent, workspace).freeze()
 
 
 def _install(state, context, parameters):
@@ -52,9 +53,16 @@ def _install(state, context, parameters):
         if Path(parameters['source_path']).is_absolute() or not path.resolve().is_relative_to(context.workspace):
             raise ValueError('source Skill must be workspace-relative')
         skill = load_skill_document(path)
-        initial, label, reference_directory = skill.content, 'Skill: ' + skill.name, str(path.parent.resolve())
+        captured = capture_skills(path.parent, context.workspace)
+        entry = next(item for item in captured.snapshot.files
+                     if item.path == path.relative_to(context.workspace).as_posix())
+        if entry.content != skill.source_text:
+            raise ValueError('Skill changed during assembly; reload')
+        locations = captured.mount(context.resources, 'skill-document')
+        initial, label = skill.content, 'Skill: ' + skill.name
+        reference_directory = locations[str(path.resolve())].rsplit('/', 1)[0]
         state = state.with_component(STATE_SNAPSHOTS_COMPONENT,
-            (*state.components.get(STATE_SNAPSHOTS_COMPONENT, ()), WorkspaceTextSnapshots(path.parent, context.workspace)))
+            (*state.components.get(STATE_SNAPSHOTS_COMPONENT, ()), captured))
     return install_retained(state, context, key=SKILL_DOCUMENT, label=label,
         schema='skill-document-v1', initial=initial, max_chars=parameters['max_chars'],
         reference_directory=reference_directory)

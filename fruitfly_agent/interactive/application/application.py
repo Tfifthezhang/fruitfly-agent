@@ -11,6 +11,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Mapping
 
+from fruitfly_agent.core.observation import (ObservationContext, OperationScope, bind_observation, current_observation, operation, start_operation)
 from fruitfly_agent.core.data_model import AgentLoopResult, ImageBlock
 from fruitfly_agent.core.data_model.media import UserContent, normalize_input
 
@@ -58,7 +59,7 @@ class AgentApplication:
         self._handle: RuntimeHandle | None = None
         self._state = ApplicationState.CLOSED
         self._submission_lock = asyncio.Lock()
-        self._pending: deque[UserContent] = deque()
+        self._pending: deque[tuple[UserContent, OperationScope]] = deque()
         self._worker: asyncio.Task[None] | None = None
         self._event_sink: EventSink | None = None
         self._authorization_enabled = False
@@ -107,6 +108,10 @@ class AgentApplication:
             permission_read_roots=tuple(self._require_handle().manifest.get('permissions', {}).get('read_roots', ())),
             permission_write_roots=tuple(self._require_handle().manifest.get('permissions', {}).get('write_roots', ())),
         )
+
+    @property
+    def operations(self):
+        return self._require_handle().operations
 
     @property
     def pending_count(self) -> int:
@@ -216,21 +221,38 @@ class AgentApplication:
 
     async def submit(self, prompt: UserContent) -> AgentLoopResult:
         prompt = self.validate_input(prompt)
-        async with self._submission_lock:
-            self._check_submission_state("submit")
-            self._state = ApplicationState.RUNNING
+        context = self._observation_context()
+        with bind_observation(context):
+            with operation('application.queue_lock', origin='application'):
+                await self._submission_lock.acquire()
             try:
-                result = await self._require_handle().session.submit(prompt)
-                self._last_result = result
-                return result
+                self._check_submission_state("submit")
+                self._state = ApplicationState.RUNNING
+                try:
+                    result = await self._require_handle().session.submit(prompt)
+                    self._last_result = result
+                    return result
+                finally:
+                    if self._state == ApplicationState.RUNNING:
+                        self._state = ApplicationState.IDLE
             finally:
-                if self._state == ApplicationState.RUNNING:
-                    self._state = ApplicationState.IDLE
+                self._submission_lock.release()
+
+    def _observation_context(self) -> ObservationContext:
+        return getattr(self._handle, 'observation_context', None) or current_observation()
+
+    def _clear_pending(self) -> None:
+        while self._pending:
+            _, observed = self._pending.popleft()
+            observed.state = 'cancelled'
+            observed.finish()
 
     def enqueue(self, prompt: UserContent) -> int:
         prompt = self.validate_input(prompt)
         self._check_submission_state("queue")
-        self._pending.append(prompt)
+        with bind_observation(self._observation_context()):
+            observed = start_operation('application.queue', origin='application')
+        self._pending.append((prompt, observed))
         if self._worker is None or self._worker.done():
             self._worker = asyncio.create_task(self._drain_queue())
         return len(self._pending)
@@ -240,7 +262,7 @@ class AgentApplication:
 
     def cancel(self) -> bool:
         had_pending = bool(self._pending)
-        self._pending.clear()
+        self._clear_pending()
         if self._state == ApplicationState.IMPROVING:
             return self._improvement_job.cancel()
         return self._require_handle().session.cancel() or had_pending
@@ -490,7 +512,7 @@ class AgentApplication:
         if self._state == ApplicationState.IMPROVING:
             raise RuntimeError("cancel or finish improvement before rebuilding")
         self._state = ApplicationState.REBUILDING
-        self._pending.clear()
+        self._clear_pending()
         self.cancel()
         try:
             await self._quiesce()
@@ -618,7 +640,7 @@ class AgentApplication:
         if self._state == ApplicationState.IMPROVING:
             self.cancel()
         self._state = ApplicationState.CLOSING
-        self._pending.clear()
+        self._clear_pending()
         if self._handle is not None:
             self._handle.session.cancel()
         await self._quiesce()
@@ -636,12 +658,13 @@ class AgentApplication:
     async def _drain_queue(self) -> None:
         self._last_error = None
         while self._pending:
-            prompt = self._pending.popleft()
+            prompt, observed = self._pending.popleft()
+            observed.finish()
             try:
                 await self.submit(prompt)
             except BaseException as exc:
                 self._last_error = exc
-                self._pending.clear()
+                self._clear_pending()
                 return
 
     def _require_handle(self) -> RuntimeHandle:

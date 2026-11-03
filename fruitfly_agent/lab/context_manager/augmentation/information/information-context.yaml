@@ -1,0 +1,7 @@
+id: information-context
+role: H
+implementation: information-context
+parameters:
+  settings:
+    top_k: 5
+    max_chars: 4000

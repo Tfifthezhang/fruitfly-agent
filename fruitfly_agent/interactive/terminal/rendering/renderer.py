@@ -12,6 +12,7 @@ from fruitfly_agent.interactive.contracts.events import (
     AuthorizationRequested,
     AuthorizationResolved,
     AssistantTextDelta,
+    ManagedOperationChanged,
     AssistantThinkingDelta,
     CompactionStarted,
     InteractiveEvent,
@@ -244,10 +245,18 @@ class TerminalRenderer:
             self._write(text)
             self._line_open = True
             return
+        if isinstance(event, ManagedOperationChanged):
+            if event.state != 'running':
+                self._newline()
+                color = _RED if event.state in {'failed', 'cleanup_unconfirmed'} else _YELLOW if event.state == 'cancelled' else _GREEN_BOLD
+                self._write(f"[background {safe_terminal_text(event.handle)} · {safe_terminal_text(event.state)} · {event.elapsed_seconds:.1f}s]\n", color)
+            return
         if isinstance(event, ToolStarted):
             self._flush_markdown()
             self._newline()
             args = summarize_arguments(event.arguments)
+            if event.presentation and event.presentation.get('target'):
+                args = truncate_cells(safe_terminal_text(event.presentation['target']), 240)
             description = _tool_description(event.description, event.tool_name, content_columns(self.output))
             self._write(
                 f"◐ {description}\n",
@@ -282,11 +291,16 @@ class TerminalRenderer:
             suffix = " · requested stop" if event.terminate else ""
             preview = (summarize_result(event.output) if event.status not in {'failed', 'cancelled'} else
                        truncate_cells(' '.join(safe_terminal_text(event.output).split()), 240))
+            if event.presentation and event.presentation.get('summary'):
+                preview = truncate_cells(' '.join(safe_terminal_text(event.presentation['summary']).split()), 240)
+            execution_state = (event.presentation or {}).get('execution_state')
             marker, status, color = {
                 'succeeded': ('✓', 'Completed', _GREEN_BOLD),
                 'failed': ('✗', 'Failed', _RED),
                 'cancelled': ('○', 'Cancelled', _YELLOW),
             }.get(event.status, ('·', 'Finished', _category_color(event.category)))
+            if execution_state == 'running':
+                marker, status, color = '◐', 'Running', _category_color(event.category)
             description = _tool_description(event.description, event.tool_name,
                 content_columns(self.output) - len(status) - len(suffix) - 3)
             self._write(

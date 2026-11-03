@@ -161,6 +161,8 @@ async def recover_from_overflow(
     committed = await _commit_decision(ctx, hooks, current, decision)
     if decision.retry and committed:
         return None
+    if committed and decision.messages is None and decision.state is not None:
+        return _overflow_details(ctx, str(error), recovery="state_only_progress")
     return _invalid_decision(ctx, decision)
 
 

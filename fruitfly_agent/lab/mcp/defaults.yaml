@@ -1,0 +1,5 @@
+id: mcp-tools
+role: H
+implementation: mcp-tools
+parameters:
+  config: .fruitfly/mcp.yaml

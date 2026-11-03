@@ -52,7 +52,9 @@ class ChatCompletionsProvider(OpenAIProvider):
         usage = None
         stream = None
         try:
+            deadline.switch_phase('connect_or_headers')
             stream = await deadline.wait(self._client.chat.completions.create(**request, stream=True), signal)
+            deadline.switch_phase('stream')
             iterator = stream.__aiter__()
             while True:
                 try:
@@ -100,13 +102,19 @@ class ChatCompletionsProvider(OpenAIProvider):
                         for key, value in wire_value(part).items():
                             if key not in {'index', 'id', 'type', 'function'} and value is not None:
                                 call[key] = value
-        except TaggedError:
+        except TaggedError as exc:
+            deadline.note_error(exc)
             raise
         except Exception as exc:
-            raise retry_details(exc, classify_error(exc, status_code=getattr(exc, 'status_code', None))) from exc
+            error = classify_error(exc, status_code=getattr(exc, 'status_code', None))
+            error.details['diagnostics']['phase'] = deadline.phase
+            error.details['failure']['stage'] = deadline.phase
+            deadline.note_error(error)
+            raise retry_details(exc, error) from exc
         finally:
             if stream is not None:
-                await close_transport(stream.close(), self._policy.cleanup_timeout)
+                await close_transport(stream.close(), self._policy.cleanup_timeout, deadline=deadline)
+        deadline.switch_phase('assemble')
         if finish not in {'stop', 'tool_calls', 'length', 'content_filter'}:
             raise FatalError('Chat Completions stream ended without a supported finish reason')
         blocks: list[Any] = []

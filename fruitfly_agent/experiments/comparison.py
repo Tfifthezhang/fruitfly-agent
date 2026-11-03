@@ -61,7 +61,7 @@ def normalize_experiment(raw, target, *, material_only=False):
         runtime['profile'] = profile.profile_id if profile is not None else baseline['profile']
     evidence = EvidenceSettings.from_dict(raw.get('evidence')).to_dict()
     normalized = {'task': task, 'runtime': runtime, 'improvement': improvement,
-        'models': {k: v for k, v in profile.model_roles.items() if k in {'editor', 'assessor'}} if profile is not None else {},
+        'models': {k: v for k, v in profile.model_roles.items() if k in {'editor', 'assessor'} and isinstance(v, str)} if profile is not None else {},
         'workflow_settings': dict(stopping), 'evidence_settings': evidence,
         'rsi': raw.get('rsi', {}), 'stop': {}}
     trial = mapping(execution.get('trial', {}), {'attempts', 'concurrency'}, 'execution.trial')

@@ -74,3 +74,6 @@ __all__ += ['configuration_resources']
 __all__ += ['restore_component_settings']
 
 __all__ += ['normalize_configuration_binding']
+
+from .model_roles import ModelRoleRequirement, role_alias
+__all__ += ['ModelRoleRequirement', 'role_alias']

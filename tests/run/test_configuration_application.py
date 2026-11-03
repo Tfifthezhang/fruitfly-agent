@@ -129,6 +129,8 @@ class ConfigurationApplicationTest(unittest.IsolatedAsyncioTestCase):
         path = app.status.session_path
         for algorithm in ('working-memory-reduction', 'layered-compaction'):
             app.configuration.select_algorithm('reduction', algorithm)
+            if algorithm == 'working-memory-reduction':
+                app.configuration.set_parameter(algorithm, 'memory_model_profile', 'a')
             await app.apply_configuration()
             self.assertEqual(app.status.session_path, path)
             self.assertEqual(app.conversation(), original)
@@ -251,7 +253,8 @@ class ConfigurationApplicationTest(unittest.IsolatedAsyncioTestCase):
         saved = Session.inspect(app.status.session_path)
         self.assertEqual(len(saved.canonical_messages()), 2)
         self.assertEqual(saved.messages(), saved.canonical_messages())
-        self.assertIn('contextProjection', saved.read_all()[-1].payload)
+        self.assertIn('contextProjection', [entry for entry in saved.read_all()
+            if entry.payload.get('kind') == 'runtimeManifest'][-1].payload)
 
 
 class SessionLeaseTest(unittest.TestCase):

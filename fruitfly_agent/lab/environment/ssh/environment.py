@@ -18,6 +18,8 @@ import uuid
 
 from fruitfly_agent.core.env import ExecOptions, ExecResult, FileInfo
 from fruitfly_agent.core.errors import Result
+from ..failures import classify_environment_failure, environment_operation
+from fruitfly_agent.core.observation import FailureInfo
 from .config import SshConfig
 from .supervisor import PROGRAM
 
@@ -50,13 +52,15 @@ class SshEnv:
             logger.addHandler(logging.NullHandler())
         client.set_log_channel(logger.name)
         try:
-            client.load_host_keys(str(Path(self.config.known_hosts).expanduser()))
+            with environment_operation('environment.ssh.host_keys'):
+                client.load_host_keys(str(Path(self.config.known_hosts).expanduser()))
             client.set_missing_host_key_policy(paramiko.RejectPolicy())
             deadline = self.config.connect_timeout_seconds
-            client.connect(self.config.host, port=self.config.port, username=self._username,
-                           password=self._password, allow_agent=False, look_for_keys=False,
-                           timeout=deadline, banner_timeout=deadline, auth_timeout=deadline,
-                           channel_timeout=deadline)
+            with environment_operation('environment.ssh.connect'):
+                client.connect(self.config.host, port=self.config.port, username=self._username,
+                               password=self._password, allow_agent=False, look_for_keys=False,
+                               timeout=deadline, banner_timeout=deadline, auth_timeout=deadline,
+                               channel_timeout=deadline)
             client.get_transport().set_keepalive(15)
             # Paramiko's subsystem negotiation does not honor channel read
             # timeouts. Closing the transport also bounds that handshake.
@@ -64,10 +68,11 @@ class SshEnv:
             watchdog.daemon = True
             watchdog.start()
             try:
-                sftp = client.open_sftp()
-                sftp.get_channel().settimeout(self.config.operation_timeout_seconds)
-                if not stat.S_ISDIR(sftp.stat(self.cwd).st_mode):
-                    raise ValueError('remote workspace is not a directory')
+                with environment_operation('environment.ssh.sftp'):
+                    sftp = client.open_sftp()
+                    sftp.get_channel().settimeout(self.config.operation_timeout_seconds)
+                    if not stat.S_ISDIR(sftp.stat(self.cwd).st_mode):
+                        raise ValueError('remote workspace is not a directory')
             finally:
                 watchdog.cancel()
             return client, sftp
@@ -320,6 +325,10 @@ class SshEnv:
             pass
 
     async def exec(self, command, options=None):
+        with environment_operation('environment.ssh.execute') as observed:
+            return await self._exec(command, options, observed=observed)
+
+    async def _exec(self, command, options=None, *, observed):
         opts = options or ExecOptions()
         channel = None
         try:
@@ -353,7 +362,8 @@ class SshEnv:
             started = time.monotonic()
             opening = asyncio.create_task(asyncio.to_thread(open_channel))
             try:
-                channel = await asyncio.shield(opening)
+                with environment_operation('environment.ssh.channel_open'):
+                    channel = await asyncio.shield(opening)
             except asyncio.CancelledError:
                 def discard(future):
                     if not future.cancelled() and future.exception() is None:
@@ -395,7 +405,9 @@ class SshEnv:
                         raise OSError('SSH disconnected without exit status')
                     output.append(decoders[0].decode(b'', final=True))
                     errors.append(decoders[1].decode(b'', final=True))
-                    return Result.success(ExecResult(''.join(output), ''.join(errors), code, cancelled))
+                    if cancelled:
+                        observed.fail(FailureInfo('environment', 'environment.ssh.execute', 'timeout', 'runtime_rule', effect_state='completed'))
+                    return Result.success(ExecResult(''.join(output), ''.join(errors), code, cancelled, 'timeout' if cancelled else 'exited'))
                 if cleanup_deadline is not None and now >= cleanup_deadline:
                     raise OSError('remote cancellation could not be confirmed')
                 if not transport.is_active():
@@ -413,7 +425,8 @@ class SshEnv:
                         channel.recv_stderr(65536)
                     await asyncio.sleep(.01)
             raise
-        except Exception:
+        except Exception as exc:
+            observed.fail(classify_environment_failure(exc, 'environment.ssh.execute'))
             if channel is not None:
                 self._cancel(channel)
             return Result.failure('SSH execution failed; connection or remote cleanup may be incomplete')

@@ -1,4 +1,5 @@
 """Working-memory candidates change real trial context and survive activation/recovery."""
+from tests.support.configuration import component_parameters, with_component_parameters, with_component_text, parameter_payload
 import json
 from dataclasses import replace
 from pathlib import Path
@@ -47,9 +48,9 @@ class MemoryGenerator:
     required_capabilities = frozenset()
     async def propose(self, request, services):
         source = request.baseline.component('working-memory-reduction')
-        value = json.loads(source.files[0].text)
+        value = component_parameters(source)
         value['instructions']['update'] += ' OPTIMIZED'
-        updated = replace(source, files=(ComponentFile('instructions.txt', json.dumps(value)),))
+        updated = with_component_parameters(source, value)
         harness = HarnessSnapshot(tuple(updated if c.component_id == source.component_id else c for c in request.baseline.components))
         return ProposalResult((CandidateBundle(request.plan.parent, request.baseline, harness, self.generator_id,
             (EditReason(source.component_id, 'Synthetic memory behavior.', (request.records[0].run_id,),
@@ -69,6 +70,7 @@ class WorkingMemoryImprovementTests(unittest.IsolatedAsyncioTestCase):
                 improvement_bindings=WorkflowBindings(generators=generators, selector=lambda *args:FirstSelector(),
                     verifier=SyntheticVerification()))
             factory.configuration.set_mechanism('working-memory-reduction', enabled=True)
+            factory.configuration.set_parameter('working-memory-reduction','memory_model_profile','local')
             factory.configuration.set_parameter('working-memory-reduction','update_every_messages','1')
             factory.configuration.save(); factory.reload_configuration()
             app = AgentApplication(factory); await app.start()

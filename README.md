@@ -19,7 +19,9 @@ changes. Core owns the Agent loop; Lab owns algorithms; Application owns lifecyc
 Run assembles them. Eval is an optional external benchmark consumer.
 
 Daily systems, experiment baselines and candidates share one H/S/I component
-configuration. Start at the [configuration guide tree](CONFIGURATION.md#navigate-the-configuration-tree)
+configuration. Owners keep text and numeric defaults in registered Lab YAML;
+system files reference those definitions without a copied components tree.
+Improvement edits isolated parameter documents, and RSI retains verified versions. Start at the [configuration guide tree](CONFIGURATION.md#navigate-the-configuration-tree)
 to write a config, register a component or declare bounded experiment changes.
 
 Named after Thomas Hunt Morgan's fruit-fly research, the project favors small,

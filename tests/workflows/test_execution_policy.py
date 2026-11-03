@@ -1,4 +1,5 @@
 """Configuration candidates execute in isolation and adopt as exact H-only versions."""
+from tests.support.configuration import component_parameters, with_component_parameters, with_component_text, parameter_payload
 from dataclasses import replace
 import json
 from pathlib import Path
@@ -120,8 +121,8 @@ class ExecutionPolicyTests(unittest.IsolatedAsyncioTestCase):
             required_capabilities = frozenset()
             async def propose(self, request, services):
                 document = request.baseline.component('bash-tool')
-                value = json.loads(document.files[0].text); value['settings']['default_timeout_seconds'] = 17
-                changed = replace(document, files=(ComponentFile('instructions.txt', json.dumps(value)),))
+                value = component_parameters(document); value['settings']['default_timeout_seconds'] = 17
+                changed = with_component_parameters(document, value)
                 harness = HarnessSnapshot(tuple(changed if c.component_id == changed.component_id else c
                     for c in request.baseline.components))
                 return ProposalResult((CandidateBundle(request.plan.parent, request.baseline, harness, self.generator_id,

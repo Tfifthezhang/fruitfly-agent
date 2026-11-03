@@ -1,0 +1,5 @@
+id: knowledge-files
+role: H
+implementation: knowledge-files
+parameters:
+  root: .fruitfly/knowledge

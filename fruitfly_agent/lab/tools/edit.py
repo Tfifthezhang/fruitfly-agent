@@ -12,6 +12,7 @@ from __future__ import annotations
 import difflib
 
 from fruitfly_agent.core.data_model import AgentToolResult, TextBlock
+from .presentation import file_call, text_result
 from fruitfly_agent.core.tool_runtime import AgentTool, ToolCallContext
 from fruitfly_agent.core.tool_runtime.authorization import ToolPermission
 from .file_queue import with_file_mutation_queue
@@ -178,6 +179,8 @@ def create_edit_tool() -> AgentTool:
     return AgentTool(
         permission=ToolPermission("write", ("path",)),
         name="edit",
+        present_call=lambda args: file_call("edit", args),
+        present_result=lambda result: text_result("edit", result),
         label="Edit file",
         description=(
             "Edit a single file in the selected execution environment (local or SSH). "

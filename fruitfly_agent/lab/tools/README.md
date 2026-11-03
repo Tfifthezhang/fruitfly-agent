@@ -158,3 +158,48 @@ Text reads also support `character_offset` (zero-based) and `character_limit`
 (1–24000, default 12000), mutually exclusive with line offset/limit. This permits
 complete readback of long single-line history through the existing tool. Every
 response retains the tool byte/line bounds and a precise continuation offset.
+
+## Present structured facts
+
+Tools may declare `present_call(arguments)` and `present_result(result)` callbacks
+returning Core `ToolPresentation` values. [presentation.py](presentation.py)
+contains shared deterministic file/text helpers. The callbacks supply a bounded
+operation, target, summary, detail items and execution state. They do not call
+models, execute commands, inspect unrelated state or decide task success. Callback
+failures fall back to ordinary labels/output. `describe_call` remains available
+for a concise action label. Shell commands are displayed literally; shell syntax
+is not interpreted to infer read/write intent.
+
+Interactive projects these facts into `ToolStarted` and `ToolFinished`, with call
+IDs and attributed `ToolOutput`. Terminal rendering keeps the existing category
+and outcome colors, escapes control sequences and bounds output independently of
+model context. A background start shows Running rather than Completed.
+
+## Own background operations
+
+[managed.py](managed.py) owns the generic in-process operation service: bounded
+active/retained handles and output, elapsed time, correlated run/call IDs, isolated
+notifications and confirmed cancellation. [commands.py](commands.py) adapts shell
+results to this service. Runtime ownership closes it; shared close is idempotent.
+Failed cancellation is `cleanup_unconfirmed`, never success. Status and completion
+notifications do not invoke the model. There is no persistent job restart or
+scheduler for multiple independent user conversations.
+
+Run optionally adapts this service to Interactive's `OperationService`; the
+registered terminal `/operations [cancel HANDLE]` command consumes only that
+capability. Existing Bash `start`, `poll`, `cancel` remain model-callable. Start
+returns control so the Agent can perform independent work; poll before depending
+on the result. Ordinary synchronous tools and model requests remain awaited.
+
+## Keep defaults and usage identities
+
+[tool-catalog.yaml](tool-catalog.yaml) owns the H tool policy;
+[bash-tool.yaml](bash-tool.yaml) owns Bash parameter defaults. Registry, menu and
+constructor values derive from these documents. Candidate parameter YAML shares
+the same typed validation for instructions and numbers. Tool names, schemas,
+permissions and individual operation contracts remain protected.
+
+Assembly records full-usage and Schema SHA-256 fingerprints before shortening API
+descriptions. Run retains them in `harness.tool_contracts`; short API descriptions
+alone are not the complete usage identity. Fresh runtimes rebuild these resources;
+existing resources remain scoped and immutable until closure.

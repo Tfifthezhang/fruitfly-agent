@@ -1,0 +1,14 @@
+id: rlm-ipython
+role: H
+implementation: rlm-ipython
+parameters:
+  settings:
+    offload_threshold_chars: 50000
+  instructions:
+    usage: 'Large messages may be replaced in model context by a
+
+      `context://sha256/...` reference. The original content remains in the Session
+
+      artifact store. Use the `ipython` tool and its preloaded `context` object to
+
+      inspect referenced content in bounded slices.'

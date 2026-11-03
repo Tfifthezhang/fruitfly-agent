@@ -98,3 +98,45 @@ class ManagedCommandsTests(unittest.IsolatedAsyncioTestCase):
             result = await manager.poll(result.details['handle'])
             self.assertEqual(result.details['status'], 'cancelled')
         finally: await manager.aclose()
+
+    async def test_background_work_does_not_block_independent_work_and_listener_failure_is_isolated(self):
+        from fruitfly_agent.lab.tools.managed import ManagedOperations
+        from fruitfly_agent.core.observation import ObservationContext, bind_observation
+        operations = ManagedOperations()
+        self.addAsyncCleanup(operations.close)
+        entered, release = asyncio.Event(), asyncio.Event()
+        notices, independent = [], []
+        async def work(update):
+            entered.set()
+            await release.wait()
+            return 'result'
+        def listen(value):
+            notices.append(value)
+            raise RuntimeError('offline display failure')
+        operations.listener = listen
+        with self.assertLogs('fruitfly_agent.lab.tools.managed', level='WARNING'):
+            with bind_observation(ObservationContext(run_id='initiator', tool_call_id='call')):
+                handle = await operations.submit(work)
+            await asyncio.wait_for(entered.wait(), 1)
+            independent.append('other work completed')
+            self.assertEqual('running', operations.status(handle).state)
+            release.set()
+            await operations.wait(handle, 1)
+        self.assertEqual(['other work completed'], independent)
+        self.assertEqual(['running', 'succeeded'], [value.state for value in notices])
+        self.assertTrue(all(value.run_id == 'initiator' and value.tool_call_id == 'call' for value in notices))
+        await operations.close()
+        await operations.close()
+
+    async def test_cancel_before_task_entry_notifies_terminal_state_once(self):
+        from fruitfly_agent.lab.tools.managed import ManagedOperations
+        operations = ManagedOperations()
+        self.addAsyncCleanup(operations.close)
+        entered, notices = [], []
+        async def work(update):
+            entered.append(True)
+        operations.listener = lambda status: notices.append(status.state)
+        handle = await operations.submit(work)
+        await operations.cancel(handle)
+        self.assertEqual([], entered)
+        self.assertEqual(['running', 'cancelled'], notices)

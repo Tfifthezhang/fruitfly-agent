@@ -45,3 +45,7 @@ Benchmark execution is provided by the external [Eval CLI](../../../fruitfly_eva
 ```
 
 These checks use fake Providers and temporary state without container/model access.
+
+[operations.py](operations.py) projects a borrowed Lab operation service into
+Interactive `OperationService` statuses, cancellation and completion events.
+The adapter owns no tasks, cleanup, model requests or scheduling decisions.

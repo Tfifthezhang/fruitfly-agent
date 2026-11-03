@@ -1,4 +1,5 @@
 """Actual Application task-set searches keep daily files and private material isolated."""
+from tests.support.configuration import component_parameters, with_component_parameters, with_component_text, parameter_payload
 from dataclasses import replace
 import json
 from pathlib import Path
@@ -92,9 +93,10 @@ class MultiTaskExperimentTests(unittest.IsolatedAsyncioTestCase):
                     'editable_fields':['parameters.instructions.update']}}})
             import yaml
             path=root/'.fruitfly/default-config.yaml';document=yaml.safe_load(path.read_text())
+            document['profiles']['baseline']['models']['roles']['working_memory'] = document['profiles']['baseline']['models']['roles']['executor']
             document['profiles']['baseline']['H']['working-memory-reduction']={'inline':{
                 'id':'working-memory-reduction','role':'H','implementation':'working-memory-reduction',
-                'parameters':{'settings':{'update_every_messages':1}}}}
+                'parameters':{'settings':{'update_every_messages':1, 'maintenance_ratio':0.}}}}
             path.write_text(yaml.safe_dump(document))
             prepared=prepare_experiment(load_configuration(root),'improvement')
             class Provider(FauxProvider):
@@ -108,9 +110,9 @@ class MultiTaskExperimentTests(unittest.IsolatedAsyncioTestCase):
             class Generator:
                 generator_id='memory-collection';required_capabilities=frozenset();supports_task_sets=True
                 async def propose(self,request,services):
-                    old=request.baseline.component('working-memory-reduction');values=json.loads(old.files[0].text)
+                    old=request.baseline.component('working-memory-reduction');values=component_parameters(old)
                     values['instructions']['update']='CANDIDATE_COLLECTION: preserve evidence'
-                    changed=replace(old,files=(ComponentFile('instructions.txt',json.dumps(values)),))
+                    changed=with_component_parameters(old, values)
                     harness=HarnessSnapshot(tuple(changed if d.component_id==old.component_id else d for d in request.baseline.components))
                     return ProposalResult((CandidateBundle(request.plan.parent,request.baseline,harness,self.generator_id,
                         (EditReason(old.component_id,'Synthetic policy invocation.',(request.records[0].run_id,),expected_effect='Auxiliary requests use the candidate policy.'),)),))

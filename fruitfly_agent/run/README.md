@@ -257,3 +257,4 @@ inside Harbor containers. Neither flag is an Agent configuration field.
 
 [Extension hosting](extensions/README.md) loads explicit developer sources and prepares idle replacements.
 
+Registered default parameter documents remain in Lab. [Configuration](configuration/README.md) preserves H/S/I references on ordinary saves and freezes complete text/numeric values for trials. Runtime manifests retain stable component-source kinds/content hashes and tool-contract hashes; filesystem origin paths stay in offline inspection so saving and restarting does not change an otherwise identical runtime identity.

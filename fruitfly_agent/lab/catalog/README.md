@@ -195,13 +195,41 @@ independently declared through `MechanismSetup`; existing forms are unchanged.
 
 ## Declare auxiliary model dependencies
 
-`MechanismDefinition.model_profiles(parameters)` optionally returns a tuple of
-non-empty model catalog labels. It receives normalized enabled parameters and
-must remain pure and offline. `catalog.required_model_profiles(selections)`
-validates and combines those declarations. An empty tuple means reuse the active
-model. Component improvement declares its optional editor model this way; Eval
-stages only the main and declared auxiliary models and their named credentials.
-Custom mechanisms requesting additional models must declare them.
+Declare `MechanismDefinition.model_role_parameters` as a mapping from a role
+name to `ModelRoleRequirement` in [model_roles.py](model_roles.py). Each requirement
+names its strict string parameter, purpose, pure `required_when` predicate,
+optional explicit `fallback_role`, and lazy-construction metadata. Conditions
+receive normalized parameters and must return a boolean without side effects.
+`definition.model_profiles(parameters)` and
+`catalog.required_model_profiles(selections)` derive dependencies from these same
+declarations. There is no separate dependency callback or role registry.
+
+Installers use `context.provider_for_role(role, max_output_tokens)` for active
+requirements. The host supplies aliases through `models.roles`; a required blank
+binding fails only when its owner disables fallback. `ModelRoleRequirement`
+defaults `fallback_role` to `executor`; owners may explicitly set it to `None`.
+Templates and `component_profile` exports retain `{inherit: executor}` positions
+for all declared executor-fallback roles, including roles whose mechanisms are not
+selected. These positions make no requests and construct no clients. Reuse follows
+the [shared model-binding grammar](../../runtime_spec/COMPONENTS.md#bind-models-once).
+`catalog.resolve_model_roles(selections, roles)` reports the same active bindings
+used by installers, including parameter overrides. Run records the resolved
+non-secret model identity; calls retain role, component
+and request attribution even when several roles use one model. Provider bindings
+forward counting and continuation capabilities. Construct and own resources through
+the normal assembly path. Lazy roles must not create clients during configuration
+inspection or ordinary Agent startup.
+
+| Role | Owner | Admission |
+|---|---|---|
+| `working_memory` | Working memory | Inherit executor by default; optional alias override |
+| `context_summary` | Layered compaction | Inherit executor in hybrid mode; inactive in deterministic mode |
+| `context_query` | IPython | Inherit executor by default; optional alias override |
+| `editor`, `assessor` | Component improvement | Lazy; declared executor fallback |
+
+Eval stages the main model and active execution dependencies with their named
+credentials. Unused I role metadata does not grant a task container model access.
+Model bindings stay protected from prompt/parameter candidate grants.
 
 ## Register experiment dependencies
 
@@ -243,3 +271,13 @@ The [execution policy adapter](../execution_policy/README.md) uses these contrac
 supply an isolated `execution_env` and declare `agent_hooks_from_host` when trial
 setups already own request hooks. Catalog preserves one resource and hook owner
 per runtime; these are host capabilities, not selectable algorithm settings.
+
+## Inspect parameter sources
+
+Each parameterized owner registers one YAML default resource through its existing
+definition or configuration surface. [defaults.py](defaults.py) resolves
+`{default: true}` and validates H/S/I identity; [configuration.py](configuration.py)
+preserves ordinary references and freezes complete execution parameters.
+[Configuration admission](CONFIGURATION.md#register-one-default-parameter-document)
+defines the registration contract. Defaults are read offline and never imply
+permission to optimize a field.

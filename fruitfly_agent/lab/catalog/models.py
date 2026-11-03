@@ -24,6 +24,8 @@ from fruitfly_agent.core.mechanisms import (
     ParameterKind,
 )
 
+from .model_roles import ModelRoleRequirement, required_profiles
+
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 
 
@@ -71,7 +73,6 @@ class MechanismDefinition:
     input_parameters: tuple[str, ...] = ()
     setup: MechanismSetup | None = None
     credential_variables: Callable[[Mapping[str, Any]], tuple[str, ...]] | None = None
-    model_profiles: Callable[[Mapping[str, Any]], tuple[str, ...]] | None = None
     prepare_targets: Callable[[Any, Any], Any] | None = None
     component_specs: Callable[[Mapping[str, Any], bool], tuple] | None = None
     execution_fields: frozenset[str] = frozenset()
@@ -79,14 +80,18 @@ class MechanismDefinition:
     tool_provider: Callable | None = None
     configuration_role: str = 'H'
     configuration_surfaces: tuple = ()
-    model_role_parameters: Mapping[str, str] = field(default_factory=dict)
+    model_role_parameters: Mapping[str, ModelRoleRequirement] = field(default_factory=dict)
     configuration_edit: Callable | None = None
     configuration_snapshot: Callable | None = None
     optimization_exemption: str = ''
     parameter_paths: Mapping[str, str] = field(default_factory=dict)
     execution_description: Callable[[Mapping[str, Any], Path], ExecutionEnvironmentDescription] | None = None
+    default_resource: tuple[str, str] | None = None
 
     def __post_init__(self) -> None:
+        if self.default_resource is not None:
+            from fruitfly_agent.runtime_spec.documents import validate_default_resource
+            validate_default_resource(self.default_resource)
         if self.parameter_paths:
             names={p.name for p in self.descriptor.parameters}
             if set(self.parameter_paths)!=names or len(set(self.parameter_paths.values()))!=len(names) or any(not v.startswith(('instructions.','settings.','content.')) for v in self.parameter_paths.values()):
@@ -102,8 +107,13 @@ class MechanismDefinition:
         if self.configuration_snapshot is not None and not callable(self.configuration_snapshot):
             raise TypeError('configuration snapshot must be callable')
         if (not isinstance(self.model_role_parameters, Mapping)
-                or set(self.model_role_parameters.values()) - {p.name for p in self.descriptor.parameters}):
-            raise ValueError('model roles must bind declared parameter fields')
+                or any(not isinstance(role, str) or not _ID.fullmatch(role)
+                    or not isinstance(value, ModelRoleRequirement)
+                    or value.parameter not in {p.name for p in self.descriptor.parameters if p.kind == 'string'}
+                    for role, value in self.model_role_parameters.items())
+                or len({r.parameter for r in self.model_role_parameters.values()}) != len(self.model_role_parameters)):
+            raise ValueError('model roles must bind distinct declared string parameters')
+        object.__setattr__(self, 'model_role_parameters', dict(self.model_role_parameters))
         for callback in (self.component_specs, self.component_validator, self.tool_provider):
             if callback is not None and not callable(callback):
                 raise TypeError('component metadata callbacks must be callable')
@@ -133,8 +143,6 @@ class MechanismDefinition:
             raise TypeError("parameter validator must be callable")
         if self.credential_variables is not None and not callable(self.credential_variables):
             raise TypeError("credential_variables must be callable")
-        if self.model_profiles is not None and not callable(self.model_profiles):
-            raise TypeError("model_profiles must be callable")
         if not callable(self.install):
             raise TypeError("mechanism installer must be callable")
         if iscoroutinefunction(self.install):
@@ -181,6 +189,9 @@ class MechanismDefinition:
                 raise ValueError('credential bindings must name string parameters')
             if self.setup.credential_resolver is not None and not callable(self.setup.credential_resolver):
                 raise TypeError('setup credential_resolver must be callable')
+
+    def model_profiles(self, parameters: Mapping[str, Any]) -> tuple[str, ...]:
+        return required_profiles(self.model_role_parameters, parameters)
 
     def setup_credentials(self, parameters: Mapping[str, Any]) -> tuple[SetupCredential, ...]:
         """Resolve hidden form fields from the current form's non-secret values."""

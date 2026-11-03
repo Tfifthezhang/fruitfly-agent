@@ -95,17 +95,18 @@ class TaskRunnerFixture:
             for document in harness.components:
                 adapter = self.components.adapters[document.component_id]
                 target = getattr(adapter, 'target', None)
+                text = adapter.to_text(document) if target is not None else None
                 if isinstance(target, ParameterTarget):
-                    values = target.parse(document.files[0].text)
+                    values = target.parse(text)
                     selections[document.component_id] = MechanismSelection(document.component_id, parameters=values)
                 elif target is not None:
                     binding = target.snapshot().binding
                     if binding.kind == 'prompt':
-                        prompt = document.files[0].text
+                        prompt = text
                     elif binding.kind == 'artifact':
-                        bindings[binding.key] = self.artifacts.put(document.files[0].text.encode())
+                        bindings[binding.key] = self.artifacts.put(text.encode())
                         if document.role != 'I' and document.component_id != 'tool-catalog':
-                            projections.append((target, document.files[0].text))
+                            projections.append((target, text))
             for target, text in projections:
                 prompt = target.prepare_trial(replace(self.config, system_prompt=prompt), text).system_prompt
             from fruitfly_agent.lab.context_manager.measurement import new_measurement_scope
