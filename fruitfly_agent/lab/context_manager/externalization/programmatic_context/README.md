@@ -48,7 +48,7 @@ Based on Zhang et al., [Recursive Language Models](https://arxiv.org/abs/2512.24
 |---|---|
 | Artifact slice reads | Load and verify the whole artifact before slicing. |
 | Output | JSONL transport occurs before truncation; large lines may exceed transport limits. |
-| Cancellation | Hard-cancel and host-request task cleanup are not unified. |
+| Cancellation | Cell timeout, cancellation signal and outer task cancellation retire the owned kernel process group and host-request tasks with bounded cleanup. Unconfirmed cleanup blocks restart; descendants that deliberately leave the process group may survive. |
 | Query timeout | Does not include semaphore queue time. |
 | Non-final query response | Rejected; call and available usage stay charged, with no hidden continuation requests. |
 | Query limits | Input characters and output tokens are bounded per request; usage is recorded without aggregate call/token quotas. |
@@ -57,6 +57,14 @@ Based on Zhang et al., [Recursive Language Models](https://arxiv.org/abs/2512.24
 Register subprocess resources immediately with `context.own` and expose them in assembly components. Define schema, serialization errors, reset, and cancellation for added state. See [Catalog](../../../catalog/README.md) and [Known limitations](../../../ALGORITHM_AUDIT.md).
 
 SessionArtifactStore implements Core's RecoveryValidator for saved externalizer projections. It checks the emitted reference format and artifact contents before activation; missing/corrupt referenced objects reject that projection. A changed mechanism selection rebuilds model context from canonical facts through Run. IPython namespaces start fresh, and callers explicitly load supported JSON state.
+
+Each kernel starts in its own process session. Retirement uses the shared
+[environment process service](../../../environment/README.md), retaining the group
+identity after the kernel exits. Successful timeout/cancellation cleanup discards
+the namespace; the next execution starts a fresh kernel. Cleanup failure retains
+resource ownership and reports `cleanup_unconfirmed` in health instead of claiming
+the runtime is ready. An explicit close can confirm later retirement; it does not
+resume execution. Shutdown also retires outstanding host query handlers.
 
 ```bash
 .venv/bin/python -m unittest tests.lab.test_rlm -v

@@ -107,6 +107,13 @@ it. The SDK owns child termination. Cleanup timeout is surfaced, with the client
 retaining its owner task. The client is not an OS process-tree sandbox.
 Server stderr is suppressed rather than copied into model output or Session logs.
 
+After a request is cancelled or times out, its local retirement uses `close_timeout`
+plus a brief cancellation-retirement interval. Shutdown applies the same bound to
+outstanding requests and the SDK owner together. A non-cooperative SDK request
+remains owned until it actually finishes; cleanup failure blocks new requests and
+reports an unknown outcome. `close_timeout` therefore also bounds request cleanup,
+not just the final SDK-context exit.
+
 Manifest schema 8 records compact service identities plus verified artifacts with
 the selected declarations, command, non-secret settings, limits, server/protocol
 metadata and generated names. Recovery validates history and required declaration

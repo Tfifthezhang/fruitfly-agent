@@ -181,6 +181,29 @@ class SshEnvironmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(channel.exit_status_ready())
         self.assertEqual(137, channel.recv_exit_status())
 
+    async def test_exited_shell_descendant_and_stalled_callback_respect_deadline(self):
+        self.process_backend()
+        marker = self.root / 'late'
+        result = await asyncio.wait_for(self.env.exec('(sleep .7; touch late) & echo started',
+            ExecOptions(timeout_seconds=.1)), 1)
+        self.assertEqual('timeout', result.unwrap().termination_reason)
+        await asyncio.sleep(.75)
+        self.assertFalse(marker.exists())
+        entered, release = asyncio.Event(), asyncio.Event()
+        async def notify(text):
+            entered.set()
+            await release.wait()
+        pending = asyncio.create_task(self.env.exec('echo progress; sleep 1',
+            ExecOptions(timeout_seconds=.1, on_stdout=notify)))
+        try:
+            await asyncio.wait_for(entered.wait(), 1)
+            done, _ = await asyncio.wait((pending,), timeout=.6)
+            self.assertTrue(done, 'log notification held the SSH deadline')
+            self.assertEqual('timeout', pending.result().unwrap().termination_reason)
+        finally:
+            release.set()
+            await asyncio.wait_for(pending, 3)
+
     async def test_missing_exit_status_is_failure_and_channel_is_closed(self):
         channel = Mock()
         channel.recv_ready.return_value = channel.recv_stderr_ready.return_value = False

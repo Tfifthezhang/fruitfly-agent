@@ -15,8 +15,8 @@ and remote process supervision. Local sessions and model calls stay local.
 | Working directory | Relative paths and default command execution use `LocalEnv.cwd`; `ExecOptions.cwd` can override it. |
 | Permissions | Current user permissions; absolute paths, `..`, network, and inherited environment are not restricted. |
 | Failures | Common path/process failures return `Result.failure`. |
-| Timeout / cancellation | Clean up the subprocess group. |
-| Output | Incremental chunk reads and UTF-8 decoding; callbacks run while the process is active. |
+| Timeout / cancellation | The deadline covers process exit and pipe draining. Kill the owned group using its saved identity, including after the leader exits. Cleanup has a separate two-second allowance and a brief cancellation-retirement interval. Unconfirmed cleanup disables further local command execution. |
+| Output | Incremental chunk reads and UTF-8 decoding. Live notifications use a bounded queue so slow callbacks cannot hold command deadlines. Intermediate display chunks may be coalesced; complete stdout/stderr remain in the result. |
 | Callback failure | Isolate ordinary failures; preserve task cancellation. |
 | Limits | File I/O is synchronous; complete stdout/stderr are retained in memory. |
 
@@ -25,6 +25,7 @@ and remote process supervision. Local sessions and model calls stay local.
 | File | Responsibility |
 |---|---|
 | [local.py](local.py) | `LocalEnv` implementation |
+| [processes.py](processes.py) | Shared owned process-group retirement and bounded live notifications, also used by SSH and IPython |
 | [description.py](description.py) | Immutable execution description published through Catalog for host presentation |
 | [permissions.py](permissions.py), [guarded.py](guarded.py) | Guarded host strategy, authorizer and environment wrapper |
 | [execution.py](execution.py) | Explicit unrestricted strategy and allow authorizer |
@@ -42,6 +43,12 @@ SSH installers supply it from their installed backend. It is presentation metada
 independent of permission wrapping and Session/runtime identity schemas.
 
 No module-specific environment variables. See [Known limitations](../ALGORITHM_AUDIT.md).
+
+Notification shutdown briefly flushes queued updates, then cancels its worker with
+a separate bounded wait. Unconfirmed notification cleanup also prevents reuse of
+the affected executor. Async callbacks must yield to the event loop; synchronous
+blocking code cannot be preempted by an asyncio deadline. Process-group cleanup
+does not contain descendants that deliberately create a separate session.
 
 ```bash
 .venv/bin/python -m unittest tests.lab.test_env tests.lab.test_builtin_tools -v

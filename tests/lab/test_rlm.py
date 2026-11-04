@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import tempfile
 import unittest
 from pathlib import Path
@@ -174,6 +175,110 @@ class ModelQueryBrokerTest(unittest.IsolatedAsyncioTestCase):
 
 
 class IpythonRuntimeTest(unittest.IsolatedAsyncioTestCase):
+    async def test_unconfirmed_host_retirement_blocks_restart_but_can_be_closed_later(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            entered, release, retired = asyncio.Event(), asyncio.Event(), asyncio.Event()
+            async def host_handler(*args):
+                entered.set()
+                try:
+                    while not release.is_set():
+                        try:
+                            await release.wait()
+                        except asyncio.CancelledError:
+                            pass
+                    return {'text': 'late'}
+                finally:
+                    retired.set()
+            runtime = IpythonRuntime(cwd=root,
+                artifact_store=SessionArtifactStore(root / 'artifacts', max_artifact_bytes=10000),
+                host_handler=host_handler, max_output_chars=10000, timeout_seconds=.1)
+            try:
+                await runtime.start()
+                pending = asyncio.create_task(runtime.execute("await llm_query('offline')"))
+                await asyncio.wait_for(entered.wait(), 1)
+                with self.assertRaisesRegex(RuntimeError, 'cleanup'):
+                    await asyncio.wait_for(pending, 3)
+                self.assertEqual('cleanup_unconfirmed', (await runtime.health())['status'])
+                with self.assertRaisesRegex(RuntimeError, 'cleanup'):
+                    await runtime.execute('1')
+            finally:
+                release.set()
+                await asyncio.wait_for(retired.wait(), 1)
+                await runtime.close()
+
+    async def test_timeout_with_child_held_pipes_and_signal_retire_host_requests(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            entered, retired = asyncio.Event(), asyncio.Event()
+            async def host_handler(*args):
+                entered.set()
+                try:
+                    await asyncio.Event().wait()
+                finally:
+                    retired.set()
+            runtime = IpythonRuntime(cwd=root,
+                artifact_store=SessionArtifactStore(root / 'artifacts', max_artifact_bytes=10000),
+                host_handler=host_handler, max_output_chars=10000, timeout_seconds=.15)
+            try:
+                await runtime.start()
+                with self.assertRaises(TimeoutError):
+                    await asyncio.wait_for(runtime.execute(
+                        "import subprocess,time\nsubprocess.Popen(['/bin/sleep','2'])\ntime.sleep(2)"), 1)
+                self.assertEqual('stopped', (await runtime.health())['status'])
+                runtime.timeout_seconds = 5
+                signal = asyncio.Event()
+                pending = asyncio.create_task(runtime.execute("await llm_query('offline')", signal=signal))
+                await asyncio.wait_for(entered.wait(), 2)
+                signal.set()
+                with self.assertRaises(asyncio.CancelledError):
+                    await asyncio.wait_for(pending, 2)
+                self.assertTrue(retired.is_set())
+                self.assertEqual('stopped', (await runtime.health())['status'])
+            finally:
+                await runtime.close()
+
+    async def test_timeout_and_outer_cancellation_retire_cell_and_children(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            async def host_handler(*args):
+                self.fail('no model requests are allowed')
+            runtime = IpythonRuntime(cwd=root,
+                artifact_store=SessionArtifactStore(root / 'artifacts', max_artifact_bytes=10000),
+                host_handler=host_handler, max_output_chars=10000, timeout_seconds=.15)
+            try:
+                await runtime.start()
+                marker = root / 'child-late'
+                code = ("import subprocess, time\n"
+                    "subprocess.Popen(['/bin/sh', '-c', 'sleep .7; touch child-late'], "
+                    "stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)\n"
+                    "time.sleep(2)")
+                with self.assertRaises(TimeoutError):
+                    await asyncio.wait_for(runtime.execute(code), 3)
+                await asyncio.sleep(.75)
+                self.assertFalse(marker.exists(), 'child survived the cell deadline')
+                runtime.timeout_seconds = 5
+                await runtime.start()
+                entered, late = root / 'entered', root / 'cell-late'
+                pending = asyncio.create_task(runtime.execute(
+                    "from pathlib import Path\nimport time\n"
+                    "Path('entered').write_text('ready')\ntime.sleep(.7)\n"
+                    "Path('cell-late').write_text('continued')"))
+                for _ in range(100):
+                    if entered.exists():
+                        break
+                    await asyncio.sleep(.01)
+                self.assertTrue(entered.exists())
+                pending.cancel()
+                with self.assertRaises(asyncio.CancelledError):
+                    await asyncio.wait_for(pending, 3)
+                await asyncio.sleep(.75)
+                self.assertFalse(late.exists(), 'cell survived outer task cancellation')
+                self.assertEqual('stopped', (await runtime.health())['status'])
+                self.assertEqual('42', (await runtime.execute('40 + 2')).result)
+            finally:
+                await runtime.close()
+
     async def test_namespace_context_model_bridge_and_explicit_resume_state(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

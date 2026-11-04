@@ -1,6 +1,8 @@
 """Lab LocalEnv Result discipline + shell semantics."""
 
+import asyncio
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -65,6 +67,100 @@ class TestEnv(unittest.IsolatedAsyncioTestCase):
         )
         self.assertTrue(result.is_ok, result.error)
         self.assertIn("hello", result.unwrap().stdout)
+
+    async def test_deadline_covers_exited_shell_and_closed_output_pipes(self):
+        for name, command in (
+            ('exited_shell', "(sleep .7; touch late) & echo started"),
+            ('closed_pipes', "exec >/dev/null 2>&1; sleep .7; touch late"),
+        ):
+            with self.subTest(name=name):
+                marker = self.root / 'late'
+                marker.unlink(missing_ok=True)
+                started = time.monotonic()
+                result = await asyncio.wait_for(self.env.exec(command, ExecOptions(timeout_seconds=.1)), 3)
+                self.assertTrue(result.is_ok, result.error)
+                self.assertEqual('timeout', result.unwrap().termination_reason)
+                self.assertLess(time.monotonic() - started, .6)
+                await asyncio.sleep(.75)
+                self.assertFalse(marker.exists())
+
+    async def test_stalled_output_notification_does_not_hold_command_deadline(self):
+        entered, release = asyncio.Event(), asyncio.Event()
+        async def notify(text):
+            entered.set()
+            await release.wait()
+        pending = asyncio.create_task(self.env.exec('echo progress; sleep 1',
+            ExecOptions(timeout_seconds=.1, on_stdout=notify)))
+        try:
+            await asyncio.wait_for(entered.wait(), 1)
+            done, _ = await asyncio.wait((pending,), timeout=.6)
+            self.assertTrue(done, 'log notification held the command deadline')
+            self.assertEqual('timeout', pending.result().unwrap().termination_reason)
+        finally:
+            release.set()
+            await asyncio.wait_for(pending, 3)
+
+    async def test_cancel_retires_children_and_propagates_callback_cancellation(self):
+        for callback_cancel in (False, True):
+            with self.subTest(callback_cancel=callback_cancel):
+                entered = asyncio.Event()
+                async def notify(text):
+                    entered.set()
+                    if callback_cancel:
+                        raise asyncio.CancelledError
+                pending = asyncio.create_task(self.env.exec('echo started; sleep .7; touch late',
+                    ExecOptions(on_stdout=notify)))
+                await asyncio.wait_for(entered.wait(), 1)
+                if not callback_cancel:
+                    pending.cancel()
+                with self.assertRaises(asyncio.CancelledError):
+                    await asyncio.wait_for(pending, 2)
+                await asyncio.sleep(.75)
+                self.assertFalse((self.root / 'late').exists())
+
+    async def test_unconfirmed_notification_cleanup_disables_backend(self):
+        release, entered = asyncio.Event(), asyncio.Event()
+        async def resist(text):
+            entered.set()
+            while not release.is_set():
+                try:
+                    await release.wait()
+                except asyncio.CancelledError:
+                    pass
+        pending = asyncio.create_task(self.env.exec('echo started', ExecOptions(on_stdout=resist)))
+        try:
+            await asyncio.wait_for(entered.wait(), 1)
+            with self.assertRaisesRegex(RuntimeError, 'cleanup'):
+                await asyncio.wait_for(pending, 1)
+            result = await self.env.exec('touch unexpected')
+            self.assertFalse(result.is_ok)
+            self.assertIn('cleanup', result.error)
+            self.assertFalse((self.root / 'unexpected').exists())
+        finally:
+            release.set()
+            await asyncio.gather(pending, return_exceptions=True)
+            await asyncio.sleep(0)
+
+    async def test_cancellation_during_notification_flush_retires_worker(self):
+        entered, release, retired = asyncio.Event(), asyncio.Event(), asyncio.Event()
+        async def notify(text):
+            entered.set()
+            try:
+                await release.wait()
+            finally:
+                retired.set()
+        pending = asyncio.create_task(self.env.exec('echo complete', ExecOptions(on_stdout=notify)))
+        try:
+            await asyncio.wait_for(entered.wait(), 1)
+            await asyncio.sleep(.02)
+            pending.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await asyncio.wait_for(pending, 1)
+            self.assertTrue(retired.is_set())
+            self.assertTrue((await self.env.exec('echo reusable')).is_ok)
+        finally:
+            release.set()
+            await asyncio.gather(pending, return_exceptions=True)
 
     async def test_remove_recursive(self):
         self.env.write_file("d/e.txt", "x")

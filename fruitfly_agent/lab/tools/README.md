@@ -135,7 +135,7 @@ Offline checks: `tests.lab.test_tool_catalog`, `tests.lab.test_component_targets
 
 ## Bound and manage shell commands
 
-Bash defaults to a 600-second timeout. A positive finite `timeout` overrides it.
+Bash defaults to a 300-second timeout. A positive finite `timeout` overrides it.
 For long work, call Bash with `action: start`, `command` and optional
 `wait_seconds` (default 0.2, range 0–30); it returns a runtime-owned handle.
 Use `action: poll` with `handle` for bounded output or `action: cancel` to retire
@@ -151,6 +151,9 @@ retained-handle and output-page limits remain fixed experiment conditions.
 Bash candidates require both configuration materialization and Bash execution. A larger command timeout never extends its parent
 operation or experiment deadline. Managed tasks are in-process capabilities, not
 persistent remote jobs or an OS sandbox. All actions retain execution permission.
+Command deadlines cover process exit and output collection. Timeout/cancellation
+uses a separate bounded cleanup interval; an unconfirmed cleanup is an error and
+prevents reuse of the affected backend. See [environment execution](../environment/README.md).
 
 Offline checks: `tests.lab.test_managed_commands`, `tests.lab.test_parameter_candidates`.
 

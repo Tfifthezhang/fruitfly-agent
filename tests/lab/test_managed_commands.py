@@ -19,9 +19,19 @@ class ManagedCommandsTests(unittest.IsolatedAsyncioTestCase):
         environment = SimpleNamespace(cwd='.', exec=execute)
         tool = create_bash_tool()
         await tool.execute(ToolCallContext('call', 'bash', {'command': 'work'}, env=environment))
-        self.assertEqual(seen, [600])
+        self.assertEqual(seen, [300])
+        startup_manager = CommandManager()
+        try:
+            managed = create_bash_tool(manager=startup_manager)
+            await managed.execute(ToolCallContext('start', 'bash',
+                {'action': 'start', 'command': 'work', 'wait_seconds': .2}, env=environment))
+            await tool.execute(ToolCallContext('override', 'bash',
+                {'command': 'work', 'timeout': 17}, env=environment))
+            self.assertEqual(seen, [300, 300, 17])
+        finally:
+            await startup_manager.aclose()
         parameters = builtin_catalog().get('bash-tool').descriptor.normalize_parameters({})
-        self.assertEqual(parameters['default_timeout_seconds'], 600)
+        self.assertEqual(parameters['default_timeout_seconds'], 300)
         manager = CommandManager()
         started = asyncio.Event()
         async def block(context):

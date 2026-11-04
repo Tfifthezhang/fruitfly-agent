@@ -18,7 +18,6 @@ import asyncio
 import codecs
 import os
 import shutil
-import signal
 import tempfile
 from pathlib import Path
 
@@ -26,6 +25,7 @@ from fruitfly_agent.core.env import ExecOptions, ExecResult, FileInfo
 from fruitfly_agent.core.errors import Result
 from fruitfly_agent.core.observation import FailureInfo, operation
 from .failures import environment_operation
+from .processes import ProcessGroup, OutputNotifications
 
 
 class LocalEnv:
@@ -38,6 +38,7 @@ class LocalEnv:
 
     def __init__(self, cwd: str | None = None) -> None:
         self.cwd = str(Path(cwd).resolve() if cwd else Path.cwd())
+        self._unretired = []
 
     # -- paths -----------------------------------------------------------
 
@@ -193,6 +194,8 @@ class LocalEnv:
 
     async def _exec(self, command: str, options: ExecOptions | None = None) -> Result[ExecResult]:
         opts = options or ExecOptions()
+        if self._unretired:
+            return Result.failure('local execution unavailable: previous cleanup was not confirmed')
         try:
             with environment_operation('environment.local.spawn'):
                 process = await asyncio.create_subprocess_shell(
@@ -207,49 +210,45 @@ class LocalEnv:
         except Exception as exc:  # noqa: BLE001
             return Result.failure(f"spawn failed: {exc}")
 
-        timeout_task: asyncio.Task | None = None
+        group = ProcessGroup(process)
+        notifications = OutputNotifications()
+        async def complete():
+            output, code = await asyncio.gather(self._drain(process, opts, notifications), process.wait())
+            return output[0], output[1], code
+        completion = asyncio.create_task(complete())
+        async def retire():
+            try:
+                await group.stop(completion)
+            except BaseException:
+                self._unretired.append(group)
+                raise
         try:
-            drain: asyncio.Task[tuple[str, str]] = asyncio.create_task(
-                self._drain(process, opts), name="exec-drain"
-            )
-            if opts.timeout_seconds is not None and opts.timeout_seconds > 0:
-                timeout_task = asyncio.create_task(
-                    asyncio.sleep(opts.timeout_seconds), name="exec-timeout"
-                )
-                pending = {timeout_task, drain}
-            else:
-                pending = {drain}
-            cancelled = False
-            while pending:
-                done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
-                if timeout_task in done and not drain.done():
-                    cancelled = True
-                    self._kill_group(process)
-                if drain in done:
-                    break
-                for task in done:
-                    if task is drain:
-                        continue
-                    task.cancel()
-            stdout, stderr = await drain
-            exit_code = await process.wait()
+            done, _ = await asyncio.wait((completion,), timeout=opts.timeout_seconds)
+            cancelled = not done
+            if cancelled:
+                await retire()
+            stdout, stderr, exit_code = await completion
             return Result.success(
                 ExecResult(stdout=stdout, stderr=stderr, exit_code=exit_code, cancelled=cancelled,
                     termination_reason="timeout" if cancelled else "exited")
             )
         except asyncio.CancelledError:
-            self._kill_group(process)
-            try:
-                await asyncio.wait_for(drain, timeout=5)
-            except (asyncio.TimeoutError, Exception):  # noqa: BLE001
-                pass
+            await retire()
             raise
         except Exception as exc:  # noqa: BLE001
-            self._kill_group(process)
+            if not self._unretired:
+                await retire()
             return Result.failure(f"exec failed: {exc}")
         finally:
-            if timeout_task is not None and not timeout_task.done():
-                timeout_task.cancel()
+            try:
+                await notifications.close()
+            except asyncio.CancelledError:
+                if not notifications.worker.done():
+                    self._unretired.append(notifications)
+                raise
+            except BaseException:
+                self._unretired.append(notifications)
+                raise
 
     @staticmethod
     def _merge_env(opts: ExecOptions) -> dict[str, str] | None:
@@ -261,17 +260,7 @@ class LocalEnv:
         return merged
 
     @staticmethod
-    def _kill_group(process: asyncio.subprocess.Process) -> None:
-        try:
-            os.killpg(os.getpgid(process.pid), signal.SIGKILL)
-        except (ProcessLookupError, PermissionError, OSError):
-            try:
-                process.kill()
-            except Exception:  # noqa: BLE001
-                pass
-
-    @staticmethod
-    async def _drain(process: asyncio.subprocess.Process, opts: ExecOptions) -> tuple[str, str]:
+    async def _drain(process: asyncio.subprocess.Process, opts: ExecOptions, notifications) -> tuple[str, str]:
         """Drain both pipes before returning; callback failures are isolated."""
 
         async def read_stream(stream: asyncio.StreamReader | None, callback) -> str:
@@ -284,11 +273,7 @@ class LocalEnv:
                 text = decoder.decode(chunk, final=not chunk)
                 if text:
                     parts.append(text)
-                    if callback is not None:
-                        try:
-                            await callback(text)
-                        except Exception:  # callback failure cannot break draining
-                            pass
+                    notifications.publish(callback, text)
                 if not chunk:
                     break
             return "".join(parts)

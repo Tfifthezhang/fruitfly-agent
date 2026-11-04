@@ -161,7 +161,7 @@ when needed. Trusted Python plugins still run locally with host privileges.
 | Behavior | Contract / limit |
 |---|---|
 | Shell | Each invocation starts `/bin/bash -c`; no PTY or interactive stdin; shell state does not persist |
-| Output | Separate stdout/stderr, incremental UTF-8 decoding and async callbacks; ordinary callback failures are isolated |
+| Output | Separate stdout/stderr and incremental UTF-8 decoding. Bounded, queued live callbacks cannot block deadline checks; intermediate display chunks may be coalesced while complete output is retained. Ordinary callback failures are isolated. |
 | Timeout | Client cancellation plus a server-side supervisor deadline; returns `ExecResult.cancelled=True` when confirmed |
 | Task cancellation | Send cancellation, briefly drain/reap, close the channel and propagate `CancelledError` |
 | Disconnect | Supervisor kills its process group when SSH stdin closes; network partitions can delay EOF; cleanup cannot be guaranteed |
@@ -178,6 +178,11 @@ with this backend and rejected by Catalog. Other local context text may still
 mention local paths; use explicit remote paths in tasks. Original-task
 experiments are blocked because the SSH workspace has no isolated frozen task
 snapshot. Offline checks do not establish real server compatibility.
+
+Live notifications use the shared [environment output service](../README.md).
+If notification cancellation cannot be confirmed, the backend retains that worker
+and rejects further commands. The server-side process deadline remains independent
+of client display work. Synchronous callbacks still must avoid blocking the event loop.
 
 ## Files and offline checks
 

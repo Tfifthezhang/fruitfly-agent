@@ -8,6 +8,7 @@ from typing import Any
 from contextlib import asynccontextmanager
 
 from fruitfly_agent.lab.catalog.tool_providers import ToolServiceInfo
+from fruitfly_agent.core.extensions.operations import OperationSupervisor, consume
 from .config import ServerConfig
 
 
@@ -113,6 +114,8 @@ class McpClient:
             task = asyncio.create_task(self._client.call_tool(name, copy.deepcopy(arguments),
                 read_timeout_seconds=self.config.call_timeout))
             self._calls.add(task)
+            task.add_done_callback(self._calls.discard)
+            task.add_done_callback(consume)
             abort = asyncio.create_task(signal.wait()) if signal is not None else None
             try:
                 watched = {task, abort} if abort is not None else {task}
@@ -124,16 +127,13 @@ class McpClient:
                 result = task.result()
                 return result.model_dump(mode='json', by_alias=True, exclude_none=True)
             except asyncio.CancelledError:
-                task.cancel()
-                await asyncio.gather(task, return_exceptions=True)
+                await self._retire((task,))
                 raise
             except Exception:
-                task.cancel()
-                await asyncio.gather(task, return_exceptions=True)
                 self.state = 'failed; outcome unknown'
+                await self._retire((task,))
                 raise RuntimeError('MCP call failed or timed out; effects may have occurred. Do not automatically replay.') from None
             finally:
-                self._calls.discard(task)
                 if abort is not None:
                     abort.cancel()
                     await asyncio.gather(abort, return_exceptions=True)
@@ -160,23 +160,31 @@ class McpClient:
             if not acquire.cancelled() and acquire.exception() is None and acquire.result():
                 self._slots.release()
 
-    async def close(self) -> None:
-        for task in tuple(self._calls):
+    async def _retire(self, tasks):
+        for task in tasks:
             task.cancel()
-        if self._calls:
-            await asyncio.gather(*self._calls, return_exceptions=True)
+        await self._drain_owned(tasks)
+
+    async def _drain_owned(self, tasks):
+        if not tasks:
+            return
+        supervisor = OperationSupervisor(retirement_timeout=.1)
+        try:
+            await supervisor.run(lambda: asyncio.gather(*tasks, return_exceptions=True),
+                timeout=self.config.close_timeout)
+        except (Exception, asyncio.CancelledError) as exc:
+            self.state = 'cleanup incomplete; outcome unknown'
+            raise RuntimeError('MCP cleanup deadline exceeded; ownership retained and outcome unknown') from exc
+
+    async def close(self) -> None:
+        calls = tuple(self._calls)
+        for task in calls:
+            task.cancel()
         self._stop.set()
         if self._task is not None:
             if self.state == 'starting':
                 self._task.cancel()
-            try:
-                await asyncio.wait_for(asyncio.shield(self._task), self.config.close_timeout)
-            except asyncio.CancelledError:
-                if not self._task.cancelled():
-                    raise
-            except TimeoutError:
-                self.state = 'cleanup incomplete'
-                raise RuntimeError('MCP cleanup deadline exceeded; service ownership retained') from None
-            if self._ready is not None and not self._ready.done():
-                self._ready.cancel()
-            self.environment.clear()
+        await self._drain_owned((*calls, *((self._task,) if self._task is not None else ())))
+        if self._ready is not None and not self._ready.done():
+            self._ready.cancel()
+        self.environment.clear()

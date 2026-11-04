@@ -13,6 +13,8 @@ import uuid
 from typing import Any, Awaitable, Callable
 
 from .artifacts import SessionArtifactStore
+from fruitfly_agent.lab.environment.processes import ProcessGroup
+from fruitfly_agent.core.extensions.operations import consume
 
 
 HostRequestHandler = Callable[
@@ -60,12 +62,20 @@ class IpythonRuntime:
         self._closed = False
         self._active_signal: asyncio.Event | None = None
         self._stderr_tail: deque[str] = deque(maxlen=100)
+        self._group = None
+        self._stop_lock = asyncio.Lock()
+        self._host_requests = set()
+        self._cleanup_unconfirmed = False
 
     async def start(self) -> None:
         if self._closed:
             raise RuntimeError("IPython runtime is closed")
+        if self._cleanup_unconfirmed:
+            raise RuntimeError('IPython unavailable: previous cleanup was not confirmed')
         if self._process is not None and self._process.returncode is None:
             return
+        if self._process is not None:
+            await self._stop_process()
         env = dict(self.process_environment)
         package_root = str(Path(__file__).resolve().parents[5])
         existing_pythonpath = env.get("PYTHONPATH")
@@ -83,6 +93,7 @@ class IpythonRuntime:
             }
         )
         self._ready = asyncio.get_running_loop().create_future()
+        self._ready.add_done_callback(consume)
         self._process = await asyncio.create_subprocess_exec(
             sys.executable,
             "-m",
@@ -92,7 +103,9 @@ class IpythonRuntime:
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            start_new_session=True,
         )
+        self._group = ProcessGroup(self._process)
         self._reader_task = asyncio.create_task(self._read_protocol())
         self._stderr_task = asyncio.create_task(self._read_stderr())
         try:
@@ -110,18 +123,21 @@ class IpythonRuntime:
     ) -> ProgramExecutionResult:
         if not isinstance(code, str) or not code.strip():
             raise ValueError("IPython code must be a non-empty string")
+        if signal is not None and signal.is_set():
+            raise asyncio.CancelledError
         async with self._execute_lock:
             await self.start()
             request_id = uuid.uuid4().hex
             future = asyncio.get_running_loop().create_future()
+            future.add_done_callback(consume)
             self._pending[request_id] = future
             self._active_signal = signal
-            await self._send({"type": "execute", "id": request_id, "code": code})
             signal_task = (
                 asyncio.create_task(signal.wait()) if signal is not None else None
             )
             try:
                 async with asyncio.timeout(self.timeout_seconds):
+                    await self._send({"type": "execute", "id": request_id, "code": code})
                     if signal_task is None:
                         event = await future
                     else:
@@ -130,7 +146,6 @@ class IpythonRuntime:
                             return_when=asyncio.FIRST_COMPLETED,
                         )
                         if signal_task in done and signal.is_set():
-                            await self._stop_process()
                             raise asyncio.CancelledError
                         event = future.result()
             except TimeoutError:
@@ -138,6 +153,9 @@ class IpythonRuntime:
                 raise TimeoutError(
                     f"IPython execution exceeded {self.timeout_seconds} seconds"
                 ) from None
+            except asyncio.CancelledError:
+                await self._stop_process()
+                raise
             finally:
                 self._active_signal = None
                 self._pending.pop(request_id, None)
@@ -149,7 +167,7 @@ class IpythonRuntime:
     async def health(self) -> dict[str, Any]:
         return {
             "status": (
-                "ready"
+                'cleanup_unconfirmed' if self._cleanup_unconfirmed else "ready"
                 if self._process is not None and self._process.returncode is None
                 else "stopped"
             ),
@@ -158,7 +176,7 @@ class IpythonRuntime:
         }
 
     async def close(self) -> None:
-        if self._closed:
+        if self._closed and not self._cleanup_unconfirmed:
             return
         self._closed = True
         await self._stop_process(graceful=True)
@@ -191,7 +209,10 @@ class IpythonRuntime:
                     if future is not None and not future.done():
                         future.set_result(event)
                 elif kind == "host_request":
-                    asyncio.create_task(self._handle_host_request(event))
+                    task = asyncio.create_task(self._handle_host_request(event))
+                    self._host_requests.add(task)
+                    task.add_done_callback(self._host_requests.discard)
+                    task.add_done_callback(consume)
                 elif kind == "protocol_error":
                     raise RuntimeError(str(event.get("error") or "kernel protocol error"))
                 else:
@@ -200,8 +221,8 @@ class IpythonRuntime:
             raise
         except BaseException as exc:
             self._fail_waiters(exc)
-            if process.returncode is None:
-                process.kill()
+            if self._group is not None and self._group.process is process:
+                self._group.kill()
         finally:
             if process.returncode is None:
                 await process.wait()
@@ -273,34 +294,32 @@ class IpythonRuntime:
             await process.stdin.drain()
 
     async def _stop_process(self, *, graceful: bool = False) -> None:
-        process = self._process
-        reader = self._reader_task
-        stderr = self._stderr_task
-        self._process = None
-        self._reader_task = None
-        self._stderr_task = None
-        if process is None:
-            return
-        if process.returncode is None and graceful and process.stdin is not None:
-            try:
-                process.stdin.write(b'{"type":"shutdown"}\n')
-                await process.stdin.drain()
-                async with asyncio.timeout(2):
-                    await process.wait()
-            except (BrokenPipeError, ConnectionError, TimeoutError):
-                pass
-        if process.returncode is None:
-            process.kill()
-            await process.wait()
-        current = asyncio.current_task()
-        for task in (reader, stderr):
-            if task is not None and task is not current:
+        async with self._stop_lock:
+            process, group = self._process, self._group
+            if process is None:
+                return
+            if process.returncode is None and graceful and process.stdin is not None:
+                try:
+                    async with asyncio.timeout(2):
+                        process.stdin.write(b'{"type":"shutdown"}\n')
+                        await process.stdin.drain()
+                        await process.wait()
+                except (BrokenPipeError, ConnectionError, TimeoutError):
+                    pass
+            current = asyncio.current_task()
+            tasks = tuple(task for task in (self._reader_task, self._stderr_task, *self._host_requests)
+                if task is not None and task is not current)
+            for task in tasks:
                 task.cancel()
-        await asyncio.gather(
-            *(task for task in (reader, stderr) if task is not None and task is not current),
-            return_exceptions=True,
-        )
-        self._fail_waiters(RuntimeError("IPython kernel stopped"))
+            try:
+                await group.stop(*tasks)
+            except BaseException:
+                self._cleanup_unconfirmed = True
+                raise
+            self._cleanup_unconfirmed = False
+            self._process = self._group = None
+            self._reader_task = self._stderr_task = None
+            self._fail_waiters(RuntimeError("IPython kernel stopped"))
 
     def _fail_waiters(self, error: BaseException) -> None:
         if self._ready is not None and not self._ready.done():

@@ -6,6 +6,40 @@ import unittest
 from tests.support.mcp import HAS_MCP, write_mcp_config
 from fruitfly_agent.lab.mcp.config import load_config
 from fruitfly_agent.lab.mcp.client import McpClient
+from fruitfly_agent.lab.mcp.config import ServerConfig
+from types import SimpleNamespace
+
+
+class McpCleanupDeadlineTests(unittest.IsolatedAsyncioTestCase):
+    async def test_uncooperative_request_has_bounded_cleanup_and_retains_ownership(self):
+        client = McpClient(ServerConfig('offline', 'unused', (), '.', ('wait',),
+            call_timeout=.05, close_timeout=.05), {})
+        release, cancelled = asyncio.Event(), asyncio.Event()
+        async def resist(*args, **kwargs):
+            while not release.is_set():
+                try:
+                    await release.wait()
+                except asyncio.CancelledError:
+                    cancelled.set()
+            raise asyncio.CancelledError
+        client._client = SimpleNamespace(call_tool=resist)
+        client.state = 'ready'
+        pending = asyncio.create_task(client.call('wait', {}))
+        try:
+            await asyncio.wait_for(cancelled.wait(), 1)
+            done, _ = await asyncio.wait((pending,), timeout=.4)
+            self.assertTrue(done, 'SDK cancellation exceeded its cleanup allowance')
+            with self.assertRaisesRegex(RuntimeError, 'cleanup|outcome'):
+                pending.result()
+            self.assertTrue(client._calls, 'unretired request ownership was discarded')
+            with self.assertRaisesRegex(RuntimeError, 'unavailable'):
+                await client.call('wait', {})
+            with self.assertRaisesRegex(RuntimeError, 'cleanup'):
+                await asyncio.wait_for(client.close(), .5)
+        finally:
+            release.set()
+            await asyncio.gather(pending, return_exceptions=True)
+            await client.close()
 
 
 @unittest.skipUnless(HAS_MCP, "install the optional [mcp] extra")

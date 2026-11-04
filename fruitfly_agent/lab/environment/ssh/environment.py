@@ -19,6 +19,7 @@ import uuid
 from fruitfly_agent.core.env import ExecOptions, ExecResult, FileInfo
 from fruitfly_agent.core.errors import Result
 from ..failures import classify_environment_failure, environment_operation
+from ..processes import OutputNotifications
 from fruitfly_agent.core.observation import FailureInfo
 from .config import SshConfig
 from .supervisor import PROGRAM
@@ -36,6 +37,7 @@ class SshEnv:
         self._client = self._sftp = None
         self._closed = False
         self._channels: set = set()
+        self._unretired = []
 
     def _connect(self):
         try:
@@ -109,6 +111,12 @@ class SshEnv:
     async def close(self):
         self._closed = True
         failed = False
+        for notifications in tuple(self._unretired):
+            try:
+                await notifications.close()
+                self._unretired.remove(notifications)
+            except Exception:
+                failed = True
         for channel in tuple(self._channels):
             self._cancel(channel)
             try:
@@ -331,7 +339,10 @@ class SshEnv:
     async def _exec(self, command, options=None, *, observed):
         opts = options or ExecOptions()
         channel = None
+        notifications = OutputNotifications()
         try:
+            if self._unretired:
+                raise OSError('previous SSH output cleanup was not confirmed')
             self._ready()
             env = opts.env or {}
             if opts.timeout_seconds is not None and (isinstance(opts.timeout_seconds, bool) or
@@ -389,11 +400,7 @@ class SshEnv:
                     if ready():
                         chunk = decoders[index].decode(receive(65536))
                         parts.append(chunk)
-                        if callback is not None and chunk:
-                            try:
-                                await callback(chunk)
-                            except Exception:
-                                pass
+                        notifications.publish(callback, chunk)
                 now = time.monotonic()
                 if opts.timeout_seconds and now - started >= opts.timeout_seconds and not cancelled:
                     cancelled = True
@@ -434,3 +441,12 @@ class SshEnv:
             if channel is not None:
                 self._channels.discard(channel)
                 self._quiet_close(channel)
+            try:
+                await notifications.close()
+            except asyncio.CancelledError:
+                if not notifications.worker.done():
+                    self._unretired.append(notifications)
+                raise
+            except BaseException:
+                self._unretired.append(notifications)
+                raise
