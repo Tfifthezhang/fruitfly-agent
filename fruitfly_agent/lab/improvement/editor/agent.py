@@ -65,6 +65,7 @@ class AgentEditor:
         mission += '\nUser guidance: ' + request.plan.direction
         mission += '\nPrefer submit_candidate to finish without a prose/JSON handoff. Search large evidence before reading selected pages.'
         mission += '\nRead execution metadata or relevant execution pages before citing a run. Listing paths alone does not supply evidence.'
+        mission += '\nRead available evidence/overview.json and evidence/coverage.json for each relevant execution. Missing outputs, partial indexing and unknown usage limit conclusions; distinguish these gaps from demonstrated task failures.'
         sealed = None
         def seal(value):
             nonlocal sealed

@@ -10,7 +10,6 @@ from .assembly import (
     assemble_lab,
     require_workspace_path,
 )
-from .builtins import builtin_catalog
 from .catalog import LabCatalog
 from .tool_providers import (PreparedToolProvider, ToolProviderContext, ToolServiceInfo,
                              ToolServiceStart, ProviderToolAuthorizer)
@@ -77,3 +76,9 @@ __all__ += ['normalize_configuration_binding']
 
 from .model_roles import ModelRoleRequirement, role_alias
 __all__ += ['ModelRoleRequirement', 'role_alias']
+
+
+def builtin_catalog() -> LabCatalog:
+    """Construct built-ins only when requested, keeping owner imports acyclic."""
+    from .builtins import builtin_catalog as build
+    return build()

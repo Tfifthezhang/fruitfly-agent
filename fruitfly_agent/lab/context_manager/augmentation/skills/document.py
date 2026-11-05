@@ -52,6 +52,10 @@ def _install(state, context, parameters):
         path = context.workspace / parameters['source_path']
         if Path(parameters['source_path']).is_absolute() or not path.resolve().is_relative_to(context.workspace):
             raise ValueError('source Skill must be workspace-relative')
+        library = state.components.get('text-target:skill-library')
+        if library is not None and any(entry['origin']['source'] == path.relative_to(context.workspace).as_posix()
+                for entry in library.entries):
+            raise ValueError('Skill source is already owned by skill-library')
         skill = load_skill_document(path)
         captured = capture_skills(path.parent, context.workspace)
         entry = next(item for item in captured.snapshot.files

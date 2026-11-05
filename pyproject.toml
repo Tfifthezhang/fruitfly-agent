@@ -60,10 +60,10 @@ include = ["fruitfly_agent*", "fruitfly_eval*"]
 
 "fruitfly_agent.lab.base_prompt" = ["defaults.yaml"]
 "fruitfly_agent.lab.context_manager.augmentation.information" = ["information-context.yaml"]
-"fruitfly_agent.lab.context_manager.augmentation.information.file_memory" = ["defaults.yaml"]
+"fruitfly_agent.lab.context_manager.augmentation.information.file_memory" = ["defaults.yaml", "memory-state.yaml"]
 "fruitfly_agent.lab.context_manager.augmentation.information.live_http" = ["defaults.yaml"]
 "fruitfly_agent.lab.context_manager.augmentation.information.local_knowledge" = ["defaults.yaml"]
-"fruitfly_agent.lab.context_manager.augmentation.skills" = ["skill-catalog.yaml", "skill-document.yaml"]
+"fruitfly_agent.lab.context_manager.augmentation.skills" = ["skill-catalog.yaml", "skill-document.yaml", "skill-library.yaml", "builtin/manifest.yaml", "builtin/*/SKILL.md"]
 "fruitfly_agent.lab.context_manager.externalization" = ["ipython-tool.yaml", "rlm-ipython.yaml"]
 "fruitfly_agent.lab.context_manager.reduction.methods.layered_compaction" = ["defaults.yaml"]
 "fruitfly_agent.lab.context_manager.reduction.methods.working_memory" = ["defaults.yaml"]
@@ -74,6 +74,8 @@ include = ["fruitfly_agent*", "fruitfly_eval*"]
 "fruitfly_agent.lab.mcp" = ["defaults.yaml"]
 "fruitfly_agent.lab.tools" = ["bash-tool.yaml", "tool-catalog.yaml"]
 "fruitfly_agent.lab.tools.web" = ["web-fetch-tool.yaml", "web-search-tool.yaml"]
+
+"fruitfly_agent.lab.context_manager.augmentation.information.file_memory.methods.threshold_maintenance" = ["defaults.yaml", "extraction.yaml", "consolidation.yaml"]
 
 [tool.mypy]
 python_version = "3.11"
@@ -88,6 +90,8 @@ files = [
     "fruitfly_agent/lab/context_manager/measurement",
     "fruitfly_agent/lab/context_manager/resources",
     "fruitfly_agent/lab/context_manager/registration.py",
+    "fruitfly_agent/lab/context_manager/augmentation/information/file_memory",
+    "fruitfly_agent/lab/context_manager/augmentation/skills",
     "fruitfly_agent/lab/tools/resources.py",
     "fruitfly_agent/core/tool_runtime/resources.py",
     "fruitfly_agent/runtime_spec",

@@ -1,82 +1,64 @@
 """Rebuildable navigation derived from immutable execution resources; no model."""
 from dataclasses import asdict, replace
-import json
 
 from fruitfly_agent.improvement.contracts.tasks import Resource
 from fruitfly_agent.improvement.contracts.versions import canonical_json, content_hash
 from fruitfly_agent.improvement.execution.facts import read_facts
+from .decoding import decode_rows
+from .events import extract_events, correlate_events
+from .coverage import build_coverage
 
 OVERVIEW_PATH = 'evidence/overview.json'
 EVENTS_PATH = 'evidence/events.json'
+COVERAGE_PATH = 'evidence/coverage.json'
+SOURCES_PATH = 'evidence/sources.json'
+DERIVED_PATHS = frozenset((OVERVIEW_PATH, EVENTS_PATH, COVERAGE_PATH, SOURCES_PATH))
 
 
 def organize_evidence(task, record, artifacts):
-    if any(r.path == OVERVIEW_PATH for r in record.artifacts):
-        return record
+    # Rebuild from originals: an existing overview alone does not establish freshness.
+    originals = tuple(r for r in record.artifacts if r.path not in DERIVED_PATHS)
+    record = replace(record, artifacts=originals)
     facts = read_facts(record, artifacts)
     sources, events = [], []
-    for resource in record.artifacts:
-        source = {'path':resource.path, 'artifact_id':resource.artifact_id, 'kind':resource.kind}
+    for resource in originals:
+        source = {'path': resource.path, 'artifact_id': resource.artifact_id, 'kind': resource.kind,
+                  'status': 'retained'}
         sources.append(source)
-        if resource.kind != 'trajectory':
-            continue
         try:
-            text = artifacts.read(resource.artifact_id).decode('utf-8')
-        except (ValueError, KeyError, OSError, UnicodeError) as exc:
-            source.update(status='unavailable', reason=type(exc).__name__)
-            continue
-        try:
-            if text.lstrip().startswith('['):
-                decoder, cursor = json.JSONDecoder(), text.index('[')+1
-                rows=[]
-                while cursor<len(text):
-                    while cursor<len(text) and (text[cursor].isspace() or text[cursor]==','):cursor+=1
-                    if cursor>=len(text) or text[cursor]==']':break
-                    value,end=decoder.raw_decode(text,cursor)
-                    rows.append((cursor,end,value));cursor=end
-            else:
-                rows=[]
-                cursor=0
-                for line in text.splitlines(keepends=True):
-                    if line.strip():rows.append((cursor,cursor+len(line.rstrip('\r\n')),json.loads(line)))
-                    cursor+=len(line)
-        except (ValueError, TypeError) as exc:
-            source.update(status='unindexed', reason=type(exc).__name__)
-            continue
-        source['status']='indexed'
-        for start,end,row in rows:
-            if not isinstance(row,dict):continue
-            payload = row.get('payload', row.get('data', row))
-            if 'payload_json' in row:
-                try:
-                    payload = json.loads(row['payload_json'])
-                except (ValueError, TypeError):
-                    payload = {}
-            if not isinstance(payload, dict):
-                payload = {}
-            message=row.get('message', payload.get('message', payload))
-            if not isinstance(message,dict):message={}
-            data=payload
-            kind=row.get('event') or row.get('kind') or message.get('role') or row.get('type','event')
-            events.append({'event_id':content_hash(canonical_json([resource.artifact_id,start,end])),
-                'kind':kind,'source_path':resource.path,'artifact_id':resource.artifact_id,'start':start,'end':end,
-                'timestamp':row.get('timestamp'), 'elapsed_seconds':data.get('elapsed_seconds'),
-                'tool_name':data.get('tool_name',message.get('toolName',message.get('tool_name'))),
-                'is_error':message.get('isError',message.get('is_error',data.get('is_error'))),
-                'status':data.get('status')})
-    identity=content_hash(canonical_json({'run_id':record.run_id,'sources':sources}))
-    event_index={'run_id':record.run_id,'source_identity':identity,'events':events,'sources':sources,
-        'complete':facts.complete if facts is not None else False}
-    overview={'run_id':record.run_id,'task':task.instruction,'status':record.status,
-        'source_identity':identity,'output_id':artifacts.put(record.output.encode()),
-        'output_characters':len(record.output),'output_excerpt':record.output[:2000],
-        'termination_reason':facts.termination_reason if facts is not None else 'unknown',
-        'elapsed_seconds':facts.elapsed_seconds if facts is not None else None,
-        'usage':asdict(facts)['usage'] if facts is not None else [],
-        'counters':dict(facts.counters) if facts is not None else {},
-        'deliverables':[asdict(r) for r in record.artifacts if r.kind=='deliverable'],
-        'event_count':len(events),'events_path':EVENTS_PATH,'sources':sources,
-        'complete':facts.complete if facts is not None else False}
-    resources=tuple(Resource(path,artifacts.put(canonical_json(value).encode()),'application/json','diagnostic')
-        for path,value in ((OVERVIEW_PATH,overview),(EVENTS_PATH,event_index)))
-    return replace(record,artifacts=(*record.artifacts,*resources))
+            data = artifacts.read(resource.artifact_id)
+            if resource.kind != 'trajectory' and not resource.path.endswith('/model-usage.json'):
+                continue
+            text = data.decode('utf-8')
+            rows, source_format, gaps = decode_rows(text)
+            source.update(format=source_format, gaps=gaps,
+                          status='partial' if gaps and rows else 'unindexed' if gaps else 'indexed')
+            events.extend(extract_events(resource, rows, source_format))
+        except (ValueError, KeyError, OSError, UnicodeError, TypeError, AttributeError, IndexError) as exc:
+            source.update(status='unindexed' if resource.kind == 'trajectory' else 'unavailable', reason=type(exc).__name__)
+    correlate_events(events)
+    identity = content_hash(canonical_json({'organizer': 'layered-evidence-2', 'run_id': record.run_id,
+                                           'output': record.output, 'sources': sources}))
+    coverage = build_coverage(record, sources, artifacts, facts)
+    event_index = {'run_id': record.run_id, 'source_identity': identity, 'events': events,
+                   'sources': sources, 'complete': coverage['evidence_complete'],
+                   'execution_diagnostics_complete': coverage['execution_diagnostics_complete'],
+                   'note': 'Events are source navigation. Derived views are not additional executions; use execution facts for counts.'}
+    overview = {'run_id': record.run_id, 'task': task.instruction, 'status': record.status,
+        'source_identity': identity, 'output_id': artifacts.put(record.output.encode()),
+        'output_characters': len(record.output), 'output_excerpt': record.output[:2000],
+        'termination_reason': facts.termination_reason if facts is not None else 'unknown',
+        'elapsed_seconds': facts.elapsed_seconds if facts is not None else None,
+        'usage': asdict(facts)['usage'] if facts is not None else [],
+        'counters': dict(facts.counters) if facts is not None else {},
+        'deliverables': [asdict(r) for r in originals if r.kind == 'deliverable'],
+        'deliverable_scope': 'Captured file versions; consult the capture manifest for stage and final-state relationships.',
+        'event_count': len(events), 'events_path': EVENTS_PATH, 'sources': sources,
+        'coverage_path': COVERAGE_PATH, 'coverage': coverage,
+        'complete': coverage['evidence_complete'],
+        'execution_diagnostics_complete': coverage['execution_diagnostics_complete']}
+    values = ((OVERVIEW_PATH, overview), (EVENTS_PATH, event_index),
+              (COVERAGE_PATH, coverage), (SOURCES_PATH, {'sources': sources, 'source_identity': identity}))
+    resources = tuple(Resource(path, artifacts.put(canonical_json(value).encode()), 'application/json', 'diagnostic')
+                      for path, value in values)
+    return replace(record, artifacts=(*originals, *resources))

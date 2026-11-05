@@ -107,3 +107,7 @@ Hosts can omit the new execution views to keep existing custom menus.
 aliases. Discovery views contain no handlers. `format_command_help()` presents
 those views without querying a host. Command registration and dispatch remain with
 Interaction and Terminal; terminal completion data belongs to I/O.
+
+[maintenance.py](maintenance.py) describes optional idle maintenance and cancellation.
+[retained_state.py](retained_state.py) describes document inspection and batch review.
+These ports contain no algorithm IDs. Hosts can omit them.

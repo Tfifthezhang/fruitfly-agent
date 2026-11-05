@@ -50,7 +50,9 @@ Major feature modules own their Improvement registration entry. Concrete methods
 belong in the owning module's `methods/`; shared contracts and services remain
 outside. See [Lab design rules](lab/README.md#design-for-improvement).
 
-Retained Skill documents belong to S. I editor instructions use a registered [fixed-depth comparison](lab/improvement/improver/README.md)
+Retained Skill and cross-session memory libraries belong to S. Descriptions and
+bodies share the ordinary candidate assembly path; bodies load on demand.
+Application owns threshold-maintenance scheduling and explicit batch adoption. I editor instructions use a registered [fixed-depth comparison](lab/improvement/improver/README.md)
 that measures the downstream H/S changes produced by each editor.
 
 Task materials and executions need no score. Persistent publication requires an injected verification policy; current-task selection retains its weaker assurance. The experience library is a separate attributed S update after explicit pending-lesson review.
@@ -197,3 +199,7 @@ Context preparation publishes passive stage activity to Session and the terminal
 classified failures and monotonic durations for ordinary interaction and external
 consumers. Source owners classify their own errors. Nested/concurrent stage totals
 are separate from observed wall time, and unfinished operations remain unknown.
+
+Eval's [evidence post-processing](../fruitfly_eval/README.md#organize-retained-evidence)
+materializes the shared Lab evidence layers after execution and through an offline
+organization command. Runtime and generic Improvement remain independent of Eval.

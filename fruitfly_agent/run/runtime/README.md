@@ -112,3 +112,12 @@ Rejected startup and idle-only lifecycle facts use adjacent
 `SESSION.jsonl.operations/*.jsonl`, encoded through the same Core Session codec.
 The sidecar holds observations only and grants no recovery authority. Archive
 failures are isolated from the primary startup/cleanup outcome.
+
+## Host retained-state maintenance
+
+[maintenance.py](maintenance.py) consumes registered workers and public retained
+owners. Application supplies idle execution and cancellation. Preparation accepts
+injected state projection and frontend adapters; leaf runtime services do not
+import improvement-host or adapter implementations. A prepared replacement starts
+no maintenance requests. One-shot tasks disable mutable workspace state services;
+normal and candidate content still use the shared assembler.

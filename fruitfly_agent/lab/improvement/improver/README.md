@@ -176,3 +176,19 @@ not import Eval. A task runner alone does not install an episode study.
 ## Keep infrastructure fixed
 
 Research, progress, evidence access and search schedules are fixed experiment conditions. Editor and evaluator prompts are mutable I surfaces. See [experiment conditions](../../../experiments/CONFIGURATION.md).
+
+## Compare memory editing instructions
+
+The registered `memory-maintenance-comparison` execution evaluates I
+`memory-extractor` and `memory-consolidator` through the S updates they produce.
+Its only downstream component is `memory-library`; enable `memory-maintenance`
+and both I owners in the baseline. Explicit disjoint task packages supply training
+inputs and independent private checks through the existing material contract.
+A registered downstream runner must support configuration materialization. No
+production memory writer enters an episode. The comparison reuses paired trials,
+verification receipts and ordinary I activation. General editor comparison rejects
+these targets because it does not implement their generation semantics. See the
+[memory owner](../../context_manager/augmentation/information/file_memory/README.md).
+
+Memory maintenance comparisons select exactly one editor operation per study.
+This keeps the changed I prompt tied to the operation actually executed.

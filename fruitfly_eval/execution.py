@@ -1,6 +1,7 @@
 """Run one selected configuration and persist its task results and report."""
 from __future__ import annotations
 from datetime import UTC, datetime
+from dataclasses import replace
 from pathlib import Path
 import json
 import uuid
@@ -69,6 +70,15 @@ def execute_request(
     except (TypeError, ValueError) as exc:
         report = report_from_runner_result(request, {"status": "failed", "errors": {"result_validation": str(exc)}},
             evaluation_id=evaluation_id, benchmark=benchmark, started_at=started_at, completed_at=_timestamp())
+    from .organization import organize_run
+    try:
+        evidence = organize_run(store.path)
+        report = replace(report, artifacts=(*report.artifacts, {'kind': 'layered_evidence',
+            'path': str(store.path / 'evidence/manifest.json'), 'status': evidence['status']}))
+    except Exception as exc:
+        store.write_json('evidence/organization-error.json', {'status': 'failed', 'reason': type(exc).__name__, 'detail': str(exc)[:500]})
+        report = replace(report, artifacts=(*report.artifacts, {'kind': 'layered_evidence',
+            'path': str(store.path / 'evidence/organization-error.json'), 'status': 'failed'}))
     store.write_json("report.json", report.to_dict())
     store.write_text("report.md", report.render_markdown())
     if progress is not None:

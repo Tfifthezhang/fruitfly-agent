@@ -202,3 +202,39 @@ copying for both source and wheel material. Improvement rejects prepared inputs
 that differ from the current declared installation before task/model execution.
 System staging freezes complete effective H/S/I parameters using the ordinary
 Catalog path. Later owner-default changes do not alter an already staged config.
+
+## Organize retained evidence
+
+Ordinary `run` automatically organizes available evidence after execution retirement
+and archival. It uses the same Lab organizer as Improvement. Organization produces
+no model requests, Docker jobs or new scores. Its status is reported separately
+from official outcomes.
+
+```bash
+# Offline. Replace the placeholder with an existing evaluation directory.
+.venv/bin/python -m fruitfly_eval organize --run /path/to/evaluation
+# Copy permitted originals into a relocatable evidence export.
+.venv/bin/python -m fruitfly_eval organize --run /path/to/evaluation --output /path/to/export --portable
+```
+
+| Path | Contents |
+|---|---|
+| `evidence/manifest.json` | Observed trials, organization status and available expected-attempt coverage |
+| `evidence/<trial>/overview.json` | Actual final/partial response, files, termination, usage and gaps |
+| `evidence/<trial>/events.json` | Source ranges, request/tool relationships and native/derived event markers |
+| `evidence/<trial>/coverage.json` | Separate collection, parsing, indexing, output, usage and identity states |
+| `evidence/<trial>/sources.json` | Resource hashes and locations relative to the evidence directory |
+| `evidence/material-inventory.json` | Availability of referenced external runtime/task material |
+
+Normal output references retained originals without copying them. `--portable`
+copies only permitted registered evidence, including generated facts. Private
+verifier inputs, external runtime/task snapshots and container image bytes are not
+included. Original reports and scores remain unchanged when organizing history.
+Organization cannot recover files that were never archived. An active or
+unconfirmed-retirement record is rejected. Partial evidence is a successful
+organization result with explicit gaps; per-trial organization errors return 1.
+
+[Capture settings and limits](harbor/README.md#capture-task-evidence) own remote
+collection. [Improvement evidence](../fruitfly_agent/lab/improvement/evidence/README.md)
+owns organization and paged reading. A standalone evidence directory is not an
+automatic grant to an editor; the Improvement adapter registers permitted resources.

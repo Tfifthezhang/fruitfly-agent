@@ -45,3 +45,11 @@ Typed instruction constructors derive values from it. Isolated editors modify
 `parameters.yaml` with a protected `role: I`; ordinary H/S task execution cannot
 supply I acceptance. Frozen comparisons and verified activation retain the
 existing I execution and recovery contracts.
+
+## Inspect evidence coverage before editing
+
+Editing guidance points to each execution's overview and coverage resources.
+Inspect relevant originals through the shared reader before attributing a defect.
+Missing files, partial indexing and unknown usage limit the supported conclusion;
+they are distinct from demonstrated task failure. The editor cannot modify source
+receipts or coverage to change an apparent outcome. See [evidence](../evidence/README.md).

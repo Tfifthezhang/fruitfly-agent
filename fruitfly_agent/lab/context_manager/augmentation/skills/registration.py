@@ -9,6 +9,7 @@ from .improvement import register
 from .catalog import render_skills_xml
 from .resources import capture_skills
 from .adapter import SkillCatalogTransformer
+from .methods.indexed_documents.catalog import render_catalog
 
 
 def snapshot(values, workspace):
@@ -29,11 +30,14 @@ def definition():
 
 def install(state, context, values):
     root = require_workspace_path(context.workspace, values['root'], name='Skill root')
-    captured = capture_skills(root, context.workspace)
-    state = state.with_component(STATE_SNAPSHOTS_COMPONENT,
-        (*state.components.get(STATE_SNAPSHOTS_COMPONENT, ()), captured))
-    locations = captured.mount(context.resources)
-    catalog = render_skills_xml(list(captured.skills), locations=locations)
+    if 'skill-library-preparation' in state.components:
+        from .library import prepare_library
+        state = prepare_library(state, context, state.components['skill-library-preparation'], root)
+    captured = state.components.get('skill-library-resources') or capture_skills(root, context.workspace)
+    if 'skill-library-resources' not in state.components:
+        state = state.with_component(STATE_SNAPSHOTS_COMPONENT,
+            (*state.components.get(STATE_SNAPSHOTS_COMPONENT, ()), captured))
+    catalog = render_catalog(captured, context.resources)
     text = values['usage'] + '\n\n' + catalog if catalog else ''
     if captured.diagnostics:
         text += '\nSkill loading diagnostics:\n' + '\n'.join(captured.diagnostics[:8])

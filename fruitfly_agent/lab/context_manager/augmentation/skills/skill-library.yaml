@@ -1,0 +1,6 @@
+id: skill-library
+role: S
+implementation: skill-library
+parameters:
+  content:
+    documents: ''

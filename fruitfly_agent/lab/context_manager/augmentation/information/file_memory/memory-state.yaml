@@ -1,0 +1,6 @@
+id: memory-library
+role: S
+implementation: memory-library
+parameters:
+  content:
+    documents: '[]'

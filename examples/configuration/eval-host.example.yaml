@@ -20,3 +20,14 @@ dependencies:
 # task_directory: /absolute/path/to/tasks
 # Optional: exact, reviewed setup replacements in private frozen task copies.
 task_patches: []
+# Protected evidence collection; additional whole-job time and disk usage.
+evidence:
+  roots: ['.']
+  extra_paths: []
+  exclude: ['.fruitfly', '.git', '.env', 'secrets.env', '__pycache__', '.ssh']
+  max_file_bytes: 268435456
+  max_total_bytes: 1073741824
+  max_entries: 10000
+  baseline_seconds: 30
+  capture_seconds: 60
+  include_tool_outputs: true

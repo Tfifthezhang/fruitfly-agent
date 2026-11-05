@@ -8,7 +8,7 @@ Retrieve file notes, local documents, and live HTTP results through shared query
 
 | Source | Default | Behavior |
 |---|---|---|
-| [File memory](file_memory/README.md) | Enabled; `.fruitfly/memory/` | Index and topic notes maintained with ordinary file tools |
+| [Cross-session memory](file_memory/README.md) | Enabled with S `memory-library` | Frozen directory; bodies read on demand through resources |
 | [Local knowledge](local_knowledge/README.md) | Disabled; `.fruitfly/knowledge/` | Read-only lexical retrieval with path/line citations |
 | [Live HTTP](live_http/README.md) | Disabled; explicit HTTPS endpoint | Send the current query to a service and retrieve text |
 

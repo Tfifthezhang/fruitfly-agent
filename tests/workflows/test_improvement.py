@@ -18,9 +18,12 @@ class ImprovementFlowTests(unittest.IsolatedAsyncioTestCase):
                     preview = app.workflow_preview(factory.test_request)
                     if phase == 'adoption':
                         record, = await app.improve('', preview_token=preview.preview_token)
-                    memory = factory.cwd / '.fruitfly/memory/MEMORY.md'
-                    memory.parent.mkdir(parents=True, exist_ok=True)
-                    memory.write_text('Different learning state')
+                    import json
+                    from tests.support.retained import memory
+                    store = factory.retained_store
+                    update = store.begin('extract', 'changed-learning-state')
+                    store.finish(update, status='completed', key='memory-library', text=json.dumps([memory()]))
+                    store.review(update, 'commit')
                     with self.assertRaisesRegex(ValueError, 'conditions changed|H/I/S'):
                         if phase == 'preview':
                             await app.improve('', preview_token=preview.preview_token)

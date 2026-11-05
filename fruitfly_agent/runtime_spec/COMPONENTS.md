@@ -57,7 +57,7 @@ automatically component configuration fields.
 | Role | Content | Related guide |
 |---|---|---|
 | H | Prompt, tools, guidance, context and execution settings | [Runtime architecture](../README.md) |
-| S | Registered retained Skill content | [Algorithm targets](../lab/improvement/targets/README.md) |
+| S | Registered memory and Skill libraries, or independent retained content | [Algorithm targets](../lab/improvement/targets/README.md) |
 | I | Editor and evaluator prompts | [Improvement](../lab/improvement/README.md) |
 
 The pure `runtime_spec.load_harness_config` reads explicit documents, retains
@@ -85,6 +85,7 @@ models:
     working_memory: {inherit: executor}
     context_query: {inherit: executor}
     context_summary: {inherit: executor}
+    memory_maintenance: {inherit: executor}
 ```
 
 `main` is a placeholder catalog alias. Replace an inherited value with another
@@ -109,6 +110,8 @@ their role and resolved model identity. Model roles are outside ordinary edit gr
 | `execution-policy` (H) | `settings`: daily optional tool/turn limits, recovery and tool execution | [Execution policy](../lab/execution_policy/README.md) |
 | Tool/environment/context mechanism (H) | Its registered descriptors | [Catalog](../lab/catalog/CONFIGURATION.md) |
 | `tool-catalog` (H) | `instructions.usage`; source-owned tool details load through existing `read` | [Tools](../lab/tools/README.md) |
+| `memory-library`, `skill-library` (S) | `content.documents`; strict attributed JSON entries | [Memory](../lab/context_manager/augmentation/information/file_memory/README.md), [Skills](../lab/context_manager/augmentation/skills/README.md) |
+| `memory-maintenance` (H), `memory-extractor` / `memory-consolidator` (I) | Threshold policy and generation instructions | [Memory maintenance](../lab/context_manager/augmentation/information/file_memory/methods/threshold_maintenance/README.md) |
 | `skill-document` (S) | `content.body`, `settings.max_chars`, optional `settings.source_path` | [Retained targets](../lab/improvement/targets/README.md) |
 | `improvement-editor` (I) | `instructions.{system,propose,reflect}` | [Editor](../lab/improvement/editor/README.md) |
 | `improvement-evaluator` (I) | `instructions.criteria`, `instructions.assess`, `instructions.compare` | [Assessment](../lab/improvement/assessment/README.md) |

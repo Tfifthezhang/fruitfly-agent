@@ -10,8 +10,12 @@ from fruitfly_agent.improvement.contracts.tasks import Resource
 from fruitfly_agent.improvement.execution.facts import attach_facts, loop_fact_values, receipt_facts
 
 
-def attach_benchmark_facts(record, root, artifacts, *, interrupted=False):
-    sessions = list(Path(root).glob('artifacts/harbor/*/*/agent/session.jsonl'))
+def attach_benchmark_facts(record, root, artifacts, *, interrupted=False, trial=None):
+    if trial is None:
+        from .evidence import trial_directories
+        directories = trial_directories(root)
+        trial = directories[0] if len(directories) == 1 else None
+    sessions = [Path(trial) / 'agent/session.jsonl'] if trial is not None else list(Path(root).glob('artifacts/harbor/*/*/agent/session.jsonl'))
     evidence = list(record.artifacts)
     values = {}
     collected = []
@@ -60,8 +64,9 @@ def attach_benchmark_facts(record, root, artifacts, *, interrupted=False):
         for name in ('model-usage.json',):
             path = agent / name
             if path.is_file() and not path.is_symlink():
-                evidence.append(Resource('agent/0/' + name, artifacts.put(path.read_bytes()),
-                    'application/json', 'diagnostic'))
+                if not any(r.path == 'agent/0/' + name for r in evidence):
+                    evidence.append(Resource('agent/0/' + name, artifacts.put(path.read_bytes()),
+                        'application/json', 'diagnostic'))
                 try:
                     from fruitfly_agent.improvement.execution.facts import model_usage_facts
                     requests = json.loads(path.read_bytes())['requests']
@@ -90,6 +95,42 @@ def attach_benchmark_facts(record, root, artifacts, *, interrupted=False):
                           'failed': 'collection_failed', 'missing': 'absent'}.get(item.get('status'), 'unknown')
                 collected.append(ArtifactFact(str(item.get('source') or item.get('destination') or 'unknown'),
                     status, 'Harbor artifact collection manifest'))
+    if not values and trial is not None:
+        sidecars = [p for p in sorted((Path(trial) / 'agent/session.jsonl.operations').glob('*.jsonl'))
+                    if p.is_file() and not p.is_symlink() and p.resolve().is_relative_to(Path(root).resolve())]
+        if sidecars:
+            try:
+                observations = summarize_observations(read_observation_files(sidecars, allow_incomplete=interrupted))
+                evidence.append(Resource('agent/0/operations.json', artifacts.put(json.dumps(observations).encode()),
+                    'application/json', 'diagnostic'))
+            except (ValueError, OSError):
+                collected.append(ArtifactFact('operation observations', 'collection_failed', 'startup observations unavailable'))
+    if not any(v.resource == 'input_tokens' for v in values.get('usage', ())):
+        receipt = next((r for r in evidence if r.path.endswith('/model-usage.json')), None)
+        if receipt:
+            try:
+                from fruitfly_agent.improvement.execution.facts import model_usage_facts
+                requests = json.loads(artifacts.read(receipt.artifact_id))['requests']
+                rows = [event for request in requests for event in (
+                    {'kind': 'request', 'id': request['id']},
+                    {'kind': 'response', 'attempt_id': request['id'], 'usage': request.get('usage')})]
+                values['usage'] = (*values.get('usage', ()), *model_usage_facts(rows, record.model_calls))
+            except (ValueError, KeyError, TypeError):
+                if not interrupted:
+                    raise
+    capture = next((r for r in evidence if r.path == 'diagnostics/capture-manifest.json'), None)
+    if capture:
+        try:
+            capture_data = json.loads(artifacts.read(capture.artifact_id))
+            if not isinstance(capture_data, dict) or not isinstance(capture_data.get('files'), list):
+                raise ValueError('invalid capture receipt')
+            capture_rows = capture_data['files']
+            for item in capture_rows:
+                status = {'collected': 'collected', 'collection_failed': 'collection_failed',
+                          'deleted': 'absent'}.get(item.get('status'), 'unknown')
+                collected.append(ArtifactFact(str(item.get('path', 'unknown')), status, 'Scoped pre-verifier capture'))
+        except (ValueError, KeyError, TypeError):
+            collected.append(ArtifactFact('scoped outputs', 'collection_failed', 'Invalid capture receipt'))
     values['usage'] = (*values.get('usage', ()), UsageFact('model_calls', 'execution', record.model_calls,
         'Agent usage receipt; includes main and auxiliary Providers'))
     if collected:

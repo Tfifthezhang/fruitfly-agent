@@ -57,4 +57,5 @@ class ExecutionRegistry:
 def builtin_executions():
     from .tasks import definition
     from ..improver.registration import definition as improver_definition
-    return ExecutionRegistry((definition(), improver_definition()))
+    from fruitfly_agent.lab.context_manager.augmentation.information.file_memory.improvement import comparison_definition
+    return ExecutionRegistry((definition(), improver_definition(), comparison_definition()))

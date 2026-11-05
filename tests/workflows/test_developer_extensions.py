@@ -31,7 +31,8 @@ class DeveloperExtensionTests(unittest.IsolatedAsyncioTestCase):
     async def test_agent_interception_is_recreated_per_trial_without_live_state_leakage(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            _write_models(root)
+            # Echoing two full default catalogs needs room; this checks hook state.
+            _write_models(root, context_window=16000)
             guidance = Path(__file__).resolve().parents[2] / 'examples/extensions/developer_guidance.py'
             hook = root / 'counter.py'
             hook.write_text('''def register(api):

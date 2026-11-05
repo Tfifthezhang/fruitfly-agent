@@ -89,6 +89,18 @@ class FruitFlyHarborAgent(BaseInstalledAgent):  # type: ignore[misc]
             identity.write_text(json.dumps(runtime["installation"], indent=2) + "\n", encoding="utf-8")
             await environment.upload_file(identity, "/logs/agent/installation.json")
         await environment.upload_file(preparation, "/logs/agent/preparation.json")
+        from fruitfly_eval.harbor.evidence_hooks import bind_capture
+        async def execute_capture(command, timeout):
+            return await self.exec_as_agent(environment, command=command,
+                env=self.runtime_environment, timeout_sec=timeout)
+        async def download_capture(target):
+            if getattr(getattr(environment, 'capabilities', None), 'mounted', False):
+                await environment.prepare_logs_for_host()
+            else:
+                await environment.download_dir(source_dir='/logs/agent/evidence-capture', target_dir=target)
+        bind_capture(self.logs_dir.parent, python=self.runtime_python,
+            policy=runtime['host'].get('evidence'), execute=execute_capture, download=download_capture,
+            forbidden=tuple(m['target'] for m in runtime.get('mounts', ())))
 
     async def _exec(
         self, environment: BaseEnvironment, command: str,
@@ -185,6 +197,15 @@ class FruitFlyHarborAgent(BaseInstalledAgent):  # type: ignore[misc]
         metadata.update({"harness": "fruitfly-agent", "native_tools_preserved": True})
         context.metadata = metadata
         context.n_input_tokens = context.n_output_tokens = None
+        from fruitfly_eval.usage import retained_usage
+        try:
+            usage, usage_source = retained_usage(self.logs_dir)
+            metadata['usage'] = usage
+            metadata['usage_source'] = usage_source
+            context.n_input_tokens = usage.get('input_tokens')
+            context.n_output_tokens = usage.get('output_tokens')
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            metadata['usage_error'] = type(exc).__name__
         try:
             installation = self.logs_dir / "installation.json"
             if installation.is_file():
@@ -199,11 +220,12 @@ class FruitFlyHarborAgent(BaseInstalledAgent):  # type: ignore[misc]
             if manifest:
                 metadata["runtime_manifest"] = manifest
                 metadata["runtime_manifest_digest"] = manifest.get("digest")
-            metrics = trajectory["final_metrics"]
-            context.n_input_tokens = metrics.get("total_prompt_tokens")
-            context.n_output_tokens = metrics.get("total_completion_tokens")
+            (self.logs_dir / 'trajectory-status.json').write_text(json.dumps({'status': 'converted',
+                'source': 'session.jsonl', 'derived': 'trajectory.json'}) + '\n')
         except (OSError, TypeError, ValueError, KeyError) as exc:
             metadata["trajectory_error"] = str(exc)
+            (self.logs_dir / 'trajectory-status.json').write_text(json.dumps({'status': 'failed',
+                'source': 'session.jsonl', 'reason': type(exc).__name__}) + '\n')
 
 
 def _required(value: Any, name: str) -> str:

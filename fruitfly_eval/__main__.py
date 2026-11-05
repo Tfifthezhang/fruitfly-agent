@@ -42,6 +42,10 @@ def _parser() -> argparse.ArgumentParser:
     report.add_argument("evaluation_id")
     report.add_argument("--output-root", default=".fruitfly/eval")
     report.add_argument("--json", action="store_true")
+    organize = sub.add_parser('organize', help='organize retained evidence offline without rerunning tasks')
+    organize.add_argument('--run', required=True, help='evaluation result directory')
+    organize.add_argument('--output', help='default: <run>/evidence')
+    organize.add_argument('--portable', action='store_true', help='include permitted original bytes in output')
     return parser
 
 
@@ -71,6 +75,11 @@ def main(argv: list[str] | None = None) -> int:
                         for problem in problems:
                             print(f"  {variant['id']}: {problem}")
             return 0
+        if args.command == 'organize':
+            from .service import organize_evaluation
+            payload = organize_evaluation(args.run, output=args.output, portable=args.portable)
+            _print_json(payload)
+            return 1 if any(t['status'] == 'failed' for t in payload['trials']) else 0
         if args.command == "run":
             request = EvaluationRequest.read(args.request)
             output_root = (

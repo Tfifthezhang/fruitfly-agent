@@ -201,6 +201,13 @@ class HarborBenchmarkAdapter:
             profile=selected_profile, secret_names=secret_names, host=host, preparation=preparation)
         budget = execution_budget(preparation['tasks'], request.execution.attempts,
             request.execution.concurrency, request.execution.timeout_seconds)
+        budget['evidence_capture'] = {
+            'max_bytes_per_pass': host.evidence['max_total_bytes'],
+            'max_final_bytes_all_attempts': host.evidence['max_total_bytes'] * len(preparation['tasks']) * request.execution.attempts,
+            'max_entries_per_pass': host.evidence['max_entries'],
+            'baseline_seconds': host.evidence['baseline_seconds'],
+            'capture_seconds': host.evidence['capture_seconds'],
+            'note': 'Additional per-phase job wall time; transfer/index storage and multi-step phases are additional. Bounds are not runtime predictions.'}
         write_json(job_root / 'execution-budget.json', budget)
         if progress is not None:
             progress({'type': 'execution_budget', **budget})
@@ -300,7 +307,8 @@ class HarborBenchmarkAdapter:
         }
         config = jobs_dir / "harbor-job.json"
         write_json(config, payload)
-        return [executable, "run", "--config", str(config), "--yes"]
+        return [executable, "run", "--config", str(config), "--yes",
+                "--plugin", "fruitfly_eval.harbor.evidence_hooks:EvidenceCapturePlugin"]
 
 
 __all__ = ["HARBOR_AGENT_IMPORT", "HarborBenchmarkAdapter", "harbor_descriptor"]

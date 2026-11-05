@@ -112,24 +112,22 @@ tool-call approval remains independent. See [MCP tools](../lab/mcp/README.md).
 
 ## Text artifacts
 
-This example stores text and creates a factory; it does not assemble a runtime or call a model:
+Store and verify immutable text without assembling a runtime or calling a model:
 
 ```python
-import os
 from pathlib import Path
-from fruitfly_agent.run import DataArtifactStore, RunApplicationFactory
-from fruitfly_agent.lab.context_manager.augmentation.skills.target import SKILL_CATALOG_GUIDANCE_KEY
+from fruitfly_agent.run import DataArtifactStore
 
 workspace = Path.cwd()
-artifact = DataArtifactStore(workspace / ".fruitfly" / "artifacts").put_text(
-    "Read relevant code and tests before answering; report how you verified the result."
-)
-factory = RunApplicationFactory(
-    cwd=workspace,
-    environment=dict(os.environ),
-    data_artifact_bindings={SKILL_CATALOG_GUIDANCE_KEY: artifact.artifact_id},
-)
+store = DataArtifactStore(workspace / ".fruitfly" / "artifacts")
+artifact = store.put_text("A retained text resource.")
+assert store.read_text(artifact.artifact_id) == "A retained text resource."
 ```
+
+An artifact alone changes no component. Use its registered owner's current
+configuration surface to bind executable content. Skill descriptions and bodies
+belong to [S libraries](../lab/context_manager/augmentation/skills/README.md),
+while catalog guidance belongs to H.
 
 | Binding | Behavior |
 |---|---|
@@ -139,7 +137,7 @@ factory = RunApplicationFactory(
 | Artifact contents | Plaintext trusted model context; keep secrets out. |
 | Lifetime | Deleting referenced contents prevents recovery; unowned hand-created artifacts are not swept. |
 
-Assembly occurs at `factory.open()` or `Application.start()`. See the [offline Application example](../../examples/extensions/README.md) for complete execution.
+Assembly occurs at `RunApplicationFactory.open()` or `Application.start()`. See the [offline Application example](../../examples/extensions/README.md) for complete execution.
 
 ## Recovery
 
@@ -258,3 +256,19 @@ inside Harbor containers. Neither flag is an Agent configuration field.
 [Extension hosting](extensions/README.md) loads explicit developer sources and prepares idle replacements.
 
 Registered default parameter documents remain in Lab. [Configuration](configuration/README.md) preserves H/S/I references on ordinary saves and freezes complete text/numeric values for trials. Runtime manifests retain stable component-source kinds/content hashes and tool-contract hashes; filesystem origin paths stay in offline inspection so saving and restarting does not change an otherwise identical runtime identity.
+
+## Host retained state
+
+The default interactive profile exposes [memory](../lab/context_manager/augmentation/information/file_memory/README.md)
+and [Skill libraries](../lab/context_manager/augmentation/skills/README.md) through
+`/memory` and `/skills`. Memory maintenance is explicitly enabled and scheduled at
+idle boundaries; foreground work cancels and retires it before proceeding. Human
+batch adoption prepares a new runtime against the same Session and commits only
+on successful activation. Independently verified S candidates use ordinary
+Improvement publication and exact resource checks.
+
+`RunApplicationFactory(retained_state_enabled=False)` disables mutable workspace
+retained-state overlays and maintenance services. The one-shot CLI selects this
+host mode. Frozen component documents still load through ordinary assembly, so
+isolated tasks consume their declared initial S without learning from other tasks.
+A configuration file's location alone does not select this isolation policy.

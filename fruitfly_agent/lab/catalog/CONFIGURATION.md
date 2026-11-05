@@ -134,8 +134,9 @@ and [Contributing](../../../CONTRIBUTING.md).
 
 `configuration_snapshot(parameters, workspace)` declares bounded local resource
 capture for configuration export. It returns the owner's existing `StateSnapshot`;
-`configuration_resources` merges files and rejects conflicting writers. Skill,
-file-memory and local-knowledge owners reuse their ordinary state snapshot rules.
+`configuration_resources` merges files and rejects conflicting writers. Workspace Skill and local-knowledge owners reuse their ordinary resource capture.
+Retained memory and Skill libraries freeze their configuration-owned S documents
+and generated read resources through their target owner.
 The materializer copies only supplied registered files under `resources/` and
 records their workspace paths and hashes. Live services remain external
 requirements. This callback is separate from pure parameter normalization and runs

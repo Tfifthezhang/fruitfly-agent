@@ -74,3 +74,5 @@ hybrid inference, rejection, cancellation, retry admission and evidence ledgers.
 and attributed execution. Working-memory safety tests cover threshold gating,
 failed-attempt cooldown, successful-prefix retention and total update deadlines.
 Managed-command tests cover independent work, isolated listeners and retirement.
+
+`test_evidence_index.py` owns format decoding, source spans, call/result relationships, explicit partial coverage and stale-view invalidation. `test_evidence_coverage.py` owns multidimensional completeness and missing captured-byte detection.

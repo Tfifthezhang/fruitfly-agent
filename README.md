@@ -82,7 +82,8 @@ installed local stdio servers with `fruitfly-agent[mcp]`. Startup and tool calls
 have separate approval. See the [REA example](examples/mcp/rea/README.md); no
 external server or native analysis engine is bundled.
 
-Context mechanisms include Skill catalogs, file memory, local knowledge,
+Context mechanisms include four packaged coding Skills, editable Skill libraries,
+[on-demand cross-session memory](fruitfly_agent/lab/context_manager/augmentation/information/file_memory/README.md), local knowledge,
 summarization and optional [programmatic context externalization](fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md).
 Bash/file tools can use a local or SSH environment. Improvement execution uses the tool set and isolation declared by its
 explicitly registered backend.
@@ -178,3 +179,7 @@ and the optional [benchmark adapter](fruitfly_eval/improvement/README.md).
 [Online assessment](fruitfly_agent/lab/improvement/assessment/README.md) can inspect
 intermediate events. Explicit control policies may request supported actions;
 phase judgments alone do not prove improvement or activate a version.
+
+Eval automatically organizes retained execution evidence and supports an offline
+[organization/export command](fruitfly_eval/README.md#organize-retained-evidence).
+Evidence coverage is separate from official benchmark outcomes.

@@ -66,6 +66,7 @@ async def run_cli(args: argparse.Namespace) -> int:
             provider_registry=registry,
             tool_service_startup_approval=approve_start,
             extensions=extensions if extensions.registrations else None,
+            retained_state_enabled=not single_task,
         )
         if not single_task:
             application = await _start_interactive(args, factory, cwd)

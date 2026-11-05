@@ -1,5 +1,6 @@
 """Bind built-in command handlers without adding branches to the input loop."""
 from fruitfly_agent.interactive.contracts.commands import CommandResult
+from fruitfly_agent.interactive.terminal.features.retained_state.commands import retained_handler
 from fruitfly_agent.interactive.terminal.features.operations import operations_handler
 from fruitfly_agent.interactive.terminal.features.configuration.command import configuration_handler
 from fruitfly_agent.interactive.terminal.features.improvement.command import improvement_handler
@@ -9,6 +10,12 @@ from fruitfly_agent.interactive.terminal.features.resume.command import resume_h
 def bind_commands(registry, *, bindings, configuration, status, cancel,
                   menu_scope, input_stream, output_stream, line_editor, write,
                   welcome, show_history, improvement_frontend):
+    if bindings.retained_state is not None:
+        for name, kind in (('memory', 'memory'), ('skills', 'skill')):
+            registry.register(name, retained_handler(kind=kind, describe=bindings.retained_state,
+                read=bindings.retained_document, review=bindings.retained_action),
+                summary='inspect retained documents and review pending updates',
+                usage='/' + name + ' [read ID|commit UPDATE|reject UPDATE' + ('|retry OPERATION' if kind == 'memory' else '') + ']')
     if bindings.operations is not None:
         registry.register('operations', operations_handler(bindings.operations),
             summary='inspect or cancel background operations', usage='/operations [cancel HANDLE]')

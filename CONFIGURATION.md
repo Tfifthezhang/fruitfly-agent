@@ -241,14 +241,14 @@ The capability page uses arrows and Space/Enter to toggle, then **Continue** to 
 | Selection | Default / behavior | Reference |
 |---|---|---|
 | Base prompt | `assistant-default`; choose another prompt in **/config → prompt** or `/config`. | [Base prompt](fruitfly_agent/lab/base_prompt/README.md) |
-| Skill catalog | Read `.skills/`; enable in **Context → Context augmentation → Skill catalog** (Space toggles; the phase is a section heading). | [Skills](fruitfly_agent/lab/context_manager/augmentation/skills/README.md) |
+| Skill catalog | Packaged coding procedures plus `.skills/`; enable S `skill-library` and H catalog in **Context → Context augmentation → Skill catalog** (Space toggles; the phase is a section heading). | [Skills](fruitfly_agent/lab/context_manager/augmentation/skills/README.md) |
 | Reduction | Layered compaction by default; optional working memory. Both read original history through `read`. Edit policy in H component files. | [Reduction](fruitfly_agent/lab/context_manager/reduction/README.md) |
 | Context measurement | Automatically shared internal service; reports precision, input/output reserves and uncertainty. Exact counting requires a declared Provider capability. | [Measurement](fruitfly_agent/lab/context_manager/measurement/README.md) |
 | Improvement | Edit I component files for editor/evaluator prompts; experiment grants and conditions control edits, phase times, scope and stopping; `/improvement` keeps a small instruction/file flow. | [Improvement](fruitfly_agent/lab/improvement/README.md) |
-| Reusable skill document | Disabled; Context augmentation. Set `settings.source_path` to one workspace-relative Skill or enter `content.body`; `settings.max_chars=16000`. | [Skill body](fruitfly_agent/lab/context_manager/augmentation/skills/README.md#optimize-a-skill-body) |
+| Reusable skill document | Disabled; Context augmentation. Set `settings.source_path` to one workspace-relative Skill or enter `content.body`; `settings.max_chars=16000`. | [Skill body](fruitfly_agent/lab/context_manager/augmentation/skills/README.md#improve-descriptions-and-bodies) |
 | Web search / fetch | Disabled; enable **Search the web** and **Fetch web pages** under Tools. Search uses Brave, Tavily or DeepSeek. Fetch uses `direct` (no key) or `deepseek`. Expand either tool and choose **Set up…** to select the service and enter a hidden API key. Save writes the secret file. DeepSeek search/fetch use separate default variables; `api_key_env` can select a shared key. | [Web tools and YAML settings](fruitfly_agent/lab/tools/web/README.md) |
 | Programmatic context | Explicitly enable `ipython-tool` or `rlm-ipython`. | [Programmatic context](fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md) |
-| Remote execution | Enable **Remote environment** under Environment to run file and Bash tools through SSH. Complete settings and credentials are reused; missing values open the six-step form. Expand **Set up…** to edit explicitly. Disabling retains saved settings across restarts in the same workspace/profile. Mutually exclusive with local execution, local IPython/RLM and file memory. | [SSH setup and limits](fruitfly_agent/lab/environment/ssh/README.md) |
+| Remote execution | Enable **Remote environment** under Environment to run file and Bash tools through SSH. Complete settings and credentials are reused; missing values open the six-step form. Expand **Set up…** to edit explicitly. Disabling retains saved settings across restarts in the same workspace/profile. Mutually exclusive with local execution and local IPython/RLM. Host memory and Skill resources remain readable. | [SSH setup and limits](fruitfly_agent/lab/environment/ssh/README.md) |
 | RSI | Explicit independent CLI or injected host; generation scheduling and independent verification. | [RSI](fruitfly_agent/lab/rsi/README.md) |
 
 Menus show mechanism switches and algorithm choices. Edit `.fruitfly/config.yaml` for detailed parameters. Summaries, improvement, and auxiliary model queries may incur model charges.
@@ -258,7 +258,7 @@ Menus show mechanism switches and algorithm choices. Edit `.fruitfly/config.yaml
 | Mechanism | Default | Parameters |
 |---|---|---|
 | `information-context` | Enabled, hidden dependency | `top_k=5`, `max_chars=4000` |
-| `memory-files` | Enabled | `root=.fruitfly/memory` |
+| `memory-files` | Enabled with S `memory-library` | Bounded directory and usage guidance; see the [memory owner](fruitfly_agent/lab/context_manager/augmentation/information/file_memory/README.md) |
 | `knowledge-files` | Disabled | `root=.fruitfly/knowledge` |
 | `live-http` | Disabled | HTTPS `endpoint`, `timeout_seconds=5` |
 
@@ -323,7 +323,7 @@ Authored text belongs in component parameters. Typed Python hosts can create imm
 
 `tool-catalog` owns the overall tool-use policy. Full tool usage loads on demand through `read`; individual schemas and usage resources remain source-owned. Tool parameter targets require explicit selection and are excluded from automatic edit scope. Experiment files select one or more editable components. A joint candidate expands into ordinary prompt/artifact bindings; tool schemas, execution and permissions retain their existing contracts. Preview is offline; execution may incur model and external-runner costs.
 
-`skill-document` retains S content. `improvement-editor` exposes six prompt fields
+`memory-library` and `skill-library` retain S descriptions, bodies and declared text references. `skill-document` is an independent single-body S mechanism. `improvement-editor` exposes six prompt fields
 and `improvement-evaluator` exposes criteria,
 assessment and comparison prompts. Every editable field has owner descriptions
 and explicit grants. Persistent publication requires independent verification and
@@ -483,3 +483,18 @@ Pending default-source changes block stale preparation/application until reload.
 Frozen trials do not follow later working-copy defaults. See
 [component syntax](fruitfly_agent/runtime_spec/COMPONENTS.md) and
 [Run configuration](fruitfly_agent/run/configuration/README.md).
+
+Eval file-capture policy belongs to the [Eval host configuration](fruitfly_eval/harbor/README.md#capture-task-evidence).
+It is protected execution infrastructure, separate from selectable Agent H/S/I parameters.
+
+## Maintain cross-session memory
+
+The [memory owner](fruitfly_agent/lab/context_manager/augmentation/information/file_memory/README.md)
+defines entry syntax and threshold parameters. Enable H `memory-maintenance` plus I
+`memory-extractor` and `memory-consolidator` explicitly to permit auxiliary calls.
+Defaults are 8000 new user characters for extraction and 50 completed user turns
+for consolidation. `models.roles.memory_maintenance` is lazy and inherits executor.
+Review generated batches through `/memory`; persistent publication is separate from
+independently verified Improvement. One-shot CLI tasks disable workspace retained
+state services and use only the selected configuration's frozen initial content.
+No key or new secret variable is required when the existing model is inherited.

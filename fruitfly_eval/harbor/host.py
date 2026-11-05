@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 
 import yaml
 from fruitfly_agent.runtime_spec.documents import UniqueLoader
+from .evidence_capture import capture_policy
 
 
 def fields(value: object, allowed: set[str], label: str) -> dict[str, Any]:
@@ -85,6 +86,7 @@ class HostConfig:
     uv: str | None = None
     offline: bool = False
     task_patches: tuple[Mapping[str, Any], ...] = ()
+    evidence: Mapping[str, Any] = field(default_factory=capture_policy)
 
     @classmethod
     def read(cls, workspace: Path, explicit: str | Path | None = None) -> HostConfig:
@@ -96,7 +98,9 @@ class HostConfig:
         except yaml.YAMLError:
             raise ValueError("invalid Eval host YAML") from None
         data = fields(loaded,
-                      {"cache", "agent", "environment", "dependencies", "task_directory", "task_patches"}, "Eval host")
+                      {"cache", "agent", "environment", "dependencies", "task_directory", "task_patches", "evidence"}, "Eval host")
+        if 'evidence' in data and not isinstance(data['evidence'], dict):
+            raise ValueError('evidence must be a mapping')
         base = path.parent
         agent = fields(data.get("agent", {}), {"python", "mounts", "library_paths"}, "agent runtime")
         python = container_path(agent.get("python"), "agent.python")
@@ -171,7 +175,7 @@ class HostConfig:
                    environment(phases.get("verifier", {})), assets, recipes,
                    path_at(data["task_directory"], base) if data.get("task_directory") else None,
                    uv,
-                   deps.get("offline", False), patches)
+                   deps.get("offline", False), patches, capture_policy(data.get('evidence')))
 
     def runtime_env(self) -> dict[str, str]:
         values = {"PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "/installed-agent/fruitfly/source"}
@@ -184,5 +188,6 @@ class HostConfig:
                 "library_paths": list(self.library_paths), "setup": dict(self.setup_env),
                 "agent": dict(self.agent_env), "verifier": dict(self.verifier_env),
                 "uv": self.uv, "offline": self.offline, "task_patches": list(self.task_patches),
+                "evidence": dict(self.evidence),
                 "task_directory": str(self.task_directory) if self.task_directory else None,
                 "resolved_task_directory": str(self.task_directory.resolve()) if self.task_directory else None}

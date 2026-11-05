@@ -33,6 +33,9 @@ from .improvement.startup_versions import RunStartupVersions
 from .improvement.versions import RunVersions
 from .improvement.pipeline import RunComponentJobs
 from .storage.experience import ExperienceStore
+from .storage.retained_state import RetainedStateStore
+from .adapters.retained_state import RetainedStateAdapter
+from .improvement.state_updates import retained_profile
 from .adapters.improvement import RunImprovementService
 from .adapters.candidates import RunCandidateService
 from .adapters.task_packs import RunTaskPackService
@@ -60,8 +63,10 @@ class RunApplicationFactory:
         improvement_bindings=None,
         tool_service_startup_approval: ToolServiceStartupApproval | None = None,
         extensions=None,
+        retained_state_enabled: bool = True,
     ) -> None:
         self.cwd = cwd.resolve()
+        self.retained_state_enabled = retained_state_enabled
         self._base_catalog = catalog or builtin_catalog()
         self._base_improvement_bindings = improvement_bindings
         self.permission_policy = permission_policy
@@ -112,6 +117,9 @@ class RunApplicationFactory:
         if not self.read_only_configuration:
             self._configure_setup()
 
+        from hashlib import sha256
+        retained_scope = sha256((str(self.selection.config_path) + ':' + self.selection.profile.profile_id).encode()).hexdigest()[:24]
+        self.retained_store = RetainedStateStore(self.cwd / '.fruitfly/retained' / retained_scope, self.artifact_store)
         self._preparer = RuntimePreparer(
             workspace=self.cwd, catalog=self.catalog, environment=self.environment,
             artifacts=self.artifact_store, provider_registry=self.provider_registry,
@@ -121,6 +129,8 @@ class RunApplicationFactory:
             describe_environment=describe_execution_environment,
             describe_services=describe_tool_services,
             adapt_operations=ManagedOperationAdapter,
+            retained_store=self.retained_store if self.retained_state_enabled else None,
+            prepare_retained_profile=retained_profile, adapt_retained=RetainedStateAdapter,
             approve_start=self._approve_tool_service,
             build=lambda *args, **kwargs: build_runtime(
                 *args, **{**kwargs, "provider_registry": self.provider_registry}),
@@ -240,7 +250,8 @@ class RunApplicationFactory:
             catalog=self._base_catalog, provider_registry=self.provider_registry,
             data_artifact_bindings=self.data_artifact_bindings, task_pack_sources=self.task_pack_sources,
             permission_policy=self.permission_policy, improvement_bindings=self._base_improvement_bindings,
-            tool_service_startup_approval=self.tool_service_startup_approval, extensions=extensions)
+            tool_service_startup_approval=self.tool_service_startup_approval, extensions=extensions,
+            retained_state_enabled=self.retained_state_enabled)
         replacement._preparer.sessions = self._preparer.sessions
         return replacement
 
@@ -321,6 +332,32 @@ class RunApplicationFactory:
             profile_override=profile_override,
         )
 
+    async def prepare_retained_update(self, identity: str, *, session_path: Path) -> RuntimeHandle:
+        from fruitfly_agent.lab.catalog import bind_component_changes
+        from fruitfly_agent.improvement.contracts.components import ComponentBinding
+        from fruitfly_agent.improvement.contracts.versions import canonical_json
+        import json
+        row = self.retained_store.read()['pending'].get(identity)
+        if row is None or row['status'] != 'pending':
+            raise ValueError('retained update is not pending')
+        target = self._current_targets.get(row['key'])
+        from fruitfly_agent.improvement.contracts.optimization import RetainedDocuments
+        if not isinstance(target, RetainedDocuments):
+            raise ValueError('retained update has no enabled document owner')
+        text = self.artifact_store.read_text(row['artifact'])
+        target.validate_documents(json.loads(text))
+        profile = bind_component_changes(self._active_profile or self.selection.profile,
+            (ComponentBinding(row['key'], 'configuration', 'component.' + row['key'],
+                canonical_json({'documents': text})),))
+        handle = await self._preparer.open(selection=self.selection,
+            improvement_service=self._improvement_service, candidate_service=self._candidate_adapter,
+            task_pack_service=self._task_pack_service, activated=self._activated,
+            resume=True, session_path=session_path, profile_override=profile)
+        activate = handle.activate_callback
+        handle.activate_callback = lambda: self.retained_store.review_with_activation(
+            identity, 'commit', activate or (lambda: None))
+        return handle
+
     async def prepare_configuration(self, *, session_path: Path) -> RuntimeHandle:
         """Prepare the draft through normal assembly; publish only on activation."""
         prepared = self.configuration.prepare_application(self.environment)
@@ -340,7 +377,18 @@ class RunApplicationFactory:
         return handle
 
     async def _prepare_profile(self, profile):
-        return await self.open(resume=False, session_path=self.new_session_path(), profile_override=profile)
+        expected = self.retained_store.read()['libraries']
+        handle = await self.open(resume=False, session_path=self.new_session_path(), profile_override=profile)
+        if self.retained_state_enabled:
+            from fruitfly_agent.improvement.contracts.optimization import RetainedDocuments
+            documents = {value.library_id: value.retained_documents for value in handle.components.values()
+                if isinstance(value, RetainedDocuments) and (
+                    value.library_id not in self._current_targets or
+                    value.retained_documents != getattr(self._current_targets[value.library_id], 'retained_documents', None))}
+            activate = handle.activate_callback
+            handle.activate_callback = lambda: self.retained_store.adopt_with_activation(
+                documents, expected, activate or (lambda: None))
+        return handle
 
     def _activated(self, prepared: PreparedRuntime):
         runtime = prepared.runtime

@@ -42,3 +42,5 @@ candidate execution, activation and recovery using a fake Provider.
 `test_layered_compaction_improvement.py` verifies both deterministic readback-policy
 and hybrid summary-prompt candidates through real isolated execution, trial
 artifacts, independent fake verification, activation and Session recovery.
+
+`test_improvement_evidence.py` verifies the real Eval collector, facts, organizer and both role workspaces through paged source reads and citation receipts.

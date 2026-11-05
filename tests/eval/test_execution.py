@@ -64,6 +64,33 @@ class FakeAdapter:
 
 
 class ExecutionTests(unittest.TestCase):
+    def test_ordinary_execution_automatically_organizes_success_and_failure_without_rescoring(self):
+        from fruitfly_eval.organization import organize_run
+        for failed in (False, True):
+            with self.subTest(failed=failed), tempfile.TemporaryDirectory() as directory:
+                adapter = FakeAdapter()
+                original = adapter.run
+                def run(**kwargs):
+                    trial = kwargs['result_path'].parent / 'harbor/job/trial'
+                    agent = trial / 'agent'; agent.mkdir(parents=True)
+                    (agent / 'session.jsonl').write_text(json.dumps({'type': 'message', 'message': {
+                        'role': 'assistant', 'stopReason': 'stop', 'content': 'real final answer'}}) + '\n')
+                    if failed:
+                        raise RuntimeError('fixture failure after evidence')
+                    (trial / 'result.json').write_text('{}')
+                    original(**kwargs)
+                with patch.object(adapter, 'run', side_effect=run):
+                    report, store = execute_request(EvaluationRequest.from_dict(request_payload()),
+                        output_root=Path(directory), catalog=BenchmarkCatalog((adapter,)))
+                self.assertEqual(report.status, 'failed' if failed else 'completed')
+                if not failed:
+                    self.assertEqual(report.metrics[0].value, 0.75)
+                saved_report = (store.path / 'report.json').read_bytes()
+                first = json.loads((store.path / 'evidence/manifest.json').read_bytes())
+                self.assertEqual(len(first['trials']), 1)
+                self.assertEqual(first, organize_run(store.path))
+                self.assertEqual(saved_report, (store.path / 'report.json').read_bytes())
+
     def test_runner_and_result_failures_still_produce_readable_reports(self) -> None:
         request = EvaluationRequest.from_dict(request_payload())
         cases = (

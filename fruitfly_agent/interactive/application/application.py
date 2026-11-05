@@ -61,6 +61,7 @@ class AgentApplication:
         self._submission_lock = asyncio.Lock()
         self._pending: deque[tuple[UserContent, OperationScope]] = deque()
         self._worker: asyncio.Task[None] | None = None
+        self._maintenance_task: asyncio.Task[None] | None = None
         self._event_sink: EventSink | None = None
         self._authorization_enabled = False
         self._authorization_handler = None
@@ -221,6 +222,7 @@ class AgentApplication:
 
     async def submit(self, prompt: UserContent) -> AgentLoopResult:
         prompt = self.validate_input(prompt)
+        await self._stop_maintenance()
         context = self._observation_context()
         with bind_observation(context):
             with operation('application.queue_lock', origin='application'):
@@ -228,18 +230,79 @@ class AgentApplication:
             try:
                 self._check_submission_state("submit")
                 self._state = ApplicationState.RUNNING
+                completed = False
                 try:
                     result = await self._require_handle().session.submit(prompt)
                     self._last_result = result
+                    completed = not result.is_error and result.stop_reason not in {'aborted', 'cancelled'}
                     return result
                 finally:
+                    maintenance = getattr(self._require_handle(), 'maintenance', None)
+                    if maintenance is not None:
+                        try:
+                            maintenance.observe(completed=completed)
+                        except Exception as exc:
+                            self._last_error = exc
                     if self._state == ApplicationState.RUNNING:
                         self._state = ApplicationState.IDLE
+                    self._schedule_maintenance()
             finally:
                 self._submission_lock.release()
 
     def _observation_context(self) -> ObservationContext:
         return getattr(self._handle, 'observation_context', None) or current_observation()
+
+    def _schedule_maintenance(self) -> None:
+        service = getattr(self._handle, 'maintenance', None)
+        if service is None or self._pending or self._state != ApplicationState.IDLE:
+            return
+        async def run() -> None:
+            async with self._submission_lock:
+                if self._state == ApplicationState.IDLE and not self._pending:
+                    await service.run()
+        self._maintenance_task = asyncio.create_task(run())
+
+    async def _stop_maintenance(self) -> None:
+        task = self._maintenance_task
+        if task is None:
+            return
+        task.cancel()
+        async with asyncio.timeout(self._shutdown_timeout):
+            await asyncio.gather(task, return_exceptions=True)
+        self._maintenance_task = None
+
+    def retained_state(self, kind: str) -> dict[str, Any]:
+        service = getattr(self._require_handle(), 'retained_state', None)
+        return service.describe(kind) if service is not None else {'entries': [], 'pending': []}
+
+    def retained_document(self, kind: str, identity: str) -> str:
+        service = getattr(self._require_handle(), 'retained_state', None)
+        if service is None:
+            raise ValueError('retained state is unavailable')
+        return service.read_document(kind, identity)
+
+    async def retained_action(self, identity: str, action: str) -> str:
+        await self._stop_maintenance()
+        if self._state != ApplicationState.IDLE or self._pending:
+            raise RuntimeError('finish active work before reviewing retained state')
+        service = getattr(self._require_handle(), 'retained_state', None)
+        if service is None:
+            raise ValueError('retained state is unavailable')
+        if action == 'commit':
+            prepare = getattr(self._factory, 'prepare_retained_update', None)
+            if prepare is None:
+                raise ValueError('this host cannot prepare retained activation')
+            expected = str(self.runtime_manifest['digest'])
+            candidate = await prepare(identity, session_path=Path(self.status.session_path))
+            await self.activate_runtime(candidate, expected_manifest_digest=expected)
+            return 'committed'
+        async with self._submission_lock:
+            if self._state != ApplicationState.IDLE or self._pending:
+                raise RuntimeError('finish active work before reviewing retained state')
+            result = service.review(identity, action)
+            if action == 'retry':
+                self._schedule_maintenance()
+            return result
 
     def _clear_pending(self) -> None:
         while self._pending:
@@ -262,6 +325,9 @@ class AgentApplication:
 
     def cancel(self) -> bool:
         had_pending = bool(self._pending)
+        if self._maintenance_task is not None and not self._maintenance_task.done():
+            self._maintenance_task.cancel()
+            had_pending = True
         self._clear_pending()
         if self._state == ApplicationState.IMPROVING:
             return self._improvement_job.cancel()
@@ -347,10 +413,13 @@ class AgentApplication:
         submitted = getattr(service, 'improvement_submitted', None)
         if submitted is not None:
             preview_token = submitted(manifest, direction, preview_token=preview_token)
+        if self._maintenance_task is not None:
+            self._maintenance_task.cancel()
         self._state = ApplicationState.IMPROVING
         self._last_error = None
         async def execute(operation):
             try:
+                await self._stop_maintenance()
                 async with self._submission_lock:
                     return await operation()
             finally:
@@ -410,6 +479,7 @@ class AgentApplication:
 
     async def adopt_candidate(self, candidate_id: str) -> CandidateView:
         """Prepare and activate a candidate as a fresh session atomically at the host boundary."""
+        await self._stop_maintenance()
         if self._state != ApplicationState.IDLE or self._pending:
             raise RuntimeError("finish active work before activating a candidate")
         if self._handle is None:
@@ -456,6 +526,7 @@ class AgentApplication:
         """Bound retirement waits without closing a still-active handle."""
         try:
             async with asyncio.timeout(self._shutdown_timeout):
+                await self._stop_maintenance()
                 await self.wait_for_improvement()
                 await self.wait_until_idle()
                 async with self._submission_lock:
@@ -467,6 +538,7 @@ class AgentApplication:
 
     async def apply_configuration(self) -> None:
         """Apply the host's draft through assembly without changing conversation identity."""
+        await self._stop_maintenance()
         if self._handle is None:
             raise RuntimeError("application is not started")
         if self._state != ApplicationState.IDLE or self._pending:
@@ -496,6 +568,7 @@ class AgentApplication:
 
     async def replace_factory(self, factory: RuntimeFactory) -> None:
         """Replace an idle host using the same checked runtime activation boundary."""
+        await self._stop_maintenance()
         if self._state != ApplicationState.IDLE or self._pending:
             raise RuntimeError('finish active work before replacing the runtime host')
         expected = self.runtime_manifest['digest']
@@ -546,6 +619,7 @@ class AgentApplication:
 
     async def resume(self, session_path: str | Path) -> None:
         """Replace an idle runtime with a successfully restored candidate."""
+        await self._stop_maintenance()
 
         if self._handle is None:
             raise RuntimeError("application is not started")
@@ -593,6 +667,7 @@ class AgentApplication:
         The injected host must bind/verify candidate content before preparing it.
         This method owns startup and the active-version conditional switch.
         """
+        await self._stop_maintenance()
         if candidate is self._handle:
             raise ValueError("candidate must be a distinct prepared handle")
         switching = False

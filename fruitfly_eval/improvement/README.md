@@ -158,3 +158,25 @@ Offline injected executors cover nested modification, scoring, partitioning,
 isolation and accounting in `tests.eval.test_improvement`.
 
 Interrupted collection retains available original evidence even when the final Session line or model-usage receipt is incomplete. Such usage stays unknown. Incomplete files cannot grant a score or complete diagnostics. Completed receipts require strict parsing.
+
+## Register complete permitted evidence
+
+The bridge registers native Session, archived events (or an interrupted live
+stream), operation originals, usage receipts, trajectory conversion status and
+verified captured files. Failed trials without a Session remain discoverable;
+startup sidecars are diagnostic evidence. Complete tool-output files are diagnostic
+resources, while captured task files are deliverables. Hash-mismatched or unavailable
+captured bytes cannot establish complete coverage.
+
+`diagnostics/final-answer.json` records whether the last retained assistant answer
+is final, partial or absent, together with its original source span. The execution
+output uses the actual answer rather than a generic runner sentence. Original
+Session pages remain available for answers exceeding the bounded output field.
+Usage extraction is independent of ATIF conversion and retains known subtotals
+when full totals are unknown.
+
+The shared organizer supplies overview, events, coverage and source navigation.
+`ExecutionFacts.complete` still describes execution diagnostics; it does not claim
+complete file collection. Both ordinary Eval post-processing and Improvement use
+the same [evidence implementation](../../fruitfly_agent/lab/improvement/evidence/README.md).
+Neither an organized directory nor a human analysis report bypasses resource grants.

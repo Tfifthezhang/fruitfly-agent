@@ -1,115 +1,103 @@
-# Skills
+# Use retained Skills
 
 [Up: Augmentation](../README.md)
 
-Give the model task-specific instructions it can read when needed. A Skill is an instruction file, not a Python plugin or tool.
+Skills are reusable task procedures, not Python plugins. Names, descriptions and
+scoped resource locations enter the catalog. Bodies and text references load only
+when the model reads them through the ordinary read tool. Visibility does not
+prove invocation or task success.
 
-## Create a Skill
+## Enable and inspect
+
+Enable H `skill-catalog`, S `skill-library`, and the read tool. Packaged
+[Built-in coding Skills](builtin/README.md) are available without a checkout or a
+workspace `.skills` directory. The catalog's `settings.root` selects additional
+workspace Skills. A duplicate identity across sources fails instead of silently
+shadowing a procedure. Source files are never overwritten.
+
+`/skills` lists active entries and provenance. `/skills read ID` displays one entry.
+Runtime contents stay frozen until checked replacement or a new session.
+
+| Skill | Scope |
+|---|---|
+| systematic-debugging | Investigate reproducible errors and repair causes |
+| regression-testing | Derive focused checks from required public behavior |
+| verification-before-completion | Support completion claims with relevant evidence |
+| code-review | Find actionable correctness issues in the requested scope |
+
+Descriptions use imperative triggers, concrete situations and reasons for using the
+procedure. Bodies explain the workflow, communication, evaluation and platform
+limits with examples. They do not introduce interviews, approval gates, commits,
+mandatory agents or an independent optimization loop. A supplied task's output,
+tool and execution contracts remain authoritative.
+
+## Add workspace content
 
 ```text
-<workspace>/.skills/code-review/
+.skills/example/
 ├── SKILL.md
 └── references/checklist.md
 ```
 
-```md
----
-name: code-review
-description: Use when asked to review code for reproducible bugs, error handling, and missing tests.
----
+Use YAML frontmatter with `name` and `description`, followed by the procedure.
+Relative text references resolve against the resource parent. Hidden files and
+descendant symlinks are excluded. Discovery retains diagnostics and has bounded
+entry, depth and byte scans. The effective library rejects unsupported identities,
+missing required descriptions, conflicting entries, unsupported execution metadata
+and invalid resources. Only `name`, `description` and boolean
+`disable-model-invocation` frontmatter is admitted into the effective library.
+`disable-model-invocation: true` hides the entry; no manual invocation bypass is
+implemented. Naming a skill in ordinary task text can guide model selection.
 
-# Code review
+## Improve descriptions and bodies
 
-1. Read the target code and relevant tests.
-2. Report concrete defects with file locations and reproduction steps.
-3. Read references/checklist.md when detailed criteria are needed.
-```
+`skill-library` is one S owner with independently identified entries. Its
+`parameters.content.documents` stores canonical JSON text. Authorized changes may
+edit descriptions, bodies and bounded text references while preserving identities,
+source attribution and visibility policy. The H catalog separately exposes
+`instructions.usage` and `settings.max_chars` (16000). Source root and provenance
+remain protected from candidate grants.
 
-The description helps the model decide when to read the full file. Use UTF-8, start with YAML frontmatter, and keep reference paths relative to the Skill directory.
+Candidates use shared configuration materialization. The installed candidate
+regenerates both the directory and resource bodies, so a description edit changes
+what the model sees and a body edit changes what read returns. The complete bodies
+are not injected to simulate successful invocation. Frozen text resources participate
+in S snapshots and export; linked executable programs are not frozen or executed.
 
-## Enable and use
+The independent `skill-document` mechanism retains one explicitly selected body
+for direct context projection. It is a separate use case, not the library editor.
+Assembly rejects a source already owned by the editable library.
 
-| Action | Behavior |
-|---|---|
-| Enable **/config → Context → Skill catalog** | Keep **Read files** enabled, then save and apply the configuration. |
-| Submit a matching task | The model sees names, descriptions, and scoped resource locations, then may use `read` to load frozen instructions. |
-| Modify a Skill | Start a new session to rescan. |
-| Set `disable-model-invocation: true` | Hide it from the model; there is no separate manual Skill command. |
+## Extend installation
 
-Reading and following a Skill remains model-driven; visibility does not guarantee invocation.
+[packages.py](packages.py) defines `SkillPackage` and `SkillPackageSource`.
+[installation.py](installation.py) validates and prepares a package without network
+or activation. External installers can implement that source seam later.
+Identity, origin, revision, content hash, license and text references travel with
+the package. The source interface reserves dependency declarations; nonempty
+dependencies fail admission until an adapter can validate and supply them. Download adapters and executable/binary package support are not
+implemented. The host owns approval and activation; package text grants no tools.
 
-| Parameter | Default | Meaning |
-|---|---|---|
-| `settings.root` | `.skills` | Directory within the active workspace; `--cwd` selects that workspace. |
-| `settings.max_chars` | `16000` | Complete rendered catalog budget; oversized blocks become an explicit omitted notice. |
-
-`instructions.usage` describes when and how to use discovered Skills. It and
-`settings.max_chars` form one H target, `skill-catalog`. The source root and
-discovered names, paths and metadata remain protected.
-
-## Loading and limits
-
-| Rule | Behavior |
-|---|---|
-| Discovery | Recursive `SKILL.md`; root-level Markdown also loads, but separate Skill directories are preferred. |
-| Nested Skills | Once a Skill directory is found, its nested `SKILL.md` files are not separate entries. |
-| Hidden entries / symlinks | Hidden entries skipped; all descendant symlinks skipped. |
-| Scan budget | 4096 enumerated entries including hidden entries; depth 32; 1 MiB/file; 8 MiB total read |
-| Invalid files | Per-file I/O/UTF-8 diagnostics are retained; malformed frontmatter may fall back to an empty description. |
-| Over-limit enumeration | Retain loaded entries; selection can depend on filesystem enumeration order. |
-| Rendered context | XML-escaped metadata, not full Skill text; repeated requests replace the owned block. |
-
-Scanning is synchronous and does not isolate filesystem permissions or concurrent edits. No module-specific environment variables.
-
-## Check offline
-
-```bash
-.venv/bin/python -c 'from fruitfly_agent.lab.context_manager.augmentation.skills import load_skills, render_skills_xml; result = load_skills(".skills"); print(render_skills_xml(result.skills)); print(result.diagnostics)'
-.venv/bin/python -m unittest tests.lab.test_skill_catalog -v
-```
-
-Use the actual workspace's Skill path if running elsewhere. Resolve diagnostics before relying on the catalog.
-
-## Files and extension points
+## Files and offline checks
 
 | File | Responsibility |
 |---|---|
-| [catalog.py](catalog.py) | `Skill`, `LoadResult`, discovery, and XML rendering |
-| [adapter.py](adapter.py) | `SkillCatalogTransformer`; bounded augmentation |
-| [configuration.py](configuration.py), [registration.py](registration.py) | Parameters, discovery and shared assembly |
-| [improvement.py](improvement.py) | One target for usage instructions and character allocation |
-| [document.py](document.py) | Explicit retained Skill body, source selection and S target registration |
+| [catalog.py](catalog.py), [adapter.py](adapter.py) | File parsing and idempotent catalog projection |
+| [library.py](library.py), [resources.py](resources.py) | Effective content and frozen resource sets |
+| [configuration.py](configuration.py), [registration.py](registration.py) | H configuration and assembly |
+| [improvement.py](improvement.py) | Catalog optimization registration |
+| [document.py](document.py) | Independent retained single-body mechanism |
+| [Methods](methods/README.md) | Concrete on-demand projection |
+| [skill-catalog.yaml](skill-catalog.yaml), [skill-library.yaml](skill-library.yaml), [skill-document.yaml](skill-document.yaml) | H/S defaults |
 
-Catalog candidates change usage policy and projection size together. Metadata is
-rendered deterministically from discovered source files. Registered Markdown/text
-dependencies join initial-state identity and configuration resource export.
-The registered task backend must restore those resources for isolated trials.
-Candidate trials use the same installer; generation never overwrites source files.
-See [Improvement](../../../improvement/README.md).
+```bash
+.venv/bin/python -m unittest tests.lab.test_skill_catalog tests.lab.test_retained_targets tests.lab.test_skill_packages
+```
 
-## Optimize a Skill body
+No model requests occur during discovery, installation preparation or assembly.
+Offline tests cover projection and isolation, not model gains or benchmark scores.
 
-Enable **Reusable skill document** under **Context → Context augmentation**. This separate mechanism owns one explicitly selected reusable body. Set `source_path` to a workspace-relative `SKILL.md`, such as `.skills/code-review/SKILL.md`; the target label becomes **Skill: code-review**. Its YAML frontmatter stays outside the optimized body. With an empty source path, `initial_text` supplies a standalone procedural document. Both fields use visible text input in configuration. `max_chars=16000` bounds the complete body; oversized input is rejected rather than truncated.
-
-Enable the retained Skill document, then select its S component in [Improvement](../../../improvement/README.md). The original body seeds the candidate; explicit verified adoption installs the immutable body in a new session. Relative references keep their source directory. Candidate execution requires a backend that restores the frozen task inputs and registered text dependencies.
-
-Source files and references are not overwritten. Registered Markdown/text dependencies and the retained body enter initial-state identity; changed dependencies invalidate pending candidates. Non-text resources and arbitrary linked programs are not frozen. An adopted artifact takes precedence over the source body; changing the starting source requires a new configuration/session and clearing the old artifact binding if it should no longer apply. One body per configured mechanism is supported, not simultaneous optimization of a Skill repository. Enabling the mechanism performs no learning or model requests.
-
-## Read a consistent runtime snapshot
-
-Catalog assembly captures metadata, complete Skill text and bounded Markdown/text
-references once. Locations use scoped `resource://` references through the normal
-`read` tool, including with SSH selected. Relative text references resolve from
-the resource location's parent. These are read-only text resources, not script
-execution paths or synchronized remote programs.
-
-The snapshot retains at most 512 files and 8 MiB, with bounded enumeration and
-per-file reads. Changed content during capture fails assembly. Later disk edits
-do not change the active catalog or its bodies; a new runtime captures them.
-Diagnostics enter Session metadata and bounded guidance. [resources.py](resources.py)
-provides the same frozen text set for execution and registered state capture.
-Non-text assets and executable dependencies require separate backend support.
-
-[skill-catalog.yaml](skill-catalog.yaml) owns H usage and numeric defaults;
-[skill-document.yaml](skill-document.yaml) owns the separate S document defaults.
-Adopted S bodies keep their existing immutable precedence and recovery rules.
+Collections also respect the editable component file budget: their YAML content
+encoding is bounded to 118000 characters, reserving owner metadata within the
+120000-character component limit. Oversized collections fail admission; retained
+entries are not silently truncated.

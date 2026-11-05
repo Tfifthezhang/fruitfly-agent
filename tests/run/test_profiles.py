@@ -45,6 +45,8 @@ class HarnessProfileTest(unittest.TestCase):
                 "bash-tool",
                 "edit-tool",
                 "write-tool",
+                "memory-library",
+                "skill-library",
                 "skill-catalog",
                 "information-context",
                 "memory-files",

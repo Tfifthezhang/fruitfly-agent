@@ -83,9 +83,10 @@ class LayeredCompactionImprovementTests(unittest.IsolatedAsyncioTestCase):
             factory.configuration.save(); factory.reload_configuration()
             app = AgentApplication(factory); await app.start()
             try:
-                # A small fixed context exercises actual reduction after the read result.
+                # Retain room for the packaged catalog and hybrid summary while the
+                # large read result still forces real reduction.
                 config = factory._current_runtime_config
-                factory._current_runtime_config = replace(config, context_window=5000, max_tokens=128)
+                factory._current_runtime_config = replace(config, context_window=6000, max_tokens=128)
                 await app.submit('DAILY_ONLY: Read input.txt, then answer.')
                 version = factory.system_version()
                 for generation in range(1):
@@ -112,7 +113,7 @@ class LayeredCompactionImprovementTests(unittest.IsolatedAsyncioTestCase):
                     self.assertNotEqual(adopted.harness, version.harness)
                     self.assertEqual(adopted.improver, version.improver)
                     version = adopted
-                    factory._current_runtime_config = replace(factory._current_runtime_config, context_window=5000, max_tokens=128)
+                    factory._current_runtime_config = replace(factory._current_runtime_config, context_window=6000, max_tokens=128)
                 self.assertEqual((root/'input.txt').read_text(), 'original evidence line\n'*700)
                 auxiliary = [call for call in provider.calls if call['system_prompt']=='Summarize archived task evidence.']
                 if mode == 'hybrid':

@@ -35,7 +35,8 @@ from fruitfly_agent.lab.context_manager.augmentation.skills.document import defi
 from fruitfly_agent.lab.context_manager.augmentation.skills.registration import definition as skill_catalog_definition
 from fruitfly_agent.lab.improvement.targets.text import TEXT_TARGET_PREFIX
 from fruitfly_agent.improvement.contracts.versions import STATE_SNAPSHOTS_COMPONENT
-from fruitfly_agent.lab.context_manager.augmentation.information.file_memory.snapshots import FileMemorySnapshots
+from fruitfly_agent.lab.context_manager.augmentation.information.file_memory.improvement import definitions as memory_definitions
+from fruitfly_agent.lab.context_manager.augmentation.skills.library import definition as skill_library_definition
 from fruitfly_agent.lab.improvement.targets.state import WorkspaceTextSnapshots
 from fruitfly_agent.improvement.contracts.versions import EXPERIMENT_BLOCKERS_COMPONENT
 from fruitfly_agent.lab.base_prompt.target import BasePromptTarget, configuration_surface as prompt_surface
@@ -212,25 +213,8 @@ def builtin_catalog() -> LabCatalog:
             ),
             default_resource=('fruitfly_agent.lab.context_manager.augmentation.information', 'information-context.yaml'),
         ),
-        _definition(
-            "memory-files",
-            optimization_exemption='Filesystem source binding; retained editable memory uses an S document owner.',
-            configuration_snapshot=lambda parameters, workspace: FileMemorySnapshots(
-                require_workspace_path(workspace, parameters['root'], name='memory root'), workspace).freeze(),
-            layer="capability",
-            family="context",
-            label="File memory",
-            description="Load a short MEMORY.md index and topic notes; edit with normal file tools.",
-            install=_install_memory_files,
-            implementation_path='fruitfly_agent/lab/context_manager/augmentation/information/file_memory/__init__.py',
-            documentation_path='fruitfly_agent/lab/context_manager/augmentation/information/file_memory/README.md',
-            input_parameters=('root',),
-            default=True,
-            order=40,
-            requires=frozenset({"information-context"}),
-            parameters=(_path_parameter("root", parameter_default('fruitfly_agent.lab.context_manager.augmentation.information.file_memory', 'defaults.yaml', 'root'), "Memory directory"),),
-            default_resource=('fruitfly_agent.lab.context_manager.augmentation.information.file_memory', 'defaults.yaml'),
-        ),
+        *memory_definitions(),
+        skill_library_definition(),
         _definition(
             "knowledge-files",
             optimization_exemption='Read-only task knowledge source; retained editable knowledge uses an S document owner.',
@@ -495,18 +479,6 @@ def _install_information_context(state: AssemblyState, context: AssemblyContext,
     return state.with_component("information", hub).with_context_stage(
         ContextStage("information-context", "augmentation", transformer, order=35)
     )
-
-
-def _install_memory_files(state: AssemblyState, context: AssemblyContext, parameters: Mapping[str, Any]) -> AssemblyState:
-    root = require_workspace_path(context.workspace, parameters["root"], name="memory root")
-    hub = state.components["information"]
-    hub.register(create_file_memory_space(root))
-    hub.add_guidance(
-        "File memory is stored as Markdown. Use read, write and edit tools to "
-        "inspect or maintain MEMORY.md and topic notes."
-    )
-    return state.with_component(STATE_SNAPSHOTS_COMPONENT,
-        (*state.components.get(STATE_SNAPSHOTS_COMPONENT, ()), FileMemorySnapshots(root, context.workspace)))
 
 
 def _install_knowledge_files(state: AssemblyState, context: AssemblyContext, parameters: Mapping[str, Any]) -> AssemblyState:

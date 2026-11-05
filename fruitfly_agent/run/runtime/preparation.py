@@ -20,6 +20,7 @@ from fruitfly_agent.core.observation import ObservationContext, bind_observation
 from fruitfly_agent.core.session.observations import session_observer
 from uuid import uuid4
 from .tool_providers import prepare_tool_providers
+from .maintenance import RetainedRuntimeService
 from .recovery import (new_session_path, check_session_manifest, record_session_manifest,
                        session_manifests)
 from .media import load_image
@@ -36,7 +37,7 @@ class PreparedRuntime:
 class RuntimePreparer:
     def __init__(self, *, workspace, catalog, environment, artifacts, provider_registry,
                  pinned_bindings, task_pack_sources, permission_policy, build, describe, describe_environment,
-                 describe_services=None, approve_start=None, adapt_operations=None):
+                 describe_services=None, approve_start=None, adapt_operations=None, retained_store=None, prepare_retained_profile=None, adapt_retained=None):
         self.cwd = workspace
         self.catalog = catalog
         self.environment = environment
@@ -52,6 +53,9 @@ class RuntimePreparer:
         self.approve_start = approve_start
         self.adapt_operations = adapt_operations
         self.sessions = SessionLeases()
+        self.retained_store = retained_store
+        self.prepare_retained_profile = prepare_retained_profile
+        self.adapt_retained = adapt_retained
 
     async def open(
         self,
@@ -67,7 +71,10 @@ class RuntimePreparer:
         model_specs=None,
         environment=None,
     ) -> RuntimeHandle:
+        isolated = profile_override is not None
         selection = selection if profile_override is None else replace(selection, profile=profile_override)
+        if self.retained_store is not None and not isolated:
+            selection = replace(selection, profile=self.prepare_retained_profile(selection.profile, self.retained_store))
         resolve_profile_models(selection.profile, selection.config_path, model_specs=model_specs)
         environment = self.environment if environment is None else environment
         path = session_path or new_session_path(self.cwd)
@@ -157,6 +164,15 @@ class RuntimePreparer:
                     finally:
                         lease.release()
 
+                retained = None
+                if self.retained_store is not None:
+                    retained = RetainedRuntimeService(session=session, session_id=str(path.resolve()),
+                        components=runtime.components, store=self.retained_store, enabled=False)
+                    runtime = replace(runtime, components={**runtime.components, 'retained-state-service': retained})
+                    resources.append(retained)
+                if self.retained_store is not None:
+                    runtime = replace(runtime, components={**runtime.components,
+                        'persistent-state-snapshots': (*runtime.components.get('persistent-state-snapshots', ()), self.retained_store)})
                 handle = RuntimeHandle(
                     session=interaction,
                     manifest=runtime.manifest.to_dict(),
@@ -169,6 +185,7 @@ class RuntimePreparer:
                     authorization=approvals,
                     operations=operation_service,
                     observation_context=context,
+                    maintenance=retained, retained_state=self.adapt_retained(retained) if retained is not None and self.adapt_retained is not None else None,
                 )
                 targets = {key[len(TEXT_TARGET_PREFIX):]: value for key, value in runtime.components.items()
                            if key.startswith(TEXT_TARGET_PREFIX)}
@@ -179,6 +196,8 @@ class RuntimePreparer:
                     with session.transaction():
                         record_session_manifest(session, runtime, messages=messages if reset_projection else None)
                         activated(PreparedRuntime(runtime, profile, targets, resume))
+                    if retained is not None:
+                        retained.activate()
                     if not resume:
                         observations.activate()
                 handle.activate_callback = activate

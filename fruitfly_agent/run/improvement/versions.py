@@ -25,7 +25,11 @@ class RunVersions:
         registered = {source.artifact_key for source in sources if getattr(source, 'artifact_key', None)}
         if set(bindings) - registered:
             raise ValueError('state artifact has no registered snapshot source')
-        snapshots = tuple(source.freeze_text(self.artifacts.read_text(bindings[source.artifact_key]))
+        from fruitfly_agent.improvement.contracts.optimization import RetainedDocuments
+        parameters = {row['id']: row['parameters'] for row in manifest['components']}
+        snapshots = tuple(source.freeze_parameters(parameters[source.library_id])
+                          if isinstance(source, RetainedDocuments) else
+                          source.freeze_text(self.artifacts.read_text(bindings[source.artifact_key]))
                           if getattr(source, 'artifact_key', None) in bindings else source.freeze()
                           for source in sources)
         files: dict[str, SnapshotFile] = {}
@@ -52,7 +56,11 @@ class RunVersions:
                 if artifact.get('role') == 'I':
                     identity = self.restore_improvement_identity(identity, artifact['key'],
                         self.artifacts.read_text(artifact['id']))
+        instruction_ids = {c['component_id'] for c in manifest.get('harness', {}).get('components', ())
+            if c['role'] == 'I' and c['kind'] == 'mechanism-parameters'}
+        instruction_components = [c for c in manifest['components'] if c['id'] in instruction_ids]
         i = self.artifacts.put_text(canonical_json({"source": source, "strategy": identity,
+            **({'components': instruction_components} if instruction_components else {}),
             "artifacts": sorted((a for a in manifest.get("data_artifacts", ()) if a.get("role") == "I"), key=lambda a: a["key"])})).artifact_id
         version = SystemVersion(h, i, self.freeze_state(manifest))
         self.versions.put(version)
@@ -69,6 +77,42 @@ class RunVersions:
                 current = candidate.version
                 changes.extend(candidate.changes)
             candidate = VersionCandidate(parent, current, tuple(changes))
+            self.versions.put_candidate(candidate)
+            return candidate
+        if snapshot.role == 'S' and snapshot.binding.kind == 'configuration':
+            from fruitfly_agent.improvement.contracts.optimization import RetainedDocuments
+            sources = [source for source in self.state_sources() if isinstance(source, RetainedDocuments)
+                and source.library_id == snapshot.target_id]
+            if len(sources) != 1 or not callable(getattr(sources[0], 'freeze_text', None)):
+                raise ValueError('state configuration has no unique registered snapshot owner')
+            owner = sources[0]
+            before_state, after_state = owner.freeze(), owner.freeze_text(text)
+            initial = self.snapshots.read(parent.state)
+            old = {entry.path: entry for entry in initial.files}
+            if any(old.get(entry.path) != entry for entry in before_state.files):
+                raise ValueError('state configuration does not match its registered parent')
+            roots = before_state.roots
+            retained = tuple(entry for entry in initial.files if not any(
+                entry.path == root or entry.path.startswith(root.rstrip('/') + '/') for root in roots))
+            updated = StateSnapshot((*retained, *after_state.files), initial.update_rule,
+                tuple(sorted((set(initial.roots) - set(roots)) | set(after_state.roots))))
+            before, after = (self.artifacts.put_text(value).artifact_id for value in (snapshot.text, text))
+            candidate = VersionCandidate(parent, SystemVersion(parent.harness, parent.improver,
+                self.snapshots.put(updated)), (TargetChange('S', snapshot.target_id, snapshot.schema, before, after),))
+            self.versions.put_candidate(candidate)
+            return candidate
+        if snapshot.role == 'I' and snapshot.binding.kind == 'configuration':
+            import json
+            payload = json.loads(self.artifacts.read_text(parent.improver))
+            if snapshot.target_id not in {c['id'] for c in payload.get('components', ())}:
+                raise ValueError('instruction configuration has no registered identity owner')
+            value = self.normalize_configuration(snapshot.binding.key, text) if self.normalize_configuration is not None else text
+            payload['components'] = [{**c, 'parameters': json.loads(value)} if c['id'] == snapshot.target_id else c
+                for c in payload['components']]
+            before, after = (self.artifacts.put_text(value).artifact_id for value in (snapshot.text, text))
+            identity = self.artifacts.put_text(canonical_json(payload)).artifact_id
+            candidate = VersionCandidate(parent, SystemVersion(parent.harness, identity, parent.state),
+                (TargetChange('I', snapshot.target_id, snapshot.schema, before, after),))
             self.versions.put_candidate(candidate)
             return candidate
         if snapshot.role not in {'H', 'S', 'I'} or (snapshot.role in {'S', 'I'} and snapshot.binding.kind != 'artifact'):

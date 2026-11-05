@@ -233,7 +233,7 @@ Model bindings stay protected from prompt/parameter candidate grants.
 
 ## Register experiment dependencies
 
-Built-in file memory, workspace skill files and local knowledge register initial text snapshot sources through `persistent-state-snapshots`. Live HTTP context registers an `experiment-blockers` reason because responses cannot be frozen. Installers register capabilities without taking snapshots or starting model work. Custom mechanisms must register each persistent dependency they read; arbitrary plugin heap state and external services remain unsupported. See [Algorithm versions](../improvement/targets/README.md) and [Original task experiments](../improvement/README.md).
+Retained memory and Skill libraries, their frozen text resources and local knowledge register initial state through `persistent-state-snapshots`. Run also records maintenance control state when the host enables retained updates. Live HTTP context registers an `experiment-blockers` reason because responses cannot be frozen. Installers register capabilities without taking snapshots or starting model work. Custom mechanisms must register each persistent dependency they read; arbitrary plugin heap state and external services remain unsupported. See [Algorithm versions](../improvement/targets/README.md) and [Original task experiments](../improvement/README.md).
 
 ## Declare per-job improvement support
 

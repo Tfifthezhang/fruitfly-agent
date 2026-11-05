@@ -25,6 +25,7 @@ def prepared_harbor(root, names=("task",)):
 def installed_agent_inputs(agent, root):
     """Stage the files that the bridge receives after job preparation."""
     host, receipt = prepared_harbor(root)
+    agent.logs_dir = root / 'trial/agent'
     agent.config_path = root / "config.yaml"
     agent.model_catalog_path = root / "models.yaml"
     agent.config_path.write_text("offline configuration")

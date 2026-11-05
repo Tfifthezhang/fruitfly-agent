@@ -165,3 +165,17 @@ The default runtime does not enable a command executor. See [delivery admission]
 and [verification limits](../../lab/improvement/verification/README.md#validate-delivery-bundles).
 Backend and hook identities join frozen preview conditions. No hook or delivery
 result authorizes production activation.
+
+Evidence assembly continues to bind the shared Lab organizer. Overview, event,
+coverage and source views are immutable references in the existing artifact store;
+the host does not introduce benchmark parsing or another evidence registry.
+
+[state_updates.py](state_updates.py) projects adopted retained content through the
+same component-binding path as candidate configuration. Attributed memory review
+and independently verified Improvement retain distinct adoption evidence. Neither
+path edits packaged Skill sources.
+
+Configuration-owned document collections keep their mechanism topology in H and
+exact document/resource snapshots in S. I parameter owners retain their generation
+instructions in I identity. Prepared activation rechecks all three axes. Unchanged
+libraries are not republished during unrelated candidate adoption.

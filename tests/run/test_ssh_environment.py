@@ -54,7 +54,7 @@ class SshRunTests(unittest.IsolatedAsyncioTestCase):
         enabled = {m.mechanism_id for m in profile.mechanisms if m.enabled}
         self.assertIn('ssh-env', enabled)
         self.assertTrue({'read-tool', 'write-tool', 'edit-tool', 'bash-tool'} <= enabled)
-        self.assertFalse({'local-env', 'memory-files', 'ipython-tool'} & enabled)
+        self.assertFalse({'local-env', 'ipython-tool'} & enabled)
         factory.configuration.save()
         text = (self.root / '.fruitfly/config.yaml').read_text()
         for secret in self.secrets.values():

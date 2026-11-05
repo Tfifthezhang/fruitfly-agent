@@ -9,7 +9,7 @@ from fruitfly_agent.improvement.contracts.failures import IntegrityError
 from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
 from fruitfly_agent.improvement.execution.handles import ManagedExecution
 from .building import RuntimeConfigBuilder
-from .evidence import collect
+from .evidence import collect, answer_evidence
 from .process import EvalProcess
 from .facts import attach_benchmark_facts
 
@@ -69,10 +69,13 @@ class EvalTaskRunner:
             artifacts, calls = collect(root, context.artifacts)
             completed = report.get('status') == 'completed' and not report.get('errors')
             reward = next((m.get('value') for m in report.get('metrics', []) if m.get('name') == 'official_reward'), None)
+            answer = answer_evidence(artifacts, context.artifacts)
+            from fruitfly_agent.improvement.contracts.tasks import Resource
+            artifacts = (*artifacts, Resource('diagnostics/final-answer.json',
+                context.artifacts.put(json.dumps(answer).encode()), 'application/json', 'diagnostic'))
             record = ExecutionRecord(run_id, task.task_id, task.material_id, harness.snapshot_id,
                 plan.parent.state, plan.conditions_id, 'completed' if completed else 'error',
-                'Benchmark execution completed; inspect Agent trajectory and collected deliverables.' if completed
-                else 'Benchmark execution failed; inspect the evaluation record.', artifacts, calls)
+                answer['text'][:120000], artifacts, calls)
             if completed and reward is not None:
                 self.measurements.values[run_id] = reward
             record = attach_benchmark_facts(record, root, context.artifacts)
@@ -85,9 +88,13 @@ class EvalTaskRunner:
             if root is not None:
                 try:
                     artifacts, calls = collect(root, context.artifacts, interrupted=True)
+                    answer = answer_evidence(artifacts, context.artifacts)
+                    from fruitfly_agent.improvement.contracts.tasks import Resource
+                    artifacts = (*artifacts, Resource('diagnostics/final-answer.json',
+                        context.artifacts.put(json.dumps(answer).encode()), 'application/json', 'diagnostic'))
                     record = ExecutionRecord(run_id, task.task_id, task.material_id, harness.snapshot_id,
                         plan.parent.state, plan.conditions_id, 'cancelled',
-                        'Benchmark execution interrupted; partial evidence is not an official score.', artifacts, calls)
+                        answer['text'][:120000], artifacts, calls)
                     record = attach_benchmark_facts(record, root, context.artifacts, interrupted=True)
                     self.observe_requests(record)
                     context.services.retain_execution(record)

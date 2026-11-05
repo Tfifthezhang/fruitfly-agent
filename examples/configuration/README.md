@@ -38,11 +38,16 @@ unless explicitly overridden, using its aliases from the shared model catalog.
 It passes `--unrestricted` inside task containers; no permission configuration
 belongs in either Agent file.
 
-The default system file retains H and I groups without copied parameter files.
-S is optional. To select a retained [Skill document](../../fruitfly_agent/lab/context_manager/augmentation/skills/README.md#optimize-a-skill-body),
-add `skill-document: {default: true}` under S, then use an explicit inline or file
-document to configure its source/content. Initialization does
-not create placeholder S state. Candidate editing additionally needs an explicit
+The default system selects H context directories, S `memory-library` and
+`skill-library`, and I editor/evaluator instructions through registered defaults.
+Four packaged coding Skills are available on demand; memory starts empty.
+Initialization does not write learned state or make model calls. Enable H
+`memory-maintenance` and I `memory-extractor` / `memory-consolidator` explicitly for
+threshold-based cross-session updates, then review pending batches with `/memory`.
+The lazy `models.roles.memory_maintenance` reference inherits executor by default.
+See [memory behavior](../../fruitfly_agent/lab/context_manager/augmentation/information/file_memory/README.md)
+and [Skill optimization](../../fruitfly_agent/lab/context_manager/augmentation/skills/README.md#improve-descriptions-and-bodies).
+Candidate editing additionally needs an explicit
 [experiment grant](../../fruitfly_agent/experiments/CONFIGURATION.md#grant-component-changes).
 
 The Eval host template is independent of daily/default Agent configuration and
@@ -173,7 +178,10 @@ Maintenance starts at 50% of the
 available input budget, then normally waits 32 new messages; each update has a
 20-second total auxiliary budget and two-page limit. It remains optional.
 IPython uses `models.roles.context_query`, which also defaults to
-`{inherit: executor}`. All five auxiliary role positions are present in the default
+`{inherit: executor}`. All six auxiliary role positions are present in the default
 configuration. Replace a reference with a catalog alias only when an independent
 model is needed. Auxiliary calls may use the network and incur model charges. See
 [role admission](../../fruitfly_agent/lab/catalog/README.md#declare-auxiliary-model-dependencies).
+
+The Eval host example includes bounded [file-capture settings](../../fruitfly_eval/harbor/README.md#capture-task-evidence).
+They apply during benchmark execution and do not run when loading this example.

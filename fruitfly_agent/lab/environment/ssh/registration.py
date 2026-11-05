@@ -27,7 +27,7 @@ def definition():
                 ParameterDescriptor('operation_timeout_seconds', 'number', 'I/O deadline', 'Seconds for SFTP and SSH channel operations.', parameter_default('fruitfly_agent.lab.environment.ssh', 'defaults.yaml', 'operation_timeout_seconds'), minimum=.1, maximum=300),
             ),
             exclusive_group='environment', install_order=10,
-            conflicts=frozenset({'ipython-tool', 'memory-files'}),
+            conflicts=frozenset({'ipython-tool'}),
             effects=MechanismEffects(uses_network=True, writes_files=True,
                 cost_notice='Selected file and Bash tools operate on the configured server with the remote account permissions.')),
         install, implementation_id='ssh-env-v1', default_resource=(__package__, 'defaults.yaml'), optimization_exemption='Remote execution binding and verified credentials are protected infrastructure.', provides=frozenset({'execution-env'}),

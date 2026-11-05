@@ -224,3 +224,17 @@ older prepared records require a fresh preparation. Package version remains
 `0.1`. Do not repair a frozen cache by copying files into it. Use
 [material validation](harbor/README.md#freeze-complete-installation-material) to
 regenerate a complete content-bound runtime.
+
+## Rebuild evidence without another experiment
+
+`python -m fruitfly_eval organize --run /path/to/evaluation` runs offline and shares
+the ordinary run's post-processing implementation. `--output /path/to/export
+--portable` retains permitted original bytes in a relocatable package. See the
+[artifact layout and limits](README.md#organize-retained-evidence).
+
+Adapters should retain attributable original evidence before teardown. Harbor
+capture uses its public lifecycle hooks before verification, with separate capture
+time. A source collection failure, unsupported format or missing output must remain
+explicit; organizing an archive cannot repair unavailable original bytes. Do not
+change official reports or rewards while rebuilding evidence. `api.organize_evaluation`
+is the public embedding entry and starts no model, verifier or environment.

@@ -26,26 +26,21 @@ from tests.support.faux_provider import FauxProvider
 
 
 class InformationSourcesTest(unittest.IsolatedAsyncioTestCase):
-    async def test_file_memory_reflects_normal_file_edits(self) -> None:
+    async def test_file_memory_directory_is_frozen_and_body_is_read_on_demand(self) -> None:
+        from tests.support.retained import memory
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp) / "memory"
-            hub = InformationHub()
-            hub.register(create_file_memory_space(root))
-            index = await hub.pipeline.select(InformationQuery("preferences"))
-            self.assertEqual("MEMORY.md", index.hits[0].artifact.ref.artifact_id)
-            self.assertIn("Index:", index.hits[0].artifact.text)
+            root = Path(tmp) / 'memory'
+            note = memory()
+            space = create_file_memory_space(root, entries=[note])
+            hub = InformationHub(); hub.register(space)
+            effect = await hub.pipeline.recall(InformationQuery('editor'))
+            self.assertIn(note['description'], effect.content)
+            self.assertNotIn(note['body'], effect.content)
+            from fruitfly_agent.lab.context_manager.augmentation.information import InformationRef
+            self.assertIn(note['body'], space.reader.get(InformationRef('workspace-memory', note['id'])).text)
+            note['body'] = 'New source content'
+            self.assertNotIn('New source content', space.reader.get(InformationRef('workspace-memory', note['id'])).text)
             self.assertFalse(root.exists())
-
-            root.mkdir()
-            (root / "MEMORY.md").write_text("- [editor](editor.md): editor preference", encoding="utf-8")
-            (root / "editor.md").write_text("Prefer Vim for code editing.", encoding="utf-8")
-            result = await hub.pipeline.select(InformationQuery("Vim editor"))
-            self.assertEqual(["MEMORY.md", "editor.md"], [
-                hit.artifact.ref.artifact_id for hit in result.hits
-            ])
-            (root / "editor.md").write_text("Prefer Emacs for code editing.", encoding="utf-8")
-            effect = await hub.pipeline.recall(InformationQuery("Emacs editor"))
-            self.assertIn("Prefer Emacs", effect.content)
 
     async def test_knowledge_reindexes_current_files_and_cites_lines(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -148,6 +143,7 @@ class InformationSourcesTest(unittest.IsolatedAsyncioTestCase):
                 selections=(
                     MechanismSelection("information-context"),
                     MechanismSelection("memory-files"),
+                    MechanismSelection("memory-library"),
                     MechanismSelection("knowledge-files"),
                 ),
                 context=AssemblyContext(
@@ -161,7 +157,7 @@ class InformationSourcesTest(unittest.IsolatedAsyncioTestCase):
             )
             frame = ContextFrame("base", (UserMessage(content="Python reports"),), (), "test", 128)
             transformed = (await stage.mechanism.transform(frame)).frame
-            self.assertIn("Prefer concise reports.", transformed.system_prompt)
+            self.assertIn("available_memories", transformed.system_prompt)
             self.assertIn("Reports use Python unittest.", transformed.system_prompt)
-            self.assertIn("read, write and edit", transformed.system_prompt)
+            self.assertIn("Read a relevant memory resource", transformed.system_prompt)
             self.assertEqual((), result.config.tools)

@@ -12,7 +12,9 @@ def session_trajectory(path: Path, *, version: str = "0.1") -> dict[str, Any]:
     manifest: dict[str, Any] = {}
     totals: dict[str, int] = {}
 
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for line in path.read_text(encoding="utf-8").split('\n'):
+        if not line.strip():
+            continue
         row = json.loads(line)
         if row.get("type") == "meta" and row.get("kind") == "runtimeManifest":
             manifest = row.get("manifest", {})
@@ -44,6 +46,8 @@ def session_trajectory(path: Path, *, version: str = "0.1") -> dict[str, Any]:
             step["extra"] = {"native_kind": message.get("kind", "custom")}
         if role == "assistant":
             blocks = message.get("content", [])
+            if isinstance(blocks, str):
+                blocks = [{"type": "text", "text": blocks}]
             thinking = "".join(b.get("thinking", "") for b in blocks if b.get("type") == "thinking")
             if thinking:
                 step["reasoning_content"] = thinking

@@ -72,7 +72,7 @@ class MaterialResourceTests(unittest.TestCase):
         with zipfile.ZipFile(wheel, 'w') as archive:
             for directory in ('fruitfly_agent', 'fruitfly_eval'):
                 for path in (ROOT / directory).rglob('*'):
-                    if path.is_file() and path.suffix in {'.py', '.yaml'} and '__pycache__' not in path.parts:
+                    if path.is_file() and path.suffix in {'.py', '.yaml', '.md'} and '__pycache__' not in path.parts:
                         archive.write(path, path.relative_to(ROOT).as_posix())
             archive.writestr('fruitfly_agent-0.1.dist-info/METADATA', 'Name: fruitfly-agent\nVersion: 0.1\n')
         for name, package in (('source', ROOT), ('wheel', wheel)):
@@ -100,12 +100,27 @@ from fruitfly_agent.lab.catalog import builtin_catalog
 from fruitfly_agent.lab.catalog.defaults import read_default
 assert read_default(builtin_catalog(), 'base_prompt')[0].role == 'H'
 assert read_default(builtin_catalog(), 'skill-document')[0].role == 'S'
+from fruitfly_agent.lab.context_manager.augmentation.skills.library import builtin_entries
+assert len(builtin_entries()) == 4
+assert read_default(builtin_catalog(), 'memory-maintenance')[0].role == 'H'
 assert read_default(builtin_catalog(), 'improvement-editor')[0].role == 'I'
 assert Path(__import__('fruitfly_agent.lab.context_manager.reduction', fromlist=['']).__file__).is_relative_to(root)
 assert 'experiment.yaml' not in templates
 assert 'experiment.yaml' in workspace_templates(source='task-set', benchmark='terminal-bench-4')
+import fruitfly_eval.harbor.evidence_capture as capture_module
+assert Path(capture_module.__file__).is_relative_to(root)
+assert capture_module.capture_policy()['capture_seconds'] == 60
+work = root.parent / ('capture-work-' + root.name)
+work.mkdir()
+(work / 'answer.txt').write_text('frozen output')
+saved = root.parent / ('capture-output-' + root.name)
+capture_module.capture(work, saved, phase='baseline')
+(work / 'answer.txt').write_text('changed output')
+receipt = capture_module.capture(work, saved)
+assert receipt['status'] == 'complete'
+assert (saved / receipt['files'][0]['archive_path']).read_text() == 'changed output'
 from fruitfly_agent.lab.improvement.execution import builtin_executions
-assert {d.execution_id for d in builtin_executions().definitions()} == {'agent-task', 'improver-comparison'}
+assert {d.execution_id for d in builtin_executions().definitions()} == {'agent-task', 'improver-comparison', 'memory-maintenance-comparison'}
 from fruitfly_agent.run import main
 sys.argv = ['fruitfly-agent', '--help']
 main()

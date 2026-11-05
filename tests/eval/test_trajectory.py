@@ -10,6 +10,25 @@ from types import SimpleNamespace
 
 
 class TrajectoryTests(unittest.TestCase):
+    def test_unicode_inside_valid_physical_records_does_not_break_conversion(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'session.jsonl'
+            path.write_text(json.dumps({'type': 'message', 'message': {'role': 'user',
+                'content': 'A\u0085B\u2028C\u2029'}}, ensure_ascii=False) + '\n')
+            self.assertEqual(session_trajectory(path)['steps'][0]['message'], 'A\u0085B\u2028C\u2029')
+
+    def test_conversion_failure_preserves_provider_receipts_as_independent_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'session.jsonl').write_text('{"incomplete":')
+            (root / 'model-usage.json').write_text(json.dumps({'schema_version': 1, 'used': 1,
+                'requests': [{'id': 'a', 'usage': {'input_tokens': 8, 'output_tokens': 3}}]}))
+            agent = load_harbor_agent().__new__(load_harbor_agent()); agent.logs_dir = root
+            context = SimpleNamespace(metadata=None)
+            agent.populate_context_post_run(context)
+            self.assertEqual((context.n_input_tokens, context.n_output_tokens), (8, 3))
+            self.assertEqual(json.loads((root / 'trajectory-status.json').read_text())['status'], 'failed')
+
     def session(self, root, messages):
         path = root / "session.jsonl"
         rows = [{"type": "meta", "kind": "runtimeManifest",

@@ -526,3 +526,22 @@ preparation and checks outside active jobs. Matching caches can remain. Rerun th
 relevant smoke when the evaluated condition changes. Receiving another supported
 dataset should normally change task selection and task dependencies, not reinstall
 Harbor or introduce benchmark-specific runtime branches.
+
+## Inspect or export layered evidence offline
+
+Each completed Eval invocation writes `evidence/manifest.json`; partial or failed
+trials retain their available evidence with explicit coverage. The original score
+and execution status are independent of organization status. Inspect capture bounds
+in the [host guide](harbor/README.md#capture-task-evidence) before preparing large jobs.
+Changing capture policy/source requires fresh preparation.
+
+```bash
+# Offline placeholders: substitute an archived evaluation and export location.
+.venv/bin/python -m fruitfly_eval organize --run /path/to/evaluation
+.venv/bin/python -m fruitfly_eval organize --run /path/to/evaluation --output /path/to/export --portable
+```
+
+The export includes permitted evidence, not private verifier inputs, complete
+runtime/task caches or Docker images. `material-inventory.json` identifies external
+material availability. Preserve exact prepared caches separately when full execution
+reproduction is required. Missing historical container files remain missing.

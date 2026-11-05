@@ -70,8 +70,8 @@ cannot change within a job. Subagents are not a component category.
 as guardrails, scripts or hooks, with an injected validator. Registration alone
 does not make code runnable or publishable. These require a runner and owner
 binding implementation. The built-in persistent host publishes registered text
-bindings; arbitrary Python/plugin replacement and whole Skill repositories are
-unsupported. No empty placeholder implementations are installed.
+bindings, including bounded Skill libraries. Arbitrary Python/plugin replacement
+and executable Skill dependencies are unsupported. No empty placeholder implementations are installed.
 
 ## Prepare task materials
 

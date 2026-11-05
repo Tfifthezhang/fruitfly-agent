@@ -54,3 +54,40 @@ Offline checks: `tests.lab.test_evidence_index`, `tests.lab.test_search_reportin
 Cross-round navigation contains relationships and references, not a second ledger
 of copied observations. Existing candidate manifests retain `expected_effect`;
 assessment and selection artifacts retain their own judgments and assurance.
+
+## Inspect coverage and source relationships
+
+The organizer also produces `evidence/coverage.json` and `evidence/sources.json`.
+Coverage separates collection, parsing, indexing, outputs, usage and identity.
+Each dimension is complete, partial, unknown or not applicable. Summary `complete`
+means scoped evidence completeness; `execution_diagnostics_complete` preserves
+the separate execution fact. A missing capture receipt, unindexed required source
+or unknown usage cannot become complete merely because terminal diagnostics exist.
+
+JSONL splits only at physical LF boundaries, preserving CRLF and Unicode character
+coordinates. A malformed record remains an explicit gap; valid records are still
+indexed. Formatted ATIF steps, JSON arrays and request-receipt arrays retain original
+source ranges. Tool calls/results join by source and call ID, including unmatched
+results. Request, operation, phase and status fields survive where recorded.
+ATIF is marked as a derived view; navigation entries must not be counted as extra
+executions. Existing execution facts remain the authority for aggregate counters. Consecutive streaming deltas share one navigation range with a record count; their full original text remains pageable.
+
+The overview includes actual output, final-answer state, deliverables and gaps.
+Reorganization derives views from current original identities and invalidates stale
+overviews. Original bytes remain unchanged. `catalog` can additionally filter an
+event directory by tool name/call ID, request ID, operation ID, phase or status;
+cataloging still grants no source-content citation.
+
+| File | Additional responsibility |
+|---|---|
+| `decoding.py` | Format recognition and original character ranges |
+| `events.py` | Event normalization and source-local relationships |
+| `coverage.py` | Separate evidence dimensions and explicit gaps |
+
+[Eval](../../../../fruitfly_eval/README.md#organize-retained-evidence) can materialize
+these views offline after a benchmark. This module has no Harbor dependency and
+performs no collection, model request or container operation.
+
+Evidence completeness applies to registered records and selected captured file
+versions. It does not prove that every task-specific output requirement is known
+or met; file scope and exclusions remain visible in the capture manifest.

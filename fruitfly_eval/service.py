@@ -61,3 +61,9 @@ def stop_evaluation(evaluation_id, *, output_root):
 def read_report(evaluation_id, *, output_root, as_json=True):
     root = evaluation_directory(output_root, evaluation_id)
     return json.loads((root / 'report.json').read_text(encoding='utf-8')) if as_json else (root / 'report.md').read_text(encoding='utf-8')
+
+
+def organize_evaluation(run, *, output=None, portable=False):
+    """Rebuild permitted evidence offline; never start a task or modify scores."""
+    from .organization import organize_run
+    return organize_run(run, output=output, portable=portable)

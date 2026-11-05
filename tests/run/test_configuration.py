@@ -140,6 +140,8 @@ class HarnessSelectionTest(unittest.TestCase):
                 "skill-catalog",
                 "information-context",
                 "memory-files",
+                "memory-library",
+                "skill-library",
                                 "layered-compaction",
                 "component-improvement",
             },
@@ -303,11 +305,11 @@ class HarnessSelectionTest(unittest.TestCase):
         self.assertEqual("context", before.family)
         self.assertEqual("externalization", before.context_phase)
         self.assertEqual(
-            ["augmentation"] * 5 + ["externalization", "reduction", "reduction"],
+            ["augmentation"] * 7 + ["externalization", "reduction", "reduction"],
             [item.display_section for item in context_items],
         )
         self.assertEqual(
-            {"skill-catalog", "memory-files", "knowledge-files", "live-http", "skill-document"},
+            {"skill-catalog", "memory-files", "knowledge-files", "live-http", "skill-document", "memory-library", "skill-library"},
             {
                 item.mechanism_id
                 for item in context_items

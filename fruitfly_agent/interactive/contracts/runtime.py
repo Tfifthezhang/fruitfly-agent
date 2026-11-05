@@ -2,6 +2,8 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Mapping, Protocol
+from fruitfly_agent.interactive.contracts.maintenance import MaintenanceService
+from fruitfly_agent.interactive.contracts.retained_state import RetainedStateService
 from fruitfly_agent.core.observation import ObservationContext
 from fruitfly_agent.core.data_model import AgentLoopResult, ContextItem, ImageBlock
 from fruitfly_agent.core.data_model.media import UserContent
@@ -71,6 +73,10 @@ class RuntimeHandle(Protocol):
     @property
     def observation_context(self) -> ObservationContext | None: ...
     @property
+    def maintenance(self) -> MaintenanceService | None: ...
+    @property
+    def retained_state(self) -> RetainedStateService | None: ...
+    @property
     def activate_callback(self) -> Callable[[], None] | None: ...
     async def start(self) -> None: ...
     async def health(self) -> dict[str, Any]: ...
@@ -92,6 +98,10 @@ class RuntimeFactory(Protocol):
 
     async def prepare_configuration(self, *, session_path: Path) -> RuntimeHandle:
         """Prepare a draft for the same conversation, committing only on activation."""
+        ...
+
+    async def prepare_retained_update(self, identity: str, *, session_path: Path) -> RuntimeHandle:
+        """Prepare a reviewed S batch for atomic activation in the same conversation."""
         ...
 
     def new_session_path(self) -> Path: ...

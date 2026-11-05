@@ -56,3 +56,19 @@ using the shared Runtime specification inventory. Owner default YAML, Provider
 services and initialization templates therefore enter H/I source snapshots.
 Unregistered workspace files and secrets are excluded. Materialized source trees
 contain the resources required by their own imports, without checkout fallback.
+
+## Commit retained state
+
+[retained_state.py](retained_state.py) stores one locked atomic checkpoint per
+workspace/configuration/profile scope under `.fruitfly/retained/<scope>/state.json`.
+Immutable document and source-evidence bytes reuse ArtifactStore. Checkpoints retain
+source identity, extraction progress, completed-turn progress, pending updates and
+operation outcomes. Evidence character counts, artifact hashes, operation states
+and progress bounds are validated. Repeated observations are idempotent. Unknown requests are not
+replayed, even after new input; an explicit retry authorization preserves the
+unknown operation record. Rejected batches do not rewind completed extraction. Active and pending
+references participate in retention. State writes synchronize the temporary file
+before atomic replacement. Activation failures restore the prior checkpoint.
+Executable documents are frozen by their owning targets; maintenance evidence and
+control records are captured separately for isolation. No model quality decision
+belongs to this store.

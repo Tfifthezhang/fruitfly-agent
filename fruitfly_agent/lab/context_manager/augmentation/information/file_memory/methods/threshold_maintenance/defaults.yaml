@@ -1,0 +1,10 @@
+id: memory-maintenance
+role: H
+implementation: memory-maintenance
+parameters:
+  settings:
+    extract_after_user_chars: 8000
+    consolidate_after_user_turns: 50
+    max_input_chars: 64000
+    max_output_tokens: 4096
+    timeout_seconds: 120

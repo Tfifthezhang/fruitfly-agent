@@ -49,3 +49,6 @@ These checks use fake Providers and temporary state without container/model acce
 [operations.py](operations.py) projects a borrowed Lab operation service into
 Interactive `OperationService` statuses, cancellation and completion events.
 The adapter owns no tasks, cleanup, model requests or scheduling decisions.
+
+[retained_state.py](retained_state.py) exposes borrowed document inspection and
+batch review without constructing a model or choosing an algorithm.

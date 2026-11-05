@@ -282,7 +282,7 @@ class SshConfigurationTests(unittest.TestCase):
                        {'operation_timeout_seconds': float('nan')}, {'known_hosts': ''}):
             with self.subTest(values=values), self.assertRaises(ValueError):
                 catalog.resolve((MechanismSelection('ssh-env', False, values),))
-        for conflict in ('local-env', 'ipython-tool', 'memory-files'):
+        for conflict in ('local-env', 'ipython-tool'):
             with self.subTest(conflict=conflict), self.assertRaises(ValueError):
                 catalog.resolve((MechanismSelection('ssh-env'), MechanismSelection(conflict)))
 

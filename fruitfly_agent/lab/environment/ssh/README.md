@@ -11,8 +11,7 @@ a review. Choose **Stage settings**, then save and apply through `/config`, or c
 The panel and configuration editor make no SSH requests. If startup cannot connect,
 it returns to the panel after cleanup so you can edit settings or switch to a local
 environment. Ctrl+C cancels startup; no automatic local fallback occurs.
-Selection disables the local environment, local IPython and file memory only
-after staging. Cancelling the form preserves the previous environment.
+Selection disables the local environment and local IPython only after staging. Cancelling the form preserves the previous environment.
 Configuration and construction are offline; Application startup opens the
 connection. Authentication failure prevents activation.
 
@@ -52,21 +51,16 @@ rejected. The backend never automatically accepts or saves host keys. See
 
 ## Configure addresses and secrets
 
-Merge the following entries into the selected profile's `mechanisms` in
-`.fruitfly/config.yaml`. Preserve unrelated model and mechanism settings.
+Set these components under the selected profile's `H` in
+`.fruitfly/config.yaml`. Preserve unrelated model and component settings.
 `server.example`, `2222` and `/srv/workspace` are placeholders. A complete minimal
 profile is in the [SSH configuration template](../../../../examples/configuration/ssh.example.yaml).
 
 ```yaml
-- id: local-env
-  enabled: false
-- id: memory-files
-  enabled: false
-- id: ipython-tool
-  enabled: false
-- id: rlm-ipython
-  enabled: false
-- id: ssh-env
+local-env: {enabled: false}
+ipython-tool: {enabled: false}
+rlm-ipython: {enabled: false}
+ssh-env:
   enabled: true
   parameters:
     host: server.example
@@ -78,7 +72,8 @@ profile is in the [SSH configuration template](../../../../examples/configuratio
 ```
 
 Keep `read-tool`, `write-tool`, `edit-tool` and `bash-tool` enabled. They share the
-remote backend. The guided form collects account/password values with terminal
+remote backend. Retained memory and Skill resources remain readable through the
+host resource registry. The guided form collects account/password values with terminal
 echo and input history disabled. Review and status show only entered, reused,
 set or missing; they never show authentication values. Blank input reuses an
 existing credential. Missing values and invalid fields are retried in place.
@@ -173,8 +168,8 @@ when needed. Trusted Python plugins still run locally with host privileges.
 | Memory use | Complete files and command stdout/stderr are retained in memory |
 
 Sessions, model calls, skills, knowledge and learned context stay local. Files
-are not synchronized. Local IPython/RLM and local file memory are incompatible
-with this backend and rejected by Catalog. Other local context text may still
+are not synchronized. Local IPython/RLM is incompatible with this backend and rejected by Catalog.
+Retained memory and Skill text use host resources and remain available. Other local context text may still
 mention local paths; use explicit remote paths in tasks. Original-task
 experiments are blocked because the SSH workspace has no isolated frozen task
 snapshot. Offline checks do not establish real server compatibility.

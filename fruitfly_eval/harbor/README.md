@@ -26,6 +26,7 @@ URLs and keep key values in the existing secret environment.
 | `dependencies.uv` | Optional absolute path to a declared executable asset under `/opt/fruitfly-eval-dependencies/assets/` |
 | `dependencies.prepare` | Explicit cached `image` and single-line shell `command` for dependency preparation |
 | `dependencies.offline` | Set uv/pip offline variables during evaluation; preparation remains online |
+| `evidence` | Bounded capture policy; see [capture task evidence](#capture-task-evidence) |
 | `task_patches` | Optional exact `task` pattern, `tests/` file `path`, `old` and `new` setup text |
 
 Library directories must be covered by runtime mounts.
@@ -234,6 +235,7 @@ not confirmation.
 
 | Module | Public entry points / responsibility |
 |---|---|
+| [evidence_capture.py](evidence_capture.py), [evidence_hooks.py](evidence_hooks.py) | Scoped file retention and public Job lifecycle callbacks |
 | [host.py](host.py) | `HostConfig.read`: strict machine configuration |
 | [material.py](material.py) | `prepare_material`, `check_material`: source/runtime identities |
 | [tasks.py](tasks.py) | `prepare_tasks`, `validate_coverage`: frozen selections, exclusions and all-run coverage |
@@ -287,3 +289,69 @@ Adjacent `agent/session.jsonl.operations/*.jsonl` retain startup/idle lifecycle
 facts without mutating rejected history. Evidence collection reads these alongside
 Agent Session observations using the same Core codec, including when no Agent
 turn started. Both remain diagnostic evidence, separate from official scores.
+
+## Capture task evidence
+
+The public Harbor 0.23.0 Job plugin installs Agent-start and Agent-end callbacks.
+The installed Agent supplies scoped capture/download capabilities for its own
+trial. Baseline inventory runs before Agent execution timing starts; final capture
+runs after that timing ends and before verification. Capture uses its own limits,
+never changes task allowances, and contributes additional whole-job wall time.
+Trial end/cancellation releases borrowed environment capabilities.
+
+`evidence_capture.py` inventories the task working directory and copies created
+or changed regular files. `extra_paths` also captures explicitly requested unchanged
+files. Final files go to `agent/evidence-capture/files/stage-<n>/...`; hashes, original
+paths, baseline comparison, stability and collection failures go to `manifest.json`.
+Multiple Agent phases retain separate stage namespaces. Public environment transfer
+retrieves this evidence before the verifier. Native logs remain authoritative.
+
+Add `evidence` to the existing host YAML; defaults are:
+
+```yaml
+evidence:
+  roots: ['.']
+  extra_paths: []
+  exclude: ['.fruitfly', '.git', '.env', 'secrets.env', '__pycache__', '.ssh']
+  max_file_bytes: 268435456
+  max_total_bytes: 1073741824
+  max_entries: 10000
+  baseline_seconds: 30
+  capture_seconds: 60
+  include_tool_outputs: true
+```
+
+| Setting | Meaning |
+|---|---|
+| `roots` | Nonempty distinct paths relative to the task working directory; no `..` |
+| `extra_paths` | Explicit additional relative or absolute output paths; no `..` |
+| `exclude` | Basename patterns excluded from the declared capture scope |
+| `max_file_bytes`, `max_total_bytes` | Per-file and per-pass read/copy bounds |
+| `max_entries` | Bound traversed directory/file entries |
+| `baseline_seconds`, `capture_seconds` | Independent inventory/capture clocks in seconds |
+| `include_tool_outputs` | Retain referenced `fruitfly-bash-` temporary logs when available |
+
+Unknown fields, duplicate YAML keys, null mappings and invalid limits fail. Policy
+joins prepared host identity; changing it requires preparation again. The default
+256 MiB file / 1 GiB pass limits are operational bounds, not measured sufficient
+limits for every benchmark. Size or time overflow makes coverage partial. Consider
+concurrency, task count and available storage before increasing them. The execution
+budget records per-pass bounds and the maximum final bytes across configured
+attempts; transfer, indexing and multi-step phases add further cost. Capture
+receipts retain elapsed capture time separately from Agent time.
+
+Capture excludes runtime mounts, Eval-owned paths, private tests, pseudo-filesystems
+and configured secrets/state directories. It does not follow symlinks. Output
+references cannot execute shell text or select arbitrary credential files. Scope
+exclusions and symlink metadata remain distinct from collection failures.
+
+Per-file before/after checks detect observed mutation, but do not establish a
+transactionally consistent service/database snapshot. Normal task services stay
+alive for verification. External services, packages and files outside scope are
+not implicitly captured. Missing baselines, failed cancellation/environment access
+or unavailable output logs remain explicit. The collector does not infer absence
+from an empty directory or reconstruct an output from a command claiming to create it.
+
+The container implementation and real image compatibility require a Linux/Docker
+smoke trial. Offline coverage is in `tests.eval.test_evidence_capture` and frozen
+resource tests. Historical/offline organization is described in [Eval](../README.md#organize-retained-evidence).

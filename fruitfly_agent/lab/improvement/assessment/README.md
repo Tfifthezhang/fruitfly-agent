@@ -48,3 +48,13 @@ Typed instruction constructors derive values from it. Isolated editors modify
 `parameters.yaml` with a protected `role: I`; ordinary H/S task execution cannot
 supply I acceptance. Frozen comparisons and verified activation retain the
 existing I execution and recovery contracts.
+
+## Assess incomplete archives
+
+The evaluator receives available overview/coverage paths with execution metadata
+and uses the same paged evidence reader as the editor. Coverage distinguishes
+collection/index gaps from execution-diagnostic completeness. Instructions separate
+setup failure, interruption, demonstrated incorrectness and unavailable outputs;
+known token subtotals cannot establish a full efficiency comparison. Existing
+uncertainty and citation validation remain authoritative. Missing evidence grants
+neither a successful outcome nor an unsupported failure claim.

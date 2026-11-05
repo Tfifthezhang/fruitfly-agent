@@ -82,3 +82,14 @@ fields. Existing text targets remain execution codecs over those parameters.
 Structured and scalar owners share the same candidate-file validation; protected
 identity and role cannot change. `bundle_text` derives publication payloads from
 the validated YAML rather than maintaining another editable text copy.
+
+## Retain a document collection
+
+[documents.py](documents.py) exposes owner-validated collections through typed
+parameter targets and ordinary configuration materialization. Descriptions and
+bodies change the actual directory and read resources. IDs and provenance remain
+protected from ordinary edits. Owner snapshots include generated text resources,
+so configuration-owned S changes can be verified and restored without changing H. The shared `RetainedDocuments` protocol allows hosts
+to inspect a collection without importing its algorithm implementation. An owner
+can bind one validated state update to an isolated downstream trial; that grants
+no production write or activation authority.

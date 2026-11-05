@@ -50,3 +50,12 @@ startup and close; Run records preparation or recovery. These are passive facts,
 not lifecycle authority. Cleanup finishes before its Session writer is released.
 Optional `operations` exposes background work independently of the active Agent
 turn; closing its owning runtime still retires that work.
+
+## Schedule optional idle work
+
+A handle can supply an independent maintenance service. Application records input
+completion, schedules work only with no queued input, and cancels and retires it
+before foreground work or runtime replacement. Maintenance holds the submission
+lock; it cannot activate a new state. `retained_action` prepares a replacement
+before a commit, then uses the ordinary checked activation boundary. Inspection
+uses frozen active documents. Hosts without maintenance retain existing behavior.

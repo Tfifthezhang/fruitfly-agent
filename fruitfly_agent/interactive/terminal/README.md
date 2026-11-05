@@ -276,3 +276,10 @@ Live fragments include their tool-call identity. Background starts remain Runnin
 `/operations cancel HANDLE` requests scoped cancellation. Completion notifications
 report observed state and do not generate assistant conclusions or restart a turn.
 Assistant intent and progress wording belongs to the configured base prompt.
+
+## Inspect memory and Skills
+
+Use `/memory` or `/skills` to list active documents and pending batches. `read ID`
+displays a document; `commit UPDATE` or `reject UPDATE` reviews a batch while idle.
+The [retained-state feature](features/retained_state/README.md) uses injected public
+operations and starts no search or model request during inspection.

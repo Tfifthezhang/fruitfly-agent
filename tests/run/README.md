@@ -55,3 +55,8 @@ explicit hybrid roles, conditional H grants and exclusive reducer/reader selecti
 Lifecycle observation regressions verify manifest-first startup, lazy role model
 metadata, byte-preserving failed/idle recovery and separate observation archives.
 The usual Application configuration tests retain ownership of activation rollback.
+
+`test_retained_state.py` owns atomic checkpoints, unknown-call retry and corruption
+rejection. `test_memory_lifecycle.py` covers threshold generation, same-Session
+review, isolated H/S/I identity, verified content activation and restart.
+`test_retained_resources.py` checks packaged resources in frozen execution.

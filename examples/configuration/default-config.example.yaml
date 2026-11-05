@@ -15,6 +15,8 @@ profiles:
           inherit: executor
         context_summary:
           inherit: executor
+        memory_maintenance:
+          inherit: executor
     H:
       local-env:
         default: true
@@ -34,7 +36,17 @@ profiles:
         default: true
       execution-policy:
         default: true
-    S: {}
+      skill-catalog:
+        default: true
+      information-context:
+        default: true
+      memory-files:
+        default: true
+    S:
+      memory-library:
+        default: true
+      skill-library:
+        default: true
     I:
       improvement-editor:
         default: true

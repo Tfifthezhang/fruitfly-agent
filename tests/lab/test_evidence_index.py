@@ -11,6 +11,54 @@ from tests.support.pipeline import build_pipeline,Runner
 
 
 class EvidenceIndexTests(unittest.IsolatedAsyncioTestCase):
+    async def test_streaming_deltas_share_navigation_ranges_without_losing_original_text(self):
+        _, plan, baseline, _ = build_pipeline()
+        artifacts = MemoryArtifacts(); task = TaskMaterial('task', 'Inspect stream')
+        text = '\n'.join(json.dumps({'type': 'assistant_text_delta', 'delta': str(i)}) for i in range(100))
+        record = await Runner().execute(plan, task, baseline)
+        record = replace(record, artifacts=(Resource('events.jsonl', artifacts.put(text.encode()), kind='trajectory'),))
+        indexed = organize_evidence(task, ensure_facts(record, artifacts), artifacts)
+        value = json.loads(artifacts.read(next(r.artifact_id for r in indexed.artifacts if r.path == EVENTS_PATH)))
+        self.assertEqual(len(value['events']), 1)
+        event = value['events'][0]
+        self.assertEqual(event['record_count'], 100)
+        self.assertEqual(text[event['start']:event['end']], text)
+
+    async def test_unicode_atif_relationships_and_torn_tail_keep_original_spans(self):
+        _, plan, baseline, _ = build_pipeline()
+        artifacts = MemoryArtifacts(); task = TaskMaterial('task', 'Inspect evidence')
+        native = [
+            {'message': {'role': 'assistant', 'content': [
+                {'type': 'text', 'text': 'A\u0085B\u2028C\u2029'},
+                {'type': 'toolCall', 'id': 'call', 'name': 'bash', 'input': {}}]}},
+            {'message': {'role': 'toolResult', 'toolCallId': 'call', 'content': []}}]
+        text = '\r\n'.join(json.dumps(v, ensure_ascii=False) for v in native) + '\r\n{"unfinished":'
+        atif = json.dumps({'schema_version': 'ATIF-v1.7', 'steps': [
+            {'source': 'agent', 'tool_calls': [{'tool_call_id': 'call', 'function_name': 'bash'}],
+             'observation': {'results': [{'source_call_id': 'call'}]}}]}, indent=2)
+        record = await Runner().execute(plan, task, baseline)
+        record = ensure_facts(replace(record, artifacts=(
+            Resource('session.jsonl', artifacts.put(text.encode()), kind='trajectory'),
+            Resource('trajectory.json', artifacts.put(atif.encode()), kind='trajectory'))), artifacts)
+        indexed = organize_evidence(task, record, artifacts)
+        index = json.loads(artifacts.read(next(r.artifact_id for r in indexed.artifacts if r.path == EVENTS_PATH)))
+        self.assertFalse(index['complete'])
+        self.assertEqual(index['sources'][0]['status'], 'partial')
+        self.assertEqual(index['sources'][1]['format'], 'atif')
+        self.assertEqual(index['sources'][1]['status'], 'indexed')
+        for event in index['events']:
+            source = text if event['source_path'] == 'session.jsonl' else atif
+            self.assertIsInstance(json.loads(source[event['start']:event['end']]), dict)
+            if event['kind'] == 'toolResult':
+                self.assertEqual(event['tool_name'], 'bash')
+                self.assertEqual(event['relationship_status'], 'matched')
+        augmented = replace(indexed, artifacts=(*indexed.artifacts,
+            Resource('extra.txt', artifacts.put(b'extra'), kind='diagnostic')))
+        rebuilt = organize_evidence(task, augmented, artifacts)
+        old = next(r for r in indexed.artifacts if r.path == OVERVIEW_PATH)
+        new = next(r for r in rebuilt.artifacts if r.path == OVERVIEW_PATH)
+        self.assertNotEqual(old.artifact_id, new.artifact_id)
+
     async def test_navigation_is_rebuildable_and_originals_are_unchanged(self):
         _,plan,baseline,_=build_pipeline();artifacts=MemoryArtifacts();task=TaskMaterial('task','Finish')
         data='\n'.join(json.dumps({'event':'tool','data':{'elapsed_seconds':v},'message':{'role':'toolResult','is_error':False}})for v in (1,318))

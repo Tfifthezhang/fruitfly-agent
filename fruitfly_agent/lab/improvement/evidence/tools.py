@@ -24,6 +24,9 @@ def evidence_tools(workspace, *, settings=None, reader=None):
             value=json.loads(workspace.read(path))
             events=value['events']
             if args.get('kind'):events=[v for v in events if v['kind']==args['kind']]
+            for field in ('tool_name', 'tool_call_id', 'request_id', 'operation_id', 'phase', 'status'):
+                if field in args:
+                    events = [v for v in events if v.get(field) == args[field]]
             if args.get('order')=='elapsed_seconds':events=sorted(events,key=lambda v:v.get('elapsed_seconds') or -1,reverse=True)
             cursor,limit=args.get('cursor',0),args.get('limit',settings.catalog.default_entries)
             if type(cursor)is not int or cursor<0 or type(limit)is not int or not 1<=limit<=settings.catalog.max_entries:
@@ -46,7 +49,9 @@ def evidence_tools(workspace, *, settings=None, reader=None):
     async def search(ctx):
         return result(reader.search(ctx.args['query'],paths=tuple(ctx.args.get('paths',())),cursor=ctx.args.get('cursor',''),limit=ctx.args.get('limit',settings.search.default_matches)))
     return (AgentTool(name='catalog',label='Browse evidence',description='Page granted files or an event index. Overview and event indexes navigate to immutable originals.',
-        parameters={'type':'object','properties':{'prefix':{'type':'string'},'path':{'type':'string'},'kind':{'type':'string'},'order':{'type':'string','enum':['elapsed_seconds']},'cursor':{'type':'integer'},'limit':{'type':'integer'}}},execute=catalog),
+        parameters={'type':'object','properties':{'prefix':{'type':'string'},'path':{'type':'string'},'kind':{'type':'string'},
+            **{key: {'type': 'string'} for key in ('tool_name', 'tool_call_id', 'request_id', 'operation_id', 'phase', 'status')},
+            'order':{'type':'string','enum':['elapsed_seconds']},'cursor':{'type':'integer'},'limit':{'type':'integer'}}},execute=catalog),
         AgentTool(name='read',label='Read evidence',description='Read a granted original page or image. Cite the returned citation_id; continue with next_offset. Offsets are source characters.',
         parameters={'type':'object','properties':{'path':{'type':'string'},'offset':{'type':'integer'},'limit':{'type':'integer'}},'required':['path']},execute=read),
         AgentTool(name='search',label='Search evidence',description='Literal search across granted files or selected paths. Returns source spans, citation IDs, failures and a continuation cursor.',
