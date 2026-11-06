@@ -1,4 +1,6 @@
 """Loadable, optimizable instruction extension. Registration is offline."""
+
+from fruitfly_agent.lab.catalog import FeatureNode
 from fruitfly_agent.improvement.contracts.optimization import OptimizationSpec
 from dataclasses import replace
 
@@ -6,7 +8,7 @@ from fruitfly_agent.lab.catalog import MechanismDefinition, MechanismDescriptor,
 from fruitfly_agent.lab.catalog.components import ComponentSpec
 from fruitfly_agent.lab.catalog.configuration import ConfigurationSurface, text_edit_options
 from fruitfly_agent.improvement.contracts.optimization import TargetSnapshot, TargetBinding
-from fruitfly_agent.lab.improvement.targets.text import TEXT_TARGET_PREFIX, validate_text
+from fruitfly_agent.improvement.contracts.text import TEXT_TARGET_PREFIX, validate_text
 
 TARGET = 'developer-guidance'
 DEFAULT = 'Use concrete evidence and state the next useful action.'
@@ -59,4 +61,4 @@ def register(api):
         documentation_path='examples/extensions/README.md', artifact_slots=frozenset({TARGET}),
         component_specs=lambda parameters, enabled: (ComponentSpec(TARGET),) if enabled else (),
         configuration_surfaces=(ConfigurationSurface(TARGET, 'H', 'artifact', TARGET, normalize,
-            edit_options=text_edit_options),)))
+            edit_options=text_edit_options),), feature_path=(FeatureNode('fixture', 'Fixture'),)))

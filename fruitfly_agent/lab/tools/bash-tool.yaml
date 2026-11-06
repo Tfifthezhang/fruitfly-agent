@@ -1,9 +1,0 @@
-id: bash-tool
-role: H
-implementation: bash-tool
-parameters:
-  settings:
-    default_timeout_seconds: 300
-    max_active_commands: 4
-    retained_commands: 128
-    output_characters: 12000

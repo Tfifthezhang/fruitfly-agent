@@ -9,7 +9,7 @@ from unittest.mock import Mock
 from fruitfly_agent.core.data_model import AssistantMessage, TextBlock, ToolCallBlock, CustomMessage
 from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone
 from fruitfly_agent.interactive import AgentApplication
-from fruitfly_agent.interactive.contracts.improvement import WorkflowRequest
+from fruitfly_agent.improvement.contracts.requests import WorkflowRequest
 from fruitfly_agent.lab.improvement.api import WorkflowBindings
 from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
 from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, EditReason
@@ -125,6 +125,9 @@ class LayeredCompactionImprovementTests(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue(task_calls)
                 self.assertTrue(all(set(c['tools']) == {'read','write','edit','bash'} for c in task_calls))
                 await app.submit('Read input.txt, then answer.')
+                current = factory.system_version()
+                self.assertEqual((current.harness, current.improver), (version.harness, version.improver))
+                version = current
                 session = Path(app.status.session_path)
             finally:
                 await app.close()

@@ -4,13 +4,10 @@ from pathlib import Path
 import yaml
 
 from fruitfly_agent.improvement.contracts.versions import SnapshotFile, StateSnapshot, canonical_json
-from fruitfly_agent.lab.catalog.models import MechanismDefinition
-from fruitfly_agent.lab.catalog.components import ComponentSpec
-from fruitfly_agent.core.mechanisms import MechanismDescriptor, MechanismContribution, ParameterDescriptor
-from fruitfly_agent.lab.improvement.targets.documents import DocumentsTarget, parse_documents
-from fruitfly_agent.lab.improvement.targets.text import TEXT_TARGET_PREFIX
+from fruitfly_agent.lab.catalog.adapters.collections import DocumentsTarget, collection_surface, parse_documents
+from fruitfly_agent.improvement.contracts.text import TEXT_TARGET_PREFIX
 from fruitfly_agent.improvement.contracts.versions import STATE_SNAPSHOTS_COMPONENT
-from .catalog import Skill, load_skills
+from fruitfly_agent.lab.context_manager.augmentation.skills.methods.indexed_documents.parser import Skill, load_skills
 from .resources import SkillResources, capture_skills
 from .packages import package_entry, validate_skills
 
@@ -44,40 +41,28 @@ def capture_library(entries, workspace):
     return SkillResources(workspace, tuple(skills), StateSnapshot(tuple(documents), roots=('.fruitfly/skill-library',)), ())
 
 
-def definition():
-    return MechanismDefinition(MechanismDescriptor('skill-library', 'Retained Skill library',
-        'Load portable coding procedures and expose their descriptions, bodies and references as S.',
-        contributions=(MechanismContribution('capability', 'context'),), install_order=29, default_enabled=True,
-
-        parameters=(ParameterDescriptor('documents', 'string', 'Skill documents',
-            'JSON Skill entries; empty text seeds packaged and workspace Skills.', ''),)), install,
-        prepare_targets=prepare_standalone,
-        configuration_role='S', default_resource=(__package__, 'skill-library.yaml'),
-        parameter_paths={'documents': 'content.documents'},
-        configuration_edit=lambda fields, bounds: _edit(fields, bounds),
-        validate_parameters=lambda values: validate_skills(parse_documents(values.get('documents', ''))) if values.get('documents') else None,
-        component_specs=lambda values, enabled: (ComponentSpec('skill-library', 'S', 'mechanism-parameters',
-            'mechanism-parameters-v1', frozenset({'configuration-materialization'})),) if enabled else (),
-        implementation_path='fruitfly_agent/lab/context_manager/augmentation/skills/library.py',
-        documentation_path='fruitfly_agent/lab/context_manager/augmentation/skills/README.md')
+def state_surface():
+    def normalize(parameters):
+        if (not isinstance(parameters, dict) or set(parameters) != {'content'}
+                or not isinstance(parameters['content'], dict) or set(parameters['content']) != {'documents'}
+                or not isinstance(parameters['content']['documents'], str)):
+            raise ValueError('Skill state requires content.documents')
+        text = parameters['content']['documents']
+        if text:
+            text = canonical_json(validate_skills(parse_documents(text)))
+        return {'content': {'documents': text}}
+    return collection_surface('skill-library', normalize=normalize,
+        default_resource=(__package__, 'skill-library.yaml'), factory=create_target)
 
 
-def _edit(fields, bounds):
-    if fields != ['parameters.content.documents'] or bounds:
-        raise ValueError('Skill library grants require content.documents without numeric bounds')
-    return {'editable_fields': fields, 'bounds': {}}
-
-
-def install(state, context, values):
-    return state.with_component('skill-library-preparation', values)
-
-
-def prepare_library(state, context, values, root):
+def create_target(state, context, parameters):
+    values = parameters['content']
     if values['documents']:
         entries = validate_skills(parse_documents(values['documents']))
     else:
         entries = builtin_entries()
-        # The workspace root is owned by the existing catalog configuration.
+        from fruitfly_agent.lab.catalog.assembly import require_workspace_path
+        root = require_workspace_path(context.workspace, context.model_parameters['root'], name='Skill root')
         captured = capture_skills(root, context.workspace)
         for skill in captured.skills:
             directory = Path(skill.file_path).parent.relative_to(context.workspace).as_posix()
@@ -86,17 +71,7 @@ def prepare_library(state, context, values, root):
             entries.append(package_entry(skill, references, str(Path(skill.file_path).relative_to(context.workspace)),
                 'workspace', 'User supplied; review source terms'))
         entries = validate_skills(entries)
-    values = {'documents': canonical_json(entries)}
-    target = DocumentsTarget(definition(), values, validate_documents=validate_skills,
-        mutable={'description', 'body', 'references'},
+    return DocumentsTarget(state_surface(), {'documents': canonical_json(entries)}, label='Installed Skills', kind='skill',
+        validate_documents=validate_skills, mutable={'description', 'body', 'references'},
+        visible=lambda entry: not entry['disabled'],
         freeze_documents=lambda documents: capture_library(documents, context.workspace).freeze())
-    captured = capture_library(entries, context.workspace)
-    return (state.with_component(TEXT_TARGET_PREFIX + 'skill-library', target)
-        .with_component('skill-library-resources', captured)
-        .with_component(STATE_SNAPSHOTS_COMPONENT, (*state.components.get(STATE_SNAPSHOTS_COMPONENT, ()), target)))
-
-
-def prepare_standalone(state, context):
-    if 'skill-library-preparation' in state.components and TEXT_TARGET_PREFIX + 'skill-library' not in state.components:
-        return prepare_library(state, context, state.components['skill-library-preparation'], context.workspace / '.skills')
-    return state

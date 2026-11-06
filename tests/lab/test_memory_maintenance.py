@@ -2,8 +2,8 @@
 from dataclasses import replace
 import json
 import unittest
-from fruitfly_agent.lab.context_manager.augmentation.information.file_memory.methods.threshold_maintenance.algorithm import ThresholdMaintenance
-from fruitfly_agent.lab.context_manager.augmentation.information.file_memory.methods.threshold_maintenance.config import MaintenanceConfig
+from fruitfly_agent.lab.context_manager.augmentation.memory.methods.file_memory.maintenance import ThresholdMaintenance
+from fruitfly_agent.lab.context_manager.augmentation.memory.methods.file_memory.config import MaintenanceConfig
 from fruitfly_agent.lab.catalog import ProviderBinding
 from tests.support.faux_provider import FauxProvider
 from tests.support.retained import memory
@@ -40,6 +40,25 @@ class MemoryMaintenanceTests(unittest.IsolatedAsyncioTestCase):
         state = checkpoint()
         text, processed, turns = await worker.generate(worker.request(state, '[]'), state, lambda row: 'text')
         self.assertIsNone(text); self.assertEqual(1, turns); self.assertEqual([], provider.calls)
+
+    async def test_unchanged_completed_consolidation_advances_turns_without_another_model_call(self):
+        provider = FauxProvider(); provider.respond_text('[]')
+        worker = self.worker(provider, consolidate_after_user_turns=1)
+        state = checkpoint()
+        documents = json.dumps([memory()])
+        first = worker.request(state, documents)
+        await worker.generate(first, state, lambda row: 'source')
+        state['consolidated_turns'] = 1
+        state['operations'] = {'done': {'status': 'completed', 'operation': 'consolidate',
+                                       'request_id': first['request_id']}}
+        state['evidence'].append({**state['evidence'][0], 'identity': 'second', 'message_id': 'second'})
+        request = worker.request(state, documents)
+        text, _, turns = await worker.generate(request, state, lambda row: 'source')
+        self.assertIsNone(text)
+        self.assertEqual(2, turns)
+        self.assertEqual(1, len(provider.calls))
+        changed = json.dumps([{**memory(), 'body': 'A changed retained fact.'}])
+        self.assertFalse(worker.request(state, changed)['unchanged'])
 
     async def test_invalid_nonempty_output_cannot_replace_library(self):
         provider = FauxProvider(); provider.respond_text('[{}]')

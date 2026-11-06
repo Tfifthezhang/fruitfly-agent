@@ -11,7 +11,7 @@ from fruitfly_agent.interactive.contracts.commands import InteractiveCommand
 from fruitfly_agent.interactive.interaction.commands import CommandRouter
 from fruitfly_agent.interactive.terminal.rendering.welcome import render_welcome
 from fruitfly_agent.lab.catalog import builtin_catalog, MechanismSelection
-from fruitfly_agent.lab.environment.ssh import SshEnv
+from fruitfly_agent.lab.environment.methods.remote import SshEnv
 from fruitfly_agent.run import build_runtime
 from fruitfly_agent.run.adapters.runtime import describe_runtime
 from fruitfly_agent.run.application import RunApplicationFactory, record_session_manifest
@@ -34,10 +34,10 @@ class SshRunTests(unittest.IsolatedAsyncioTestCase):
     def factory(self):
         factory = RunApplicationFactory(cwd=self.root, environment=self.secrets, provider_registry=self.registry)
         factory.configuration.set_mechanism('working-memory-reduction', enabled=False)
-        factory.configuration.set_mechanism('ssh-env', enabled=True)
-        factory.configuration.set_parameter('ssh-env', 'host', 'server.example')
-        factory.configuration.set_parameter('ssh-env', 'port', '2222')
-        factory.configuration.set_parameter('ssh-env', 'cwd', '/srv/project')
+        factory.configuration.set_mechanism('remote-env', enabled=True)
+        factory.configuration.set_parameter('remote-env', 'host', 'server.example')
+        factory.configuration.set_parameter('remote-env', 'port', '2222')
+        factory.configuration.set_parameter('remote-env', 'cwd', '/srv/project')
         factory.configuration.save()
         factory.reload_configuration()
         return factory
@@ -48,11 +48,11 @@ class SshRunTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(snapshot.ready, snapshot.warnings)
         views = {item.mechanism_id: item for item in snapshot.mechanisms}
         self.assertEqual('Local environment', views['local-env'].label)
-        self.assertEqual('Remote environment', views['ssh-env'].label)
-        self.assertIn('SSH', views['ssh-env'].description)
+        self.assertEqual('Remote environment', views['remote-env'].label)
+        self.assertIn('SSH', views['remote-env'].description)
         profile = factory.configuration.profile()
         enabled = {m.mechanism_id for m in profile.mechanisms if m.enabled}
-        self.assertIn('ssh-env', enabled)
+        self.assertIn('remote-env', enabled)
         self.assertTrue({'read-tool', 'write-tool', 'edit-tool', 'bash-tool'} <= enabled)
         self.assertFalse({'local-env', 'ipython-tool'} & enabled)
         factory.configuration.save()
@@ -62,13 +62,13 @@ class SshRunTests(unittest.IsolatedAsyncioTestCase):
         for name in ('FRUITFLY_SSH_USERNAME', 'FRUITFLY_SSH_PASSWORD'):
             self.assertIn(name, text)
         saved = load_harness_config(self.root / '.fruitfly/config.yaml').select()
-        remote = next(m for m in saved.mechanisms if m.mechanism_id == 'ssh-env')
+        remote = next(m for m in saved.mechanisms if m.mechanism_id == 'remote-env')
         self.assertEqual(2222, remote.parameters['port'])
         self.assertEqual('/srv/project', remote.parameters['cwd'])
         factory.configuration.set_mechanism('local-env', enabled=True)
         enabled = {m.mechanism_id for m in factory.configuration.profile().mechanisms if m.enabled}
         self.assertIn('local-env', enabled)
-        self.assertNotIn('ssh-env', enabled)
+        self.assertNotIn('remote-env', enabled)
 
     async def test_environment_display_tracks_activation_and_retains_previous_target_on_failure(self):
         factory = self.factory()
@@ -97,7 +97,7 @@ class SshRunTests(unittest.IsolatedAsyncioTestCase):
             for secret in self.secrets.values():
                 self.assertNotIn(secret, display())
             self.assertEqual(1, connection.call_count, 'inspection must not reconnect')
-            factory.configuration.set_parameter('ssh-env', 'host', 'unavailable.example')
+            factory.configuration.set_parameter('remote-env', 'host', 'unavailable.example')
             self.assertEqual(initial, app.status.execution_environment, 'a draft is not active')
             factory.configuration.save()
             self.assertEqual(initial, app.status.execution_environment, 'saving alone does not activate')
@@ -105,7 +105,7 @@ class SshRunTests(unittest.IsolatedAsyncioTestCase):
                 await app.apply_configuration()
             self.assertEqual(initial, app.status.execution_environment)
             self.assertNotIn('unavailable.example', display())
-            factory.configuration.set_parameter('ssh-env', 'host', 'replacement.example')
+            factory.configuration.set_parameter('remote-env', 'host', 'replacement.example')
             factory.configuration.save()
             await app.apply_configuration()
             self.assertEqual('replacement.example:2222', app.status.execution_environment.server)
@@ -122,7 +122,7 @@ class SshRunTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_assembly_is_offline_and_secret_rotation_does_not_serialize_credentials(self):
         profile = HarnessProfile('remote', str(self.root / '.fruitfly/models.yaml'), 'offline', (
-            MechanismSelection('ssh-env', parameters={'host': 'server.example', 'port': 2222}),
+            MechanismSelection('remote-env', parameters={'host': 'server.example', 'port': 2222}),
             MechanismSelection('read-tool'), MechanismSelection('bash-tool')))
         digests = []
         with patch.object(SshEnv, '_connect', side_effect=AssertionError('construction made SSH request')):
@@ -135,7 +135,7 @@ class SshRunTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(2222, runtime.manifest.permissions['port'])
                     self.assertEqual('/srv/workspace', runtime.config.env.cwd)
                     _, details, _ = describe_runtime(runtime, builtin_catalog())
-                    remote = next(item for item in details if item.mechanism_id == 'ssh-env')
+                    remote = next(item for item in details if item.mechanism_id == 'remote-env')
                     self.assertEqual('Remote environment', remote.label)
                     self.assertEqual('environment', remote.category)
                     record_session_manifest(session, runtime)
@@ -146,7 +146,7 @@ class SshRunTests(unittest.IsolatedAsyncioTestCase):
                     self.assertIn('FRUITFLY_SSH_USERNAME', text)
                     self.assertIn('FRUITFLY_SSH_PASSWORD', text)
                     digests.append(runtime.manifest.digest)
-                    await runtime.components['ssh-environment'].close()
+                    await runtime.components['remote-environment'].close()
         self.assertEqual(digests[0], digests[1])
 
     async def test_missing_secret_and_disabled_backend_make_no_connections(self):
@@ -158,7 +158,7 @@ class SshRunTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(ValueError, 'secret environment'):
                 await app.start()
             connect.assert_not_called()
-        factory.configuration.set_mechanism('ssh-env', enabled=False)
+        factory.configuration.set_mechanism('remote-env', enabled=False)
         factory.configuration.set_mechanism('local-env', enabled=True)
         factory.configuration.save()
         factory.reload_configuration()
@@ -199,9 +199,9 @@ class SshRunTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual('remote world', (server / 'srv/project/hello.txt').read_text())
             self.assertFalse((self.root / 'hello.txt').exists())
             await app.close()
-            factory.configuration.set_parameter('ssh-env', 'host', 'resumed.example')
-            factory.configuration.set_parameter('ssh-env', 'port', '2223')
-            factory.configuration.set_parameter('ssh-env', 'cwd', '/srv/resumed')
+            factory.configuration.set_parameter('remote-env', 'host', 'resumed.example')
+            factory.configuration.set_parameter('remote-env', 'port', '2223')
+            factory.configuration.set_parameter('remote-env', 'cwd', '/srv/resumed')
             (server / 'srv/resumed').mkdir()
             factory.configuration.save()
             factory.reload_configuration()
@@ -230,7 +230,7 @@ class SshRunTests(unittest.IsolatedAsyncioTestCase):
                 self.addAsyncCleanup(app.close)
                 with patch.object(SshEnv, '__init__', capture), patch.object(SshEnv, '_connect', side_effect=OSError('fixture-private-password')) as connect:
                     if failure == 'assembly':
-                        with patch('fruitfly_agent.lab.catalog.builtins.create_read_tool', side_effect=ValueError('fixture assembly failure')):
+                        with patch('fruitfly_agent.lab.tools.registration.create_read_tool', side_effect=ValueError('fixture assembly failure')):
                             with self.assertRaisesRegex(ValueError, 'assembly failure'):
                                 await app.start()
                         connect.assert_not_called()
@@ -245,7 +245,7 @@ class SshRunTests(unittest.IsolatedAsyncioTestCase):
         template = Path(__file__).resolve().parents[2] / 'examples/configuration/ssh.example.yaml'
         profile = load_harness_config(template).select()
         resolved = builtin_catalog().resolve(profile.mechanisms)
-        self.assertEqual({'ssh-env', 'read-tool', 'write-tool', 'edit-tool', 'bash-tool'},
+        self.assertEqual({'remote-env', 'read-tool', 'write-tool', 'edit-tool', 'bash-tool'},
                          {item.definition.descriptor.mechanism_id for item in resolved})
         ignore = (template.parents[2] / '.gitignore').read_text().splitlines()
         self.assertTrue({'.fruitfly/', '.env', '.env.*', 'secrets.env'} <= set(ignore))

@@ -25,6 +25,7 @@ from fruitfly_agent.core.mechanisms import (
 )
 
 from .model_roles import ModelRoleRequirement, required_profiles
+from .classification import FeatureNode, OptimizationCoverage
 
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 
@@ -67,7 +68,8 @@ class MechanismDefinition:
     selection_group: str | None = None
     selection_group_label: str | None = None
     selection_group_allow_disabled: bool = True
-    configuration_category: str | None = None
+    feature_path: tuple[FeatureNode, ...] = ()
+    configurable: bool = True
     implementation_path: str = ''
     documentation_path: str = ''
     input_parameters: tuple[str, ...] = ()
@@ -83,7 +85,7 @@ class MechanismDefinition:
     model_role_parameters: Mapping[str, ModelRoleRequirement] = field(default_factory=dict)
     configuration_edit: Callable | None = None
     configuration_snapshot: Callable | None = None
-    optimization_exemption: str = ''
+    optimization_coverage: OptimizationCoverage | None = None
     parameter_paths: Mapping[str, str] = field(default_factory=dict)
     execution_description: Callable[[Mapping[str, Any], Path], ExecutionEnvironmentDescription] | None = None
     default_resource: tuple[str, str] | None = None
@@ -96,8 +98,10 @@ class MechanismDefinition:
             names={p.name for p in self.descriptor.parameters}
             if set(self.parameter_paths)!=names or len(set(self.parameter_paths.values()))!=len(names) or any(not v.startswith(('instructions.','settings.','content.')) for v in self.parameter_paths.values()):
                 raise ValueError('owner must declare distinct categorized paths for every parameter')
-        if not isinstance(self.optimization_exemption, str):
-            raise TypeError('optimization exemption must explain an infrastructure invariant')
+        if self.optimization_coverage is not None and not isinstance(self.optimization_coverage, OptimizationCoverage):
+            raise TypeError('optimization coverage must be an explicit declaration')
+        if type(self.configurable) is not bool:
+            raise TypeError('configurable must be boolean')
         if self.execution_description is not None and not callable(self.execution_description):
             raise TypeError('execution_description must be callable')
         if self.configuration_role not in {'H', 'S', 'I'}:
@@ -123,8 +127,6 @@ class MechanismDefinition:
         object.__setattr__(self, 'execution_fields', frozenset(self.execution_fields))
         if self.prepare_targets is not None and not callable(self.prepare_targets):
             raise TypeError('object target preparation must be callable')
-        if self.configuration_category is not None and not _ID.fullmatch(self.configuration_category):
-            raise ValueError('configuration category must be a stable identifier')
         if self.implementation_id is not None and (
             not isinstance(self.implementation_id, str) or not _ID.fullmatch(self.implementation_id)
         ):
@@ -239,3 +241,76 @@ __all__ = [
     "MechanismInstaller", "MechanismDefinition", "ResolvedMechanism",
     "MechanismSetup", "SetupCredential",
 ]
+
+
+def define_mechanism(
+    mechanism_id: str,
+    *,
+    layer: str,
+    family: str,
+    label: str,
+    description: str,
+    install,
+    implementation_path: str,
+    documentation_path: str,
+    input_parameters: tuple[str, ...] = (),
+    context_phase: str | None = None,
+    parameters: tuple[ParameterDescriptor, ...] = (),
+    default: bool = False,
+    order: int,
+    exclusive_group: str | None = None,
+    requires: frozenset[str] = frozenset(),
+    conflicts: frozenset[str] = frozenset(),
+    activation: str = "new_session",
+    effects: MechanismEffects | None = None,
+    additional_contributions: tuple[MechanismContribution, ...] = (),
+    implementation_id: str | None = None,
+    visible: bool = True,
+    optimization_coverage=None,
+    artifact_slots: frozenset[str] = frozenset(),
+    provides: frozenset[str] = frozenset(),
+    requires_capabilities: frozenset[str] = frozenset(),
+    selection_group: str | None = None,
+    selection_group_label: str | None = None,
+    selection_group_allow_disabled: bool = True,
+    validate_parameters=None,
+    component_specs=None,
+    configuration_snapshot=None,
+    execution_description=None,
+    model_role_parameters=None,
+    default_resource=None,
+    parameter_paths=None,
+    feature_path=(),
+) -> MechanismDefinition:
+    return MechanismDefinition(
+        MechanismDescriptor(
+            mechanism_id=mechanism_id,
+            label=label,
+            description=description,
+            contributions=(
+                MechanismContribution(layer, family, context_phase),
+                *additional_contributions,
+            ),
+            parameters=parameters,
+            requires=requires,
+            conflicts=conflicts,
+            exclusive_group=exclusive_group,
+            default_enabled=default,
+            install_order=order,
+            activation=activation,
+            effects=effects or MechanismEffects(),
+        ),
+        install, feature_path=feature_path,
+        implementation_id=implementation_id, visible=visible, optimization_coverage=optimization_coverage,
+        artifact_slots=artifact_slots, provides=provides,
+        requires_capabilities=requires_capabilities, validate_parameters=validate_parameters,
+        component_specs=component_specs,
+        configuration_snapshot=configuration_snapshot,
+        execution_description=execution_description,
+        selection_group=selection_group, selection_group_label=selection_group_label,
+        selection_group_allow_disabled=selection_group_allow_disabled,
+        implementation_path=implementation_path, documentation_path=documentation_path,
+        input_parameters=input_parameters,
+        model_role_parameters=model_role_parameters or {}, default_resource=default_resource,
+        parameter_paths=parameter_paths or {},
+    )

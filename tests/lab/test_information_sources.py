@@ -15,7 +15,6 @@ from fruitfly_agent.lab.context_manager.augmentation.information import (
     InformationRef,
     create_local_knowledge_space,
     create_live_http_space,
-    create_file_memory_space,
     create_static_lexical_space,
 )
 from fruitfly_agent.lab.catalog import (
@@ -27,20 +26,26 @@ from tests.support.faux_provider import FauxProvider
 
 class InformationSourcesTest(unittest.IsolatedAsyncioTestCase):
     async def test_file_memory_directory_is_frozen_and_body_is_read_on_demand(self) -> None:
+        import json
         from tests.support.retained import memory
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp) / 'memory'
+            root = Path(tmp).resolve()
             note = memory()
-            space = create_file_memory_space(root, entries=[note])
-            hub = InformationHub(); hub.register(space)
-            effect = await hub.pipeline.recall(InformationQuery('editor'))
-            self.assertIn(note['description'], effect.content)
-            self.assertNotIn(note['body'], effect.content)
-            from fruitfly_agent.lab.context_manager.augmentation.information import InformationRef
-            self.assertIn(note['body'], space.reader.get(InformationRef('workspace-memory', note['id'])).text)
+            runtime = assemble_lab(AgentLoopConfig(FauxProvider()), catalog=builtin_catalog(),
+                selections=tuple(MechanismSelection(name) for name in ('local-env', 'read-tool', 'file-memory')),
+                context=AssemblyContext(root, None, 'fake', lambda *_: self.fail('auxiliary request'),
+                    component_settings={'memory-library': {'content': {'documents': json.dumps([note])}}}))
+            resources = runtime.config.readable_resources
+            self.addCleanup(resources.close)
+            stage = next(stage for stage in runtime.context_pipeline.stages if stage.stage_id == 'file-memory')
+            effect = stage.mechanism.transform(ContextFrame('base', (), (), 'fake', 32)).frame.system_prompt
+            self.assertIn(note['description'], effect)
+            self.assertNotIn(note['body'], effect)
+            uri = f'resource://{resources.scope}/retained-memory/{note["id"]}.md'
+            self.assertIn(note['body'], resources.read(uri).decode())
             note['body'] = 'New source content'
-            self.assertNotIn('New source content', space.reader.get(InformationRef('workspace-memory', note['id'])).text)
-            self.assertFalse(root.exists())
+            self.assertNotIn('New source content', resources.read(uri).decode())
+            self.assertFalse((root / '.fruitfly/memory').exists())
 
     async def test_knowledge_reindexes_current_files_and_cites_lines(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -131,33 +136,21 @@ class InformationSourcesTest(unittest.IsolatedAsyncioTestCase):
     async def test_catalog_assembly_combines_sources_without_extra_tools(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            memory = root / ".fruitfly" / "memory"
-            knowledge = root / ".fruitfly" / "knowledge"
-            memory.mkdir(parents=True)
+            knowledge = root / '.fruitfly/knowledge'
             knowledge.mkdir(parents=True)
-            (memory / "MEMORY.md").write_text("Prefer concise reports.", encoding="utf-8")
-            (knowledge / "guide.md").write_text("Reports use Python unittest.", encoding="utf-8")
-            result = assemble_lab(
-                AgentLoopConfig(provider=FauxProvider()),
-                catalog=builtin_catalog(),
-                selections=(
-                    MechanismSelection("information-context"),
-                    MechanismSelection("memory-files"),
-                    MechanismSelection("memory-library"),
-                    MechanismSelection("knowledge-files"),
-                ),
-                context=AssemblyContext(
-                    root, object(), "test-model",
-                    lambda *_: (_ for _ in ()).throw(AssertionError("unexpected provider")),
-                ),
-            )
-            stage = next(
-                item for item in result.context_pipeline.stages
-                if item.stage_id == "information-context"
-            )
-            frame = ContextFrame("base", (UserMessage(content="Python reports"),), (), "test", 128)
-            transformed = (await stage.mechanism.transform(frame)).frame
-            self.assertIn("available_memories", transformed.system_prompt)
-            self.assertIn("Reports use Python unittest.", transformed.system_prompt)
-            self.assertIn("Read a relevant memory resource", transformed.system_prompt)
-            self.assertEqual((), result.config.tools)
+            (knowledge / 'guide.md').write_text('Reports use Python unittest.', encoding='utf-8')
+            result = assemble_lab(AgentLoopConfig(provider=FauxProvider()), catalog=builtin_catalog(),
+                selections=tuple(MechanismSelection(name) for name in
+                    ('local-env', 'read-tool', 'information-context', 'file-memory', 'knowledge-files')),
+                context=AssemblyContext(root, None, 'test-model', lambda *_: self.fail('unexpected provider')))
+            self.addCleanup(result.config.readable_resources.close)
+            frame = ContextFrame('base', (UserMessage('Python reports'),), (), 'test', 128)
+            information = next(item for item in result.context_pipeline.stages if item.stage_id == 'information-context')
+            projected = (await information.mechanism.transform(frame)).frame
+            self.assertIn('Reports use Python unittest.', projected.system_prompt)
+            self.assertNotIn('available_memories', projected.system_prompt)
+            memory = next(item for item in result.context_pipeline.stages if item.stage_id == 'file-memory')
+            combined = memory.mechanism.transform(projected).frame
+            self.assertIn('available_memories', combined.system_prompt)
+            self.assertIn('Read a relevant memory resource', combined.system_prompt)
+            self.assertEqual(('read',), tuple(tool.name for tool in result.config.tools))

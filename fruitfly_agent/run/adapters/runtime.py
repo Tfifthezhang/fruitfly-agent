@@ -31,12 +31,12 @@ def describe_runtime(
     details = tuple(
         InteractiveMechanism(
             mechanism_id,
-            catalog.get(mechanism_id).configuration_category or display_group(catalog.get(mechanism_id).descriptor),
+            display_group(catalog.get(mechanism_id)),
             catalog.get(mechanism_id).descriptor.label,
             catalog.get(mechanism_id).descriptor.primary.layer,
             catalog.get(mechanism_id).descriptor.primary.family,
             catalog.get(mechanism_id).descriptor.primary.context_phase,
-            display_section(catalog.get(mechanism_id).descriptor),
+            display_section(catalog.get(mechanism_id)),
             (*catalog.get(mechanism_id).descriptor.effects.tools,
              *(tool.name for tool in runtime.tool_providers[mechanism_id].tools))
                 if mechanism_id in runtime.tool_providers else tuple(catalog.get(mechanism_id).descriptor.effects.tools),

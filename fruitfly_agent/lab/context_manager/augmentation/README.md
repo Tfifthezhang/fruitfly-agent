@@ -2,29 +2,33 @@
 
 [Up: Context Manager](../README.md)
 
-Add bounded instructions or information to each model request without changing the canonical conversation.
+Add bounded instructions or information to model requests without rewriting
+canonical conversation facts.
 
-| Module | Adds |
+| Peer capability | Implementation and state |
 |---|---|
-| [Skills](skills/README.md) | Packaged/workspace Skill directories, editable S libraries and an independent single-body mechanism |
-| [Information spaces](information/README.md) | A cross-session memory directory, retrieved local documents, or live HTTP results |
+| [Memory](memory/README.md) | File memory: H reading/maintenance and S retained notes |
+| [Skills](skills/README.md) | H progressive loader and S installed procedures |
+| [Local knowledge](information/methods/local_knowledge/README.md) | Read-only documents through shared information selection |
+| [Live HTTP](information/methods/live_http/README.md) | External information through the same selection policy |
 
-Skill documents and learned environment memory remain Context augmentation capabilities. Their S libraries use shared Improvement targets. Augmentation itself starts no search. Separately selected threshold maintenance prepares attributed memory updates at idle boundaries.
+[Information spaces](information/README.md) own query, retrieval and rendering
+contracts for the last two sources. Their hidden H policy is independently
+editable; connectors and read-only knowledge are fixed input conditions. Memory
+and Skills generate metadata directories directly and load bodies through `read`.
+They do not need an information-ranking dependency or a separate catalog switch.
 
 ## Implement a transformer
 
-| Concern | Contract |
-|---|---|
-| Method | `transform(frame)`, synchronous or asynchronous |
-| Result | New `ContextFrame`, `ContextTransform(frame, metadata)`, or `None` |
-| Input | Read-only, including nested messages; use `dataclasses.replace`. |
-| Output | Relevant, bounded, and stable across repeated requests |
-| I/O | Inject dependencies; keep synchronous transformations quick. |
-| Errors | Core isolates ordinary failures; cancellation propagates. |
-| Retrieved text | Treat it as untrusted data. |
+Return a new `ContextFrame`, `ContextTransform(frame, metadata)` or `None` from
+`transform(frame)`. Sync and async implementations are supported. Treat input and
+nested messages as read-only. Bound projection size, define repeated-request
+behavior, inject I/O and preserve cancellation. Core isolates ordinary stage
+failures. Retrieved text remains untrusted data.
 
-See the [offline example](../../../../examples/extensions/README.md) and [Information protocols](information/README.md#extend-a-source). Verify output, unchanged input, empty results, repeated requests, and applicable failure/budget/cancellation paths.
+Declare the same owner feature path for the mechanism, configuration menu and
+optimization surfaces through [Catalog](../../catalog/README.md). See the
+[offline extension](../../../../examples/extensions/README.md).
 
-```bash
-.venv/bin/python -m unittest tests.lab.test_skill_catalog tests.lab.test_information_pipeline -v
-```
+Offline checks: `tests.lab.test_skill_catalog`, `tests.lab.test_information_pipeline`
+and `tests.workflows.test_memory_skills`.

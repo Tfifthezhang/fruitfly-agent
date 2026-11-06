@@ -11,6 +11,7 @@ from typing import Callable
 from fruitfly_agent.runtime_spec import HarnessConfig, MechanismSelection
 from fruitfly_agent.runtime_spec.components import ComponentConfiguration
 from .parameters import encode_parameters, decode_parameters
+from fruitfly_agent.improvement.contracts.optimization import OptimizationSpec
 from fruitfly_agent.runtime_spec.model_roles import ModelRoleBinding
 from fruitfly_agent.runtime_spec.profiles import load_harness_config, DEFAULT_PROMPT_ID
 
@@ -31,6 +32,11 @@ class ConfigurationSurface:
     reference: Callable | None = None
     standalone: bool = False
     default_resource: tuple[str, str] | None = None
+    optimization: OptimizationSpec | None = None
+    target_factory: Callable | None = None
+    kind: str = 'instructions'
+    schema: str = 'text-v1'
+    artifact_slot: str | None = None
 
     def __post_init__(self):
         if self.default_resource is not None:
@@ -52,6 +58,12 @@ class ConfigurationSurface:
             raise TypeError('configuration reference must be callable')
         if type(self.standalone) is not bool:
             raise TypeError('standalone must be boolean')
+        if (self.optimization is None) != (self.target_factory is None):
+            raise ValueError('editable surface must declare both optimization and target factory')
+        if self.optimization is not None and self.optimization.role != self.role:
+            raise ValueError('surface optimization role must match its owner')
+        if self.artifact_slot is not None and self.artifact_slot != self.id:
+            raise ValueError('surface artifact slot must match its registered identity')
 
 
 def configuration_surfaces(catalog):
@@ -70,8 +82,10 @@ def configure_profile(profile, catalog):
     if missing_extensions:
         raise ValueError('configuration requires loaded extensions: ' + ', '.join(sorted(missing_extensions)))
     """Validate and project documents without constructing clients or writing files."""
-    if not profile.component_documents or profile.configured:
+    if profile.configured:
         return profile
+    if not profile.component_documents:
+        return _surface_defaults(profile, catalog)
     profile = resolve_defaults(profile, catalog)
     surfaces = configuration_surfaces(catalog)
     selections, deferred = [], []
@@ -82,6 +96,8 @@ def configure_profile(profile, catalog):
             deferred.append(document)
             continue
         definition = catalog.get(document.implementation)
+        if not definition.configurable:
+            raise ValueError('internal owner is not a selectable mechanism: ' + document.implementation)
         if document.id != document.implementation or document.role != definition.configuration_role:
             raise ValueError('component does not match its registered ID/role: ' + document.id)
         if set(document.parameters) & {r.parameter for r in definition.model_role_parameters.values()}:
@@ -121,13 +137,15 @@ def configure_profile(profile, catalog):
             result = replace(result, mechanisms=(*result.mechanisms, MechanismSelection(owner, False)))
             continue
         if document.artifacts:
-            if surface.binding != 'artifact' or set(document.artifacts) != {surface.key}:
+            slot = surface.artifact_slot or (surface.key if surface.binding == 'artifact' else None)
+            if slot is None or set(document.artifacts) != {slot}:
                 raise ValueError('surface artifact slots differ from the registered binding: ' + document.id)
-            raw = document.artifacts[surface.key]
-            if surface.normalize(surface.decode(raw)) != parameters:
+            raw = document.artifacts[slot]
+            restored = surface.restore(parameters, raw) if surface.binding == 'settings' else surface.decode(raw)
+            if surface.normalize(restored) != parameters:
                 raise ValueError('component artifact differs from its configured value: ' + document.id)
             reference = 'sha256:' + hashlib.sha256(raw.encode()).hexdigest()
-            result = replace(result, artifact_bindings={**result.artifact_bindings, surface.key: reference},
+            result = replace(result, artifact_bindings={**result.artifact_bindings, slot: reference},
                              artifact_contents={**result.artifact_contents, reference: raw})
         if surface.binding == 'settings' and document.id in result.artifact_bindings:
             parameters = surface.normalize(surface.restore(parameters,
@@ -159,10 +177,21 @@ def configure_profile(profile, catalog):
                 raise ValueError('unsupported registered configuration binding')
         # A virtual surface may require a real owner; explicit documents never
         # silently enable missing environment/tool dependencies.
-        if not surface.standalone and surface.binding in {'artifact', 'settings'} and not any(s.mechanism_id == owner for s in result.mechanisms):
-            result = replace(result, mechanisms=(*result.mechanisms, MechanismSelection(owner, surface.binding != 'settings')))
+        if not surface.standalone and not any(s.mechanism_id == owner for s in result.mechanisms):
+            raise ValueError('configuration surface requires its explicit owner: ' + document.id + ' → ' + owner)
     catalog.resolve(result.mechanisms)
-    return replace(result, configured=True)
+    return _surface_defaults(replace(result, configured=True), catalog)
+
+
+def _surface_defaults(profile, catalog):
+    from .defaults import read_default
+    active = {selection.mechanism_id for selection in profile.mechanisms if selection.enabled}
+    settings = dict(profile.component_settings)
+    for name, (owner, surface) in configuration_surfaces(catalog).items():
+        if surface.binding == 'settings' and surface.key not in settings and (owner in active or surface.standalone):
+            document, _ = read_default(catalog, name)
+            settings[surface.key] = surface.normalize(dict(document.parameters))
+    return replace(profile, component_settings=settings)
 
 
 def load_system_config(path, *, catalog=None):
@@ -237,6 +266,8 @@ def configuration_inventory(profile, catalog, *, artifact_reader=None):
                        'implementation_id': definition.implementation_id,
                        'resource_capture': 'registered' if definition.configuration_snapshot else 'no local resource capture declared',
                        'field_editing_declared': editable, 'authorized': False,
+                       'feature_path': [node.id for node in definition.feature_path],
+                       'feature_labels': [node.label for node in definition.feature_path],
                        'artifacts': {key: 'sha256:' + hashlib.sha256(text.encode()).hexdigest()
                                      for key, text in document.artifacts.items()}})
     return result
@@ -286,8 +317,9 @@ def component_profile(profile, catalog, *, artifact_reader=None, freeze=False):
         documents[selection.mechanism_id] = fresh
     active = {item.mechanism_id for item in profile.mechanisms if item.enabled}
     for name, (owner, surface) in surfaces.items():
-        if surface.binding == 'artifact' and owner not in active and not surface.standalone:
-            documents.pop(name, None)
+        if owner not in active and not surface.standalone:
+            if name not in documents:
+                documents.pop(name, None)
             continue
         parameters = None
         if surface.binding == 'configuration':
@@ -298,7 +330,7 @@ def component_profile(profile, catalog, *, artifact_reader=None, freeze=False):
             parameters = surface.decode(json.dumps(value))
         elif surface.binding == 'settings':
             parameters = profile.component_settings.get(surface.key)
-            if parameters is not None and name in profile.artifact_bindings:
+            if name in profile.artifact_bindings:
                 parameters = surface.restore(parameters or {}, read(profile.artifact_bindings[name]))
             elif freeze and parameters is None and surface.default_resource is not None:
                 from .defaults import read_default
@@ -315,12 +347,14 @@ def component_profile(profile, catalog, *, artifact_reader=None, freeze=False):
                 parameters = surface.default()
         if parameters is not None:
             old = documents.get(name)
-            fresh = ComponentConfiguration(name, surface.role, name, parameters,
-                artifacts=({surface.key: read(profile.artifact_bindings[surface.key])}
-                    if surface.binding == 'artifact' and surface.key in profile.artifact_bindings
-                    else old.artifacts if old and surface.binding == 'artifact' else {}))
+            slot = surface.artifact_slot or (surface.key if surface.binding == 'artifact' else None)
+            artifacts = ({slot: read(profile.artifact_bindings[slot])}
+                if slot is not None and slot in profile.artifact_bindings
+                else old.artifacts if old and slot else {})
+            fresh = ComponentConfiguration(name, surface.role, name, parameters, artifacts=artifacts)
             # Keep authored references only when the values actually agree.
-            if old and surface.normalize(dict(old.parameters)) == surface.normalize(dict(parameters)):
+            if (old and surface.normalize(dict(old.parameters)) == surface.normalize(dict(parameters))
+                    and old.artifacts == fresh.artifacts):
                 fresh = old
             elif old is None and surface.default_resource is not None and not fresh.artifacts:
                 # Only an absent authored value may acquire default intent.
@@ -336,7 +370,7 @@ def component_profile(profile, catalog, *, artifact_reader=None, freeze=False):
     return replace(profile, component_documents=tuple(documents.values()), model_roles=roles)
 
 
-def bind_component_changes(profile, bindings):
+def bind_component_changes(profile, bindings, *, catalog=None):
     """Apply registered publication values to a new profile without writing sources."""
     from fruitfly_agent.runtime_spec import apply_profile_binding
     result = profile
@@ -344,6 +378,8 @@ def bind_component_changes(profile, bindings):
         reference = 'sha256:' + hashlib.sha256(binding.text.encode('utf-8')).hexdigest()
         contents = {**result.artifact_contents, reference: binding.text}
         if binding.kind == 'configuration':
+            if catalog is not None:
+                normalize_configuration_binding(binding.key, binding.text, catalog)
             result = apply_profile_binding(result, binding.kind, binding.key, binding.text)
         elif binding.kind == 'prompt':
             result = replace(result, prompt=reference)
@@ -362,6 +398,28 @@ def restore_component_settings(settings, artifact_key, text, catalog):
         if surface.binding == 'settings' and surface.id == artifact_key and surface.key in result:
             result[surface.key] = surface.normalize(surface.restore(result[surface.key], text))
     return result
+
+
+def reset_artifact_binding(profile, key, catalog):
+    """Restore one owner's defaults, removing its exact adopted text together."""
+    from .defaults import read_default
+    if key not in catalog.artifact_slots(profile.mechanisms):
+        raise ValueError('artifact binding has no active owner: ' + key)
+    settings = dict(profile.component_settings)
+    replacements = {}
+    for identity, (_, surface) in configuration_surfaces(catalog).items():
+        if (surface.artifact_slot or (surface.key if surface.binding == 'artifact' else None)) != key:
+            continue
+        document, _ = read_default(catalog, identity)
+        replacements[identity] = replace(document, reference={'default': True})
+        if surface.binding == 'settings':
+            settings[surface.key] = surface.normalize(dict(document.parameters))
+    return replace(profile,
+        artifact_bindings={name: value for name, value in profile.artifact_bindings.items() if name != key},
+        component_settings=settings,
+        component_documents=tuple(replacements.get(document.id, replace(document,
+            artifacts={name: value for name, value in document.artifacts.items() if name != key}))
+            for document in profile.component_documents))
 
 
 def configuration_resources(profile, catalog, workspace):
@@ -437,17 +495,42 @@ def materialize_system(profile, destination, *, catalog=None, artifact_reader=No
     return destination
 
 
-def normalize_configuration_binding(key, text, catalog):
+def normalize_configuration_binding(key, text, catalog, *, grouped=False):
     """Normalize a configuration binding for the exact assembled execution identity."""
     if key == 'execution':
         from fruitfly_agent.runtime_spec import parse_execution
         values = parse_execution(text)
     elif key.startswith('component.'):
         from .parameters import decode_parameters
-        definition = catalog.get(key.removeprefix('component.'))
-        values = definition.descriptor.normalize_parameters(decode_parameters(definition, json.loads(text)))
-        if definition.validate_parameters:
-            definition.validate_parameters(values)
+        name = key.removeprefix('component.')
+        surfaces = configuration_surfaces(catalog)
+        if name in surfaces:
+            values = surfaces[name][1].normalize(json.loads(text))
+        else:
+            definition = catalog.get(name)
+            # Publication bindings carry the owner's installer values. Component
+            # files use grouped paths and are decoded by configure_profile.
+            payload = json.loads(text)
+            values = definition.descriptor.normalize_parameters(
+                decode_parameters(definition, payload) if grouped else payload)
+            if definition.validate_parameters:
+                definition.validate_parameters(values)
     else:
         raise ValueError('unsupported configuration binding')
     return json.dumps(values, sort_keys=True, ensure_ascii=False, separators=(',', ':'), allow_nan=False)
+
+
+def validate_component_options(catalog, name, options, inventory):
+    surfaces = configuration_surfaces(catalog)
+    if name in surfaces:
+        surface = surfaces[name][1]
+        if surface.edit_options is None:
+            raise ValueError('component has no option validator: ' + name)
+        if set(options) - {'editable_fields', 'bounds'}:
+            raise ValueError('unsupported component options: ' + name)
+        surface.edit_options(options.get('editable_fields', []), options.get('bounds', {}))
+        return
+    owner = catalog.get(dict(inventory.owners)[name])
+    if owner.component_validator is None:
+        raise ValueError('component has no option validator: ' + name)
+    owner.component_validator(name, options, inventory)

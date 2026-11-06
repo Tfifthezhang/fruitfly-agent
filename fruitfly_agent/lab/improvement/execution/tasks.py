@@ -132,4 +132,4 @@ def definition():
         parameters=(ExecutionParameter('delivery_manifest', 'Delivery manifest input', 'string', '', description='Frozen JSON input declaring the output entrypoint, dependencies and permitted inputs; requires an injected backend.'),
             ExecutionParameter('assessment_interval', 'Online assessment interval', 'integer', 0, 0, 1000,
             'Events per assessment; 0 disables online process/resource assessment.')), accepts_runner_override=True,
-        component_scope=component_scope)
+        component_scope=component_scope, requires_runner_factory=True)

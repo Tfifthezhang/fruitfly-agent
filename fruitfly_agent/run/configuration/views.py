@@ -14,17 +14,10 @@ def mechanism_views(profile: HarnessProfile, catalog: LabCatalog, warnings: list
         item.mechanism_id: item for item in profile.mechanisms
     }
     mechanisms: list[ConfigurationMechanism] = []
-    for descriptor in sorted(
-        catalog.descriptors(),
-        key=lambda item: (
-            display_group(item),
-            _context_phase_order(item),
-            item.install_order,
-            item.mechanism_id,
-        ),
-    ):
-        definition = catalog.get(descriptor.mechanism_id)
-        category = definition.configuration_category or display_group(descriptor)
+    for definition in sorted(catalog.definitions(), key=lambda item:
+            (tuple(node.order for node in item.feature_path), item.descriptor.install_order, item.descriptor.mechanism_id)):
+        descriptor = definition.descriptor
+        category = definition.feature_path[0].id
         selection = selections.get(descriptor.mechanism_id)
         enabled = selection.enabled if selection is not None else False
         raw_parameters = selection.parameters if selection is not None else {}
@@ -62,8 +55,9 @@ def mechanism_views(profile: HarnessProfile, catalog: LabCatalog, warnings: list
                 layer=descriptor.primary.layer,
                 family=descriptor.primary.family,
                 context_phase=descriptor.primary.context_phase,
-                display_section=display_section(descriptor),
-                visible=definition.visible and category != 'improvement',
+                display_section=display_section(definition),
+                feature_path=tuple((node.id, node.label, node.order) for node in definition.feature_path),
+                visible=definition.visible and definition.configurable,
                 parameters=parameters,
                 effects=_effect_messages(descriptor.effects),
                 requires=tuple(sorted(descriptor.requires)),
@@ -124,33 +118,9 @@ def _effect_messages(effects) -> tuple[str, ...]:
     return tuple(rows)
 
 
-def display_section(descriptor) -> str | None:
-    contribution = descriptor.primary
-    if contribution.family != "context":
-        return None
-    if contribution.context_phase is not None:
-        return contribution.context_phase
-    if contribution.layer == "capability":
-        return "augmentation"
-    return None
+def display_section(definition) -> str | None:
+    return definition.feature_path[1].id if len(definition.feature_path) > 1 else None
 
 
-def _context_phase_order(descriptor) -> int:
-    phase = display_section(descriptor)
-    return {
-        "augmentation": 0,
-        "externalization": 1,
-        "reduction": 2,
-        None: 4,
-    }[phase]
-
-
-def display_group(descriptor) -> str:
-    """Project Core mechanism coordinates into the current application menu."""
-    contribution = descriptor.primary
-    if contribution.layer == "improvement":
-        return "improvement"
-    if contribution.family == "context":
-        return "context-manager"
-    return contribution.family
-
+def display_group(definition) -> str:
+    return definition.feature_path[0].id

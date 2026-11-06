@@ -11,10 +11,10 @@ component names or H/S/I roles.
 
 | File | Responsibility |
 |---|---|
-| [text.py](text.py) | Text validation, binding expansion and changed leaves |
+| [Text utilities](../../../improvement/contracts/text.py) | Text validation, binding expansion and changed leaves |
 | [bundle.py](bundle.py) | A flat text view over independently owned components |
 | [retained.py](retained.py) | Identical production and isolated-trial projections for retained documents |
-| [state.py](state.py) | Bounded snapshots of registered workspace text dependencies |
+| [Resource snapshots](../../catalog/adapters/resources.py) | Bounded snapshots of registered workspace text dependencies |
 
 `ComponentDocument` and `HarnessSnapshot` identify candidate content. Typed YAML snapshots
 and text bundles are projections; they cannot register a new owner or grant activation.
@@ -36,7 +36,7 @@ tool and catalog guidance use their object-owned adapters. I editor instructions
 require an explicit improver-comparison runner. Declared roles do not supply an
 execution capability automatically.
 
-[retained.py](retained.py) provides immutable `RetainedText` S adapters for Skill documents. `state_artifact_path(key)` in the public target contract identifies their virtual snapshot location. Sources expose `artifact_key`, `freeze()` and `freeze_text(text)` for exact prepared-runtime state verification. Overlapping source snapshots must agree on shared file contents. They do not write these virtual files in the production workspace.
+[retained.py](retained.py) provides immutable `RetainedText` S adapters for owner-declared retained text. `state_artifact_path(key)` in the public target contract identifies their virtual snapshot location. Sources expose `artifact_key`, `freeze()` and `freeze_text(text)` for exact prepared-runtime state verification. Overlapping source snapshots must agree on shared file contents. They do not write these virtual files in the production workspace.
 
 A compatible registered runner projects H/S adapters into fresh task execution.
 The backend owns models, Session, tools, permissions and isolation. [Retained target tests](../../../../tests/lab/test_retained_targets.py)
@@ -69,7 +69,7 @@ source replacement is not installed.
 
 [versions.py](../../../improvement/contracts/versions.py) defines immutable `SystemVersion(harness, improver, state)`, `SnapshotFile` and `StateSnapshot`. References use SHA-256 content identities; model, permission, verifier, phase-time and environment conditions remain outside the modifiable triple. [candidates.py](../../../improvement/contracts/candidates.py) binds a modification set to its exact parent. Declared H/I/S roles must match the axes that changed; `TargetRegistry` rejects unregistered role/target/schema adapters.
 
-[snapshots.py](state.py) freezes bounded registered workspace text dependencies. Catalog exposes snapshot sources through `persistent-state-snapshots`; dynamic dependencies can declare `experiment-blockers`. Snapshots record roots even when empty. They bind initial-state identity; a registered backend must explicitly restore the required frozen resources and reject unsupported state. Arbitrary plugin objects are not captured. The [component host](../README.md) supports registered executable H/S text components. I comparison uses the registered editor experiment; executable source changes require additional execution and verification adapters.
+[Resource snapshots](../../catalog/adapters/resources.py) freezes bounded registered workspace text dependencies. Catalog exposes snapshot sources through `persistent-state-snapshots`; dynamic dependencies can declare `experiment-blockers`. Snapshots record roots even when empty. They bind initial-state identity; a registered backend must explicitly restore the required frozen resources and reject unsupported state. Arbitrary plugin objects are not captured. The [component host](../README.md) supports registered executable H/S text components. I comparison uses the registered editor experiment; executable source changes require additional execution and verification adapters.
 
 ```bash
 .venv/bin/python -m unittest tests.lab.test_experiment_contracts -v
@@ -85,7 +85,7 @@ the validated YAML rather than maintaining another editable text copy.
 
 ## Retain a document collection
 
-[documents.py](documents.py) exposes owner-validated collections through typed
+[Collection adapter](../../catalog/adapters/collections.py) exposes owner-validated collections through typed
 parameter targets and ordinary configuration materialization. Descriptions and
 bodies change the actual directory and read resources. IDs and provenance remain
 protected from ordinary edits. Owner snapshots include generated text resources,

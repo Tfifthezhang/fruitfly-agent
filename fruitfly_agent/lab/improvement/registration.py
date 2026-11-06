@@ -1,8 +1,9 @@
 """One generic workflow configuration; stage implementations are injected ports."""
 from dataclasses import replace
+from fruitfly_agent.lab.catalog.classification import IMPROVEMENT
 
 from fruitfly_agent.core.mechanisms import MechanismDescriptor, MechanismContribution, MechanismEffects, ParameterDescriptor as P
-from fruitfly_agent.lab.improvement.targets.text import TEXT_TARGET_PREFIX
+from fruitfly_agent.improvement.contracts.text import TEXT_TARGET_PREFIX
 from .editor.instructions import EditorInstructions, EditorInstructionTarget
 from fruitfly_agent.lab.catalog.model_roles import ModelRoleRequirement, RoleProvider
 
@@ -21,21 +22,17 @@ def definition():
     return MechanismDefinition(MechanismDescriptor('component-improvement', 'Component improvement',
         'Configure editor and evaluator models without starting improvement.',
         contributions=(MechanismContribution('improvement', 'context'),),
-        default_enabled=True,
+        default_enabled=False,
         parameters=(P('editor_profile', 'string', 'Editor model', 'Model catalog profile; empty reuses the active model.', ''),
             P('assessor_profile', 'string', 'Assessment model', 'Model catalog profile; empty reuses the active model.', '')),
         install_order=76, effects=MechanismEffects(uses_provider=True, uses_network=True, writes_files=True,
             cost_notice="Explicit improvement runs call models and execute tasks; registration makes no requests.")),
-        _install, visible=False, default_resource=(__package__, 'defaults.yaml'), implementation_id='component-workflow-v1', configuration_role='I',
+        _install, visible=False, configurable=False, feature_path=(IMPROVEMENT,), implementation_id='component-workflow-v1', configuration_role='I',
         configuration_surfaces=configuration_surfaces(),
         model_role_parameters={'editor': ModelRoleRequirement('editor_profile', 'Generate candidates.', fallback_role='executor', lazy=True),
             'assessor': ModelRoleRequirement('assessor_profile', 'Assess candidate evidence.', fallback_role='executor', lazy=True)},
         component_validator=validate_component_options,
         artifact_slots=frozenset({'improvement-editor', 'improvement-evaluator'}), prepare_targets=_prepare_targets,
-        component_specs=lambda parameters, enabled: (ComponentSpec('improvement-editor', 'I', kind='improvement-instructions', schema='editor-instructions',
-            required_capabilities=frozenset({'improver-comparison'})),
-            ComponentSpec('improvement-evaluator', 'I', kind='evaluator-instructions', schema='evaluator-instructions-v1',
-                required_capabilities=frozenset({'improver-comparison'}))),
         implementation_path='fruitfly_agent/lab/improvement/registration.py',
         documentation_path='fruitfly_agent/lab/improvement/README.md')
 
@@ -48,39 +45,16 @@ def _install(state, context, parameters):
 
 def _prepare_targets(state, context):
     from dataclasses import asdict
-    from .assessment.instructions import EvaluatorInstructions, EvaluatorInstructionTarget
-    settings = dict(context.component_settings)
-    evaluator = EvaluatorInstructions(**settings.get('evaluator', {}).get('instructions', {}))
-    evaluator_text = None
-    reference = context.artifact_bindings.get('improvement-evaluator')
-    if reference is not None:
-        text = context.artifact_reader(reference)
-        evaluator = EvaluatorInstructionTarget.parse(text)
-        evaluator_text = text
-        state = state.with_data_artifact({'key': 'improvement-evaluator', 'id': reference, 'role': 'I',
-            'media_type': 'application/json', 'size_bytes': len(text.encode('utf-8'))})
-    settings['evaluator'] = {'instructions': asdict(evaluator)}
-    state = state.with_component(TEXT_TARGET_PREFIX + 'improvement-evaluator', EvaluatorInstructionTarget(evaluator, text=evaluator_text))
-    instructions = EditorInstructions(**context.component_settings.get('editor', {}).get('instructions', {}))
-    text = None
-    reference = context.artifact_bindings.get('improvement-editor')
-    if reference is not None:
-        if context.artifact_reader is None:
-            raise ValueError('editor instructions require an artifact reader')
-        text = context.artifact_reader(reference)
-        instructions = EditorInstructionTarget.parse_document(text)
-        if 'editor' in settings:
-            from dataclasses import asdict
-            settings['editor'] = {**settings['editor'], 'instructions': asdict(instructions)}
-        if not any(a['key'] == 'improvement-editor' for a in state.data_artifacts):
-            state = state.with_data_artifact({'key': 'improvement-editor', 'id': reference, 'role': 'I',
-                'media_type': 'application/json', 'size_bytes': len(text.encode('utf-8'))})
+    from .tasks import TaskPackCatalog, TASK_PACK_COMPONENT
+    state = state.with_component(TASK_PACK_COMPONENT, TaskPackCatalog(context.workspace, context.task_pack_sources))
+    editor = state.components[TEXT_TARGET_PREFIX + 'improvement-editor'].instructions
+    evaluator = state.components[TEXT_TARGET_PREFIX + 'improvement-evaluator'].instructions
+    settings = {'editor': {'model_role': 'editor', 'instructions': asdict(editor)},
+        'evaluator': {'instructions': asdict(evaluator)}}
     for role, key in (('editor', EDITOR_CONFIG), ('assessor', ASSESSOR_CONFIG)):
-        if key not in state.components:
-            state = state.with_component(key, _lazy_role_config(state.config, context, role))
+        state = state.with_component(key, _lazy_role_config(state.config, context, role))
     return (state.with_component(SYSTEM_SETTINGS, settings)
-        .with_component(EDITOR_INSTRUCTIONS, instructions)
-        .with_component(TEXT_TARGET_PREFIX + 'improvement-editor', EditorInstructionTarget(instructions, text=text)))
+        .with_component(EDITOR_INSTRUCTIONS, editor))
 
 
 def _lazy_role_config(config, context, role):

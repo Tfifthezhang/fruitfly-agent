@@ -29,12 +29,12 @@ class WebError(RuntimeError):
 
 @dataclass(frozen=True)
 class WebConfig:
-    timeout_seconds: float = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.tools.web', 'web-fetch-tool.yaml', 'settings.timeout_seconds'))
-    max_retries: int = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.tools.web', 'web-fetch-tool.yaml', 'settings.max_retries'))
-    max_response_bytes: int = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.tools.web', 'web-fetch-tool.yaml', 'settings.max_response_bytes'))
-    cache_ttl_seconds: float = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.tools.web', 'web-fetch-tool.yaml', 'settings.cache_ttl_seconds'))
-    cache_entries: int = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.tools.web', 'web-fetch-tool.yaml', 'settings.cache_entries'))
-    max_redirects: int = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.tools.web', 'web-fetch-tool.yaml', 'settings.max_redirects'))
+    timeout_seconds: float = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.tools.methods.web_fetch', 'defaults.yaml', 'settings.timeout_seconds'))
+    max_retries: int = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.tools.methods.web_fetch', 'defaults.yaml', 'settings.max_retries'))
+    max_response_bytes: int = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.tools.methods.web_fetch', 'defaults.yaml', 'settings.max_response_bytes'))
+    cache_ttl_seconds: float = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.tools.methods.web_fetch', 'defaults.yaml', 'settings.cache_ttl_seconds'))
+    cache_entries: int = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.tools.methods.web_fetch', 'defaults.yaml', 'settings.cache_entries'))
+    max_redirects: int = field(default_factory=lambda: parameter_default('fruitfly_agent.lab.tools.methods.web_fetch', 'defaults.yaml', 'settings.max_redirects'))
 
     def __post_init__(self):
         for name, low, high in (("timeout_seconds", .01, 120), ("cache_ttl_seconds", 0, 3600)):

@@ -11,18 +11,18 @@ ROOT = Path(__file__).resolve().parents[2]
 
 @unittest.skipUnless(os.name == 'posix', 'PTY regression requires a POSIX terminal')
 class TerminalInputPtyRegressionTest(unittest.TestCase):
-    def test_improvement_field_echoes_before_submission_and_restores_menu_input(self):
+    def test_configuration_field_echoes_before_submission_and_restores_menu_input(self):
         import fcntl
         import struct
         import termios
         code = (
             "import asyncio, sys, termios\n"
             "from fruitfly_agent.interactive import TerminalFrontend\n"
-            "from fruitfly_agent.interactive.terminal.bindings import ImprovementClients\n"
+            "from fruitfly_agent.interactive.terminal.io.input import read_field_line\n"
             "from tests.support.application import offline_session\n"
-            "frontend=TerminalFrontend(offline_session(), improvement_clients=ImprovementClients(search=object()))\n"
+            "frontend=TerminalFrontend(offline_session())\n"
             "with frontend.menu_scope():\n"
-            "    value=asyncio.run(frontend.improvement_frontend().read_value('Search guidance\\nCurrent: old value'))\n"
+            "    value=read_field_line(frontend.line_editor,'Guidance')\n"
             "    print('MENU_ACTIVE='+str(frontend.line_editor.display.active),flush=True)\n"
             "frontend._suspend_inline_terminal()\n"
             "print('ECHO='+str(bool(termios.tcgetattr(sys.stdin.fileno())[3] & termios.ECHO)),flush=True)\n"
@@ -35,7 +35,7 @@ class TerminalInputPtyRegressionTest(unittest.TestCase):
             terminal.read_until('❯ Ｈello')
             terminal.send(b'\x1b[D!\r')
             output = terminal.finish()
-        self.assertIn('Current: old value', output)
+        self.assertIn('Guidance', output)
         self.assertIn("RESULT='Ｈell!o'", output)
         self.assertIn('MENU_ACTIVE=False', output)
         self.assertIn('ECHO=True', output)

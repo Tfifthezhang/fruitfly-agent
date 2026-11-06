@@ -1,6 +1,6 @@
 """Compose object-owned text adapters into one executable candidate."""
 from fruitfly_agent.improvement.contracts.optimization import TargetBinding, TargetSnapshot
-from fruitfly_agent.lab.improvement.targets.text import expand_target
+from fruitfly_agent.improvement.contracts.text import expand_target
 from fruitfly_agent.improvement.contracts.versions import canonical_json
 
 

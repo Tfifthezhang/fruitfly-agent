@@ -7,7 +7,7 @@ from fruitfly_agent.improvement.contracts.experiments import MaterialOption, Pre
 from fruitfly_agent.improvement.contracts.versions import canonical_json, content_hash
 from fruitfly_agent.improvement.contracts.failures import IntegrityError
 from fruitfly_agent.lab.improvement.improver.episodes import ComparisonEpisodeExecutor
-from fruitfly_agent.lab.improvement.improver.materials import FrozenMaterials
+from fruitfly_agent.lab.improvement.materials.episodes import FrozenMaterials
 from fruitfly_agent.lab.improvement.improver.registration import comparison_definition
 from fruitfly_agent.improvement.contracts.experiments import ExecutionRequest
 from .assessment import OfficialMeasurements

@@ -36,7 +36,7 @@ from fruitfly_agent.run.storage.prompts import resolve_base_prompt
 from .manifest import RuntimeManifest, digest_manifest as _digest
 from .media import retain_tool_media
 from fruitfly_agent.lab.catalog import resolve_harness, verify_runtime, configure_profile
-from fruitfly_agent.lab.improvement.targets.text import TEXT_TARGET_PREFIX
+from fruitfly_agent.improvement.contracts.text import TEXT_TARGET_PREFIX
 
 
 @dataclass(frozen=True)
@@ -213,22 +213,9 @@ def build_runtime(
                         components={**assembled.components, "authorization": approvals})
     main_spec.require(tools=bool(assembled.config.tools), streaming=True)
     resolved = catalog.resolve(profile.mechanisms)
-    component_entries = tuple(
-        {
-            "id": item.definition.descriptor.mechanism_id,
-            "contributions": [
-                contribution.to_dict()
-                for contribution in item.definition.descriptor.contributions
-            ],
-            "requires": sorted(item.definition.descriptor.requires),
-            "activation": item.definition.descriptor.activation,
-            **({"requires_capabilities": sorted(item.definition.requires_capabilities)} if item.definition.requires_capabilities else {}),
-            "parameters": dict(item.parameters),
-            **({"implementation_id": item.definition.implementation_id}
-               if item.definition.implementation_id is not None else {}),
-        }
-        for item in resolved
-    )
+    from fruitfly_agent.lab.catalog import runtime_component_entries
+    component_entries = runtime_component_entries(profile, catalog,
+        tuple(value for key, value in assembled.components.items() if key.startswith(TEXT_TARGET_PREFIX)))
     data_artifacts = tuple(assembled.data_artifacts)
     bound_keys = {item.get("key") for item in data_artifacts}
     if bound_keys != set(bindings):

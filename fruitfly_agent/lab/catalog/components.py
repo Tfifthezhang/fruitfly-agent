@@ -14,6 +14,7 @@ class ComponentSpec:
     schema: str = 'text-v1'
     required_capabilities: frozenset[str] = frozenset()
     default_selected: bool = True
+    feature_path: tuple[str, ...] = ()
 
     def __post_init__(self):
         if self.role not in {'H', 'S', 'I'} or not self.component_id:
@@ -91,21 +92,27 @@ def resolve_harness(profile, catalog, *, tool_providers=None):
                 key = component.component_id
                 if key in components:
                     raise ValueError('duplicate component declaration: ' + key)
-                components[key], owners[key] = component, name
-    shared_tool_policy = any(component.kind == 'tool-catalog' for component in components.values())
+                from dataclasses import replace
+                components[key], owners[key] = replace(component,
+                    feature_path=tuple(n.id for n in definition.feature_path)), name
+        for surface in definition.configuration_surfaces:
+            if surface.optimization is None or (active is None and not surface.standalone):
+                continue
+            if surface.id in components:
+                raise ValueError('duplicate component declaration: ' + surface.id)
+            components[surface.id] = ComponentSpec(surface.id, surface.role, surface.kind, surface.schema,
+                surface.optimization.required_capabilities, surface.optimization.default_selected,
+                tuple(n.id for n in definition.feature_path))
+            owners[surface.id] = name
     for name, item in enabled.items():
-        tool_policy = shared_tool_policy and bool(item.definition.descriptor.effects.tools)
-        if not item.definition.optimization_exemption and name not in owners.values() and not tool_policy:
+        coverage = item.definition.optimization_coverage
+        if coverage is not None and coverage.kind == 'shared' and set(coverage.components) - components.keys():
+            raise ValueError('shared optimization owner is unavailable: ' + name)
+        if coverage is None and name not in owners.values():
             raise ValueError('active algorithm exposes no optimization component: ' + name)
     mechanisms = tuple({'id': item.definition.descriptor.mechanism_id, 'parameters': dict(item.parameters),
         'implementation_id': item.definition.implementation_id} for item in resolved)
     from .configuration import configuration_surfaces
-    for name, (owner, surface) in configuration_surfaces(catalog).items():
-        if surface.binding == 'settings' and name not in components and (
-                surface.key in profile.component_settings or name in profile.artifact_bindings):
-            components[name] = ComponentSpec(name, surface.role, kind='improvement-settings',
-                schema='improvement-settings-v1', required_capabilities=frozenset({'improver-comparison'}))
-            owners[name] = owner
     return ResolvedHarness(profile.profile_id, mechanisms, tuple(sorted(tools)), execution_values(profile.execution),
         tuple(components[key] for key in sorted(components)), tuple(sorted(owners.items())), tuple(sorted(controlled.items())),
         dict(profile.component_settings), catalog.extension_identities)
@@ -137,3 +144,25 @@ def verify_runtime(inventory, config, targets):
             raise ValueError('assembled default edit selection differs from declaration: ' + key)
         components.append(replace(spec, schema=snapshot.schema))
     return replace(inventory, execution=values, components=tuple(components))
+
+
+def runtime_component_entries(profile, catalog, targets):
+    """Record mechanisms and attached content without making content selectable."""
+    entries = []
+    for item in catalog.resolve(profile.mechanisms):
+        definition, descriptor = item.definition, item.definition.descriptor
+        entries.append({'id': descriptor.mechanism_id,
+            'contributions': [contribution.to_dict() for contribution in descriptor.contributions],
+            'requires': sorted(descriptor.requires), 'activation': descriptor.activation,
+            **({'requires_capabilities': sorted(definition.requires_capabilities)} if definition.requires_capabilities else {}),
+            'parameters': dict(item.parameters),
+            **({'implementation_id': definition.implementation_id} if definition.implementation_id else {})})
+    known = {entry['id'] for entry in entries}
+    for target in targets:
+        snapshot = target.snapshot()
+        if snapshot.binding.kind == 'configuration' and snapshot.target_id not in known:
+            entries.append({'id': snapshot.target_id, 'role': snapshot.role,
+                'contributions': [], 'requires': [], 'activation': 'new_session',
+                'parameters': target.parameter_values(snapshot.text)})
+            known.add(snapshot.target_id)
+    return tuple(entries)

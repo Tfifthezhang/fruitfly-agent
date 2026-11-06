@@ -1,0 +1,12 @@
+id: remote-env
+role: H
+implementation: remote-env
+parameters:
+  host: ''
+  port: 22
+  cwd: /srv/workspace
+  username_env: FRUITFLY_SSH_USERNAME
+  password_env: FRUITFLY_SSH_PASSWORD
+  known_hosts: ~/.ssh/known_hosts
+  connect_timeout_seconds: 15
+  operation_timeout_seconds: 30

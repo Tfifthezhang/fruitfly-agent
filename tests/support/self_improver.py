@@ -13,7 +13,7 @@ from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
 from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, EditReason
 from fruitfly_agent.improvement.contracts.components import ComponentFile, HarnessSnapshot
 from fruitfly_agent.improvement.contracts.editing import ProposalResult
-from fruitfly_agent.interactive.contracts.improvement import WorkflowRequest
+from fruitfly_agent.improvement.contracts.requests import WorkflowRequest
 from tests.support.task_execution import TaskApplicationFixture as RunApplicationFactory
 from tests.support.faux_provider import FauxProvider
 from tests.support.materials import _write_models

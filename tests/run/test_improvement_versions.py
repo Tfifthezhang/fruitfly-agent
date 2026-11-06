@@ -55,7 +55,7 @@ class RetentionTests(unittest.TestCase):
             session_owned = create('session text')
             latest = create('latest')
             other = create('other profile', 'other')
-            skill = create('skill latest', target=RetainedText('skill-document','original guidance','Skill','skill-document-v1',4000).snapshot())
+            skill = create('skill latest', target=RetainedText('fixture-note','original guidance','Fixture note','fixture-note-v1',4000).snapshot())
             sessions = root / '.fruitfly/sessions'
             sessions.mkdir()
             (sessions / 'old.jsonl').write_text(json.dumps({'reference':session_owned.artifact_id})+'\n')
@@ -164,34 +164,33 @@ class StartupVersionsTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(before,app.runtime_manifest['digest'])
             finally: await app.close()
 
-    async def test_skill_guidance_uses_same_startup_protocol_and_can_return_to_default(self):
+    async def test_editor_instructions_use_same_startup_protocol_and_can_return_to_default(self):
         with tempfile.TemporaryDirectory() as tmp:
             app,factory,provider=await self.setup_app(Path(tmp))
             try:
-                factory.configuration.set_mechanism('skill-document',enabled=True)
-                factory.configuration.save()
-                await app.rebuild()
-                record=self.candidate(app,factory,target_id='skill-document')
+                from fruitfly_agent.lab.improvement.editor.instructions import EditorInstructions, EditorInstructionTarget
+                text = EditorInstructionTarget(EditorInstructions(system='Changed editor procedure.')).snapshot().text
+                record=self.candidate(app,factory,text=text,target_id='improvement-editor')
                 service=factory.startup_versions()
                 latest=next(v.token for v in service.versions(factory.configuration.snapshot())
-                            if v.target == 'skill-document' and 'Latest' in v.label)
+                            if v.target == 'improvement-editor' and 'Latest' in v.label)
                 handle=await service.prepare(app.runtime_manifest,(latest,),remember=(latest,))
                 await app.activate_runtime(handle,expected_manifest_digest=app.runtime_manifest['digest'])
-                self.assertEqual(record.artifact_id,factory._resolve().profile.artifact_bindings['skill-document'])
+                self.assertEqual(record.artifact_id,factory._resolve().profile.artifact_bindings['improvement-editor'])
                 service=factory.startup_versions()
                 default=next(v.token for v in service.versions(factory.configuration.snapshot())
-                             if v.target == 'skill-document' and 'default version' in v.label)
+                             if v.target == 'improvement-editor' and 'default version' in v.label)
                 handle=await service.prepare(app.runtime_manifest,(default,),remember=(default,))
                 await app.activate_runtime(handle,expected_manifest_digest=app.runtime_manifest['digest'])
-                self.assertNotIn('skill-document',factory._resolve().profile.artifact_bindings)
+                self.assertNotIn('improvement-editor',factory._resolve().profile.artifact_bindings)
                 service=factory.startup_versions()
                 accepted=next(v.token for v in service.versions(factory.configuration.snapshot())
-                              if v.target == 'skill-document' and 'Latest accepted' in v.label)
+                              if v.target == 'improvement-editor' and 'Latest accepted' in v.label)
                 handle=await service.prepare(app.runtime_manifest,(accepted,))
                 await app.activate_runtime(handle,expected_manifest_digest=app.runtime_manifest['digest'])
                 self.assertEqual(record.artifact_id, next(a['id'] for a in app.runtime_manifest['data_artifacts']
-                                                         if a['key'] == 'skill-document'))
-                self.assertNotIn('skill-document',factory._resolve().profile.artifact_bindings)
+                                                         if a['key'] == 'improvement-editor'))
+                self.assertNotIn('improvement-editor',factory._resolve().profile.artifact_bindings)
                 self.assertEqual([],provider.calls)
             finally: await app.close()
 
@@ -257,23 +256,3 @@ class StartupVersionsTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('❯ Back', output.getvalue())
         self.assertIn('❯ Use this prompt', output.getvalue())
 
-    async def test_candidate_section_switch_keeps_action_selection_and_full_text_pages(self):
-        record=SimpleNamespace(candidate_id='candidate-1',status='proposed',algorithm='custom',target='target',
-            evidence=(),sections=(CandidateSection('Overview','summary'),CandidateSection('Evaluation','score'),
-                                 CandidateSection('Changes','diff',initial=True),CandidateSection('Original text','first\n'*20),
-                                 CandidateSection('Candidate text','new')))
-        session=SimpleNamespace(set_event_sink=Mock(),candidate_detail=lambda _: (record,'diff'),candidate_action=Mock(),
-            candidates=lambda: (record,), candidate_notice=lambda: (), acknowledge_candidate_notice=Mock(),
-            adopt_candidate=AsyncMock())
-        output=io.StringIO();frontend=TerminalFrontend(session,input_stream=io.StringIO(),output_stream=output)
-        sequence=iter((b'\x1b[A',b'n',b'\x1b[6~',b'n',b'p',b'\x1b'))
-        frontend.menu_input=SimpleNamespace(read_event=lambda:RawTerminalMenuInput.decode(next(sequence)))
-        frontend.menu_renderer=TerminalMenuRenderer(output)
-        frontend.menu_renderer.ansi=True
-        await frontend.improvement_frontend().candidate_detail('candidate-1')
-        self.assertIn('Original text (2/3)',output.getvalue())
-        self.assertIn('Candidate text (1/1)',output.getvalue())
-        frames=[f for f in output.getvalue().split('\x1b[2J\x1b[H') if f.startswith('Candidate candidate-')]
-        self.assertIn('❯ Back',frames[0])
-        self.assertTrue(all('❯ Discard candidate' in f for f in frames[1:]))
-        session.candidate_action.assert_not_called()

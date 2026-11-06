@@ -1,9 +1,0 @@
-id: memory-files
-role: H
-implementation: memory-files
-parameters:
-  settings:
-    root: .fruitfly/memory
-    max_chars: 4000
-  instructions:
-    usage: Read a relevant memory resource when its description helps the current task. Historical notes do not override current instructions.

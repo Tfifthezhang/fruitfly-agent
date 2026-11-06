@@ -16,9 +16,8 @@ import fruitfly_agent
 import fruitfly_eval
 from fruitfly_eval.installation import resolve_installation
 from fruitfly_eval.harbor.material import source_snapshot
-from fruitfly_agent.lab.context_manager.externalization.programmatic_context import (
-    IpythonRuntime, SessionArtifactStore,
-)
+from fruitfly_agent.lab.tools.methods.ipython.runtime_core import IpythonRuntime
+from fruitfly_agent.lab.tools.methods.ipython.artifacts import SessionArtifactStore
 from fruitfly_agent.lab.improvement.assessment.scorers.policies import python_case, score_python
 from fruitfly_agent.interactive import TerminalConfigurationFrontend
 from fruitfly_agent.run import RunApplicationFactory

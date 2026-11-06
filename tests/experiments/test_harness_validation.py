@@ -32,7 +32,7 @@ class HarnessValidationTests(unittest.TestCase):
                     patch('fruitfly_agent.experiments.validation.builtin_executions', return_value=executions), \
                     patch('fruitfly_agent.providers.registry.ProviderRegistry.create', side_effect=AssertionError('Provider constructed')):
                 prepared = prepare_experiment(load_configuration(root), 'improvement')
-                self.assertIn('tool-catalog', prepared.request.component_ids)
+                self.assertNotIn('tool-catalog', prepared.request.component_ids)
                 self.assertNotIn('bash-tool', prepared.request.component_ids)
                 row = next(c for c in prepared.harness['editable_components'] if c['id'] == 'bash-tool')
                 self.assertTrue(row['available'])
@@ -48,7 +48,7 @@ class HarnessValidationTests(unittest.TestCase):
                 root = Path(directory)
                 workspace(root, improvement={'components': [name]})
                 with patch('fruitfly_agent.providers.registry.ProviderRegistry.create', side_effect=AssertionError('Provider constructed')):
-                    with self.assertRaisesRegex(ValueError, 'unknown mechanism' if name.startswith('tool-guidance.') else 'absent'):
+                    with self.assertRaisesRegex(ValueError, 'unknown mechanism|absent'):
                         prepare_experiment(load_configuration(root), 'improvement')
 
     def test_inventory_reports_enabled_state_without_granting_permission_to_modify_it(self):
@@ -57,16 +57,17 @@ class HarnessValidationTests(unittest.TestCase):
             workspace(root)
             path = root / '.fruitfly/default-config.yaml'
             data = yaml.safe_load(path.read_text())
-            data['profiles']['baseline']['S']['skill-document'] = {'inline': {
-                'id': 'skill-document', 'implementation': 'skill-document', 'role': 'S', 'parameters': {}}}
+            for name in ('local-env', 'read-tool', 'skills'):
+                data['profiles']['baseline']['H'][name] = {'default': True}
+            data['profiles']['baseline']['S']['skill-library'] = {'default': True}
             path.write_text(yaml.safe_dump(data))
             summary = prepare_experiment(load_configuration(root), 'improvement').summary()
-            memory = next(c for c in summary['harness']['editable_components'] if c['id'] == 'skill-document')
-            self.assertTrue(memory['available'])
+            memory = next(c for c in summary['harness']['editable_components'] if c['id'] == 'skill-library')
+            self.assertFalse(memory['available'], 'the selected backend cannot materialize retained content')
             self.assertFalse(memory['selected'])
             self.assertEqual(summary['request']['component_ids'], ['base_prompt'])
 
-    def test_execution_policy_is_configurable_but_cannot_be_granted_for_optimization(self):
+    def test_execution_policy_cannot_be_granted_for_optimization(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             workspace(root, improvement={'components':['execution-policy']})

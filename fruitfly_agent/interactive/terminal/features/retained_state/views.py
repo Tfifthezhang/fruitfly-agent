@@ -7,7 +7,7 @@ def render_state(state):
         source = entry.get('origin')
         details = (' · ' + source['source'] + '@' + source['revision']) if source else (
             ' · ' + entry.get('kind', '') + ' · ' + entry.get('status', ''))
-        lines.append(entry['id'] + ' · ' + entry['description'] + details)
+        lines.append(entry.get('name', entry['id']) + ' · ' + entry['description'] + details)
     if not lines:
         lines.append('No retained documents.')
     if 'user_chars' in state:

@@ -28,6 +28,16 @@ Check whether the workflow produced the requested behavior with proportionate ef
 Input: a parser rejects an empty valid list.
 Output: repair the incorrect empty-list check and verify empty, nonempty and malformed inputs.
 
+## Advanced use
+
+For a larger change, apply the same workflow to affected interfaces and state
+transitions. Reuse existing evidence and scale checks to the task constraints.
+
 ## Platform adaptation
 
 Use ordinary host file and command tools. Treat unavailable capabilities as limits, not instructions to change the environment. The host owns permissions, lifecycle and verification policy. This skill supplies no independent authority.
+
+## Reference files
+
+This procedure is self-contained. Read task-provided code and project guidance
+when their details affect the requested work.

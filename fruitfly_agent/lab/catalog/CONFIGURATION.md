@@ -11,7 +11,7 @@ algorithm-specific parsing to Run, the terminal or Eval.
 
 | Capability | Owner and registration |
 |---|---|
-| Tool, environment, context mechanism, retained document | Owning Lab module, composed by Catalog |
+| Tool, environment or context mechanism | Owning Lab module, composed by Catalog |
 | Candidate generator | Improvement `GeneratorRegistry` |
 | Round flow and incumbent retention | Fixed Improvement engine; stopping conditions remain separate |
 | Completed assessment/comparison | Shared prompt-driven model evaluator |
@@ -22,13 +22,41 @@ These implementations keep their own execution interfaces. Shared configuration
 declarations provide discovery, validation and composition, not one universal
 algorithm implementation. Registration and inspection must remain offline.
 
+## Classify mechanisms and optimization together
+
+Declare `feature_path` as a tuple of `FeatureNode(id, label, order)` values.
+`classification.py` supplies built-in coordinates; extensions can add nodes.
+Catalog validates a nonempty path and rejects conflicting node metadata. Menus,
+configuration inventory and `ComponentSpec.feature_path` derive from that one
+owner declaration. There is no menu registry or parallel optimization taxonomy.
+
+| Functional path | Mechanisms and attached surfaces |
+|---|---|
+| Execution | Base-prompt H surface through an internal owner |
+| Environment | Local and Remote implementations; protected host bindings |
+| Tools / Files and shell, IPython, Web, MCP | Native H tools or protected external services |
+| Context / Augmentation / Memory | File memory H; retained notes S |
+| Context / Augmentation / Skills | Progressive loader H; installed procedures S |
+| Context / Augmentation / Local knowledge, Live HTTP, Information selection | Read-only connectors and shared editable H projection policy |
+| Context / Externalization | Programmatic context H |
+| Context / Reduction | Layered compaction or working memory H |
+| Improvement | Editor/evaluator I surfaces through an internal owner |
+
+H describes ordinary execution policies and prompts, including the maintenance
+that updates S. S is retained content plus provenance/resources. I describes how
+improvements are edited and evaluated. A prompt's text format does not determine
+its role. Native tool descriptions and memory extraction prompts therefore remain
+H; Skill bodies remain S; instructions for editing either belong to the I editor.
+This classification does not grant candidate authority or execution capability.
+
 ## Declare a mechanism
 
 A `MechanismDefinition` already supplies parameter descriptors, dependencies,
 effects, installation, model/credential requirements and lifecycle ownership.
 Its ID is selectable in a component document without another parser branch.
-`configuration_role` defaults to H; retained owners explicitly declare S and
-Improvement declares I.
+`configuration_role` defaults to H. Attached retained-content surfaces explicitly
+declare S; editor/evaluator surfaces declare I. `configurable=False` marks an
+internal owner whose surfaces remain available without a selectable mechanism.
 
 ```yaml
 id: example-note
@@ -60,12 +88,15 @@ execution or I setting surface. A `ConfigurationSurface` declares:
 | `normalize` | Pure field/default validation; no clients, files or model calls |
 | `encode`, `decode` | Exact text projection when applicable |
 | `edit_options` | Optional field-grant normalization into the owner's candidate adapter |
-| `restore` | Restore exact artifact-backed settings when applicable |
+| `restore`, `artifact_slot` | Restore exact adopted text and declare its owned slot; settings and artifact bytes must agree |
 | `default`, `reference` | Optional pure derived defaults and canonical built-in text identities |
-| `standalone` | Surface prepared without enabling a separate installer; default false |
+| `standalone` | Prepare the surface without an enabled selectable parent; default false |
+| `optimization`, `target_factory` | Declare both together; shared assembly constructs and verifies the target |
+| `kind`, `schema` | Retained content/instruction identity reported in the same inventory |
 
-A surface does not install its owner twice. The shared Tool catalog policy is prepared after tool installation;
-individual owners retain schemas, usage resources, implementation and permissions.
+A surface does not install its owner twice. Attached S content is prepared before
+the loader, and inherits its functional classification without becoming a mechanism.
+An S document alone does not activate its H loader.
 An explicit surface and a frozen artifact must describe the same effective value.
 Candidate bundles preserve exact artifact bytes as well as readable values.
 
@@ -142,9 +173,8 @@ records their workspace paths and hashes. Live services remain external
 requirements. This callback is separate from pure parameter normalization and runs
 only when explicitly freezing/exporting resources.
 
-A surface may declare a pure `default` callback. The shared Tool catalog uses
-this to expose its default policy during offline inspection and
-materialization, without creating a runtime or opening a service.
+A surface may declare a pure `default` callback for inspection/materialization
+without creating a runtime or opening a service.
 
 
 ## Expose parameter candidates
@@ -178,9 +208,11 @@ the actually assembled runtime.
 ## Enforce algorithm readiness
 
 `LabCatalog.require_optimization()` runs before Run constructs runtime services.
-Every algorithm needs an executable component/parameter declaration. Tools
-share the Tool catalog policy while keeping individual operation contracts fixed. Infrastructure connectors declare a concrete
-`optimization_exemption` explaining their protected responsibility. This is not
+Every algorithm needs an executable component/parameter declaration. Native tools
+expose their own descriptions and explicitly allowed settings. Infrastructure
+connectors declare `OptimizationCoverage`: `protected` explains immutable
+responsibilities; `shared` names the actual active optimization components controlling
+their behavior. Shared components must exist in the resolved inventory. This is not
 permission to expose an algorithm without an optimization surface. Assembly
 verifies that declared targets actually exist; component admission also checks
 timing, boundary and runner capabilities through the

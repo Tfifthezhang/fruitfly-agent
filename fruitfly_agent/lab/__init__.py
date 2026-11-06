@@ -3,7 +3,6 @@
 from .context_manager.augmentation.information import (
     InformationHub,
     InformationQuery,
-    create_file_memory_space,
     create_live_http_space,
     create_local_knowledge_space,
 )
@@ -15,7 +14,6 @@ from .tools import builtin_tools
 __all__ = [
     "InformationHub",
     "InformationQuery",
-    "create_file_memory_space",
     "create_local_knowledge_space",
     "create_live_http_space",
     "Skill",

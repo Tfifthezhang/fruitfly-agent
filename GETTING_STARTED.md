@@ -97,9 +97,9 @@ See [Terminal](fruitfly_agent/interactive/terminal/README.md) for daily controls
 | Need | Setup | Guide |
 |---|---|---|
 | Reusable instructions | Create `.skills/<name>/SKILL.md` and enable Skill catalog. | [Skills](fruitfly_agent/lab/context_manager/augmentation/skills/README.md) |
-| Notes across sessions | Add an index at `.fruitfly/memory/MEMORY.md` and topic notes beside it. | [File memory](fruitfly_agent/lab/context_manager/augmentation/information/file_memory/README.md) |
-| Local reference documents | Add Markdown or text files to `.fruitfly/knowledge/` and enable Local knowledge. | [Local knowledge](fruitfly_agent/lab/context_manager/augmentation/information/local_knowledge/README.md) |
-| A live information service | Configure an HTTPS endpoint and enable Live HTTP. | [Live HTTP](fruitfly_agent/lab/context_manager/augmentation/information/live_http/README.md) |
+| Notes across sessions | Add an index at `.fruitfly/memory/MEMORY.md` and topic notes beside it. | [File memory](fruitfly_agent/lab/context_manager/augmentation/memory/methods/file_memory/README.md) |
+| Local reference documents | Add Markdown or text files to `.fruitfly/knowledge/` and enable Local knowledge. | [Local knowledge](fruitfly_agent/lab/context_manager/augmentation/information/methods/local_knowledge/README.md) |
+| A live information service | Configure an HTTPS endpoint and enable Live HTTP. | [Live HTTP](fruitfly_agent/lab/context_manager/augmentation/information/methods/live_http/README.md) |
 
 ## Try an offline extension
 
@@ -135,7 +135,7 @@ other generated destinations must not exist.
 
 Plain `init` creates system configuration only. Instruction/file and task-package
 materials require an embedding with a registered task backend; no local task
-executor is bundled. `/improvement` uses the same execution requirement. RSI also
+executor is bundled. Embedding workflows use the same execution requirement. RSI also
 requires independent verification material. See [experiment templates](examples/experiments/README.md)
 for file ownership and [execution registration](fruitfly_agent/lab/improvement/execution/README.md)
 for embedding contracts.

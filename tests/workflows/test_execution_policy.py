@@ -9,7 +9,7 @@ from unittest.mock import Mock
 
 from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.interactive import AgentApplication
-from fruitfly_agent.interactive.contracts.improvement import WorkflowRequest
+from fruitfly_agent.improvement.contracts.requests import WorkflowRequest
 from fruitfly_agent.lab.base_prompt.target import BasePromptTarget
 from fruitfly_agent.lab.improvement.api import WorkflowBindings
 from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
@@ -56,7 +56,7 @@ class ExecutionPolicyTests(unittest.IsolatedAsyncioTestCase):
                 default = app.workflow_preview(WorkflowRequest('Inspect the task.'))
                 default_ids = dict(default.details)['Components'].split(', ')
                 self.assertNotIn('bash-tool', default_ids)
-                self.assertIn('tool-catalog', default_ids)
+                self.assertNotIn('tool-catalog', default_ids)
                 explicit = app.workflow_preview(WorkflowRequest('Inspect the task.', component_ids=('bash-tool',)))
                 self.assertEqual(dict(explicit.details)['Components'], 'bash-tool')
                 self.assertEqual(providers.create.return_value.calls, [])

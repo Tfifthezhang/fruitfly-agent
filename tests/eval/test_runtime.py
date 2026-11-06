@@ -106,12 +106,12 @@ class RuntimeStagingTests(unittest.TestCase):
             root = Path(directory)
             state, profile, output = self.fixture(root)
             profile['models']['roles']['editor'] = 'editor'
-            profile['I']['component-improvement'] = component_document('component-improvement')
+            profile['I']['improvement-editor'] = component_document('improvement-editor')
             (state / "default-config.yaml").write_text(yaml.safe_dump({
                 "default_profile": "baseline", "profiles": {"baseline": profile}}))
             _, models, names = prepare_runtime(runtime={"working_directory": str(root)}, output_dir=output,
                 environment={"SHARED_KEY": "fixture", "EDITOR_KEY": "fixture"})
-            self.assertEqual(names, ("EDITOR_KEY", "SHARED_KEY"))
+            self.assertEqual(names, ("SHARED_KEY",), "unused I roles need no execution credentials")
             self.assertEqual(set(yaml.safe_load(models.read_text())["models"]), {"main", "editor"})
 
     def test_component_staging_preserves_i_and_inactive_role_metadata_without_requesting_its_key(self):
@@ -126,8 +126,7 @@ class RuntimeStagingTests(unittest.TestCase):
                 'default_profile': 'baseline', 'profiles': {'baseline': {
                     'models': {'catalog': 'models.yaml', 'roles': {
                         'executor': 'main', 'editor': 'editor', 'assessor': 'editor'}},
-                    'H': {'execution-policy': component('execution-policy', 'H', {'settings': {'max_tool_calls_per_turn': 128}}),
-                          'base_prompt': component('base_prompt', 'H', {'instructions': {'system': 'Exact prompt.\n'}})},
+                    'H': {'base_prompt': component('base_prompt', 'H', {'instructions': {'system': 'Exact prompt.\n'}})},
                     'I': {'improvement-evaluator': component('improvement-evaluator', 'I', {
                         'instructions': {'assess': 'Inspect loops.'}})}}}}))
             generated, models, names = prepare_runtime(runtime={'working_directory': str(root)},
@@ -135,35 +134,24 @@ class RuntimeStagingTests(unittest.TestCase):
             staged = load_system_config(generated).select()
             self.assertNotIn('schema_version', yaml.safe_load(generated.read_text()))
             self.assertEqual(staged.component_settings['evaluator']['instructions']['assess'], 'Inspect loops.')
-            self.assertEqual(staged.execution['max_tool_calls_per_turn'], 128)
+            self.assertEqual(staged.execution, {})
             self.assertEqual(staged.artifact_contents[staged.prompt], 'Exact prompt.\n')
             self.assertEqual(staged.model_roles['editor'], 'editor')
             self.assertEqual(set(yaml.safe_load(models.read_text())['models']), {'main', 'editor'})
             self.assertEqual(names, ('SHARED_KEY',))
 
-    def test_explicit_execution_parameters_survive_the_real_container_staging_path(self):
+    def test_fixed_execution_defaults_survive_container_staging(self):
         from fruitfly_agent.runtime_spec import execution_kwargs
         from fruitfly_agent.core.config import AgentLoopConfig
         from tests.support.faux_provider import FauxProvider
-        for limit in (0, 256):
-            with self.subTest(limit=limit), tempfile.TemporaryDirectory() as directory:
-                root = Path(directory)
-                state, profile, output = self.fixture(root)
-                execution = {'max_tool_calls_per_turn': limit, 'max_turns': 12,
-                    'max_context_recovery_attempts': 3,
-                    'tool_execution': {'max_parallel': 2, 'default_execution_mode': 'sequential'}}
-                profile['H']['execution-policy'] = {'inline': {'id': 'execution-policy',
-                    'role': 'H', 'implementation': 'execution-policy', 'parameters': {'settings': execution}}}
-                (state / 'default-config.yaml').write_text(yaml.safe_dump({
-                    'default_profile': 'baseline', 'profiles': {'baseline': profile}}))
-                config, _, _ = prepare_runtime(runtime={'working_directory': str(root)}, output_dir=output)
-                staged = load_system_config(config).select()
-                self.assertEqual(staged.execution, execution)
-                loop = AgentLoopConfig(provider=FauxProvider(), **execution_kwargs(staged.execution))
-                self.assertEqual(loop.max_tool_calls_per_turn, limit)
-                self.assertEqual(loop.max_turns, 12)
-                self.assertEqual(loop.tool_execution.max_parallel, 2)
-                self.assertEqual(loop.tool_execution.default_execution_mode, 'sequential')
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            _, _, output = self.fixture(root)
+            config, _, _ = prepare_runtime(runtime={'working_directory': str(root)}, output_dir=output)
+            staged = load_system_config(config).select()
+            effective = AgentLoopConfig(FauxProvider(), **execution_kwargs(staged.execution))
+            self.assertEqual(effective.max_tool_calls_per_turn, 512)
+            self.assertEqual(effective.tool_execution.max_parallel, 8)
 
     def test_invalid_execution_parameters_fail_before_any_staging(self):
         for value in ({'max_tool_calls_per_turn': True}, {'max_turns': -1},
@@ -173,7 +161,7 @@ class RuntimeStagingTests(unittest.TestCase):
             with self.subTest(value=value), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 state, profile, output = self.fixture(root)
-                profile['H']['execution-policy']['inline']['parameters'] = {'settings': value}
+                profile['H']['execution-policy'] = {'inline': {'id': 'execution-policy', 'role': 'H', 'implementation': 'execution-policy', 'parameters': {'settings': value}}}
                 (state / 'default-config.yaml').write_text(yaml.safe_dump({
                     'default_profile': 'baseline', 'profiles': {'baseline': profile}}))
                 with self.assertRaisesRegex(ValueError, 'execution'):
@@ -184,7 +172,7 @@ class RuntimeStagingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             state, profile, output = self.fixture(root)
-            profile['H'] = {'ssh-env': component_document('ssh-env', parameters={'host': 'fixture.invalid'})}
+            profile['H'] = {'remote-env': component_document('remote-env', parameters={'host': 'fixture.invalid'})}
             (state / "default-config.yaml").write_text(yaml.safe_dump({
                 "default_profile": "baseline", "profiles": {"baseline": profile}}))
             with self.assertRaisesRegex(ValueError, "inside the task container"):
@@ -214,7 +202,8 @@ class RuntimeStagingTests(unittest.TestCase):
             root = Path(directory)
             artifacts = root / ".fruitfly/artifacts"
             artifacts.mkdir(parents=True)
-            body = b"Use the configured instructions."
+            from fruitfly_agent.lab.improvement.editor.instructions import EditorInstructionTarget, EditorInstructions
+            body = EditorInstructionTarget(EditorInstructions(system='Use the configured instructions.')).snapshot().text.encode()
             digest = hashlib.sha256(body).hexdigest()
             (artifacts / digest).write_bytes(body)
             (artifacts / "unselected").write_text("private unrelated state")
@@ -223,7 +212,7 @@ class RuntimeStagingTests(unittest.TestCase):
             config = root / "config.yaml"
             profile = profile_document(catalog="models.yaml", executor="fake",
                 mechanisms=[{'id': 'local-env'}, {'id': 'read-tool'}], prompt=reference,
-                artifact_bindings={'tool-catalog': reference},
+                artifact_bindings={'improvement-editor': reference},
                 artifact_reader=lambda value: (artifacts / value[7:]).read_text())
             config.write_text(yaml.safe_dump({"default_profile": "default", "profiles": {"default": profile}}))
             output = root / "runtime"
@@ -232,13 +221,13 @@ class RuntimeStagingTests(unittest.TestCase):
                                                        "working_directory": str(root)}, output_dir=output)
             staged = load_system_config(generated).select()
             self.assertEqual(staged.prompt, reference)
-            self.assertEqual(staged.artifact_bindings['tool-catalog'], reference)
+            self.assertEqual(staged.artifact_bindings['improvement-editor'], reference)
             self.assertEqual([p.name for p in (output / "artifacts").iterdir()], [digest])
             self.assertEqual((output / "artifacts" / digest).read_bytes(), body)
             (artifacts / digest).write_text("tampered")
             # The authored component contains the frozen text; the old artifact
             # store is no longer an input. Conflicting component values still fail.
-            profile['H']['tool-catalog']['inline']['parameters']['instructions']['usage'] = 'tampered'
+            profile['I']['improvement-editor']['inline']['parameters']['instructions']['system'] = 'tampered'
             config.write_text(yaml.safe_dump({'default_profile': 'default', 'profiles': {'default': profile}}))
             with self.assertRaisesRegex(ValueError, "component artifact differs from its configured value"):
                 prepare_runtime(runtime={"config_path": str(config), "profile": "default",

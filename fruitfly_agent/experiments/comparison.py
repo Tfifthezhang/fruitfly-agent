@@ -19,7 +19,7 @@ def normalize_experiment(raw, target, *, material_only=False):
     profile = None if material_only else load_system_config(path, catalog=catalog).select(baseline.get('profile'))
     reader = DocumentReader()
     task, task_path = reader.reference(raw.get('tasks'), target)
-    mapping(task, {'source', 'instruction', 'input_paths', 'pack', 'parameters', 'request', 'host', 'collections', 'material'}, 'task document')
+    mapping(task, {'source', 'execution', 'instruction', 'input_paths', 'pack', 'parameters', 'request', 'host', 'collections', 'material'}, 'task document')
     def paths(value):
         if not isinstance(value, dict):
             raise ValueError('task and collection documents must be mappings')

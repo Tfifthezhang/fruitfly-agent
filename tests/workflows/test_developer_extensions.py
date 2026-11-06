@@ -10,7 +10,7 @@ from fruitfly_agent.extensions import ExtensionContext
 from fruitfly_agent.run.extensions import load_extensions, discover_extensions
 from tests.support.task_execution import TaskApplicationFixture as RunApplicationFactory
 from fruitfly_agent.interactive import AgentApplication
-from fruitfly_agent.interactive.contracts.improvement import WorkflowRequest
+from fruitfly_agent.improvement.contracts.requests import WorkflowRequest
 from fruitfly_agent.lab.improvement.api import WorkflowBindings
 from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
 from fruitfly_agent.rsi import EvolutionEngine

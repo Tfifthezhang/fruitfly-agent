@@ -18,7 +18,7 @@ the component grammar linked above; it has no flat `prompt`, `execution`,
 |---|---|
 | `HarnessConfig` | Default profile and profile mapping |
 | `HarnessProfile` | Model catalog/profile, prompt, execution limits, artifact bindings, and mechanism selections |
-| `execution` | Declared turn/tool/recovery limits and nested tool scheduling; see [shared fields](../../runtime_spec/README.md#configure-execution) |
+| `execution` | Declared turn/tool/recovery limits and nested tool scheduling; see [shared fields](../../runtime_spec/README.md#record-host-execution-conditions) |
 | `execution.max_tool_calls_per_turn` | Nonnegative integer, default 512 per daily outer turn; Improvement trials remove this count cap; 0 prevents tool attempts |
 | `prompt` | Optional; `assistant-default` or a text artifact ID |
 | `artifact_bindings` | Named slots declared by enabled consumers |
@@ -62,9 +62,9 @@ only after success. Pending models and credentials use the same boundary; failed
 application retains them for retry. The terminal does not call `save()` in this
 flow. Startup and explicit offline callers retain the standalone `save()` API.
 
-Restoration also stages execution limits. These file settings do not add a
-terminal parameter form. Unknown execution fields, booleans and negative/fractional
-limits are rejected. Model-call and editor budgets are separate settings.
+Restoration preserves daily model bindings and restores registered H/S/I content.
+Execution conditions remain host-owned, outside file-edit and menu surfaces.
+Independent experiment phase times are declared in experiment files.
 
 | File | Responsibility |
 |---|---|

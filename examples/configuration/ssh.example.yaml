@@ -11,10 +11,10 @@ profiles:
         context_query: {inherit: executor}
         context_summary: {inherit: executor}
     H:
-      ssh-env:
+      remote-env:
         inline:
-          id: ssh-env
-          implementation: ssh-env
+          id: remote-env
+          implementation: remote-env
           role: H
           enabled: true
           parameters:

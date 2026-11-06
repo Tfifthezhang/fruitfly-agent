@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from fruitfly_agent.core.tool_runtime import ToolCallContext
 from fruitfly_agent.core.env import ExecResult
 from fruitfly_agent.core.errors import Result
-from fruitfly_agent.lab.tools.bash import create_bash_tool
+from fruitfly_agent.lab.tools.methods.bash.algorithm import create_bash_tool
 from fruitfly_agent.lab.tools.commands import CommandManager
 
 

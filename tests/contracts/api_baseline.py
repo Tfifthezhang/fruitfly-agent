@@ -128,7 +128,7 @@ MODULE_EXPORTS = {
         "builtin_tools",
     },
     "fruitfly_agent.lab.environment": LAB_ENV_PUBLIC_API,
-    "fruitfly_agent.lab.environment.local": {"LocalEnv"},
+    "fruitfly_agent.lab.environment.methods.local.algorithm": {"LocalEnv"},
     "fruitfly_agent.lab.catalog": {
         "PermissionPolicy", "apply_permission_policy",
         "ActivationScope",
@@ -187,11 +187,8 @@ MODULE_EXPORTS = {
         "LatestUserQueryBuilder",
         "InformationPipeline",
         "InformationHub",
-        "FileMemorySource",
-        "FileMemoryRetriever",
         "LocalKnowledgeSource",
         "LiveHttpRetriever",
-        "create_file_memory_space",
         "create_local_knowledge_space",
         "create_live_http_space",
     },
@@ -200,16 +197,12 @@ MODULE_EXPORTS = {
         "InformationPipeline",
     },
     "fruitfly_agent.lab.context_manager.augmentation.information.hub": {"InformationHub"},
-    "fruitfly_agent.lab.context_manager.augmentation.information.file_memory": {
-        "FileMemorySource",
-        "FileMemoryRetriever",
-        "create_file_memory_space",
-    },
-    "fruitfly_agent.lab.context_manager.augmentation.information.local_knowledge": {
+    "fruitfly_agent.lab.context_manager.augmentation.memory.methods.file_memory": set(),
+    "fruitfly_agent.lab.context_manager.augmentation.information.methods.local_knowledge": {
         "LocalKnowledgeSource",
         "create_local_knowledge_space",
     },
-    "fruitfly_agent.lab.context_manager.augmentation.information.live_http": {
+    "fruitfly_agent.lab.context_manager.augmentation.information.methods.live_http": {
         "LiveHttpRetriever",
         "create_live_http_space",
     },
@@ -293,18 +286,18 @@ MODULE_EXPORTS = {
     "fruitfly_agent.lab.context_manager.reduction.methods.working_memory.algorithm": {
         "WorkingMemoryReducer",
     },
-    "fruitfly_agent.lab.context_manager.augmentation.skills.catalog": {
+    "fruitfly_agent.lab.context_manager.augmentation.skills.methods.indexed_documents.parser": {
         "Skill",
         "LoadResult",
         "load_skills",
         "render_skills_xml",
     },
     "fruitfly_agent.lab.tools.builtin": {"builtin_tools"},
-    "fruitfly_agent.lab.tools.read": {"create_read_tool"},
-    "fruitfly_agent.lab.tools.bash": {"create_bash_tool"},
-    "fruitfly_agent.lab.tools.edit": {"create_edit_tool"},
-    "fruitfly_agent.lab.tools.write": {"create_write_tool"},
-    "fruitfly_agent.lab.tools.ipython": {"create_ipython_tool"},
+    "fruitfly_agent.lab.tools.methods.read.algorithm": {"create_read_tool"},
+    "fruitfly_agent.lab.tools.methods.bash.algorithm": {"create_bash_tool"},
+    "fruitfly_agent.lab.tools.methods.edit.algorithm": {"create_edit_tool"},
+    "fruitfly_agent.lab.tools.methods.write.algorithm": {"create_write_tool"},
+    "fruitfly_agent.lab.tools.methods.ipython.algorithm": {"create_ipython_tool"},
     "fruitfly_agent.lab.context_manager.augmentation.information.adapter": {
         "InformationRecallTiming",
         "InformationRecallTransformer",

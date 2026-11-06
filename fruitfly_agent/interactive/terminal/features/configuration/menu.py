@@ -231,9 +231,9 @@ class TerminalConfigurationFrontend:
             ]
             rows.extend(
                 MenuRow(
-                    _category_label(category),
+                    _category_label(category, snapshot),
                     _category_summary(mechanisms),
-                    help=MenuHelp(_category_label(category), 'Choose components and their settings.'),
+                    help=MenuHelp(_category_label(category, snapshot), 'Choose components and their settings.'),
                 )
                 for category, mechanisms in categories
             )
@@ -415,7 +415,7 @@ class TerminalConfigurationFrontend:
             activate = 'select'
             if focused_action.kind == 'expand':
                 activate = 'expand' if len(focused_action.options) > 1 else 'settings'
-            self._render(title=_category_label(category),
+            self._render(title=_category_label(category, snapshot),
                          subtitle='Choose runtime components.' + (' Unsaved changes.' if snapshot.changed else ''),
                          rows=tuple(rows), selected=selected, toggle=focused_action.kind == 'expand', activate=activate)
             event = self.menu_input.read_event()
@@ -546,7 +546,7 @@ class TerminalConfigurationFrontend:
             MenuRow("prompt", snapshot.prompt_label),
         ]
         rows.extend(
-            MenuRow(_category_label(category), _category_summary(mechanisms))
+            MenuRow(_category_label(category, snapshot), _category_summary(mechanisms))
             for category, mechanisms in categories
         )
         rows.append(MenuRow("Back", help=MenuHelp("Back", "Return from configuration review")))
@@ -652,12 +652,14 @@ def _group_mechanisms(
         if mechanism.visible:
             grouped.setdefault(mechanism.category, []).append(mechanism)
     return tuple(
-        (category, tuple(grouped[category])) for category in sorted(grouped)
+        (category, tuple(grouped[category])) for category in sorted(grouped, key=lambda key: next((item.feature_path[0][2]
+            for item in grouped[key] if item.feature_path), 0))
     )
 
 
-def _category_label(category: str) -> str:
-    return 'Context' if category == 'context-manager' else category.replace('-', ' ').capitalize()
+def _category_label(category: str, snapshot: ConfigurationSnapshot) -> str:
+    return next((item.feature_path[0][1] for item in snapshot.mechanisms
+        if item.category == category and item.feature_path), category.replace('-', ' ').capitalize())
 
 
 def _category_summary(mechanisms: tuple[ConfigurationMechanism, ...]) -> str:

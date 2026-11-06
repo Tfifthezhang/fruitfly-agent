@@ -46,6 +46,7 @@ class ConfigurationMechanism:
     input_parameters: tuple[str, ...] = ()
     setup_available: bool = False
     setup_status: str = ''
+    feature_path: tuple[tuple[str, str, int], ...] = ()
 
 
 @dataclass(frozen=True)

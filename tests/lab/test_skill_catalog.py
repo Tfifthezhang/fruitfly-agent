@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from fruitfly_agent.lab.context_manager.augmentation.skills import catalog
+from fruitfly_agent.lab.context_manager.augmentation.skills.methods.indexed_documents import parser as catalog
 
 from fruitfly_agent.core.context import ContextFrame
 from fruitfly_agent.lab.context_manager.augmentation.skills import (
@@ -171,7 +171,7 @@ class SkillResourceTests(unittest.IsolatedAsyncioTestCase):
         from fruitfly_agent.lab.catalog import builtin_catalog, PermissionPolicy, MechanismSelection
         from fruitfly_agent.runtime_spec import HarnessProfile
         profile = HarnessProfile('test', str(self.workspace.model_path), 'offline',
-            tuple(MechanismSelection(name) for name in ('local-env', 'read-tool', 'skill-catalog')))
+            tuple(MechanismSelection(name) for name in ('local-env', 'read-tool', 'skills')))
         return self.workspace.assemble(profile, session, catalog=builtin_catalog(),
             permission_policy=PermissionPolicy.unrestricted(self.root))
 
@@ -182,7 +182,7 @@ class SkillResourceTests(unittest.IsolatedAsyncioTestCase):
         with Session(self.root / 'first.jsonl') as session:
             runtime = self.assemble(session)
             provider = runtime.config.provider
-            prefix = f'resource://{runtime.config.readable_resources.scope}/skills/.skills/example/'
+            prefix = f'resource://{runtime.config.readable_resources.scope}/skills/.fruitfly/skill-library/example/'
             self.path.write_text('---\nname: example\ndescription: Updated description\n---\nUpdated body')
             (self.path.parent / 'references/guide.md').write_text('Updated reference')
             provider.respond_tool_call('read', {'path': prefix + 'SKILL.md'})
@@ -203,9 +203,10 @@ class SkillResourceTests(unittest.IsolatedAsyncioTestCase):
         with Session(self.root / 'second.jsonl') as session:
             runtime = self.assemble(session)
             try:
-                snapshot = runtime.components['skill-catalog-resources']
-                self.assertEqual('Updated description', snapshot.skills[0].description)
-                self.assertIn('Updated body', snapshot.skills[0].content)
+                snapshot = runtime.components['skill-resources']
+                skill = next(skill for skill in snapshot.skills if skill.name == 'example')
+                self.assertEqual('Updated description', skill.description)
+                self.assertIn('Updated body', skill.content)
             finally:
                 runtime.config.readable_resources.close()
 
@@ -218,7 +219,7 @@ class SkillResourceTests(unittest.IsolatedAsyncioTestCase):
         with Session(self.root / 'ssh.jsonl') as session:
             runtime = self.assemble(session)
             resources = runtime.config.readable_resources
-            uri = f'resource://{resources.scope}/skills/.skills/example/SKILL.md'
+            uri = f'resource://{resources.scope}/skills/.fruitfly/skill-library/example/SKILL.md'
             read = next(t for t in runtime.config.tools if t.name == 'read')
             result = await read.execute(ToolCallContext('read-skill', 'read', {'path': uri}, RemoteFilesystem()))
             self.assertIn('Original body', result.content[0].text)
@@ -231,13 +232,8 @@ class SkillResourceTests(unittest.IsolatedAsyncioTestCase):
         from fruitfly_agent.core.session import Session
         self.path.write_text('---\nname: example\n---\nbody')
         with Session(self.root / 'diagnostics.jsonl') as session:
-            runtime = self.assemble(session)
-            try:
-                captured = runtime.components['skill-catalog-resources']
-                self.assertTrue(any('description' in item for item in captured.diagnostics))
-                self.assertTrue(any(entry.payload.get('kind') == 'contextSourceDiagnostics' for entry in session.read_all()))
-            finally:
-                runtime.config.readable_resources.close()
+            with self.assertRaisesRegex(ValueError, 'Skill description'):
+                self.assemble(session)
         stale = load_skills(self.root / '.skills')
         self.path.write_text('Concurrent edit')
         with patch('fruitfly_agent.lab.context_manager.augmentation.skills.resources.load_skills', return_value=stale):

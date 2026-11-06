@@ -5,7 +5,7 @@
 `LocalEnv` accesses the host filesystem and runs local shell commands through Core's execution contracts.
 
 Choose **Local environment** to execute on the machine or container running the
-Agent. Select [Remote environment](ssh/README.md) to run file and Bash
+Agent. Select [Remote environment](methods/remote/README.md) to run file and Bash
 tools on an external server through SSH. It supports configurable host/port, remote paths,
 password authentication through the host secret environment, verified host keys,
 and remote process supervision. Local sessions and model calls stay local.
@@ -24,12 +24,12 @@ and remote process supervision. Local sessions and model calls stay local.
 
 | File | Responsibility |
 |---|---|
-| [local.py](local.py) | `LocalEnv` implementation |
+| [Local method](methods/local/algorithm.py) | `LocalEnv` implementation |
 | [processes.py](processes.py) | Shared owned process-group retirement and bounded live notifications, also used by SSH and IPython |
 | [description.py](description.py) | Immutable execution description published through Catalog for host presentation |
 | [permissions.py](permissions.py), [guarded.py](guarded.py) | Guarded host strategy, authorizer and environment wrapper |
 | [execution.py](execution.py) | Explicit unrestricted strategy and allow authorizer |
-| [ssh](ssh/README.md) | `SshConfig`, `SshEnv`, remote permissions and Catalog registration |
+| [ssh](methods/remote/README.md) | `SshConfig`, `SshEnv`, remote permissions and Catalog registration |
 | [__init__.py](__init__.py) | Public exports |
 | [Core protocols](../../core/env/protocols.py) | Required filesystem and shell operations |
 
@@ -100,5 +100,5 @@ inherited environment. External isolation must bound its effects. See
 of Providers. Local process spawn and command execution publish phase events;
 `ExecResult.termination_reason` distinguishes `timeout` from ordinary `exited`
 without parsing output or exit-code conventions. SSH adds source-owned connection,
-SFTP and channel phases. See [SSH limits](ssh/README.md).
+SFTP and channel phases. See [SSH limits](methods/remote/README.md).
 Operation metadata excludes command text, credentials and remote banners.

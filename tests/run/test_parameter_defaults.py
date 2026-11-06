@@ -68,8 +68,7 @@ class ParameterDefaultTests(unittest.IsolatedAsyncioTestCase):
                                               context_pipeline=runtime.context_pipeline)
                 self.assertFalse(result.is_error)
                 reducer = runtime.components['layered-compaction-state']
-                # Fresh runtimes intentionally receive different resource URIs.
-                base = provider.calls[0]['system_prompt'].split('<!-- fruitfly:tool-catalog:start -->', 1)[0].rstrip()
+                base = provider.calls[0]['system_prompt'].rstrip()
                 return base, reducer.config.trigger_ratio
             finally:
                 for resource in reversed(owned):
@@ -187,7 +186,7 @@ from fruitfly_agent.lab.context_manager.reduction.methods.working_memory import 
 assert Path(config.__file__).is_relative_to(root)
 assert config.WorkingMemoryConfig().maintenance_ratio == .5
 catalog = builtin_catalog()
-for name, role in [('base_prompt','H'), ('skill-document','S'), ('improvement-editor','I')]:
+for name, role in [('base_prompt','H'), ('skill-library','S'), ('improvement-editor','I')]:
     assert read_default(catalog, name)[0].role == role
 '''
         result = subprocess.run([sys.executable, '-I', '-B', '-c', code, str(frozen)],

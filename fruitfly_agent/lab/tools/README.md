@@ -5,7 +5,7 @@
 File, shell, IPython and public web operations implementing Core's `AgentTool`. Local tools use the host's execution environment; web tools use injected HTTP clients.
 
 Read, write, edit and Bash use the selected backend, including the optional
-[SSH environment](../environment/ssh/README.md). IPython remains local and is
+[SSH environment](../environment/methods/remote/README.md). IPython remains local and is
 incompatible with the SSH selection.
 
 ## Factories and files
@@ -13,13 +13,11 @@ incompatible with the SSH selection.
 | File | Factory / responsibility |
 |---|---|
 | [builtin.py](builtin.py) | `builtin_tools()` collects the file and shell tools. |
-| [read.py](read.py) | `create_read_tool`: text pagination and image reading |
-| [bash.py](bash.py) | `create_bash_tool`: commands and live output |
-| [edit.py](edit.py) | `create_edit_tool`: unique, non-overlapping text replacement |
-| [write.py](write.py) | `create_write_tool`: file writes |
-| [media.py](media.py) | `create_save_media_tool` using host-granted resources and the shared Core media limits |
-| [ipython.py](ipython.py) | `create_ipython_tool`: explicit Python workspace integration |
-| [catalog.py](catalog.py) | One editable tool policy; detailed usage through scoped read-only resources |
+| [read.py](methods/read/algorithm.py) | `create_read_tool`: text pagination and image reading |
+| [bash.py](methods/bash/algorithm.py) | `create_bash_tool`: commands and live output |
+| [edit.py](methods/edit/algorithm.py) | `create_edit_tool`: unique, non-overlapping text replacement |
+| [write.py](methods/write/algorithm.py) | `create_write_tool`: file writes |
+| [ipython.py](methods/ipython/algorithm.py) | `create_ipython_tool`: explicit Python workspace integration |
 | [Web tools](web/README.md) | `web_search` through Brave/Tavily/DeepSeek; `web_fetch` directly or through DeepSeek; disabled by default |
 | [truncate.py](truncate.py) | Head/tail output limits |
 | [path_utils.py](path_utils.py), [file_queue.py](file_queue.py) | Path normalization and in-process mutation ordering |
@@ -48,18 +46,11 @@ image API. Path locks coordinate only this process. See [Known limitations](../A
 
 ## Save a media resource
 
-Enable optional `save-media-tool` through ordinary configuration. It installs
-`save_media(resource_id, path)`, separate from text-only `write(path, content)`.
-Run grants IDs from user attachments and image tool results. The tool reads only
-granted resources, verifies content hashes, then writes original bytes (up to
-10 MiB) through `ctx.env.write_file`, the normal write permission and mutation
-queue. SSH destinations stay remote; resource storage stays local. IDs are not
-arbitrary artifact paths. The tool does not generate or convert media.
-
-Media operations retain their fixed schema and implementation. Their detailed usage
-joins the shared Tool catalog. An Improvement backend must explicitly declare
-and supply media-saving capability and its resource grants. Media grants are Session-owned and restored after hash
-checks; no cross-Session sharing or automatic resource collection is added.
+Use `write` with `path` and exactly one of `content` or `resource_id`. Text uses
+`content`; a granted media resource uses `resource_id` to save its original bytes
+without base64 arguments. The same file authorization, read-only resource checks,
+mutation queue and local/remote environment apply. Ungranted IDs and resources
+above 10 MiB fail before writing. Media registration/recovery remains host-owned.
 
 ## Add a tool
 
@@ -95,43 +86,30 @@ purpose, such as `Run menu tests`. Its `describe_call` callback uses that value 
 for observation; it does not change the command, timeout, authorization or outcome.
 Omission or blank text uses the tool label. Do not include credentials in descriptions.
 The factory's full `description` is source-owned tool usage. Catalog assembly
-exposes concise API descriptions and demand-loaded details when `read` is enabled.
+preserves the complete native API description and argument schema.
 
-## Describe visible operations
+## Describe and improve native tools
 
-`tool-catalog` is one H optimization target. Its `parameters.instructions.usage`
-coordinates tool selection, composition, failure recovery and verification. Names,
-schemas, permissions, implementations and individual usage documents stay fixed.
-The policy accepts 1–12000 characters. It uses ordinary artifact binding,
-configuration export, isolated trials, verified activation and recovery.
+Each tool sends its complete description and original parameter schema directly
+to the Provider. Its owner registers `instructions.description` as an H editing
+surface alongside explicitly allowed settings. There is no independent tool
+catalog policy, resource loader or extra read requirement.
 
-| Model input | Content |
-|---|---|
-| System projection | Overall policy, actual tool names/labels and full-usage references |
-| API tool definition | Short operation description and original argument schema |
-| `read(resource://…/tools/<name>.txt)` | Full source-owned usage for the selected tool |
+Tool names, schemas, implementations and permissions remain protected. Parameter
+targets default to `default_selected: false`; explicit grants and a capable
+isolated runner are required. Candidate assembly replaces only the declared fields
+and records actual description/schema fingerprints in `harness.tool_contracts`.
+MCP remains a service source producing distinct native tools. External schemas,
+transport and authorization are protected, and unsupported isolated trials fail.
 
-Details are loaded only when the model calls the existing `read` tool. No loader
-tool is added. Resources are scoped to the runtime, read-only, and independent of
-local/SSH paths. Closing the runtime retires them. Hidden tools are omitted.
-A runtime without visible `read` retains inline descriptions so usage remains
-accessible. Loading is instruction-driven, not an enforced precondition on calls.
+[registration.py](registration.py) composes native tools; [improvement.py](improvement.py)
+binds owner parameter adapters. Each implementation and its canonical defaults live
+under `methods/<name>/`. [Web](web/README.md) owns service adapters; [IPython](methods/ipython/README.md)
+owns its process and model bridge. Shared file queues and resource access stay at
+module level.
 
-Factories must supply complete, standalone usage and concise labels. New tools,
-including prepared external tools, automatically join the assembled catalog.
-No per-tool optimization slots are registered. The catalog's defaults and exact
-adopted policy are exported by the shared configuration path. Its standalone
-surface requires no separate installer; the instruction owner prepares it after
-all tools exist. Candidate backends must derive references from their own tool
-set and fresh resource scope, without borrowing the daily catalog.
-
-Tool parameter targets remain discoverable, but `default_selected: false` keeps
-them out of automatic CLI and chat edit scope. Explicit experiment grants can
-select supported parameters with an appropriate execution backend. This does not
-change model-supplied arguments such as one Bash call's `timeout`.
-
-Offline checks: `tests.lab.test_tool_catalog`, `tests.lab.test_component_targets`,
-`tests.workflows.test_improvement`, `tests.experiments.test_harness_validation`.
+Offline checks: `tests.lab.test_tool_instructions`, `tests.lab.test_parameter_candidates`
+and `tests.workflows.test_multimodal`.
 
 ## Bound and manage shell commands
 
@@ -196,13 +174,9 @@ on the result. Ordinary synchronous tools and model requests remain awaited.
 
 ## Keep defaults and usage identities
 
-[tool-catalog.yaml](tool-catalog.yaml) owns the H tool policy;
-[bash-tool.yaml](bash-tool.yaml) owns Bash parameter defaults. Registry, menu and
-constructor values derive from these documents. Candidate parameter YAML shares
-the same typed validation for instructions and numbers. Tool names, schemas,
-permissions and individual operation contracts remain protected.
+Each method's `defaults.yaml` owns its complete description and declared settings.
+Factories, Catalog parameters, candidates and exports derive from that resource.
+Assembly fingerprints actual tool descriptions and schemas without shortening
+them. These identities describe instructions/contracts, not evidence of tool use
+or model quality. Runtime resources retire when their owning runtime closes.
 
-Assembly records full-usage and Schema SHA-256 fingerprints before shortening API
-descriptions. Run retains them in `harness.tool_contracts`; short API descriptions
-alone are not the complete usage identity. Fresh runtimes rebuild these resources;
-existing resources remain scoped and immutable until closure.

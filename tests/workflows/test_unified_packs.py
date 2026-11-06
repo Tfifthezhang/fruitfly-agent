@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 from fruitfly_agent.interactive import TerminalFrontend
-from fruitfly_agent.interactive.contracts.improvement import WorkflowRequest
+from fruitfly_agent.improvement.contracts.requests import WorkflowRequest
 from fruitfly_agent.lab.improvement.tasks import load_pack
 from tests.support import application as fixtures
 from tests.support.improvers import QueueEditor

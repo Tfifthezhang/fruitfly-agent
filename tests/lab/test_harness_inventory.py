@@ -1,4 +1,6 @@
 """Configured owners, execution support and edit permission remain distinct."""
+
+from fruitfly_agent.lab.catalog import FeatureNode
 from dataclasses import replace
 from types import SimpleNamespace
 import json
@@ -7,7 +9,7 @@ from unittest.mock import Mock
 
 from fruitfly_agent.lab.catalog import (builtin_catalog, resolve_harness, ComponentSpec,
     MechanismDefinition, MechanismDescriptor, MechanismContribution, MechanismEffects, MechanismSelection)
-from fruitfly_agent.lab.improvement.components.parameters import ParameterTarget
+from fruitfly_agent.lab.catalog.adapters.parameters import ParameterTarget
 from fruitfly_agent.runtime_spec import HarnessProfile, execution_kwargs
 
 
@@ -24,12 +26,12 @@ class HarnessInventoryTests(unittest.TestCase):
 
     def test_enabled_state_and_tools_are_discovered_without_running_installers(self):
         catalog = builtin_catalog()
-        selections = tuple(MechanismSelection(name) for name in ('local-env', 'read-tool', 'skill-document'))
+        selections = tuple(MechanismSelection(name) for name in ('local-env', 'read-tool', 'skills'))
         inventory = resolve_harness(HarnessProfile('baseline', mechanisms=selections), catalog)
         self.assertEqual(inventory.tools, ('read',))
-        self.assertEqual({c.component_id for c in inventory.components if c.role == 'S'}, {'skill-document'})
+        self.assertEqual({c.component_id for c in inventory.components if c.role == 'S'}, {'skill-library'})
         with self.assertRaisesRegex(ValueError, 'backend'):
-            inventory.select(('tool-catalog',), frozenset(), frozenset({'I'}))
+            inventory.select(('read-tool',), frozenset(), frozenset({'I'}))
         selected = inventory.select(('base_prompt',), frozenset(), frozenset({'H'}))
         self.assertEqual([c.component_id for c in selected], ['base_prompt'])
 
@@ -39,11 +41,12 @@ class HarnessInventoryTests(unittest.TestCase):
             'Provide an arbitrary offline fixture component.', contributions=(MechanismContribution('online', 'context', 'augmentation'),),
             effects=MechanismEffects(tools=('fixture-operation',))), installer,
             implementation_path=__file__, documentation_path='tests/lab/README.md',
-            component_specs=lambda parameters, enabled: (ComponentSpec('fixture-state', 'S'),) if enabled else ())
+            component_specs=lambda parameters, enabled: (ComponentSpec('fixture-state', 'S'),) if enabled else (), feature_path=(FeatureNode('fixture', 'Fixture'),))
         catalog = builtin_catalog().extended((definition,))
         enabled = resolve_harness(HarnessProfile('baseline', mechanisms=(MechanismSelection('fixture-owner'),)), catalog)
         disabled = resolve_harness(HarnessProfile('baseline'), catalog)
-        self.assertIn('tool-catalog', {c.component_id for c in enabled.components})
+        self.assertIn('base_prompt', {c.component_id for c in enabled.components})
+        self.assertNotIn('tool-catalog', {c.component_id for c in enabled.components})
         self.assertFalse(any(c.component_id.startswith('tool-guidance.') for c in enabled.components))
         self.assertIn('fixture-state', {c.component_id for c in enabled.components})
         self.assertNotIn('fixture-state', {c.component_id for c in disabled.components})

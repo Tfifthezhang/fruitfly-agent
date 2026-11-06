@@ -19,8 +19,8 @@ class _Context:
         tool_names=("read", "bash"),
         mechanisms=("compaction", "memory"),
         mechanism_details=(
-            InteractiveMechanism("compaction", "context-manager", "Compaction", display_section="reduction"),
-            InteractiveMechanism("memory", "context-manager", "File memory", display_section="augmentation"),
+            InteractiveMechanism("compaction", "context", "Compaction", display_section="reduction"),
+            InteractiveMechanism("memory", "context", "File memory", display_section="augmentation"),
         ),
     )
 
@@ -73,7 +73,7 @@ class CommandRouterTest(unittest.TestCase):
 
         self.assertIn("model: offline-model", status.text)
         self.assertIn("Lab · Active session", lab.text)
-        self.assertIn("Context Manager", lab.text)
+        self.assertIn("Context", lab.text)
         self.assertIn("Reduction: Compaction", lab.text)
         self.assertIn("Augmentation: File memory", lab.text)
         self.assertIn("Tools\n  read: Enabled\n  bash: Enabled", lab.text)
@@ -94,7 +94,7 @@ class CommandRouterTest(unittest.TestCase):
                 mechanism_details=(
                     InteractiveMechanism(
                         "information-context",
-                        "context-manager",
+                        "context",
                         "Information context",
                         "online",
                         "context",
@@ -103,7 +103,7 @@ class CommandRouterTest(unittest.TestCase):
                     ),
                     InteractiveMechanism(
                         "rlm-ipython",
-                        "context-manager",
+                        "context",
                         "Programmatic Context (RLM)",
                         "online",
                         "context",
@@ -117,7 +117,7 @@ class CommandRouterTest(unittest.TestCase):
             InteractiveCommand(name="lab"), ContextManagerContext()
         )
 
-        self.assertIn("Context Manager", result.text)
+        self.assertIn("Context", result.text)
         self.assertIn("Augmentation: Information context", result.text)
         self.assertNotIn("Selection", result.text)
         self.assertIn(
@@ -144,7 +144,7 @@ class CommandRouterTest(unittest.TestCase):
         self.assertNotIn("/steer", HELP_TEXT)
         self.assertNotIn("/candidates", HELP_TEXT)
         self.assertNotIn("/candidate ID", HELP_TEXT)
-        self.assertIn("/improvement [TEXT]", HELP_TEXT)
+        self.assertNotIn("/improvement [TEXT]", HELP_TEXT)
         self.assertEqual(
             self.router.execute(InteractiveCommand(name="steer"), self.context).text,
             "unknown command: /steer; use /help\n",
@@ -177,11 +177,11 @@ class CommandRouterTest(unittest.TestCase):
         self.assertIn("/resume [PATH]", HELP_TEXT)
         self.assertIn("session picker is unavailable", result.text)
 
-    def test_improvement_replaces_eval_and_optimize_without_aliases(self):
+    def test_experiment_commands_are_not_daily_commands(self):
         result = self.router.execute(InteractiveCommand("improvement"), self.context)
-        self.assertIn("/improvement [TEXT]", HELP_TEXT)
-        self.assertIn("menu is unavailable", result.text)
-        for name in ("eval", "optimize"):
+        self.assertNotIn("/improvement [TEXT]", HELP_TEXT)
+        self.assertIn("unknown command", result.text)
+        for name in ("eval", "optimize", "improvement"):
             self.assertNotIn("/" + name, HELP_TEXT)
             self.assertEqual(self.router.execute(InteractiveCommand(name), self.context).text,
                              f"unknown command: /{name}; use /help\n")

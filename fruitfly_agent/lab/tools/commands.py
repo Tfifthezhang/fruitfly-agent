@@ -5,15 +5,15 @@ from fruitfly_agent.runtime_spec.documents import parameter_default
 from fruitfly_agent.core.data_model import AgentToolResult, TextBlock
 from .managed import ManagedOperations
 
-DEFAULT_MAX_ACTIVE = parameter_default(__package__, 'bash-tool.yaml', 'settings.max_active_commands')
-DEFAULT_RETAINED_COMMANDS = parameter_default(__package__, 'bash-tool.yaml', 'settings.retained_commands')
+DEFAULT_MAX_ACTIVE = parameter_default('fruitfly_agent.lab.tools.methods.bash', 'defaults.yaml', 'settings.max_active_commands')
+DEFAULT_RETAINED_COMMANDS = parameter_default('fruitfly_agent.lab.tools.methods.bash', 'defaults.yaml', 'settings.retained_commands')
 
 
 class CommandManager:
     def __init__(self, *, max_active=None, retained_commands=None, output_characters=None):
-        max_active = parameter_default(__package__, 'bash-tool.yaml', 'settings.max_active_commands') if max_active is None else max_active
-        retained_commands = parameter_default(__package__, 'bash-tool.yaml', 'settings.retained_commands') if retained_commands is None else retained_commands
-        output_characters = parameter_default(__package__, 'bash-tool.yaml', 'settings.output_characters') if output_characters is None else output_characters
+        max_active = parameter_default('fruitfly_agent.lab.tools.methods.bash', 'defaults.yaml', 'settings.max_active_commands') if max_active is None else max_active
+        retained_commands = parameter_default('fruitfly_agent.lab.tools.methods.bash', 'defaults.yaml', 'settings.retained_commands') if retained_commands is None else retained_commands
+        output_characters = parameter_default('fruitfly_agent.lab.tools.methods.bash', 'defaults.yaml', 'settings.output_characters') if output_characters is None else output_characters
         self.max_active, self.retained_commands, self.output_characters = max_active, retained_commands, output_characters
         self.operations = ManagedOperations(max_active=max_active, retained=retained_commands, output_characters=output_characters)
 

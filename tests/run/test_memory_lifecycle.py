@@ -25,9 +25,7 @@ class MemoryLifecycleTests(unittest.IsolatedAsyncioTestCase):
         provider = FauxProvider()
         registry = Mock(); registry.create.return_value = provider
         factory = RunApplicationFactory(cwd=root, environment={'FRUITFLY_MODEL_PROFILE': 'offline'}, provider_registry=registry)
-        for key in ('memory-extractor', 'memory-consolidator', 'memory-maintenance'):
-            factory.configuration.set_mechanism(key, enabled=True)
-        factory.configuration.set_parameter('memory-maintenance', 'extract_after_user_chars', '1')
+        factory.configuration.set_parameter('file-memory', 'extract_after_user_chars', '1')
         factory.configuration.save()
         factory.reload_configuration()
         app = AgentApplication(factory); self.addAsyncCleanup(app.close)
@@ -40,7 +38,7 @@ class MemoryLifecycleTests(unittest.IsolatedAsyncioTestCase):
         provider.respond_text('Understood.')
         # Evidence identity is assigned by the Session, so derive it from the
         # actual bounded maintenance request rather than guessing a position.
-        from fruitfly_agent.lab.context_manager.augmentation.information.file_memory.methods.threshold_maintenance.algorithm import ThresholdMaintenance
+        from fruitfly_agent.lab.context_manager.augmentation.memory.methods.file_memory.maintenance import ThresholdMaintenance
         original = ThresholdMaintenance.generate
         async def generate(worker, request, checkpoint, read, **kwargs):
             row = checkpoint['evidence'][0]
@@ -98,7 +96,7 @@ class MemoryLifecycleTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len('interruptedcompleted'), sum(e['chars'] for e in evidence))
 
     async def test_verified_skill_candidate_changes_only_s_and_recovers_exact_resources(self):
-        from fruitfly_agent.interactive.contracts.improvement import WorkflowRequest
+        from fruitfly_agent.improvement.contracts.requests import WorkflowRequest
         from fruitfly_agent.lab.improvement.api import WorkflowBindings
         from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
         from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, EditReason
@@ -154,25 +152,25 @@ class MemoryLifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(version, fresh_factory.system_version())
         self.assertEqual('CANDIDATE RESOURCE BODY', fresh.retained_state('skill')['entries'][0]['body'])
 
-    async def test_instruction_parameter_identity_changes_only_i(self):
+    async def test_maintenance_instruction_identity_changes_only_h(self):
         from fruitfly_agent.lab.catalog import bind_component_changes
         from fruitfly_agent.improvement.contracts.components import ComponentBinding
         from fruitfly_agent.improvement.contracts.versions import canonical_json
         _, factory, app, _, _ = await self.fixture()
         parent = factory.system_version()
-        target = factory._current_targets['memory-extractor']
+        target = factory._current_targets['file-memory']
         parameters = json.loads(target.snapshot().text)
-        parameters['instructions']['prompt'] = 'CANDIDATE INSTRUCTIONS'
+        parameters['instructions']['extraction'] = 'CANDIDATE INSTRUCTIONS'
         text = canonical_json(parameters)
         version = factory._versions.text_candidate(parent, target.snapshot(), text).version
-        profile = bind_component_changes(factory._active_profile, (ComponentBinding('memory-extractor',
-            'configuration', 'component.memory-extractor', target.export_text(text)),))
+        profile = bind_component_changes(factory._active_profile, (ComponentBinding('file-memory',
+            'configuration', 'component.file-memory', target.export_text(text)),))
         candidate = await factory._prepare_profile(profile)
         try:
             self.assertEqual(version, factory._versions.freeze(manifest=candidate.manifest))
             worker = candidate.components['maintenance-workers'][0]
             self.assertEqual('CANDIDATE INSTRUCTIONS', worker.extraction)
-            self.assertEqual((parent.harness, parent.state), (version.harness, version.state))
-            self.assertNotEqual(parent.improver, version.improver)
+            self.assertEqual((parent.improver, parent.state), (version.improver, version.state))
+            self.assertNotEqual(parent.harness, version.harness)
         finally:
             await candidate.close()

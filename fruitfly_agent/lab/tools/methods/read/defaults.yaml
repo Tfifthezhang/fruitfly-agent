@@ -1,0 +1,11 @@
+id: read-tool
+role: H
+implementation: read-tool
+parameters:
+  instructions:
+    description: Read a file in the selected execution environment or a registered
+      resource:// reference. Use for inspecting source code, configuration, logs and
+      saved artifacts. Supports text files and images (jpg, png, gif, webp; up to
+      10 MiB per image). Unsupported binary files are rejected. Text output is truncated
+      to 2000 lines or 50KB (whichever is hit first). Use line offset/limit or character_offset/character_limit
+      for large text.

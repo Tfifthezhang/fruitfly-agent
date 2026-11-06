@@ -15,7 +15,7 @@ from fruitfly_agent.providers.registry import load_model_specs
 from fruitfly_agent.providers.workspace import WorkspacePaths
 from fruitfly_agent.run.configuration import load_harness_config
 from fruitfly_agent.run.configuration.resolution import model_catalog_path
-from fruitfly_agent.interactive.contracts.improvement import WorkflowRequest
+from fruitfly_agent.improvement.contracts.requests import WorkflowRequest
 
 from .sources import resolve_source
 from .policies import stop_policy
@@ -49,7 +49,7 @@ class PreparedExperiment:
         snapshot.update({'operation': self.operation, 'runtime_source': str(self.config_path),
             'profile': self.profile.profile_id, 'model_catalog': str(self.model_path),
             'model_roles': self.model_roles, 'request': asdict(self.request), 'policy_id': self.policy_id,
-            'available': self.source.execution_id not in {'agent-task', 'improver-comparison'}, 'model_connectivity': 'not checked'})
+            'available': not self.source.requires_runner_factory, 'model_connectivity': 'not checked'})
         if not snapshot['available']:
             snapshot['unavailable_reason'] = 'No built-in task executor. Use prepared Eval execution or register TaskRunner/episode ports through the embedding API.'
         from fruitfly_agent.runtime_spec import execution_values
@@ -143,21 +143,15 @@ def prepare_experiment(config, operation, *, require_prepared=True, environment=
             raise ValueError('select the default Agent model explicitly')
         executor = next(iter(specs))
     profile = replace(profile, model_profile=executor)
-    selected = list(profile.mechanisms)
-    existing = next((s for s in selected if s.mechanism_id == 'component-improvement'), None)
-    parameters = dict(existing.parameters) if existing is not None else {}
-    for role in ('editor', 'assessor'):
-        if role in profile.model_roles:
-            binding = profile.model_roles[role]
-            parameters[role + '_profile'] = binding if isinstance(binding, str) else ''
-    for role in ('editor', 'assessor') if operation != 'eval' else ():
-        if role in config.models:
-            parameters[role + '_profile'] = config.models[role]
+    role_bindings = dict(profile.model_roles)
     if operation != 'eval':
-        selected = [s for s in selected if s.mechanism_id != 'component-improvement']
-        selected.append(MechanismSelection('component-improvement', True, parameters))
-    profile = replace(profile, mechanisms=tuple(selected))
-    roles = {'executor': executor, **{role: parameters.get(role + '_profile') or executor for role in ('editor', 'assessor') if operation != 'eval'}}
+        for role in ('editor', 'assessor'):
+            if role in config.models:
+                role_bindings[role] = config.models[role]
+    profile = replace(profile, model_roles=role_bindings)
+    resolved_roles = profile.resolved_model_roles(executor)
+    roles = {'executor': executor, **{role: resolved_roles.get(role, executor)
+        for role in ('editor', 'assessor') if operation != 'eval'}}
     process_env = {**load_env(WorkspacePaths(config.workspace).secret_file()), **(os.environ if environment is None else environment)}
     required = {*roles.values(), *catalog.required_model_profiles(profile.mechanisms)}
     for name in required:

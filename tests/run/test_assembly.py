@@ -8,6 +8,7 @@ from fruitfly_agent.core.data_model import UserMessage
 from fruitfly_agent.core.context import ContextFrame
 from fruitfly_agent.core.session import Session
 from fruitfly_agent.lab.catalog import (
+    FeatureNode,
     MechanismSelection,
     builtin_catalog,
 )
@@ -63,15 +64,15 @@ class RuntimeAssemblyTest(unittest.TestCase):
         skill.parent.mkdir(parents=True); skill.write_text('---\nname: example\ndescription: Read source evidence\n---\nSteps')
         catalog = builtin_catalog()
         selections = tuple(replace(s, parameters={'usage':'Candidate usage policy','max_chars':4000})
-            if s.mechanism_id == 'skill-catalog' else s for s in catalog.default_selections())
+            if s.mechanism_id == 'skills' else s for s in catalog.default_selections())
         profile = HarnessProfile('default', str(self.workspace.model_path), 'offline', selections)
         with Session(root/'candidate.jsonl') as session:
             runtime = self.workspace.assemble(profile,session,catalog=catalog)
-        stage = next(s for s in runtime.context_pipeline.stages if s.stage_id == 'skill-catalog')
+        stage = next(s for s in runtime.context_pipeline.stages if s.stage_id == 'skills')
         text = stage.mechanism.transform(ContextFrame('base',(),(),'offline-model',32)).frame.system_prompt
         self.assertIn('Candidate usage policy',text)
         self.assertIn('<name>example</name>',text)
-        self.assertIn('text-target:skill-catalog',runtime.components)
+        self.assertIn('text-target:skills',runtime.components)
         self.assertNotIn('text-target:skill-catalog.guidance',runtime.components)
 
     def test_oversized_guidance_artifact_fails_runtime_assembly(self) -> None:
@@ -105,7 +106,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
             model_profile="offline",
             mechanisms=tuple(
                 item for item in catalog.default_selections()
-                if item.mechanism_id != "skill-catalog"
+                if item.mechanism_id != "skills"
             ),
         )
         with Session(root / "disabled.jsonl") as session:
@@ -140,7 +141,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
         )
         self.assertEqual(
             runtime.mechanism_ids,
-            ("skill-catalog", "information-context", "layered-compaction", "component-improvement"),
+            ("skills", "file-memory", "layered-compaction"),
         )
         self.assertEqual(runtime.manifest.schema_version, 7)
         self.assertEqual(runtime.manifest.data_artifacts, ())
@@ -198,15 +199,15 @@ class RuntimeAssemblyTest(unittest.TestCase):
 
         catalog = builtin_catalog()
         catalog = LabCatalog(tuple(
-            replace(definition, configuration_category='learning')
-            if definition.descriptor.mechanism_id == 'skill-catalog' else definition
+            replace(definition, feature_path=(FeatureNode('learning', 'Learning'),))
+            if definition.descriptor.mechanism_id == 'skills' else definition
             for definition in catalog.definitions()
         ))
         profile = HarnessProfile('default', str(self.workspace.model_path), 'offline', catalog.default_selections())
         with Session(self.workspace.root / 'overview-category.jsonl') as session:
             runtime = self.workspace.assemble(profile, session, catalog=catalog)
         _, details, _ = describe_runtime(runtime, catalog)
-        view = next(item for item in details if item.mechanism_id == 'skill-catalog')
+        view = next(item for item in details if item.mechanism_id == 'skills')
         self.assertEqual('learning', view.category)
 
     def test_builtin_tools_are_individually_selectable(self) -> None:
@@ -253,7 +254,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
         for enabled in (False, True):
             mechanisms = base.mechanisms
             if enabled:
-                mechanisms = (*mechanisms, MechanismSelection("knowledge-files"))
+                mechanisms = (*mechanisms, MechanismSelection("information-context"), MechanismSelection("knowledge-files"))
             profile = HarnessProfile(
                 "default",
                 model_catalog=str(model_path),

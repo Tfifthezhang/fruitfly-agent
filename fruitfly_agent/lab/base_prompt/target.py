@@ -2,7 +2,7 @@
 from fruitfly_agent.improvement.contracts.optimization import OptimizationSpec
 from dataclasses import replace
 from fruitfly_agent.improvement.contracts.optimization import TargetBinding, TargetSnapshot
-from fruitfly_agent.lab.improvement.targets.text import validate_text
+from fruitfly_agent.improvement.contracts.text import validate_text
 
 
 class BasePromptTarget:
@@ -41,4 +41,6 @@ def configuration_surface():
         return {}
     return ConfigurationSurface('base_prompt','H','prompt','',normalize,
         encode=lambda p:p['instructions']['system'], decode=lambda text:{'instructions':{'system':text}},
-        edit_options=options,reference=reference, default_resource=(__package__, 'defaults.yaml'))
+        edit_options=options,reference=reference, default_resource=(__package__, 'defaults.yaml'), standalone=True,
+        optimization=BasePromptTarget.optimization, kind='system-prompt',
+        target_factory=lambda state, context, parameters: BasePromptTarget(state.config.system_prompt))

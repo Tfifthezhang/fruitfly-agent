@@ -6,7 +6,7 @@
   "target_schema": "text-v1",
   "compatible_targets": [
     "base_prompt",
-    "skill-catalog.guidance"
+    "skills"
   ],
   "objective": {
     "policy_id": "python-function-tests-v1",

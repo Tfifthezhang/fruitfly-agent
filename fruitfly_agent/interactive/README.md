@@ -78,7 +78,11 @@ To add a frontend, consume Application's public operations and the capability pr
 
 Replacement paths share preparation and retirement: start resources, bind events, invoke activation, then switch the active handle. Failed replacement keeps the active handle; failure to retire the previous handle is exposed through `last_error` after a successful switch. Configuration writes and external side effects do not automatically roll back. No source hot reload or cross-process activation transaction. Improvement progress covers the current batch, not overall search completion.
 
-Resume continues canonical history in the original file with the selected current configuration. Discovery exposes availability/reasons rather than filtering by the active manifest digest. Run records changed environments after successful startup; history display never triggers model/tool replay. `/improvement` selects current instructions, explicit input files or saved task packages for a bounded component workflow. The light panel selects explicit material and inputs for a simple base-prompt comparison; advanced settings and H/S/I experiments use the independent experiment CLI with file configuration. Results and history include empty/failed/cancelled experiments, and candidates remain subject to human adoption. Container benchmark evaluation belongs to the optional external Eval CLI.
+Resume continues canonical history in the original file with the selected current configuration. Discovery exposes availability/reasons rather than filtering by the active manifest digest. Run records changed environments after successful startup; history display never triggers model/tool replay. Daily `/skills` and `/memory` inspect retained content through injected
+services. Advanced H/S/I experiments use the independent experiment CLI and file
+configuration. Programmatic search, candidate and task-material capabilities stay
+available to embedding hosts. Container benchmark evaluation belongs to the
+optional external Eval CLI.
 
 ## Modules
 

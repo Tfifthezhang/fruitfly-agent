@@ -31,7 +31,7 @@ class ExecutionLimitTests(unittest.IsolatedAsyncioTestCase):
             profile = HarnessProfile('baseline', model_profile='offline', execution={'max_tool_calls_per_turn': 128})
             path = root / 'config.yaml'
             save_harness_config(path, HarnessConfig('baseline', {'baseline': profile}))
-            self.assertEqual(load_harness_config(path).select().to_runtime_dict(), profile.to_runtime_dict())
+            self.assertEqual(load_harness_config(path).select().execution, {}, 'host conditions have no YAML editing surface')
             with Session(root / 'one.jsonl') as session:
                 changed = build_runtime(profile, config_path=path, catalog=builtin_catalog(), environment={},
                     session=session, cwd=root, provider_registry=providers)

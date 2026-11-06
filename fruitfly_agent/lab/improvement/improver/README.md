@@ -34,7 +34,7 @@ reference policy; candidate judgments cannot verify their own adoption.
 | File | Owns |
 |---|---|
 | [registration.py](registration.py) | Definition, public parameters and source preparation |
-| [materials.py](materials.py) | Strict bounded manifest and disjoint task-package freezing |
+| [Episode materials](../materials/episodes.py) | Strict bounded manifest and disjoint task-package freezing |
 | [episodes.py](episodes.py) | Fresh fixed-I inner workflow and private task checks |
 | [runner.py](runner.py) | One-editor trials, attributable reports and development measurements |
 | [verification.py](verification.py) | Alternating paired repeats, acceptance and immutable proof |
@@ -177,18 +177,15 @@ not import Eval. A task runner alone does not install an episode study.
 
 Research, progress, evidence access and search schedules are fixed experiment conditions. Editor and evaluator prompts are mutable I surfaces. See [experiment conditions](../../../experiments/CONFIGURATION.md).
 
-## Compare memory editing instructions
+## Share episode execution without sharing I ownership
 
-The registered `memory-maintenance-comparison` execution evaluates I
-`memory-extractor` and `memory-consolidator` through the S updates they produce.
-Its only downstream component is `memory-library`; enable `memory-maintenance`
-and both I owners in the baseline. Explicit disjoint task packages supply training
-inputs and independent private checks through the existing material contract.
-A registered downstream runner must support configuration materialization. No
-production memory writer enters an episode. The comparison reuses paired trials,
-verification receipts and ordinary I activation. General editor comparison rejects
-these targets because it does not implement their generation semantics. See the
-[memory owner](../../context_manager/augmentation/information/file_memory/README.md).
+The generic [episode runner](../execution/episodes.py), [frozen materials](../materials/episodes.py)
+and [paired verification](../verification/episodes.py) support both editor studies
+and ordinary H learning studies. They receive explicit roles and episode factories.
+They contain no memory implementation or editor-specific dispatch.
 
-Memory maintenance comparisons select exactly one editor operation per study.
-This keeps the changed I prompt tied to the operation actually executed.
+Memory extraction and consolidation are ordinary H execution instructions. Their
+[File memory learning executor](../../context_manager/augmentation/memory/methods/file_memory/README.md)
+compares trial-local S updates and downstream tasks. It is registered by the
+memory owner, independently of I editor/evaluator comparison.
+

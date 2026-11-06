@@ -60,8 +60,9 @@ Provider scope calibration, exact-count fallback and auxiliary preflight.
 valid measured requests. These fake episodes establish covered runtime behavior,
 not model quality or benchmark gains.
 
-`test_tool_catalog.py` checks demand-loaded usage, protected tool contracts and
-isolated policy candidates. `test_execution_registration.py` covers explicit
+`test_tool_instructions.py` checks native descriptions, protected tool contracts
+and isolated candidates. `test_feature_classification.py` checks that one owner
+path drives menus and optimization discovery, including registration conflicts. `test_execution_registration.py` covers explicit
 backend requirements and rejection before model calls. Catalog assembly and
 resource-materialization tests cover cleanup and frozen dependencies. `test_context_history.py` checks ordinary
 read routing, long-line pagination and session isolation.
@@ -76,3 +77,7 @@ failed-attempt cooldown, successful-prefix retention and total update deadlines.
 Managed-command tests cover independent work, isolated listeners and retirement.
 
 `test_evidence_index.py` owns format decoding, source spans, call/result relationships, explicit partial coverage and stale-view invalidation. `test_evidence_coverage.py` owns multidimensional completeness and missing captured-byte detection.
+
+`test_memory_comparison.py` covers H learning instructions, isolated S updates,
+owner-registered task material and independent paired verification.
+`test_memory_maintenance.py` checks thresholds and model-call suppression.

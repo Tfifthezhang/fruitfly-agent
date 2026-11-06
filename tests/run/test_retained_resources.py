@@ -23,8 +23,8 @@ from fruitfly_agent.lab.catalog import builtin_catalog
 from fruitfly_agent.lab.context_manager.augmentation.skills.library import builtin_entries
 assert len(builtin_entries()) == 4
 catalog = builtin_catalog()
-assert catalog.get('memory-maintenance').descriptor.normalize_parameters({})['extract_after_user_chars'] == 8000
-assert catalog.get('memory-extractor').descriptor.normalize_parameters({})['prompt']
+assert catalog.get('file-memory').descriptor.normalize_parameters({})['extract_after_user_chars'] == 8000
+assert catalog.get('file-memory').descriptor.normalize_parameters({})['extraction']
 print('retained resources loaded from frozen material')
 '''
             result = subprocess.run([sys.executable, '-I', '-c', script, str(frozen)], cwd=root,

@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 import asyncio
 from fruitfly_agent.improvement.contracts.candidates import CandidateBundle
-from typing import Callable
+from typing import Callable, Any
 from uuid import uuid4
 
 from fruitfly_agent.improvement.contracts.plans import RunPlan
@@ -43,7 +43,9 @@ class RunComponentJobs:
                  targets, generators=None, runner=None, selector=None,
                  reflector=None, verifier=None, measurements=None, workflow_factory=None,
                  tasks=None, publish=None, editor=None, inspector=None, components=None, executions=None, stop_policy=None,
-                 component_options=None, hooks=None, delivery_backend=None, workflow_settings=None, evidence_settings=None):
+                 component_options=None, hooks=None, delivery_backend=None, workflow_settings=None, evidence_settings=None,
+                 resource_factories=None):
+        self.resource_factories: Callable[[], dict[str, Any]] = resource_factories or (lambda: {})
         self.workflow_settings = dict(workflow_settings or {})
         self.evidence_settings = dict(evidence_settings or {})
         self.component_options = json.loads(json.dumps(component_options or {}, allow_nan=False))
@@ -119,7 +121,8 @@ class RunComponentJobs:
             remaining_verification=self.verification_uses.remaining,
             assessor_config=self.assessor_configuration() if self.assessor_configuration else self.editor_configuration(),
             completed_assessment_factory=self.completed_assessment,
-            generator_definitions=self.generators.definitions(), system_settings=self.system_settings(), workflow_settings=self.workflow_settings, evidence_settings=self.evidence_settings, hooks_factory=self.hooks_factory, delivery_backend=self.delivery_backend)
+            generator_definitions=self.generators.definitions(), system_settings=self.system_settings(), workflow_settings=self.workflow_settings, evidence_settings=self.evidence_settings, hooks_factory=self.hooks_factory, delivery_backend=self.delivery_backend,
+            resource_factories=dict(self.resource_factories()))
 
     def workflow_configuration(self):
         context = self.context()
@@ -136,10 +139,15 @@ class RunComponentJobs:
                 tuple(ImprovementParameterView(p.name, p.label, p.kind, p.default, p.minimum, p.maximum,
                     'execution', p.description) for p in definition.parameters), definition.notice, definition.defaults))
         primary = views[0]
+        inventory = (self.manifest() or {}).get('harness', {})
+        owners = dict(inventory.get('owners', ()))
+        coordinates = {row['component_id']: tuple(row.get('feature_path', ()))
+                       for row in inventory.get('components', ())}
         components = tuple(WorkflowComponentView(d.component_id,
             getattr(getattr(context.components.adapters[d.component_id], 'target', None), 'label', d.component_id),
             d.kind, d.role, d.component_id in primary.component_ids,
-            '' if d.component_id in primary.component_ids else 'Choose an execution strategy supporting this component.') for d in documents)
+            '' if d.component_id in primary.component_ids else 'Choose an execution strategy supporting this component.',
+            owners.get(d.component_id, ''), coordinates.get(d.component_id, ())) for d in documents)
         measured = self.measurements is not None or any(c.choice_id and c.available for v in views for c in v.materials)
         generators = tuple(WorkflowChoice(d.generator_id, d.label,
             not (d.required_capabilities - ({'editor', 'model'} | ({'measurements'} if measured else set()))),

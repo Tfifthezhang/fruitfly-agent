@@ -21,7 +21,6 @@ Use FruitFlyAgent through stdin/stdout, menus, and live events. Application owns
 | Clear a draft | First Ctrl+C while idle; normal submitted input resets the double-press interval. |
 | Restore a conversation | `/resume` to choose a session; `/resume PATH` to switch directly. |
 | Review live details | `/trace` |
-| Search or review candidates | `/improvement [DIRECTION]` |
 
 POSIX ANSI terminals support live input, history, cancellation, and bracketed paste. Non-ANSI POSIX TTY input uses a stoppable canonical reader and handles SIGINT while a run is waiting. Redirected input uses sequential line-based fallback and cannot consume `/cancel` during a run. Display limits do not alter model context or stored messages. `NO_COLOR` and terminal capabilities affect rendering.
 
@@ -119,28 +118,18 @@ binding within that form. `/clear` clears an ordinary field; required-field
 validation still applies. Hidden input and review reuse the model form's echo,
 history, cancellation and staging behavior. The host owns secret-file writes.
 
-## Improve against a task set
+## Inspect retained content
 
-`/improvement [DIRECTION]` opens a small task-material panel for one simple
-base-prompt comparison. Choose explicit instructions/files or a saved package,
-then review the frozen preview before submission. Advanced H/S/I experiments,
-models, strategies and allocations use the independent experiment CLI and files;
-chat does not edit experiment configuration.
+`/skills` lists installed visible Skill names and descriptions. `/skills read ID`
+shows one retained procedure. `/memory` lists notes, counters and pending upkeep;
+its read/commit/reject/retry actions consume the host's retained-state capability.
+No model request is made by listing or reading these records. Models use ordinary
+read resources for on-demand bodies during a task.
 
-| Action | Behavior |
-|---|---|
-| Start improvement | Fresh preview and one confirmation, defaulting to Cancel; model work may incur charges |
-| Task / Input files | Select explicit task materials |
-| Pending experience | Review and explicitly commit or reject lessons while idle |
-| Return to chat while running | Continue Application-owned work; inspect `/status`, `/cancel`, or Results and history |
-| Results and history | Inspect every submitted run, including empty, failed and cancelled experiments |
-| Review candidate | Assessment, comparison, usage, changes, original/candidate text, scope and evidence |
-| Set as next-session default | Confirm a saved configuration change without replacing the active session |
-| Set default and start a new session | Confirm the default change and open an empty session |
-
-Back/Esc cancels active field input, then collapses a section, then returns to chat. Draft fields remain intact. `q` exits menu mode and is literal text during field input. Cyan focus and green enabled/selected markers remain distinct; Modified/warnings use yellow and errors use red. Section titles and indentation express hierarchy. Raw-key menus omit row numbers; line fallback retains them. `NO_COLOR` preserves symbols and text. Confirmation always starts with Cancel selected. Detail actions default to Back; `n`/`p` switch sections, PageUp/PageDown page text. Numbered fallback accepts next/previous and pageup/pagedown. Cancellation and outcomes remain visible after restoring chat. Candidates are already stored and do not guarantee improvement.
-
-Current tasks and saved packages use the same running/result flow. Raw TTY input polls through the existing reader to refresh progress and offer return/cancel actions. Redirected/non-polling input waits for completion and cannot consume `/cancel` during the wait. Progress measures the current batch, not overall completion. Results expose the stop reason and measured evidence even when no candidate is published. See the [feature guide](features/improvement/README.md).
+Improvement and RSI use the independent experiment CLI or embedding services.
+Daily commands and configuration expose no experiment editor or candidate panel.
+Generic menu navigation retains Back/Esc, paging, cancel-by-default confirmations
+and line-input fallback for configuration and startup flows.
 
 ## Inspect the active harness
 
@@ -154,10 +143,7 @@ metadata show Unavailable rather than assuming local execution.
 
 `/lab` inspects the current runtime, including tools and execution capabilities.
 It reads a supplied status snapshot, so saved configuration drafts do not appear
-as active. Unselected algorithms remain available through `/config`. Hidden
-internal aggregation components stay hidden. Improvement appears as Available
-only when the host supplies the component-workflow capability; inspection starts
-no work.
+as active. Unselected algorithms remain available through `/config`. Hidden internal aggregation components stay hidden. Inspection starts no work.
 
 Section titles have compact color blocks. Bodies remain unfilled and use aligned
 rows, with explicit Not enabled text for empty context phases. Example content
@@ -166,8 +152,8 @@ for a runtime with an SSH backend:
 ```text
 Lab · Active session
 
-Context Manager
-  Augmentation     Skill catalog
+Context
+  Augmentation     Skills · File memory
   Externalization  Not enabled
   Reduction        Working memory
 
@@ -182,8 +168,6 @@ Tools
   read   Read files
   bash   Run shell commands
 
-Improvement
-  Component workflow  Available · /improvement
 ```
 
 Actual rows follow host-provided runtime metadata. Unknown categories and missing
@@ -225,7 +209,6 @@ Names are lowercase, path-free tokens. Duplicate registration raises an error. T
 |---|---|
 | [frontend.py](frontend.py) | Single input owner, menu lending, and command dispatch |
 | [bindings.py](bindings.py), [commands.py](commands.py) | Optional host capabilities and asynchronous command registration |
-| [notifications.py](notifications.py) | Deduplicated improvement progress and candidate notices |
 | [I/O](io/README.md) | Line/key readers, live terminal control, menu primitives, and shared safe text utilities |
 | [Rendering](rendering/README.md) | Events, history, Markdown, welcome, and branding |
 | [Features](features/README.md) | Configuration, restoration, and improvement; each package keeps its handler and menu together |

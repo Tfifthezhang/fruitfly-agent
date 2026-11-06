@@ -197,12 +197,12 @@ def _lab(
         grouped.setdefault("improvement", [])
     grouped.setdefault("environment", [])
     order = {name: index for index, name in enumerate((
-        "context-manager", "environment", "tools", "workflow", "improvement",
+        "context", "environment", "tools", "workflow", "improvement",
     ))}
     sections = []
     for category in sorted(grouped, key=lambda name: (order.get(name, len(order)), name)):
         mechanisms = grouped[category]
-        if category == "context-manager":
+        if category == "context":
             phases: dict[str, list[str]] = {}
             for item in mechanisms:
                 phase = item.display_section or item.context_phase or "other"
@@ -225,8 +225,6 @@ def _lab(
             rows.extend((name, "Enabled") for name in dict.fromkeys(status.tool_names) if name not in described)
         else:
             rows = [(item.label, "Enabled") for item in mechanisms]
-        if category == "improvement" and status.improvement_available:
-            rows.append(("Component workflow", "Available · /improvement"))
         if rows:
             sections.append(CommandSection(category, _category_label(category), tuple(rows)))
     if not sections:
@@ -250,10 +248,6 @@ def _lab(
 
 def _category_label(category: str) -> str:
     return category.replace("-", " ").replace("_", " ").title()
-
-
-def _improvement_unavailable(command: InteractiveCommand, context: CommandContext) -> CommandResult:
-    return CommandResult(text="the /improvement menu is unavailable in this embedded frontend\n")
 
 
 def _trace(
@@ -315,7 +309,6 @@ _BUILTIN_ENTRIES: tuple[tuple[CommandDescription, CommandHandler | None], ...] =
     (CommandDescription('exit', 'leave the interactive session', aliases=('quit',)), _exit),
     (CommandDescription('config', 'requires a configuration frontend', '/config', False), _configuration_unavailable),
     (CommandDescription('resume', 'requires a session picker', '/resume [PATH]', False), _resume_unavailable),
-    (CommandDescription('improvement', 'requires an improvement frontend', '/improvement [TEXT]', False), _improvement_unavailable),
 )
 _ALIASES = {alias: description.name for description, _ in _BUILTIN_ENTRIES for alias in description.aliases}
 # Router reference, including frontend placeholders; live help uses effective registrations.

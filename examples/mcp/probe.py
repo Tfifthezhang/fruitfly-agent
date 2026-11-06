@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import time
 
-from fruitfly_agent.lab.mcp.client import McpClient
+from fruitfly_agent.lab.mcp.methods.stdio.client import McpClient
 from fruitfly_agent.lab.mcp.config import load_config
 from fruitfly_agent.lab.mcp.results import ResultStore
 from fruitfly_agent.lab.mcp.tools import make_tools

@@ -10,7 +10,7 @@ of editing, scoring and execution backends.
 | [Runtime registry](../../../improvement/components/README.md) | Distinct ownership, complete snapshots, schema validation and nonconflicting exports |
 | `text.py` | One typed `parameters.yaml` view over object-owned H/S/I execution codecs |
 | `files.py` | Explicit multi-file component validation; no implied execution support |
-| `parameters.py` | Owner-declared mechanism parameter grants and shared configuration materialization |
+| [Catalog parameter adapter](../../catalog/adapters/parameters.py) | Owner-declared mechanism parameter grants and shared configuration materialization |
 | `changes.py` | Add/replace/remove UTF-8 files with parent/content preconditions |
 
 `ChangeSet` consumes immutable artifacts and returns a new document. It does not
@@ -35,7 +35,7 @@ H/S/I components from active owners. Execution capabilities and experiment
 permission further restrict them. Inactive state owners do not create S targets.
 A selected component unsupported by any task collection fails before execution.
 Tool parameters remain available for explicit grants but are excluded from
-automatic edit scope. The shared Tool catalog policy is a default target.
+automatic edit scope. Native tool descriptions share their owner targets and require explicit selection.
 
 `ComponentRegistry.configure` validates component-owned `component_options` and
 enforces them again on each candidate. `RunPlan` freezes these options into
@@ -44,8 +44,7 @@ IDs; other registered baseline components must remain unchanged.
 
 Bindings include `prompt`, `artifact` and `configuration`. Configuration bindings
 name a supported declarative section; they cannot write arbitrary profile fields.
-[Execution policy](../../execution_policy/README.md) uses `configuration / execution`
-for fixed runtime conditions and H identity; it has no optimization target.
+Host execution conditions remain fixed and recorded; they have no candidate binding.
 
 
 ## Edit owner parameters

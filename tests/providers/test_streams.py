@@ -12,7 +12,7 @@ from fruitfly_agent.providers.openai import OpenAIProvider
 from fruitfly_agent.providers.anthropic import AnthropicProvider
 from fruitfly_agent.lab.base_prompt import DEFAULT_PROMPT
 from fruitfly_agent.lab.tools.builtin import builtin_tools
-from fruitfly_agent.lab.tools.ipython import create_ipython_tool
+from fruitfly_agent.lab.tools.methods.ipython.algorithm import create_ipython_tool
 from fruitfly_agent.lab.tools.web import WebClient, create_web_fetch_tool, create_web_search_tool
 from tests.support.loop import make_tool
 

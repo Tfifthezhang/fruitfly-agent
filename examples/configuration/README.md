@@ -42,10 +42,10 @@ The default system selects H context directories, S `memory-library` and
 `skill-library`, and I editor/evaluator instructions through registered defaults.
 Four packaged coding Skills are available on demand; memory starts empty.
 Initialization does not write learned state or make model calls. Enable H
-`memory-maintenance` and I `memory-extractor` / `memory-consolidator` explicitly for
+H `file-memory` automatic maintenance for
 threshold-based cross-session updates, then review pending batches with `/memory`.
 The lazy `models.roles.memory_maintenance` reference inherits executor by default.
-See [memory behavior](../../fruitfly_agent/lab/context_manager/augmentation/information/file_memory/README.md)
+See [memory behavior](../../fruitfly_agent/lab/context_manager/augmentation/memory/methods/file_memory/README.md)
 and [Skill optimization](../../fruitfly_agent/lab/context_manager/augmentation/skills/README.md#improve-descriptions-and-bodies).
 Candidate editing additionally needs an explicit
 [experiment grant](../../fruitfly_agent/experiments/CONFIGURATION.md#grant-component-changes).
@@ -120,7 +120,7 @@ service definitions; it contains no model-specific policies. See the
 
 ## Configure other services
 
-For an external execution server, follow [SSH environment setup](../../fruitfly_agent/lab/environment/ssh/README.md).
+For an external execution server, follow [SSH environment setup](../../fruitfly_agent/lab/environment/methods/remote/README.md).
 Startup of an SSH profile opens a verified SSH connection; file and Bash tools
 operate on the server. Copy the SSH template only when the destination is absent,
 or merge its mechanism settings into your existing profile. Keep account and

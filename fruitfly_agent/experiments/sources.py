@@ -24,6 +24,7 @@ class SourceBinding:
     required_components: tuple[str, ...] = ()
     forbidden_components: tuple[str, ...] = ('improvement-editor', 'improvement-evaluator')
     task_set: Any = None
+    requires_runner_factory: bool = False
 
 
 def task_material(config):
@@ -63,7 +64,7 @@ def task_material(config):
         task.get('parameters', {}), {'assessment_interval', 'delivery_manifest'}, 'task adapter parameters').items()))
     return SourceBinding('agent-task', pack, instruction, relative, tuple(sorted(parameters.items())), bool(pack),
         source_identity=identity,
-        persistent_policy='task-holdout-v1' if pack and catalog.holdout(pack) else '')
+        persistent_policy='task-holdout-v1' if pack and catalog.holdout(pack) else '', requires_runner_factory=True)
 
 
 def editor(config):
@@ -85,13 +86,13 @@ def editor(config):
     if not parameters['inner_components'].split():
         raise ValueError('declare inner editable components')
     from types import SimpleNamespace
-    from fruitfly_agent.lab.improvement.improver.materials import freeze
+    from fruitfly_agent.lab.improvement.materials.episodes import freeze
     from fruitfly_agent.lab.improvement.tasks import TaskPackCatalog
     frozen = freeze(SimpleNamespace(workspace=config.workspace, tasks=TaskPackCatalog(config.workspace)),
         material, parameters['inner_components'].split()[0])
     return SourceBinding('improver-comparison', material, parameters=tuple(sorted(parameters.items())), measured=True,
         source_identity=frozen.source_id, persistent_policy='improver-paired-v1',
-        required_components=(), forbidden_components=())
+        required_components=(), forbidden_components=(), requires_runner_factory=True)
 
 
 def benchmark(config):
@@ -105,6 +106,34 @@ def benchmark(config):
 
 
 SOURCES = {'files': task_material, 'editor': editor, 'eval': benchmark}
+
+
+def registered(config):
+    """Use an execution owner's offline material and adoption declarations."""
+    from types import SimpleNamespace
+    from fruitfly_agent.lab.improvement.execution import builtin_executions
+    from fruitfly_agent.lab.improvement.tasks import TaskPackCatalog
+    task = mapping(config.task, {'source', 'execution', 'material', 'parameters'}, 'registered task')
+    execution, material = task.get('execution'), task.get('material')
+    if not isinstance(execution, str) or not isinstance(material, str) or not material:
+        raise ValueError('registered task requires execution and material')
+    definition = builtin_executions().get(execution)
+    if definition.material_snapshot is None:
+        raise ValueError('execution has no offline material snapshot declaration')
+    supplied = task.get('parameters', {})
+    if not isinstance(supplied, dict):
+        raise ValueError('execution parameters must be a mapping')
+    parameters = definition.normalize(tuple(supplied.items()))
+    frozen = definition.material_snapshot(SimpleNamespace(workspace=config.workspace,
+        tasks=TaskPackCatalog(config.workspace)), material, parameters)
+    return SourceBinding(execution, material, parameters=tuple(sorted(parameters.items())), measured=True,
+        source_identity=frozen.source_id, persistent_policy=definition.persistent_policy,
+        required_components=definition.required_components, requires_runner_factory=definition.requires_runner_factory,
+        forbidden_components=tuple(name for name in ('improvement-editor', 'improvement-evaluator')
+            if 'I' not in definition.roles))
+
+
+SOURCES['registered'] = registered
 
 
 def task_set(config):

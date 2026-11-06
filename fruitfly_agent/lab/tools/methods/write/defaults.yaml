@@ -1,0 +1,11 @@
+id: write-tool
+role: H
+implementation: write-tool
+parameters:
+  instructions:
+    description: Write a complete text file in the selected execution environment
+      (local or SSH). Use for creating files or replacing their entire contents. Creates
+      the file if it doesn't exist, overwrites if it does. Automatically creates parent
+      directories. Alternatively provide resource_id instead of content to save an
+      existing granted media resource as original bytes. Provide exactly one source;
+      no generation, conversion or automatic download occurs.

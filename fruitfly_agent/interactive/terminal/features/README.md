@@ -11,7 +11,6 @@ Keep each user-facing function's command flow and menus in one package. Features
 | [Resume](resume/README.md) | Session selection, restoration requests, and history display |
 | [tool_services/approval.py](tool_services/approval.py) | TTY-only external process startup review while ordinary terminal input is suspended |
 | [Retained state](retained_state/README.md) | Memory and Skill inspection and batch review |
-| [Improvement](improvement/README.md) | Task source selection, iterative improvement, candidate review/activation, and saved cases |
 | [assembly.py](assembly.py): bind_commands | Bind available built-in features and cancellation to the terminal registry |
 | [attachments.py](attachments.py): `AttachmentDraft` | Pending frozen images, retained rejected text and attachment command handlers |
 

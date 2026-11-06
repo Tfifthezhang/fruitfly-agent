@@ -4,6 +4,28 @@ import unittest
 from tests.architecture.checks import ROOT, SOURCE_ROOTS, boundary_violations, _module_info, _project_imports
 
 
+def _mechanism_literals(tree, relative):
+    """Distinguish public command/event names from concrete mechanism dispatch."""
+    allowed = set()
+    if relative == 'terminal/features/assembly.py':
+        for node in ast.walk(tree):
+            if (isinstance(node, ast.For) and isinstance(node.target, ast.Tuple)
+                    and [n.id for n in node.target.elts if isinstance(n, ast.Name)] == ['name', 'kind']
+                    and isinstance(node.iter, ast.Tuple)):
+                for row in node.iter.elts:
+                    if (isinstance(row, ast.Tuple) and len(row.elts) == 2
+                            and all(isinstance(n, ast.Constant) for n in row.elts)
+                            and tuple(n.value for n in row.elts) == ('skills', 'skill')):
+                        allowed.add(id(row.elts[0]))
+    if relative == 'terminal/rendering/renderer.py':
+        for node in tree.body:
+            if (isinstance(node, ast.Assign) and isinstance(node.value, ast.Dict)
+                    and any(isinstance(t, ast.Name) and t.id == '_CATEGORY_COLORS' for t in node.targets)):
+                allowed.update(id(key) for key in node.value.keys)
+    return {node.value for node in ast.walk(tree)
+            if isinstance(node, ast.Constant) and isinstance(node.value, str) and id(node) not in allowed}
+
+
 class LayeringTest(unittest.TestCase):
     def test_import_directions(self) -> None:
         violations = []
@@ -52,8 +74,13 @@ class LayeringTest(unittest.TestCase):
             "edit-tool",
             "write-tool",
             "skill-catalog",
+            "skills",
+            "memory-library",
+            "skill-library",
+            "remote-env",
+            "mcp-tools",
             "information-context",
-            "memory-files",
+            "file-memory",
             "knowledge-files",
             "live-http",
             "lessons",
@@ -61,16 +88,22 @@ class LayeringTest(unittest.TestCase):
         violations = []
         for path in sorted(interactive.rglob("*.py")):
             tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-            literals = {
-                node.value
-                for node in ast.walk(tree)
-                if isinstance(node, ast.Constant) and isinstance(node.value, str)
-            }
+            literals = _mechanism_literals(tree, path.relative_to(interactive).as_posix())
             violations.extend(
                 f"{path.relative_to(interactive)} contains {identifier}"
                 for identifier in sorted(identifiers & literals)
             )
         self.assertEqual([], violations)
+
+    def test_mechanism_guard_rejects_skill_dispatch_beside_legal_command_and_color_metadata(self):
+        for relative, permitted in (
+            ('terminal/features/assembly.py', "for name, kind in (('skills', 'skill'),): pass"),
+            ('terminal/rendering/renderer.py', "_CATEGORY_COLORS = {'skills': 'blue'}"),
+        ):
+            with self.subTest(relative=relative):
+                self.assertNotIn('skills', _mechanism_literals(ast.parse(permitted), relative))
+                changed = ast.parse(permitted + "\nif mechanism_id == 'skills': pass")
+                self.assertIn('skills', _mechanism_literals(changed, relative))
 
 class RunAlgorithmBoundaryTests(unittest.TestCase):
     def test_run_services_do_not_depend_on_composition_or_foreign_private_state(self):
@@ -106,7 +139,7 @@ class RunAlgorithmBoundaryTests(unittest.TestCase):
     def test_run_only_imports_public_lab_host_contracts(self):
         allowed = {"fruitfly_agent.lab.catalog", "fruitfly_agent.lab.catalog.models",
                    "fruitfly_agent.lab.base_prompt", "fruitfly_agent.lab.improvement.api", "fruitfly_agent.lab.improvement.tasks",
-                   "fruitfly_agent.lab.improvement.targets.text", "fruitfly_agent.rsi.contracts"}
+                   "fruitfly_agent.improvement.contracts.text", "fruitfly_agent.rsi.contracts"}
         violations = []
         for path in (ROOT / "fruitfly_agent" / "run").rglob("*.py"):
             for target in _project_imports(path):
@@ -216,7 +249,8 @@ class InteractiveDirectoryTests(unittest.TestCase):
                     if not target.startswith(prefixes):
                         violations.append(f"{path.relative_to(interactive)} imports {target}")
         features = interactive / "terminal" / "features"
-        for feature in ("configuration", "resume", "improvement", "startup"):
+        for feature in sorted(path.name for path in features.iterdir()
+                              if path.is_dir() and (path / '__init__.py').is_file()):
             prefixes = (base + "contracts.", base + "terminal.io.", base + "terminal.rendering.",
                         base + "terminal.bindings.", base + "terminal.commands.",
                         base + f"terminal.features.{feature}.")
@@ -229,7 +263,7 @@ class InteractiveDirectoryTests(unittest.TestCase):
     def test_interactive_root_and_terminal_root_keep_only_composition_entries(self):
         interactive = ROOT / "fruitfly_agent" / "interactive"
         self.assertEqual({"__init__.py"}, {path.name for path in interactive.glob("*.py")})
-        self.assertEqual({"__init__.py", "frontend.py", "bindings.py", "commands.py", "notifications.py"},
+        self.assertEqual({"__init__.py", "frontend.py", "bindings.py", "commands.py"},
                          {path.name for path in (interactive / "terminal").glob("*.py")})
 
     def test_concrete_runtime_owner_satisfies_the_public_handle_protocol(self):

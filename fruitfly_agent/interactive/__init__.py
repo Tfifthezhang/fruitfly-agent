@@ -59,7 +59,6 @@ from fruitfly_agent.interactive.contracts.runtime import RuntimeSession
 from fruitfly_agent.interactive.terminal import (
     LineEditor,
     TerminalConfigurationFrontend,
-    TerminalImprovementFrontend,
     TerminalFrontend,
     TerminalRenderer,
     TerminalResumeFrontend,
@@ -112,7 +111,6 @@ __all__ = [
     "ResumableSession",
     "TerminalFrontend",
     "TerminalConfigurationFrontend",
-    "TerminalImprovementFrontend",
     "TerminalRenderer",
     "TerminalResumeFrontend",
 ]

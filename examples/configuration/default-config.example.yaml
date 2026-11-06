@@ -28,19 +28,13 @@ profiles:
         default: true
       write-tool:
         default: true
-      tool-catalog:
-        default: true
       layered-compaction:
         default: true
       base_prompt:
         default: true
-      execution-policy:
+      skills:
         default: true
-      skill-catalog:
-        default: true
-      information-context:
-        default: true
-      memory-files:
+      file-memory:
         default: true
     S:
       memory-library:

@@ -1,0 +1,9 @@
+id: edit-tool
+role: H
+implementation: edit-tool
+parameters:
+  instructions:
+    description: Edit a single file in the selected execution environment (local or
+      SSH). Use for targeted changes to existing text while preserving surrounding
+      content. Uses exact text replacement. Every edits[].oldText must match a unique,
+      non-overlapping region of the original file. Merge nearby changes into one edit.

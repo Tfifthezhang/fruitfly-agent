@@ -12,14 +12,15 @@ from fruitfly_agent.run.configuration.operations import ProfileEditor
 
 class RunStartupVersions:
     def __init__(self, *, config_path, profile, active_profile, resolved_profile,
-                 configuration: Callable[[], ProfileEditor], resolve_mechanisms, store, artifacts, candidates,
+                 configuration: Callable[[], ProfileEditor], artifact_slots, reset_artifact, store, artifacts, candidates,
                  target, pinned_bindings, prepare_runtime, reload_configuration):
         self.config_path = config_path
         self.profile = profile
         self.active_profile = active_profile
         self.resolved_profile = resolved_profile
         self.configuration = configuration
-        self.resolve_mechanisms = resolve_mechanisms
+        self.artifact_slots = artifact_slots
+        self.reset_artifact = reset_artifact
         self.store = store
         self.artifacts = artifacts
         self.candidates = candidates
@@ -37,8 +38,7 @@ class RunStartupVersions:
             if (record.config_path, record.profile_id) == scope:
                 latest.setdefault(record.target, record)
         records = tuple(latest.values())
-        slots = {slot for item in self.resolve_mechanisms(profile.mechanisms)
-                 for slot in item.definition.artifact_slots}
+        slots = self.artifact_slots(profile.mechanisms)
         bindings = {'base_prompt': ('prompt', '')}
         bindings.update({key: ('artifact', key) for key in profile.artifact_bindings if key in slots})
         for record in records:
@@ -117,6 +117,8 @@ class RunStartupVersions:
             def apply(value):
                 if kind == 'prompt':
                     return replace(value, prompt=ref)
+                if action == 'default':
+                    return self.reset_artifact(value, key)
                 bindings = dict(value.artifact_bindings)
                 if ref is None:
                     bindings.pop(key, None)

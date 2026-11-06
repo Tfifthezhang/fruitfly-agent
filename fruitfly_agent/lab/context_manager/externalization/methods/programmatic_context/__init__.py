@@ -1,0 +1,1 @@
+"""Programmatic context externalization implementation."""

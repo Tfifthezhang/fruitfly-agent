@@ -13,7 +13,7 @@ from fruitfly_agent.core.env import ExecResult
 from fruitfly_agent.core.tool_runtime import ToolCallContext
 from fruitfly_agent.lab.catalog import builtin_catalog, assemble_lab, AssemblyContext, load_system_config
 from fruitfly_agent.lab.catalog.configuration import materialize_system
-from fruitfly_agent.lab.improvement.components.parameters import ParameterTarget
+from fruitfly_agent.lab.catalog.adapters.parameters import ParameterTarget
 from fruitfly_agent.lab.improvement.editor.instructions import EditorInstructionTarget
 from fruitfly_agent.lab.improvement.system_configuration import restore_editor, editor_edit_options
 from fruitfly_agent.runtime_spec import HarnessProfile, MechanismSelection
@@ -112,17 +112,21 @@ class ParameterCandidateTests(unittest.IsolatedAsyncioTestCase):
             root = Path(directory)
             skill = root / '.skills/example/SKILL.md'; skill.parent.mkdir(parents=True)
             skill.write_text('---\nname: example\ndescription: ' + 'evidence ' * 100 + '\n---\nDo the task.\n')
-            baseline = HarnessProfile('default', mechanisms=(MechanismSelection('skill-catalog'),))
-            target = ParameterTarget(catalog.get('skill-catalog'), {}, {'max_chars'})
-            values = json.loads(target.snapshot().text); values['settings']['max_chars'] = 128
-            candidate = apply_profile_binding(baseline, 'configuration', 'component.skill-catalog', target.export_text(json.dumps(values)))
+            baseline = HarnessProfile('default', mechanisms=tuple(MechanismSelection(name) for name in ('local-env', 'read-tool', 'skills')))
+            target = ParameterTarget(catalog.get('skills'), {}, {'max_chars'})
+            values = json.loads(target.snapshot().text); values['settings']['max_chars'] = 256
+            candidate = apply_profile_binding(baseline, 'configuration', 'component.skills', target.export_text(json.dumps(values)))
             omitted = []
             for index, profile in enumerate((baseline, candidate)):
                 path = materialize_system(profile, root / str(index) / 'config.yaml', catalog=catalog)
                 runtime = assemble_lab(AgentLoopConfig(provider=lambda *args: None), catalog=catalog,
                     selections=load_system_config(path).select().mechanisms,
                     context=AssemblyContext(root, None, '', lambda *args: None))
-                transform = next(stage.mechanism for stage in runtime.context_pipeline.stages if stage.stage_id == 'skill-catalog')
+                transform = next(stage.mechanism for stage in runtime.context_pipeline.stages if stage.stage_id == 'skills')
+                index_uri = transform.directory
+                index = runtime.config.readable_resources.read(index_uri).decode()
+                self.assertIn('<name>example</name>', index)
+                self.assertNotIn('Do the task.', index)
                 result = transform.transform(ContextFrame('base', (), (), 'fake', 32))
                 omitted.append(result.metadata['catalog_omitted'])
             self.assertEqual(omitted, [False, True])

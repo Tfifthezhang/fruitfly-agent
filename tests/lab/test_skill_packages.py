@@ -44,7 +44,7 @@ class SkillPackageTests(unittest.TestCase):
                 return SkillPackage(tuple(entries), 'test', 'fixed', dependencies=('tool:bash',))
         with self.assertRaisesRegex(ValueError, 'dependencies'):
             prepare_installation((), Source())
-        from fruitfly_agent.lab.context_manager.augmentation.skills.catalog import Skill
+        from fruitfly_agent.lab.context_manager.augmentation.skills.methods.indexed_documents.parser import Skill
         from fruitfly_agent.lab.context_manager.augmentation.skills.packages import package_entry
         skill = Skill('example', 'Read when relevant', 'Body', '/example', source_text=
             '---\nname: example\ndescription: Read when relevant\nallowed-tools: [bash]\n---\nBody')

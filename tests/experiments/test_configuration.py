@@ -37,8 +37,9 @@ class ConfigurationTests(unittest.TestCase):
         prepared = prepare_experiment(load_configuration(self.root), 'improvement')
         self.assertEqual(prepared.model_roles, {'executor': 'executor', 'editor': 'editor', 'assessor': 'assessor'})
         self.assertEqual((self.root / '.fruitfly/default-config.yaml').read_bytes(), original)
-        selected = next(m for m in prepared.profile.mechanisms if m.mechanism_id == 'component-improvement')
-        self.assertEqual(selected.parameters, {'editor_profile': 'editor', 'assessor_profile': 'assessor'})
+        self.assertFalse(any(m.mechanism_id == 'component-improvement' for m in prepared.profile.mechanisms))
+        self.assertEqual(prepared.profile.model_roles['editor'], 'editor')
+        self.assertEqual(prepared.profile.model_roles['assessor'], 'assessor')
 
     def test_unknown_duplicate_and_invalid_fields_fail_without_fallback(self):
         for text in ('schema_version: 1\nunknown: true\n', 'schema_version: 1\nschema_version: 1\n',

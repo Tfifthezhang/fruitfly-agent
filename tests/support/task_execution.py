@@ -13,7 +13,8 @@ from fruitfly_agent.core.loop import run_agent_loop
 from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone
 from fruitfly_agent.core.session import Session
 from fruitfly_agent.lab.catalog import AssemblyContext, ProviderBinding, assemble_lab, builtin_catalog, MechanismSelection
-from fruitfly_agent.lab.improvement.components.parameters import ParameterTarget
+from fruitfly_agent.lab.catalog.adapters.parameters import ParameterTarget
+from fruitfly_agent.improvement.contracts.optimization import RetainedDocuments
 from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
 from fruitfly_agent.improvement.contracts.tasks import Resource
 from fruitfly_agent.improvement.contracts.versions import canonical_json
@@ -90,13 +91,16 @@ class TaskRunnerFixture:
                 for d in catalog.definitions() if d.descriptor.effects.tools and set(d.descriptor.effects.tools) <= names}
             selections['local-env'] = MechanismSelection('local-env')
             bindings = {}
+            settings = {}
             projections = []
             prompt = self.config.system_prompt
             for document in harness.components:
                 adapter = self.components.adapters[document.component_id]
                 target = getattr(adapter, 'target', None)
                 text = adapter.to_text(document) if target is not None else None
-                if isinstance(target, ParameterTarget):
+                if isinstance(target, RetainedDocuments):
+                    settings[document.component_id] = target.parameter_values(text)
+                elif isinstance(target, ParameterTarget):
                     values = target.parse(text)
                     selections[document.component_id] = MechanismSelection(document.component_id, parameters=values)
                 elif target is not None:
@@ -105,7 +109,7 @@ class TaskRunnerFixture:
                         prompt = text
                     elif binding.kind == 'artifact':
                         bindings[binding.key] = self.artifacts.put(text.encode())
-                        if document.role != 'I' and document.component_id != 'tool-catalog':
+                        if document.role != 'I':
                             projections.append((target, text))
             for target, text in projections:
                 prompt = target.prepare_trial(replace(self.config, system_prompt=prompt), text).system_prompt
@@ -154,6 +158,7 @@ class TaskRunnerFixture:
                     context=AssemblyContext(root, session, base.model,
                         lambda alias, max_tokens: ProviderBinding(provider, base.model, '', base.context_window, base.max_tokens),
                         session_path=session.path, resource_sink=owned, artifact_bindings=bindings,
+                        component_settings=settings,
                         artifact_reader=lambda ref: self.artifacts.read(ref).decode(), agent_hooks_from_host=self.components.agent_hooks_from_host))
                 result = await run_agent_loop(runtime.config, [UserMessage(task.instruction)],
                     signal=self.services.signal, context_pipeline=runtime.context_pipeline)

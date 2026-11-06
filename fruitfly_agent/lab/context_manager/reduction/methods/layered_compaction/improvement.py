@@ -1,6 +1,6 @@
 """Mode-aware H grants through the shared parameter materializer."""
 from dataclasses import fields
-from fruitfly_agent.lab.improvement.components.parameters import editable_parameters
+from fruitfly_agent.lab.catalog.adapters.parameters import editable_parameters
 from .config import LayeredCompactionConfig
 
 PROTECTED = frozenset({'mode', 'summary_model_profile'})

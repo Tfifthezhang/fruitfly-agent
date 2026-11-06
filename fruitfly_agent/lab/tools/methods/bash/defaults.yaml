@@ -1,0 +1,20 @@
+id: bash-tool
+role: H
+implementation: bash-tool
+parameters:
+  settings:
+    default_timeout_seconds: 300
+    max_active_commands: 4
+    retained_commands: 128
+    output_characters: 12000
+  instructions:
+    description: Execute a bash command in the selected execution environment (local
+      or SSH), starting in its current working directory. Use for inspecting the environment,
+      running programs, installing dependencies, building and testing, downloading
+      files, and processing structured API responses. Returns stdout and stderr. Output
+      is truncated to the last 2000 lines or 50KB (whichever is hit first). If truncated,
+      the tool attempts to save the full output to a temp file and reports save failures.
+      Commands use the configured timeout when omitted; provide a positive timeout
+      to override. For long work use action=start, then action=poll or action=cancel
+      with the returned handle. Managed polls wait at most 30 seconds and return bounded
+      output. Completed old handles may be retired.

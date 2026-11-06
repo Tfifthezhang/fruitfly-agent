@@ -103,7 +103,7 @@ Editing, execution and evaluation use `RunPlan.timeouts`. Each invocation starts
 Configuration candidates use the shared declarative binding adapter. Their
 normalized component values change H identity and are applied to an isolated
 profile before activation. I and S remain unchanged unless separately declared
-components change. [Execution policy](../../lab/execution_policy/README.md) documents
+components change. [Execution policy](../../runtime_spec/README.md#record-host-execution-conditions) documents
 fixed runtime settings; execution policy is not an optimization target.
 
 ## Inspect complete candidate configurations

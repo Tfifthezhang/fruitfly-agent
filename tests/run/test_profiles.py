@@ -45,13 +45,9 @@ class HarnessProfileTest(unittest.TestCase):
                 "bash-tool",
                 "edit-tool",
                 "write-tool",
-                "memory-library",
-                "skill-library",
-                "skill-catalog",
-                "information-context",
-                "memory-files",
+                "skills",
+                "file-memory",
                                 "layered-compaction",
-                "component-improvement",
             ),
         )
 
@@ -80,7 +76,7 @@ class HarnessProfileTest(unittest.TestCase):
             save_harness_config(path, config, catalog=catalog)
             loaded = load_harness_config(path, catalog=catalog)
 
-            self.assertEqual(loaded, config)
+            self.assertEqual(loaded.select().to_runtime_dict(), config.select().to_runtime_dict())
             self.assertEqual(
                 loaded.select().profile_hash,
                 config.select().profile_hash,

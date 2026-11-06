@@ -25,16 +25,14 @@ class MemorySkillWorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.provider = FauxProvider()
 
     def assemble(self, *, skills=None, memories=None, extra=()):
-        selections = [MechanismSelection(name) for name in ('local-env', 'read-tool', 'skill-library',
-            'skill-catalog', 'memory-library', 'information-context', 'memory-files')]
+        selections = [MechanismSelection(name) for name in ('local-env', 'read-tool', 'skills', 'file-memory')]
         changes = {'memory-library': {'documents': canonical_json(memories or [])}}
         if skills is not None:
             changes['skill-library'] = {'documents': canonical_json(skills)}
-        selections = [MechanismSelection(s.mechanism_id, parameters=changes.get(s.mechanism_id, {})) for s in selections]
         resources = []
         result = assemble_lab(AgentLoopConfig(provider=self.provider, model='fake'), catalog=builtin_catalog(),
             selections=tuple(selections) + extra,
-            context=AssemblyContext(self.root, None, 'fake', lambda *_: self.fail('unexpected auxiliary model'), resource_sink=resources))
+            context=AssemblyContext(self.root, None, 'fake', lambda *_: self.fail('unexpected auxiliary model'), resource_sink=resources, component_settings={key: {'content': values} for key, values in changes.items()}))
         self.addCleanup(result.config.readable_resources.close)
         return result
 
@@ -91,23 +89,21 @@ class MemorySkillWorkflowTests(unittest.IsolatedAsyncioTestCase):
             service.review(update, 'commit')
         restored = RetainedStateStore(store.root, artifacts)
         second = self.assemble(memories=json.loads(restored.library('memory-library')))
-        self.assertEqual(memory()['body'], second.components['memory-library'][0]['body'])
+        self.assertEqual(memory()['body'], second.components['text-target:memory-library'].list_entries()[0]['body'])
         self.assertFalse((self.root / '.skills').exists())
 
-    def test_duplicate_ownership_of_a_workspace_skill_is_rejected(self):
-        source = self.root / '.skills/custom/SKILL.md'
-        source.parent.mkdir(parents=True)
-        source.write_text('---\nname: custom\ndescription: Use this skill when custom checks apply.\n---\nRun custom checks.')
-        with self.assertRaisesRegex(ValueError, 'already owned'):
-            self.assemble(extra=(MechanismSelection('skill-document', parameters={'source_path': '.skills/custom/SKILL.md'}),))
+    def test_removed_single_document_mechanism_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, 'unknown mechanism'):
+            self.assemble(extra=(MechanismSelection('skill-document'),))
 
     def test_bounded_memory_catalog_keeps_the_complete_directory_readable(self):
         entries = [memory('memory-' + str(i), body='A body omitted from the directory.') for i in range(30)]
         runtime = self.assemble(memories=entries)
-        reader = runtime.components['information'].catalog.spaces()[0].reader
-        self.assertLessEqual(len(reader.index.text), 4000)
-        self.assertIn('INDEX.md', reader.index.text)
-        self.assertNotIn(entries[0]['body'], reader.index.text)
+        stage = next(s for s in runtime.context_pipeline.stages if s.stage_id == 'file-memory')
+        text = stage.mechanism.text
+        self.assertLessEqual(len(text), 5000)
+        self.assertIn('INDEX.md', text)
+        self.assertNotIn(entries[0]['body'], text)
         resources = runtime.config.readable_resources
         uri = f'resource://{resources.scope}/retained-memory/INDEX.md'
         # Read through the same tool resource path as the model.

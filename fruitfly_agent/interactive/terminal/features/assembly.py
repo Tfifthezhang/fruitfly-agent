@@ -3,13 +3,12 @@ from fruitfly_agent.interactive.contracts.commands import CommandResult
 from fruitfly_agent.interactive.terminal.features.retained_state.commands import retained_handler
 from fruitfly_agent.interactive.terminal.features.operations import operations_handler
 from fruitfly_agent.interactive.terminal.features.configuration.command import configuration_handler
-from fruitfly_agent.interactive.terminal.features.improvement.command import improvement_handler
 from fruitfly_agent.interactive.terminal.features.resume.command import resume_handler
 
 
 def bind_commands(registry, *, bindings, configuration, status, cancel,
                   menu_scope, input_stream, output_stream, line_editor, write,
-                  welcome, show_history, improvement_frontend):
+                  welcome, show_history):
     if bindings.retained_state is not None:
         for name, kind in (('memory', 'memory'), ('skills', 'skill')):
             registry.register(name, retained_handler(kind=kind, describe=bindings.retained_state,
@@ -41,11 +40,3 @@ def bind_commands(registry, *, bindings, configuration, status, cancel,
             output_stream=output_stream, line_editor=line_editor, write=write,
             welcome=welcome, show_history=show_history,
         ), summary='continue saved history using current configuration', usage='/resume [PATH]')
-    if improvement_frontend is not None:
-        registry.register("improvement", improvement_handler(frontend=improvement_frontend, menu_scope=menu_scope),
-            summary='run component improvement or review candidates', usage='/improvement [TEXT]')
-
-    def candidate_command(command):
-        return CommandResult(text=f"unknown command: /{command.name}; use /improvement\n")
-    for name in ("candidates", "candidate"):
-        registry.register(name, candidate_command, discoverable=False)

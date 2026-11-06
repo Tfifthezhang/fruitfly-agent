@@ -4,7 +4,7 @@ from pathlib import Path
 import os
 
 from fruitfly_agent.improvement.contracts.versions import SnapshotFile, StateSnapshot
-from .catalog import load_skills, Skill
+from fruitfly_agent.lab.context_manager.augmentation.skills.methods.indexed_documents.parser import load_skills, Skill
 
 
 @dataclass(frozen=True)
@@ -20,8 +20,11 @@ class SkillResources:
     def mount(self, resources, name='skills'):
         documents = {entry.path: entry.content.encode('utf-8') for entry in self.snapshot.files}
         prefix = resources.mount(name, lambda path: documents[path])
-        return {skill.file_path: prefix + Path(skill.file_path).relative_to(self.workspace).as_posix()
-                for skill in self.skills}
+        locations = {skill.file_path: prefix + Path(skill.file_path).relative_to(self.workspace).as_posix()
+                     for skill in self.skills}
+        from .methods.indexed_documents.parser import render_skills_xml
+        documents['INDEX.md'] = render_skills_xml(list(self.skills), locations=locations).encode('utf-8')
+        return {**locations, '__catalog__': prefix + 'INDEX.md'}
 
 
 def capture_skills(root, workspace):

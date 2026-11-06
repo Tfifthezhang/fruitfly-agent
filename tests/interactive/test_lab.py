@@ -35,7 +35,7 @@ class LabCommandTests(unittest.TestCase):
             mechanisms=('context-fixture',),
             tool_names=('inspect_file', 'extra_tool'),
             mechanism_details=(
-                InteractiveMechanism('context-fixture', 'context-manager', 'Fixture context', context_phase='augmentation'),
+                InteractiveMechanism('context-fixture', 'context', 'Fixture context', context_phase='augmentation'),
                 InteractiveMechanism('remote-fixture', 'environment', 'Fixture execution backend'),
                 InteractiveMechanism('tool-fixture', 'tools', 'Inspect a file', tool_names=('inspect_file', 'not_installed')),
                 InteractiveMechanism('workflow-fixture', 'workflow', 'Execute stages'),
@@ -56,7 +56,7 @@ class LabCommandTests(unittest.TestCase):
         result = CommandRouter().execute(InteractiveCommand('lab'), host)
         self.assertEqual(1, host.reads)
         self.assertIsNotNone(result.panel)
-        self.assertEqual(['context-manager', 'environment', 'tools', 'workflow', 'improvement'],
+        self.assertEqual(['context', 'environment', 'tools', 'workflow'],
                          [section.category for section in result.panel.sections])
         self.assertIn('Augmentation: Fixture context', result.text)
         self.assertIn('Externalization: Not enabled', result.text)
@@ -64,7 +64,7 @@ class LabCommandTests(unittest.TestCase):
         self.assertIn('inspect_file: Inspect a file', result.text)
         self.assertIn('extra_tool: Enabled', result.text)
         self.assertIn('Execute stages: Enabled', result.text)
-        self.assertIn('Available · /improvement', result.text)
+        self.assertNotIn('/improvement', result.text)
         self.assertNotIn('not_installed', result.text)
         self.assertNotIn('\x1b', result.text)
         self.assertEqual(('context-fixture',), snapshot.mechanisms)
@@ -73,8 +73,8 @@ class LabCommandTests(unittest.TestCase):
         result = lab(status(
             mechanisms=('legacy-fixture',),
             mechanism_details=(
-                InteractiveMechanism('missing-phase', 'context-manager', 'Unplaced context'),
-                InteractiveMechanism('future-phase', 'context-manager', 'Future context', display_section='future'),
+                InteractiveMechanism('missing-phase', 'context', 'Unplaced context'),
+                InteractiveMechanism('future-phase', 'context', 'Future context', display_section='future'),
                 InteractiveMechanism('extension', 'custom-research', 'Extension capability'),
             ),
         ))
@@ -97,7 +97,7 @@ class LabPresentationTests(unittest.IsolatedAsyncioTestCase):
     def panel(self):
         return lab(status(
             mechanism_details=(
-                InteractiveMechanism('context-fixture', 'context-manager', 'Fixture context', display_section='reduction'),
+                InteractiveMechanism('context-fixture', 'context', 'Fixture context', display_section='reduction'),
                 InteractiveMechanism('env-fixture', 'environment', 'Fixture environment'),
             ),
             tool_names=('inspect_file',),
@@ -105,7 +105,7 @@ class LabPresentationTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_frontend_renders_panel_without_model_requests(self):
         session = offline_session(mechanism_details=(
-            InteractiveMechanism('context-fixture', 'context-manager', 'Fixture context', display_section='reduction'),
+            InteractiveMechanism('context-fixture', 'context', 'Fixture context', display_section='reduction'),
         ))
         output = TtyStringIO()
         with patch.dict('os.environ', {'TERM': 'xterm-256color'}, clear=True):
@@ -113,7 +113,7 @@ class LabPresentationTests(unittest.IsolatedAsyncioTestCase):
                                         line_editor=ScriptedLines('/lab', '/exit'))
             self.assertEqual(0, await frontend.run())
         rendered = output.getvalue()
-        self.assertIn('\x1b[1;37;44m Context Manager \x1b[0m', rendered)
+        self.assertIn('\x1b[1;37;44m Context \x1b[0m', rendered)
         self.assertIn('Fixture context', rendered)
         self.assertEqual(1, rendered.count('Lab · Active session'))
         self.assertEqual([], session.messages)
@@ -128,7 +128,7 @@ class LabPresentationTests(unittest.IsolatedAsyncioTestCase):
                 renderer = TerminalRenderer(output)
                 renderer.write_command_result(CommandResult(panel=self.panel()))
                 text = output.getvalue()
-                self.assertIn('\x1b[1;37;44m Context Manager ', text)
+                self.assertIn('\x1b[1;37;44m Context ', text)
                 self.assertIn('\x1b[1;30;46m Environment ', text)
                 self.assertIn('\x1b[1;37;45m Tools ', text)
 
@@ -141,7 +141,7 @@ class LabPresentationTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(environment=environment), patch.dict('os.environ', environment, clear=True):
                 renderer = TerminalRenderer(output)
                 renderer.write_command_result(CommandResult(panel=self.panel()))
-                self.assertIn('Context Manager\n', output.getvalue())
+                self.assertIn('Context\n', output.getvalue())
                 self.assertIn('Not enabled', output.getvalue())
                 self.assertNotIn('\x1b', output.getvalue())
 
@@ -187,7 +187,7 @@ class LabPresentationTests(unittest.IsolatedAsyncioTestCase):
         await app.start()
         try:
             self.assertTrue(app.status.improvement_available)
-            self.assertIn('Available · /improvement', lab(app.status).text)
+            self.assertNotIn('/improvement', lab(app.status).text)
             self.assertEqual([], service.mock_calls)
             await app.rebuild()
             self.assertFalse(app.status.improvement_available)

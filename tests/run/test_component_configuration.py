@@ -20,11 +20,12 @@ class ComponentConfigurationTests(unittest.TestCase):
         self.root = Path(self.enterContext(tempfile.TemporaryDirectory())).resolve()
         _write_catalog(self.root / 'models.yaml', {'offline': 'offline-model'})
         self.path = self.root / 'config.yaml'
-        self.document = {'id': 'execution-policy', 'role': 'H',
-                         'implementation': 'execution-policy', 'parameters': {'settings': {'max_tool_calls_per_turn': 128}}}
+        self.document = {'id': 'layered-compaction', 'role': 'H',
+                         'implementation': 'layered-compaction', 'parameters': {'settings': {'tail_tokens': 512}}}
         self.config = {'default_profile': 'baseline', 'profiles': {'baseline': {
             'models': {'catalog': 'models.yaml', 'roles': {'executor': 'offline'}},
-            'H': {'execution-policy': {'file': 'execution.yaml'}, 'base_prompt': {'inline': {
+            'H': {'local-env': {'default': True}, 'read-tool': {'default': True},
+                  'layered-compaction': {'file': 'reduction.yaml'}, 'base_prompt': {'inline': {
                 'id': 'base_prompt', 'role': 'H', 'implementation': 'base_prompt',
                 'parameters': {'instructions': {'system': 'Use the supplied evidence.\nKeep exact text.\n'}}}}},
             'I': {'improvement-editor': {'inline': {'id': 'improvement-editor',
@@ -32,7 +33,7 @@ class ComponentConfigurationTests(unittest.TestCase):
 
     def write(self):
         self.path.write_text(yaml.safe_dump(self.config))
-        (self.root / 'execution.yaml').write_text(yaml.safe_dump(self.document))
+        (self.root / 'reduction.yaml').write_text(yaml.safe_dump(self.document))
 
     def test_parse_is_pure_and_shared_runtime_uses_exact_prompt_and_limit(self):
         _write_catalog(self.root / 'models.yaml', {'offline': 'offline-model',
@@ -46,9 +47,9 @@ class ComponentConfigurationTests(unittest.TestCase):
         with Session(self.root / 'session.jsonl') as session:
             runtime = build_runtime(profile, config_path=self.path, catalog=builtin_catalog(),
                 environment={}, session=session, cwd=self.root, provider_registry=registry)
-        self.assertEqual(runtime.config.max_tool_calls_per_turn, 128)
+        self.assertEqual(next(c for c in runtime.manifest.components if c['id'] == 'layered-compaction')['parameters']['tail_tokens'], 512)
         self.assertEqual(runtime.config.system_prompt, 'Use the supplied evidence.\nKeep exact text.\n')
-        self.assertEqual(runtime.manifest.execution['max_tool_calls_per_turn'], 128)
+        self.assertEqual(runtime.manifest.execution['max_tool_calls_per_turn'], 512)
         self.assertEqual(registry.create.call_count, 1, 'unused I must not create auxiliary clients')
         self.assertEqual('editor-model', runtime.manifest.model_roles['editor']['model'])
         self.assertEqual('assessor-model', runtime.manifest.model_roles['assessor']['model'])
@@ -56,12 +57,12 @@ class ComponentConfigurationTests(unittest.TestCase):
     def test_candidate_bundle_reloads_without_original_component_files(self):
         self.write()
         profile = load_system_config(self.path).select()
-        candidate = replace(profile, execution={'max_tool_calls_per_turn': 192})
+        candidate = replace(profile, mechanisms=tuple(replace(m, parameters={**m.parameters, 'tail_tokens':768}) if m.mechanism_id == 'layered-compaction' else m for m in profile.mechanisms))
         target = self.root / 'candidate' / 'config.yaml'
         materialize_system(candidate, target, model_source=self.root / 'models.yaml')
-        (self.root / 'execution.yaml').unlink()
+        (self.root / 'reduction.yaml').unlink()
         reloaded = load_system_config(target).select()
-        self.assertEqual(reloaded.execution['max_tool_calls_per_turn'], 192)
+        self.assertEqual(next(m for m in reloaded.mechanisms if m.mechanism_id == 'layered-compaction').parameters['tail_tokens'], 768)
         self.assertEqual(reloaded.artifact_contents[reloaded.prompt], 'Use the supplied evidence.\nKeep exact text.\n')
         self.assertEqual(self.config, yaml.safe_load(self.path.read_text()))
 
@@ -91,7 +92,7 @@ class ComponentConfigurationTests(unittest.TestCase):
     def test_file_and_inline_have_equal_effective_values_and_sources_are_checked(self):
         self.write()
         file_profile = load_system_config(self.path).select()
-        self.config['profiles']['baseline']['H']['execution-policy'] = {'inline': self.document}
+        self.config['profiles']['baseline']['H']['layered-compaction'] = {'inline': self.document}
         self.path.write_text(yaml.safe_dump(self.config))
         inline = load_system_config(self.path).select()
         self.assertEqual(file_profile.to_runtime_dict(), inline.to_runtime_dict())
@@ -113,7 +114,7 @@ class ComponentConfigurationTests(unittest.TestCase):
         self.write()
         load_system_config(self.path)
         self.assertFalse((self.root / '.fruitfly').exists())
-        (self.root / 'execution.yaml').write_text('id: x\nid: y\n')
+        (self.root / 'reduction.yaml').write_text('id: x\nid: y\n')
         with self.assertRaisesRegex(ValueError, 'distinct'):
             load_system_config(self.path)
 
@@ -134,7 +135,7 @@ class ComponentConfigurationTests(unittest.TestCase):
                         'id': 'component-improvement', 'role': 'I', 'implementation': 'component-improvement',
                         'parameters': {'editor_profile': 'offline'}}}
                 self.path.write_text(yaml.safe_dump(document))
-                (self.root / 'execution.yaml').write_text(yaml.safe_dump(component))
+                (self.root / 'reduction.yaml').write_text(yaml.safe_dump(component))
                 with self.assertRaises(ValueError):
                     load_system_config(self.path)
 
@@ -144,6 +145,7 @@ class ComponentConfigurationTests(unittest.TestCase):
         _write_catalog(self.root / 'models.yaml', {'offline': 'original-model', 'next': 'next-model', 'small': 'memory-model'})
         self.config['profiles']['baseline']['H']['working-memory-reduction'] = {'inline': {
             'id': 'working-memory-reduction', 'role': 'H', 'implementation': 'working-memory-reduction', 'parameters': {}}}
+        self.config['profiles']['baseline']['H'].pop('layered-compaction')
         for binding, expected in (({'inherit': 'executor'}, 'next-model'), ('small', 'memory-model')):
             with self.subTest(binding=binding):
                 self.config['profiles']['baseline']['models']['roles']['working_memory'] = binding

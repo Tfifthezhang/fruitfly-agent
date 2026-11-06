@@ -12,7 +12,7 @@ from fruitfly_agent.interactive.contracts.candidates import CandidateView
 from fruitfly_agent.interactive.contracts.commands import CommandResult, InteractiveCommand
 from fruitfly_agent.interactive.contracts.improvement import ImprovementPreview
 from fruitfly_agent.interactive.contracts.task_packs import TaskPackView
-from fruitfly_agent.interactive.terminal import TerminalFrontend, TerminalCommandRegistry, TerminalBindings, ImprovementClients
+from fruitfly_agent.interactive.terminal import TerminalFrontend, TerminalCommandRegistry, TerminalBindings
 from fruitfly_agent.interactive.terminal.features.configuration.command import configuration_handler
 from tests.support.application import _Factory, offline_session
 from tests.support.faux_provider import FauxProvider
@@ -229,23 +229,6 @@ class ExtensionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([True, True], cancelled)
         self.assertEqual([], provider.calls)
 
-    async def test_menu_accepts_distinct_feature_clients(self):
-        from tests.support.improvement_ui import configuration
-        workflow = SimpleNamespace(workflow_configuration=configuration, workflow_preview=Mock())
-        clients = ImprovementClients(workflow=workflow, candidates=SimpleNamespace(candidates=lambda: ()))
-        provider = FauxProvider()
-        output = io.StringIO()
-        frontend = TerminalFrontend(offline_session(provider=provider), improvement_clients=clients,
-            input_stream=io.StringIO(), output_stream=output,
-            line_editor=ScriptedLines('/improvement', 'q', '/exit'))
-        await frontend.run()
-        self.assertIn('Component improvement', output.getvalue())
-        self.assertIn('Input files', output.getvalue())
-        self.assertIn('Start improvement', output.getvalue())
-        self.assertNotIn('Editable components', output.getvalue())
-        self.assertNotIn('Candidate generator', output.getvalue())
-        workflow.workflow_preview.assert_not_called()
-        self.assertEqual(provider.calls, [])
 
     async def test_previous_job_completion_cannot_reset_new_job_state(self):
         second_started, release = asyncio.Event(), asyncio.Event()

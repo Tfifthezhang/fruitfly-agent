@@ -130,7 +130,7 @@ class RunApplicationFactory:
             describe_services=describe_tool_services,
             adapt_operations=ManagedOperationAdapter,
             retained_store=self.retained_store if self.retained_state_enabled else None,
-            prepare_retained_profile=retained_profile, adapt_retained=RetainedStateAdapter,
+            prepare_retained_profile=lambda profile, store: retained_profile(profile, store, catalog=self.catalog), adapt_retained=RetainedStateAdapter,
             approve_start=self._approve_tool_service,
             build=lambda *args, **kwargs: build_runtime(
                 *args, **{**kwargs, "provider_registry": self.provider_registry}),
@@ -166,7 +166,7 @@ class RunApplicationFactory:
             workspace=self.cwd, artifacts=self.artifact_store, manifest=self.system_manifest,
             improvement_identity=self.improvement_identity,
             restore_improvement_identity=self.restore_improvement_identity,
-            normalize_configuration=lambda key, text: normalize_configuration_binding(key, text, self.catalog),
+            normalize_configuration=lambda key, text: normalize_configuration_binding(key, text, self.catalog, grouped=True),
             state_sources=lambda: (*self._current_components.get(STATE_SNAPSHOTS_COMPONENT, ()), self._experience_store),
         )
         self._candidate_service = RunCandidates(
@@ -190,6 +190,7 @@ class RunApplicationFactory:
             manifest=self.system_manifest, version=self.system_version,
             config=lambda: self._current_runtime_config, targets=lambda: tuple(self._current_targets.values()),
             tasks=self.task_pack_catalog, publish=self.publish_component_candidate,
+            resource_factories=lambda: self._current_components.get('execution-resources', {}),
             **{f.name: getattr(pipeline_bindings, f.name) for f in fields(pipeline_bindings)})
         from fruitfly_agent.lab.improvement.api import EDITOR_CONFIG, ASSESSOR_CONFIG, EDITOR_INSTRUCTIONS, SETTINGS, SYSTEM_SETTINGS
         self._component_jobs.defaults = lambda: self._current_components.get(SETTINGS, {})
@@ -311,7 +312,11 @@ class RunApplicationFactory:
             raise ValueError(f"improvement target {target_id!r} is not enabled") from exc
 
     def improvement_target_id(self):
-        return next(iter(self._current_targets))
+        targets = [identity for identity, target in self._current_targets.items()
+                   if target.snapshot().binding.kind == 'prompt']
+        if len(targets) != 1:
+            raise ValueError('select an explicit target when no unique prompt binding exists')
+        return targets[0]
 
     def improvement_usage(self):
         return dict(self._component_jobs.observed_usage)
@@ -348,7 +353,7 @@ class RunApplicationFactory:
         target.validate_documents(json.loads(text))
         profile = bind_component_changes(self._active_profile or self.selection.profile,
             (ComponentBinding(row['key'], 'configuration', 'component.' + row['key'],
-                canonical_json({'documents': text})),))
+                canonical_json({'content': {'documents': text}})),), catalog=self.catalog)
         handle = await self._preparer.open(selection=self.selection,
             improvement_service=self._improvement_service, candidate_service=self._candidate_adapter,
             task_pack_service=self._task_pack_service, activated=self._activated,
@@ -440,7 +445,7 @@ class RunApplicationFactory:
         with frozen_models.open('xb') as stream:
             stream.write(model_path.read_bytes())
         def materialize(candidate, registry, destination):
-            bound = bind_component_changes(profile, registry.export(candidate.harness, changed_only=False))
+            bound = bind_component_changes(profile, registry.export(candidate.harness, changed_only=False), catalog=self.catalog)
             path = materialize_system(bound, destination / 'config.yaml', catalog=self.catalog,
                 artifact_reader=self.artifact_store.read_text, model_source=frozen_models,
                 resources=frozen_state.files)
@@ -502,13 +507,15 @@ class RunApplicationFactory:
                 raise ValueError("prepared runtime differs from the verified candidate H/I/S")
 
     def startup_versions(self):
+        from fruitfly_agent.lab.catalog import reset_artifact_binding
         return RunStartupVersions(
             config_path=lambda: self.selection.config_path,
             profile=lambda: self.selection.profile,
             active_profile=lambda: self._active_profile,
             resolved_profile=lambda: self._resolve().profile,
             configuration=lambda: self.configuration,
-            resolve_mechanisms=self.catalog.resolve,
+            artifact_slots=self.catalog.artifact_slots,
+            reset_artifact=lambda profile, key: reset_artifact_binding(profile, key, self.catalog),
             store=self.candidate_store, artifacts=self.artifact_store,
             candidates=self._candidate_service,
             target=lambda identity: self._current_targets.get(identity),

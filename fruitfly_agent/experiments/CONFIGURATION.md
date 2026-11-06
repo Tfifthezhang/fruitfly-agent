@@ -52,19 +52,19 @@ Model roles belong to the referenced system configuration.
 
 | Field category | Examples | Meaning |
 |---|---|---|
-| `parameters.instructions.*` | Base `system`, Tool/Skill catalog `usage`, memory `update`/`shrink`/`readback`, editor/evaluator prompts | Model-facing instructions |
+| `parameters.instructions.*` | Base `system`, native tool `description`, Skill loading `usage`, task-memory `update`/`shrink`/`readback`, cross-session `reading`/`extraction`/`consolidation`, editor/evaluator prompts | Model-facing instructions |
 | `parameters.settings.*` | Layered-compaction policy, working-memory sizes, Skill catalog `max_chars`, Bash default timeout | Owner-declared mutable parameters |
-| `parameters.content.*` | Retained Skill `body`, registered multi-file `documents` | Retained editable material |
+| `parameters.content.*` | Memory/Skill `documents` collections | Retained editable material |
 
 `list_targets` pages a frozen target index. `describe_target` supplies field type,
 meaning, current/default value, unit and constraints. Owner validation and the
 experiment grant both apply. Models, permissions, schemas, source locations,
 coverage bookkeeping, official objectives and private verification data remain
-protected. Execution policy is configured in H but has no optimization target.
+protected. Host execution conditions have no selectable component or optimization grant.
 
 Tool parameters are available for explicit grants but excluded from automatic
-selection. Default searches can edit the unified `tool-catalog` policy; individual
-tool usage, schemas and permissions remain protected.
+selection. Native tools expose their complete H descriptions; individual
+schemas, names, implementations and permissions remain protected.
 
 Candidate execution requires a backend declaring the relevant capabilities,
 including configuration materialization for working-memory parameters. The backend
@@ -73,7 +73,7 @@ material format, not a built-in executor; embeddings must register its runner. H
 
 ## Supply task and comparison documents
 
-Tasks use `source: files`, `eval`, `editor` or `task-set`. See the
+Tasks use `source: files`, `eval`, `editor`, `registered` or `task-set`. See the
 [recipes](../../examples/experiments/README.md). Task sets additionally accept
 `execution.trial: {attempts: 1, concurrency: 1}`, `execution.sampling` and
 `execution.promotion_every_rounds`. Candidate concurrency remains one.
@@ -82,6 +82,36 @@ Tasks use `source: files`, `eval`, `editor` or `task-set`. See the
 `aggregation: collection-macro|task-macro` and positive collection `weights`.
 Incomplete shared selection coverage cannot produce joint utility. Persistent
 publication requires independent verification and explicit host activation.
+
+### Use an owner-registered learning execution
+
+```yaml
+tasks:
+  inline:
+    source: registered
+    execution: memory-learning
+    material: memory-study
+    parameters:
+      repetitions: 2
+      min_gain: 0
+      max_regression: 0
+edit:
+  file-memory:
+    fields: [parameters.instructions.extraction]
+evaluation:
+  scope: persistent
+```
+
+`memory-study` is a placeholder installed study ID under
+`.fruitfly/improvement/experiments/<id>/experiment.json`. Its manifest references
+disjoint development and verification task packages compatible with `file-memory`.
+Each package needs training inputs and private validation/holdout checks. See
+[File memory](../lab/context_manager/augmentation/memory/methods/file_memory/README.md).
+The execution owner declares roles, capabilities, material freezing, persistent
+verification policy and runner requirements. The shared source consumes those
+declarations. A study document supplies no task runner: an embedding must inject a
+compatible isolated downstream backend. Check reports this limitation offline;
+explicit execution may call models and does not activate production memory.
 
 ## Configure evaluation and evidence
 

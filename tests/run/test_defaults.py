@@ -21,7 +21,7 @@ def write_workspace(root):
              "max_output_tokens": 1024, "api_key_env": "SHARED_MODEL_KEY"}
     (state / "models.yaml").write_text(yaml.safe_dump({"models": {"fake": model}}))
     for prefix, name in (("", "daily"), ("default-", "baseline")):
-        ids = ("local-env", "read-tool") if prefix else ("local-env", "read-tool", "bash-tool", "write-tool", "skill-catalog")
+        ids = ("local-env", "read-tool") if prefix else ("local-env", "read-tool", "bash-tool", "write-tool", "skills")
         profile = profile_document(catalog="models.yaml", executor="fake", mechanisms=[{"id": n} for n in ids])
         (state / (prefix + "config.yaml")).write_text(yaml.safe_dump({
             "default_profile": name, "profiles": {name: profile}}))
@@ -65,10 +65,11 @@ class DefaultConfigurationTests(unittest.TestCase):
     def test_restoration_preserves_model_credentials_other_profiles_and_default_files(self):
         factory = self.factory()
         controller = factory.configuration
-        artifact = factory.artifact_store.put_text("Fixture experiment instructions")
+        from fruitfly_agent.lab.improvement.editor.instructions import EditorInstructionTarget
+        artifact = factory.artifact_store.put_text(EditorInstructionTarget().snapshot().text)
         original_profile = replace(controller.profile(), prompt=artifact.artifact_id,
             execution={"max_tool_calls_per_turn": 128},
-            artifact_bindings={"skill-catalog.guidance": artifact.artifact_id})
+            artifact_bindings={"improvement-editor": artifact.artifact_id})
         controller.stage_profile(original_profile)
         controller.save()
         controller.model_setup.credentials.values["PENDING_FIXTURE_KEY"] = "offline-pending"
@@ -131,14 +132,14 @@ class DefaultConfigurationTests(unittest.TestCase):
         path = self.root / ".fruitfly/default-config.yaml"
         config = yaml.safe_load(path.read_text())
         config['profiles']['baseline']['H'] = {
-            name: component_document(name) for name in ('local-env', 'write-tool')}
-        config['profiles']['baseline']['H']['execution-policy'] = {'inline': {
-            'id': 'execution-policy', 'implementation': 'execution-policy', 'role': 'H',
-            'parameters': {'settings': {'max_tool_calls_per_turn': 96}}}}
+            name: component_document(name) for name in ('local-env', 'read-tool', 'write-tool')}
+        config['profiles']['baseline']['H']['layered-compaction'] = {'inline': {
+            'id': 'layered-compaction', 'implementation': 'layered-compaction', 'role': 'H',
+            'parameters': {'settings': {'tail_tokens': 512}}}}
         path.write_text(yaml.safe_dump(config))
         controller.restore_defaults()
-        self.assertEqual({m.mechanism_id for m in controller.profile().mechanisms}, {"local-env", "write-tool"})
-        self.assertEqual(controller.profile().execution, {"max_tool_calls_per_turn": 96})
+        self.assertEqual({m.mechanism_id for m in controller.profile().mechanisms}, {"local-env", "read-tool", "write-tool", "layered-compaction"})
+        self.assertEqual(next(m for m in controller.profile().mechanisms if m.mechanism_id == 'layered-compaction').parameters['tail_tokens'], 512)
 
     def test_default_file_stays_read_only_and_has_no_model_wizard(self):
         controller = self.factory(config_path=".fruitfly/default-config.yaml").configuration
@@ -174,14 +175,13 @@ class DefaultConfigurationTests(unittest.TestCase):
         self.assertEqual(profile.model_catalog, 'models.yaml')
         self.assertEqual(path.read_bytes(), original)
 
-    def test_default_auxiliary_model_missing_from_daily_catalog_rejects_restoration(self):
+    def test_default_model_metadata_does_not_replace_daily_model_bindings(self):
         controller = self.factory().configuration
         original = controller.profile()
         path = self.root / ".fruitfly/default-config.yaml"
         config = yaml.safe_load(path.read_text())
         config['profiles']['baseline']['models']['roles']['editor'] = 'editor'
-        config['profiles']['baseline']['I']['component-improvement'] = component_document('component-improvement')
+        config['profiles']['baseline']['I']['improvement-editor'] = component_document('improvement-editor')
         path.write_text(yaml.safe_dump(config))
-        with self.assertRaisesRegex(ValueError, "editor"):
-            controller.restore_defaults()
-        self.assertEqual(controller.profile(), original)
+        controller.restore_defaults()
+        self.assertEqual(controller.profile().model_roles, original.model_roles)

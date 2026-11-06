@@ -1,4 +1,4 @@
-"""Composable information spaces for file memory, local knowledge and live data.
+"""Composable information spaces for local knowledge and live data.
 
 Vendor clients and runtime lifecycle ownership stay outside this package.
 Core Context Stage integration lives in this package's adapter module.
@@ -16,16 +16,11 @@ from .lexical import (
     create_static_lexical_space,
 )
 from .hub import InformationHub
-from .file_memory import (
-    FileMemorySource,
-    FileMemoryRetriever,
-    create_file_memory_space,
-)
-from .local_knowledge import (
+from fruitfly_agent.lab.context_manager.augmentation.information.methods.local_knowledge import (
     LocalKnowledgeSource,
     create_local_knowledge_space,
 )
-from .live_http import (
+from fruitfly_agent.lab.context_manager.augmentation.information.methods.live_http import (
     LiveHttpRetriever,
     create_live_http_space,
 )
@@ -88,11 +83,8 @@ __all__ = [
     "LatestUserQueryBuilder",
     "InformationPipeline",
     "InformationHub",
-    "FileMemorySource",
-    "FileMemoryRetriever",
     "LocalKnowledgeSource",
     "LiveHttpRetriever",
-    "create_file_memory_space",
     "create_local_knowledge_space",
     "create_live_http_space",
 ]

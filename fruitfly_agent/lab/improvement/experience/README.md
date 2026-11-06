@@ -22,8 +22,8 @@ No benchmark answer or scorer is an implicit learning resource. Offline checks:
 
 ## Review a pending lesson
 
-Use `/improvement` → Results and history → Pending experience. Inspect the lesson
-and initial S identity, choose Commit or Reject, and confirm. Application rejects
+Use the embedding host experience service. Inspect the lesson and initial S
+identity, then explicitly commit or reject it. Application rejects
 writes while work is active. A changed library snapshot rejects a stale commit;
 it does not silently merge a lesson into new conditions. Human confirmation
 expresses adoption, not a measured claim of improvement.

@@ -99,10 +99,10 @@ assert LayeredCompactionConfig().mode == 'deterministic'
 from fruitfly_agent.lab.catalog import builtin_catalog
 from fruitfly_agent.lab.catalog.defaults import read_default
 assert read_default(builtin_catalog(), 'base_prompt')[0].role == 'H'
-assert read_default(builtin_catalog(), 'skill-document')[0].role == 'S'
+assert read_default(builtin_catalog(), 'skill-library')[0].role == 'S'
 from fruitfly_agent.lab.context_manager.augmentation.skills.library import builtin_entries
 assert len(builtin_entries()) == 4
-assert read_default(builtin_catalog(), 'memory-maintenance')[0].role == 'H'
+assert read_default(builtin_catalog(), 'file-memory')[0].role == 'H'
 assert read_default(builtin_catalog(), 'improvement-editor')[0].role == 'I'
 assert Path(__import__('fruitfly_agent.lab.context_manager.reduction', fromlist=['']).__file__).is_relative_to(root)
 assert 'experiment.yaml' not in templates
@@ -120,7 +120,7 @@ receipt = capture_module.capture(work, saved)
 assert receipt['status'] == 'complete'
 assert (saved / receipt['files'][0]['archive_path']).read_text() == 'changed output'
 from fruitfly_agent.lab.improvement.execution import builtin_executions
-assert {d.execution_id for d in builtin_executions().definitions()} == {'agent-task', 'improver-comparison', 'memory-maintenance-comparison'}
+assert {d.execution_id for d in builtin_executions().definitions()} == {'agent-task', 'improver-comparison', 'memory-learning'}
 from fruitfly_agent.run import main
 sys.argv = ['fruitfly-agent', '--help']
 main()

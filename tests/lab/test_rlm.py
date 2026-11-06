@@ -18,13 +18,10 @@ from fruitfly_agent.lab.catalog import (
     assemble_lab,
     builtin_catalog,
 )
-from fruitfly_agent.lab.context_manager.externalization.programmatic_context import (
-    ProgrammaticContextExternalizer,
-    IpythonRuntime,
-    ModelQueryBroker,
-    ModelQueryConfig,
-    SessionArtifactStore,
-)
+from fruitfly_agent.lab.context_manager.externalization.methods.programmatic_context.projection import ProgrammaticContextExternalizer
+from fruitfly_agent.lab.tools.methods.ipython.runtime_core import IpythonRuntime
+from fruitfly_agent.lab.tools.methods.ipython.query import ModelQueryBroker, ModelQueryConfig
+from fruitfly_agent.lab.tools.methods.ipython.artifacts import SessionArtifactStore
 from tests.support.faux_provider import FauxProvider
 
 
@@ -361,9 +358,7 @@ class RlmAssemblyTest(unittest.TestCase):
             self.assertEqual(["ipython"], [tool.name for tool in result.config.tools])
             self.assertIn("Persistent IPython workspace", result.config.system_prompt)
             self.assertIs(result.config.provider, main)
-            self.assertEqual(result.context_pipeline.profile.externalization, ())
-            self.assertEqual(result.context_pipeline.profile.reduction, ())
-            self.assertEqual(result.context_pipeline.profile.augmentation, ('instruction-components.tool-catalog',))
+            self.assertIsNone(result.context_pipeline)
             self.assertIn("ipython-tool", result.components)
             self.assertEqual([("child-profile", 4096)], resolver_calls)
 
@@ -424,8 +419,7 @@ class StandaloneIpythonToolTest(unittest.IsolatedAsyncioTestCase):
                 second = await component.runtime.execute("value + 2")
             finally:
                 await component.close()
-            self.assertEqual(result.context_pipeline.profile.externalization, ())
-            self.assertEqual(result.context_pipeline.profile.reduction, ())
+            self.assertIsNone(result.context_pipeline)
             self.assertEqual("ok", first.status)
             self.assertEqual("42", second.result)
 

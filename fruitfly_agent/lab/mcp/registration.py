@@ -1,6 +1,7 @@
 """Catalog declaration and asynchronous preparation of optional MCP services."""
 from fruitfly_agent.runtime_spec.documents import parameter_default
 from dataclasses import replace
+from fruitfly_agent.lab.catalog.classification import TOOLS, MCP, OptimizationCoverage
 from pathlib import Path
 import hashlib
 import json
@@ -19,14 +20,14 @@ def definition():
         parameters=(ParameterDescriptor('config', 'path', 'Service configuration',
             'Workspace-local YAML file declaring stdio servers and selected tools.', parameter_default('fruitfly_agent.lab.mcp', 'defaults.yaml', 'config')),),
         effects=MechanismEffects(uses_network=True, writes_files=True, cost_notice='Starts configured local processes; external tools may have independent effects and costs.')),
-        install, implementation_id='mcp-stdio-v1', default_resource=(__package__, 'defaults.yaml'), optimization_exemption='External tool transport and schemas are protected service bindings.', tool_provider=prepare,
-        implementation_path='fruitfly_agent/lab/mcp/client.py', documentation_path='fruitfly_agent/lab/mcp/README.md',
+        install, implementation_id='mcp-stdio-v1', default_resource=(__package__, 'defaults.yaml'), feature_path=(TOOLS, MCP), optimization_coverage=OptimizationCoverage('protected', 'External tool transport and schemas are protected service bindings.'), tool_provider=prepare,
+        implementation_path='fruitfly_agent/lab/mcp/methods/stdio/client.py', documentation_path='fruitfly_agent/lab/mcp/README.md',
         input_parameters=('config',))
 
 
 async def prepare(parameters, context):
     # Optional libraries and the SDK are not imported by Catalog discovery.
-    from .client import McpClient
+    from fruitfly_agent.lab.mcp.methods.stdio.client import McpClient
     from .tools import make_tools
     from .results import ResultStore
     from .authorization import ExternalToolPolicy

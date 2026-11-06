@@ -12,6 +12,9 @@ class RetainedRuntimeService:
         self.session, self.session_id, self.store = session, session_id, store
         self.targets = {value.library_id: value for value in components.values()
             if isinstance(value, RetainedDocuments)}
+        self.collections = {target.kind: target for target in self.targets.values()}
+        if len(self.collections) != len(self.targets):
+            raise ValueError('retained collection kinds must have a unique active owner')
         self.registered_workers = tuple(components.get('maintenance-workers', ()))
         self.workers = self.registered_workers if enabled else ()
         self.task = None
@@ -111,12 +114,12 @@ class RetainedRuntimeService:
             await asyncio.gather(task, return_exceptions=True)
 
     def describe(self, kind):
-        key = kind + '-library'
-        target = self.targets.get(key)
+        target = self.collections.get(kind)
         if target is None:
             return {'entries': [], 'pending': [], 'error': self.error}
         # The visible active runtime remains frozen until its next checked rebuild.
-        entries = json.loads(target.retained_documents)
+        key = target.library_id
+        entries = target.view_entries()
         state = self.store.read()
         return {'entries': entries, 'pending': [dict(v, id=k) for k, v in state['pending'].items()
             if v['status'] == 'pending' and v['key'] == key], 'error': self.error,
@@ -126,10 +129,10 @@ class RetainedRuntimeService:
             'user_turns': sum(e['completed'] for e in state['evidence']) - state['consolidated_turns']}
 
     def read_document(self, kind, identity):
-        entry = next((e for e in self.describe(kind)['entries'] if e['id'] == identity), None)
-        if entry is None:
+        target = self.collections.get(kind)
+        if target is None:
             raise ValueError('retained document identity is unavailable')
-        return canonical_json(entry)
+        return target.read_entry(identity)
 
     def review(self, identity, action):
         if action == 'retry':

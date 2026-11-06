@@ -85,14 +85,16 @@ def apply_profile_binding(profile, kind, key, text):
         parameters = json.loads(text, object_pairs_hook=unique)
         if not isinstance(parameters, dict):
             raise ValueError('component parameters must be an object')
+        if name in profile.component_settings:
+            return replace(profile, component_settings={**profile.component_settings, name: parameters},
+                component_documents=tuple(replace(document, parameters=parameters, reference={}, artifacts={})
+                    if document.id == name else document for document in profile.component_documents))
         if not any(m.mechanism_id == name and m.enabled for m in profile.mechanisms):
             raise ValueError('parameter binding requires an existing enabled component')
         return replace(profile,
             mechanisms=tuple(replace(m, parameters=parameters) if m.mechanism_id == name else m for m in profile.mechanisms),
             component_documents=profile.component_documents)
-    if kind != 'configuration' or key != 'execution':
-        raise ValueError('unsupported configuration binding')
-    return replace(profile, execution=parse_execution(text))
+    raise ValueError('unsupported or protected configuration binding')
 
 
 def apply_execution_payload_binding(payload, kind, key, text):

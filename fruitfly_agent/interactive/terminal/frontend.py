@@ -11,12 +11,11 @@ from typing import TextIO, Mapping
 from contextlib import contextmanager
 
 from fruitfly_agent.interactive.contracts.events import AuthorizationRequested, AuthorizationResolved
-from fruitfly_agent.interactive.terminal.bindings import TerminalBindings, TerminalSession, ImprovementClients
+from fruitfly_agent.interactive.terminal.bindings import TerminalBindings, TerminalSession
 from fruitfly_agent.interactive.terminal.commands import TerminalCommandRegistry, TerminalCommandHandler, effective_commands, complete_command
 from fruitfly_agent.interactive.contracts.commands import CommandDescription, CommandResult, format_command_help
 from fruitfly_agent.interactive.terminal.features.assembly import bind_commands
 from fruitfly_agent.interactive.terminal.features.attachments import AttachmentDraft
-from fruitfly_agent.interactive.terminal.notifications import ImprovementNotifications
 
 from fruitfly_agent.interactive.contracts.configuration import ConfigurationController
 from fruitfly_agent.interactive.interaction.commands import CommandRouter, parse_command
@@ -28,7 +27,6 @@ from fruitfly_agent.interactive.terminal.io.live import (
 )
 from fruitfly_agent.interactive.terminal.rendering.renderer import TerminalRenderer
 from fruitfly_agent.interactive.terminal.io.screen import transient_screen
-from fruitfly_agent.interactive.terminal.features.improvement.menu import TerminalImprovementFrontend
 
 
 class TerminalFrontend:
@@ -46,7 +44,6 @@ class TerminalFrontend:
         configuration: ConfigurationController | None = None,
         command_handlers: Mapping[str, TerminalCommandHandler] | None = None,
         bindings: TerminalBindings | None = None,
-        improvement_clients: ImprovementClients | None = None,
     ) -> None:
         self.session = session
         self._last_interrupt = 0.0
@@ -68,13 +65,6 @@ class TerminalFrontend:
             raise ValueError("pass command_router or configuration, not both")
         self.bindings = bindings or TerminalBindings.from_session(session)
         self._configuration_override = configuration
-        self._improvement_clients = improvement_clients
-        self.menu_input = None
-        self.menu_renderer = None
-        if (improvement_clients or ImprovementClients.from_session(session)).available:
-            from fruitfly_agent.interactive.terminal.io.menu import create_menu_input, TerminalMenuRenderer
-            self.menu_input = create_menu_input(self.input, self.output, self.line_editor)
-            self.menu_renderer = TerminalMenuRenderer(self.output)
         self.command_router = command_router or CommandRouter()
         self._reading_authorization = False
         self.session.set_event_sink(self._render_event)
@@ -91,7 +81,6 @@ class TerminalFrontend:
             menu_scope=self.menu_scope, input_stream=self.input, output_stream=self.output,
             line_editor=lambda: self.line_editor, write=self.renderer.write_system,
             welcome=self.renderer.show_welcome, show_history=self.show_history,
-            improvement_frontend=self.improvement_frontend if self.menu_input is not None else None,
         )
         for name, handler in (command_handlers or {}).items():
             self.commands.register(name, handler)
@@ -102,11 +91,6 @@ class TerminalFrontend:
         configure_completion = getattr(self.line_editor, 'set_completion_provider', None)
         if self._inline_display is not None and callable(configure_completion):
             configure_completion(lambda query: complete_command(query, self.command_descriptions()))
-        self._notifications = ImprovementNotifications(
-            progress=self.bindings.progress, notice=self.bindings.candidate_notice,
-            acknowledge=self.bindings.acknowledge_notice, busy=self.bindings.busy,
-            write=self.renderer.write_system,
-        )
 
     async def run(self) -> int:
         try:
@@ -122,7 +106,6 @@ class TerminalFrontend:
                 enable(bool(self.input.isatty()))
             self.renderer.show_welcome(self.session.status)
             await self.show_history()
-            self._notifications.show_candidates()
             return await self._run_loop()
         finally:
             enable = self.bindings.enable_authorization
@@ -153,7 +136,6 @@ class TerminalFrontend:
                     self.renderer.write_system('Session changed; pending attachments and unsent draft cleared.\n')
                 self._attachments.clear()
                 self._attachment_session = current_session
-            self._notifications.show()
             if self._interrupt_exit:
                 return 0
             try:
@@ -336,17 +318,13 @@ class TerminalFrontend:
         try:
             while not reader.done():
                 await asyncio.wait({reader}, timeout=0.5)
-                self._notifications.show()
-            return await reader
+                return await reader
         finally:
             if not reader.done():
                 interrupt = getattr(self.line_editor, "interrupt", None)
                 if interrupt is not None:
                     interrupt()
                 reader.cancel()
-
-    def show_notifications(self) -> None:
-        self._notifications.show()
 
     def command_descriptions(self) -> tuple[CommandDescription, ...]:
         return effective_commands(self.command_router.descriptions(), self.commands.descriptions())
@@ -364,12 +342,6 @@ class TerminalFrontend:
                 yield
         finally:
             self._activate_inline_terminal()
-
-    def improvement_frontend(self) -> TerminalImprovementFrontend:
-        return TerminalImprovementFrontend(
-            self.session, self.renderer, self.line_editor, self.menu_input, self.menu_renderer,
-            clients=self._improvement_clients,
-        )
 
     async def show_history(self) -> None:
         # History is optional for existing embedding hosts implementing TerminalSession.

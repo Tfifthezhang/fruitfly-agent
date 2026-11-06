@@ -47,7 +47,7 @@ class FixtureFetch:
 class ServiceInjectionTests(unittest.IsolatedAsyncioTestCase):
     async def test_search_uses_injected_contract_and_still_filters_and_deduplicates(self):
         service, signal = FixtureSearch(), asyncio.Event()
-        with patch("fruitfly_agent.lab.tools.web.search.default_service_registry", side_effect=AssertionError("vendor lookup")):
+        with patch("fruitfly_agent.lab.tools.methods.web_search.algorithm.default_service_registry", side_effect=AssertionError("vendor lookup")):
             tool = create_web_search_tool(service=service)
         result = (await tool.execute(ToolCallContext("call", tool.name,
             {"query": " topic ", "domains": ["example.org"], "freshness": "week"}, None, signal=signal))).details
@@ -63,7 +63,7 @@ class ServiceInjectionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_fetch_uses_injected_contract_and_common_pagination(self):
         service, signal = FixtureFetch(), asyncio.Event()
-        with patch("fruitfly_agent.lab.tools.web.fetch.default_service_registry", side_effect=AssertionError("vendor lookup")):
+        with patch("fruitfly_agent.lab.tools.methods.web_fetch.algorithm.default_service_registry", side_effect=AssertionError("vendor lookup")):
             tool = create_web_fetch_tool(service=service)
         result = (await tool.execute(ToolCallContext("call", tool.name,
             {"url": "https://example.org/start", "offset": 2, "limit": 1}, None, signal=signal))).details

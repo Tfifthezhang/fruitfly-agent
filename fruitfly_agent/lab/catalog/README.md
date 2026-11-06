@@ -21,17 +21,19 @@ implementation through the shared H/S/I configuration protocol. See
 
 The [offline example](../../../examples/extensions/README.md) completes this path. The CLI does not scan Python packages for plugins.
 
-Improvement registers one shared workflow configuration. Per-job generator factories and stage bindings use the [public Improvement API](../improvement/README.md#extend-search), independently of selectable runtime mechanisms.
+Improvement registers editor/evaluator surfaces through an internal owner, with no daily mechanism switch. Per-job generator factories and stage bindings use the [public Improvement API](../improvement/README.md#extend-search), independently of selectable runtime mechanisms.
 
 ## Files
 
 | File | Responsibility |
 |---|---|
 | [components.py](components.py) | Offline `ComponentSpec` / `ResolvedHarness` inventory and actual assembly verification |
+| [classification.py](classification.py) | Owner feature coordinates shared by menus and optimization inventory |
+| [Parameter](adapters/parameters.py), [collection](adapters/collections.py) and [resource](adapters/resources.py) adapters | Shared owner validation, materialization and snapshots |
 | [models.py](models.py) | Definitions, selections, and UI selection groups |
 | [catalog.py](catalog.py) | Parameter, dependency, capability, and conflict resolution |
 | [builtins.py](builtins.py) | Explicit built-in definitions and installers |
-| [SSH registration](../environment/ssh/README.md) | Optional remote execution, credentials and namespace permissions |
+| [SSH registration](../environment/methods/remote/README.md) | Optional remote execution, credentials and namespace permissions |
 | [assembly.py](assembly.py) | Assembly context, state, and installer execution |
 | [tool_providers.py](tool_providers.py) | Async external-tool preparation, status and separate authorization contracts |
 
@@ -119,7 +121,7 @@ descriptions differ. Paths describe the installed package or extension source;
 the terminal does not open an editor or execute them.
 
 `input_parameters` explicitly names user-provided resources or content that remain
-editable in ordinary configuration, such as Skill paths, initial text and HTTP
+editable in ordinary configuration, such as knowledge roots, memory thresholds and HTTP
 endpoints. Other tuning parameters remain validated YAML settings. Display paths
 and field visibility do not enter runtime identity. All effective parameters and
 implementation IDs continue to do so.
@@ -137,8 +139,9 @@ Selection groups share display placement and exclusivity. Display metadata does 
 
 No Catalog-specific environment variables. Catalog itself makes no model requests; selected mechanisms declare their own effects.
 
-`MechanismDefinition.configuration_category` optionally declares menu placement
-without adding a Core mechanism layer. 
+`MechanismDefinition.feature_path` declares one functional owner path for menu
+placement, mechanism discovery and optimization inventory. H/S/I is an independent
+axis describing what changes. Conflicting labels/orders for the same path fail. 
 
 ```bash
 .venv/bin/python -m unittest tests.lab.test_catalog tests.run.test_configuration tests.run.test_assembly -v
@@ -247,8 +250,8 @@ Availability is not authorization: experiments explicitly select editable IDs.
 Absent owners provide no editable state. Unsupported explicit selections fail
 rather than enabling mechanisms or silently removing components.
 
-Enabled mechanisms declare the actual tools. One shared Tool catalog owns their
-coordination policy; operation descriptions remain source-owned. Components use `component_specs(parameters, enabled)` returning `ComponentSpec`
+Enabled mechanisms declare actual native tools. Each tool owns editable H
+description text and protects its schema, implementation and permissions. Components use `component_specs(parameters, enabled)` returning `ComponentSpec`
 values. The callback is pure and receives normalized enabled parameters; disabled
 owners receive an empty mapping. Owners with no active component return an empty
 tuple. Object-target preparation and this declaration must agree.
@@ -261,7 +264,7 @@ records the final schema and effective execution values.
 
 Run, Lab and Eval consume the [shared runtime specification](../../runtime_spec/README.md);
 Catalog retains mechanism dependency, conflict, parameter and component ownership.
-The [execution policy adapter](../execution_policy/README.md) uses these contracts.
+Host execution conditions remain protected and are recorded without a selectable adapter.
 
 ```bash
 .venv/bin/python -m unittest tests.lab.test_harness_inventory tests.experiments.test_harness_validation

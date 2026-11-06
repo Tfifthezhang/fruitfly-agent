@@ -5,7 +5,7 @@ from typing import Any, Callable
 from fruitfly_agent.lab.catalog.configuration import ConfigurationSurface
 from fruitfly_agent.runtime_spec.documents import mapping
 from .assessment.instructions import EvaluatorInstructions, EvaluatorInstructionTarget
-from .editor.instructions import EditorInstructions
+from .editor.instructions import EditorInstructions, EditorInstructionTarget
 from .configuration import ImprovementSettings
 
 
@@ -32,10 +32,29 @@ def evaluator_parameters(parameters):
 def configuration_surfaces():
     return (
         ConfigurationSurface('improvement-editor', 'I', 'settings', 'editor', editor_parameters,
-                             edit_options=editor_edit_options, restore=restore_editor, default_resource=('fruitfly_agent.lab.improvement.editor', 'defaults.yaml')),
+                             edit_options=editor_edit_options, restore=restore_editor, default_resource=('fruitfly_agent.lab.improvement.editor', 'defaults.yaml'),
+                             standalone=True, optimization=EditorInstructionTarget.optimization,
+                             kind='improvement-instructions', schema='editor-instructions', target_factory=editor_target,
+                             artifact_slot='improvement-editor'),
         ConfigurationSurface('improvement-evaluator', 'I', 'settings', 'evaluator', evaluator_parameters,
-                             edit_options=settings_edit_options, default_resource=('fruitfly_agent.lab.improvement.assessment', 'defaults.yaml'),
-                             restore=lambda parameters, text: {'instructions': asdict(EvaluatorInstructionTarget.parse(text))}))
+                             edit_options=evaluator_edit_options, default_resource=('fruitfly_agent.lab.improvement.assessment', 'defaults.yaml'),
+                             restore=lambda parameters, text: {'instructions': asdict(EvaluatorInstructionTarget.parse(text))},
+                             standalone=True, optimization=EvaluatorInstructionTarget.optimization,
+                             kind='evaluator-instructions', schema='evaluator-instructions-v1', target_factory=evaluator_target,
+                             artifact_slot='improvement-evaluator'))
+
+
+def editor_target(state, context, parameters):
+    reference = context.artifact_bindings.get('improvement-editor')
+    return EditorInstructionTarget(EditorInstructions(**parameters['instructions']),
+        text=context.artifact_reader(reference) if reference else None)
+
+
+def evaluator_target(state, context, parameters):
+    reference = context.artifact_bindings.get('improvement-evaluator')
+    return EvaluatorInstructionTarget(EvaluatorInstructionTarget.parse(context.artifact_reader(reference))
+        if reference else EvaluatorInstructions(**parameters['instructions']),
+        text=context.artifact_reader(reference) if reference else None)
 
 
 def restore_editor(parameters, text):
@@ -51,11 +70,11 @@ def editor_edit_options(fields, bounds):
     return {'editable_fields':list(fields)}
 
 
-def settings_edit_options(fields, bounds):
-    if any(not name.startswith('parameters.') for name in fields):
-        raise ValueError('I setting grants must select parameters fields')
-    return {'editable_fields': list(fields),
-            'bounds': dict(bounds)}
+def evaluator_edit_options(fields, bounds):
+    allowed = {'parameters.instructions.' + name for name in EvaluatorInstructions.__dataclass_fields__}
+    if not fields or len(set(fields)) != len(fields) or set(fields) - allowed or bounds:
+        raise ValueError('evaluator grants select distinct instruction fields only')
+    return {'editable_fields': list(fields)}
 
 
 def validate_component_options(name, options, inventory):

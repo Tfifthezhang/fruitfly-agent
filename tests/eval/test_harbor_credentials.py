@@ -1,5 +1,7 @@
 """Harbor credentials behavior and failure contracts."""
 from __future__ import annotations
+
+from fruitfly_agent.lab.catalog import FeatureNode
 from tests.support.configuration import profile_document
 import json
 import unittest
@@ -123,7 +125,7 @@ class HarborAdapterTests(unittest.TestCase):
                                 contributions=(MechanismContribution("capability", "tools"),)),
             lambda *args: self.fail("credential discovery ran an installer"),
             credential_variables=lambda parameters: ("RESOURCE_KEY",),
-            implementation_path="tests/eval/test_harbor_credentials.py", documentation_path="tests/eval/README.md")
+            implementation_path="tests/eval/test_harbor_credentials.py", documentation_path="tests/eval/README.md", feature_path=(FeatureNode('fixture', 'Fixture'),))
         catalog = builtin_catalog().extended((definition,))
         (root / 'config.yaml').write_text(yaml.safe_dump({'default_profile': 'default', 'profiles': {
             'default': profile_document(catalog='models.yaml', mechanisms=[{'id': 'fixture-resource'}], lab=catalog)}}))

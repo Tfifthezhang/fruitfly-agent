@@ -83,8 +83,8 @@ have separate approval. See the [REA example](examples/mcp/rea/README.md); no
 external server or native analysis engine is bundled.
 
 Context mechanisms include four packaged coding Skills, editable Skill libraries,
-[on-demand cross-session memory](fruitfly_agent/lab/context_manager/augmentation/information/file_memory/README.md), local knowledge,
-summarization and optional [programmatic context externalization](fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md).
+[on-demand cross-session memory](fruitfly_agent/lab/context_manager/augmentation/memory/methods/file_memory/README.md), local knowledge,
+summarization and optional [programmatic context externalization](fruitfly_agent/lab/context_manager/externalization/methods/programmatic_context/README.md).
 Bash/file tools can use a local or SSH environment. Improvement execution uses the tool set and isolation declared by its
 explicitly registered backend.
 
@@ -97,7 +97,7 @@ Chat uses native terminal scrollback; temporary menus restore it on return.
 | Capability | Current behavior | Guide |
 |---|---|---|
 | Improvement runtime | Independent stage kernel with injected algorithms, accounting, failure boundaries and evidence retention | [Runtime](fruitfly_agent/improvement/README.md) |
-| H/S improvement | Propose, execute and compare registered instructions, permitted execution parameters or retained documents; keep the baseline selectable | [Improvement](fruitfly_agent/lab/improvement/README.md) |
+| H/S improvement | Propose, execute and compare registered instructions, permitted owner parameters or retained documents; keep the baseline selectable | [Improvement](fruitfly_agent/lab/improvement/README.md) |
 | I experiments | Compare editor/evaluator instructions by downstream H/S behavior, then verify on separate task packages | [Editor experiments](fruitfly_agent/lab/improvement/improver/README.md) |
 | Persistent adoption | Publish verified text candidates for explicit review and activation | [Improvement host](fruitfly_agent/run/improvement/README.md) |
 | Experience | Stage attributed lessons; commit or reject separately while idle | [Experience](fruitfly_agent/lab/improvement/experience/README.md) |
@@ -106,9 +106,9 @@ Chat uses native terminal scrollback; temporary menus restore it on return.
 
 Use the independent [experiment CLI](fruitfly_agent/experiments/README.md) for Eval,
 Improvement and RSI. File settings have bounded defaults; each round proposes at
-most one candidate through a fixed comparison flow. `/improvement` retains a small explicit
-task/material entry and result review. Preview is offline; execution may incur
-charges. Task execution requires an explicitly registered backend; prepared Eval
+most one candidate through a fixed comparison flow. The daily terminal exposes
+configuration, memory and Skills; experiments run through the independent CLI or
+embedding API. Preview is offline; execution may incur charges. Task execution requires an explicitly registered backend; prepared Eval
 experiments use the configured Agent tools inside benchmark environments. I experiments edit only registered fields at fixed nesting
 depth. They do not train model weights or replace arbitrary source code.
 
@@ -121,7 +121,7 @@ ordinary chat does not collect training material. See [task preparation](fruitfl
 | Task | Start here |
 |---|---|
 | Install, configure, run or resume | [Getting started](GETTING_STARTED.md) · [Configuration](CONFIGURATION.md) |
-| Use remote file and shell tools | [SSH environment](fruitfly_agent/lab/environment/ssh/README.md) |
+| Use remote file and shell tools | [SSH environment](fruitfly_agent/lab/environment/methods/remote/README.md) |
 | Add or replace an algorithm | [Lab development](fruitfly_agent/lab/README.md#develop-an-algorithm) |
 | Prepare an improvement experiment | [Examples](examples/improvement/README.md) · [Task packs](fruitfly_agent/lab/improvement/tasks/README.md) |
 | Start Eval, Improvement or RSI | [Experiment CLI](fruitfly_agent/experiments/README.md) · [File templates](examples/experiments/README.md) |
@@ -158,7 +158,7 @@ FruitFlyAgent is released under the [MIT License](LICENSE). See [Third-party not
 |---|---|
 | [Pi](https://github.com/earendil-works/pi) | Runtime design and adapted Agent loop, Session, and tool infrastructure; code attribution and the upstream license are recorded in [Third-party notices](THIRD_PARTY_NOTICES.md). |
 | [Harness²](https://arxiv.org/abs/2610.14224) | Role-separated candidate editing, comparison and attributed experience; [implemented scope](fruitfly_agent/lab/improvement/README.md). |
-| [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) | Inspiration for externalizing context into a programmable Python environment; see [Programmatic context](fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md). |
+| [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) | Inspiration for externalizing context into a programmable Python environment; see [Programmatic context](fruitfly_agent/lab/context_manager/externalization/methods/programmatic_context/README.md). |
 | [Learn Claude Code](https://github.com/shareAI-lab/learn-claude-code) and the user-supplied `learning harness/compact` reference | Inspiration for cheap previews before history summaries and structured continuity sections; [implemented scope](fruitfly_agent/lab/context_manager/reduction/methods/layered_compaction/README.md). |
 
 Research sources and the scope of each adaptation are documented in the corresponding algorithm modules.

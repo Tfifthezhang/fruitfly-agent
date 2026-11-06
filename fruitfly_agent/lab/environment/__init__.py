@@ -4,6 +4,6 @@ An implementation that outgrows one readable module should become a same-named
 subpackage; its internal filesystem/shell split remains private to that env.
 """
 
-from .local import LocalEnv
+from fruitfly_agent.lab.environment.methods.local.algorithm import LocalEnv
 
 __all__ = ["LocalEnv"]

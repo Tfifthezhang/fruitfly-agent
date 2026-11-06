@@ -1,6 +1,8 @@
 """Register a context mechanism and run it through the Application, offline."""
 from __future__ import annotations
 
+from fruitfly_agent.lab.catalog import FeatureNode
+
 import asyncio
 from dataclasses import replace
 from pathlib import Path
@@ -43,7 +45,7 @@ def install_guidance(state, context, parameters):
 
 
 def example_definition():
-    from fruitfly_agent.lab.improvement.components.parameters import editable_parameters
+    from fruitfly_agent.lab.catalog.adapters.parameters import editable_parameters
     return editable_parameters(MechanismDefinition(
         descriptor=MechanismDescriptor(
             mechanism_id='example-guidance',
@@ -57,7 +59,7 @@ def example_definition():
 
         implementation_path='examples/extensions/offline_guidance.py',
         documentation_path='examples/extensions/README.md',
-    ), {'instructions'})
+     feature_path=(FeatureNode('fixture', 'Fixture'),)), {'instructions'})
 
 
 class OfflineProvider:

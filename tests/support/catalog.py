@@ -1,5 +1,7 @@
 """Minimal registered mechanisms for Catalog boundary tests."""
 from __future__ import annotations
+
+from fruitfly_agent.lab.catalog import FeatureNode
 from fruitfly_agent.lab.catalog import MechanismContribution, MechanismDefinition, MechanismDescriptor, MechanismEffects, ParameterDescriptor
 
 def mechanism_definition(
@@ -44,4 +46,4 @@ def mechanism_definition(
 
         implementation_path='tests/support/catalog.py',
         documentation_path='tests/lab/README.md',
-    )
+     feature_path=(FeatureNode('fixture', 'Fixture'),))

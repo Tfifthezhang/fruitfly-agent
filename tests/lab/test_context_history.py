@@ -9,7 +9,7 @@ from fruitfly_agent.core.tool_runtime.authorization import AuthorizationRequest,
 from fruitfly_agent.lab.context_manager.resources import SessionHistory
 from fruitfly_agent.lab.context_manager.resources.views import history_view
 from fruitfly_agent.lab.tools.resources import ResourceRegistry, ResourceAuthorizer
-from fruitfly_agent.lab.tools.read import create_read_tool
+from fruitfly_agent.lab.tools.methods.read.algorithm import create_read_tool
 
 
 class ContextHistoryTests(unittest.IsolatedAsyncioTestCase):

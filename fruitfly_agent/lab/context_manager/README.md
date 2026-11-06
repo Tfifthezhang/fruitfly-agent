@@ -6,7 +6,7 @@ Build the model's request context through three Core stages. Canonical Session m
 
 | Stage | Purpose | Implementation |
 |---|---|---|
-| [Augmentation](augmentation/README.md) | Add bounded instructions or retrieved information | Skills and Information spaces |
+| [Augmentation](augmentation/README.md) | Add bounded instructions or retrieved information | Memory, Skills and Information spaces |
 | [Externalization](externalization/README.md) | Replace large content with retrievable references | Programmatic context |
 | [Reduction](reduction/README.md) | Fit the projection to the request budget | Layered compaction (default), optional working memory |
 

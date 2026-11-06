@@ -1,4 +1,5 @@
 """Working-memory method's configuration and Improvement admission."""
+from fruitfly_agent.lab.catalog.classification import CONTEXT, REDUCTION
 from dataclasses import replace
 from functools import partial
 from fruitfly_agent.core.mechanisms import MechanismDescriptor, MechanismContribution, MechanismEffects
@@ -20,7 +21,7 @@ def definition():
             lifecycle_hooks=('before_compaction',),
             cost_notice='Memory updates and shortening requests may incur Provider charges.')),
         install, implementation_id='working-memory-v1', implementation_path=root + 'algorithm.py',
-        documentation_path=root + 'README.md', selection_group='reduction', selection_group_label='Reduction',
+        documentation_path=root + 'README.md', feature_path=(CONTEXT, REDUCTION), selection_group='reduction', selection_group_label='Reduction',
         validate_parameters=partial(validate, WorkingMemoryConfig),
         input_parameters=('memory_model_profile',), default_resource=(__package__, 'defaults.yaml'),
         model_role_parameters={'working_memory': ModelRoleRequirement('memory_model_profile', 'Maintain bounded incremental task memory.')})

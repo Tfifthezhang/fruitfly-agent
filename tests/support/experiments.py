@@ -28,17 +28,11 @@ def workspace(root, *, task=None, **sections):
     component_ids = values.get('components', ['improvement-editor'] if task.get('source') == 'editor' else ['base_prompt'])
     field_defaults = {
         'base_prompt': ['parameters.instructions.system'],
-        'tool-catalog': ['parameters.instructions.usage'],
-        'skill-document': ['parameters.content.body'],
         'improvement-editor': ['parameters.instructions.' + key for key in ('propose', 'system', 'reflect')]}
     edit = {}
     options = values.get('component_options', {})
     for name in component_ids:
-        if name == 'execution-policy':
-            from fruitfly_agent.runtime_spec.execution import flatten_execution
-            default = ['parameters.settings.'+key for key in flatten_execution({}) if key not in {'max_turns','max_tool_calls_per_turn'}]
-        else:
-            default = field_defaults.get(name, ['parameters.instructions.system'])
+        default = field_defaults.get(name, ['parameters.instructions.system'])
         option = options.get(name, {})
         edit[name] = {'fields': list(option['editable_fields'])
                       if 'editable_fields' in option else default}

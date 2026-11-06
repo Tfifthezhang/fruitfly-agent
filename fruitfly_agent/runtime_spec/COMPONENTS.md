@@ -31,13 +31,13 @@ model catalog. The API model ID belongs inside that entry. Aliases are case-sens
 ## Write a component
 
 ```yaml
-id: execution-policy
+id: layered-compaction
 role: H
-implementation: execution-policy
+implementation: layered-compaction
 enabled: true
 parameters:
   settings:
-    max_tool_calls_per_turn: 128
+    tail_tokens: 4096
 ```
 
 The component ID and role must match its position and registered definition.
@@ -56,9 +56,9 @@ automatically component configuration fields.
 
 | Role | Content | Related guide |
 |---|---|---|
-| H | Prompt, tools, guidance, context and execution settings | [Runtime architecture](../README.md) |
+| H | Operational prompts, tools, context and memory/Skill loading policies | [Runtime architecture](../README.md) |
 | S | Registered memory and Skill libraries, or independent retained content | [Algorithm targets](../lab/improvement/targets/README.md) |
-| I | Editor and evaluator prompts | [Improvement](../lab/improvement/README.md) |
+| I | Strategies and prompts for editing/evaluating improvements | [Improvement](../lab/improvement/README.md) |
 
 The pure `runtime_spec.load_harness_config` reads explicit documents, retains
 unresolved default references and records file hashes. `lab.catalog.load_system_config` also validates registered owners and
@@ -107,12 +107,9 @@ their role and resolved model identity. Model roles are outside ordinary edit gr
 | Document | Typical parameters | Parameter owner |
 |---|---|---|
 | `base_prompt` (H) | `instructions.system` | [Base prompt](../lab/base_prompt/README.md) |
-| `execution-policy` (H) | `settings`: daily optional tool/turn limits, recovery and tool execution | [Execution policy](../lab/execution_policy/README.md) |
 | Tool/environment/context mechanism (H) | Its registered descriptors | [Catalog](../lab/catalog/CONFIGURATION.md) |
-| `tool-catalog` (H) | `instructions.usage`; source-owned tool details load through existing `read` | [Tools](../lab/tools/README.md) |
-| `memory-library`, `skill-library` (S) | `content.documents`; strict attributed JSON entries | [Memory](../lab/context_manager/augmentation/information/file_memory/README.md), [Skills](../lab/context_manager/augmentation/skills/README.md) |
-| `memory-maintenance` (H), `memory-extractor` / `memory-consolidator` (I) | Threshold policy and generation instructions | [Memory maintenance](../lab/context_manager/augmentation/information/file_memory/methods/threshold_maintenance/README.md) |
-| `skill-document` (S) | `content.body`, `settings.max_chars`, optional `settings.source_path` | [Retained targets](../lab/improvement/targets/README.md) |
+| `file-memory`, `skills` (H) | Reading/loading instructions and declared settings | [Augmentation](../lab/context_manager/augmentation/README.md) |
+| `memory-library`, `skill-library` (S) | `content.documents`; strict attributed JSON entries | [Memory](../lab/context_manager/augmentation/memory/methods/file_memory/README.md), [Skills](../lab/context_manager/augmentation/skills/README.md) |
 | `improvement-editor` (I) | `instructions.{system,propose,reflect}` | [Editor](../lab/improvement/editor/README.md) |
 | `improvement-evaluator` (I) | `instructions.criteria`, `instructions.assess`, `instructions.compare` | [Assessment](../lab/improvement/assessment/README.md) |
 
@@ -120,9 +117,9 @@ Search scheduling, evidence page size and independent phase times belong to the
 fixed [experiment configuration](../experiments/CONFIGURATION.md). They do not
 become editable I components. Facts collection preserves raw observations for the shared model evaluator.
 
-A tool's default guidance is derived from the registered tool; a separate guidance
+A tool's complete description is derived from its method default document; a separate guidance
 file is needed only for an explicit value. To configure S, select its owner under
-S and supply initial text. Each trial receives its declared frozen initial state.
+S alongside its enabled H loader and supply initial content. Content surfaces do not enable a loader implicitly. Each trial receives its declared frozen initial state.
 Editing retained text does not imply automatic learning or trained weights.
 
 ## Preserve exact resources
@@ -151,7 +148,7 @@ changed components become explicit documents. Explicit text equal to the default
 remains explicit. There is no per-field inheritance or automatic merge language.
 
 Candidate/export materialization writes complete effective values, including
-numeric defaults, I instructions and fixed execution settings. Its output uses
+numeric defaults, I instructions and protected owner settings. Its output uses
 the same component format and contains no unresolved default references.
 Adoption fixes each changed component's parameter version. Other components keep
 their original references. Package-source receipts reject stale default expansion;

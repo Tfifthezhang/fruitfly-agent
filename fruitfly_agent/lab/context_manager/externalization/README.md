@@ -8,7 +8,7 @@ Move large text out of the model projection while keeping a stable way to read i
 |---|---|
 | `ipython-tool` | Run Python in a persistent workspace. |
 | `rlm-ipython` | Also externalize large context into retrievable Session artifacts. |
-| [Programmatic context](programmatic_context/README.md) | Artifact access, IPython execution, and budgeted auxiliary model queries |
+| [Programmatic context](methods/programmatic_context/README.md) | Reference projection over an injected artifact writer |
 
 IPython cells and auxiliary model queries each default to 300 seconds. Output,
 input and concurrency limits remain bounded. Tool parameters require explicit
@@ -40,7 +40,7 @@ This is an adaptation within the existing Agent loop, not a reproduction of the 
 | Assembly | Depend on the `ContextArtifactWriter` component, not concrete IPython internals. |
 | Resources | Register newly constructed owned objects with `context.own`. |
 
-Recovery restores artifacts and explicit JSON state, not arbitrary Python objects. IPython inherits user permissions; auxiliary model calls may incur charges. Detailed limits belong to [Programmatic context](programmatic_context/README.md).
+Recovery restores artifacts and explicit JSON state, not arbitrary Python objects. IPython inherits user permissions; auxiliary model calls may incur charges. Detailed limits belong to [Programmatic context](methods/programmatic_context/README.md).
 
 ```bash
 .venv/bin/python -m unittest tests.lab.test_rlm -v
@@ -56,9 +56,9 @@ experiment conditions, separate from editable query limits and instructions.
 
 ## Configure instructions and numeric parameters together
 
-[ipython-tool.yaml](ipython-tool.yaml) owns `instructions.usage`,
+[IPython defaults](../../tools/methods/ipython/defaults.yaml) owns `instructions.usage`,
 `instructions.query` and numeric workspace/query defaults.
-[rlm-ipython.yaml](rlm-ipython.yaml) owns `instructions.usage` and the offload
+[Externalization defaults](methods/programmatic_context/defaults.yaml) owns `instructions.usage` and the offload
 threshold. Registered owner fields use the same typed parameter adapter and
 explicit experiment grants. Query guidance supplies the fallback system message;
 explicit `llm_query` system instructions retain their existing behavior. Input

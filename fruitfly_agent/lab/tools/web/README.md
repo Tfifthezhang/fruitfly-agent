@@ -114,7 +114,7 @@ search discovers information and sources; fetch reads a known URL and verifies
 source details. Neither description requires the other tool to be enabled. Fetch
 services retain their capability limits in their usage resources. With `read`
 enabled, full usage is loaded on demand through the shared Tool catalog. See
-[tool descriptions](../README.md#describe-visible-operations) for the shared contract.
+[tool descriptions](../README.md#describe-and-improve-native-tools) for the shared contract.
 
 Domain filters include subdomains and are checked against returned URLs. Results
 are deduplicated after fragment removal. Brave uses `site:` operators and rejects
@@ -198,8 +198,8 @@ owns bounded transport; Catalog owns configuration and resource assembly.
 | [contracts.py](contracts.py) | `SearchRequest`, `SearchHit`, `SearchResponse`, `FetchResponse`, `SearchService`, `FetchService` |
 | [client.py](client.py) | `WebClient`, `WebConfig`, `WebError`; HTTP, cache, destinations, cancellation and close |
 | [registry.py](registry.py) | `WebServiceDefinition`, `WebServiceRegistry`, `default_service_registry`, `web_api_key_variable`; factories and credential defaults |
-| [search.py](search.py): `create_web_search_tool` | Common argument checks, source filtering, deduplication and bounded tool output |
-| [fetch.py](fetch.py): `create_web_fetch_tool` | Common argument checks, text pagination and numbered tool output |
+| [search.py](../methods/web_search/algorithm.py): `create_web_search_tool` | Common argument checks, source filtering, deduplication and bounded tool output |
+| [fetch.py](../methods/web_fetch/algorithm.py): `create_web_fetch_tool` | Common argument checks, text pagination and numbered tool output |
 | [common.py](common.py) | Shared output, source identity and text formatting helpers |
 | [services/brave.py](services/brave.py) | Brave search parameters, authentication and response fields |
 | [services/tavily.py](services/tavily.py) | Tavily basic search parameters, authentication and response fields |
@@ -252,4 +252,4 @@ quality or model quality. Protocol references:
 [Brave Web Search](https://api-dashboard.search.brave.com/api-reference/web/search/get),
 [Tavily Search](https://docs.tavily.com/documentation/api-reference/endpoint/search).
 
-[web-search-tool.yaml](web-search-tool.yaml) and [web-fetch-tool.yaml](web-fetch-tool.yaml) own their typed defaults. The shared WebConfig fallback derives from the fetch document; each registered service mechanism resolves its own document. Grants and live-service snapshot requirements remain unchanged.
+[Search defaults](../methods/web_search/defaults.yaml) and [Fetch defaults](../methods/web_fetch/defaults.yaml) own their typed defaults. The shared WebConfig fallback derives from the fetch document; each registered service mechanism resolves its own document. Grants and live-service snapshot requirements remain unchanged.

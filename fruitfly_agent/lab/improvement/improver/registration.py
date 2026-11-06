@@ -6,7 +6,7 @@ from fruitfly_agent.improvement.contracts.experiments import (ExecutionDefinitio
 from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
 from fruitfly_agent.improvement.contracts.versions import canonical_json
 from fruitfly_agent.improvement.contracts.versions import content_hash
-from .materials import freeze, materials
+from fruitfly_agent.lab.improvement.materials.episodes import freeze, materials
 from .runner import ImproverTaskRunner, TrialMeasurements
 from .verification import ImproverVerification
 
@@ -80,7 +80,7 @@ def definition():
         frozenset({'I'}), ImproverTaskRunner.capabilities, materials, prepare, build, PARAMETERS,
         'Runs bounded nested improvement experiments and private comparisons. Calls may incur charges. '
         'Each editor, execution and evaluator invocation uses its configured independent time.',
-        defaults=(('scope', 'persistent'),))
+        defaults=(('scope', 'persistent'),), requires_runner_factory=True)
 
 
 def comparison_definition(*, execution_id, freeze_materials, list_materials, episode_factory,

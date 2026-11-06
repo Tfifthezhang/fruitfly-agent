@@ -1,4 +1,5 @@
 """Default H reduction with optional, explicitly bound summary inference."""
+from fruitfly_agent.lab.catalog.classification import CONTEXT, REDUCTION
 from dataclasses import replace, fields
 from functools import partial
 
@@ -27,7 +28,7 @@ def definition():
             cost_notice='Deterministic mode makes no auxiliary requests. Hybrid summaries use the selected summary model and may incur charges.')),
         install, implementation_id='layered-compaction-v1', configuration_role='H',
         implementation_path=root + 'algorithm.py', documentation_path=root + 'README.md',
-        selection_group='reduction', selection_group_label='Reduction',
+        feature_path=(CONTEXT, REDUCTION), selection_group='reduction', selection_group_label='Reduction',
         input_parameters=('mode', 'summary_model_profile'), default_resource=(__package__, 'defaults.yaml'),
         validate_parameters=partial(validate, LayeredCompactionConfig),
         model_role_parameters={'context_summary': ModelRoleRequirement('summary_model_profile',

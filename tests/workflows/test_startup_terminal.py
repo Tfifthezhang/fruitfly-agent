@@ -11,7 +11,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 from fruitfly_agent.run import cli
 from fruitfly_agent.run.application import RunApplicationFactory
-from fruitfly_agent.lab.environment.ssh import SshEnv
+from fruitfly_agent.lab.environment.methods.remote import SshEnv
 from fruitfly_agent.interactive.terminal.features.tool_services.approval import approve_start
 from fruitfly_agent.interactive.contracts.tool_services import ToolServiceStartPlan
 from tests.support.faux_provider import FauxProvider
@@ -35,8 +35,8 @@ async def main():
             environment={'TEST_API_KEY': 'fixture', 'FRUITFLY_SSH_USERNAME': 'fixture',
                          'FRUITFLY_SSH_PASSWORD': 'fixture'})
         factory.configuration.set_mechanism('working-memory-reduction', enabled=False)
-        factory.configuration.set_mechanism('ssh-env', enabled=True)
-        factory.configuration.set_parameter('ssh-env', 'host', 'unavailable.example')
+        factory.configuration.set_mechanism('remote-env', enabled=True)
+        factory.configuration.set_parameter('remote-env', 'host', 'unavailable.example')
         factory.configuration.save()
         factory.reload_configuration()
         with patch.object(cli, 'RunApplicationFactory', return_value=factory), patch.object(SshEnv, 'start', waiting):

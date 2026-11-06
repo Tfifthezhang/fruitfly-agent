@@ -13,7 +13,7 @@ from fruitfly_agent.core.tool_runtime.authorization import AuthorizationDecision
 from fruitfly_agent.interactive import InteractiveSession, TerminalFrontend, TerminalRenderer
 from fruitfly_agent.interactive.contracts.events import ToolStarted, ToolFinished, ToolOutput, event_from_dict
 from fruitfly_agent.interactive.interaction.commands import HELP_TEXT
-from fruitfly_agent.lab.tools.bash import create_bash_tool
+from fruitfly_agent.lab.tools.methods.bash.algorithm import create_bash_tool
 from tests.support.faux_provider import FauxProvider
 from tests.support.terminal import ScriptedLines
 

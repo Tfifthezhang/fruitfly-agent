@@ -4,7 +4,7 @@ from dataclasses import dataclass, replace
 
 from fruitfly_agent.core.context import ContextTransform
 from fruitfly_agent.improvement.contracts.optimization import TargetBinding, TargetSnapshot
-from fruitfly_agent.lab.improvement.targets.text import validate_text, state_artifact_path
+from fruitfly_agent.improvement.contracts.text import validate_text, state_artifact_path
 from fruitfly_agent.improvement.contracts.versions import SnapshotFile, StateSnapshot
 
 
@@ -78,7 +78,7 @@ class RetainedText:
 def install_retained(state, context, *, key, label, schema, initial, max_chars, reference_directory=''):
     """Install a frozen state document without editing user files or starting work."""
     from fruitfly_agent.core.context import ContextStage
-    from fruitfly_agent.lab.improvement.targets.text import TEXT_TARGET_PREFIX
+    from fruitfly_agent.improvement.contracts.text import TEXT_TARGET_PREFIX
     from fruitfly_agent.improvement.contracts.versions import STATE_SNAPSHOTS_COMPONENT
     reference = context.artifact_bindings.get(key)
     text = initial

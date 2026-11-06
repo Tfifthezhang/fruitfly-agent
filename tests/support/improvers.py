@@ -12,7 +12,7 @@ from fruitfly_agent.improvement.contracts.components import ComponentFile, Harne
 from fruitfly_agent.improvement.contracts.editing import ProposalResult
 from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
 from fruitfly_agent.improvement.contracts.assessment import SelectionDecision
-from fruitfly_agent.interactive.contracts.improvement import WorkflowRequest
+from fruitfly_agent.improvement.contracts.requests import WorkflowRequest
 from fruitfly_agent.run.application import RunApplicationFactory
 from tests.support.materials import _write_models
 from tests.support.faux_provider import FauxProvider
@@ -70,7 +70,7 @@ class SyntheticVerification:
 
 
 class OfflineRunner:
-    capabilities = frozenset({'tool:read', 'tool:write', 'tool:edit'})
+    capabilities = frozenset({'tool:read', 'tool:write', 'tool:edit', 'configuration-materialization'})
 
     async def execute(self, plan, task, harness):
         return ExecutionRecord('run-' + uuid4().hex, task.task_id, task.material_id,
@@ -83,9 +83,12 @@ def offline_factory(root, target='base_prompt'):
     providers.create.side_effect = lambda *_: FauxProvider()
     generators = GeneratorRegistry()
     generators.register('offline-rule', OfflineGenerator)
+    def runner(*args):
+        return OfflineRunner()
+    runner.capabilities = OfflineRunner.capabilities
     factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=providers,
         improvement_bindings=WorkflowBindings(generators=generators,
-            runner=lambda *args: OfflineRunner(), 
+            runner=runner, 
             selector=lambda *args: FirstSelector(), reflector=lambda *args: NoReflection(),
             verifier=SyntheticVerification()))
     factory.test_request = WorkflowRequest('Complete the synthetic task.', component_ids=(target,),

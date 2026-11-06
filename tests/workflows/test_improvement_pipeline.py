@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import Mock
 
 from fruitfly_agent.interactive import AgentApplication
-from fruitfly_agent.interactive.contracts.improvement import WorkflowRequest
+from fruitfly_agent.improvement.contracts.requests import WorkflowRequest
 from fruitfly_agent.lab.improvement.api import WorkflowBindings
 from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
 from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, EditReason
@@ -103,12 +103,14 @@ class ApplicationPipelineTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(factory._current_runtime_config.system_prompt, 'Read the input before completing the task.')
                 provider.respond_text('done')
                 await app.submit('Continue with the adopted component')
+                continued = factory.system_version()
+                self.assertEqual((continued.harness, continued.improver), (declared.version.harness, declared.version.improver))
                 session = Path(app.status.session_path)
             finally:
                 await app.close()
             await app.start(resume=True, session_path=session)
             try:
-                self.assertEqual(factory.system_version(), declared.version)
+                self.assertEqual(factory.system_version(), continued)
             finally:
                 await app.close()
 

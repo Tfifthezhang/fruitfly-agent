@@ -61,7 +61,8 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
             root = Path(tmp)
             _write_catalog(root / ".fruitfly/models.yaml", {"offline": "offline-model"})
             store = DataArtifactStore(root / ".fruitfly" / "artifacts")
-            ref = store.put_text("Pinned skill catalog guidance")
+            from fruitfly_agent.lab.improvement.editor.instructions import EditorInstructionTarget, EditorInstructions
+            ref = store.put_text(EditorInstructionTarget(EditorInstructions(system='Pinned editor guidance')).snapshot().text)
             session_path = root / "candidate-session.jsonl"
             registry = Mock()
             providers = []
@@ -79,7 +80,7 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
                 environment={},
                 provider_registry=registry,
                 data_artifact_bindings={
-                    "tool-catalog": ref.artifact_id,
+                    "improvement-editor": ref.artifact_id,
                 },
             )
             initial = await initial_factory.open(
@@ -90,8 +91,8 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
             initial_manifest = initial.manifest
             await initial.session.submit("exercise the bound guidance")
             self.assertIn(
-                "Pinned skill catalog guidance",
-                initial_factory._current_runtime_config.provider.calls[-1]['system_prompt'],
+                "Pinned editor guidance",
+                initial_factory._current_targets['improvement-editor'].instructions.system,
             )
             await initial.close()
 
@@ -116,8 +117,8 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
                 self.assertNotEqual(resumed.manifest, initial_manifest)
                 self.assertEqual([], resumed.manifest.get("data_artifacts", []))
                 await resumed.session.submit('exercise current guidance')
-                self.assertNotIn('Pinned skill catalog guidance',
-                    resumed_factory._current_runtime_config.provider.calls[-1]['system_prompt'])
+                self.assertNotIn('Pinned editor guidance',
+                    resumed_factory._current_targets['improvement-editor'].instructions.system)
             finally:
                 await resumed.close()
 

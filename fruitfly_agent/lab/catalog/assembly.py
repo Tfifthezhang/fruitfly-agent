@@ -113,6 +113,15 @@ class AssemblyState:
     def with_data_artifact(self, artifact: Mapping[str, Any]) -> "AssemblyState":
         return replace(self, data_artifacts=(*self.data_artifacts, dict(artifact)))
 
+    def with_execution_resource(self, capability, factory):
+        """Publish a borrowed trial factory without constructing or starting it."""
+        if not isinstance(capability, str) or not capability or not callable(factory):
+            raise ValueError('execution resource needs a named factory')
+        resources = dict(self.components.get('execution-resources', {}))
+        if capability in resources:
+            raise ValueError('duplicate execution resource: ' + capability)
+        return self.with_component('execution-resources', {**resources, capability: factory})
+
 
 @dataclass(frozen=True)
 class AssemblyResult:
@@ -152,6 +161,7 @@ def assemble_lab(
         if not isinstance(state, AssemblyState):
             raise TypeError("catalog bootstrap must return AssemblyState")
         _own_state(state, context)
+    state = _prepare_surfaces(state, context, catalog, resolved)
     reduction_stage_id: str | None = None
     for item in resolved:
         descriptor = item.definition.descriptor
@@ -242,6 +252,9 @@ def assemble_lab(
     # Object adapters see the complete tool set, independently of search enablement.
     # They may consume declared artifacts but cannot start model work.
     state = _prepare_object_targets(state, context, catalog)
+    from fruitfly_agent.lab.tools.contracts import contract_fingerprints
+    if state.config.tools:
+        state = state.with_component('tool-contracts', contract_fingerprints(state.config.tools))
     stages = state.context_stages
     if state.reducer is not None:
         if reduction_stage_id is None:
@@ -286,6 +299,42 @@ def _prepare_object_targets(state, context, catalog):
             state = definition.prepare_targets(state, context)
             if not isinstance(state, AssemblyState):
                 raise TypeError('object target preparation must return AssemblyState')
+            _own_state(state, context)
+    return state
+
+
+def _prepare_surfaces(state, context, catalog, resolved):
+    """Construct active owner targets from the same offline surface declarations."""
+    from .defaults import read_default
+    from fruitfly_agent.improvement.contracts.optimization import RetainedDocuments
+    from fruitfly_agent.improvement.contracts.text import TEXT_TARGET_PREFIX
+    from fruitfly_agent.improvement.contracts.versions import STATE_SNAPSHOTS_COMPONENT
+    enabled = {item.definition.descriptor.mechanism_id: item for item in resolved}
+    for definition in catalog.definitions():
+        active = enabled.get(definition.descriptor.mechanism_id)
+        for surface in definition.configuration_surfaces:
+            if surface.target_factory is None or (active is None and not surface.standalone):
+                continue
+            owner_context = replace(context, model_parameters=active.parameters if active else {},
+                model_requirements=definition.model_role_parameters,
+                component_id=definition.descriptor.mechanism_id)
+            parameters = context.component_settings.get(surface.key)
+            if parameters is None:
+                document, _ = read_default(catalog, surface.id)
+                parameters = dict(document.parameters)
+            reference = context.artifact_bindings.get(surface.id)
+            if reference:
+                raw = context.artifact_reader(reference)
+                parameters = surface.restore(parameters, raw)
+                state = state.with_data_artifact({'key': surface.id, 'id': reference, 'role': surface.role,
+                    'media_type': 'application/json', 'size_bytes': len(raw.encode('utf-8'))})
+            target = surface.target_factory(state, owner_context, surface.normalize(parameters))
+            if target.optimization != surface.optimization or target.snapshot().role != surface.role:
+                raise ValueError('surface target differs from its declaration: ' + surface.id)
+            state = state.with_component(TEXT_TARGET_PREFIX + surface.id, target)
+            if isinstance(target, RetainedDocuments):
+                state = state.with_component(STATE_SNAPSHOTS_COMPONENT,
+                    (*state.components.get(STATE_SNAPSHOTS_COMPONENT, ()), target))
             _own_state(state, context)
     return state
 

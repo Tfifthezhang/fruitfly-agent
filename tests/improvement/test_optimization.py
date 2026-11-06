@@ -40,7 +40,7 @@ class OptimizationProtocolTests(unittest.IsolatedAsyncioTestCase):
         catalog = builtin_catalog()
         original = catalog.get('local-env')
         definition = replace(original, descriptor=replace(original.descriptor, mechanism_id='uneditable'),
-            optimization_exemption='')
+            optimization_coverage=None)
         with self.assertRaisesRegex(ValueError, 'optimization declaration'):
             catalog.extended((definition,)).require_optimization()
         empty = replace(definition, component_specs=lambda parameters, enabled: ())

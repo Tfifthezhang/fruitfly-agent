@@ -63,7 +63,7 @@ before a remote request. See [continuation rules](../../providers/PROVIDER_GUIDE
 
 Assembly supplies an optional generic secret resolver from the host environment to Lab. Selected [web tools](../../lab/tools/web/README.md) receive only the named search credential; keys are not added to manifest parameters or the minimal child-process environment. Construction makes no search or fetch requests.
 
-The optional [SSH environment](../../lab/environment/ssh/README.md) uses this
+The optional [SSH environment](../../lab/environment/methods/remote/README.md) uses this
 resolver for its named account and password. Construction makes no SSH request;
 Application startup connects and retirement closes it. Catalog permits a backend
 to supply `with_permissions(policy, confirm=..., audit=...)`, returning a guarded

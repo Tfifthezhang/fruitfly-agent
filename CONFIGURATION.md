@@ -244,11 +244,11 @@ The capability page uses arrows and Space/Enter to toggle, then **Continue** to 
 | Skill catalog | Packaged coding procedures plus `.skills/`; enable S `skill-library` and H catalog in **Context → Context augmentation → Skill catalog** (Space toggles; the phase is a section heading). | [Skills](fruitfly_agent/lab/context_manager/augmentation/skills/README.md) |
 | Reduction | Layered compaction by default; optional working memory. Both read original history through `read`. Edit policy in H component files. | [Reduction](fruitfly_agent/lab/context_manager/reduction/README.md) |
 | Context measurement | Automatically shared internal service; reports precision, input/output reserves and uncertainty. Exact counting requires a declared Provider capability. | [Measurement](fruitfly_agent/lab/context_manager/measurement/README.md) |
-| Improvement | Edit I component files for editor/evaluator prompts; experiment grants and conditions control edits, phase times, scope and stopping; `/improvement` keeps a small instruction/file flow. | [Improvement](fruitfly_agent/lab/improvement/README.md) |
+| Improvement | Edit I component files for editor/evaluator prompts; use experiment files and the independent experiment CLI for grants, conditions and execution. | [Improvement](fruitfly_agent/lab/improvement/README.md) |
 | Reusable skill document | Disabled; Context augmentation. Set `settings.source_path` to one workspace-relative Skill or enter `content.body`; `settings.max_chars=16000`. | [Skill body](fruitfly_agent/lab/context_manager/augmentation/skills/README.md#improve-descriptions-and-bodies) |
 | Web search / fetch | Disabled; enable **Search the web** and **Fetch web pages** under Tools. Search uses Brave, Tavily or DeepSeek. Fetch uses `direct` (no key) or `deepseek`. Expand either tool and choose **Set up…** to select the service and enter a hidden API key. Save writes the secret file. DeepSeek search/fetch use separate default variables; `api_key_env` can select a shared key. | [Web tools and YAML settings](fruitfly_agent/lab/tools/web/README.md) |
-| Programmatic context | Explicitly enable `ipython-tool` or `rlm-ipython`. | [Programmatic context](fruitfly_agent/lab/context_manager/externalization/programmatic_context/README.md) |
-| Remote execution | Enable **Remote environment** under Environment to run file and Bash tools through SSH. Complete settings and credentials are reused; missing values open the six-step form. Expand **Set up…** to edit explicitly. Disabling retains saved settings across restarts in the same workspace/profile. Mutually exclusive with local execution and local IPython/RLM. Host memory and Skill resources remain readable. | [SSH setup and limits](fruitfly_agent/lab/environment/ssh/README.md) |
+| Programmatic context | Explicitly enable `ipython-tool` or `rlm-ipython`. | [Programmatic context](fruitfly_agent/lab/context_manager/externalization/methods/programmatic_context/README.md) |
+| Remote execution | Enable **Remote environment** under Environment to run file and Bash tools through SSH. Complete settings and credentials are reused; missing values open the six-step form. Expand **Set up…** to edit explicitly. Disabling retains saved settings across restarts in the same workspace/profile. Mutually exclusive with local execution and local IPython/RLM. Host memory and Skill resources remain readable. | [SSH setup and limits](fruitfly_agent/lab/environment/methods/remote/README.md) |
 | RSI | Explicit independent CLI or injected host; generation scheduling and independent verification. | [RSI](fruitfly_agent/lab/rsi/README.md) |
 
 Menus show mechanism switches and algorithm choices. Edit `.fruitfly/config.yaml` for detailed parameters. Summaries, improvement, and auxiliary model queries may incur model charges.
@@ -257,54 +257,33 @@ Menus show mechanism switches and algorithm choices. Edit `.fruitfly/config.yaml
 
 | Mechanism | Default | Parameters |
 |---|---|---|
-| `information-context` | Enabled, hidden dependency | `top_k=5`, `max_chars=4000` |
-| `memory-files` | Enabled with S `memory-library` | Bounded directory and usage guidance; see the [memory owner](fruitfly_agent/lab/context_manager/augmentation/information/file_memory/README.md) |
+| `information-context` | Hidden dependency of knowledge/HTTP | `top_k=5`, `max_chars=4000` |
+| `file-memory` | Enabled with automatic maintenance | Bounded directory and usage guidance; see the [memory owner](fruitfly_agent/lab/context_manager/augmentation/memory/methods/file_memory/README.md) |
 | `knowledge-files` | Disabled | `root=.fruitfly/knowledge` |
 | `live-http` | Disabled | HTTPS `endpoint`, `timeout_seconds=5` |
 
-Source paths resolve within the workspace. All three sources require `information-context`. Live HTTP sends the current query to the configured service. See [Information spaces](fruitfly_agent/lab/context_manager/augmentation/information/README.md).
+Source paths resolve within the workspace. Local knowledge and HTTP require `information-context`; File memory has its own directory loader. Live HTTP sends the current query to the configured service. See [Information spaces](fruitfly_agent/lab/context_manager/augmentation/information/README.md).
 
 ## Bound task tool calls
 
-Set the limit in the Agent configuration selected for execution, usually
-`.fruitfly/default-config.yaml` for experiments:
-
-Use an inline H `execution-policy` document or an explicitly selected custom file:
-
-```yaml
-id: execution-policy
-role: H
-implementation: execution-policy
-parameters:
-  settings:
-    max_tool_calls_per_turn: 128
-```
-
-Daily execution defaults to 512 tool attempts per turn. `settings.max_tool_calls_per_turn` accepts a nonnegative integer or `null` for no count limit; 0 permits none. Daily `settings.max_turns` accepts the same optional count semantics. Improvement uses independent phase times and removes task/editor tool, turn and model-call quotas. Final effective values are recorded in runtime identity.
+Execution count limits, overflow recovery and tool concurrency are fixed host
+conditions. They have no component, menu setting or Improvement edit grant.
+Daily Core defaults include 512 tool attempts per turn, 32 outer turns and six
+context-recovery attempts. Improvement uses independent phase times and removes
+count caps for task/editor execution. Actual effective values remain recorded in
+the manifest and trial receipts. Embedding code can supply execution conditions
+through typed Core/runtime interfaces; YAML selects registered H/S/I content.
 
 ## Configure the complete execution policy
 
-Run and Eval use the [shared runtime specification](fruitfly_agent/runtime_spec/README.md).
-The execution-policy component's `parameters.settings` mapping also accepts:
+[Runtime specification](fruitfly_agent/runtime_spec/README.md) validates host
+execution values and recorded identities. Model token limits retain their model
+catalog owner. Permissions remain an injected host strategy. Neither becomes an
+editable algorithm because it appears in a runtime receipt.
 
-| Field | Default | Meaning |
-|---|---|---|
-| `max_turns` | 32 | Maximum outer turns, including follow-ups; not model calls |
-| `max_context_recovery_attempts` | 6 | Positive overflow-recovery bound |
-| `tool_execution.max_parallel` | 8 | Positive tool batch concurrency |
-| `tool_execution.default_execution_mode` | `parallel` | `parallel` or `sequential` |
-
-Models and token limits retain their model-catalog owner. Callbacks, Session,
-Provider and authorization objects cannot be supplied in this mapping. Runtime
-manifest schema 7 records the final effective execution values and configured
-component inventory; old manifests retain their original identities.
-
-Use experiment `edit` grants to select registered optimizable parameters and bounds.
-[Execution policy](fruitfly_agent/lab/execution_policy/README.md) remains protected infrastructure, not an optimization target. Enabled mechanisms determine available components;
-backend capabilities and experiment permissions further restrict them. Absent
-state owners do not expose editable S components. Invalid explicit selections fail.
-The experiment check prints the resolved inventory and exercises Eval staging
-offline before real execution.
+Enabled owners determine available optimization components. Backend capabilities
+and explicit grants further restrict them; unsupported targets fail before model
+work. The experiment check reports this inventory offline.
 
 ## Text artifacts
 
@@ -321,13 +300,19 @@ paths. Omit experiment `edit` to discover all legal backend/material targets;
 
 Authored text belongs in component parameters. Typed Python hosts can create immutable text with `DataArtifactStore.put_text`; see the [Run example](fruitfly_agent/run/README.md#text-artifacts). Runtime prompt/artifact bindings are internal projections of the same component configuration. Unknown or unused bindings are rejected; recovery verifies the original contents and manifest. Keep secrets out of artifacts, configuration, sessions, and reports.
 
-`tool-catalog` owns the overall tool-use policy. Full tool usage loads on demand through `read`; individual schemas and usage resources remain source-owned. Tool parameter targets require explicit selection and are excluded from automatic edit scope. Experiment files select one or more editable components. A joint candidate expands into ordinary prompt/artifact bindings; tool schemas, execution and permissions retain their existing contracts. Preview is offline; execution may incur model and external-runner costs.
+Native tool owners expose H `instructions.description` and allowed settings.
+The Provider receives complete descriptions and parameter schemas directly.
+Names, schemas, implementations and permissions remain protected. Tool targets
+require explicit selection and a capable isolated backend.
 
-`memory-library` and `skill-library` retain S descriptions, bodies and declared text references. `skill-document` is an independent single-body S mechanism. `improvement-editor` exposes six prompt fields
-and `improvement-evaluator` exposes criteria,
-assessment and comparison prompts. Every editable field has owner descriptions
-and explicit grants. Persistent publication requires independent verification and
-explicit adoption.
+`memory-library` and `skill-library` are S content surfaces attached to their H
+owners. They are not selectable mechanisms or independent menu entries. Memory
+reading, extraction and consolidation instructions all belong to H `file-memory`.
+Skill descriptions, bodies and text resources belong to S; loader guidance belongs
+to H `skills`. I `improvement-editor` exposes system/propose/reflect instructions;
+I `improvement-evaluator` exposes criteria/assess/compare. These strategies define
+how granted H/S changes are proposed and evaluated. Persistent improvement
+publication requires independent verification and explicit activation.
 
 ## Environment variables
 
@@ -338,7 +323,7 @@ explicit adoption.
 | `FRUITFLY_MODEL_USAGE_PATH` | Optional atomic request receipts with status and reported usage |
 | `NO_COLOR` | Disable terminal colors |
 | Model-specific `api_key_env` | Name of the variable containing that model's API key |
-| `FRUITFLY_SSH_USERNAME` / `FRUITFLY_SSH_PASSWORD` | Secret SSH account/password; `ssh-env.username_env` and `password_env` can select different variable names |
+| `FRUITFLY_SSH_USERNAME` / `FRUITFLY_SSH_PASSWORD` | Secret SSH account/password; `remote-env.username_env` and `password_env` can select different variable names |
 | `BRAVE_SEARCH_API_KEY` / `TAVILY_API_KEY` | Secret used by the selected web search backend; optional `web-search-tool.api_key_env` overrides the variable name |
 | `DEEPSEEK_API_KEY` | Model credential used by the DeepSeek model examples |
 | `DEEPSEEK_SEARCH_API_KEY` / `DEEPSEEK_FETCH_API_KEY` | Separate default secrets for DeepSeek search and fetch. Each tool's `api_key_env` can select another variable, including the model key when explicit reuse is wanted. |
@@ -446,8 +431,8 @@ and mixed outer H/S/I comparison is unsupported.
 
 Every task execution uses fixed components. Search stopping is recorded separately
 from `selected` or `verified` assurance. A task-local result changes no default.
-Lessons remain pending until **Results and history → Pending experience** explicitly
-commits or rejects them. A library change invalidates a stale pending commit.
+Lessons remain pending until the embedding host explicitly commits or rejects
+them through its experience service. A library change invalidates a stale pending commit.
 Persistent I experiments cannot write production experience.
 
 Auxiliary model admission belongs to the owning mechanism's
@@ -489,12 +474,17 @@ It is protected execution infrastructure, separate from selectable Agent H/S/I p
 
 ## Maintain cross-session memory
 
-The [memory owner](fruitfly_agent/lab/context_manager/augmentation/information/file_memory/README.md)
-defines entry syntax and threshold parameters. Enable H `memory-maintenance` plus I
-`memory-extractor` and `memory-consolidator` explicitly to permit auxiliary calls.
-Defaults are 8000 new user characters for extraction and 50 completed user turns
-for consolidation. `models.roles.memory_maintenance` is lazy and inherits executor.
-Review generated batches through `/memory`; persistent publication is separate from
-independently verified Improvement. One-shot CLI tasks disable workspace retained
-state services and use only the selected configuration's frozen initial content.
-No key or new secret variable is required when the existing model is inherited.
+[File memory](fruitfly_agent/lab/context_manager/augmentation/memory/methods/file_memory/README.md)
+and automatic maintenance are enabled by default. Extraction uses 8000 new user
+characters; consolidation uses 50 completed user turns. Counters accumulate across
+sessions. `models.roles.memory_maintenance` inherits executor and constructs its
+client only when generation starts. Advanced H instructions and bounds are in the
+same File memory component. Retained note text is the attached S surface.
+
+Review pending batches with `/memory`, then commit or reject explicitly. Normal
+maintenance is H operating on S and needs no I editor/evaluator. The `memory-learning`
+execution compares H candidates with trial-local learning and private downstream
+evaluation. One-shot tasks disable workspace retained-state services and consume
+only frozen initial content. Skills are also enabled by default; `/skills` lists
+installed names and descriptions and `/skills read ID` displays the procedure.
+

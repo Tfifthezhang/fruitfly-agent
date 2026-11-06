@@ -65,11 +65,11 @@ def execution_version_payload(manifest: Mapping[str, Any], source: str) -> dict[
     """Execution identity excludes the independently versioned improvement strategy."""
     inventory = manifest.get('harness', {})
     state_parameters = {c['component_id'] for c in inventory.get('components', ())
-        if c['role'] == 'S' and c['kind'] == 'mechanism-parameters'}
+        if c['role'] == 'S' and c['kind'] in {'mechanism-parameters', 'retained-collection'}}
     # State owners keep topology in H and exact executable content in S.
     components = [({key: value for key, value in c.items() if key != 'parameters'}
         if c['id'] in state_parameters else c) for c in manifest['components']
-        if not any(x.get('layer') == 'improvement' for x in c.get('contributions', ()))]
+        if c.get('role') != 'I' and not any(x.get('layer') == 'improvement' for x in c.get('contributions', ()))]
     return {**({'extensions': manifest['harness']['extensions']} if manifest.get('harness', {}).get('extensions') else {}),
             **({'execution': manifest['execution']} if 'execution' in manifest else {}),
             **({'tool_services': manifest['tool_services']} if manifest.get('tool_services') else {}),

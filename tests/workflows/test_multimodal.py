@@ -12,8 +12,8 @@ from fruitfly_agent.core.session import Session
 from fruitfly_agent.core.tool_runtime import ToolCallContext
 from fruitfly_agent.interactive import AgentApplication, InteractiveSession, TerminalFrontend
 from fruitfly_agent.lab.environment import LocalEnv
-from fruitfly_agent.lab.tools.read import create_read_tool
-from fruitfly_agent.lab.tools.media import create_save_media_tool
+from fruitfly_agent.lab.tools.methods.read.algorithm import create_read_tool
+from fruitfly_agent.lab.tools.methods.write.algorithm import create_write_tool
 from fruitfly_agent.run import RunApplicationFactory
 from fruitfly_agent.run.runtime.media import load_image
 from fruitfly_agent.run.storage.artifacts import DataArtifactStore
@@ -35,7 +35,6 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
             provider.respond_text('seen')
             registry = Mock(create=Mock(return_value=provider))
             factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=registry)
-            factory.configuration.set_mechanism('save-media-tool', enabled=True)
             factory.configuration.save()
             factory.reload_configuration()
             app = AgentApplication(factory)
@@ -49,7 +48,7 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(message.content[1], image())
                 resource = next(b.text.split('Media resource: ')[1] for b in message.content
                                 if isinstance(b, TextBlock) and b.text.startswith('Media resource: '))
-                provider.respond_tool_call('save_media', {'resource_id': resource, 'path': 'copy.png'})
+                provider.respond_tool_call('write', {'resource_id': resource, 'path': 'copy.png'})
                 provider.respond_text('saved')
                 await app.submit('save a copy')
                 self.assertEqual((root / 'copy.png').read_bytes(), png_bytes())
@@ -150,7 +149,7 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
                 (root / 'input.png').write_bytes(png_bytes())
                 result = await create_read_tool(media.put).execute(ToolCallContext('a', 'read', {'path': 'input.png'}, env))
                 resource = result.content[-1].text.split('Media resource: ')[1]
-                await create_save_media_tool(media.read).execute(ToolCallContext('b', 'save_media',
+                await create_write_tool(media.read).execute(ToolCallContext('b', 'write',
                     {'resource_id': resource, 'path': 'output.png'}, env))
                 self.assertEqual((root / 'output.png').read_bytes(), png_bytes())
                 with self.assertRaisesRegex(ValueError, 'not granted'):
@@ -162,42 +161,29 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
                 with self.assertRaisesRegex(ValueError, 'damaged image'):
                     load_image('bad.png', workspace=root)
 
-    async def test_save_media_h_guidance_binding_changes_the_actual_model_request(self):
+    async def test_write_description_candidate_saves_original_resource_bytes(self):
         from fruitfly_agent.lab.catalog import builtin_catalog, assemble_lab, AssemblyContext, MechanismSelection
         from fruitfly_agent.core.loop import run_agent_loop
-        from fruitfly_agent.core.data_model import AssistantMessage, ToolCallBlock
-        from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             store = DataArtifactStore(root / 'artifacts')
-            instructions = 'Save the supplied resource to the exact requested path. Preserve original bytes.'
-            binding = store.put_text(instructions).artifact_id
+            instructions = 'Use write with a granted resource ID to preserve exact original bytes.'
             with Session(root / 'session.jsonl') as session:
                 media = SessionMedia(store, session)
                 resource = media.put(png_bytes(), 'image/png', 'fixture')
                 provider = FauxProvider()
-                observed = []
-                def execute(view, **kwargs):
-                    observed.append(view.system_prompt)
-                    async def events():
-                        yield StreamDone(AssistantMessage([ToolCallBlock('save', 'save_media',
-                            {'resource_id': resource, 'path': 'candidate.png'})], stop_reason='toolUse'))
-                    return AssistantMessageEventStream(events())
-                provider.script.append(execute)
+                provider.respond_tool_call('write', {'resource_id': resource, 'path': 'candidate.png'})
                 provider.respond_text('done')
                 candidate = assemble_lab(AgentLoopConfig(provider=provider), catalog=builtin_catalog(),
-                    selections=(MechanismSelection('local-env'), MechanismSelection('save-media-tool')),
-                    context=AssemblyContext(root, session, 'offline', lambda *args: None,
-                        artifact_reader=store.read_text, artifact_bindings={'tool-catalog': binding},
-                        media_reader=media.read))
-                target = candidate.components['text-target:tool-catalog']
-                self.assertEqual(target.snapshot().text, instructions)
-                self.assertEqual(target.snapshot().binding.key, 'tool-catalog')
+                    selections=(MechanismSelection('local-env'),
+                        MechanismSelection('write-tool', parameters={'description': instructions})),
+                    context=AssemblyContext(root, session, 'offline', lambda *args: None, media_reader=media.read))
+                tool = candidate.config.tools[0]
+                self.assertEqual(tool.description, instructions)
+                self.assertEqual(tool.permission.operation, 'write')
                 result = await run_agent_loop(candidate.config, [UserMessage('save the resource')],
                     context_pipeline=candidate.context_pipeline)
                 self.assertFalse(result.is_error)
-                self.assertEqual(len(observed), 1)
-                self.assertIn(instructions, observed[0])
                 self.assertEqual((root / 'candidate.png').read_bytes(), png_bytes())
 
     async def test_pending_attachment_draft_survives_rejection_and_clears_on_session_switch(self):
@@ -227,7 +213,6 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
             provider = FauxProvider()
             registry = Mock(create=Mock(return_value=provider))
             factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=registry)
-            factory.configuration.set_mechanism('save-media-tool', enabled=True)
             factory.configuration.save()
             factory.reload_configuration()
             app = AgentApplication(factory)
@@ -237,7 +222,7 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
                 await app.submit([image()])
                 resource = next(b.text.split('Media resource: ')[1] for b in provider.calls[0]['messages'][0].content
                                 if isinstance(b, TextBlock) and b.text.startswith('Media resource: '))
-                provider.respond_tool_call('save_media', {'resource_id': resource, 'path': '.env'})
+                provider.respond_tool_call('write', {'resource_id': resource, 'path': '.env'})
                 provider.respond_text('permission denied')
                 await app.submit('save to protected path')
                 result = next(m for m in provider.calls[-1]['messages'] if m.role == 'toolResult')
@@ -271,7 +256,7 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
             await app.close()
 
     async def test_media_save_uses_remote_binary_environment_without_network(self):
-        from fruitfly_agent.lab.environment.ssh import SshConfig, SshEnv
+        from fruitfly_agent.lab.environment.methods.remote import SshConfig, SshEnv
         from tests.support.ssh import SftpFixture
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -280,8 +265,8 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
             env = SshEnv(SshConfig(host='server.example', cwd='/srv/project'), username='fixture', password='fixture')
             env._sftp = sftp
             try:
-                tool = create_save_media_tool(lambda _: png_bytes())
-                await tool.execute(ToolCallContext('remote', 'save_media',
+                tool = create_write_tool(lambda _: png_bytes())
+                await tool.execute(ToolCallContext('remote', 'write',
                     {'resource_id': 'fixture-resource', 'path': 'output/image.png'}, env))
                 self.assertEqual(sftp.path('/srv/project/output/image.png').read_bytes(), png_bytes())
             finally:

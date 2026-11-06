@@ -1,4 +1,6 @@
 """Capability substitution, construction failure ownership and owner-loop model I/O."""
+
+from fruitfly_agent.lab.catalog import FeatureNode, OptimizationCoverage
 import asyncio
 from dataclasses import replace
 from pathlib import Path
@@ -23,8 +25,8 @@ class ContractBoundaryTests(unittest.IsolatedAsyncioTestCase):
 
             implementation_path='tests/lab/test_decoupling.py',
             documentation_path='tests/lab/README.md',
-            optimization_exemption='Infrastructure fixture for dependency and resource lifecycle contracts.',
-        )
+            optimization_coverage=OptimizationCoverage('protected', 'Infrastructure fixture for dependency and resource lifecycle contracts.'),
+         feature_path=(FeatureNode('fixture', 'Fixture'),))
         catalog = builtin_catalog().extended((definition,))
         resolved = catalog.resolve((MechanismSelection('other-env'), MechanismSelection('read-tool')))
         self.assertEqual([i.definition.descriptor.mechanism_id for i in resolved], ['other-env', 'read-tool'])
@@ -55,8 +57,8 @@ class ContractBoundaryTests(unittest.IsolatedAsyncioTestCase):
 
             implementation_path='tests/lab/test_decoupling.py',
             documentation_path='tests/lab/README.md',
-            optimization_exemption='Infrastructure fixture for dependency and resource lifecycle contracts.',
-        )
+            optimization_coverage=OptimizationCoverage('protected', 'Infrastructure fixture for dependency and resource lifecycle contracts.'),
+         feature_path=(FeatureNode('fixture', 'Fixture'),))
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             _write_models(root)
@@ -94,8 +96,8 @@ class ContractBoundaryTests(unittest.IsolatedAsyncioTestCase):
 
                     implementation_path='tests/lab/test_decoupling.py',
                     documentation_path='tests/lab/README.md',
-                    optimization_exemption='Infrastructure fixture for dependency and resource lifecycle contracts.',
-                )
+                    optimization_coverage=OptimizationCoverage('protected', 'Infrastructure fixture for dependency and resource lifecycle contracts.'),
+                 feature_path=(FeatureNode('fixture', 'Fixture'),))
                 base = builtin_catalog()
                 bootstrap = base.bootstrap
                 if source == 'bootstrap':
@@ -124,8 +126,8 @@ class ContractBoundaryTests(unittest.IsolatedAsyncioTestCase):
                 contributions=(MechanismContribution('online', 'workflow'),), requires=frozenset({dependency})), lambda s,c,p: s,
                 implementation_path='tests/lab/test_decoupling.py',
                 documentation_path='tests/lab/README.md',
-            optimization_exemption='Infrastructure fixture for dependency and resource lifecycle contracts.',
-            )
+            optimization_coverage=OptimizationCoverage('protected', 'Infrastructure fixture for dependency and resource lifecycle contracts.'),
+             feature_path=(FeatureNode('fixture', 'Fixture'),))
         with self.assertRaisesRegex(ValueError, 'cyclic'):
             catalog.extended((definition('a', 'b'), definition('b', 'a'))).resolve((MechanismSelection('a'), MechanismSelection('b')))
 
@@ -143,8 +145,8 @@ class ContractBoundaryTests(unittest.IsolatedAsyncioTestCase):
 
             implementation_path='tests/lab/test_decoupling.py',
             documentation_path='tests/lab/README.md',
-            optimization_exemption='Infrastructure fixture for dependency and resource lifecycle contracts.',
-        )
+            optimization_coverage=OptimizationCoverage('protected', 'Infrastructure fixture for dependency and resource lifecycle contracts.'),
+         feature_path=(FeatureNode('fixture', 'Fixture'),))
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             _write_models(root)

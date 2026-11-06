@@ -27,6 +27,8 @@ class LabCatalog:
         self.bootstrap = bootstrap
         self.extension_identities = tuple(dict(v) for v in extension_identities)
         items = tuple(definitions)
+        from .classification import validate_tree
+        validate_tree(items)
         by_id: dict[str, MechanismDefinition] = {}
         for definition in items:
             mechanism_id = definition.descriptor.mechanism_id
@@ -45,19 +47,24 @@ class LabCatalog:
                 exclusive = {item.descriptor.exclusive_group for item in members}
                 if len(exclusive) != 1 or None in exclusive:
                     raise ValueError(f"multi-option selection group {group_id!r} must share an exclusive group")
-                locations = {(item.descriptor.primary.family, item.descriptor.primary.layer,
-                              item.descriptor.primary.context_phase) for item in members}
+                locations = {item.feature_path for item in members}
                 if len(locations) != 1:
                     raise ValueError(f"selection group {group_id!r} must have one display location")
         self._definitions = by_id
+        surfaces = set()
+        for definition in items:
+            for surface in definition.configuration_surfaces:
+                if surface.id in by_id or surface.id in surfaces:
+                    raise ValueError('duplicate mechanism or surface identity: ' + surface.id)
+                surfaces.add(surface.id)
 
     def require_optimization(self):
         for definition in self.definitions():
-            if definition.optimization_exemption:
+            if definition.optimization_coverage:
                 continue
             if (definition.configuration_edit is None and definition.component_specs is None
                     and not any(s.edit_options is not None for s in definition.configuration_surfaces)
-                    and not definition.descriptor.effects.tools):
+                    ):
                 raise ValueError('algorithm has no executable optimization declaration: ' + definition.descriptor.mechanism_id)
 
     def definitions(self) -> tuple[MechanismDefinition, ...]:
@@ -69,6 +76,13 @@ class LabCatalog:
 
     def descriptors(self) -> tuple[MechanismDescriptor, ...]:
         return tuple(item.descriptor for item in self.definitions())
+
+    def artifact_slots(self, selections) -> frozenset[str]:
+        """Bindings consumed by enabled installers and always-prepared owners."""
+        enabled = {item.definition.descriptor.mechanism_id for item in self.resolve(selections)}
+        return frozenset(slot for definition in self.definitions()
+                         if definition.descriptor.mechanism_id in enabled or definition.prepare_targets is not None
+                         for slot in definition.artifact_slots)
 
     def get(self, mechanism_id: str) -> MechanismDefinition:
         try:
@@ -105,7 +119,7 @@ class LabCatalog:
                     item.descriptor.mechanism_id,
                 ),
             )
-            if definition.descriptor.default_enabled
+            if definition.descriptor.default_enabled and definition.configurable
         )
 
     def resolve(

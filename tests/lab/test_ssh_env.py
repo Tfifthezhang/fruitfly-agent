@@ -13,7 +13,7 @@ from unittest.mock import Mock, patch
 from fruitfly_agent.core.env import ExecOptions
 from fruitfly_agent.core.tool_runtime.authorization import AuthorizationRequest, ToolPermission
 from fruitfly_agent.lab.catalog import PermissionPolicy, builtin_catalog, MechanismSelection
-from fruitfly_agent.lab.environment.ssh import SshConfig, SshEnv
+from fruitfly_agent.lab.environment.methods.remote import SshConfig, SshEnv
 from tests.support.ssh import SftpFixture, ProcessChannel
 
 
@@ -172,7 +172,7 @@ class SshEnvironmentTests(unittest.IsolatedAsyncioTestCase):
                    'env': {}, 'inherit_env': False, 'timeout': .1}
         import json
         import shlex
-        from fruitfly_agent.lab.environment.ssh.supervisor import PROGRAM
+        from fruitfly_agent.lab.environment.methods.remote.supervisor import PROGRAM
         channel.exec_command('python3 -u -c ' + shlex.quote(PROGRAM) + ' ' + shlex.quote(json.dumps(payload)))
         for _ in range(100):
             if channel.exit_status_ready():
@@ -281,10 +281,10 @@ class SshConfigurationTests(unittest.TestCase):
                        {'host': 'user@host'}, {'host': 'host:22/path'}, {'host': 'host:22'},
                        {'operation_timeout_seconds': float('nan')}, {'known_hosts': ''}):
             with self.subTest(values=values), self.assertRaises(ValueError):
-                catalog.resolve((MechanismSelection('ssh-env', False, values),))
+                catalog.resolve((MechanismSelection('remote-env', False, values),))
         for conflict in ('local-env', 'ipython-tool'):
             with self.subTest(conflict=conflict), self.assertRaises(ValueError):
-                catalog.resolve((MechanismSelection('ssh-env'), MechanismSelection(conflict)))
+                catalog.resolve((MechanismSelection('remote-env'), MechanismSelection(conflict)))
 
 class SshFailureDeadlineTests(unittest.IsolatedAsyncioTestCase):
     async def test_missing_optional_dependency_is_actionable(self):

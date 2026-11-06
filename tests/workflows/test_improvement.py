@@ -35,7 +35,7 @@ class ImprovementFlowTests(unittest.IsolatedAsyncioTestCase):
     async def test_multiple_components_publish_and_bind_together(self):
         with tempfile.TemporaryDirectory() as tmp:
             factory = offline_factory(Path(tmp))
-            factory.test_request = replace(factory.test_request, component_ids=('base_prompt', 'tool-catalog'))
+            factory.test_request = replace(factory.test_request, component_ids=('base_prompt', 'read-tool'))
             app = AgentApplication(factory)
             await app.start()
             try:
@@ -46,7 +46,7 @@ class ImprovementFlowTests(unittest.IsolatedAsyncioTestCase):
                 await app.adopt_candidate(record.candidate_id)
                 self.assertIn('Use exact answers.', factory._current_runtime_config.system_prompt)
                 read = next(t for t in factory._current_runtime_config.tools if t.name == 'read')
-                self.assertNotIn('Use exact answers.', read.description)
+                self.assertIn('Use exact answers.', read.description)
                 self.assertEqual(read.parameters['required'], ['path'])
             finally:
                 await app.close()

@@ -44,16 +44,17 @@ def category_rows(
                  item.mechanism_id if item.enabled else None, True, False,
                  item.display_section or item.context_phase)
                 for item in mechanisms if item.mechanism_id not in grouped_ids]
-    order = {'augmentation': 0, 'externalization': 1, 'reduction': 2}
-    entries.sort(key=lambda entry: order.get(entry[6] or '', 3))
+    sections = {item.feature_path[1][0]: (item.feature_path[1][1], item.feature_path[1][2])
+        for item in mechanisms if len(item.feature_path) > 1}
+    entries.sort(key=lambda entry: sections.get(entry[6], ('', 0))[1])
     before = {item.mechanism_id: item for item in original.mechanisms} if original else {}
     rows: list[MenuRow] = []
     actions: list[ConfigurationMenuAction] = []
     for key, label, options, active, allow_disabled, declared, section in entries:
         multiple = len(options) > 1
         current = by_id[active] if active else by_id[options[0]]
-        heading = 'Context ' + section if section in order else (section or '')
-        summary = ' · ' + current.label if active and multiple else ''
+        heading = sections.get(section, (section or '', 0))[0]
+        summary = ' · ' + current.label if active and declared else ''
         suffix = (' ▴' if expanded == key else ' ▾') if multiple else (' ›' if has_settings(current) else '')
         explanation = current.description if active or not multiple else 'Choose an implementation.'
         rows.append(MenuRow(label + summary + suffix, marker='[✓]' if active else '[ ]',

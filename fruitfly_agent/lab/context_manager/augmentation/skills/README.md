@@ -9,13 +9,15 @@ prove invocation or task success.
 
 ## Enable and inspect
 
-Enable H `skill-catalog`, S `skill-library`, and the read tool. Packaged
+Enable H `skills` and the read tool. Skills are enabled by default. The menu offers
+one Skills switch; S `skill-library` is attached retained content, without a separate
+mechanism switch. Packaged
 [Built-in coding Skills](builtin/README.md) are available without a checkout or a
 workspace `.skills` directory. The catalog's `settings.root` selects additional
 workspace Skills. A duplicate identity across sources fails instead of silently
 shadowing a procedure. Source files are never overwritten.
 
-`/skills` lists active entries and provenance. `/skills read ID` displays one entry.
+`/skills` lists every active Skill name and description. `/skills read ID` displays one entry.
 Runtime contents stay frozen until checked replacement or a new session.
 
 | Skill | Scope |
@@ -64,9 +66,10 @@ what the model sees and a body edit changes what read returns. The complete bodi
 are not injected to simulate successful invocation. Frozen text resources participate
 in S snapshots and export; linked executable programs are not frozen or executed.
 
-The independent `skill-document` mechanism retains one explicitly selected body
-for direct context projection. It is a separate use case, not the library editor.
-Assembly rejects a source already owned by the editable library.
+When metadata exceeds the H projection budget, the prompt retains a complete
+`INDEX.md` resource pointer. Reading it discovers every visible Skill without
+injecting procedure bodies. An insufficient budget for that pointer fails
+configuration instead of making installed content unreachable.
 
 ## Extend installation
 
@@ -82,13 +85,10 @@ implemented. The host owns approval and activation; package text grants no tools
 
 | File | Responsibility |
 |---|---|
-| [catalog.py](catalog.py), [adapter.py](adapter.py) | File parsing and idempotent catalog projection |
-| [library.py](library.py), [resources.py](resources.py) | Effective content and frozen resource sets |
-| [configuration.py](configuration.py), [registration.py](registration.py) | H configuration and assembly |
-| [improvement.py](improvement.py) | Catalog optimization registration |
-| [document.py](document.py) | Independent retained single-body mechanism |
-| [Methods](methods/README.md) | Concrete on-demand projection |
-| [skill-catalog.yaml](skill-catalog.yaml), [skill-library.yaml](skill-library.yaml), [skill-document.yaml](skill-document.yaml) | H/S defaults |
+| [Methods](methods/README.md) | Parsing, H defaults and progressive projection |
+| [library.py](library.py), [resources.py](resources.py) | S content and frozen read resources |
+| [registration.py](registration.py), [improvement.py](improvement.py) | Owner mechanism and target declarations |
+| [skill-library.yaml](skill-library.yaml) | Initial retained content |
 
 ```bash
 .venv/bin/python -m unittest tests.lab.test_skill_catalog tests.lab.test_retained_targets tests.lab.test_skill_packages

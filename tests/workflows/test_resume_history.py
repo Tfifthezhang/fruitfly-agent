@@ -1,5 +1,7 @@
 """Real offline recovery exposes history without changing model context."""
 
+from fruitfly_agent.lab.catalog import FeatureNode, OptimizationCoverage
+
 import contextlib
 import io
 import json
@@ -135,8 +137,8 @@ class ResumeHistoryTest(unittest.IsolatedAsyncioTestCase):
                 (MechanismContribution("capability", "tools"),)), install,
                 implementation_path='tests/workflows/test_resume_history.py',
                 documentation_path='tests/workflows/README.md',
-                optimization_exemption='Resource startup fixture; no research algorithm is installed.',
-            )
+                optimization_coverage=OptimizationCoverage('protected', 'Resource startup fixture; no research algorithm is installed.'),
+             feature_path=(FeatureNode('fixture', 'Fixture'),))
             catalog = builtin_catalog().extended((definition,))
             factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=registry, catalog=catalog)
             app = AgentApplication(factory)

@@ -43,16 +43,16 @@ class TerminalConfigurationFrontendTest(unittest.TestCase):
         profile = HarnessProfile('daily', mechanisms=(
             MechanismSelection('working-memory-reduction', parameters={'memory_tokens':12345}),
             MechanismSelection('live-http', parameters={'endpoint':'https://example.test/?q={query}'}),
-            MechanismSelection('skill-document', parameters={'source_path':'.skills/check/SKILL.md'})))
+            MechanismSelection('skills')))
         mechanisms, groups = mechanism_views(profile, catalog, [])
         snapshot = replace(MockConfiguration(model='offline').snapshot(), mechanisms=mechanisms, selection_groups=groups)
-        rows, actions = category_rows(snapshot, 'context-manager', 'reduction')
+        rows, actions = category_rows(snapshot, 'context', 'reduction')
         self.assertFalse(any(a.kind == 'parameter' for a in actions))
         self.assertTrue(all(not r.references and not r.detail for r in rows))
         self.assertTrue(all('Enabled' not in r.label and 'Disabled' not in r.label for r in rows))
         compaction = next(m for m in mechanisms if m.mechanism_id == 'working-memory-reduction')
         self.assertEqual(next(p.value for p in compaction.parameters if p.name == 'memory_tokens'), 12345)
-        for identity, names in [('live-http', ['endpoint']), ('skill-document', ['initial_text', 'source_path'])]:
+        for identity, names in [('live-http', ['endpoint']), ('skills', [])]:
             item = next(m for m in mechanisms if m.mechanism_id == identity)
             _, actions = settings_rows(item, original=snapshot)
             self.assertEqual([a.parameter.name for a in actions if a.kind == 'parameter'], names)
@@ -266,8 +266,8 @@ class TerminalConfigurationFrontendTest(unittest.TestCase):
         controller = MockConfiguration(model='offline')
         original = controller.snapshot
         controller.snapshot = lambda: replace(original(), mechanisms=tuple(
-            ConfigurationMechanism(identity, 'context-manager', label, 'Description', False, 'new_session',
-                display_section=phase) for identity,label,phase in (
+            ConfigurationMechanism(identity, 'context', label, 'Description', False, 'new_session',
+                display_section=phase, feature_path=(('context', 'Context', 30), (phase, 'Context ' + phase, {'augmentation':0, 'externalization':10, 'reduction':20}[phase]))) for identity,label,phase in (
                     ('shrink', 'Context shrinker', 'reduction'),
                     ('skills', 'Skills', 'augmentation'), ('memory', 'Memory', 'augmentation'),
                     ('http', 'HTTP', 'augmentation'), ('knowledge', 'Knowledge', 'augmentation'),

@@ -57,12 +57,12 @@ class ComponentExperimentTests(unittest.TestCase):
         from fruitfly_agent.lab.catalog import builtin_catalog
         from fruitfly_agent.lab.catalog.defaults import read_default
         catalog = builtin_catalog()
-        for component, role in (('execution-policy', 'H'), ('improvement-evaluator', 'I')):
+        for component, role in (('layered-compaction', 'H'), ('improvement-evaluator', 'I')):
             path = self.directory / (component + '.yaml')
             path.write_text(yaml.safe_dump(read_default(catalog, component)[0].to_dict()))
             self.change('default-config.yaml', lambda value, component=component, role=role:
                 value['profiles']['baseline'][role].update({component: {'file': component + '.yaml'}}))
-        for name in ('execution-policy.yaml', 'improvement-evaluator.yaml', 'experiment.yaml'):
+        for name in ('layered-compaction.yaml', 'improvement-evaluator.yaml', 'experiment.yaml'):
             with self.subTest(name=name):
                 prepared = self.prepare()
                 path = self.directory / name

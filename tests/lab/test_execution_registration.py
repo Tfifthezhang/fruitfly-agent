@@ -7,7 +7,7 @@ from unittest.mock import Mock
 
 from fruitfly_agent.lab.improvement.execution import builtin_executions
 from fruitfly_agent.interactive import AgentApplication
-from fruitfly_agent.interactive.contracts.improvement import WorkflowRequest
+from fruitfly_agent.improvement.contracts.requests import WorkflowRequest
 from fruitfly_agent.run import RunApplicationFactory
 from tests.support.materials import _write_models
 from tests.support.faux_provider import FauxProvider

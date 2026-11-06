@@ -115,7 +115,7 @@ declarations without vendor-specific branches. Model Providers remain independen
 | Live events | Frontend observation; not a complete persisted request trace |
 
 Core enforces per-turn tool allowances and bounds consecutive truncated responses;
-Run and Eval share the declarative execution configuration (tool limit default 512).
+Run and Eval record effective host execution conditions (daily tool limit default 512).
 Manifest schema 7 records effective execution parameters and the resolved harness
 inventory. Historical manifests remain validated against their original contents. Terminal loop diagnostics distinguish
 budget stops from normal completion without granting task success. See
@@ -132,7 +132,7 @@ Recovery validates recorded contents and required artifacts, then continues with
 | Add model-callable operations | [Tools](lab/tools/README.md) |
 | Connect independently installed MCP tools | [MCP client](lab/mcp/README.md) |
 | Replace filesystem or shell access | [Environment](lab/environment/README.md) |
-| Execute on an external SSH server | [SSH environment](lab/environment/ssh/README.md) |
+| Execute on an external SSH server | [SSH environment](lab/environment/methods/remote/README.md) |
 | Search text candidates | [Improvement](lab/improvement/README.md) |
 | Optimize a shared candidate across tasks | [Task sets](lab/improvement/task_sets/README.md) |
 | Verify and adopt across generations | [RSI runtime](rsi/README.md) |

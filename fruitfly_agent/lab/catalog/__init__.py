@@ -64,7 +64,8 @@ __all__ = [
 from .permissions import PermissionPolicy, apply_permission_policy
 
 
-from .components import ComponentSpec, ResolvedHarness, resolve_harness, verify_runtime
+from .components import ComponentSpec, ResolvedHarness, resolve_harness, verify_runtime, runtime_component_entries
+__all__ += ['runtime_component_entries']
 from .configuration import (ConfigurationSurface, configure_profile, load_system_config,
                             component_profile, materialize_system, edit_grants, bind_component_changes,
                             configuration_inventory, configuration_resources, restore_component_settings, normalize_configuration_binding)
@@ -76,6 +77,9 @@ __all__ += ['normalize_configuration_binding']
 
 from .model_roles import ModelRoleRequirement, role_alias
 __all__ += ['ModelRoleRequirement', 'role_alias']
+from .classification import FeatureNode, OptimizationCoverage
+from .configuration import validate_component_options, configuration_surfaces, reset_artifact_binding
+__all__ += ['FeatureNode', 'OptimizationCoverage', 'validate_component_options', 'configuration_surfaces', 'reset_artifact_binding']
 
 
 def builtin_catalog() -> LabCatalog:

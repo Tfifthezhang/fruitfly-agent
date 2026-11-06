@@ -66,7 +66,7 @@ class EditorEvolutionTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(provider.calls, [])
 
     async def test_material_order_preserves_use_limit_and_invalid_manifests_make_no_requests(self):
-        from fruitfly_agent.lab.improvement.improver.materials import freeze
+        from fruitfly_agent.lab.improvement.materials.episodes import freeze
         from tests.support.task_packs import install, package
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

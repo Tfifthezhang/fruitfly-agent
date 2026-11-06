@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from fruitfly_agent.interactive import TerminalConfigurationFrontend
-from fruitfly_agent.lab.environment.ssh import SshEnv
+from fruitfly_agent.lab.environment.methods.remote import SshEnv
 from fruitfly_agent.run import cli
 from fruitfly_agent.run.application import RunApplicationFactory
 from fruitfly_agent.run.configuration import load_harness_config
@@ -31,8 +31,8 @@ class StartupRecoveryTests(unittest.IsolatedAsyncioTestCase):
             provider_registry=self.registry, allow_incomplete=True)
         controller = self.factory.configuration
         controller.set_mechanism('working-memory-reduction', enabled=False)
-        controller.set_mechanism('ssh-env', enabled=True)
-        controller.set_parameter('ssh-env', 'host', 'unavailable.example')
+        controller.set_mechanism('remote-env', enabled=True)
+        controller.set_parameter('remote-env', 'host', 'unavailable.example')
         controller.save()
         self.factory.reload_configuration()
 
@@ -94,7 +94,7 @@ class StartupRecoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(path.read_bytes(), before)
 
     async def test_configure_saves_remote_settings_and_returns_without_connecting(self):
-        self.factory.configuration.set_parameter('ssh-env', 'host', 'changed.example')
+        self.factory.configuration.set_parameter('remote-env', 'host', 'changed.example')
         output = io.StringIO()
         def editor(configuration):
             return TerminalConfigurationFrontend(configuration, output_stream=output,
@@ -109,7 +109,7 @@ class StartupRecoveryTests(unittest.IsolatedAsyncioTestCase):
         application.assert_not_called()
         self.registry.create.assert_not_called()
         saved = load_harness_config(self.root / '.fruitfly/config.yaml').select()
-        remote = next(m for m in saved.mechanisms if m.mechanism_id == 'ssh-env')
+        remote = next(m for m in saved.mechanisms if m.mechanism_id == 'remote-env')
         self.assertEqual(remote.parameters['host'], 'changed.example')
         self.assertIn('changed.example', output.getvalue())
         self.assertFalse((self.root / '.fruitfly/sessions').exists())

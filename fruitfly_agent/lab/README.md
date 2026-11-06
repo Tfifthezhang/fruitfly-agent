@@ -15,7 +15,6 @@ Add tools, execution backends, context strategies, and improvement algorithms th
 | [MCP client](mcp/README.md) | Optional selected tools from independently installed local stdio services |
 | [Environment](environment/README.md) | Local filesystem and process backend |
 | [Base prompt](base_prompt/README.md) | Built-in prompt text and its target adapter |
-| [Execution policy](execution_policy/README.md) | Typed execution parameters and the H candidate adapter |
 | [Improvement](improvement/README.md) | Component workflow, task evidence, experience and optional verification |
 | [RSI](rsi/README.md) | Verified adoption and continuation across generations |
 | [Known limitations](ALGORITHM_AUDIT.md) | Current budget, I/O, cancellation, and composition limits |

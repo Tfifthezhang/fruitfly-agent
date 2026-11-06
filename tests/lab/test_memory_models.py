@@ -1,9 +1,9 @@
 """Memory shape, immutable evidence and explicit update semantics."""
 from copy import deepcopy
 import unittest
-from fruitfly_agent.lab.context_manager.augmentation.information.file_memory.models import MemoryEvidence
-from fruitfly_agent.lab.context_manager.augmentation.information.file_memory.validation import validate_memories, apply_changes
-from fruitfly_agent.lab.improvement.targets.documents import parse_documents
+from fruitfly_agent.lab.context_manager.augmentation.memory.methods.file_memory.models import MemoryEvidence
+from fruitfly_agent.lab.context_manager.augmentation.memory.methods.file_memory.validation import validate_memories, apply_changes
+from fruitfly_agent.lab.catalog.adapters.collections import parse_documents
 from tests.support.retained import memory
 
 

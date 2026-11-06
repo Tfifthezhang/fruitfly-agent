@@ -43,7 +43,7 @@ class EpisodeRequest:
     component_ids: tuple[str, ...]
     task: TaskMaterial
     repeat: int
-    improver: HarnessSnapshot | None = None
+    candidate: HarnessSnapshot | None = None
 
 
 @dataclass(frozen=True)
@@ -170,6 +170,10 @@ class ExecutionDefinition:
     plan_factory: Callable = RunPlan
     uses_configured_tools: bool = False
     component_scope: Callable | None = None
+    material_snapshot: Callable | None = None
+    persistent_policy: str = ''
+    required_components: tuple[str, ...] = ()
+    requires_runner_factory: bool = False
 
     def capabilities_for(self, tool_names):
         return self.capabilities | (frozenset("tool:" + name for name in tool_names) if self.uses_configured_tools else frozenset())
@@ -182,6 +186,10 @@ class ExecutionDefinition:
             raise ValueError('invalid execution roles')
         if len({p.name for p in self.parameters}) != len(self.parameters):
             raise ValueError('duplicate execution parameters')
+        if self.material_snapshot is not None and not callable(self.material_snapshot):
+            raise TypeError('execution material snapshot must be callable')
+        if type(self.requires_runner_factory) is not bool:
+            raise TypeError('runner requirement must be boolean')
 
     def normalize(self, supplied):
         if len(dict(supplied)) != len(supplied):

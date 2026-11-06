@@ -11,10 +11,10 @@ from fruitfly_agent.lab.environment import LocalEnv
 from fruitfly_agent.core.tool_runtime import ToolCallContext
 from fruitfly_agent.core.env import ExecResult
 from fruitfly_agent.core.errors import Result
-from fruitfly_agent.lab.tools.bash import create_bash_tool
-from fruitfly_agent.lab.tools.edit import create_edit_tool
-from fruitfly_agent.lab.tools.read import create_read_tool
-from fruitfly_agent.lab.tools.write import create_write_tool
+from fruitfly_agent.lab.tools.methods.bash.algorithm import create_bash_tool
+from fruitfly_agent.lab.tools.methods.edit.algorithm import create_edit_tool
+from fruitfly_agent.lab.tools.methods.read.algorithm import create_read_tool
+from fruitfly_agent.lab.tools.methods.write.algorithm import create_write_tool
 
 
 class ToolTestCase(unittest.IsolatedAsyncioTestCase):

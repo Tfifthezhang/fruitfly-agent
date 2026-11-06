@@ -15,6 +15,8 @@ and cost notice. Discovery starts no models or task execution.
 | Entry | Responsibility |
 |---|---|
 | [__init__.py](__init__.py): `ExecutionRegistry`, `ExecutionContext` | Registration and borrowed task/model/component/artifact capabilities |
+| [episodes.py](episodes.py) | Role-neutral paired trials with injected episode factories |
+| [File memory learning](../../context_manager/augmentation/memory/methods/file_memory/README.md) | H learning trials over isolated S updates |
 | [tasks.py](tasks.py) | Task material, optional task-package scoring and holdout; requires an injected runner |
 | [Experiment contracts](../../../improvement/contracts/experiments.py) | Requests, prepared material and stage ports |
 | [Editor experiments](../improver/README.md) | Fixed-depth I comparison with an explicit episode/task backend |
@@ -107,3 +109,7 @@ dependency and no delivery result authorizes production activation.
 
 Fake Providers test contracts and orchestration. Real backend execution may call
 models or start containers and requires an explicitly invoked experiment.
+
+Execution owners can declare `material_snapshot`, `persistent_policy`,
+`required_components` and `requires_runner_factory` for the generic registered
+experiment source. Material declarations do not supply execution capabilities.

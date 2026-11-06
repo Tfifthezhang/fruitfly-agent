@@ -36,7 +36,7 @@ class ComparisonEpisodeExecutor:
         settings = deepcopy(context.system_settings or {})
         from ..assessment.instructions import EvaluatorInstructionTarget, EvaluatorInstructions
         from .methods.evaluator_comparison.episodes import install_candidate
-        install_candidate(registry, request.improver, settings)
+        install_candidate(registry, request.candidate, settings)
         search = context.workflow_settings or {}
         evidence = context.evidence_settings or {}
         depth = min(search.get('max_rounds', params['inner_depth']), params['inner_depth'])
@@ -45,7 +45,7 @@ class ComparisonEpisodeExecutor:
         if any(registry.snapshot().component(name).role == 'I' for name in request.component_ids):
             raise ValueError('inner experiments cannot modify I')
         parent = SystemVersion(context.plan.parent.harness,
-            request.improver.snapshot_id if request.improver is not None else content_hash(request.instructions),
+            request.candidate.snapshot_id if request.candidate is not None else content_hash(request.instructions),
             context.plan.parent.state)
         plan = RunPlan(request.episode_id, parent, request.component_ids,
             generator_id=self.generator_factory.generator_id, rounds=depth,

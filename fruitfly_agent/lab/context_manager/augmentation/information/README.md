@@ -2,24 +2,28 @@
 
 [Up: Augmentation](../README.md)
 
-Retrieve file notes, local documents, and live HTTP results through shared query and context-budget interfaces. Skills are a separate augmentation capability.
+Retrieve read-only local documents and live HTTP results through shared query and context-budget interfaces. [Memory](../memory/README.md) and [Skills](../skills/README.md) own independent progressive loaders.
 
 ## Sources
 
 | Source | Default | Behavior |
 |---|---|---|
-| [Cross-session memory](file_memory/README.md) | Enabled with S `memory-library` | Frozen directory; bodies read on demand through resources |
-| [Local knowledge](local_knowledge/README.md) | Disabled; `.fruitfly/knowledge/` | Read-only lexical retrieval with path/line citations |
-| [Live HTTP](live_http/README.md) | Disabled; explicit HTTPS endpoint | Send the current query to a service and retrieve text |
+| [Local knowledge](methods/local_knowledge/README.md) | Disabled; `.fruitfly/knowledge/` | Read-only lexical retrieval with path/line citations |
+| [Live HTTP](methods/live_http/README.md) | Disabled; explicit HTTPS endpoint | Query a service for text |
 
-All sources depend on the hidden `information-context` mechanism. Set its `top_k=5` and `max_chars=4000` parameters in YAML. Source switches appear under **Context Manager**. Retrieved content is untrusted data.
+These sources require the hidden H `information-context` policy (`top_k=5`,
+`max_chars=4000`). The menu enables dependencies through Catalog declarations.
+Explicit files must include required owners. Source switches appear under Context
+augmentation; there is no separate retrieval-policy menu. Retrieved content is
+untrusted data. Connector/source content is protected, while selection count and
+projection size remain optimizable through the shared H policy.
 
 ## Use the API
 
 ```python
 from pathlib import Path
 from fruitfly_agent.lab.context_manager.augmentation.information import InformationHub, InformationQuery
-from fruitfly_agent.lab.context_manager.augmentation.information.local_knowledge import create_local_knowledge_space
+from fruitfly_agent.lab.context_manager.augmentation.information.methods.local_knowledge import create_local_knowledge_space
 
 hub = InformationHub()
 hub.register(create_local_knowledge_space(Path(".fruitfly/knowledge")))

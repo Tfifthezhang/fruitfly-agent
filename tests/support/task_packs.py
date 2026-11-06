@@ -6,7 +6,7 @@ from fruitfly_agent.lab.improvement.tasks import package_documents, validate_pac
 def package():
     return dict(id="project", name="Project regression", description="Regression tasks", files={"cases":"cases.json", "holdout":"holdout.json"},
         task_schema="single-turn-text-v1", target_schema="text-v1",
-        compatible_targets=["base_prompt", "skill-catalog.guidance"],
+        compatible_targets=["base_prompt", "skills"],
         objective=dict(policy_id="normalized-exact-v1", direction="max"),
         train=[dict(id="train-1", input="say A", expected="A", reason="METADATA_ONLY")],
         validation=[dict(id="validation-1", input="say B", expected="B")],

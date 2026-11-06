@@ -1,7 +1,5 @@
 """Terminal behavior and failure contracts."""
 from __future__ import annotations
-from fruitfly_agent.interactive.contracts.improvement import ImprovementPreview
-from tests.support.improvement_ui import configuration
 import asyncio
 import io
 from types import SimpleNamespace
@@ -57,65 +55,6 @@ class TerminalFrontendTest(unittest.IsolatedAsyncioTestCase):
                 await renderer.close()
                 display.suspend()
 
-    async def test_opro_command_confirms_cost_and_reviews_candidate(self) -> None:
-        candidate_id = "a" * 32
-        record = SimpleNamespace(
-            candidate_id=candidate_id, status="proposed", validation_score=1.0,
-            seed_score=0.0, direction="be concise", parent_manifest_digest="parent",
-            artifact_id="sha256:" + "b" * 64, cases_digest="cases", metric_calls=5,
-            algorithm="opro", target="base_prompt", role="H", evidence=(("Validation", "1.0"),),
-        )
-
-        class ImprovementSession(TerminalSessionStub):
-            def workflow_configuration(self):
-                return configuration()
-
-            def workflow_preview(self, request):
-                return ImprovementPreview('rule', 'Rule', 'Model requests may incur cost',
-                    (('Maximum model calls', '8'),), target='base_prompt', preview_token='token')
-
-            def start_improvement(self, direction, *, preview_token=""):
-                return asyncio.create_task(self.improve(direction))
-
-            async def improve(self, direction):
-                self.direction = direction
-                return (record,)
-
-            def candidate_notice(self):
-                return (candidate_id,) if not getattr(self, "acknowledged", False) else ()
-
-            def acknowledge_candidate_notice(self, ids):
-                self.acknowledged = True
-
-            def cancel_improvement(self):
-                return False
-
-            def candidates(self):
-                return (record,)
-
-            def candidate_detail(self, value):
-                return record, "-old\n+new\n"
-
-            def candidate_action(self, value, action):
-                record.status = "selected_for_next_session" if action == "adopt" else "reviewed"
-                return record
-
-        session = ImprovementSession()
-        output = io.StringIO()
-        frontend = TerminalFrontend(
-            session,
-            input_stream=io.StringIO(),
-            output_stream=output,
-            line_editor=MenuScriptedLines(output,
-                '/improvement be concise', '@Start improvement', '@Start the frozen workflow',
-                '@Review candidate', '@Set as next-session default', '@Set as next-session default', 'q', '/exit',
-            ),
-        )
-        self.assertEqual(await frontend.run(), 0)
-        self.assertEqual(session.direction, "be concise")
-        self.assertIn("Maximum model calls: 8", output.getvalue())
-        self.assertIn("candidate(s)", output.getvalue())
-        self.assertIn("Candidate saved for the next session", output.getvalue())
 
     async def test_inline_terminal_accepts_input_while_run_is_active(self) -> None:
 

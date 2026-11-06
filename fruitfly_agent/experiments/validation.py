@@ -25,11 +25,8 @@ def validate_harness(config, profile, source, *, operation, environment, catalog
         inventory.select(config.improvement.components, capabilities, roles)
         for name, options in config.improvement.component_options.items():
             # Options are owned by the registered component, not interpreted by the CLI.
-            spec = next(c for c in inventory.components if c.component_id == name)
-            owner = catalog.get(dict(inventory.owners)[name])
-            if owner.component_validator is None:
-                raise ValueError('component has no option validator: ' + name)
-            owner.component_validator(name, options, inventory)
+            from fruitfly_agent.lab.catalog import validate_component_options
+            validate_component_options(catalog, name, options, inventory)
     consumed = {slot for item in catalog.resolve(profile.mechanisms) for slot in item.definition.artifact_slots}
     consumed |= {c.component_id for c in inventory.components}
     if set(profile.artifact_bindings) - consumed:
@@ -55,6 +52,7 @@ def validate_harness(config, profile, source, *, operation, environment, catalog
         except ValueError as exc:
             reason = str(exc)
         rows.append({'id': component.component_id, 'role': component.role, 'owner': dict(inventory.owners)[component.component_id],
+            'feature_path': list(component.feature_path),
             'available': not reason, 'default_selected': component.default_selected,
             'selected': component.component_id in selected, 'reason': reason})
     configuration = configuration_inventory(profile, catalog,

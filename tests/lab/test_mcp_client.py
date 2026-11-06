@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from tests.support.mcp import HAS_MCP, write_mcp_config
 from fruitfly_agent.lab.mcp.config import load_config
-from fruitfly_agent.lab.mcp.client import McpClient
+from fruitfly_agent.lab.mcp.methods.stdio.client import McpClient
 from fruitfly_agent.lab.mcp.config import ServerConfig
 from types import SimpleNamespace
 

@@ -160,7 +160,7 @@ cp -R examples/improvement/python_functions .fruitfly/improvement/task-packs/pyt
 | 5 | Run `fruitfly-agent-lab improvement check`, then explicitly `improvement run`; model requests may incur charges. |
 | 6 | Inspect the result and evidence; `rsi run` performs verified adoption into its experiment configuration copy. |
 
-Selecting a pack changes one job, not the YAML or runtime manifest. `/improvement TEXT` prefills direction, not a path. Search only changes target text, not Python task outputs. See [Improvement](../README.md) for timing, results, and retention.
+Selecting a pack changes one job, not the YAML or runtime manifest. Experiment requests select instruction text and explicit input paths. Search only changes target text, not Python task outputs. See [Improvement](../README.md) for timing, results, and retention.
 
 Embedding hosts can register read-only sources with `TaskPackRegistration` via `RunApplicationFactory(task_pack_sources=...)`. The default CLI scans the workspace task-packs directory, not arbitrary examples or Session directories.
 

@@ -8,9 +8,11 @@ from fruitfly_agent.core.mechanisms import MechanismContribution, MechanismDescr
 from fruitfly_agent.lab.catalog.models import MechanismDefinition, MechanismSetup, SetupCredential
 from fruitfly_agent.improvement.contracts.versions import EXPERIMENT_BLOCKERS_COMPONENT
 from .client import WebClient, WebConfig
+from fruitfly_agent.lab.tools.improvement import native_tool
+from fruitfly_agent.lab.catalog.classification import TOOLS, WEB
 from .registry import WebServiceRegistry, default_service_registry
-from .fetch import create_web_fetch_tool
-from .search import create_web_search_tool
+from fruitfly_agent.lab.tools.methods.web_fetch.algorithm import create_web_fetch_tool
+from fruitfly_agent.lab.tools.methods.web_search.algorithm import create_web_search_tool
 
 
 def definitions(registry: WebServiceRegistry | None = None):
@@ -33,18 +35,18 @@ def definitions(registry: WebServiceRegistry | None = None):
         params += (
             ParameterDescriptor("backend", "choice", "Search service" if kind == "search" else "Fetch service",
                 "Web service; API requests may incur charges.",
-                parameter_default(__package__, 'web-' + kind + '-tool.yaml', 'settings.backend'),
+                parameter_default('fruitfly_agent.lab.tools.methods.web_' + kind, 'defaults.yaml', 'settings.backend'),
                 choices=registry.choices(kind)),
-            ParameterDescriptor("api_key_env", "string", "API key variable", "Secret variable name; blank uses the selected service default. Credential-free services ignore it.", parameter_default(__package__, 'web-' + kind + '-tool.yaml', 'settings.api_key_env')),
+            ParameterDescriptor("api_key_env", "string", "API key variable", "Secret variable name; blank uses the selected service default. Credential-free services ignore it.", parameter_default('fruitfly_agent.lab.tools.methods.web_' + kind, 'defaults.yaml', 'settings.api_key_env')),
         )
         result.append(MechanismDefinition(
             MechanismDescriptor("web-" + kind + "-tool", label, description,
                 contributions=(MechanismContribution("capability", "tools"),), parameters=params,
                 install_order=order, effects=MechanismEffects(uses_network=True, tools=("web_" + kind,),
                     cost_notice="Queries are sent to the selected search service and may incur charges." if kind == "search" else "Source URLs are sent to the configured fetch service; API requests may incur charges.")),
-            partial(_install, kind=kind, registry=registry), default_resource=(__package__, 'web-' + kind + '-tool.yaml'),
+            partial(_install, kind=kind, registry=registry), default_resource=('fruitfly_agent.lab.tools.methods.web_' + kind, 'defaults.yaml'), feature_path=(TOOLS, WEB),
             parameter_paths={p.name: 'settings.' + p.name for p in params},
-            implementation_id="web-" + kind + "-v3", implementation_path="fruitfly_agent/lab/tools/web/" + kind + ".py",
+            implementation_id="web-" + kind + "-v3", implementation_path="fruitfly_agent/lab/tools/methods/web_" + kind + "/algorithm.py",
             documentation_path="fruitfly_agent/lab/tools/web/README.md",
             input_parameters=("backend", "api_key_env"),
             validate_parameters=_validate,
@@ -53,7 +55,8 @@ def definitions(registry: WebServiceRegistry | None = None):
                 guidance="Choose a service and optional key variable. Blank uses the current value; /clear restores the service default variable. API key input is hidden and excluded from history. Save configuration to write credentials to the workspace secret file.",
                 credential_resolver=partial(_setup_credentials, kind=kind, registry=registry)),
         ))
-    return tuple(result)
+    return tuple(native_tool(d, {'backend', 'max_response_bytes', 'max_retries', 'timeout_seconds',
+        'cache_entries', 'cache_ttl_seconds', *({'max_redirects'} if d.descriptor.mechanism_id == 'web-fetch-tool' else set())}) for d in result)
 
 
 def _validate(parameters):

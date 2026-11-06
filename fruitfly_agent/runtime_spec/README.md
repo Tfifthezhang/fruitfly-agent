@@ -30,43 +30,22 @@ registered projection to Catalog; the pure specification loader constructs no
 clients or artifacts. All system files use one H/S/I component format without a
 version marker. There is one runtime assembler.
 
-## Configure execution
+## Record host execution conditions
 
-```yaml
-id: execution-policy
-role: H
-implementation: execution-policy
-parameters:
-  settings:
-    max_tool_calls_per_turn: 256
-    max_turns: 32
-    max_context_recovery_attempts: 6
-    tool_execution:
-      max_parallel: 8
-      default_execution_mode: parallel
-```
+`execution.py` validates typed host values and projects Core defaults for assembly
+and receipts. Execution limits and concurrency have no YAML component or
+optimization surface. Programmatic hosts may supply conditions; ordinary config,
+experiments and generated candidates all select registered H/S/I documents.
+Invalid types, unknown fields and duplicate candidate JSON fields fail.
 
-Defaults come from the existing Core dataclasses. Turn/tool limits accept
-nonnegative integers; recovery attempts and parallelism require positive integers.
-The tool mode is `parallel` or `sequential`. Unknown fields, booleans, fractional
-limits and duplicate JSON candidate fields fail. Configured values and effective
-values remain distinct; configuration does not replace recorded execution facts.
+Model limits belong to the model catalog. Permissions are injected host
+capabilities. Callbacks, live state and credentials cannot be supplied as execution
+parameters. Effective runtime values remain part of recorded identity; historical
+records retain their validated values. [Catalog](../lab/catalog/README.md) owns
+mechanism availability and [Eval](../../fruitfly_eval/README.md) stages the same
+component configuration.
 
-Models and token limits stay in the model catalog. Prompt and mechanism bindings
-retain their own owners. Callbacks, permission objects, credentials and live state
-cannot be supplied as execution options. Model-call and wall-clock experiment
-allowances remain independent fixed comparison conditions.
-
-Run assembles the configuration and [Catalog](../lab/catalog/README.md) checks
-component availability. [Execution policy](../lab/execution_policy/README.md)
-owns fixed runtime settings; these are not Improvement targets. [Eval](../../fruitfly_eval/README.md) uses the same
-profile parser before staging a selected runtime.
-
-```bash
-.venv/bin/python -m unittest tests.run.test_runtime_spec tests.eval.test_runtime
-```
-
-These checks use temporary files and fake Providers; they make no model requests.
+Offline checks: `tests.run.test_runtime_spec`, `tests.eval.test_runtime`.
 
 ## Inventory declared package resources
 

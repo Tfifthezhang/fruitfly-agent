@@ -126,6 +126,14 @@ from fruitfly_agent.runtime_spec import HarnessProfile, MechanismSelection
 
 def component_document(name, *, parameters=None, enabled=True, catalog=None):
     catalog = catalog or builtin_catalog()
+    from fruitfly_agent.lab.catalog.configuration import configuration_surfaces
+    from fruitfly_agent.lab.catalog.defaults import read_default
+    surfaces = configuration_surfaces(catalog)
+    if name in surfaces:
+        surface = surfaces[name][1]
+        values = dict(read_default(catalog, name)[0].parameters) if parameters is None else parameters
+        return {'inline': {'id': name, 'implementation': name, 'role': surface.role,
+            'enabled': enabled, 'parameters': values}}
     definition = catalog.get(name)
     return {'inline': {'id': name, 'implementation': name,
         'role': definition.configuration_role, 'enabled': enabled,
@@ -136,10 +144,21 @@ def profile_document(*, catalog='models.yaml', executor=None, mechanisms=(),
                      prompt='assistant-default', execution=None, artifact_bindings=None,
                      artifact_reader=None, lab=None):
     lab = lab or builtin_catalog()
+    from fruitfly_agent.lab.catalog.configuration import configuration_surfaces
+    surfaces = configuration_surfaces(lab)
     selections = tuple(MechanismSelection(item['id'], item.get('enabled', True), item.get('parameters', {}))
-                       for item in mechanisms)
+                       for item in mechanisms if item['id'] not in surfaces)
+    settings = {}
+    for item in mechanisms:
+        if item['id'] in surfaces:
+            surface = surfaces[item['id']][1]
+            values = item.get('parameters')
+            if values is not None:
+                if 'documents' in values:
+                    values = {'content': values}
+                settings[surface.key] = surface.normalize(values)
     profile = HarnessProfile('fixture', catalog, executor, selections, prompt,
-        artifact_bindings or {}, execution or {})
+        artifact_bindings or {}, execution or {}, component_settings=settings)
     return component_profile(profile, lab, artifact_reader=artifact_reader).to_dict(references=False)
 
 

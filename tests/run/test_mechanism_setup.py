@@ -28,7 +28,7 @@ class MechanismSetupTests(unittest.TestCase):
             output_stream=self.output, line_editor=MenuScriptedLines(self.output, *lines))
 
     def stage(self, **secrets):
-        return self.service.stage('ssh-env', {'host': 'server.example', 'port': '2222',
+        return self.service.stage('remote-env', {'host': 'server.example', 'port': '2222',
             'cwd': '/srv/project', 'known_hosts': '~/.ssh/known_hosts'},
             {'username_env': 'fixture-private-account', 'password_env': 'fixture-private-password', **secrets})
 
@@ -59,15 +59,15 @@ class MechanismSetupTests(unittest.TestCase):
         self.assertEqual(0o600, path.stat().st_mode & 0o777)
         self.assertEqual('fixture-private-password', self.factory.environment['FRUITFLY_SSH_PASSWORD'])
         enabled = {m.mechanism_id for m in self.configuration.profile().mechanisms if m.enabled}
-        self.assertIn('ssh-env', enabled)
+        self.assertIn('remote-env', enabled)
         self.assertNotIn('local-env', enabled)
         self.assert_hidden()
 
     def test_starting_existing_remote_configuration_with_missing_secrets_guides_repair(self):
         self.factory.environment.update(FRUITFLY_SSH_USERNAME='fixture-private-account',
                                         FRUITFLY_SSH_PASSWORD='fixture-private-password')
-        self.configuration.set_mechanism('ssh-env', enabled=True)
-        self.configuration.set_parameter('ssh-env', 'host', 'server.example')
+        self.configuration.set_mechanism('remote-env', enabled=True)
+        self.configuration.set_parameter('remote-env', 'host', 'server.example')
         self.configuration.save()
         self.factory.environment.pop('FRUITFLY_SSH_USERNAME')
         self.factory.environment.pop('FRUITFLY_SSH_PASSWORD')
@@ -75,7 +75,7 @@ class MechanismSetupTests(unittest.TestCase):
         self.assertFalse(snapshot.ready)
         self.assertIn('Set up…', ' '.join(snapshot.warnings))
         frontend = self.frontend('', '', '', '', '@Stage settings', '@Save and start')
-        with patch('fruitfly_agent.lab.environment.ssh.SshEnv.start', side_effect=AssertionError('setup made a connection')):
+        with patch('fruitfly_agent.lab.environment.methods.remote.SshEnv.start', side_effect=AssertionError('setup made a connection')):
             result = frontend.run()
         self.assertTrue(result.start)
         self.assertTrue(result.saved)
@@ -106,7 +106,7 @@ class MechanismSetupTests(unittest.TestCase):
     def test_invalid_fields_and_missing_secrets_retry_without_echo_or_partial_stage(self):
         frontend = self.frontend('server.example', '0', '2222', '/srv/project', '', '@Stage settings',
             secrets='\nfixture-private-account\n\nfixture-private-password\n')
-        self.assertTrue(run_mechanism_setup(frontend._model_form(), self.service, 'ssh-env'))
+        self.assertTrue(run_mechanism_setup(frontend._model_form(), self.service, 'remote-env'))
         self.assertIn('Invalid SSH port', self.output.getvalue())
         self.assertIn('Account is missing', self.output.getvalue())
         self.assertIn('Password is missing', self.output.getvalue())
@@ -128,13 +128,13 @@ class MechanismSetupTests(unittest.TestCase):
 
     def test_rechecking_complete_staged_settings_skips_wizard(self):
         self.stage()
-        parameters = next(m.parameters for m in self.configuration.profile().mechanisms if m.mechanism_id == 'ssh-env')
+        parameters = next(m.parameters for m in self.configuration.profile().mechanisms if m.mechanism_id == 'remote-env')
         frontend = self.frontend('@Environment', 'down', 'space', 'space',
             'back', 'back', '@Save and start', secrets='')
         with patch('fruitfly_agent.interactive.terminal.features.configuration.menu.run_mechanism_setup',
                    side_effect=AssertionError('complete settings reopened setup')):
             self.assertTrue(frontend.run(configure=True).saved)
-        remote = next(m for m in self.configuration.profile().mechanisms if m.mechanism_id == 'ssh-env')
+        remote = next(m for m in self.configuration.profile().mechanisms if m.mechanism_id == 'remote-env')
         self.assertTrue(remote.enabled)
         self.assertEqual(parameters, remote.parameters)
         self.assert_hidden()
@@ -157,7 +157,7 @@ class MechanismSetupTests(unittest.TestCase):
         with patch('fruitfly_agent.interactive.terminal.features.configuration.menu.run_mechanism_setup',
                    side_effect=AssertionError('saved settings reopened setup')):
             self.assertTrue(frontend.run(configure=True).saved)
-        remote = next(m for m in self.configuration.profile().mechanisms if m.mechanism_id == 'ssh-env')
+        remote = next(m for m in self.configuration.profile().mechanisms if m.mechanism_id == 'remote-env')
         self.assertTrue(remote.enabled)
         self.assertEqual('server.example', remote.parameters['host'])
         self.assertEqual(2222, remote.parameters['port'])
@@ -220,7 +220,7 @@ class MechanismSetupTests(unittest.TestCase):
         self.assertEqual('UNRELATED=value\n', target.read_text())
 
     def test_incomplete_configuration_cannot_be_saved(self):
-        self.configuration.set_mechanism('ssh-env', enabled=True)
+        self.configuration.set_mechanism('remote-env', enabled=True)
         with self.assertRaisesRegex(ValueError, 'Set up…'):
             self.configuration.save()
         self.assertFalse((self.root / '.fruitfly/config.yaml').exists())

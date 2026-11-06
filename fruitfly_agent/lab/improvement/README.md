@@ -106,14 +106,14 @@ grading outside the behavior-based editing path.
 4. Inspect the run report, evidence and stopping reason. Use `rsi run` for verified
    adoption across generations; benchmark development reward alone is insufficient.
 
-`/improvement [DIRECTION]` retains a light explicit instruction/file/package flow
-and result review when a compatible backend is registered. It discovers legal targets and uses the fixed flow; there is no experiment
-configuration editor in chat. Advanced component, generator, scope and
-timing choices belong to experiment files or the public embedding API.
+The daily terminal provides no improvement command or experiment switch.
+Embedding hosts retain the public workflow, candidate and task-material services;
+the independent CLI composes experiments from files. Discovery and preview are
+Provider-free. Execution requires a compatible registered backend.
 
 Current-task output selection does not prove improvement or change profile
-defaults. Reflection is staged in a separate pending queue. Use Results and history
-→ Pending experience to commit or reject it explicitly while idle. A commit is an
+defaults. Reflection is staged in a separate pending queue. Use the embedding host
+experience service to commit or reject it explicitly while idle. A commit is an
 attributed S update, not a verified quality claim. Persistent jobs defer library
 updates; editor experiments disable experience retention. The library belongs
 to S identity and is frozen for each task. Later tasks start from the common

@@ -70,7 +70,7 @@ supported. In chat use [attachment commands](../interactive/terminal/README.md#a
 Run stores selected images and image tool outputs as immutable resources in
 `.fruitfly/artifacts/`, with Session grants recording their IDs, origin, type and
 size. Original inline image messages remain readable. Recovery validates granted
-resource hashes before startup. Optional `save-media-tool` saves a resource ID
+resource hashes before startup. `write(path, resource_id=...)` saves a granted resource ID
 to the selected local or SSH environment through normal file-write permissions;
 enable it in `/config`. See [Tools](../lab/tools/README.md#save-a-media-resource).
 
@@ -218,7 +218,7 @@ Run exposes an optional `configuration.model_setup` service to the terminal. Mod
 
 After Lab installation, Run applies the policy to the final config and environment. It creates a fresh Interactive authorization service, binds it to Session frontend events, and protects the active Session file from tool writes. The normalized effective policy enters `RuntimeManifest.permissions` as a record of the active environment. Recovery uses current policy even when the historical policy differs or is absent. The current Session path is an additional per-handle protection, not part of reusable policy identity.
 
-The optional [SSH environment](../lab/environment/ssh/README.md) supplies remote
+The optional [SSH environment](../lab/environment/methods/remote/README.md) supplies remote
 path authorization and records `ssh-permissions-v1` instead of local file roots.
 Remote execution prompts identify the server and port. Local extra roots and
 Session protections do not become remote path rules; SSH account/password values
@@ -241,8 +241,7 @@ Authorization audit entries contain call/tool identity, operation, outcome, and 
 
 ## Start component improvement
 
-Use `/improvement` for explicit instructions/input files or a saved package,
-one simple base-prompt comparison and result review. Advanced settings and RSI
+Use explicit task materials with an injected backend. Improvement and RSI
 use the independent [experiment CLI](../experiments/README.md), which also composes
 optional [Eval](../../fruitfly_eval/README.md) through public services. Run itself does not
 import Eval. See [Improvement](../lab/improvement/README.md).
@@ -259,7 +258,7 @@ Registered default parameter documents remain in Lab. [Configuration](configurat
 
 ## Host retained state
 
-The default interactive profile exposes [memory](../lab/context_manager/augmentation/information/file_memory/README.md)
+The default interactive profile exposes [memory](../lab/context_manager/augmentation/memory/methods/file_memory/README.md)
 and [Skill libraries](../lab/context_manager/augmentation/skills/README.md) through
 `/memory` and `/skills`. Memory maintenance is explicitly enabled and scheduled at
 idle boundaries; foreground work cancels and retires it before proceeding. Human

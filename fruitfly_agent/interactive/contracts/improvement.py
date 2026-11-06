@@ -22,6 +22,8 @@ class WorkflowComponentView:
     role: str
     available: bool = True
     reason: str = ''
+    owner: str = ''
+    feature_path: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -45,26 +47,12 @@ class WorkflowExecutionView:
     defaults: tuple[tuple[str, object], ...] = ()
 
 
-@dataclass(frozen=True)
-class WorkflowRequest:
-    instruction: str = ''
-    input_paths: tuple[str, ...] = ()
-    component_ids: tuple[str, ...] = ()
-    generator_id: str = 'agent-editor-v1'
-    scope: str = 'task'
-    rounds: int = 1
-    timeouts: dict[str, float] = field(default_factory=lambda: {'editor_seconds':1200,'execution_seconds':3600,'evaluator_seconds':1200})
-    direction: str = ''
-    task_pack_id: str = ''
-    execution_id: str = 'agent-task'
-    execution_parameters: tuple[tuple[str, object], ...] = ()
-    retain_experience: bool = False
 
 
 @runtime_checkable
 class ComponentImprovementClient(Protocol):
     def workflow_configuration(self) -> WorkflowConfiguration | None: ...
-    def workflow_preview(self, request: WorkflowRequest) -> 'ImprovementPreview': ...
+    def workflow_preview(self, request: object) -> 'ImprovementPreview': ...
 
 
 @dataclass(frozen=True)
@@ -89,7 +77,7 @@ class ImprovementTargetView:
 
 class ImprovementService(Protocol):
     def workflow_configuration(self) -> WorkflowConfiguration: ...
-    def workflow_preview(self, request: WorkflowRequest) -> ImprovementPreview: ...
+    def workflow_preview(self, request: object) -> ImprovementPreview: ...
     async def improve(self, manifest: Mapping[str, object], direction: str, *, preview_token="") -> tuple[CandidateView, ...]: ...
     def cancel_improvement(self) -> bool: ...
 

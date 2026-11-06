@@ -7,10 +7,6 @@ from fruitfly_agent.interactive.contracts.inputs import ImageAttachment, UserCon
 
 from fruitfly_agent.interactive.contracts.events import EventSink
 from fruitfly_agent.interactive.contracts.models import InteractiveStatus
-from fruitfly_agent.interactive.contracts.improvement import ImprovementClient, ImprovementProgress, ComponentImprovementClient
-from fruitfly_agent.interactive.contracts.candidates import CandidateClient, CandidateActivationClient
-from fruitfly_agent.interactive.contracts.task_packs import TaskPackClient
-from fruitfly_agent.interactive.contracts.experience import ExperienceReviewClient
 
 
 class TerminalSession(Protocol):
@@ -38,9 +34,6 @@ class TerminalBindings:
     busy: Callable[[], bool]
     authorization: Callable
     enable_authorization: Callable | None
-    progress: Callable
-    candidate_notice: Callable | None
-    acknowledge_notice: Callable | None
     apply_configuration: Callable[[], Awaitable[None]] | None = None
     load_attachment: Callable[[str], ImageAttachment] | None = None
     validate_input: Callable[[UserContent], UserContent] | None = None
@@ -65,9 +58,6 @@ class TerminalBindings:
                               or getattr(getattr(session, "status", None), "application_state", "idle") != "idle"),
             authorization=lambda: getattr(session, "authorization", None),
             enable_authorization=getattr(session, "enable_authorization", None),
-            progress=lambda: getattr(session, "improvement_progress", None),
-            candidate_notice=getattr(session, "candidate_notice", None),
-            acknowledge_notice=getattr(session, "acknowledge_candidate_notice", None),
             apply_configuration=getattr(session, "apply_configuration", None),
             load_attachment=(getattr(session, 'load_attachment', None)
                              if getattr(session, 'attachments_available', True) else None),
@@ -78,38 +68,3 @@ class TerminalBindings:
             retained_action=getattr(session, 'retained_action', None),
         )
 
-
-@dataclass(frozen=True)
-class ImprovementClients:
-    """Menus can compose distinct feature clients without an Application object."""
-    search: ImprovementClient | None = None
-    candidates: CandidateClient | None = None
-    materials: TaskPackClient | None = None
-    activation: CandidateActivationClient | None = None
-    progress: Callable[[], ImprovementProgress | None] = lambda: None
-    history: Callable = lambda: ()
-    cancel: Callable[[], bool] = lambda: False
-    history_logs: Callable | None = None
-    wait: Callable | None = None
-    workflow: ComponentImprovementClient | None = None
-    experience: ExperienceReviewClient | None = None
-
-    @classmethod
-    def from_session(cls, session: Any) -> ImprovementClients:
-        return cls(
-            search=session if isinstance(session, ImprovementClient) else None,
-            candidates=session if isinstance(session, CandidateClient) else None,
-            materials=session if isinstance(session, TaskPackClient) else None,
-            activation=session if isinstance(session, CandidateActivationClient) else None,
-            progress=lambda: getattr(session, "improvement_progress", None),
-            history=getattr(session, 'improvement_history', lambda: ()),
-            cancel=getattr(session, 'cancel', lambda: False),
-            history_logs=getattr(session, 'improvement_run_logs', None),
-            wait=getattr(session, 'wait_for_improvement', None),
-            workflow=session if isinstance(session, ComponentImprovementClient) else None,
-            experience=session if isinstance(session, ExperienceReviewClient) else None,
-        )
-
-    @property
-    def available(self) -> bool:
-        return any(client is not None for client in (self.workflow, self.search, self.candidates, self.materials))

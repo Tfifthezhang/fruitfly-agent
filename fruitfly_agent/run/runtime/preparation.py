@@ -10,7 +10,7 @@ from fruitfly_agent.core.extensions.protocols import RecoveryValidator
 from fruitfly_agent.interactive import InteractiveSession
 from fruitfly_agent.interactive.application import RuntimeHandle
 from fruitfly_agent.interactive.contracts.runtime import RuntimeCleanupError
-from fruitfly_agent.lab.improvement.targets.text import TEXT_TARGET_PREFIX
+from fruitfly_agent.improvement.contracts.text import TEXT_TARGET_PREFIX
 from fruitfly_agent.run.configuration.resolution import resolve_profile_models
 from fruitfly_agent.run.configuration.profile import HarnessProfile
 from fruitfly_agent.run.storage.sessions import SessionLeases

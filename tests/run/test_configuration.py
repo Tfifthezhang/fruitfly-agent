@@ -137,14 +137,10 @@ class HarnessSelectionTest(unittest.TestCase):
                 "bash-tool",
                 "edit-tool",
                 "write-tool",
-                "skill-catalog",
-                "information-context",
-                "memory-files",
-                "memory-library",
-                "skill-library",
-                                "layered-compaction",
-                "component-improvement",
-            },
+                "skills",
+                                "file-memory",
+                                                                "layered-compaction",
+                            },
         )
 
     def test_ambiguous_model_can_enter_provider_free_setup(self) -> None:
@@ -184,7 +180,7 @@ class HarnessSelectionTest(unittest.TestCase):
 
         controller.select_model("b")
         controller.set_mechanism("knowledge-files", enabled=True)
-        controller.set_mechanism("skill-catalog", enabled=True)
+        controller.set_mechanism("skills", enabled=True)
         before = controller.snapshot()
         result = controller.save()
         persisted = load_harness_config(root / ".fruitfly" / "config.yaml")
@@ -206,7 +202,7 @@ class HarnessSelectionTest(unittest.TestCase):
             for item in persisted.select().mechanisms
             if item.enabled
         }
-        self.assertIn("skill-catalog", enabled)
+        self.assertIn("skills", enabled)
 
     def test_synthesized_configuration_is_saved_to_the_hidden_default(self) -> None:
         root = self.root
@@ -289,7 +285,7 @@ class HarnessSelectionTest(unittest.TestCase):
         context_items = [
             item
             for item in controller.snapshot().mechanisms
-            if item.category == "context-manager" and item.visible
+            if item.category == "context" and item.visible
         ]
         information_context = next(
             item for item in controller.snapshot().mechanisms
@@ -300,16 +296,16 @@ class HarnessSelectionTest(unittest.TestCase):
             if item.mechanism_id == "ipython-tool"
         )
 
-        self.assertEqual("context-manager", before.category)
+        self.assertEqual("context", before.category)
         self.assertEqual("online", before.layer)
         self.assertEqual("context", before.family)
         self.assertEqual("externalization", before.context_phase)
         self.assertEqual(
-            ["augmentation"] * 7 + ["externalization", "reduction", "reduction"],
+            ["augmentation"] * 4 + ["externalization", "reduction", "reduction"],
             [item.display_section for item in context_items],
         )
         self.assertEqual(
-            {"skill-catalog", "memory-files", "knowledge-files", "live-http", "skill-document", "memory-library", "skill-library"},
+            {"skills", "file-memory", "knowledge-files", "live-http"},
             {
                 item.mechanism_id
                 for item in context_items

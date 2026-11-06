@@ -3,7 +3,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from fruitfly_agent.core.tool_runtime import ToolCallContext
-from fruitfly_agent.lab.mcp.client import McpClient
+from fruitfly_agent.lab.mcp.methods.stdio.client import McpClient
 from fruitfly_agent.lab.mcp.config import load_config
 from fruitfly_agent.lab.mcp.schemas import compile_schema
 from fruitfly_agent.lab.mcp.results import ResultStore

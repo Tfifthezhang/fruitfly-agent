@@ -1,6 +1,6 @@
 """Owner-controlled H surfaces; grants and trials use existing component contracts."""
 from dataclasses import fields
-from fruitfly_agent.lab.improvement.components.parameters import editable_parameters
+from fruitfly_agent.lab.catalog.adapters.parameters import editable_parameters
 
 
 def expose(definition, config_type, *, protected=()):
