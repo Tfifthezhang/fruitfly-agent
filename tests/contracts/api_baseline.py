@@ -101,14 +101,14 @@ LAB_ENV_PUBLIC_API = {"LocalEnv"}
 
 LAB_HOST_PUBLIC_API = {
     "ASSESSOR_CONFIG", "AgentEditor", "AgentGenerator",
-    "AgentReflector", "AgentSelector", "CompletedAssessmentService", "ComponentWorkflow",
-    "EDITOR_CONFIG", "EDITOR_INSTRUCTIONS", "ExecutionContext",
+    "AgentReflector", "AgentSelector", "CompletedAssessmentService",
+    "LayeredOrganizer", "OrganizerInstructions", "EDITOR_CONFIG", "EDITOR_INSTRUCTIONS", "ORGANIZER_CONFIG", "ExecutionContext",
     "GeneratorRegistry",  "ReadOnlyInspector", "SETTINGS",
     "SYSTEM_SETTINGS", "SearchActivity", "SearchActivitySource", "SearchCompletion",
-    "SearchCompletionSource", "WorkflowBindings", 
+    "SearchCompletionSource", "StageBindings", "StageContext", "builtin_stage_handlers",
     "builtin_executions", "bundle_target",
     "bundle_text", "component_registry", "entry_from_dict", "entry_to_dict", "experience_id",
-    "extension_spec", "install_workflow_mechanisms", "model_completion", "policy_spec",
+    "extension_spec", "model_completion", "policy_spec",
       "evaluator_instructions",
     'organize_evidence',
 
@@ -130,6 +130,8 @@ MODULE_EXPORTS = {
     "fruitfly_agent.lab.environment": LAB_ENV_PUBLIC_API,
     "fruitfly_agent.lab.environment.methods.local.algorithm": {"LocalEnv"},
     "fruitfly_agent.lab.catalog": {
+        "registry_optimization_table", "select_default_components", "optimization_grants", "optimization_table", "render_optimization_table",
+        "RoleProvider",
         "PermissionPolicy", "apply_permission_policy",
         "ActivationScope",
         "ContextPhase",

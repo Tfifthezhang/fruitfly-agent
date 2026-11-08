@@ -24,7 +24,7 @@ its scope and validates required artifact hashes and source coverage.
 
 These are trusted in-process capabilities, not an OS sandbox. There is no generated
 topic archive or semantic history search. `tests.lab.test_context_history` and
-`tests.workflows.test_layered_compaction_improvement` exercise routing and isolation.
+`tests.run.test_layered_compaction` exercise routing and isolation.
 
 `SessionHistory.execution_artifacts()` exports immutable context text and committed
 coverage checkpoints for trial evidence. Runtime resource scopes retire with the

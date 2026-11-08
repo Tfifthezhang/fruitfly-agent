@@ -104,20 +104,27 @@ class ScaffoldingTests(unittest.TestCase):
             resolve_benchmark(replace(config, task={k: v for k, v in collection.items() if k != 'id'})).stage_host()
             self.assertNotEqual(Path.cwd().resolve(), self.root)
             self.assertEqual(main(['--cwd', str(self.root), 'improvement', 'check', '--json']), 0)
-            summary = json.loads(output.getvalue())
+            summary = json.loads(output.getvalue())['execution']
             self.assertEqual(summary['task_set']['collections'][0]['tasks'], 1)
             self.assertEqual(summary['multi_task']['execution']['concurrency'], 1)
             self.assertIn('base_prompt', summary['request']['component_ids'])
             self.assertIn('layered-compaction', summary['request']['component_ids'])
             self.assertNotIn('improvement-editor', summary['request']['component_ids'])
             self.assertEqual(summary['execution']['max_tool_calls_per_turn'], 512)
-            # Relative paths must still be inside the declared experiment workspace.
+            # Research stages report historical workspace differences and use
+            # the workspace explicitly selected for this invocation.
             request_path = config.resolve(collection['request'])
             request = json.loads(request_path.read_text())
             request['runtime']['working_directory'] = '..'
             request_path.write_text(json.dumps(request))
+            output.seek(0); output.truncate()
             with redirect_stderr(io.StringIO()):
-                self.assertEqual(main(['--cwd', str(self.root), 'improvement', 'check']), 2)
+                self.assertEqual(main(['--cwd', str(self.root), 'improvement', 'check']), 0)
+            report = json.loads(output.getvalue())['execution']['collection_configurations'][0]
+            self.assertEqual(report['declared']['runtime']['working_directory'], '..')
+            self.assertEqual(report['effective_runtime']['working_directory'], str(self.root))
+            self.assertTrue(report['runtime_differences'])
+            self.assertEqual(json.loads(request_path.read_text()), request)
 
     def test_catalog_id_is_data_and_unknown_ids_or_invalid_flags_write_nothing(self):
         for source, benchmark, variant in (('task-set', 'swe-bench', 'smoke'),

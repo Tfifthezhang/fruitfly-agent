@@ -29,6 +29,7 @@ class TaskSetPreparation:
     def freeze(self, context):
         context.runtime_config = self.runtime_config
         context.runtime_profile = self.runtime_profile
+        context.runtime_override = self.config.runtime_override
         return self.registry.freeze(self.specifications, context)
 
     def definition(self):
@@ -99,7 +100,7 @@ def resolve(config):
     path = config.resolve(config.runtime['config']) if 'config' in config.runtime else None
     profile = config.runtime.get('profile')
     for row in rows:
-        if row['source'] == 'eval':
+        if row['source'] == 'eval' and not config.runtime_override:
             from fruitfly_eval.contracts import EvaluationRequest
             runtime = EvaluationRequest.read(row['request']).runtime
             path, profile = runtime_reference(config.workspace, runtime.config_path, runtime.profile,
@@ -114,8 +115,6 @@ def resolve(config):
     batch = sample_batch(snapshot, config.multi_task.sampling, 0, attempts=config.multi_task.execution.attempts)
     from fruitfly_agent.lab.improvement.assessment.joint import assess_batch
     assess_batch(snapshot, batch, (), config.multi_task.evaluation)
-    if config.improvement.retain_experience:
-        raise ValueError('task-set search currently needs simple search without experience retention')
     return SourceBinding('task-set', 'task-set', measured=True, source_identity=snapshot.snapshot_id,
         adoption_notice='joint development scores need an independently registered adoption verifier',
         config_path=path, profile=profile,

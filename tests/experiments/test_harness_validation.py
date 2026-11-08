@@ -11,7 +11,7 @@ from tests.support.experiments import workspace
 
 
 class HarnessValidationTests(unittest.TestCase):
-    def test_default_discovery_excludes_tool_parameters_but_explicit_grants_remain_legal(self):
+    def test_default_discovery_includes_tool_parameters_and_explicit_scope_replaces_it(self):
         from dataclasses import replace
         from fruitfly_agent.lab.improvement.execution import builtin_executions, ExecutionRegistry
         with tempfile.TemporaryDirectory() as directory:
@@ -33,10 +33,10 @@ class HarnessValidationTests(unittest.TestCase):
                     patch('fruitfly_agent.providers.registry.ProviderRegistry.create', side_effect=AssertionError('Provider constructed')):
                 prepared = prepare_experiment(load_configuration(root), 'improvement')
                 self.assertNotIn('tool-catalog', prepared.request.component_ids)
-                self.assertNotIn('bash-tool', prepared.request.component_ids)
+                self.assertIn('bash-tool', prepared.request.component_ids)
                 row = next(c for c in prepared.harness['editable_components'] if c['id'] == 'bash-tool')
                 self.assertTrue(row['available'])
-                self.assertFalse(row['default_selected'])
+                self.assertTrue(row['default_selected'])
                 document['edit'] = {'bash-tool': {'fields': ['parameters.settings.default_timeout_seconds']}}
                 experiment.write_text(yaml.safe_dump(document))
                 explicit = prepare_experiment(load_configuration(root), 'improvement')

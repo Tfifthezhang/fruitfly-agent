@@ -29,13 +29,15 @@ def freeze(spec, context, *, executor=None):
     workspace = Path(context.workspace).resolve()
     declared = Path(request.runtime.working_directory)
     declared = (declared if declared.is_absolute() else workspace / declared).resolve()
-    if declared != workspace:
+    override = getattr(context, 'runtime_override', False)
+    if declared != workspace and not override:
         raise ValueError('benchmark collections must use the experiment workspace')
     request = replace(request, runtime=replace(request.runtime, working_directory=str(workspace)))
     if request.execution.attempts != 1 or request.execution.concurrency != 1:
         raise ValueError('leaf benchmark requests need attempts=1 and concurrency=1; the shared scheduler owns parallelism')
     from fruitfly_agent.runtime_spec import runtime_reference
-    config_path, profile_id = runtime_reference(context.workspace, request.runtime.config_path, request.runtime.profile,
+    config_path, profile_id = runtime_reference(context.workspace,
+        None if override else request.runtime.config_path, None if override else request.runtime.profile,
         inherited_path=context.runtime_config, inherited_profile=context.runtime_profile)
     request = replace(request, runtime=replace(request.runtime, config_path=str(config_path), profile=profile_id))
     builder = RuntimeConfigBuilder(context.workspace, request.runtime, None)

@@ -14,7 +14,7 @@ from fruitfly_agent.improvement.contracts.tasks import Resource
 from fruitfly_agent.improvement.contracts.versions import canonical_json
 from fruitfly_agent.improvement.contracts.validation import identifier
 from fruitfly_agent.improvement.execution.facts import read_facts, attach_facts, receipt_facts, FACTS_PATH
-from fruitfly_agent.improvement.workflow.operations import run_stage, require_type
+from fruitfly_agent.improvement.stages.operations import run_stage, require_type
 from ..execution.deliverables import DeliveryBundle
 
 

@@ -14,7 +14,7 @@ Installation and preparation can download files, build images and start containe
 Only `run` invokes the Agent and official verifier and can incur model charges.
 
 For a fresh public-template setup and candidate search through the independent
-experiment CLI, see [experiment examples](../examples/experiments/README.md#start-a-remote-linux-benchmark-experiment).
+experiment CLI, see [experiment examples](../examples/experiments/README.md#initialize-and-prepare).
 Its `init` command generates editable request/host/default files without private
 configuration transfer. This guide also covers reusable environment preparation
 and fixed-version evaluation independently of search.

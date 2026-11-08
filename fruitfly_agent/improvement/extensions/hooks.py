@@ -6,7 +6,7 @@ from ..contracts.tasks import Resource
 from ..contracts.lifecycle import HOOK_NAMES, ContextContribution, LifecycleEvent
 from ..contracts.validation import identifier
 from ..contracts.failures import StageFailure
-from ..workflow.operations import run_stage
+from ..stages.operations import run_stage
 
 
 @dataclass(frozen=True)

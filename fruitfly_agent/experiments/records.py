@@ -37,6 +37,15 @@ class RunRecords:
         record = {'schema_version': 1, 'id': run_id, 'operation': operation, 'status': 'created',
             'started_at': timestamp(), 'configuration': configuration, 'links': {}}
         self.save(record)
+        config_directory = directory / 'configuration'
+        config_directory.mkdir()
+        from fruitfly_agent.run.improvement.configuration.snapshot import redact
+        write_bytes(config_directory / 'effective.json', (json.dumps(redact(configuration), ensure_ascii=False, indent=2, allow_nan=False) + '\n').encode())
+        write_bytes(config_directory / 'sources.json', (json.dumps(configuration.get('configuration_sources', []), ensure_ascii=False, indent=2) + '\n').encode())
+        if 'optimization_table' in configuration:
+            from fruitfly_agent.lab.catalog import render_optimization_table
+            write_bytes(config_directory / 'optimization.json', (json.dumps(configuration['optimization_table'], ensure_ascii=False, indent=2) + '\n').encode())
+            write_bytes(config_directory / 'optimization.md', render_optimization_table(configuration['optimization_table']).encode())
         return record
 
     def save(self, record):

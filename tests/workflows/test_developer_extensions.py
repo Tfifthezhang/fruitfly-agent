@@ -11,7 +11,7 @@ from fruitfly_agent.run.extensions import load_extensions, discover_extensions
 from tests.support.task_execution import TaskApplicationFixture as RunApplicationFactory
 from fruitfly_agent.interactive import AgentApplication
 from fruitfly_agent.improvement.contracts.requests import WorkflowRequest
-from fruitfly_agent.lab.improvement.api import WorkflowBindings
+from fruitfly_agent.lab.improvement.api import StageBindings
 from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
 from fruitfly_agent.rsi import EvolutionEngine
 from fruitfly_agent.rsi.contracts import VerificationEvidence
@@ -28,41 +28,6 @@ class EchoGuidance(FauxProvider):
 
 
 class DeveloperExtensionTests(unittest.IsolatedAsyncioTestCase):
-    async def test_agent_interception_is_recreated_per_trial_without_live_state_leakage(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            # Echoing two full default catalogs needs room; this checks hook state.
-            _write_models(root, context_window=16000)
-            guidance = Path(__file__).resolve().parents[2] / 'examples/extensions/developer_guidance.py'
-            hook = root / 'counter.py'
-            hook.write_text('''def register(api):
-    def apply(event, ctx):
-        ctx.state['requests'] = ctx.state.get('requests', 0) + 1
-        event.system_prompt += '\\nEXTENSION_REQUEST=' + str(ctx.state['requests'])
-    api.intercept_agent('before_request', apply)
-''')
-            providers = Mock(); providers.create.side_effect = lambda *args: EchoGuidance()
-            generators = GeneratorRegistry(); generators.register('offline-rule', OfflineGenerator)
-            factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=providers,
-                extensions=load_extensions((str(guidance), str(hook)), workspace=root),
-                improvement_bindings=WorkflowBindings(generators=generators,
-                     selector=lambda *args: FirstSelector()))
-            factory.configuration.set_mechanism('developer-guidance-owner', enabled=True)
-            factory.configuration.save(); factory.reload_configuration()
-            app = AgentApplication(factory)
-            await app.start()
-            self.addAsyncCleanup(app.close)
-            first = await app.submit('ordinary request')
-            self.assertIn('EXTENSION_REQUEST=1', first.messages[-1].text)
-            request = WorkflowRequest('Compare task guidance.', component_ids=('developer-guidance',),
-                generator_id='offline-rule',  retain_experience=False)
-            preview = app.workflow_preview(request)
-            await app.improve('', preview_token=preview.preview_token)
-            records = factory._component_jobs.outcome.records
-            self.assertEqual(len(records), 2)
-            self.assertTrue(all(record.output.count('EXTENSION_REQUEST=1') == 1 for record in records))
-            second = await app.submit('ordinary request after trials')
-            self.assertIn('EXTENSION_REQUEST=2', second.messages[-1].text)
 
     async def test_late_owned_resources_close_in_reverse_order_even_after_failure(self):
         closed = []
@@ -118,51 +83,6 @@ class DeveloperExtensionTests(unittest.IsolatedAsyncioTestCase):
             self.assertNotEqual(app.runtime_manifest['digest'], initial)
             self.assertEqual(app.status.message_count, 2)
 
-    async def test_external_algorithm_runs_trials_activates_and_binds_two_generations(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            _write_models(root)
-            source = Path(__file__).resolve().parents[2] / 'examples/extensions/developer_guidance.py'
-            extensions = load_extensions((str(source),), workspace=root)
-            providers = Mock()
-            seen = []
-            def create(*args):
-                value = EchoGuidance()
-                seen.append(value)
-                return value
-            providers.create.side_effect = create
-            generators = GeneratorRegistry()
-            generators.register('offline-rule', OfflineGenerator)
-            factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=providers,
-                extensions=extensions, improvement_bindings=WorkflowBindings(generators=generators,
-                     selector=lambda *args: FirstSelector(),
-                    verifier=SyntheticVerification()))
-            factory.configuration.set_mechanism('developer-guidance-owner', enabled=True)
-            factory.configuration.save()
-            config = root / '.fruitfly/config.yaml'
-            raw = yaml.safe_load(config.read_text())
-            raw['profiles']['default']['extensions'] = [str(source)]
-            config.write_text(yaml.safe_dump(raw))
-            factory.reload_configuration()
-            app = AgentApplication(factory)
-            await app.start()
-            self.addAsyncCleanup(app.close)
-            initial = app.runtime_manifest['digest']
-            request = WorkflowRequest('Show applied guidance.', component_ids=('developer-guidance',),
-                generator_id='offline-rule', scope='persistent',  retain_experience=False)
-            async def verify(record, text):
-                return VerificationEvidence(record.candidate_id, record.artifact_id,
-                    record.parent_manifest_digest, 'synthetic-extension', True)
-            host = RunEvolutionHost(app, factory, policy_id='synthetic-extension', verify=verify, request=request)
-            result = await EvolutionEngine().evolve(host, job_id='external', policy_id='synthetic-extension',
-                direction='Improve developer guidance.', max_steps=2)
-            self.assertEqual((result.phase, result.steps), ('complete', 2))
-            self.assertNotEqual(initial, app.runtime_manifest['digest'])
-            reply = await app.submit('Use the active algorithm.')
-            self.assertEqual(reply.messages[-1].text.count('Use exact answers.'), 2)
-            prompts = [call['system_prompt'] for provider in seen for call in provider.calls]
-            self.assertTrue(any(text.count('Use exact answers.') == 1 for text in prompts))
-            self.assertEqual(app.runtime_manifest['harness']['extensions'][0]['source'], str(source))
 
     async def test_reload_replaces_observers_and_retires_old_context_without_losing_history(self):
         with tempfile.TemporaryDirectory() as directory:

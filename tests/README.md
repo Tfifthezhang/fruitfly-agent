@@ -8,7 +8,7 @@ Verify public contracts, module boundaries, and observable behavior with offline
 
 ```bash
 .venv/bin/python -m tests --area lab --area workflows
-.venv/bin/python -m tests --module tests.lab.test_improvement_pipeline
+.venv/bin/python -m tests --module tests.lab.test_detached_editor
 .venv/bin/python -m tests --area run --list
 .venv/bin/python -m unittest discover -s tests -t .
 ```

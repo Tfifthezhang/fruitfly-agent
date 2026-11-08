@@ -29,8 +29,8 @@ Add tools, execution backends, context strategies, and improvement algorithms th
 
 Improvement runs independently of RSI. Its public stage contracts separate proposal, execution, output selection, verification and reflection. Persistent RSI requires an explicit host and verification policy; only confirmed activation advances the deployed version.
 
-Generators implement `CandidateGenerator`; `WorkflowBindings` injects replaceable stages. Existing H/S text owners reuse the same execution and adoption path. I edits use the registered fixed-depth editor-comparison runner and independent paired verification.
-See [editor experiments](improvement/improver/README.md).
+Generators implement `CandidateGenerator`; `StageBindings` injects replaceable stages. Existing H/S text owners reuse the same execution and adoption path. I edits use the registered fixed-depth editor-comparison runner and independent paired verification.
+See [Independent stages](improvement/DEVELOPER_GUIDE.md).
 
 Task-local work can use execution evidence without answers or scores. Persistent candidates require independent verification before human adoption. Attributed experience is staged separately at task boundaries and enters the library only after explicit review.
 
@@ -53,7 +53,7 @@ It registers a context transformer, assembles it through Run, and submits a task
 | Add an operation | `AgentTool` | [Tools](tools/README.md) |
 | Replace file or shell access | `ExecutionEnv` | [Environment](environment/README.md) |
 | Collect feedback or update experience | Active hook or passive observer | [Core extensions](../core/extensions/README.md) |
-| Search candidates | `CandidateGenerator` and stage ports | [Improvement](improvement/README.md#extend-search) |
+| Search candidates | `CandidateGenerator` and stage ports | [Improvement](improvement/README.md#extend-a-stage) |
 | Verify and adopt across generations | `EvolutionHost` and explicit policy | [RSI](rsi/README.md) |
 
 ## Implementation rules

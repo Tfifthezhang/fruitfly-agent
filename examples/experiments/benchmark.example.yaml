@@ -11,7 +11,6 @@ execution:
   generator: agent-editor-v1
   editor_seconds: 1200
   task_seconds: 3600
-  retain_experience: false
   trial:
     concurrency: 1
     attempts: 1
@@ -29,7 +28,3 @@ evidence:
 evaluation:
   evaluator_seconds: 1200
   scope: task
-stopping:
-  max_rounds: 1
-  no_improvement_rounds: 0
-  consecutive_failures: 0

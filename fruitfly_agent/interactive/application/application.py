@@ -33,7 +33,6 @@ from fruitfly_agent.interactive.contracts.improvement import (
 from fruitfly_agent.interactive.contracts.candidates import CandidateView, CandidateService
 from fruitfly_agent.interactive.contracts.task_packs import TaskPackService
 from fruitfly_agent.interactive.contracts.experience import ExperienceReviewClient
-from fruitfly_agent.interactive.application.jobs import ImprovementJob
 from fruitfly_agent.interactive.session.materials import TaskMaterials
 
 
@@ -67,7 +66,6 @@ class AgentApplication:
         self._authorization_handler = None
         self._last_result: AgentLoopResult | None = None
         self._last_error: BaseException | None = None
-        self._improvement_job = ImprovementJob()
         self._materials = TaskMaterials(
             service=self._task_pack_service,
             items=lambda: self._require_handle().session.canonical_items(),
@@ -329,8 +327,6 @@ class AgentApplication:
             self._maintenance_task.cancel()
             had_pending = True
         self._clear_pending()
-        if self._state == ApplicationState.IMPROVING:
-            return self._improvement_job.cancel()
         return self._require_handle().session.cancel() or had_pending
 
     def _improvement_service(self) -> ImprovementService:
@@ -372,13 +368,6 @@ class AgentApplication:
         service = self._improvement_service()
         return service.workflow_configuration() if isinstance(service, ComponentImprovementClient) else None
 
-    def workflow_preview(self, request):
-        if self._state != ApplicationState.IDLE or self._pending:
-            raise RuntimeError('finish active work before preparing improvement')
-        service = self._improvement_service()
-        if not isinstance(service, ComponentImprovementClient):
-            raise RuntimeError('component improvement is unavailable')
-        return service.workflow_preview(request)
 
     def improvement_targets(self):
         configuration = self.workflow_configuration()
@@ -404,53 +393,9 @@ class AgentApplication:
             raise RuntimeError('experience review is unavailable')
         return service.experience_action(job_id, action)
 
-    def start_improvement(self, direction: str, *, preview_token="") -> asyncio.Task[tuple[CandidateView, ...]]:
-        """Own confirmed work while allowing the frontend to continue reading input."""
-        if self._state != ApplicationState.IDLE or self._pending:
-            raise RuntimeError("finish active work before starting improvement")
-        service = self._improvement_service()
-        manifest = self.runtime_manifest
-        submitted = getattr(service, 'improvement_submitted', None)
-        if submitted is not None:
-            preview_token = submitted(manifest, direction, preview_token=preview_token)
-        if self._maintenance_task is not None:
-            self._maintenance_task.cancel()
-        self._state = ApplicationState.IMPROVING
-        self._last_error = None
-        async def execute(operation):
-            try:
-                await self._stop_maintenance()
-                async with self._submission_lock:
-                    return await operation()
-            finally:
-                if self._state == ApplicationState.IMPROVING:
-                    self._state = ApplicationState.IDLE
 
-        def finished(error):
-            if self._state == ApplicationState.IMPROVING:
-                self._state = ApplicationState.IDLE
-            self._last_error = error
-            completed = getattr(service, 'improvement_finished', None)
-            if completed is not None:
-                try:
-                    completed(preview_token, self._improvement_job.progress.status, str(error) if error else '')
-                except Exception as exc:
-                    self._last_error = exc
 
-        return self._improvement_job.start(
-            service, manifest, direction, preview_token=preview_token,
-            execute=execute, finished=finished,
-        )
 
-    async def improve(self, direction: str, *, preview_token="") -> tuple[CandidateView, ...]:
-        return await self.start_improvement(direction, preview_token=preview_token)
-
-    @property
-    def improvement_progress(self) -> ImprovementProgress:
-        return self._improvement_job.progress
-
-    async def wait_for_improvement(self) -> None:
-        await self._improvement_job.wait()
 
     def _candidate_service(self) -> CandidateService:
         service = self._require_handle().candidates
@@ -527,7 +472,6 @@ class AgentApplication:
         try:
             async with asyncio.timeout(self._shutdown_timeout):
                 await self._stop_maintenance()
-                await self.wait_for_improvement()
                 await self.wait_until_idle()
                 async with self._submission_lock:
                     pass

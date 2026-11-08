@@ -7,12 +7,12 @@ from fruitfly_agent.improvement.contracts.tasks import Resource, TaskMaterial
 from fruitfly_agent.improvement.execution.facts import attach_facts, receipt_facts
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
 from fruitfly_agent.lab.improvement.evidence.indexing import organize_evidence, COVERAGE_PATH
-from tests.support.pipeline import build_pipeline, Runner
+from tests.support.stages import proposal_fixture, Runner
 
 
 class EvidenceCoverageTests(unittest.IsolatedAsyncioTestCase):
     async def test_required_parse_gap_or_missing_captured_bytes_prevents_complete(self):
-        _, plan, baseline, _ = build_pipeline()
+        _, plan, baseline, _ = proposal_fixture()
         task = TaskMaterial('task', 'Inspect evidence')
         for defect in ('none', 'parse', 'missing-file', 'usage'):
             with self.subTest(defect=defect):

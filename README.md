@@ -67,7 +67,7 @@ See the [walkthrough](examples/extensions/README.md).
 For a benchmark experiment, use
 `.venv/bin/fruitfly-agent-lab init --source task-set --benchmark terminal-bench-4`,
 configure models/credentials and prepare Eval before running `improvement check`
-and `improvement run` (model charges may apply). Plain `init` creates system files
+and `improvement step` (model charges may apply). Plain `init` creates system files
 only. See the [remote Linux TB4 walkthrough](examples/experiments/TB4_SERVER.md).
 
 ## Choose your mechanisms
@@ -98,19 +98,18 @@ Chat uses native terminal scrollback; temporary menus restore it on return.
 |---|---|---|
 | Improvement runtime | Independent stage kernel with injected algorithms, accounting, failure boundaries and evidence retention | [Runtime](fruitfly_agent/improvement/README.md) |
 | H/S improvement | Propose, execute and compare registered instructions, permitted owner parameters or retained documents; keep the baseline selectable | [Improvement](fruitfly_agent/lab/improvement/README.md) |
-| I experiments | Compare editor/evaluator instructions by downstream H/S behavior, then verify on separate task packages | [Editor experiments](fruitfly_agent/lab/improvement/improver/README.md) |
+| I targets | Explicit instruction proposals; no automatic nested comparison backend | [Independent stages](fruitfly_agent/lab/improvement/DEVELOPER_GUIDE.md) |
 | Persistent adoption | Publish verified text candidates for explicit review and activation | [Improvement host](fruitfly_agent/run/improvement/README.md) |
 | Experience | Stage attributed lessons; commit or reject separately while idle | [Experience](fruitfly_agent/lab/improvement/experience/README.md) |
-| RSI | An explicitly invoked host repeats verified adoption and loads the adopted version for the next generation | [RSI](fruitfly_agent/lab/rsi/README.md) |
+| RSI | Generic injected evolution runtime; no automatic Improvement CLI composition | [RSI](fruitfly_agent/lab/rsi/README.md) |
 | Benchmark execution | Run the native Agent in Harbor containers and collect official results | [Eval](fruitfly_eval/README.md) |
 
-Use the independent [experiment CLI](fruitfly_agent/experiments/README.md) for Eval,
-Improvement and RSI. File settings have bounded defaults; each round proposes at
-most one candidate through a fixed comparison flow. The daily terminal exposes
-configuration, memory and Skills; experiments run through the independent CLI or
-embedding API. Preview is offline; execution may incur charges. Task execution requires an explicitly registered backend; prepared Eval
-experiments use the configured Agent tools inside benchmark environments. I experiments edit only registered fields at fixed nesting
-depth. They do not train model weights or replace arbitrary source code.
+Use the independent [experiment CLI](fruitfly_agent/experiments/README.md) for
+fixed Eval and separate Improvement stages. One editable research configuration
+shows prior activity and selects the next operation. Each invocation performs one
+stage; it never automatically runs baseline, evidence, editing and execution.
+Model/task stages may incur charges. Task execution requires a registered backend;
+prepared Eval uses the configured Agent inside benchmark environments.
 
 Output selection is not independent verification. Tests with fake Providers prove
 covered control flow, not real model gains. Task packages are explicitly authored;
@@ -124,7 +123,7 @@ ordinary chat does not collect training material. See [task preparation](fruitfl
 | Use remote file and shell tools | [SSH environment](fruitfly_agent/lab/environment/methods/remote/README.md) |
 | Add or replace an algorithm | [Lab development](fruitfly_agent/lab/README.md#develop-an-algorithm) |
 | Prepare an improvement experiment | [Examples](examples/improvement/README.md) · [Task packs](fruitfly_agent/lab/improvement/tasks/README.md) |
-| Start Eval, Improvement or RSI | [Experiment CLI](fruitfly_agent/experiments/README.md) · [File templates](examples/experiments/README.md) |
+| Start Eval or an Improvement stage | [Experiment CLI](fruitfly_agent/experiments/README.md) · [File templates](examples/experiments/README.md) |
 | Run Terminal-Bench or SWE-bench | [Eval](fruitfly_eval/README.md) |
 | Change and verify the implementation | [Contributing](CONTRIBUTING.md) · [Tests](tests/README.md) |
 

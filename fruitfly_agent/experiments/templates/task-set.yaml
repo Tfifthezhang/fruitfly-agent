@@ -1,17 +1,33 @@
+research:
+  id: benchmark-research
+  title: Fixed benchmark and independent Improvement stages
+  output_root: research-output
+  branch: main
 baseline:
   config: default-config.yaml
   profile: baseline
-tasks:
-  file: tasks/tb4-smoke.yaml
-edit: {}
-execution:
-  generator: agent-editor-v1
-  editor_seconds: 1200
-  task_seconds: 3600
-  retain_experience: false
-  trial:
+roles: {}
+overrides: {}
+optimization:
+  scope: defaults
+  include: {}
+  exclude: []
+stages:
+  execute:
+    tasks:
+      file: tasks/tb4-smoke.yaml
+    task_seconds: 3600
     concurrency: 1
     attempts: 1
+  organize:
+    timeout_seconds: 1200
+  assess:
+    timeout_seconds: 1200
+  propose:
+    timeout_seconds: 1200
+    generator: agent-editor-v1
+  compare:
+    timeout_seconds: 1200
 evidence:
   read:
     default_characters: 12000
@@ -23,10 +39,10 @@ evidence:
     default_matches: 20
     max_matches: 50
     max_characters: 12000
-evaluation:
-  evaluator_seconds: 1200
-  scope: task
-stopping:
-  max_rounds: 1
-  no_improvement_rounds: 0
-  consecutive_failures: 0
+next:
+  stage: execute
+  publish_as: baseline-results
+  inputs:
+    harness:
+      config: default-config.yaml
+  attempt: reuse

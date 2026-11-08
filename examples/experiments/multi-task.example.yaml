@@ -3,15 +3,11 @@ baseline:
   profile: baseline
 tasks:
   file: tasks/multi.yaml
-edit:
-  base_prompt:
-    fields:
-    - parameters.instructions.system
+edit: {}
 execution:
   generator: agent-editor-v1
   editor_seconds: 1200
   task_seconds: 3600
-  retain_experience: false
   trial:
     concurrency: 2
     attempts: 1
@@ -29,7 +25,3 @@ evidence:
 evaluation:
   evaluator_seconds: 1200
   scope: task
-stopping:
-  max_rounds: 1
-  no_improvement_rounds: 0
-  consecutive_failures: 0

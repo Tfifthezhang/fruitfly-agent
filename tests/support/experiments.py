@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 import yaml
 
-from fruitfly_agent.lab.improvement.api import WorkflowBindings
+from fruitfly_agent.lab.improvement.api import StageBindings
 from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
 from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, EditReason
 from fruitfly_agent.improvement.contracts.components import ComponentFile, HarnessSnapshot
@@ -40,7 +40,7 @@ def workspace(root, *, task=None, **sections):
             edit[name]['bounds'] = dict(option['bounds'])
     multi = sections.pop('multi_task', {})
     times = values.get('timeouts', {'editor_seconds':1200, 'execution_seconds':3600, 'evaluator_seconds':1200})
-    execution = {key: values[key] for key in ('generator', 'retain_experience', 'direction') if key in values}
+    execution = {key: values[key] for key in ('generator', 'direction') if key in values}
     execution.update(editor_seconds=times['editor_seconds'], task_seconds=times['execution_seconds'])
     if multi.get('execution'):
         execution['trial'] = multi['execution']
@@ -55,7 +55,7 @@ def workspace(root, *, task=None, **sections):
     (directory / 'default-config.yaml').write_text(yaml.safe_dump(config))
     (directory / 'secrets.env').write_text('EXPERIMENT_TEST_KEY=offline-placeholder\n')
     document = {'baseline': {'config': 'default-config.yaml'}, 'tasks': {'inline': task}, 'edit': edit,
-        'execution':execution, 'evaluation':evaluation, 'stopping':{'max_rounds':values.get('rounds', 1)}, **sections}
+        'execution':execution, 'evaluation':evaluation, **sections}
     path = directory / 'experiment.yaml'
     path.write_text(yaml.safe_dump(document))
     return path
@@ -89,5 +89,5 @@ def factory_builder(registry):
         generators.register(Rule.generator_id, Rule)
         return RunApplicationFactory(cwd=prepared.config.workspace, environment=prepared.environment,
             config_path=str(path), profile_id=prepared.profile.profile_id, provider_registry=registry,
-            improvement_bindings=WorkflowBindings(generators=generators, selector=lambda *args: FirstSelector()))
+            improvement_bindings=StageBindings(generators=generators))
     return build

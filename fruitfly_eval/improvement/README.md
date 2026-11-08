@@ -31,7 +31,7 @@ This offline composition example uses placeholder paths:
 from pathlib import Path
 import os
 from fruitfly_eval.improvement import benchmark_execution
-from fruitfly_agent.lab.improvement.api import builtin_executions, WorkflowBindings
+from fruitfly_agent.lab.improvement.api import builtin_executions, StageBindings
 from fruitfly_agent.run import RunApplicationFactory
 
 workspace = Path('/path/to/workspace')
@@ -41,7 +41,7 @@ executions.register(benchmark_execution(
     workspace / '.fruitfly/eval-host.yaml',
 ))
 factory = RunApplicationFactory(cwd=workspace, environment=dict(os.environ),
-    improvement_bindings=WorkflowBindings(executions=executions))
+    improvement_bindings=StageBindings(executions=executions))
 ```
 
 Start an Application with that factory and submit a `WorkflowRequest` selecting
@@ -56,7 +56,7 @@ registered-task entry; full experiments use the independent CLI or public API.
 One task, one attempt and concurrency one are supported per leaf execution.
 The [task-set adapter](../../fruitfly_agent/lab/improvement/task_sets/README.md)
 can expose many such leaves from a larger prepared selection. Editor instructions remain an I-comparison responsibility: this runner
-cannot establish I improvement from a direct task score. Prepared benchmark studies use the explicit [I comparison composition](#compare-i-on-prepared-benchmarks).
+cannot establish I improvement from a direct task score. Automatic nested I comparison is not an installed execution backend.
 
 The request, host, preparation and source model/configuration bytes bind material
 identity. Candidate configurations never overwrite the source profile. Each
@@ -113,52 +113,6 @@ task-set experiment prepares its Eval sources through derived hosts;
 custom non-Eval sources own their preparation. No additional benchmark adapter or
 package is installed by declaring a collection name.
 
-## Compare I on prepared benchmarks
-
-`benchmark_improver(development, verification, ...)` composes nonempty, disjoint
-sets of prepared one-task `benchmark_execution` definitions. It returns an
-execution definition for the ordinary Improvement registry. The adapter injects
-material construction and `EpisodeExecutor`; Lab imports no Eval implementation.
-Task execution alone does not install this comparison.
-
-For example, after preparing separate development and verification requests and
-hosts, register the following with the same `executions` registry and
-factory shown above. These are placeholder paths; running the resulting study
-starts repeated model and container work and can incur substantial charges.
-
-```python
-from fruitfly_eval.improvement import benchmark_improver
-
-executions.register(benchmark_improver(
-    (benchmark_execution(workspace / 'development-request.json',
-                         workspace / 'development-host.yaml',
-                         execution_id='development'),),
-    (benchmark_execution(workspace / 'verification-request.json',
-                         workspace / 'verification-host.yaml',
-                         execution_id='independent'),),
-    max_verifications=1,
-))
-```
-
-Select `execution_id='benchmark-improver'`, `task_pack_id='benchmark-editor-study'`, I components and scored feedback. Independent phase times apply to editing, leaf execution and evaluation. Composite studies do not impose another deadline or count quota.
-
-Each episode freezes candidate I while the inner workflow edits H/S, then measures
-before/after H/S through the benchmark's official score. Inner component capability
-checks remain mandatory. Development and verification inputs must be distinct;
-source changes invalidate the study. Input identity checks do not prove semantic
-independence across related tasks. Verification-use claims follow the ordinary
-I comparison policy. Nested requests and executions contribute observations;
-missing external usage remains unknown. Only independently
-verified I is eligible for explicit activation. Inner H/S is never activated by it.
-
-This composition is currently exposed through the public embedding API; the
-experiment file `source: editor` selects task-package materials and needs an
-explicitly registered task/episode backend; it provides no local executor.
-Offline injected executors cover nested modification, scoring, partitioning,
-isolation and accounting in `tests.eval.test_improvement`.
-
-Interrupted collection retains available original evidence even when the final Session line or model-usage receipt is incomplete. Such usage stays unknown. Incomplete files cannot grant a score or complete diagnostics. Completed receipts require strict parsing.
-
 ## Register complete permitted evidence
 
 The bridge registers native Session, archived events (or an interrupted live
@@ -180,3 +134,19 @@ The shared organizer supplies overview, events, coverage and source navigation.
 complete file collection. Both ordinary Eval post-processing and Improvement use
 the same [evidence implementation](../../fruitfly_agent/lab/improvement/evidence/README.md).
 Neither an organized directory nor a human analysis report bypasses resource grants.
+
+## Import retained execution evidence
+
+`history.import_history(run, artifacts)` converts permitted retained Harbor task
+evidence into a benchmark-neutral `ResearchBatch`. It preserves available task
+instructions, separate execution status and official reward observations, immutable
+originals and diagnostic provenance. Verifier answers remain excluded. Missing
+instructions are explicitly marked; previous harness, source and initial learning
+state are not reconstructed. Import supports diagnosis and proposal, without a
+fresh baseline or an assumption of comparable execution conditions.
+
+Historical imports accept an associated report directory through `related_records`.
+Available configuration declarations and runtime receipts are retained as separate
+provenance resources. Missing original source or learning-state reconstruction
+remains explicit. The associated report is not a second independent execution
+batch and its conclusions do not replace original trajectories.

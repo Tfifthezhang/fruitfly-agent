@@ -7,8 +7,8 @@ from fruitfly_agent.improvement.contracts.plans import StageTimeouts
 from dataclasses import asdict
 
 
-def normalize_experiment(raw, target, *, material_only=False):
-    mapping(raw, {'baseline', 'tasks', 'edit', 'execution', 'evidence', 'evaluation', 'stopping', 'rsi'}, 'experiment')
+def normalize_experiment(raw, target, *, material_only=False, stage=None):
+    mapping(raw, {'baseline', 'tasks', 'edit', 'execution', 'evidence', 'evaluation'}, 'experiment')
     baseline = mapping(raw.get('baseline'), {'config', 'profile'}, 'experiment baseline')
     if not isinstance(baseline.get('config'), str) or not baseline['config'].strip():
         raise ValueError('experiment baseline requires config')
@@ -18,7 +18,10 @@ def normalize_experiment(raw, target, *, material_only=False):
     catalog = extensions.catalog(builtin_catalog()) if extensions is not None else builtin_catalog()
     profile = None if material_only else load_system_config(path, catalog=catalog).select(baseline.get('profile'))
     reader = DocumentReader()
-    task, task_path = reader.reference(raw.get('tasks'), target)
+    if raw.get('tasks') is None and stage in {'organize', 'assess', 'compare', 'propose'}:
+        task, task_path = {}, target
+    else:
+        task, task_path = reader.reference(raw.get('tasks'), target)
     mapping(task, {'source', 'execution', 'instruction', 'input_paths', 'pack', 'parameters', 'request', 'host', 'collections', 'material'}, 'task document')
     def paths(value):
         if not isinstance(value, dict):
@@ -39,42 +42,34 @@ def normalize_experiment(raw, target, *, material_only=False):
         if not isinstance(task['collections'], list) or not task['collections']:
             raise ValueError('task collections must be a nonempty list')
         task['collections'] = [paths(row) for row in task['collections']]
-    execution = mapping(raw.get('execution', {}), {'generator', 'editor_seconds', 'task_seconds', 'retain_experience', 'direction', 'trial', 'sampling', 'promotion_every_rounds'}, 'execution')
+    execution = mapping(raw.get('execution', {}), {'generator', 'organizer_seconds', 'editor_seconds', 'task_seconds', 'direction', 'trial'}, 'execution')
     evaluation = mapping(raw.get('evaluation', {}), {'evaluator_seconds', 'scope', 'comparison'}, 'evaluation')
     comparison = mapping(evaluation.get('comparison', {}), {'minimum_gain', 'max_collection_regression', 'aggregation', 'weights'}, 'evaluation.comparison')
-    stopping = mapping(raw.get('stopping', {}), {'max_rounds', 'no_improvement_rounds', 'consecutive_failures'}, 'stopping')
-    for name, value in stopping.items():
-        if type(value) is not int or value < (1 if name == 'max_rounds' else 0):
-            raise ValueError('stopping limits must be nonnegative integers; max_rounds must be positive')
-    timeouts = StageTimeouts(execution.get('editor_seconds', 1200), execution.get('task_seconds', 3600), evaluation.get('evaluator_seconds', 1200))
+    timeouts = StageTimeouts(execution.get('editor_seconds', 1200), execution.get('task_seconds', 3600), evaluation.get('evaluator_seconds', 1200), execution.get('organizer_seconds', 1200))
     grants = raw.get('edit', {})
     if not isinstance(grants, dict):
         raise ValueError('edit must map component IDs to field grants')
     options = {} if material_only or not grants else edit_grants(profile, grants, catalog)
     improvement = asdict(ImprovementSettings(components=tuple(grants), component_options=options,
-        generator=execution.get('generator', 'agent-editor-v1'), rounds=stopping.get('max_rounds', 1),
+        generator=execution.get('generator', 'agent-editor-v1'),
         scope=evaluation.get('scope', 'task'), direction=execution.get('direction', ''),
-        retain_experience=execution.get('retain_experience', False), timeouts=timeouts))
+        timeouts=timeouts))
     improvement['components'] = list(grants)
     runtime = {'config': str(path)}
     if profile is not None or baseline.get('profile'):
         runtime['profile'] = profile.profile_id if profile is not None else baseline['profile']
     evidence = EvidenceSettings.from_dict(raw.get('evidence')).to_dict()
     normalized = {'task': task, 'runtime': runtime, 'improvement': improvement,
-        'models': {k: v for k, v in profile.model_roles.items() if k in {'editor', 'assessor'} and isinstance(v, str)} if profile is not None else {},
-        'workflow_settings': dict(stopping), 'evidence_settings': evidence,
-        'rsi': raw.get('rsi', {}), 'stop': {}}
+        'models': {k: v for k, v in profile.model_roles.items() if k in {'editor', 'assessor', 'organizer'} and isinstance(v, str)} if profile is not None else {},
+        'evidence_settings': evidence,
+        'rsi': {}, 'stop': {}}
     trial = mapping(execution.get('trial', {}), {'attempts', 'concurrency'}, 'execution.trial')
     if task.get('source') == 'task-set':
         normalized['multi_task'] = {'execution': dict(trial),
             'evaluation': {k: comparison[k] for k in ('aggregation', 'weights') if k in comparison},
             'promotion': {k: comparison[k] for k in ('minimum_gain', 'max_collection_regression') if k in comparison}}
-        if 'sampling' in execution:
-            normalized['multi_task']['sampling'] = execution['sampling']
-        if 'promotion_every_rounds' in execution:
-            normalized['multi_task']['promotion']['every_rounds'] = execution['promotion_every_rounds']
-    elif 'sampling' in execution or 'promotion_every_rounds' in execution or trial:
-        raise ValueError('sampling, attempts and concurrency require a task-set source')
+    elif trial:
+        raise ValueError('attempts and concurrency require a task-set source')
     if comparison and task.get('source') != 'task-set':
         raise ValueError('evaluation.comparison requires a task-set source')
     sources = (*(profile.source_files if profile is not None else ()), *reader.sources.values())

@@ -8,11 +8,10 @@ class ImprovementBoundaryTests(unittest.TestCase):
         from fruitfly_agent.lab.improvement.editor import AgentEditor
         from fruitfly_agent.lab.improvement.assessment.selection import AgentSelector
         from fruitfly_agent.lab.improvement.experience.reflection import AgentReflector
-        from fruitfly_agent.lab.improvement.termination import BoundedStopPolicy
         from fruitfly_agent.lab.improvement.assessment.aggregation import WeightedSum
         for implementation, owner in (
             (AgentEditor, 'editor'), (AgentSelector, 'assessment'),
-            (AgentReflector, 'experience'), (BoundedStopPolicy, 'termination'),
+            (AgentReflector, 'experience'),
             (WeightedSum, 'assessment'),
         ):
             with self.subTest(implementation=implementation.__name__):
@@ -45,8 +44,8 @@ class ImprovementBoundaryTests(unittest.TestCase):
                                   'fruitfly_agent.lab.improvement.editor', 'fruitfly_eval'))]
         self.assertEqual(violations, [])
 
-    def test_shared_round_engine_does_not_select_task_or_backend_implementations(self):
-        path = ROOT / 'fruitfly_agent/improvement/workflow/engine.py'
+    def test_single_stage_controller_does_not_select_task_or_backend_implementations(self):
+        path = ROOT / 'fruitfly_agent/improvement/stages/controller.py'
         forbidden = ('fruitfly_agent.lab.improvement.task_sets',
                      'fruitfly_agent.lab.improvement.execution',
                      'fruitfly_agent.lab.improvement.assessment',
@@ -80,7 +79,7 @@ class Block(importlib.abc.MetaPathFinder):
                                 'fruitfly_agent.providers', 'fruitfly_agent.interactive', 'fruitfly_eval')):
             raise ImportError('forbidden dependency: ' + fullname)
 sys.meta_path.insert(0, Block())
-from fruitfly_agent.improvement.api import ImprovementWorkflow, WorkflowServices
+from fruitfly_agent.improvement.api import ResearchController, StageServices
 '''
         result = subprocess.run([sys.executable, '-B', '-c', source], cwd=ROOT, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)

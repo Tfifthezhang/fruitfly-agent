@@ -16,14 +16,14 @@ from fruitfly_agent.improvement.contracts.task_sets import TaskSetSnapshot
 from fruitfly_agent.lab.improvement.task_sets import MultiTaskSettings
 from fruitfly_agent.improvement.execution.batches import BatchEvaluator
 from fruitfly_agent.lab.improvement.execution import ExecutionContext
-from fruitfly_agent.improvement.workflow.services import WorkflowServices
+from fruitfly_agent.improvement.stages.services import StageServices
 from fruitfly_agent.improvement.contracts.plans import RunPlan
 from fruitfly_agent.improvement.contracts.evaluation import EvaluationBatch
 from fruitfly_agent.lab.improvement.components import ComponentRegistry, TextComponentAdapter
 from fruitfly_agent.lab.base_prompt.target import BasePromptTarget
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
 from fruitfly_agent.lab.improvement.assessment.joint import assess_batch
-from tests.support.pipeline import version
+from tests.support.stages import version
 
 
 class EvalCollectionTests(unittest.IsolatedAsyncioTestCase):
@@ -47,7 +47,7 @@ class EvalCollectionTests(unittest.IsolatedAsyncioTestCase):
             prepared = {'id': 'prepared-fixture', 'tasks': tasks, 'runtime': {'installation': {'files': files}}}
             components = ComponentRegistry((TextComponentAdapter(BasePromptTarget('baseline'), 'system-prompt'),))
             plan = RunPlan('joint-eval', version(), ('base_prompt',))
-            services = WorkflowServices(plan)
+            services = StageServices(plan)
             context = ExecutionContext(root, MemoryArtifacts(), components, None, None, None, plan=plan, services=services)
             context.runtime_config, context.runtime_profile = config, None
             names = []

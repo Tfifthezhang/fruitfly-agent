@@ -1,7 +1,6 @@
 """Registered task-set preparation, separate from source and search algorithms."""
 from fruitfly_agent.improvement.contracts.task_sets import TaskSetSnapshot
 from fruitfly_agent.improvement.contracts.experiments import ExecutionDefinition, MaterialOption, PreparedExecution, ExecutionPorts
-from ..workflow.task_sets import TaskSetProblem
 from .sampling import sample_batch
 from fruitfly_agent.improvement.contracts.plans import TaskSetRunPlan
 from fruitfly_agent.improvement.contracts.versions import content_hash, canonical_json
@@ -45,8 +44,22 @@ def execution_definition(freeze, settings, *, expected, capabilities, roles=froz
              ('Joint aggregation', settings.evaluation.aggregation)), current, bindings)
 
     def build(context, prepared):
+        async def execute_batch(plan, harness, services):
+            from fruitfly_agent.improvement.execution.batches import BatchEvaluator
+            from fruitfly_agent.improvement.contracts.research import ResearchBatch
+            from fruitfly_agent.improvement.contracts.evaluation import EvaluationBatch
+            from ..assessment.joint import assess_batch
+            ctx = replace(context, plan=plan, services=services)
+            evaluator = BatchEvaluator(ctx, prepared.task, prepared.private, settings, aggregate=assess_batch)
+            entries = prepared.task.partition('development')
+            batch = EvaluationBatch(prepared.task.snapshot_id, tuple(e.key for e in entries), attempts=settings.execution.attempts)
+            result = await evaluator.evaluate(plan, harness, batch, fresh=True)
+            return ResearchBatch(tuple(e.task for e in entries),
+                tuple(t.record for t in result.trials if t.record is not None),
+                tuple({'task_key': t.task_key, 'attempt': t.attempt, 'error': t.error,
+                    'measurement': asdict(t.measurement) if t.measurement else None} for t in result.trials))
         return ExecutionPorts(None, retain_experience=False,
-            search_problem=TaskSetProblem(context, prepared.task, prepared.private, settings))
+            execute_batch=execute_batch)
 
     return ExecutionDefinition('task-set', 'Joint task-set execution', 'task-set-execution-v1-' + conditions[7:23], roles,
         capabilities, materials, prepare, build,

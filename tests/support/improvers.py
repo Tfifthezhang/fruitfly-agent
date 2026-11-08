@@ -5,7 +5,7 @@ from queue import Queue
 from uuid import uuid4
 from unittest.mock import Mock
 
-from fruitfly_agent.lab.improvement.api import WorkflowBindings
+from fruitfly_agent.lab.improvement.api import StageBindings
 from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
 from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, EditReason
 from fruitfly_agent.improvement.contracts.components import ComponentFile, HarnessSnapshot
@@ -75,29 +75,3 @@ class OfflineRunner:
     async def execute(self, plan, task, harness):
         return ExecutionRecord('run-' + uuid4().hex, task.task_id, task.material_id,
             harness.snapshot_id, plan.parent.state, plan.conditions_id, 'completed', 'offline result', model_calls=0)
-
-
-def offline_factory(root, target='base_prompt'):
-    _write_models(root)
-    providers = Mock()
-    providers.create.side_effect = lambda *_: FauxProvider()
-    generators = GeneratorRegistry()
-    generators.register('offline-rule', OfflineGenerator)
-    def runner(*args):
-        return OfflineRunner()
-    runner.capabilities = OfflineRunner.capabilities
-    factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=providers,
-        improvement_bindings=WorkflowBindings(generators=generators,
-            runner=runner, 
-            selector=lambda *args: FirstSelector(), reflector=lambda *args: NoReflection(),
-            verifier=SyntheticVerification()))
-    factory.test_request = WorkflowRequest('Complete the synthetic task.', component_ids=(target,),
-        generator_id='offline-rule', scope='persistent')
-    factory.configuration.save()
-    factory.reload_configuration()
-    return factory
-
-
-async def improve(app, factory, direction='improve'):
-    preview = app.workflow_preview(replace(factory.test_request, direction=direction))
-    return await app.improve(direction, preview_token=preview.preview_token)

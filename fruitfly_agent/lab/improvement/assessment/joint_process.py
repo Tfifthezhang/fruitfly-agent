@@ -8,9 +8,9 @@ from .completed import completed_input
 async def choose_seed(service, snapshot, evaluations, incumbent):
     if service is None:
         return incumbent, 'Completed assessment is disabled.'
-    candidates = tuple(e for e in evaluations if e.complete)
+    candidates = tuple(evaluations)
     if len(candidates) < 2:
-        return incumbent, 'Only one complete batch is available.'
+        return incumbent, 'Only one observed batch is available.'
     try:
         tasks = {e.key: e.task for e in snapshot.entries}
         inputs = {e.evaluation_id: tuple(completed_input(tasks[t.task_key], t.record, service.artifacts)
@@ -28,4 +28,4 @@ async def choose_seed(service, snapshot, evaluations, incumbent):
         raise
     except Exception as exc:
         service.services.check()
-        return incumbent, 'Process comparison unavailable; retain objective incumbent: ' + type(exc).__name__
+        return incumbent, 'Process comparison unavailable; retain research incumbent: ' + type(exc).__name__

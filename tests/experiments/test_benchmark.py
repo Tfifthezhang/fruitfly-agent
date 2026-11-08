@@ -56,6 +56,35 @@ class BenchmarkEntryTests(unittest.TestCase):
         self.assertTrue(prepare.call_args.kwargs['tasks_only'])
         self.assertIn('experiments/prepared', str(prepare.call_args.kwargs['host_config_path']))
 
+    def test_research_stage_reports_historical_runtime_differences_without_rejecting(self):
+        request = json.loads(self.request.read_text())
+        request['runtime'].update(config_path='/historical/unavailable.yaml',
+            profile='historical-profile', working_directory='/historical/workspace')
+        self.request.write_text(json.dumps(request))
+        original = self.request.read_bytes()
+        main = self.root / 'research.yaml'
+        main.write_text(yaml.safe_dump({
+            'research': {'id': 'historical-research', 'output_root': 'results'},
+            'baseline': {'config': '.fruitfly/default-config.yaml', 'profile': 'baseline'},
+            'roles': {'executor': 'executor', 'editor': 'future-editor'},
+            'stages': {'eval': {'tasks': {'inline': {'source': 'eval',
+                'request': 'request.json', 'host': 'host.yaml'}}}},
+            'next': {'stage': 'eval'}}))
+        config = load_configuration(self.root, main, stage='eval')
+        self.assertTrue(config.runtime_override)
+        self.assertEqual(config.models, {})
+        benchmark = resolve_benchmark(config)
+        self.assertEqual(benchmark.request.runtime.working_directory, str(self.root))
+        self.assertEqual(benchmark.request.runtime.profile, 'baseline')
+        self.assertTrue(benchmark.runtime_differences)
+        with patch('fruitfly_eval.api.check_evaluation', return_value={'available': True}):
+            prepared = prepare_experiment(config, 'eval', require_prepared=False,
+                require_credentials=False)
+        report = prepared.summary()['benchmark_configuration']
+        self.assertEqual(report['declared']['runtime']['profile'], 'historical-profile')
+        self.assertTrue(report['runtime_differences'])
+        self.assertEqual(self.request.read_bytes(), original)
+
     def test_explicit_request_supports_material_preparation_without_experiment_file(self):
         self.config_path.unlink()
         (self.root / '.fruitfly/eval-request.json').write_bytes(self.request.read_bytes())

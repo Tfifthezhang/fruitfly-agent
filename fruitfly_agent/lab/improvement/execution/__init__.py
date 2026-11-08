@@ -29,9 +29,10 @@ class ExecutionContext:
     system_settings: Any = None
     hooks_factory: Any = None
     delivery_backend: Any = None
-    workflow_settings: Any = None
     evidence_settings: Any = None
     resource_factories: Any = None
+    organizer_factory: Any = None
+    organizer_config: Any = None
 
 
 class ExecutionRegistry:
@@ -57,6 +58,5 @@ class ExecutionRegistry:
 
 def builtin_executions():
     from .tasks import definition
-    from ..improver.registration import definition as improver_definition
     from fruitfly_agent.lab.context_manager.augmentation.memory.improvement import execution_definitions
-    return ExecutionRegistry((definition(), improver_definition(), *execution_definitions()))
+    return ExecutionRegistry((definition(), *execution_definitions()))

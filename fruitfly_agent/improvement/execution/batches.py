@@ -5,10 +5,10 @@ from uuid import uuid4
 from fruitfly_agent.improvement.contracts.evaluation import CandidateEvaluation, TrialResult
 from fruitfly_agent.improvement.contracts.versions import canonical_json
 from fruitfly_agent.improvement.contracts.assessment import AssessmentUnavailable
-from fruitfly_agent.improvement.workflow.services import WorkflowServices
+from fruitfly_agent.improvement.stages.services import StageServices
 from fruitfly_agent.improvement.execution.facts import ensure_facts
 from fruitfly_agent.improvement.execution.scheduler import TaskScheduler
-from ..workflow.operations import run_stage, require_type, validate_assessment_result
+from ..stages.operations import run_stage, require_type, validate_assessment_result
 from ..contracts.execution import ExecutionRecord
 from ..contracts.assessment import Measurement
 from ..contracts.failures import IntegrityError, StageFailure
@@ -75,7 +75,7 @@ class BatchEvaluator:
 
     async def trial(self, plan, harness, entry, attempt, *, assess=True):
         parent = self.context.services
-        services = WorkflowServices(plan, signal=parent.signal,
+        services = StageServices(plan, signal=parent.signal,
             record=lambda event, **fields: parent.record(event, task_key=entry.key, attempt=attempt, **fields))
         services.evidence_builder = parent.evidence_builder
         services.hypotheses = parent.hypotheses

@@ -31,7 +31,7 @@ from .runtime.recovery import (check_session_manifest, discover_resumable_sessio
 from .improvement.candidates import RunCandidates
 from .improvement.startup_versions import RunStartupVersions
 from .improvement.versions import RunVersions
-from .improvement.pipeline import RunComponentJobs
+from .improvement.execution_host import RunExecutionHost
 from .storage.experience import ExperienceStore
 from .storage.retained_state import RetainedStateStore
 from .adapters.retained_state import RetainedStateAdapter
@@ -183,24 +183,25 @@ class RunApplicationFactory:
             activation_guard=self.check_candidate_runtime,
         )
         from dataclasses import fields
-        from fruitfly_agent.lab.improvement.api import WorkflowBindings
-        pipeline_bindings = self.improvement_bindings or WorkflowBindings()
-        self._component_jobs = RunComponentJobs(
+        from fruitfly_agent.lab.improvement.api import StageBindings
+        pipeline_bindings = self.improvement_bindings or StageBindings()
+        self._execution_host = RunExecutionHost(
             workspace=self.cwd, artifacts=self.artifact_store, experience=self._experience_store,
             manifest=self.system_manifest, version=self.system_version,
             config=lambda: self._current_runtime_config, targets=lambda: tuple(self._current_targets.values()),
             tasks=self.task_pack_catalog, publish=self.publish_component_candidate,
             resource_factories=lambda: self._current_components.get('execution-resources', {}),
             **{f.name: getattr(pipeline_bindings, f.name) for f in fields(pipeline_bindings)})
-        from fruitfly_agent.lab.improvement.api import EDITOR_CONFIG, ASSESSOR_CONFIG, EDITOR_INSTRUCTIONS, SETTINGS, SYSTEM_SETTINGS
-        self._component_jobs.defaults = lambda: self._current_components.get(SETTINGS, {})
-        self._component_jobs.editor_configuration = lambda: self._current_components.get(EDITOR_CONFIG, self._current_runtime_config)
-        self._component_jobs.assessor_configuration = lambda: self._current_components.get(ASSESSOR_CONFIG, self._current_runtime_config)
-        self._component_jobs.editor_instructions = lambda: self._current_components.get(EDITOR_INSTRUCTIONS)
-        self._component_jobs.system_settings = lambda: self._current_components.get(SYSTEM_SETTINGS, {})
-        self._component_jobs.prepare_materialization = self.prepare_candidate_materialization
+        from fruitfly_agent.lab.improvement.api import ORGANIZER_CONFIG, EDITOR_CONFIG, ASSESSOR_CONFIG, EDITOR_INSTRUCTIONS, SETTINGS, SYSTEM_SETTINGS
+        self._execution_host.defaults = lambda: self._current_components.get(SETTINGS, {})
+        self._execution_host.editor_configuration = lambda: self._current_components.get(EDITOR_CONFIG, self._current_runtime_config)
+        self._execution_host.organizer_configuration = lambda: self._current_components.get(ORGANIZER_CONFIG, self._current_runtime_config)
+        self._execution_host.assessor_configuration = lambda: self._current_components.get(ASSESSOR_CONFIG, self._current_runtime_config)
+        self._execution_host.editor_instructions = lambda: self._current_components.get(EDITOR_INSTRUCTIONS)
+        self._execution_host.system_settings = lambda: self._current_components.get(SYSTEM_SETTINGS, {})
+        self._execution_host.prepare_materialization = self.prepare_candidate_materialization
         self._improvement_service = RunImprovementService(
-            jobs=self._component_jobs, activity=self.improvement_activity, cancel=self.cancel_improvement,
+            jobs=self._execution_host, activity=self.improvement_activity, cancel=self.cancel_improvement,
             runs=ImprovementRunStore(self.cwd), scope=self.candidate_scope,
         )
         self._candidate_adapter = RunCandidateService(
@@ -274,30 +275,36 @@ class RunApplicationFactory:
                 (self.cwd / self._requested_config_path).resolve() == (self.cwd / ".fruitfly/default-config.yaml").resolve()),
         )
 
+    def research_service(self, research_id, request, *, artifacts=None):
+        """Use started runtime resources through the registered research stage service."""
+        if self._current_runtime_config is None:
+            raise ValueError('start the runtime before constructing execution-backed research')
+        return self._execution_host.research_service(research_id, request, artifacts=artifacts)
+
     def improvement_activity(self):
-        improver = self._improvement_service.running_improver or self._component_jobs.running_improver
+        improver = self._improvement_service.running_improver or self._execution_host.running_improver
         return improver.progress() if isinstance(improver, SearchActivitySource) else None
 
     def improvement_identity(self):
         from fruitfly_agent.lab.improvement.api import SETTINGS
-        return {**self._component_jobs.identity(),
+        return {**self._execution_host.identity(),
                 'configuration': self._current_components.get(SETTINGS, {})}
 
     def restore_improvement_identity(self, identity, key, text):
         from fruitfly_agent.lab.catalog import restore_component_settings
         settings = restore_component_settings(identity.get('system_settings', {}), key, text, self.catalog)
-        return {**identity, **self._component_jobs.identity(system_settings=settings)}
+        return {**identity, **self._execution_host.identity(system_settings=settings)}
 
     def improvement_targets(self):
         return tuple(ImprovementTargetView(c.role, c.component_id, c.label, c.available, c.reason)
-                     for c in self._component_jobs.workflow_configuration().components)
+                     for c in self._execution_host.workflow_configuration().components)
 
     def task_material_target(self, target_id):
         target = self._current_targets.get(target_id)
         return getattr(target, 'task_target_id', target_id)
 
     def cancel_improvement(self) -> bool:
-        improver = self._improvement_service.running_improver or self._component_jobs.running_improver
+        improver = self._improvement_service.running_improver or self._execution_host.running_improver
         return improver.cancel() if improver is not None else False
 
     def _target(self, active_manifest, *, target_id=None):
@@ -319,7 +326,7 @@ class RunApplicationFactory:
         return targets[0]
 
     def improvement_usage(self):
-        return dict(self._component_jobs.observed_usage)
+        return dict(self._execution_host.observed_usage)
 
     def task_pack_catalog(self):
         if self._current_runtime_config is None:
@@ -523,15 +530,7 @@ class RunApplicationFactory:
             prepare_runtime=self._prepare_profile, reload_configuration=self.reload_configuration,
         )
 
-    async def improve(
-        self, active_manifest: Mapping[str, object], direction: str, *, preview_token: str = ""
-    ) -> tuple[CandidateRecord, ...]:
-        return await self._component_jobs.improve(active_manifest, direction, preview_token=preview_token)
 
-    def improvement_preview(self, active_manifest: Mapping[str, object], request):
-        if active_manifest != self.system_manifest():
-            raise ValueError('active runtime changed before preview')
-        return self._component_jobs.preview(request)
 
     def compact_candidates(self):
         return self._candidate_service.compact_candidates()
@@ -565,7 +564,7 @@ class RunApplicationFactory:
     def verified_candidate(self, record, policy_id):
         self._candidate_service.check_scope(record)
         self.check_candidate_version(record)
-        return self._component_jobs.verified_candidate(record, policy_id)
+        return self._execution_host.verified_candidate(record, policy_id)
 
 
 __all__ = ["RunApplicationFactory", "check_session_manifest", "discover_resumable_sessions"]

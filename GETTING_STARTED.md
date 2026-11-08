@@ -130,7 +130,7 @@ other generated destinations must not exist.
 .venv/bin/fruitfly-agent-lab eval prepare
 .venv/bin/fruitfly-agent-lab improvement check
 # Model requests and benchmark execution; charges may apply.
-.venv/bin/fruitfly-agent-lab improvement run --events jsonl
+.venv/bin/fruitfly-agent-lab improvement step --events jsonl
 ```
 
 Plain `init` creates system configuration only. Instruction/file and task-package

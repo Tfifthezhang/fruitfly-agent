@@ -44,8 +44,8 @@ cp -R examples/improvement/ticket_triage .fruitfly/improvement/task-packs/ticket
 | 1 | Prepare the independent default Agent/model files and credentials. |
 | 2 | Select `source: files` and the pack in the task document referenced by experiment `tasks`. |
 | 3 | For persistent verification, set `scope: persistent` in the referenced comparison document and choose suitable independent phase times. |
-| 4 | Run `fruitfly-agent-lab improvement check`, then explicitly `improvement run`; model calls may incur charges. |
-| 5 | Inspect the linked candidate and evidence. `rsi run` performs verified adoption into its experiment copy. |
+| 4 | Run `fruitfly-agent-lab improvement check`, then explicitly `improvement step`; model calls may incur charges. |
+| 5 | Inspect the linked candidate and evidence. Candidate execution does not authorize production adoption. |
 
 Search and live answers may incur model charges. Classification instructions can change general Agent behavior; inspect their scope before adoption.
 

@@ -34,7 +34,7 @@ These checks make no model requests. See [Task packs](../../../fruitfly_agent/la
 
 | Step | Action |
 |---|---|
-| 1 | Register an execution backend through `WorkflowBindings.runner` in an embedding; the CLI supplies no local executor. |
+| 1 | Register an execution backend through `StageBindings.runner` in an embedding; the CLI supplies no local executor. |
 | 2 | Prepare the Agent/model files and credentials, and select this pack in the workflow request. |
 | 3 | For persistent verification, set `scope="persistent"` and suitable independent phase times on the request. |
 | 4 | Preview, then invoke the Application workflow explicitly; model calls may incur charges. |
@@ -57,6 +57,6 @@ Compare baseline and candidate under the same model, materials and policy. Selec
 | Function runner | POSIX restricted Python subset; no imports, files/network/processes, classes, or third-party dependencies |
 | Limits | Per-case time/CPU limits; Linux memory limit; kill/reap on cancellation |
 | Correction | The public task-material API can update training acceptance without a model request. |
-| Evidence | Export explicitly; [retention](../../../fruitfly_agent/lab/improvement/README.md#results-and-retention) protects referenced contents but is not permanent research storage. |
+| Evidence | Export explicitly; [retention](../../../fruitfly_agent/lab/improvement/README.md#select-editable-surfaces) protects referenced contents but is not permanent research storage. |
 
 Do not save holdout cases into train. A restricted function runner is not a general code sandbox. Full contracts belong to [Task packs](../../../fruitfly_agent/lab/improvement/tasks/README.md).

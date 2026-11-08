@@ -1,152 +1,96 @@
-# Write Experiment Configuration
+# Configure Independent Research
 
 [Up: Experiments](README.md)
 
-An experiment chooses a baseline, task material and authorized edits. Its runtime
-conditions have four owners: execution, evidence, evaluation and stopping.
-System H/S/I syntax belongs to the [runtime specification](../runtime_spec/COMPONENTS.md).
+Use one editable research document for historical configuration summaries and the
+explicitly selected next operation. The complete field responsibilities and
+examples belong to the [Improvement developer guide](../lab/improvement/DEVELOPER_GUIDE.md).
+System component syntax belongs to [Runtime specification](../runtime_spec/COMPONENTS.md);
+owner admission belongs to [Catalog](../lab/catalog/CONFIGURATION.md).
 
-```yaml
-baseline: {config: default-config.yaml, profile: baseline}
-tasks: {file: tasks/tb4-smoke.yaml}
-edit:
-  working-memory-reduction:
-    fields: [parameters.instructions.update, parameters.settings.memory_tokens]
-    bounds:
-      parameters.settings.memory_tokens: {minimum: 512, maximum: 4096}
-execution:
-  generator: agent-editor-v1
-  editor_seconds: 1200
-  task_seconds: 3600
-  retain_experience: false
-evidence:
-  read: {default_characters: 12000, max_characters: 24000}
-  catalog: {default_entries: 50, max_entries: 100}
-  search: {default_matches: 20, max_matches: 50, max_characters: 12000}
-evaluation:
-  evaluator_seconds: 1200
-  scope: task
-stopping:
-  max_rounds: 1
-  no_improvement_rounds: 0
-  consecutive_failures: 0
-```
-
-The baseline must enable each granted component and fit its bounds. Paths resolve
-from the declaring file. `tasks` accepts exactly one `file` or `inline` reference.
-Unknown fields and duplicate keys fail; there is one configuration grammar.
-Model roles belong to the referenced system configuration.
-
-| Section | Fields and meaning |
+| Control | Meaning |
 |---|---|
-| `baseline` | `config`, optional `profile` |
-| `tasks` | File instruction/inputs, installed package, I study or task collections |
-| `edit` | Component IDs mapped to `fields` and optional numeric `bounds`; omission discovers supported default-selected surfaces |
-| `execution` | Generator, editor/task seconds, direction and explicit experience retention |
-| `evidence` | Shared read, directory and search limits; validated by the evidence module and injected into both roles |
-| `evaluation` | Evaluator seconds, `scope: task|persistent` and optional task-set `comparison` |
-| `stopping` | `max_rounds` (1–10); no-improvement/failure round limits (0 disables the condition) |
-| `rsi` | Separate generation and independent activation conditions |
+| `research.id`, `output_root`, `branch` | Study storage and branch-local reference lookup |
+| `research.history_entries` | Generated recent-history/reference display length; default 10; full records remain on disk |
+| `baseline.config`, optional `profile` | Original complete system configuration |
+| `roles` | Executor, organizer, assessor and editor aliases from the model catalog |
+| `overrides` | Ordinary profile mapping changes applied to the selected complete system |
+| `optimization.scope` | `defaults` or `explicit` |
+| `optimization.include` | Owner IDs with `fields` and optional numeric `bounds` |
+| `optimization.exclude` | Owner IDs removed from the edit scope |
+| `stages` | Parameters for each separately invoked stage |
+| `evidence` | Shared read/catalog/search response limits |
+| `next` | One stage, named inputs, context, attempt and optional immutable output alias |
+| `observed` | Generated projection; ignored for execution |
 
-## Grant component changes
+Only the selected stage's required inputs and settings are resolved. Config changes
+never rewrite producer snapshots or require rerunning earlier stages. A required
+missing/corrupt artifact prevents that operation, while other outputs remain usable.
 
-| Field category | Examples | Meaning |
-|---|---|---|
-| `parameters.instructions.*` | Base `system`, native tool `description`, Skill loading `usage`, task-memory `update`/`shrink`/`readback`, cross-session `reading`/`extraction`/`consolidation`, editor/evaluator prompts | Model-facing instructions |
-| `parameters.settings.*` | Layered-compaction policy, working-memory sizes, Skill catalog `max_chars`, Bash default timeout | Owner-declared mutable parameters |
-| `parameters.content.*` | Memory/Skill `documents` collections | Retained editable material |
-
-`list_targets` pages a frozen target index. `describe_target` supplies field type,
-meaning, current/default value, unit and constraints. Owner validation and the
-experiment grant both apply. Models, permissions, schemas, source locations,
-coverage bookkeeping, official objectives and private verification data remain
-protected. Host execution conditions have no selectable component or optimization grant.
-
-Tool parameters are available for explicit grants but excluded from automatic
-selection. Native tools expose their complete H descriptions; individual
-schemas, names, implementations and permissions remain protected.
-
-Candidate execution requires a backend declaring the relevant capabilities,
-including configuration materialization for working-memory parameters. The backend
-owns fresh Session/history, resources, hooks, tools and isolation. `files` is a
-material format, not a built-in executor; embeddings must register its runner. H/S and I cannot mix in one study.
-
-## Supply task and comparison documents
-
-Tasks use `source: files`, `eval`, `editor`, `registered` or `task-set`. See the
-[recipes](../../examples/experiments/README.md). Task sets additionally accept
-`execution.trial: {attempts: 1, concurrency: 1}`, `execution.sampling` and
-`execution.promotion_every_rounds`. Candidate concurrency remains one.
-
-`evaluation.comparison` accepts `minimum_gain`, `max_collection_regression`,
-`aggregation: collection-macro|task-macro` and positive collection `weights`.
-Incomplete shared selection coverage cannot produce joint utility. Persistent
-publication requires independent verification and explicit host activation.
-
-### Use an owner-registered learning execution
+## Select the next operation
 
 ```yaml
-tasks:
-  inline:
-    source: registered
-    execution: memory-learning
-    material: memory-study
-    parameters:
-      repetitions: 2
-      min_gain: 0
-      max_regression: 0
-edit:
-  file-memory:
-    fields: [parameters.instructions.extraction]
-evaluation:
-  scope: persistent
+next:
+  stage: propose
+  publish_as: candidate-b
+  inputs:
+    harness: {candidate: candidate-a}
+    batches: [{artifact: candidate-a-results}]
+    evidence: [{artifact: candidate-a-evidence}]
+  context: []
+  attempt: reuse
 ```
 
-`memory-study` is a placeholder installed study ID under
-`.fruitfly/improvement/experiments/<id>/experiment.json`. Its manifest references
-disjoint development and verification task packages compatible with `file-memory`.
-Each package needs training inputs and private validation/holdout checks. See
-[File memory](../lab/context_manager/augmentation/memory/methods/file_memory/README.md).
-The execution owner declares roles, capabilities, material freezing, persistent
-verification policy and runner requirements. The shared source consumes those
-declarations. A study document supplies no task runner: an embedding must inject a
-compatible isolated downstream backend. Check reports this limitation offline;
-explicit execution may call models and does not activate production memory.
+`artifact` selects a branch-local named bundle. `candidate` selects a complete
+candidate; `bundle` names an explicit portable bundle path. `config` is an explicit
+system file for a harness input, including initial fixed execution. No latest,
+score ranking or filesystem ordering selects a research origin.
 
-## Configure evaluation and evidence
+`reuse` permits identical completed-activity reuse; `fresh` requests another
+attempt; `retry-unresolved` explicitly authorizes retry after uncertain work.
+A different result does not overwrite an existing output alias. Full reports remain
+retained even if projection/alias publication needs attention.
 
-One shared evaluator assesses the six default dimensions when applicable: quality,
-reliability, resources, progress, verification and completion. It reads execution
-facts and optional authoritative measurements. Unsupported or uncertain judgments
-retain the incumbent; official scores are not rewritten by model opinion.
-See [Assessment](../lab/improvement/assessment/README.md).
+## Configure stage settings
 
-Evidence navigation has three layers: overview, event directory and originals.
-Literal search and exact source-page citations share one
-[evidence service](../lab/improvement/evidence/README.md). Cross-round indexes link
-candidate hypotheses, receipts, assessments and selections; they do not copy facts
-or grant assurance. Merely listing a source does not establish that it was read.
+| Stage | Parameters |
+|---|---|
+| `import` | `source: eval|batch`, `path`, optional `related_records` |
+| `eval` | `tasks`, `task_seconds`; fixed prepared benchmark execution |
+| `organize` | `timeout_seconds`, `instruction` |
+| `assess` | `timeout_seconds` |
+| `propose` | `timeout_seconds`, `generator`, `direction` |
+| `execute` | `tasks`, `task_seconds`, task-set `attempts` and `concurrency` |
+| `compare` | `timeout_seconds` |
 
-## Fix rounds and stopping
+A task reference uses exactly one `file` or `inline` document. Supported material
+sources are owned by their registered backend. Import/organize/assess/propose/compare
+do not require task containers. Execute/Eval require their backend and preparation.
+All relative paths resolve from the main document.
 
-The fixed flow executes a baseline, generates zero or one candidate each round,
-executes it, compares completed results and continues from the retained incumbent.
-No candidate or a generator stop ends search. The default is one round,
-`agent-editor-v1`, no retained experience. Other registered generators implement
-the same proposal contract. I studies hold candidate I fixed during fresh inner
-H/S searches and compare downstream behavior independently.
+## Inspect configuration before models
 
-## Inspect and retain results
+```bash
+fruitfly-agent-lab improvement show --config experiment.yaml
+fruitfly-agent-lab improvement check --config experiment.yaml
+fruitfly-agent-lab improvement defaults --config experiment.yaml
+```
 
-`improvement check --json` reports resolved values, source hashes, backend
-capabilities and edit bounds without model calls. Candidate bundles live under
-`.fruitfly/improvement/jobs/<job-id>/candidates/<id>/`. Generation preserves source
-component files and daily defaults. Experience retention stages attributed lessons
-for explicit review; it does not automatically change S.
+Show includes the current component configuration table; defaults expands legal
+owner edit fields. Each proposal retains `configuration/optimization.json` and
+`optimization.md` before its Editor Provider is constructed.
 
-Each editor, task and evaluator invocation has an independent positive finite
-time. Nested calls in the same invocation share its clock. Composite studies
-use leaf clocks. Improvement observes requests, tools and reported tokens without
-count quotas. Daily Core execution separately defaults to 512 tool calls per turn.
-Cancellation covers the job; unconfirmed cleanup stops scheduling. Offline fake
-Providers establish covered behavior, not real quality gains.
+Default scope includes enabled supported owners except File memory and the three
+I roles. Memory/Skill libraries remain included. Include grants replace that owner's
+field scope; explicit scope starts empty; exclude removes an owner. Protected and
+mode-dependent fields still use owner validators. Permission to edit a mechanism
+does not enable it or authorize production activation.
+
+## Use fixed execution documents
+
+Fixed Eval and advanced explicit bundle consumers also accept the common
+`baseline`, `tasks`, `edit`, `execution`, `evidence` and `evaluation` sections.
+These project through the same system loader and owner validators. They do not
+provide stopping rounds, automatic promotion or automatic RSI composition.
+A nonempty `edit` explicitly replaces the default scope in this direct projection.
+Use the research main file for normal staged work.

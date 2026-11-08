@@ -35,7 +35,6 @@ def show_summary(summary):
         print(f"Concurrency: {parallel['concurrency']} task executions; 1 candidate")
         print('Joint aggregation: ' + summary['multi_task']['evaluation']['aggregation'])
     if summary['operation'] != 'eval':
-        print(f"Candidate rounds: {request['rounds']}")
         print('Evaluation: shared model evaluator; process dimensions are defined by instructions')
         print('Independent stage times: ' + json.dumps(summary['improvement']['timeouts']))
         print('Improvement request, tool and token usage is observed without count quotas')

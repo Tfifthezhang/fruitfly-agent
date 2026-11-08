@@ -86,7 +86,7 @@ auxiliary token usage without storing prompts or credentials in activity events.
 The terminal shows these stages while preparing the main request.
 
 ```bash
-.venv/bin/python -m unittest tests.lab.test_layered_compaction tests.lab.test_layered_compaction_failures tests.workflows.test_layered_compaction_improvement
+.venv/bin/python -m unittest tests.lab.test_layered_compaction tests.lab.test_layered_compaction_failures tests.run.test_layered_compaction
 ```
 
 Offline fake Providers establish covered execution and isolation, not factual

@@ -62,6 +62,7 @@ class AgentEditor:
         mission += '\nUse list_targets and describe_target to load parameter semantics on demand. Read context/edit-grants.json for this experiment’s scope.'
         mission += ('\nAfter editing return only JSON {"reasons":[{"component_id":"...",'
             '"explanation":"...","expected_effect":"observable change and disconfirming evidence","evidence_ids":["run-id"]}]}. Each changed component needs a supplied run ID; no changes is valid.')
+        mission += '\nUse context/extensions/ for organizer reading guides when present. Discover optimization signals yourself; derived guides are readable summaries, not verified causes or recommendations.'
         mission += '\nUser guidance: ' + request.plan.direction
         mission += '\nPrefer submit_candidate to finish without a prose/JSON handoff. Search large evidence before reading selected pages.'
         mission += '\nRead execution metadata or relevant execution pages before citing a run. Listing paths alone does not supply evidence.'

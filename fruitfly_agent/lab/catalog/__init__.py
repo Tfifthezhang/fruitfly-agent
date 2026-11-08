@@ -75,8 +75,8 @@ __all__ += ['restore_component_settings']
 
 __all__ += ['normalize_configuration_binding']
 
-from .model_roles import ModelRoleRequirement, role_alias
-__all__ += ['ModelRoleRequirement', 'role_alias']
+from .model_roles import ModelRoleRequirement, RoleProvider, role_alias
+__all__ += ['ModelRoleRequirement', 'RoleProvider', 'role_alias']
 from .classification import FeatureNode, OptimizationCoverage
 from .configuration import validate_component_options, configuration_surfaces, reset_artifact_binding
 __all__ += ['FeatureNode', 'OptimizationCoverage', 'validate_component_options', 'configuration_surfaces', 'reset_artifact_binding']
@@ -86,3 +86,6 @@ def builtin_catalog() -> LabCatalog:
     """Construct built-ins only when requested, keeping owner imports acyclic."""
     from .builtins import builtin_catalog as build
     return build()
+
+from .optimization import registry_optimization_table, select_default_components, optimization_grants, optimization_table, render_optimization_table
+__all__ += ['registry_optimization_table', 'select_default_components', 'optimization_grants', 'optimization_table', 'render_optimization_table']

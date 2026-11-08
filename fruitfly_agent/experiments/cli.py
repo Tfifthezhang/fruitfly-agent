@@ -1,4 +1,4 @@
-"""Independent Eval, Improvement and RSI commands with file-based defaults."""
+"""Fixed Eval and independent research stages with file-based defaults."""
 import argparse
 import asyncio
 import json
@@ -32,11 +32,13 @@ def parser():
     initialize.add_argument('--source', choices=('task-set',), default=None)
     initialize.add_argument('--benchmark', help='registered benchmark ID; required for task-set')
     initialize.add_argument('--variant', choices=('smoke', 'no_gpu', 'full'), default='smoke')
-    for operation in ('eval', 'improvement', 'rsi'):
+    for operation in ('eval', 'improvement'):
         group = operations.add_parser(operation)
         _options(group, suppress=True)
         actions = group.add_subparsers(dest='command', required=True)
-        names = ['check', 'run', 'report', 'stop', 'list']
+        names = ['check', 'report', 'list'] if operation == 'improvement' else ['check', 'run', 'report', 'stop', 'list']
+        if operation == 'improvement':
+            names += ['show', 'step', 'defaults', 'import', 'organize', 'assess', 'propose', 'execute', 'compare', 'inspect', 'resume', 'fork']
         if operation == 'eval':
             names += ['prepare', 'catalog']
         if operation == 'rsi':
@@ -44,7 +46,22 @@ def parser():
         for name in names:
             action = actions.add_parser(name)
             _options(action, suppress=True)
-            if name in {'report', 'stop', 'resume'}:
+            if operation == 'improvement' and name in {'import', 'organize', 'assess', 'propose', 'execute', 'compare', 'inspect', 'resume', 'fork'}:
+                action.add_argument('--study')
+                action.add_argument('--output-root', help='portable study output directory')
+                action.add_argument('--apply-to-current', action='store_true', help='derive a candidate on current configuration when executing')
+                action.add_argument('--fresh', action='store_true')
+                action.add_argument('--retry-unresolved', action='store_true',
+                    help='explicitly authorize another attempt after an unresolved intent')
+                if name == 'import':
+                    action.add_argument('--source', choices=('eval', 'batch'))
+                    action.add_argument('path', nargs='?')
+                    action.add_argument('--related-records', help='associated report export directory')
+                elif name == 'fork':
+                    action.add_argument('target')
+                elif name in {'organize', 'assess', 'propose', 'execute', 'compare'}:
+                    action.add_argument('inputs', nargs='*', help='explicit input artifact IDs or bundle paths')
+            elif name in {'report', 'stop', 'resume'}:
                 action.add_argument('run_id')
             if name == 'prepare':
                 action.add_argument('--tasks-only', action='store_true')
@@ -68,6 +85,30 @@ def dispatch(args):
                 print('Preserved: ' + path)
             for step in result['next_steps']:
                 print(step)
+        return 0
+    if ((args.operation == 'improvement' and args.command in {'show', 'step', 'check', 'import', 'organize', 'assess', 'propose', 'execute', 'compare', 'inspect', 'resume', 'list', 'report'})
+            or (args.operation == 'eval' and args.command == 'run')):
+        from fruitfly_agent.runtime_spec.documents import DocumentReader
+        target = Path(args.config).expanduser() if args.config else workspace / '.fruitfly/experiment.yaml'
+        if not target.is_absolute():
+            target = workspace / target
+        is_research = target.is_file() and 'research' in DocumentReader().read(target)
+        if is_research or args.command in {'show', 'step'}:
+            from .operations.step import dispatch as step
+            if args.operation == 'eval':
+                from copy import copy
+                args = copy(args)
+                args.command = 'eval'
+            result = asyncio.run(step(args, workspace))
+            print_json(result)
+            return 3 if args.command == 'check' and result.get('available') is False else 0
+    if args.operation == 'improvement' and args.command == 'defaults':
+        from .operations.research import defaults
+        print_json(defaults(args, workspace))
+        return 0
+    if args.operation == 'improvement' and args.command in {'import', 'organize', 'assess', 'propose', 'execute', 'compare', 'inspect', 'resume', 'fork'}:
+        from .operations.research import dispatch as research
+        print_json(asyncio.run(research(args, workspace)))
         return 0
     records = RunRecords(workspace)
     operation, command = args.operation, args.command
@@ -141,12 +182,6 @@ def dispatch(args):
         if operation == 'eval':
             from .operations.evaluate import run as evaluate
             result = evaluate(prepared, record, records, emit)
-        elif operation == 'improvement':
-            from .operations.improve import run as improve
-            result = asyncio.run(improve(prepared, record, records, emit))
-        else:
-            from .operations.evolve import run as evolve
-            result = asyncio.run(evolve(prepared, record, records, emit, resume=command == 'resume'))
         record['result'] = result
     emit({'type': 'finished', **result})
     if not args.events:

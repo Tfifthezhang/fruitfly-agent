@@ -8,7 +8,7 @@ from fruitfly_agent.improvement.contracts.versions import canonical_json
 from fruitfly_agent.core.extensions.hooks import HookRegistry, HOOK_NAMES
 from fruitfly_agent.core.extensions.operations import OperationSupervisor
 from fruitfly_agent.lab.catalog import LabCatalog
-from fruitfly_agent.lab.improvement.api import WorkflowBindings
+from fruitfly_agent.lab.improvement.api import StageBindings
 from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
 
 
@@ -193,7 +193,7 @@ class ExtensionSet:
             extension_identities=(*base.extension_identities, *self.identities))
 
     def bindings(self, base=None):
-        base = base or WorkflowBindings()
+        base = base or StageBindings()
         generators = GeneratorRegistry()
         if base.generators is not None:
             for item in base.generators.definitions():
@@ -238,7 +238,7 @@ class ExtensionSet:
                         result = handler(value, scope)
                         return await result if inspect.isawaitable(result) else result
                     context.services.hooks.on(event, observe)
-        from fruitfly_agent.lab.improvement.workflow.mechanisms import extension_spec
+        from fruitfly_agent.lab.improvement.stages.extensions import extension_spec
         hooks.configuration = {'extensions': list(self.identities), 'host': extension_spec(previous)}
         return replace(base, generators=generators, hooks=hooks, components=components)
 

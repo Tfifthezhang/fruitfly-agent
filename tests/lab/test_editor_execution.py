@@ -4,18 +4,18 @@ from dataclasses import replace
 import unittest
 from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.lab.improvement.evidence.query import search_text
-from fruitfly_agent.improvement.workflow.services import WorkflowServices
+from fruitfly_agent.improvement.stages.services import StageServices
 from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
 from fruitfly_agent.improvement.contracts.editing import ProposalRequest
 from fruitfly_agent.lab.improvement.editor import AgentEditor
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
-from tests.support.pipeline import build_pipeline
+from tests.support.stages import proposal_fixture
 from tests.support.faux_provider import FauxProvider
 
 
 class ReliabilityTests(unittest.IsolatedAsyncioTestCase):
     async def test_submission_tool_finishes_without_an_extra_model_request(self):
-        flow, plan, baseline, runner = build_pipeline()
+        flow, plan, baseline, runner = proposal_fixture()
         task = TaskMaterial('task', 'Work')
         record = await runner.execute(plan, task, baseline)
         provider = FauxProvider()
@@ -24,14 +24,14 @@ class ReliabilityTests(unittest.IsolatedAsyncioTestCase):
         provider.respond_tool_call('submit_candidate', {'reasons': [{'component_id': 'prompt',
             'explanation': 'Observed missing procedure', 'evidence_ids': [record.run_id], 'expected_effect':'The proposed behavior appears in the subsequent execution.'}]})
         editor = AgentEditor(AgentLoopConfig(provider=provider), MemoryArtifacts(), flow.components)
-        services = WorkflowServices(plan)
+        services = StageServices(plan)
         candidate = await editor.edit('propose', ProposalRequest(plan, task, baseline, (record,), 'invariant', 0), services)
         self.assertEqual(candidate.changed_ids, ('prompt',))
         self.assertEqual(len(provider.calls), 3)
         self.assertFalse(provider.script)
 
     async def test_format_repair_keeps_draft_and_removes_large_evidence(self):
-        flow, plan, baseline, runner = build_pipeline()
+        flow, plan, baseline, runner = proposal_fixture()
         task = TaskMaterial('task', 'Work')
         record = await runner.execute(plan, task, baseline)
         provider = FauxProvider()
@@ -42,7 +42,7 @@ class ReliabilityTests(unittest.IsolatedAsyncioTestCase):
         provider.respond_tool_call('submit_candidate', {'reasons': [{'component_id': 'prompt',
             'explanation': 'Observed missing procedure', 'evidence_ids': [record.run_id], 'expected_effect':'The proposed behavior appears in the subsequent execution.'}]})
         editor = AgentEditor(AgentLoopConfig(provider=provider), MemoryArtifacts(), flow.components)
-        services = WorkflowServices(plan)
+        services = StageServices(plan)
         candidate = await editor.edit('propose', ProposalRequest(plan, task, baseline, (record,), 'invariant', 0), services)
         self.assertEqual(candidate.harness.component('prompt').files[0].text, 'candidate')
         messages = provider.calls[-1]['messages']
@@ -63,10 +63,10 @@ class ReliabilityTests(unittest.IsolatedAsyncioTestCase):
     async def test_interrupted_registered_execution_keeps_written_files_and_partial_facts(self):
         from tests.support.task_execution import TaskRunnerFixture
         from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone
-        from fruitfly_agent.improvement.workflow.operations import run_stage
+        from fruitfly_agent.improvement.stages.operations import run_stage
         from fruitfly_agent.improvement.contracts.failures import StageFailure
         from fruitfly_agent.improvement.execution.facts import read_facts
-        flow, plan, baseline, _ = build_pipeline()
+        flow, plan, baseline, _ = proposal_fixture()
         provider = FauxProvider()
         provider.respond_tool_call('write', {'path': 'partial.txt', 'content': 'work survived'})
         def blocking(view, *, signal=None):
@@ -77,7 +77,7 @@ class ReliabilityTests(unittest.IsolatedAsyncioTestCase):
         provider.script.append(blocking)
         artifacts = MemoryArtifacts()
         plan = replace(plan, timeouts={'editor_seconds':.02,'execution_seconds':.02,'evaluator_seconds':.02})
-        services = WorkflowServices(plan)
+        services = StageServices(plan)
         runner = TaskRunnerFixture(AgentLoopConfig(provider=provider), flow.components, artifacts, services)
         with self.assertRaises(StageFailure) as caught:
             await run_stage(services, 'execute', runner.execute(plan, TaskMaterial('task', 'Work'), baseline))

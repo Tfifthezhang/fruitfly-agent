@@ -45,8 +45,13 @@ def build_workspace(request, artifacts, *, record=None):
         'development_tasks': sorted(allowed)}).encode()
     for index, candidate in enumerate(request.history):
         files[f'context/candidates/{index}.json'] = canonical_json(asdict(candidate)).encode()
-    files['INDEX.json'] = canonical_json({'files': sorted((*files, *references)),
+    files['INDEX.json'] = canonical_json({'files': ['context/task-set.json', 'context/evaluations.json',
+        'context/edit-grants.json', *sorted(p for p in references if p.startswith('context/extensions/'))],
+        'reference_count': len(references), 'task_count': len(request.tasks),
+        'navigation': 'Use catalog with context/tasks/<task-id>/ prefixes; originals are paged, not repeated in this directory.',
         'writable_components': request.plan.component_ids}).encode()
+    references.update({path: artifacts.put(data) for path, data in files.items()})
+    files = {}
     return ReferenceWorkspace(artifacts=artifacts, references=references, baseline=request.baseline,
         files=files, writable_ids=request.plan.component_ids, record=record,
         access=EvidenceAccess((r.run_id for r in request.records), record=record))

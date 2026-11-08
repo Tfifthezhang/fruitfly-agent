@@ -1,0 +1,15 @@
+# Offline scope preview:
+# .venv/bin/python -m fruitfly_agent.experiments improvement defaults --config examples/experiments/improvement-defaults.example.yaml
+# Independent proposal accepts this file with batch/evidence bundle inputs.
+# Proposal calls models and requires credentials. No tasks are executed by proposal.
+baseline:
+  config: ../configuration/default-config.example.yaml
+  profile: baseline
+# Omitted edit selects all enabled owner-default components.
+# An explicit edit map replaces this scope; it does not merge with it.
+execution:
+  generator: agent-editor-v1
+  organizer_seconds: 1200
+  editor_seconds: 1200
+evaluation:
+  scope: task

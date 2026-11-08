@@ -195,7 +195,7 @@ class InteractiveExtensibilityTests(unittest.TestCase):
     def test_helpers_do_not_depend_on_application_or_foreign_private_state(self):
         interactive = ROOT / "fruitfly_agent" / "interactive"
         features = interactive / "terminal" / "features"
-        paths = [interactive / "application" / "jobs.py", interactive / "session" / "materials.py",
+        paths = [interactive / "session" / "materials.py",
                  features / "configuration" / "model_setup.py", features / "assembly.py",
                  *sorted(features.glob("*/command.py"))]
         violations = []

@@ -49,7 +49,7 @@ def component_scope(context, material_id, components):
 
 def prepare(context, request):
     if context.runner_factory is None:
-        raise ValueError('task execution requires an explicitly registered TaskRunner; use an Eval source or inject WorkflowBindings.runner')
+        raise ValueError('task execution requires an explicitly registered TaskRunner; use an Eval source or inject StageBindings.runner')
     parameters = definition().normalize(request.parameters)
     if request.material_id:
         if parameters['delivery_manifest']:

@@ -10,7 +10,6 @@ from fruitfly_agent.core.data_model import AssistantMessage, TextBlock
 from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone
 from fruitfly_agent.experiments.configuration import load_configuration
 from fruitfly_agent.experiments.composition import prepare_experiment, application_factory
-from fruitfly_agent.experiments.operations.improve import run
 from fruitfly_agent.experiments.records import RunRecords
 from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
 from tests.support.experiments import workspace, Rule
@@ -48,40 +47,3 @@ class ProcessConfigurationTests(unittest.IsolatedAsyncioTestCase):
         new = prepare_experiment(load_configuration(self.root), 'improvement')
         self.assertNotEqual(old.summary(), new.summary())
         self.assertEqual(new.summary()['evidence_settings']['read']['default_characters'], 8000)
-
-    async def test_cli_composition_drives_all_zero_search_with_a_separate_assessor_and_isolated_defaults(self):
-        pack = package()
-        install(self.root, pack)
-        workspace(self.root, task={'source': 'files', 'pack': pack['id']},
-            models={'assessor': 'assessor'}, improvement={'rounds': 2})
-        provider = FauxProvider()
-        def answer(view, signal=None):
-            if view.model == 'offline-assessor':
-                from tests.support.model_evaluation import judgment
-                text = judgment(view).text
-            else:
-                text = 'wrong'
-            async def stream(): yield StreamDone(AssistantMessage(content=[TextBlock(text)], stop_reason='stop'))
-            return AssistantMessageEventStream(stream())
-        provider.script = [answer] * 16
-        registry = Mock(); registry.create.return_value = provider
-        prepared = prepare_experiment(load_configuration(self.root), 'improvement')
-        records = RunRecords(self.root)
-        record = records.create('improvement', prepared.summary())
-        original = prepared.config_path.read_bytes()
-        def build(prepared, runtime_path):
-            initial = application_factory(prepared, runtime_path, provider_registry=registry)
-            from tests.support.task_execution import TaskApplicationFixture
-            generators = GeneratorRegistry(); generators.register('agent-editor-v1', Rule)
-            return TaskApplicationFixture(cwd=self.root, environment=prepared.environment, config_path=str(runtime_path),
-                provider_registry=registry, improvement_bindings=replace(initial.improvement_bindings, generators=generators))
-        with patch('fruitfly_agent.experiments.operations.improve.application_factory', side_effect=build):
-            result = await run(prepared, record, records, lambda event: None)
-        self.assertEqual(result['status'], 'completed', result)
-        self.assertEqual(result['usage'], {'model': 8, 'execution': 3})
-        self.assertEqual(prepared.config_path.read_bytes(), original)
-        outcome = json.loads(next((self.root / '.fruitfly/improvement/jobs').glob('*/result.json')).read_text())
-        self.assertEqual(outcome['selected']['run_id'], outcome['records'][-1]['run_id'])
-        self.assertNotIn('exploration', outcome)
-        self.assertNotIn('Exploration seed', result['links'])
-        self.assertEqual(sum(c['model'] == 'offline-assessor' for c in provider.calls), 5)

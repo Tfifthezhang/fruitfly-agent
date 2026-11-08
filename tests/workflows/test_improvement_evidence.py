@@ -11,7 +11,7 @@ from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.improvement.contracts.editing import ProposalRequest, TaskSetProposalRequest
 from fruitfly_agent.improvement.contracts.task_sets import TaskEntry, TaskSetSnapshot, ScoreSpec
 from fruitfly_agent.improvement.contracts.evaluation import EvaluationBatch, CandidateEvaluation, TrialResult, JointAssessment
-from fruitfly_agent.improvement.workflow.services import WorkflowServices
+from fruitfly_agent.improvement.stages.services import StageServices
 from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
 from fruitfly_agent.lab.improvement.evidence import EvidenceWorkspace, MemoryArtifacts
 from fruitfly_agent.lab.improvement.evidence.catalog import WorkspaceEvidence
@@ -19,7 +19,7 @@ from fruitfly_agent.lab.improvement.evidence.indexing import organize_evidence
 from fruitfly_agent.lab.improvement.assessment.evaluator import ModelEvaluator
 from fruitfly_eval.improvement.evidence import collect, answer_evidence
 from fruitfly_eval.improvement.facts import attach_benchmark_facts
-from tests.support.pipeline import build_pipeline, Runner
+from tests.support.stages import proposal_fixture, Runner
 
 
 class ImprovementEvidenceTests(unittest.IsolatedAsyncioTestCase):
@@ -33,12 +33,12 @@ class ImprovementEvidenceTests(unittest.IsolatedAsyncioTestCase):
             outputs = agent.parent / 'artifacts'; outputs.mkdir()
             (outputs / 'answer.txt').write_text('actual delivered bytes')
             artifacts = MemoryArtifacts(); task = TaskMaterial('task', 'Check output')
-            _, plan, baseline, _ = build_pipeline()
+            _, plan, baseline, _ = proposal_fixture()
             resources, calls = collect(root, artifacts)
             record = await Runner().execute(plan, task, baseline)
             record = replace(record, artifacts=resources, model_calls=calls,
                 output=answer_evidence(resources, artifacts)['text'])
-            services = WorkflowServices(plan)
+            services = StageServices(plan)
             self.addAsyncCleanup(services.close)
             services.evidence_builder = organize_evidence
             record = services.prepare_evidence(task, attach_benchmark_facts(record, root, artifacts), artifacts)
@@ -76,11 +76,13 @@ class ImprovementEvidenceTests(unittest.IsolatedAsyncioTestCase):
                 with self.assertRaises(ValueError):
                     workspace.write(original, 'changed')
                 citation = page['citation_id']
-                return json.dumps({'evaluations': [{'run_id': record.run_id, 'dimensions': [{
+                response = json.dumps({'evaluations': [{'run_id': record.run_id, 'dimensions': [{
                     'dimension': 'output', 'criterion': 'retained content', 'judgment': 'met',
                     'reason': 'actual bytes read', 'uncertainty': 'no correctness oracle', 'evidence_ids': [citation]}],
                     'findings': []}], 'choice': None, 'reason': 'read retained output',
                     'uncertainty': 'correctness not established', 'evidence_ids': [citation]})
+                kwargs['validate_final'](response)
+                return response
             evaluator.session.session = inspect
             result, _ = await evaluator.evaluate(task, (record,), services)
             self.assertEqual(result['evaluations'][0]['run_id'], record.run_id)

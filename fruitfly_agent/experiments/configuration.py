@@ -30,9 +30,9 @@ class ExperimentConfig:
     stop: dict[str, Any] = field(default_factory=dict)
     sources: dict[str, str] = field(default_factory=dict)
     multi_task: MultiTaskSettings = field(default_factory=MultiTaskSettings)
-    workflow_settings: dict = field(default_factory=dict)
     evidence_settings: dict = field(default_factory=dict)
     source_files: tuple = field(default=(), compare=False, repr=False)
+    runtime_override: bool = False
 
     def resolve(self, value: str) -> Path:
         if not isinstance(value, str) or not value.strip():
@@ -46,10 +46,11 @@ class ExperimentConfig:
             'task': self.task, 'runtime': self.runtime, 'models': self.models,
             'improvement': asdict(self.improvement), 'rsi': asdict(self.rsi),
             'stop': self.stop, 'sources': self.sources,
-            'multi_task': asdict(self.multi_task), 'workflow_settings': self.workflow_settings, 'evidence_settings': self.evidence_settings}
+            'multi_task': asdict(self.multi_task), 'evidence_settings': self.evidence_settings,
+            'runtime_override': self.runtime_override}
 
 
-def load_configuration(workspace, path=None, *, overrides=None, material_only=False):
+def load_configuration(workspace, path=None, *, overrides=None, material_only=False, stage=None):
     workspace = Path(workspace).resolve()
     target = Path(path).expanduser() if path is not None else workspace / '.fruitfly/experiment.yaml'
     if not target.is_absolute():
@@ -65,8 +66,29 @@ def load_configuration(workspace, path=None, *, overrides=None, material_only=Fa
             'tasks': {'inline': overrides['task']}} 
     else:
         raise ValueError('experiment configuration not found: ' + str(target) + '; initialize a workspace first')
+    research_document = None
+    if 'research' in document:
+        from fruitfly_agent.run.improvement.configuration import ResearchDocument
+        research_document = ResearchDocument(target)
+        document = research_document.experiment(stage or research_document.next['stage'])
+        selected_stage = stage or research_document.next['stage']
+        if selected_stage in {'propose', 'execute'} and research_document.next.get('inputs', {}).get('harness'):
+            from fruitfly_agent.run.improvement.context import ResearchContext
+            resolved = ResearchContext.resolve(target, selected_stage).inputs
+            selected = resolved.get('harness_configuration', resolved['harness'])
+            if not selected.endswith(('.yaml', '.yml')):
+                raise ValueError('proposal harness must select a candidate configuration')
+            document['baseline'] = {'config': selected}
+        from fruitfly_agent.run.improvement.configuration.resolution import derive_configuration
+        document['baseline'] = derive_configuration(research_document, document['baseline'], workspace)
     from .comparison import normalize_experiment
-    raw, references, _ = normalize_experiment(document, target, material_only=material_only)
+    raw, references, _ = normalize_experiment(document, target, material_only=material_only, stage=stage)
+    if research_document is not None:
+        raw['models'] = {**raw.get('models', {}), **research_document.raw.get('roles', {})}
+        if selected_stage in {'execute', 'eval'}:
+            # Executor selection is projected into the complete system profile;
+            # future auxiliary-role selections do not constrain task execution.
+            raw['models'] = {}
     source_files = (*reader.sources.values(), *references)
     sources = {section + '.' + name: str(target) for section, value in raw.items()
         if isinstance(value, dict) for name in value}
@@ -74,7 +96,7 @@ def load_configuration(workspace, path=None, *, overrides=None, material_only=Fa
         raw[section] = {**raw.get(section, {}), **values}
         sources.update({section + '.' + name: 'command line' for name in values})
     runtime = mapping(raw.get('runtime', {}), {'config', 'profile'}, 'runtime')
-    models = mapping(raw.get('models', {}), {'executor', 'editor', 'assessor'}, 'models')
+    models = mapping(raw.get('models', {}), {'executor', 'editor', 'assessor', 'organizer'}, 'models')
     if any(not isinstance(v, str) or not v.strip() for v in (*runtime.values(), *models.values())):
         raise ValueError('runtime and model selections must be nonempty strings')
     task = raw.get('task', {})
@@ -86,4 +108,4 @@ def load_configuration(workspace, path=None, *, overrides=None, material_only=Fa
             raw.get('improvement', {}), 'improvement'),
         settings(EvolutionSettings, raw.get('rsi', {}), 'rsi'), stop, sources,
         MultiTaskSettings.from_dict(raw.get('multi_task', {})),
-        raw.get('workflow_settings', {}), raw.get('evidence_settings', {}), source_files)
+        raw.get('evidence_settings', {}), source_files, runtime_override=research_document is not None)

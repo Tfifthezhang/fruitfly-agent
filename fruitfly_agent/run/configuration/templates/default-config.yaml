@@ -7,6 +7,8 @@ profiles:
         executor: deepseek-flash-openai
         editor:
           inherit: executor
+        organizer:
+          inherit: executor
         assessor:
           inherit: executor
         working_memory:
@@ -42,6 +44,8 @@ profiles:
       skill-library:
         default: true
     I:
+      improvement-organizer:
+        default: true
       improvement-editor:
         default: true
       improvement-evaluator:

@@ -12,7 +12,7 @@ from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
 from fruitfly_agent.improvement.contracts.plans import RunPlan
 from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
 from fruitfly_agent.improvement.contracts.versions import SystemVersion, content_hash
-from fruitfly_agent.improvement.workflow.services import WorkflowServices
+from fruitfly_agent.improvement.stages.services import StageServices
 from fruitfly_agent.lab.catalog import AssemblyContext, MechanismSelection, ProviderBinding, assemble_lab, builtin_catalog
 from fruitfly_agent.lab.improvement.components import component_registry
 from fruitfly_agent.lab.context_manager.augmentation.memory.methods.file_memory.trials import MemoryEpisodeExecutor, definition
@@ -34,7 +34,7 @@ class MemoryComparisonTests(unittest.IsolatedAsyncioTestCase):
         baseline = registry.snapshot()
         parent = SystemVersion(*(content_hash(v) for v in ('H', 'I', 'S')))
         plan = RunPlan('study', parent, ('file-memory',))
-        services = WorkflowServices(plan)
+        services = StageServices(plan)
         executions = []
         class Runner:
             async def execute(self, inner_plan, task, harness):

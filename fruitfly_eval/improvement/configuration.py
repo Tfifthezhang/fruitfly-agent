@@ -17,6 +17,7 @@ class BenchmarkSettings:
     host: HostConfig
     generated_host: Path
     host_bytes: bytes
+    runtime_differences: tuple = ()
 
     def stage_host(self):
         self.generated_host.parent.mkdir(parents=True, exist_ok=True)
@@ -39,11 +40,17 @@ def resolve_benchmark(config):
         raise ValueError('unknown Eval task settings')
     request_path = config.resolve(task['request']) if 'request' in task else config.workspace / '.fruitfly/eval-request.json'
     request = EvaluationRequest.read(request_path)
+    override = getattr(config, 'runtime_override', False)
     workspace = Path(request.runtime.working_directory)
     workspace = (workspace if workspace.is_absolute() else config.workspace / workspace).resolve()
-    if workspace != config.workspace:
+    if workspace != config.workspace and not override:
         raise ValueError('Eval request and experiment must use the same workspace; select it with --cwd')
-    baseline, profile = runtime_reference(workspace, request.runtime.config_path, request.runtime.profile,
+    declared = {'config_path': request.runtime.config_path, 'profile': request.runtime.profile,
+        'working_directory': request.runtime.working_directory}
+    if override:
+        workspace = config.workspace
+    baseline, profile = runtime_reference(workspace,
+        None if override else request.runtime.config_path, None if override else request.runtime.profile,
         inherited_path=config.resolve(config.runtime['config']) if 'config' in config.runtime else None,
         inherited_profile=config.runtime.get('profile'))
     request = replace(request, runtime=replace(request.runtime, working_directory=str(workspace),
@@ -66,4 +73,9 @@ def resolve_benchmark(config):
     data = yaml.safe_dump(payload, sort_keys=False).encode()
     identity = hashlib.sha256(data).hexdigest()
     generated = workspace / '.fruitfly/experiments/prepared' / identity / 'host.yaml'
-    return BenchmarkSettings(request, request_path, host, generated, data)
+    differences = ()
+    if override:
+        from fruitfly_agent.improvement.contracts.configuration import configuration_differences
+        differences = tuple(configuration_differences(declared,
+            {'config_path': str(baseline), 'profile': profile, 'working_directory': str(workspace)}))
+    return BenchmarkSettings(request, request_path, host, generated, data, differences)

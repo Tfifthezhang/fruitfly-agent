@@ -157,8 +157,8 @@ cp -R examples/improvement/python_functions .fruitfly/improvement/task-packs/pyt
 | 2 | Reference a task document with `source: files` and `pack` set to the installed package ID. |
 | 3 | Use experiment `edit` grants for registered component fields; default feedback uses the pack measurement. |
 | 4 | Set `scope: persistent` in the referenced comparison document, and configure suitable independent phase times. |
-| 5 | Run `fruitfly-agent-lab improvement check`, then explicitly `improvement run`; model requests may incur charges. |
-| 6 | Inspect the result and evidence; `rsi run` performs verified adoption into its experiment configuration copy. |
+| 5 | Run `fruitfly-agent-lab improvement check`, then explicitly `improvement step`; model requests may incur charges. |
+| 6 | Inspect the result and evidence; Candidate execution does not authorize production adoption. |
 
 Selecting a pack changes one job, not the YAML or runtime manifest. Experiment requests select instruction text and explicit input paths. Search only changes target text, not Python task outputs. See [Improvement](../README.md) for timing, results, and retention.
 

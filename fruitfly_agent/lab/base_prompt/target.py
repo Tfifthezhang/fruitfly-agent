@@ -21,6 +21,14 @@ class BasePromptTarget:
     def validate(self, text):
         validate_text(text)
 
+    def validate_options(self, options):
+        if options != {'editable_fields': ['parameters.instructions.system']} :
+            raise ValueError('base prompt grants require instructions.system')
+
+    def validate_change(self, text, options):
+        self.validate_options(options)
+        self.validate(text)
+
     def prepare_trial(self, config, text):
         self.validate(text)
         return replace(config, system_prompt=text)
@@ -38,7 +46,7 @@ def configuration_surface():
         return next((p.prompt_id for p in builtins() if p.text==parameters['instructions']['system']),None)
     def options(fields,bounds):
         if fields!=['parameters.instructions.system'] or bounds:raise ValueError('base prompt grants require instructions.system')
-        return {}
+        return {'editable_fields': fields}
     return ConfigurationSurface('base_prompt','H','prompt','',normalize,
         encode=lambda p:p['instructions']['system'], decode=lambda text:{'instructions':{'system':text}},
         edit_options=options,reference=reference, default_resource=(__package__, 'defaults.yaml'), standalone=True,

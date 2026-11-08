@@ -12,4 +12,4 @@ Catalog declares available owners; runners declare capabilities; Run owns storag
 and activation. Each grant is validated before work and against every candidate.
 
 Offline checks: `tests.lab.test_harness_inventory`,
-`tests.lab.test_parameter_candidates`, `tests.workflows.test_decoupling`.
+`tests.lab.test_parameter_candidates`, `tests.run.test_host_services`.

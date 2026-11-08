@@ -135,7 +135,7 @@ exact bindings. Secret values never belong in either representation.
 The editor's detached workspace uses `parameters.yaml` with `id`, `role`,
 `implementation` and typed `parameters`. Identity, role, implementation, model
 bindings and protected fields cannot be changed. String and numeric fields use
-the same owner adapter and grant paths. [Experiment field grants](../experiments/CONFIGURATION.md#grant-component-changes)
+the same owner adapter and grant paths. [Experiment field grants](../experiments/CONFIGURATION.md#inspect-configuration-before-models)
 authorize changes; the owner codec derives the existing execution binding.
 A file editing capability alone does not grant execution or adoption.
 

@@ -63,7 +63,7 @@ messages/artifacts through ordinary `read`. It adds no historical tools. See
 | [config.py](config.py), [registration.py](registration.py), [improvement.py](improvement.py) | Strict defaults, role admission and H grants |
 
 Offline: `tests.lab.test_working_memory`, `tests.lab.test_reduction_safety` and
-`tests.workflows.test_working_memory_improvement`. These checks establish control
+`tests.lab.test_working_memory`. These checks establish control
 and integrity behavior, not the quality of generated memory.
 
 ## Maintain one parameter definition

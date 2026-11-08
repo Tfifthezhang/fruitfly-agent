@@ -23,8 +23,8 @@ class ExecutionRegistrationTests(unittest.IsolatedAsyncioTestCase):
         from fruitfly_agent.experiments.task_sets import registry_for
         with self.assertRaisesRegex(ValueError, 'unknown task-set source'):
             registry_for(({'source': 'files'},)).get('files')
-        options = registry.get('improver-comparison').materials(SimpleNamespace(runner_factory=None))
-        self.assertTrue(options[0].error)
+        with self.assertRaisesRegex(ValueError, 'unknown execution'):
+            registry.get('improver-comparison')
 
     async def test_ordinary_agent_starts_but_improvement_without_runner_makes_no_model_request(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -36,8 +36,7 @@ class ExecutionRegistrationTests(unittest.IsolatedAsyncioTestCase):
             app = AgentApplication(RunApplicationFactory(cwd=root, environment={}, provider_registry=providers))
             await app.start()
             try:
-                with self.assertRaisesRegex(ValueError, 'explicitly registered TaskRunner'):
-                    app.workflow_preview(WorkflowRequest('Do a task.', component_ids=('base_prompt',)))
+                self.assertFalse(hasattr(app, 'start_improvement'))
                 self.assertEqual(provider.calls, [])
                 provider.respond_text('ordinary chat still works')
                 await app.submit('Hello')

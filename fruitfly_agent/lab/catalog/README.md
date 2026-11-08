@@ -21,7 +21,7 @@ implementation through the shared H/S/I configuration protocol. See
 
 The [offline example](../../../examples/extensions/README.md) completes this path. The CLI does not scan Python packages for plugins.
 
-Improvement registers editor/evaluator surfaces through an internal owner, with no daily mechanism switch. Per-job generator factories and stage bindings use the [public Improvement API](../improvement/README.md#extend-search), independently of selectable runtime mechanisms.
+Improvement registers editor/evaluator surfaces through an internal owner, with no daily mechanism switch. Per-job generator factories and stage bindings use the [public Improvement API](../improvement/README.md#extend-a-stage), independently of selectable runtime mechanisms.
 
 ## Files
 
@@ -240,7 +240,7 @@ Retained memory and Skill libraries, their frozen text resources and local knowl
 
 ## Declare per-job improvement support
 
-Per-job candidate generators register through `GeneratorRegistry`; stage factories are injected with `WorkflowBindings`. Catalog owns mechanism construction and object adapters, without a parallel algorithm selector or method binder.
+Per-job candidate generators register through `GeneratorRegistry`; stage factories are injected with `StageBindings`. Catalog owns mechanism construction and object adapters, without a parallel algorithm selector or method binder.
 ## Resolve one harness inventory
 
 `resolve_harness(profile, catalog)` reads enabled selections and owner declarations
@@ -284,3 +284,17 @@ preserves ordinary references and freezes complete execution parameters.
 [Configuration admission](CONFIGURATION.md#register-one-default-parameter-document)
 defines the registration contract. Defaults are read offline and never imply
 permission to optimize a field.
+
+`research.configuration_targets` prepares explicitly granted surface/parameter targets without starting a task environment; owner validation and ordinary parameter codecs still apply.
+
+Research target construction freezes the complete available owner set, including
+unselected retained and parameter surfaces. Explicit grants constrain edits rather
+than truncate the configuration. Public owner factories receive registered defaults,
+retained bindings and model parameters. Shared materialization exports candidates
+without starting task environments.
+
+[optimization.py](optimization.py) owns shared default selection, current-mode
+owner grant expansion and candidate configuration tables. Consumers do not encode
+component-name exclusions. Owner declarations default native tools on, File memory
+and I roles off; explicit experiment scopes retain precedence. Research parameter
+targets use the same owner-admitted fields as normal runtime targets.

@@ -35,5 +35,5 @@ Prompt candidates use the ordinary H target and retain exact text/hash identity.
 Run verifies prompt contents and fixes the hash in the manifest. Tool/Skill catalog and information augmentation is outside the base text hash. [Improvement](../improvement/README.md) searches candidates; [Run](../../run/README.md) stores them; Application manages activation. This module does not search or adopt autonomously. Lookup reads the installed owner resource, without network or model requests. There are no module-specific environment variables.
 
 ```bash
-.venv/bin/python -m unittest tests.lab.test_base_prompt tests.run.test_base_prompt_flow tests.workflows.test_decoupling
+.venv/bin/python -m unittest tests.lab.test_base_prompt tests.experiments.test_stage_cli tests.run.test_host_services
 ```

@@ -7,10 +7,8 @@ from fruitfly_agent.improvement.contracts.plans import StageTimeouts
 class ImprovementSettings:
     components: tuple[str, ...] = ()
     generator: str = 'agent-editor-v1'
-    rounds: int = 1
     scope: str = 'task'
     direction: str = ''
-    retain_experience: bool = False
     timeouts: StageTimeouts = field(default_factory=StageTimeouts)
     component_options: dict = field(default_factory=dict)
 
@@ -22,16 +20,12 @@ class ImprovementSettings:
             raise ValueError('components must contain distinct registered component IDs')
         if self.scope not in {'task', 'persistent'}:
             raise ValueError('invalid feedback or effect scope')
-        for name, maximum in (('rounds', 10),):
-            value = getattr(self, name)
-            if type(value) is not int or value < 1 or maximum is not None and value > maximum:
-                raise ValueError(name + ' exceeds its positive allocation bound')
         if isinstance(self.timeouts, dict):
             object.__setattr__(self, 'timeouts', StageTimeouts(**self.timeouts))
         if not isinstance(self.timeouts, StageTimeouts):
             raise ValueError('improvement requires stage times')
-        if type(self.retain_experience) is not bool or not isinstance(self.direction, str) or len(self.direction) > 2000:
-            raise ValueError('invalid retention or guidance')
+        if not isinstance(self.direction, str) or len(self.direction) > 2000:
+            raise ValueError('invalid stage guidance')
 
 @dataclass(frozen=True)
 class TaskSetImprovementSettings(ImprovementSettings):

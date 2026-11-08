@@ -11,17 +11,17 @@ from tests.support.task_execution import TaskRunnerFixture
 from fruitfly_agent.lab.improvement.assessment.metrics import ProcessMetrics
 from fruitfly_agent.improvement.contracts.plans import RunPlan
 from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
-from fruitfly_agent.improvement.workflow.services import WorkflowServices
+from fruitfly_agent.improvement.stages.services import StageServices
 from fruitfly_agent.lab.improvement.assessment.inspection import ReadOnlyInspector
-from fruitfly_agent.lab.improvement.termination import MetricThreshold
-from fruitfly_agent.lab.improvement.workflow.adaptive import StopExecutionPolicy
+from fruitfly_agent.lab.improvement.stages.control import MetricThreshold
+from fruitfly_agent.lab.improvement.stages.control import StopExecutionPolicy
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
 from fruitfly_agent.improvement.execution.control import ControlDispatcher
 from fruitfly_agent.improvement.execution.events import EventJournal
 from fruitfly_agent.improvement.execution.handles import ManagedExecution
 from fruitfly_agent.core.config import AgentLoopConfig
 from tests.support.faux_provider import FauxProvider
-from tests.support.pipeline import fixture, version
+from tests.support.stages import fixture, version
 
 
 class LiveExecutionTests(unittest.IsolatedAsyncioTestCase):
@@ -30,7 +30,7 @@ class LiveExecutionTests(unittest.IsolatedAsyncioTestCase):
         artifacts = MemoryArtifacts()
         plan = RunPlan('live-job', version(), ('prompt',))
         task = TaskMaterial('live-task', 'Create the requested output.')
-        return registry, baseline, artifacts, plan, task, WorkflowServices(plan)
+        return registry, baseline, artifacts, plan, task, StageServices(plan)
 
     async def test_file_tools_stream_and_final_assessments_preserve_actual_usage(self):
         registry, baseline, artifacts, plan, task, services = self.setup_task()

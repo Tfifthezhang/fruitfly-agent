@@ -52,15 +52,15 @@ outside. See [Lab design rules](lab/README.md#design-for-improvement).
 
 Retained Skill and cross-session memory libraries belong to S. Descriptions and
 bodies share the ordinary candidate assembly path; bodies load on demand.
-Application owns threshold-maintenance scheduling and explicit batch adoption. I editor instructions use a registered [fixed-depth comparison](lab/improvement/improver/README.md)
-that measures the downstream H/S changes produced by each editor.
+Application owns threshold-maintenance scheduling and explicit batch adoption.
+I instruction targets can be proposed explicitly through [independent stages](lab/improvement/DEVELOPER_GUIDE.md); no automatic nested I comparison backend is installed.
 
 Task materials and executions need no score. Persistent publication requires an injected verification policy; current-task selection retains its weaker assurance. The experience library is a separate attributed S update after explicit pending-lesson review.
-Search preserves reference results and separates stopping from assurance. Editing, execution and evaluation each receive an independent invocation time. Usage is recorded without quotas. No component changes during a task execution.
+Research preserves input results and separates continuation from assurance. Editing, execution and evaluation each receive an independent invocation time. Usage is recorded without quotas. No component changes during a task execution.
 
 Hosted executions expose immutable terminal facts through the common
 [execution contract](lab/improvement/execution/README.md#record-execution-facts).
-A prompt-driven model evaluator supplies dimension judgments, process signals and candidate-hypothesis checks. It can guide the next editing seed or compare processes when official scores tie. Official scores remain unchanged; independent adoption retains its own rules.
+A prompt-driven model evaluator supplies dimension judgments, process signals and candidate-hypothesis checks. Its feedback is an optional input to a later explicit proposal or comparison. Official scores remain unchanged; independent adoption retains its own rules.
 
 Run separates [configuration](run/configuration/README.md), [runtime preparation](run/runtime/README.md), [storage](run/storage/README.md), [improvement hosting](run/improvement/README.md), and [adapters](run/adapters/README.md). Its Factory composes these services; leaf services receive explicit capabilities and own their local state.
 
@@ -165,7 +165,7 @@ benchmarks and can optionally register a runner/official-assessment adapter.
 Normal Improvement/RSI remain usable without Eval; `eval run` does not evolve.
 
 Editing, [assessment](lab/improvement/assessment/README.md), execution and
-[termination](lab/improvement/termination/README.md) have separate owners. Online
+[Execution control](lab/improvement/stages/control.py) have separate owners. Online
 assessment consumes immutable event positions. Feedback/control is explicit;
 version switching requires an implemented backend boundary. Current managed
 handles support scoped stop; live code/state replacement is not implied.

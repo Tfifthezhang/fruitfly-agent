@@ -219,7 +219,7 @@ def edit_grants(profile, grants, catalog):
         if normalize is None:
             raise ValueError('component has no registered field editing adapter: ' + name)
         value = normalize(fields, bounds)
-        if value:
+        if value is not None:
             options[name] = value
     return options
 

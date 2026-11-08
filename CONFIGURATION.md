@@ -347,7 +347,7 @@ With no initial choice, a sole catalog entry is selected automatically. With mul
 | Private-suite claims | `.fruitfly/improvement/verification-uses.json`; completed or uncertain verification consumes a declared use |
 | Explicit evolution jobs | `.fruitfly/evolution/`; host-owned phases, policy, and activation evidence |
 
-Referenced results remain protected. Failed or cancelled searches do not replace a complete candidate. Editing a readable export does not change the runtime. See [Improvement](fruitfly_agent/lab/improvement/README.md#results-and-retention) for retention and [Run](fruitfly_agent/run/README.md#recovery) for compatibility rules.
+Referenced results remain protected. Failed or cancelled searches do not replace a complete candidate. Editing a readable export does not change the runtime. See [Improvement](fruitfly_agent/lab/improvement/README.md#select-editable-surfaces) for retention and [Run](fruitfly_agent/run/README.md#recovery) for compatibility rules.
 
 ## Host execution policies
 
@@ -389,11 +389,11 @@ Host-owned `PermissionPolicy.allow_network=True` allows declared network-read to
 
 ### Time registered improvement execution
 
-Set `execution.editor_seconds`, `execution.task_seconds` and `evaluation.evaluator_seconds` (defaults 1200, 3600, 1200). Each invocation starts a separate clock; nested calls within it share that clock. Composite studies time their leaf phases. Usage is recorded without admission quotas. User cancellation covers the job; unconfirmed cleanup stops further scheduling. External execution still requires a registered compatible runner.
+Set `execution.organizer_seconds`, `execution.editor_seconds`, `execution.task_seconds` and `evaluation.evaluator_seconds` (defaults 1200, 1200, 3600, 1200). Each invocation starts a separate clock; nested calls within it share that clock. Composite studies time their leaf phases. Usage is recorded without admission quotas. User cancellation covers the job; unconfirmed cleanup stops further scheduling. External execution still requires a registered compatible runner.
 
 ### Assess completed executions
 
-The shared model evaluator assesses completed runs and compares candidates through I evaluator prompts. It reports dimensions, process signals, candidate-hypothesis checks, uncertainty and exact supplied citations. Overview/event indexes navigate to immutable originals. Official scores remain unchanged; supported process evidence can resolve ties. Configure shared read/catalog/search limits under `evidence`; the retained incumbent seeds the next round. See [Assessment](fruitfly_agent/lab/improvement/assessment/README.md) and [experiment configuration](fruitfly_agent/experiments/CONFIGURATION.md).
+The shared model evaluator assesses completed runs and compares candidates through I evaluator prompts. It reports dimensions, process signals, candidate-hypothesis checks, uncertainty and exact supplied citations. Overview/event indexes navigate to immutable originals. Official scores remain observations; their presence, equality or magnitude never gates research stages. Configure shared read/catalog/search limits under `evidence`; the retained incumbent seeds the next round. See [Assessment](fruitfly_agent/lab/improvement/assessment/README.md) and [experiment configuration](fruitfly_agent/experiments/CONFIGURATION.md).
 
 ## Choose a candidate generator
 
@@ -410,40 +410,21 @@ Unknown generator IDs and unsupported component fields are rejected before execu
 
 ## Configure the component editor
 
-Select editor/assessor aliases in `models.roles`. I editor and evaluator components expose model-facing instructions. Fixed experiment configuration owns scheduling, independent phase times and evidence page size. See [component grammar](fruitfly_agent/runtime_spec/COMPONENTS.md). Both roles compose the shared Lab Agent runner with separate tools and histories.
+Select organizer/editor/assessor aliases in `models.roles`. I organizer, editor and evaluator components expose model-facing instructions. Fixed experiment configuration owns scheduling, independent phase times and evidence page size. See [component grammar](fruitfly_agent/runtime_spec/COMPONENTS.md). These roles compose the shared Lab Agent runner with separate tools and histories.
 
-Python embeddings inject `WorkflowBindings` into `RunApplicationFactory` to replace
+Python embeddings inject `StageBindings` into `RunApplicationFactory` to replace
 stages. Task execution requires a compatible explicitly registered `TaskRunner`
 or episode backend. Material declarations do not inherit the active environment
 or provide a built-in local executor.
 No dedicated search-tool API key is needed for component editing; web search/fetch
 credentials remain independent tool settings.
 
-## Configure an editor comparison
+## Configure independent research stages
 
-Reference `source: editor` and an installed study `material`. Parameters declare inner H/S components, repetitions, fixed depth and independent acceptance thresholds. Every role/leaf invocation uses the experiment phase times. Usage is observed without an inner quota, development-trial ceiling or model-cost ratio veto. Model calls begin only when the experiment is explicitly run.
-
-Prepare independent development and verification packages, each with train,
-selection and holdout. The exact manifest, parameters, data separation, proof and
-limits are documented in [Editor self-improvement](fruitfly_agent/lab/improvement/improver/README.md).
-Selecting I alone does not grant execution support; ordinary file trials reject I
-and mixed outer H/S/I comparison is unsupported.
-
-Every task execution uses fixed components. Search stopping is recorded separately
-from `selected` or `verified` assurance. A task-local result changes no default.
-Lessons remain pending until the embedding host explicitly commits or rejects
-them through its experience service. A library change invalidates a stale pending commit.
-Persistent I experiments cannot write production experience.
-
-Auxiliary model admission belongs to the owning mechanism's
-[Catalog role declaration](fruitfly_agent/lab/catalog/README.md#declare-auxiliary-model-dependencies).
-All built-in auxiliary roles default to executor. Templates and generated files
-retain each role as `{inherit: executor}`; a catalog alias overrides that role.
-Inheritance follows executor changes and survives saving/export/staging. See the
-[model-binding grammar](fruitfly_agent/runtime_spec/COMPONENTS.md#bind-models-once).
-Conditional roles remain inactive until needed; editor/assessor remain lazy.
-See [examples](examples/configuration/README.md#select-reduction-and-measurement)
-for operational selection. Model-role aliases contain no credential values.
+Use one editable experiment document for historical inputs, role models,
+configuration overrides and the explicitly selected next stage. See the
+[Improvement developer guide](fruitfly_agent/lab/improvement/DEVELOPER_GUIDE.md).
+Each invocation performs one stage; no automatic baseline/search runner is exposed.
 
 ## Follow component sources and activation
 
@@ -488,3 +469,21 @@ evaluation. One-shot tasks disable workspace retained-state services and consume
 only frozen initial content. Skills are also enabled by default; `/skills` lists
 installed names and descriptions and `/skills read ID` displays the procedure.
 
+
+### Continue research under changed configuration
+
+Independent Improvement stages save their own effective configuration and report
+differences from input producers. Historical evidence remains consumable after
+model, instruction, source or grant changes; old outputs retain their original
+production settings. Organization and proposal need no task execution document.
+See [research configuration and development](fruitfly_agent/lab/improvement/DEVELOPER_GUIDE.md).
+
+### Select default Improvement targets
+
+Omitting experiment `edit` selects all enabled supported default optimization
+components, including native tool targets. File memory and the three I instruction
+roles are excluded by default; retained Memory/Skill libraries remain included.
+An explicit `edit` map replaces this scope. Inspect the effective field-level table
+with `improvement defaults --config EXPERIMENT` before model work. Generation
+retains `configuration/optimization.json` and `optimization.md`. See
+[experiment configuration](fruitfly_agent/experiments/CONFIGURATION.md#inspect-configuration-before-models).

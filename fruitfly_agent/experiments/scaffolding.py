@@ -125,7 +125,7 @@ def initialize_workspace(workspace: Path, *, source: str | None = None,
             'Run eval prepare --tasks-only, then eval prepare through fruitfly-agent-lab (downloads/containers; no model calls).',
         ]
     if source == 'task-set':
-        steps.append('Run improvement check, then explicitly improvement run (model/container work; charges may apply).')
+        steps.append('Use a stage research document; inspect with improvement show, then explicitly improvement step (model/container work; charges may apply).')
     else:
         steps.append('System configuration is ready. For Improvement, register a task backend through the embedding API or initialize a separate benchmark workspace with --source task-set --benchmark ID.')
     return {'workspace': str(workspace), 'source': source or 'system',

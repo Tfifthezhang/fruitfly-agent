@@ -14,7 +14,7 @@ class ExperimentBoundaryTests(unittest.TestCase):
         for layer in ('core', 'providers', 'interactive', 'lab', 'run'):
             self.assertTrue(boundary_violations('from fruitfly_agent.experiments import cli', 'fruitfly_agent.' + layer + '.example'))
 
-    def test_fixed_workflow_contains_only_the_proposal_mission(self):
-        source = (ROOT / 'fruitfly_agent/improvement/workflow/controller.py').read_text()
-        self.assertNotIn("'invariant'", source)
-        self.assertNotIn("'domain'", source)
+    def test_independent_stage_controller_has_no_search_loop(self):
+        source = (ROOT / 'fruitfly_agent/improvement/stages/controller.py').read_text()
+        self.assertNotIn("SearchEngine", source)
+        self.assertNotIn(".perform('propose'", source)

@@ -300,7 +300,7 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
         from types import SimpleNamespace as NS
         from fruitfly_agent.lab.improvement.evidence.session import EvidenceSession
         from fruitfly_agent.lab.improvement.evidence import EvidenceWorkspace
-        from tests.support.pipeline import fixture
+        from tests.support.stages import fixture
         gif = base64.b64decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7')
         for data, mime in ((png_bytes(), 'image/png'), (gif, 'image/gif')):
             with self.subTest(media_type=mime):

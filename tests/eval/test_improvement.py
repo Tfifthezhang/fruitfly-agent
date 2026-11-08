@@ -17,8 +17,7 @@ from fruitfly_eval.improvement import benchmark_execution
 from fruitfly_eval.improvement.runner import EvalTaskRunner
 from fruitfly_agent.lab.improvement.components import ComponentRegistry, TextComponentAdapter
 from fruitfly_agent.improvement.contracts.plans import RunPlan
-from fruitfly_agent.improvement.workflow.services import WorkflowServices
-from fruitfly_agent.lab.improvement.workflow import ImprovementWorkflow as ComponentWorkflow
+from fruitfly_agent.improvement.stages.services import StageServices
 from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
 from fruitfly_agent.lab.improvement.execution import ExecutionContext
 from fruitfly_agent.improvement.contracts.experiments import ExecutionRequest
@@ -29,7 +28,7 @@ from fruitfly_agent.improvement.contracts.editing import ProposalResult
 from fruitfly_agent.improvement.contracts.assessment import SelectionDecision
 from fruitfly_agent.lab.base_prompt.target import BasePromptTarget
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
-from tests.support.pipeline import version
+from tests.support.stages import version
 
 
 class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
@@ -51,7 +50,7 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
         receipt = {'id': 'prepared-identity', 'runtime': {'installation': {'files': files}},
             'tasks': [{'id': 'external/task', 'path': str(task)}]}
         plan = RunPlan('experiment', version(), ('base_prompt',), generator_id='rule')
-        services = WorkflowServices(plan)
+        services = StageServices(plan)
         context = ExecutionContext(root, artifacts, components, None, None, None, plan=plan, services=services)
         return context, request, host, receipt
 
@@ -61,49 +60,6 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
         return definition, patch('fruitfly_eval.improvement.registration.HostConfig.read', return_value=host_model), patch(
             'fruitfly_eval.improvement.registration.load_preparation', return_value=receipt)
 
-    async def test_candidate_executes_then_official_results_drive_existing_workflow(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            context, request, host, receipt = self.fixture(root)
-            calls = []
-            async def executor(evaluation, host_path, *, directory, output_root, emit):
-                self.assertFalse(hasattr(context.services,'budget'))
-                from fruitfly_agent.lab.catalog import load_system_config
-                selected = load_system_config(evaluation.runtime.config_path).select()
-                candidate = selected.artifact_contents[selected.prompt] != 'baseline'
-                calls.append(candidate)
-                path = output_root / ('evaluation-' + str(len(calls)))
-                agent = path / 'artifacts/harbor/job/trial/agent'; agent.mkdir(parents=True)
-                (agent / 'session.jsonl').write_text('{"type":"message"}\n')
-                (agent / 'trajectory.json').write_text('{}')
-                (agent / 'model-usage.json').write_text('{"schema_version":1,"used":2,"requests":[{"id":"call-0","status":"completed","usage":null},{"id":"call-1","status":"completed","usage":null}]}')
-                verifier = agent.parent / 'verifier'; verifier.mkdir(); (verifier / 'answers.txt').write_text('PRIVATE')
-                emit('benchmark-progress', event_type='completed')
-                return {'evaluation_id': path.name, 'status': 'completed', 'errors': {},
-                    'metrics': [{'name': 'official_reward', 'value': float(candidate)}]}, path
-            definition, host_patch, receipt_patch = self.freeze(context, request, host, receipt, executor)
-            with host_patch, receipt_patch:
-                prepared = definition.prepare(context, ExecutionRequest('', (), ('base_prompt',), 'benchmark-task', 'task'))
-                ports = definition.build(context, prepared)
-                class Generator:
-                    generator_id = 'rule'; required_capabilities = frozenset()
-                    async def propose(self, request, services):
-                        document = with_component_text(request.baseline.components[0], 'candidate')
-                        candidate = CandidateBundle(request.plan.parent, request.baseline, HarnessSnapshot((document,)), 'rule',
-                            (EditReason('base_prompt', 'Evidence-driven proposal', (request.records[0].run_id,), expected_effect='The proposed behavior appears in the subsequent execution.'),))
-                        return ProposalResult((candidate,))
-                generators = GeneratorRegistry(); generators.register('rule', Generator)
-                flow = ComponentWorkflow(generators=generators, components=context.components, runner=ports.runner,
-                     selector=None, measurements=ports.measurements)
-                result = await flow.run(context.plan, prepared.task, context.components.snapshot(), context.services)
-                self.assertEqual(calls, [False, True])
-                self.assertEqual(context.services.used, {'model': 4, 'execution': 2})
-                self.assertEqual(component_text(result.harness.components[0]), 'candidate')
-                self.assertEqual(result.decision.assurance, 'selected')
-                self.assertTrue(all('PRIVATE' not in context.artifacts.read(a.artifact_id).decode() for r in result.records for a in r.artifacts))
-                self.assertTrue(all('reward' not in r.output for r in result.records))
-                self.assertNotIn('prompt', yaml.safe_load((root / '.fruitfly/config.yaml').read_text())['profiles']['default'])
-                await context.services.close()
 
     async def test_preview_is_offline_and_changed_model_material_invalidates_source(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -161,70 +117,9 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(context.services.used, {'model': 0, 'execution': 0})
             await context.services.close()
 
-    async def test_fixed_i_benchmark_episodes_measure_downstream_changes_with_shared_budget(self):
-        from copy import deepcopy
-        from fruitfly_agent.core.config import AgentLoopConfig
-        from fruitfly_agent.lab.improvement.editor.instructions import EditorInstructionTarget, EditorInstructions
-        from tests.support.self_improver import ProceduralProvider
-        from fruitfly_eval.improvement import benchmark_improver
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            context, request, host, receipt = self.fixture(root)
-            context.components.register(TextComponentAdapter(EditorInstructionTarget(), 'improvement-instructions'))
-            plan = replace(context.plan, component_ids=('improvement-editor',))
-            context.plan = plan
-            context.services = WorkflowServices(plan)
-            provider = ProceduralProvider()
-            context.config = context.editor_config = AgentLoopConfig(provider=provider)
-            independent_task = root / 'independent'; independent_task.mkdir()
-            (independent_task / 'instruction.md').write_text('Independent external task.')
-            independent_receipt = deepcopy(receipt)
-            independent_receipt['tasks'][0]['path'] = str(independent_task)
-            independent_receipt['tasks'][0]['id'] = 'independent/task'
-            second_host = root / 'independent-host.yaml'; second_host.write_text('independent host identity')
-            receipts = {str(host.resolve()): receipt, str(second_host.resolve()): independent_receipt}
-            calls = []
-            async def executor(evaluation, host_path, *, directory, output_root, emit):
-                from fruitfly_agent.lab.catalog import load_system_config
-                selected = load_system_config(evaluation.runtime.config_path).select()
-                changed = selected.artifact_contents[selected.prompt] != 'baseline'
-                calls.append((str(host_path), changed))
-                path = output_root / ('nested-' + str(len(calls)))
-                agent = path / 'artifacts/harbor/job/trial/agent'; agent.mkdir(parents=True)
-                (agent / 'session.jsonl').write_text('{}\n')
-                (agent / 'model-usage.json').write_text('{"schema_version":1,"used":1,"requests":[{"id":"call-0","status":"completed","usage":null}]}')
-                return {'evaluation_id': path.name, 'status': 'completed', 'errors': {},
-                    'metrics': [{'name': 'official_reward', 'value': float(changed)}]}, path
-            development = benchmark_execution(request, host,  execution_id='development')
-            independent = benchmark_execution(request, second_host,  execution_id='independent')
-            study = benchmark_improver((development,), (independent,), executor=executor)
-            supplied = ()
-            with patch('fruitfly_eval.improvement.registration.HostConfig.read', side_effect=lambda workspace, path:
-                    SimpleNamespace(agent_env={'FRUITFLY_MAX_MODEL_CALLS': '2'}, receipt=receipts[str(Path(path).resolve())])), patch(
-                    'fruitfly_eval.improvement.registration.load_preparation', side_effect=lambda host, *args: host.receipt):
-                prepared = study.prepare(context, ExecutionRequest('', (), ('improvement-editor',),
-                    'benchmark-editor-study', 'task', supplied))
-                self.assertFalse(calls)
-                ports = study.build(context, prepared)
-                baseline = context.components.snapshot()
-                document = baseline.component('improvement-editor')
-                values = component_parameters(document); values['instructions']['propose'] += ' STEP'
-                changed = with_component_parameters(document, values)
-                candidate = HarnessSnapshot(tuple(changed if d.component_id == changed.component_id else d for d in baseline.components))
-                before = await ports.runner.trial(baseline, 'development')
-                after = await ports.runner.trial(candidate, 'development')
-                confirmation = await ports.runner.trial(candidate, 'verification')
-                self.assertEqual((before.failures, after.failures, confirmation.failures), (0, 0, 0))
-                self.assertEqual((before.mean_gain, after.mean_gain, confirmation.mean_gain), (0, 1, 1))
-                self.assertTrue(any(Path(path).resolve() == second_host.resolve() for path, _ in calls))
-                self.assertEqual(context.services.used['execution'], len(calls))
-                self.assertEqual(context.services.used['model'], len(calls) + len(provider.calls))
-                self.assertFalse(hasattr(context.services,'budget'))
-                self.assertEqual(context.components.snapshot(), baseline)
-            await context.services.close()
 
     async def test_timeout_collects_partial_evidence_and_observed_usage(self):
-        from fruitfly_agent.improvement.workflow.operations import run_stage
+        from fruitfly_agent.improvement.stages.operations import run_stage
         from fruitfly_agent.improvement.contracts.failures import StageFailure
         from fruitfly_agent.improvement.execution.facts import read_facts
         with tempfile.TemporaryDirectory() as directory:
@@ -238,7 +133,7 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
                     await asyncio.Event().wait()
             definition, host_patch, receipt_patch = self.freeze(context, request, host, receipt, Interrupted())
             context.plan = replace(context.plan, timeouts={'editor_seconds':.01,'execution_seconds':.01,'evaluator_seconds':.01})
-            context.services = WorkflowServices(context.plan)
+            context.services = StageServices(context.plan)
             with host_patch, receipt_patch:
                 prepared = definition.prepare(context, ExecutionRequest('', (), ('base_prompt',), 'benchmark-task', 'task'))
                 runner = definition.build(context, prepared).runner

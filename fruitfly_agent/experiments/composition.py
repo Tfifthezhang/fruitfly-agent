@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import Any
 import yaml
 
-from fruitfly_agent.lab.catalog import builtin_catalog, MechanismSelection, materialize_system, configuration_resources
-from fruitfly_agent.lab.improvement.api import WorkflowBindings
+from fruitfly_agent.lab.catalog import select_default_components, optimization_grants, optimization_table, builtin_catalog, MechanismSelection, materialize_system, configuration_resources
+from fruitfly_agent.lab.improvement.api import StageBindings
 from fruitfly_agent.lab.improvement.execution import builtin_executions
 from fruitfly_agent.providers.config import load_env
 from fruitfly_agent.providers.registry import load_model_specs
@@ -18,7 +18,6 @@ from fruitfly_agent.run.configuration.resolution import model_catalog_path
 from fruitfly_agent.improvement.contracts.requests import WorkflowRequest
 
 from .sources import resolve_source
-from .policies import stop_policy
 
 
 class PreparationUnavailable(RuntimeError):
@@ -43,6 +42,7 @@ class PreparedExperiment:
     resources: tuple = ()
     catalog: Any = None
     extensions: Any = None
+    optimization_scope: tuple = ()
 
     def summary(self):
         snapshot = self.config.snapshot()
@@ -55,6 +55,9 @@ class PreparedExperiment:
         from fruitfly_agent.runtime_spec import execution_values
         snapshot['execution'] = execution_values(self.profile.execution)
         snapshot['harness'] = self.harness
+        snapshot['optimization_table'] = list(self.optimization_scope) or optimization_table(self.profile, self.catalog,
+            self.config.improvement.components, self.config.improvement.component_options)
+        snapshot['model_specifications'] = {name: asdict(spec) for name, spec in load_model_specs(self.model_path).items()}
         snapshot['runtime_hashes'] = {'config': hashlib.sha256(self.config_bytes).hexdigest(),
             'models': hashlib.sha256(self.model_bytes).hexdigest()}
         snapshot['configuration_sources'] = [{'path': source.path, 'sha256': source.digest}
@@ -65,8 +68,31 @@ class PreparedExperiment:
             **{'models.' + role: ('experiment override' if role in self.config.models else str(self.config_path))
                 for role in self.model_roles}}
         snapshot['material_identity'] = self.source.source_identity
+        if self.source.benchmark is not None:
+            benchmark = self.source.benchmark
+            snapshot['benchmark_configuration'] = {
+                'source_request': str(benchmark.source_request),
+                'source_sha256': hashlib.sha256(benchmark.source_request.read_bytes()).hexdigest(),
+                'declared': json.loads(benchmark.source_request.read_text()),
+                'effective_runtime': asdict(benchmark.request.runtime),
+                'runtime_differences': list(benchmark.runtime_differences)}
         if self.source.task_set is not None:
             material = self.source.task_set.snapshot
+            from fruitfly_agent.improvement.contracts.configuration import configuration_differences
+            effective_runtime = {'config_path': str(self.config_path),
+                'profile': self.profile.profile_id, 'working_directory': str(self.config.workspace)}
+            snapshot['collection_configurations'] = []
+            for row in self.source.task_set.specifications:
+                if row['source'] != 'eval':
+                    continue
+                source_path = Path(row['request'])
+                declared = json.loads(source_path.read_text())
+                snapshot['collection_configurations'].append({'id': row['id'],
+                    'source_request': str(source_path),
+                    'source_sha256': hashlib.sha256(source_path.read_bytes()).hexdigest(),
+                    'declared': declared, 'effective_runtime': effective_runtime,
+                    'runtime_differences': configuration_differences(
+                        declared.get('runtime', {}), effective_runtime)})
             snapshot['task_set'] = {'identity': material.snapshot_id,
                 'collections': [{
                     'id': name, 'tasks': sum(e.collection_id == name for e in material.entries),
@@ -145,13 +171,13 @@ def prepare_experiment(config, operation, *, require_prepared=True, environment=
     profile = replace(profile, model_profile=executor)
     role_bindings = dict(profile.model_roles)
     if operation != 'eval':
-        for role in ('editor', 'assessor'):
+        for role in ('editor', 'assessor', 'organizer'):
             if role in config.models:
                 role_bindings[role] = config.models[role]
     profile = replace(profile, model_roles=role_bindings)
     resolved_roles = profile.resolved_model_roles(executor)
     roles = {'executor': executor, **{role: resolved_roles.get(role, executor)
-        for role in ('editor', 'assessor') if operation != 'eval'}}
+        for role in ('editor', 'assessor', 'organizer') if operation != 'eval'}}
     process_env = {**load_env(WorkspacePaths(config.workspace).secret_file()), **(os.environ if environment is None else environment)}
     required = {*roles.values(), *catalog.required_model_profiles(profile.mechanisms)}
     for name in required:
@@ -163,7 +189,6 @@ def prepare_experiment(config, operation, *, require_prepared=True, environment=
     catalog.resolve(profile.mechanisms)
     from fruitfly_agent.lab.catalog import resolve_harness
     inventory = resolve_harness(profile, catalog)
-    from fruitfly_agent.lab.improvement.execution import builtin_executions
     if source.task_set is not None:
         capabilities=frozenset.intersection(*(b.capabilities for b in source.task_set.bindings))
         allowed_roles=frozenset.intersection(*(b.roles for b in source.task_set.bindings))
@@ -177,14 +202,14 @@ def prepare_experiment(config, operation, *, require_prepared=True, environment=
         capabilities=execution.capabilities_for(inventory.tools)
         allowed_roles=execution.roles
     if not config.improvement.components:
-        legal=tuple(c.component_id for c in inventory.components if c.default_selected and c.role in allowed_roles and not c.required_capabilities-capabilities)
+        legal=select_default_components({c.component_id: c for c in inventory.components}, roles=allowed_roles, capabilities=capabilities)
         from fruitfly_agent.lab.improvement.tasks import TaskPackCatalog
         packs=[]
         if source.execution_id=='agent-task' and source.material_id:packs.append(source.material_id)
         for pack in packs:
             legal=tuple(name for name in legal if name in TaskPackCatalog(config.workspace).compatible_targets(pack))
         if not legal:raise ValueError('no legal optimization targets for this execution and material')
-        config=replace(config,improvement=replace(config.improvement,components=legal))
+        config=replace(config,improvement=replace(config.improvement,components=legal, component_options=optimization_grants(profile, catalog, legal)))
     options = config.improvement
     if source.defaults:
         values = {name: value for name, value in source.defaults.items() if 'improvement.' + name not in config.sources and name != 'components'}
@@ -209,12 +234,10 @@ def prepare_experiment(config, operation, *, require_prepared=True, environment=
         if set(options.components) & set(source.forbidden_components):
             raise ValueError('I changes require task.source: editor and downstream comparisons')
     request = WorkflowRequest(source.instruction, source.input_paths, options.components,
-        generator_id=options.generator,   rounds=options.rounds,
+        generator_id=options.generator,   rounds=1,
          scope='persistent' if persistent else 'task', timeouts=asdict(options.timeouts), direction=options.direction,
         task_pack_id=source.material_id, execution_id=source.execution_id, execution_parameters=source.parameters,
-         retain_experience=options.retain_experience)
-    stop_policy(config.stop.get('improvement'))
-    stop_policy(config.stop.get('rsi'))
+         retain_experience=False)
     if source.benchmark is not None:
         if extensions.registrations:
             raise ValueError('container execution does not support Python extension source staging')
@@ -232,7 +255,9 @@ def prepare_experiment(config, operation, *, require_prepared=True, environment=
         environment=process_env if require_credentials else None, catalog=catalog)
     return PreparedExperiment(config, operation, source, profile, config_path, model_path,
         config_path.read_bytes(), model_path.read_bytes(), roles, process_env, request, policy_id, inventory,
-        configuration_resources(profile, catalog, config.workspace), catalog, extensions)
+        configuration_resources(profile, catalog, config.workspace), catalog, extensions,
+        tuple(optimization_table(profile, catalog, options.components, options.component_options,
+            roles=allowed_roles, capabilities=capabilities)))
 
 
 def application_factory(prepared, runtime_path, *, provider_registry=None):
@@ -245,11 +270,10 @@ def application_factory(prepared, runtime_path, *, provider_registry=None):
         benchmark = prepared.source.benchmark
         executions.register(benchmark_execution(benchmark.source_request, benchmark.require_host(),
             runtime_override=benchmark.request.runtime))
-    bindings = WorkflowBindings(executions=executions,
-        stop_policy=stop_policy(prepared.config.stop.get('improvement')),
+    bindings = StageBindings(executions=executions,
         
         component_options=prepared.config.improvement.component_options,
-        workflow_settings=prepared.config.workflow_settings, evidence_settings=prepared.config.evidence_settings)
+        evidence_settings=prepared.config.evidence_settings)
     return RunApplicationFactory(cwd=prepared.config.workspace, environment=prepared.environment,
         config_path=str(runtime_path), profile_id=prepared.profile.profile_id,
         provider_registry=provider_registry, improvement_bindings=bindings, extensions=prepared.extensions)

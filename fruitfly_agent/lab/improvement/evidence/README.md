@@ -91,3 +91,15 @@ performs no collection, model request or container operation.
 Evidence completeness applies to registered records and selected captured file
 versions. It does not prove that every task-specific output requirement is known
 or met; file scope and exclusions remain visible in the capture manifest.
+
+## Keep batch entry points compact
+
+The task-set `INDEX.json` lists the task directory, evaluation metadata, edit
+grants and organized-view references. It records reference/task counts rather
+than repeating every archived file path. Use `catalog` with a task prefix to
+load further paths. All original resources remain granted through the existing
+reader; compact navigation does not truncate the evidence collection.
+
+Single-task root indexes likewise keep source paths behind paged catalog access
+and describe component identities without embedding complete component text.
+See the [development guide](../DEVELOPER_GUIDE.md) for portable stage bundles.

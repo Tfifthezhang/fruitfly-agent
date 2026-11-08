@@ -62,7 +62,7 @@ require runner support; I needs an improver-comparison runner. Arbitrary executa
 source replacement is not installed.
 
 ```bash
-.venv/bin/python -m unittest tests.workflows.test_decoupling -v
+.venv/bin/python -m unittest tests.run.test_host_services -v
 ```
 
 ## Bind execution, improvement and persistent state

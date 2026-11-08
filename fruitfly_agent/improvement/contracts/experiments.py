@@ -151,6 +151,7 @@ class ExecutionPorts:
     selector: Any = None
     retain_experience: bool = True
     search_problem: Any = None
+    execute_batch: Callable | None = None
 
 
 @dataclass(frozen=True)

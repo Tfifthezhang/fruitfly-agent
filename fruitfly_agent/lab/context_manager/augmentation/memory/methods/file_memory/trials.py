@@ -13,7 +13,7 @@ from fruitfly_agent.improvement.contracts.plans import RunPlan
 from fruitfly_agent.improvement.contracts.components import HarnessSnapshot, ComponentFile
 from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
 from fruitfly_agent.improvement.contracts.versions import canonical_json, content_hash
-from fruitfly_agent.improvement.workflow.services import WorkflowServices
+from fruitfly_agent.improvement.stages.services import StageServices
 from fruitfly_agent.lab.improvement.components import TextComponentAdapter
 from fruitfly_agent.lab.improvement.execution.episodes import EpisodeTaskRunner, EpisodeMeasurements
 from fruitfly_agent.lab.improvement.verification.episodes import PairedEpisodeVerification
@@ -80,7 +80,7 @@ class MemoryEpisodeExecutor:
         documents = state.retained_documents
         plan = RunPlan(request.episode_id, context.plan.parent, ('file-memory', 'memory-library'),
             timeouts=context.plan.timeouts, retain_experience=False)
-        services = WorkflowServices(plan, signal=signal,
+        services = StageServices(plan, signal=signal,
             record=lambda event, **fields: context.services.record(event, episode_id=request.episode_id, **fields))
         source = 'study-' + content_hash(request.task.instruction)[7:31]
         checkpoint: dict[str, Any] = {'pending': {}, 'processed': 0, 'consolidated_turns': 0,

@@ -1,0 +1,1 @@
+"""Independent Lab stage support."""

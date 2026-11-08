@@ -72,3 +72,23 @@ before atomic replacement. Activation failures restore the prior checkpoint.
 Executable documents are frozen by their owning targets; maintenance evidence and
 control records are captured separately for isolation. No model quality decision
 belongs to this store.
+
+## Retain research activities
+
+[research.py](research.py) stores immutable revisions and activity attempts in
+`jobs/<study>/research-events.jsonl` under the Improvement root. Envelopes bind
+sequence, previous hash and event content. Mutations require `.research-owner`
+exclusive ownership. Readers validate journal integrity and state transitions.
+An abandoned owner marker does not retain the OS lock after its process exits. Stage outputs and role events reference the shared artifact
+store and remain visible to reference-aware candidate retention.
+
+`research_bundles.py` publishes typed stage bundles and relative root locators in
+an explicit study output directory. Artifacts are shared across runs. A complete
+study can move without an unrelated checkout cache. Inputs from another study
+copy available transitive dependencies into the destination store.
+
+Research ownership uses an OS file lock. An exited process releases ownership
+even when the marker file remains. Unresolved external work still requires an
+explicit retry decision. The journal is validated before a writer starts;
+role-event appends use the validated owner cache instead of reparsing the complete
+journal on every evidence read.

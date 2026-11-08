@@ -4,17 +4,19 @@
 
 Declare finite experiment settings for the independent [RSI runtime](../../rsi/README.md).
 This module owns no generation loop. Concrete stopping mechanisms use the existing
-[Improvement termination contracts](../improvement/termination/README.md).
+[Execution control](../improvement/stages/control.py).
 
 | Entry | Behavior |
 |---|---|
 | `configuration.py`: `EvolutionSettings` | Generation count, continuation and verification policy |
-| Experiment CLI | Explicit `rsi check` and `rsi run`; normal chat never starts evolution implicitly |
+| Generic embedding | Inject proposal, verification and activation explicitly; no automatic Improvement CLI composition |
 
-The [experiment host](../../experiments/README.md) activates into its experiment configuration copy after independent verification. Each editor, execution and evaluator invocation receives its own configured time. Usage is recorded across generations without a shared admission ledger. Daily configuration remains unchanged. [Run](../../run/README.md#explicit-text-evolution) also exposes explicit embedding.
+The generic host accepts explicit capabilities. Independent Improvement stages
+remain separate operations and do not start evolution. Configuration snapshots
+and candidate research choices do not authorize activation.
 
 ```bash
-.venv/bin/python -m unittest tests.lab.test_evolution_policies tests.experiments.test_operations
+.venv/bin/python -m unittest tests.rsi.test_recovery tests.experiments.test_operations
 ```
 
 Offline fixtures establish orchestration behavior, not real model quality.

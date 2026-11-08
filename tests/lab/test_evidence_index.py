@@ -7,12 +7,12 @@ from fruitfly_agent.improvement.execution.facts import ensure_facts
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts,EvidenceWorkspace
 from fruitfly_agent.lab.improvement.evidence.indexing import organize_evidence,OVERVIEW_PATH,EVENTS_PATH
 from fruitfly_agent.lab.improvement.evidence.catalog import WorkspaceEvidence
-from tests.support.pipeline import build_pipeline,Runner
+from tests.support.stages import proposal_fixture,Runner
 
 
 class EvidenceIndexTests(unittest.IsolatedAsyncioTestCase):
     async def test_streaming_deltas_share_navigation_ranges_without_losing_original_text(self):
-        _, plan, baseline, _ = build_pipeline()
+        _, plan, baseline, _ = proposal_fixture()
         artifacts = MemoryArtifacts(); task = TaskMaterial('task', 'Inspect stream')
         text = '\n'.join(json.dumps({'type': 'assistant_text_delta', 'delta': str(i)}) for i in range(100))
         record = await Runner().execute(plan, task, baseline)
@@ -25,7 +25,7 @@ class EvidenceIndexTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(text[event['start']:event['end']], text)
 
     async def test_unicode_atif_relationships_and_torn_tail_keep_original_spans(self):
-        _, plan, baseline, _ = build_pipeline()
+        _, plan, baseline, _ = proposal_fixture()
         artifacts = MemoryArtifacts(); task = TaskMaterial('task', 'Inspect evidence')
         native = [
             {'message': {'role': 'assistant', 'content': [
@@ -60,7 +60,7 @@ class EvidenceIndexTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotEqual(old.artifact_id, new.artifact_id)
 
     async def test_navigation_is_rebuildable_and_originals_are_unchanged(self):
-        _,plan,baseline,_=build_pipeline();artifacts=MemoryArtifacts();task=TaskMaterial('task','Finish')
+        _,plan,baseline,_=proposal_fixture();artifacts=MemoryArtifacts();task=TaskMaterial('task','Finish')
         data='\n'.join(json.dumps({'event':'tool','data':{'elapsed_seconds':v},'message':{'role':'toolResult','is_error':False}})for v in (1,318))
         original=artifacts.put(data.encode())
         record=await Runner().execute(plan,task,baseline)
@@ -76,7 +76,7 @@ class EvidenceIndexTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any(r.path==OVERVIEW_PATH for r in indexed.artifacts))
 
     async def test_cross_file_search_pages_cover_hidden_failure_without_whole_file_citation(self):
-        _,_,baseline,_=build_pipeline()
+        _,_,baseline,_=proposal_fixture()
         text='ok\n'*10000+'compiler error hidden by echo\n'
         workspace=EvidenceWorkspace(baseline=baseline,files={'first.txt':text.encode(),'second.txt':b'compiler error again'},writable_ids=())
         reader=WorkspaceEvidence(workspace)
@@ -91,7 +91,7 @@ class EvidenceIndexTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):reader.search('different',cursor=page['next_cursor'])
 
     async def test_catalog_pages_are_navigation_not_evidence_supply(self):
-        _,_,baseline,_=build_pipeline()
+        _,_,baseline,_=proposal_fixture()
         workspace=EvidenceWorkspace(baseline=baseline,files={'a':b'0123456789','b':b'other'},writable_ids=())
         reader=WorkspaceEvidence(workspace)
         result=reader.catalog(limit=1)
@@ -101,7 +101,7 @@ class EvidenceIndexTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):reader.search('x',paths=('outside',))
 
     async def test_event_directory_decodes_native_payload_without_modifying_original(self):
-        _, plan, baseline, _ = build_pipeline()
+        _, plan, baseline, _ = proposal_fixture()
         artifacts = MemoryArtifacts()
         task = TaskMaterial('task', 'Inspect failures')
         raw = json.dumps({'kind': 'tool-finished', 'position': {'sequence': 1},

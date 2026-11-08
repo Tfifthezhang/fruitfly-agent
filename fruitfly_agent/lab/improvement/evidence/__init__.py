@@ -41,6 +41,7 @@ class EvidenceWorkspace:
         self.writable_ids = frozenset(writable_ids)
         self.max_bytes = max_bytes
         self.provided_ids = set()
+        self.provided_paths = {}
         self.access = access or EvidenceAccess(record=record)
         self.record = record or (lambda event, **fields: None)
         if self.writable_ids - {c.component_id for c in baseline.components}:
@@ -57,6 +58,10 @@ class EvidenceWorkspace:
 
     @classmethod
     def build(cls, request, artifacts, *, record=None):
+        from fruitfly_agent.improvement.contracts.editing import ResearchProposalRequest
+        if isinstance(request, ResearchProposalRequest):
+            from .research import build_workspace
+            return build_workspace(request, artifacts, record=record)
         from fruitfly_agent.improvement.contracts.editing import TaskSetProposalRequest
         if isinstance(request, TaskSetProposalRequest):
             from .task_sets import build_workspace
@@ -90,8 +95,9 @@ class EvidenceWorkspace:
                     files[f'context/candidates/{index}/{component.component_id}/{file.path}'] = file.text.encode('utf-8')
         if getattr(request, 'feedback', ()):
             files['context/measurements.json'] = canonical_json([asdict(m) for m in request.feedback]).encode('utf-8')
-        files['INDEX.json'] = canonical_json({'files': sorted((*files, *references)),
-            'components': [asdict(c) for c in baseline.components],
+        files['INDEX.json'] = canonical_json({'files': sorted(files),
+            'reference_count': len(references), 'navigation': 'Use catalog prefixes for paged original resources.',
+            'components': [{'component_id': c.component_id, 'role': c.role, 'kind': c.kind} for c in baseline.components],
             'writable_components': request.plan.component_ids}).encode('utf-8')
         from .resources import ReferenceWorkspace
         return ReferenceWorkspace(artifacts=artifacts, references=references, baseline=baseline,

@@ -95,62 +95,6 @@ class MemoryLifecycleTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual([False, True], [e['completed'] for e in evidence])
             self.assertEqual(len('interruptedcompleted'), sum(e['chars'] for e in evidence))
 
-    async def test_verified_skill_candidate_changes_only_s_and_recovers_exact_resources(self):
-        from fruitfly_agent.improvement.contracts.requests import WorkflowRequest
-        from fruitfly_agent.lab.improvement.api import WorkflowBindings
-        from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry
-        from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, EditReason
-        from fruitfly_agent.improvement.contracts.components import HarnessSnapshot
-        from fruitfly_agent.improvement.contracts.editing import ProposalResult
-        from tests.support.configuration import component_parameters, with_component_parameters
-        from tests.support.improvers import FirstSelector, SyntheticVerification
-        from tests.support.model_evaluation import RoleProvider
-        from tests.support.task_execution import TaskApplicationFixture
-        root = Path(self.enterContext(tempfile.TemporaryDirectory())).resolve()
-        _write_catalog(root / '.fruitfly/models.yaml', {'offline': 'fake'})
-        class Generator:
-            generator_id = 'library-fixture'
-            required_capabilities = frozenset()
-            async def propose(self, request, services):
-                document = request.baseline.component('skill-library')
-                parameters = component_parameters(document)
-                entries = json.loads(parameters['content']['documents'])
-                entries[0]['description'] = 'Use this skill when the RETAINED_CANDIDATE marker applies.'
-                entries[0]['body'] = 'CANDIDATE RESOURCE BODY'
-                parameters['content']['documents'] = json.dumps(entries)
-                changed = with_component_parameters(document, parameters)
-                harness = HarnessSnapshot(tuple(changed if c.component_id == 'skill-library' else c
-                    for c in request.baseline.components))
-                return ProposalResult((CandidateBundle(request.plan.parent, request.baseline, harness,
-                    self.generator_id, (EditReason('skill-library', 'Exercise retained content.',
-                        (request.records[0].run_id,), expected_effect='Candidate descriptions and resources load.'),)),))
-        generators = GeneratorRegistry(); generators.register(Generator.generator_id, Generator)
-        provider = RoleProvider(); provider.respond_text('reference'); provider.respond_text('candidate')
-        registry = Mock(); registry.create.return_value = provider
-        bindings = WorkflowBindings(generators=generators, selector=lambda *args: FirstSelector(),
-            verifier=SyntheticVerification())
-        factory = TaskApplicationFixture(cwd=root, environment={'FRUITFLY_MODEL_PROFILE': 'offline'}, provider_registry=registry,
-            improvement_bindings=bindings)
-        factory.configuration.save(); factory.reload_configuration()
-        app = AgentApplication(factory); self.addAsyncCleanup(app.close); await app.start()
-        parent = factory.system_version()
-        request = WorkflowRequest('Review a coding change.', component_ids=('skill-library',),
-            generator_id=Generator.generator_id, scope='persistent', retain_experience=False)
-        candidates = await app.improve('', preview_token=app.workflow_preview(request).preview_token)
-        self.assertEqual(1, len(candidates))
-        version = factory._versions.versions.read_candidate(dict(candidates[0].evidence)['Version candidate']).version
-        self.assertEqual((parent.harness, parent.improver), (version.harness, version.improver))
-        self.assertNotEqual(parent.state, version.state)
-        self.assertTrue(any('RETAINED_CANDIDATE' in call['system_prompt'] for call in provider.calls))
-        await app.adopt_candidate(candidates[0].candidate_id)
-        self.assertEqual(version, factory.system_version())
-        self.assertEqual('CANDIDATE RESOURCE BODY', app.retained_state('skill')['entries'][0]['body'])
-        await app.close()
-        fresh_factory = TaskApplicationFixture(cwd=root, environment={'FRUITFLY_MODEL_PROFILE': 'offline'}, provider_registry=registry,
-            improvement_bindings=bindings)
-        fresh = AgentApplication(fresh_factory); self.addAsyncCleanup(fresh.close); await fresh.start()
-        self.assertEqual(version, fresh_factory.system_version())
-        self.assertEqual('CANDIDATE RESOURCE BODY', fresh.retained_state('skill')['entries'][0]['body'])
 
     async def test_maintenance_instruction_identity_changes_only_h(self):
         from fruitfly_agent.lab.catalog import bind_component_changes

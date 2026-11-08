@@ -41,7 +41,7 @@ remains an injected capability; ordinary search does not imply verification.
 Benchmark execution is provided by the external [Eval CLI](../../../fruitfly_eval/README.md).
 
 ```bash
-.venv/bin/python -m unittest tests.run.test_task_prompt_catalog tests.run.test_improvement_versions tests.workflows.test_improvement_history -v
+.venv/bin/python -m unittest tests.run.test_task_prompt_catalog tests.run.test_improvement_versions tests.experiments.test_research_continuation -v
 ```
 
 These checks use fake Providers and temporary state without container/model access.

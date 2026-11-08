@@ -15,4 +15,4 @@ network download or Provider request occurs here.
 Task execution uses a fresh input copy for each candidate. External task sources
 implement the same material contract through an injected runner/source adapter.
 
-Offline checks: `tests.lab.test_improvement_pipeline`.
+Offline checks: `tests.lab.test_detached_editor`.

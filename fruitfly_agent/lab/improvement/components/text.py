@@ -104,6 +104,21 @@ class TextComponentAdapter:
     def validate_change(self, document, options):
         self.target.validate_change(self._read(document), options)
 
+    def canonicalize(self, document):
+        """Normalize a persisted executable document after ordinary config assembly.
+
+        This does not admit formatting-only edits as new research candidates.
+        """
+        expected = self.snapshot()
+        if (document.component_id, document.role, document.kind, document.schema) != (
+                expected.component_id, expected.role, expected.kind, expected.schema):
+            raise ValueError('component ownership cannot change')
+        text = self._read(document)
+        if text == self.target.snapshot().text:
+            return expected
+        self.target.validate(text)
+        return document
+
     def prepare_trial(self, config, document):
         self.validate(document)
         text = self._read(document)

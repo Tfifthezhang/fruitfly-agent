@@ -62,8 +62,7 @@ class ExtensionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(task.task_id, saved[0][3]["source"]["message_id"])
         self.assertEqual(app.runtime_manifest["digest"], saved[0][3]["source"]["parent_manifest"])
         self.assertEqual((), app.candidates())
-        with self.assertRaisesRegex(RuntimeError, "no improvement service"):
-            app.workflow_preview(None)
+        self.assertFalse(hasattr(app, "start_improvement"))
 
     async def test_candidate_review_works_without_improvement(self):
         view = CandidateView("candidate", "proposed", "custom", "text", "artifact", "improve", "parent")
@@ -84,56 +83,7 @@ class ExtensionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([(app.runtime_manifest["digest"], "candidate", "review")], actions)
         self.assertEqual([], provider.calls)
 
-    async def test_search_only_service_obeys_application_exclusion_and_cancellation(self):
-        entered = asyncio.Event()
 
-        class Search:
-            def improvement_preview(self, manifest, **options):
-                return ImprovementPreview("custom", "Custom", "offline")
-            async def improve(self, manifest, direction, **options):
-                entered.set()
-                await asyncio.Event().wait()
-                return ()
-            def cancel_improvement(self): return True
-
-        app, provider = await self.app(improvement=Search())
-        task = app.start_improvement("improve")
-        await entered.wait()
-        self.assertEqual(ApplicationState.IMPROVING, app.state)
-        self.assertTrue(TerminalBindings.from_session(app).busy())
-        with self.assertRaisesRegex(RuntimeError, "finish.*active work"):
-            await app.apply_configuration()
-        with self.assertRaisesRegex(RuntimeError, "cannot queue"):
-            app.enqueue("next")
-        with self.assertRaisesRegex(RuntimeError, "finish active work"):
-            app.candidate_action("candidate", "review")
-        self.assertTrue(app.cancel())
-        with self.assertRaises(asyncio.CancelledError):
-            await task
-        await app.wait_for_improvement()
-        self.assertEqual(ApplicationState.IDLE, app.state)
-        self.assertEqual("cancelled", app.improvement_progress.status)
-        self.assertEqual([], provider.calls)
-
-    async def test_cancel_before_job_starts_restores_application_and_allows_next_job(self):
-        calls = []
-
-        class Search:
-            async def improve(self, manifest, direction, **options):
-                calls.append(direction)
-                return ()
-            def cancel_improvement(self): return True
-
-        app, _ = await self.app(improvement=Search())
-        task = app.start_improvement("first")
-        app.cancel()
-        with self.assertRaises(asyncio.CancelledError):
-            await task
-        await app.wait_for_improvement()
-        self.assertEqual(ApplicationState.IDLE, app.state)
-        await app.improve("second")
-        self.assertEqual(["second"], calls)
-        self.assertEqual("completed", app.improvement_progress.status)
 
     async def test_async_command_extension_does_not_submit_to_model(self):
         app, provider = await self.app()
@@ -228,33 +178,3 @@ class ExtensionTests(unittest.IsolatedAsyncioTestCase):
         await frontend.run()
         self.assertEqual([True, True], cancelled)
         self.assertEqual([], provider.calls)
-
-
-    async def test_previous_job_completion_cannot_reset_new_job_state(self):
-        second_started, release = asyncio.Event(), asyncio.Event()
-        tasks = []
-        app = None
-
-        class Search:
-            async def improve(self, manifest, direction, **options):
-                if direction == "first":
-                    asyncio.get_running_loop().call_soon(
-                        lambda: tasks.append(app.start_improvement("second"))
-                    )
-                    return ()
-                second_started.set()
-                await release.wait()
-                return ()
-            def cancel_improvement(self): return True
-
-        app, _ = await self.app(improvement=Search())
-        await app.improve("first")
-        await second_started.wait()
-        try:
-            self.assertEqual(ApplicationState.IMPROVING, app.state)
-            self.assertEqual("running", app.improvement_progress.status)
-            self.assertEqual(2, app.improvement_progress.sequence)
-        finally:
-            release.set()
-            await tasks[0]
-        self.assertEqual(ApplicationState.IDLE, app.state)

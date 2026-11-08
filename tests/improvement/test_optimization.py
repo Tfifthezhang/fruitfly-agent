@@ -8,9 +8,9 @@ from fruitfly_agent.lab.improvement.components.files import FileComponentAdapter
 from fruitfly_agent.lab.improvement.components.text import TextComponentAdapter
 from fruitfly_agent.improvement.components.registry import ComponentRegistry
 from fruitfly_agent.lab.base_prompt.target import BasePromptTarget
-from tests.support.pipeline import fixture, build_pipeline
+from tests.support.stages import fixture, proposal_fixture
 from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
-from fruitfly_agent.improvement.workflow.services import WorkflowServices
+from fruitfly_agent.improvement.stages.services import StageServices
 
 
 class OptimizationProtocolTests(unittest.IsolatedAsyncioTestCase):
@@ -57,16 +57,15 @@ class OptimizationProtocolTests(unittest.IsolatedAsyncioTestCase):
         spec.admit(role='S', capabilities={'snapshot'}, boundaries={'task'}, updates={'between-tasks'})
 
     async def test_unsupported_online_surface_rejects_before_any_trial(self):
-        flow, plan, baseline, runner = build_pipeline()
+        flow, plan, baseline, runner = proposal_fixture()
         flow.components.adapters['prompt'] = FileComponentAdapter(baseline.component('prompt'), lambda doc: None,
             optimization=OptimizationSpec('H', 'text', update='within-task', boundary='turn'))
-        async with WorkflowServices(plan) as services:
-            with self.assertRaisesRegex(ValueError, 'optimization surface'):
-                await flow.run(plan, TaskMaterial('task', 'Do the task'), baseline, services)
+        with self.assertRaisesRegex(ValueError, 'optimization surface'):
+            flow.components.admit(plan.component_ids, runner.capabilities)
         self.assertEqual(runner.calls, [])
 
     def test_plan_rejects_retired_allowances(self):
-        _, plan, _, _ = build_pipeline()
+        _, plan, _, _ = proposal_fixture()
         with self.assertRaises(TypeError):
             replace(plan, max_model_calls=2)
 

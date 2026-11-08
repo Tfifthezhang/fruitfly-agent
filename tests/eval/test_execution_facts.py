@@ -12,7 +12,7 @@ from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
 from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
 from fruitfly_agent.improvement.execution.facts import read_facts
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
-from tests.support.pipeline import fixture, version
+from tests.support.stages import fixture, version
 
 
 class BenchmarkFactTests(unittest.TestCase):

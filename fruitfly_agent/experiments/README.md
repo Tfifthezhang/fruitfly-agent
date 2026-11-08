@@ -1,173 +1,90 @@
 # Experiments
 
-[Up: Runtime Architecture](../README.md)
+[Up: Runtime architecture](../README.md)
 
-Run fixed-version Eval, Improvement and RSI independently of chat. System config
-selects H/S/I; an experiment selects tasks, optional edit narrowing and fixed comparison
-conditions. Daily, baseline and candidate configs use the same runtime assembler.
+Use fixed Eval and independent Improvement stages outside chat. One editable
+research document describes historical inputs, current configuration and the next
+operation. No Improvement command runs an automatic search or a multi-stage loop.
 
-## Configure a workspace
+## Start a staged study
+
+Copy the [research example](../../examples/experiments/research-stage.example.yaml)
+and replace placeholder paths. System H/S/I and models retain their ordinary
+configuration formats. Importing old records requires no prepared benchmark or
+model credential.
+
+```bash
+fruitfly-agent-lab improvement show --config experiment.yaml
+fruitfly-agent-lab improvement check --config experiment.yaml
+# Executes only next.stage. Model/task phases may incur charges.
+fruitfly-agent-lab improvement step --config experiment.yaml
+```
+
+Set `next.stage` to `import`, `organize`, `assess`, `propose`, `execute`, `compare`
+or `eval`. Named inputs resolve explicit branch references; neither scores nor
+a global latest output chooses the next operation. A stage never reruns a missing
+prerequisite. Editing this file changes the next invocation without changing
+historical configuration snapshots or previously exported candidates.
+
+See [configuration](CONFIGURATION.md) and the detailed
+[Improvement developer guide](../lab/improvement/DEVELOPER_GUIDE.md).
+
+## Initialize system and benchmark inputs
 
 ```bash
 fruitfly-agent-lab init
-# Optional benchmark recipe; no model, download or container starts here.
 fruitfly-agent-lab --cwd /path/to/workspace init --source task-set --benchmark terminal-bench-4
 ```
 
-The workspace must already exist. Initialization creates a
-`default-config.yaml`, `models.yaml` and an empty-key `secrets.env` under
-`.fruitfly/`. H/S/I remain in the system file; registered default parameter
-documents stay in their Lab owners. No components directory is generated. Default
-initialization writes system files only. The explicit benchmark recipe adds
-`experiment.yaml`, a task document and request/host files. No empty S documents are created. Existing regular `models.yaml` and
-secret files are reused unchanged; other existing destinations cause an error.
-The daily config stays untouched. New files use 0600
-and new directories use 0700. Ordinary write failures clean up only new files.
+Initialization performs no download, container start or model request. Configure
+the shared models, secret environment and host before benchmark preparation.
+Paths resolve from their declaring files; explicit missing files, unknown fields
+and duplicate keys fail. Existing configs are never silently overwritten.
+See [examples](../../examples/experiments/README.md) and
+[remote setup](../../examples/experiments/TB4_SERVER.md).
 
-Edit model specifications and credentials before checking. System initialization
-works without Eval. See [system setup](../../examples/experiments/README.md#initialize-system-configuration)
-and [remote TB4 setup](../../examples/experiments/TB4_SERVER.md).
+## Keep fixed Eval independent
 
-The configuration guide tree is:
+`eval catalog`, `prepare`, `check`, `run`, `list`, `report` and `stop` retain their
+fixed-configuration responsibility. A research document with `next.stage: eval`
+registers the result batch in the same study and stops there. Eval is optional:
+removing it leaves generic research stages and injected task executors usable.
+The composition entry wires adapters; Runtime and Lab never import Experiments.
 
-- [Configuration overview](../../CONFIGURATION.md): file responsibilities and precedence.
-- [Component documents](../runtime_spec/COMPONENTS.md): write a system and its H/S/I files.
-- [Experiment configuration](CONFIGURATION.md): tasks, grants, comparisons and phase times.
-- [Component registration](../lab/catalog/CONFIGURATION.md): expose a new implementation.
-- [Runnable recipes](../../examples/experiments/README.md): initialize, check and execute.
+Task-set preparation supports `eval prepare --tasks-only` followed by
+`eval prepare`. Preparation may download/build/start containers; it does not
+perform task model requests. Fixed execution requires an explicit request.
 
-`--cwd` selects a workspace. `--config` selects an experiment file. Paths resolve
-from their declaring documents. Explicit missing files, unknown fields and
-duplicate YAML keys fail. The [field guide](CONFIGURATION.md) defines the single accepted grammar.
-Configuration version markers and unknown sections are rejected.
+## Retain portable stage outputs
 
-## Choose operation and source
+Every invocation retains `runs/<id>/configuration/`, inputs, outputs and reports.
+Bundles retain immutable producer/configuration references and transitive
+artifacts. Complete candidate exports use the normal Catalog materializer.
+`references.json` resolves names inside the explicitly selected branch.
+Generated `observed` content shows recent activity but never controls execution.
 
-| Operation | Actions | Responsibility |
-|---|---|---|
-| `eval` | `catalog`, `prepare`, `check`, `run`, `list`, `report ID`, `stop ID` | Fixed-version benchmark execution |
-| `improvement` | `check`, `run`, `list`, `report ID`, `stop ID` | Generate and compare changes |
-| `rsi` | `check`, `run`, `list`, `report ID`, `stop ID`, `resume ID` | Independently verify, adopt and continue |
-
-| Task source | Required material |
-|---|---|
-| `files` | Instruction/files or an installed task package; embedding must register a runner |
-| `task-set` | Prepared Eval collections or explicitly registered sources |
-| `editor` | Disjoint study episodes and an explicitly registered episode/task backend |
-| `eval` | Prepared benchmark request and host |
-
-Task source declarations live in the document referenced by `tasks`. Material
-formats do not install task executors. CLI `files` and `editor` sources report an
-unavailable backend; `check` exits 3 and `run` rejects them before model work.
-Embeddings supply execution through [public ports](../lab/improvement/execution/README.md). Ordinary conversations do not automatically create training material.
-Eval is optional; `eval run` never starts improvement. Benchmark reward alone
-cannot grant persistent adoption or RSI.
-
-## Override only what matters
-
-Start from the generated tree and edit the responsible file:
-
-| Change | File |
-|---|---|
-| Available model definitions and Provider parameters | Shared `models.yaml` |
-| Model roles or selected components | `default-config.yaml` |
-| Prompt/tool/context/execution values | Referenced H component |
-| Retained Skill | Referenced S component |
-| Editor instructions | Referenced I editor component |
-| Evaluator prompts | Referenced I evaluator component |
-| Generator, sampling and leaf execution conditions | Experiment `execution` |
-| Read/catalog/search response limits | Experiment `evidence` |
-| Round/failure/no-gain limits | Experiment `stopping` |
-| Optional edit narrowing and independent phase times | `experiment.yaml` |
-| Formal comparison/scope | Experiment `evaluation` |
-| Task source and material | Referenced task document |
-
-Do not copy component values into experiment sections. See the complete
-[field guide](CONFIGURATION.md) rather than maintaining a second field list here.
-CLI choices do not activate arbitrary Python or install plugins.
-
-## Use completed-process feedback
-
-The shared evaluator uses I evaluator prompts and the assessor model role. Configure shared response limits under `evidence`; each round continues from its retained incumbent. See [the field guide](CONFIGURATION.md#configure-evaluation-and-evidence).
-
-Raw execution facts remain immutable. Model judgments report dimensions, process signals and behavior hypotheses with cited source spans. Unknown judgments retain the incumbent. Official scores and independent verification retain their authority. Online registered-task assessment remains a separate explicit parameter.
-
-## Prepare benchmarks
-
-```bash
-# Downloads/builds/containers may occur; no task model requests.
-fruitfly-agent-lab eval prepare --tasks-only
-fruitfly-agent-lab eval prepare
-fruitfly-agent-lab improvement check
-# Explicit model/task execution; charges may apply.
-fruitfly-agent-lab improvement run
-```
-
-The adapter stages a derived host for the selected runtime. Original host
-files stay unchanged. Preparation must match current runtime source and frozen
-inputs. Checks never silently prepare, download or launch task containers.
-All collections share one baseline and workspace; conflicting explicit request
-references fail. See [Eval](../../fruitfly_eval/README.md) and its
-[Improvement adapter](../../fruitfly_eval/improvement/README.md).
-
-## Inspect records and stop safely
-
-```bash
-fruitfly-agent-lab improvement check --json
-fruitfly-agent-lab improvement list
-fruitfly-agent-lab improvement report '<RUN_ID>' --json
-fruitfly-agent-lab improvement stop '<RUN_ID>'
-fruitfly-agent-lab rsi resume '<RUN_ID>'
-```
-
-Use actual run IDs. `check` constructs no Providers and makes no model request.
-It validates sources, model aliases, credential presence, capabilities and
-phase times and grants; external connectivity and quality remain unverified.
-
-Run indexes stay in `.fruitfly/experiments/runs/<id>/`. Journals and trials stay
-in `.fruitfly/improvement/jobs/<job-id>/`; each generated candidate has an
-ordinary config under `candidates/<id>/config.yaml` there. Models and component
-contents are frozen with the candidate; source defaults stay unchanged. Follow
-recorded links to Eval and independent verification evidence.
-
-The host owns scoped cancellation and cleanup. Resume restores durable job conditions, rejects unsupported records, avoids replaying uncertain requests and reconciles activation. Each role invocation starts its own clock. One process owns each run.
-
-`--events jsonl` reports lifecycle/search events. Exit 0 means command completion,
-1 incomplete execution, 2 configuration error, 3 blocked execution and 130
-interruption; these are not quality certificates.
+Advanced explicit input commands accept `--study`, `--output-root` and bundle paths.
+The main research file supplies these values for normal use. `improvement inspect`
+and `resume` inspect durable activity state; they do not replay external work.
+Different configuration is reported, not used as a continuation gate.
 
 ## Files and offline checks
 
-| Files | Responsibility |
+| File | Responsibility |
 |---|---|
-| `configuration.py`, `comparison.py` | Strict experiment parsing and fixed condition resolution |
-| `sources.py`, `task_sets.py`, `policies.py` | Public task, batch and stopping composition |
-| `composition.py`, `validation.py` | Shared runtime staging, backend checks and grants |
-| `scaffolding.py`, `templates/` | Experiment-specific inputs; shared system templates belong to Run |
-| `operations/`, `records.py` | Explicit execution, indexes, locks and scoped stop |
-| `cli.py`, `menu.py`, `presentation.py` | Arguments and views |
+| `cli.py`, `menu.py` | Thin operation selection and argument parsing |
+| `configuration.py`, `comparison.py` | Project common owner-validated configuration |
+| `operations/step.py` | Bind the main file to one explicit stage |
+| `operations/research.py` | Inject independent role/backend services and publish results |
+| `operations/evaluate.py` | Optional fixed Eval adapter |
+| `composition.py`, `validation.py` | Runtime/source construction and offline admission |
+| `records.py` | Fixed Eval indexes and scoped stop |
+| `scaffolding.py`, `templates/` | Private workspace templates |
 
 ```bash
 .venv/bin/python -m unittest discover -s tests/experiments -t .
 ```
 
-Tests use fake Providers/executors and temporary files, without model fees or
-containers. Installed templates are checked outside the source checkout.
-
-## Optimize a shared task set
-
-Use the [multi-collection recipe](../../examples/experiments/multi-task.example.yaml).
-Task documents preserve collection objectives and private partitions. Experiment
-`execution` owns sampling/promotion scheduling and trial attempts/concurrency;
-`evaluation.comparison` owns aggregation/regression rules. Candidate concurrency remains one.
-
-Each leaf is an attributable execution. Shared-batch retention and complete
-selection remain separate; incomplete coverage cannot win. Each editor, execution and evaluator invocation has its own time. Task-set search uses the fixed flow and task scope without experience retention. Independent adoption needs a
-separately implemented policy.
-
-## Check one resolved harness
-
-Text/JSON checks show selected components, owner/source, effective values,
-registered capabilities and edit bounds. Enabled, configurable and editable have
-different meanings. New components must follow [Catalog admission](../lab/catalog/CONFIGURATION.md).
-No host branch or hidden import may substitute for registration.
+Offline tests use fake Providers and executors. They do not establish benchmark
+quality or external connectivity. Generic materials require a registered executor;
+a file instruction alone does not install a task runner.

@@ -60,6 +60,16 @@ class ProposalResult:
             raise ValueError('a proposal batch needs at most one candidate and an explicit stop flag')
 
 
+@dataclass(frozen=True)
+class ResearchProposalRequest:
+    """Retained observations directly, without synthetic scores or search trials."""
+    plan: RunPlan
+    tasks: tuple[TaskMaterial, ...]
+    baseline: HarnessSnapshot
+    records: tuple[ExecutionRecord, ...]
+    context: tuple[Resource, ...] = ()
+
+
 
 
 class GenerationServices(Protocol):

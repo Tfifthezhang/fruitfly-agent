@@ -95,7 +95,7 @@ class CandidateEvaluation:
 
     @property
     def complete(self):
-        return self.assessment.score is not None
+        return len(self.trials) == len(self.batch.task_keys) * self.batch.attempts
 
 
 @dataclass(frozen=True)

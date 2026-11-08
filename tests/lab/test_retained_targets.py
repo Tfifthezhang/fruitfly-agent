@@ -33,7 +33,7 @@ class RetainedTargetTests(unittest.IsolatedAsyncioTestCase):
         from fruitfly_agent.improvement.contracts.plans import RunPlan
         from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
         from tests.support.task_execution import TaskRunnerFixture
-        from fruitfly_agent.improvement.workflow.services import WorkflowServices
+        from fruitfly_agent.improvement.stages.services import StageServices
         from fruitfly_agent.improvement.contracts.components import HarnessSnapshot, ComponentFile
         from fruitfly_agent.improvement.contracts.versions import SystemVersion, content_hash
         from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
@@ -41,7 +41,7 @@ class RetainedTargetTests(unittest.IsolatedAsyncioTestCase):
         harness = HarnessSnapshot(tuple(with_component_text(c, text)
             if c.component_id == changed else c for c in registry.snapshot().components))
         plan = RunPlan('test', SystemVersion(*(content_hash(v) for v in ('H', 'I', 'S'))), (changed,))
-        services = WorkflowServices(plan)
+        services = StageServices(plan)
         record = await TaskRunnerFixture(config, registry, MemoryArtifacts(), services).execute(
             plan, TaskMaterial('task', 'select'), harness)
         return record, services

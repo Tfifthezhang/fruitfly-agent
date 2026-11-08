@@ -63,7 +63,7 @@ def definition():
         implementation_path='fruitfly_agent/lab/context_manager/augmentation/memory/methods/file_memory/algorithm.py',
         documentation_path='fruitfly_agent/lab/context_manager/augmentation/memory/methods/file_memory/README.md')
     return editable_parameters(value, {p.name for p in params} - {'root', 'model_profile'},
-        required_capabilities={'memory-learning'})
+        required_capabilities={'memory-learning'}, default_selected=False)
 
 
 def install(state, context, values):

@@ -47,7 +47,7 @@ class AgentRunner:
             max_turns=None, max_tool_calls_per_turn=None,
             get_follow_up_messages=None, get_steering_messages=None)
         result = await run_agent_loop(invocation, list(messages), signal=signal)
-        record('agent-finished', usage=result.usage.to_dict(),
+        record('agent-finished', usage=result.usage.to_dict(), error_details=result.error_details if result.is_error else None,
             diagnostics=asdict(result.diagnostics) if result.diagnostics is not None else None,
             status='error' if result.is_error else result.stop_reason)
         return result

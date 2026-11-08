@@ -23,7 +23,7 @@ class EvaluatorInstructions:
 
 class EvaluatorInstructionTarget:
     structured_parameters = True
-    optimization = OptimizationSpec('I', 'parameters', required_capabilities=frozenset({'improver-comparison'}))
+    optimization = OptimizationSpec('I', 'parameters', required_capabilities=frozenset({'improver-comparison'}), default_selected=False)
     component_kind = 'evaluator-instructions'
     required_capabilities = frozenset({'improver-comparison'})
     adoption_roles = frozenset({'I'})

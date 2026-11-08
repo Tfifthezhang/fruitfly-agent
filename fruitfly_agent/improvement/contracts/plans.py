@@ -14,6 +14,7 @@ class StageTimeouts:
     editor_seconds: float = 1200
     execution_seconds: float = 3600
     evaluator_seconds: float = 1200
+    organizer_seconds: float = 1200
 
     def __post_init__(self):
         for value in asdict(self).values():

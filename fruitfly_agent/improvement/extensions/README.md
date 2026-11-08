@@ -32,8 +32,8 @@ persistence, integrity and cleanup errors propagate. Nested handlers share
 the current invocation deadline and must cooperate with cancellation. A trusted Python
 extension can retain external references; these contracts are not an OS sandbox.
 
-Embeddings register directly on `WorkflowServices.hooks`. Hosted jobs may supply
-`WorkflowBindings.hooks(context)` to install callbacks per job and inner I trial.
+Embeddings register directly on `StageServices.hooks`. Hosted jobs may supply
+`StageBindings.hooks(context)` to install callbacks per job and inner I trial.
 The factory must declare a JSON `configuration` dictionary (empty for a stateless
 factory); its implementation identity and parameters join frozen previews.
 It must register owned

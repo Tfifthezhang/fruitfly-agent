@@ -9,12 +9,12 @@ from fruitfly_agent.improvement.contracts.assessment import AssessmentUnavailabl
 from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
 from fruitfly_agent.improvement.contracts.tasks import TaskMaterial, Resource
 from fruitfly_agent.improvement.contracts.plans import RunPlan
-from fruitfly_agent.improvement.workflow.services import WorkflowServices
+from fruitfly_agent.improvement.stages.services import StageServices
 from fruitfly_agent.lab.improvement.assessment.evaluator import ModelEvaluator
 from fruitfly_agent.lab.improvement.assessment.instructions import EvaluatorInstructions, EvaluatorInstructionTarget
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
 from tests.support.faux_provider import FauxProvider
-from tests.support.pipeline import version
+from tests.support.stages import version
 from tests.support.model_evaluation import judgment
 
 
@@ -29,9 +29,27 @@ class EvaluatorTests(unittest.IsolatedAsyncioTestCase):
             (Resource('trajectory.txt', log, kind='trajectory'),)) for i in range(2))
         provider = FauxProvider()
         evaluator = ModelEvaluator(AgentLoopConfig(provider), artifacts)
-        services = WorkflowServices(plan)
+        services = StageServices(plan)
         self.addAsyncCleanup(services.close)
         return evaluator, task, records, services, provider, log
+
+    async def test_structured_submission_rejects_wrong_nesting_then_finishes_without_prose(self):
+        evaluator, task, records, services, provider, _ = self.setup_evaluation()
+        provider.respond_tool_call('submit_comparison', {'evaluations': []})
+        from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone
+        from fruitfly_agent.core.data_model import ToolCallBlock
+        def submit(view, signal=None):
+            data = json.loads(judgment(view).text)
+            async def events():
+                yield StreamDone(AssistantMessage([ToolCallBlock(id='submit', name='submit_comparison', input=data)], stop_reason='toolUse'))
+            return AssistantMessageEventStream(events())
+        provider.script.append(submit)
+        value, reference = await evaluator.evaluate(task, records, services)
+        self.assertEqual(value['choice'], 'run-1')
+        self.assertEqual(services.used['model'], 2)
+        self.assertTrue(provider.calls[1]['messages'][-1].is_error)
+        from fruitfly_agent.lab.improvement.assessment.responses import reprocess_response
+        self.assertEqual(reprocess_response(evaluator.artifacts, reference, records, value['evidence_ids']), value)
 
     async def test_initial_evidence_lists_full_index_without_reading_large_trajectory(self):
         evaluator, task, records, services, provider, log = self.setup_evaluation()
@@ -51,7 +69,7 @@ class EvaluatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(1, services.used['model'])
         initial = json.loads(provider.calls[0]['messages'][0].content)
         self.assertIn('catalog', initial)
-        self.assertLessEqual(set(provider.calls[0]['tools']), {'catalog', 'read', 'search'})
+        self.assertLessEqual(set(provider.calls[0]['tools']), {'catalog', 'read', 'search', 'submit_comparison'})
         self.assertTrue(result['evaluations'][0]['dimensions'])
 
     async def test_search_supplies_only_returned_spans_and_keeps_tools_available(self):
@@ -59,7 +77,7 @@ class EvaluatorTests(unittest.IsolatedAsyncioTestCase):
         provider.respond_tool_call('search', {'path': 'context/executions/run-0/trajectory.txt', 'query': 'decisive'})
         from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone
         def finish(view, signal=None):
-            self.assertEqual({'catalog', 'read', 'search'}, {tool.name for tool in view.tools})
+            self.assertEqual({'catalog', 'read', 'search', 'submit_comparison'}, {tool.name for tool in view.tools})
             data = json.loads(judgment(view).text)
             data['evidence_ids'] = [json.loads(view.messages[-1].text)['matches'][0]['citation_id']]
             async def events(): yield StreamDone(AssistantMessage([TextBlock(json.dumps(data))], stop_reason='stop'))

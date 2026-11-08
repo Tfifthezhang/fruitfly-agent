@@ -10,10 +10,7 @@ from fruitfly_agent.improvement.contracts.pipeline import ImprovementOutcome, Wo
 from .contracts.facts import ExecutionFacts, UsageFact, ArtifactFact
 from .contracts.evaluation import EvaluationBatch, TrialResult, CandidateEvaluation
 from .contracts.experiments import EpisodeExecutor, EpisodeRequest, EpisodeResult
-from .workflow.controller import ImprovementWorkflow
-from .workflow.engine import SearchEngine
-from .workflow.problems import SearchProblem
-from .workflow.services import WorkflowServices, GeneratorServices
+from .stages.services import StageServices, GeneratorServices
 from .execution.scheduler import TaskScheduler
 from .execution.handles import ManagedExecution, CompletionOnlyRunner
 from .execution.facts import attach_facts, ensure_facts, read_facts, receipt_facts
@@ -27,3 +24,7 @@ from .extensions.hooks import HookRegistry
 from fruitfly_agent.core.extensions.operations import OperationSupervisor
 
 from .contracts.optimization import OptimizationSpec, OptimizationAdapter, TextProjection
+
+from .stages.controller import ResearchController
+from .contracts.stages import StageInputs
+from .contracts.editing import ResearchProposalRequest

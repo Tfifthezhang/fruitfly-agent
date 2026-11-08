@@ -67,34 +67,6 @@ def task_material(config):
         persistent_policy='task-holdout-v1' if pack and catalog.holdout(pack) else '', requires_runner_factory=True)
 
 
-def editor(config):
-    from fruitfly_agent.lab.improvement.execution import builtin_executions
-    task = mapping(config.task, {'source', 'material', 'parameters'}, 'editor experiment')
-    material = task.get('material')
-    if not isinstance(material, str) or not material:
-        raise ValueError('editor experiments require task.material')
-    from fruitfly_agent.improvement.contracts.validation import identifier
-    identifier(material)
-    path = config.workspace / '.fruitfly/improvement/experiments' / material / 'experiment.json'
-    if not path.is_file() or path.is_symlink():
-        raise ValueError('installed editor experiment is missing')
-    definition = builtin_executions().get('improver-comparison')
-    params = task.get('parameters', {})
-    if not isinstance(params, dict):
-        raise ValueError('editor execution parameters must be a mapping')
-    parameters = definition.normalize(tuple(params.items()))
-    if not parameters['inner_components'].split():
-        raise ValueError('declare inner editable components')
-    from types import SimpleNamespace
-    from fruitfly_agent.lab.improvement.materials.episodes import freeze
-    from fruitfly_agent.lab.improvement.tasks import TaskPackCatalog
-    frozen = freeze(SimpleNamespace(workspace=config.workspace, tasks=TaskPackCatalog(config.workspace)),
-        material, parameters['inner_components'].split()[0])
-    return SourceBinding('improver-comparison', material, parameters=tuple(sorted(parameters.items())), measured=True,
-        source_identity=frozen.source_id, persistent_policy='improver-paired-v1',
-        required_components=(), forbidden_components=(), requires_runner_factory=True)
-
-
 def benchmark(config):
     import hashlib
     from fruitfly_eval.improvement.configuration import resolve_benchmark
@@ -105,7 +77,7 @@ def benchmark(config):
         adoption_notice='benchmark reward supports search; RSI needs a separately registered independent verifier')
 
 
-SOURCES = {'files': task_material, 'editor': editor, 'eval': benchmark}
+SOURCES = {'files': task_material, 'eval': benchmark}
 
 
 def registered(config):

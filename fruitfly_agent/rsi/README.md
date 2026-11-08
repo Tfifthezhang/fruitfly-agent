@@ -35,7 +35,7 @@ Hosts provide `load_job`, `save_job`, `active_manifest` and `is_active`. Interru
 ## Verify offline
 
 ```bash
-.venv/bin/python -m unittest tests.rsi.test_callbacks tests.rsi.test_recovery tests.workflows.test_evolution tests.workflows.test_developer_extensions
+.venv/bin/python -m unittest tests.rsi.test_callbacks tests.rsi.test_recovery tests.rsi.test_recovery tests.workflows.test_developer_extensions
 ```
 
 Fake Providers verify execution binding, cancellation, continuation and recovery.

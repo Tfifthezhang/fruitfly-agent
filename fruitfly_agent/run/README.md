@@ -160,7 +160,7 @@ Canonical data and record semantics belong to [Session](../core/session/README.m
 
 ## Candidate jobs
 
-[improvement/pipeline.py](improvement/pipeline.py) owns preview receipts and uses public stage factories, components, task, storage and active-version queries. The Factory retains active bindings and exposes the public host methods.
+[improvement/execution_host.py](improvement/execution_host.py) owns preview receipts and uses public stage factories, components, task, storage and active-version queries. The Factory retains active bindings and exposes the public host methods.
 
 | Step | Run's responsibility |
 |---|---|
@@ -179,38 +179,17 @@ or completed without a candidate; reports retain usage, stopping reasons and
 verified journal references. History protects referenced candidates without
 relaxing activation checks.
 
-Component and generator views declare capability availability. Typed workflow requests select materials, component scope, generator, rounds and independent phase times. Adding an implementation does not add algorithm branches to Run or the terminal.
+Component and generator views declare capability availability. Typed workflow requests select materials, component scope, generator and independent phase times. Adding an implementation does not add algorithm branches to Run or the terminal.
 
-Task selection does not change runtime configuration. Lab owns pack parsing and training edits. Readable `latest.txt` exports are not runtime inputs. Failed replacement retains the active runtime; external writes and effects do not automatically roll back. See [Improvement results](../lab/improvement/README.md#results-and-retention).
+Task selection does not change runtime configuration. Lab owns pack parsing and training edits. Readable `latest.txt` exports are not runtime inputs. Failed replacement retains the active runtime; external writes and effects do not automatically roll back. See [Improvement results](../lab/improvement/README.md#select-editable-surfaces).
 
 ## Explicit text evolution
 
-For a started Application with an available improver, an embedding host can inject an independent asynchronous verifier:
+`run.improvement.evolution.RunEvolutionHost` remains a generic adapter over
+explicitly injected proposal, verification and activation capabilities. It has no
+automatic Improvement composition. Independent stages and research configuration
+do not authorize adoption. See [RSI](../rsi/README.md) for its generic contracts.
 
-```python
-from fruitfly_agent.rsi import EvolutionEngine
-from fruitfly_agent.run.evolution import RunEvolutionHost
-
-# application, factory, request, and verify_candidate are supplied by the host.
-# request is an explicit WorkflowRequest selecting materials, scope and phase times.
-host = RunEvolutionHost(
-    application, factory,
-    policy_id="my-fixed-policy-v1", verify=verify_candidate, request=request,
-)
-# In the host's event loop, after explicitly authorizing model work:
-# result = await EvolutionEngine().evolve(
-#     host, job_id="text-evolution-1", policy_id="my-fixed-policy-v1",
-#     direction="Improve the fixed task", max_steps=2, phase_timeout_seconds=60,
-# )
-```
-
-The verifier returns `VerificationEvidence` bound to candidate/artifact/parent/policy identities, not merely a search score. For built-in completed proofs, omit `verify` and select `task-holdout-v1` or `improver-paired-v1` as appropriate. The host rechecks exact content, parent, material and execution identity without repeating paid verification. See [proof reuse](improvement/README.md#reuse-a-completed-independent-proof). Jobs live in `.fruitfly/evolution/`. Only confirmed activation advances the version. Unknown paid phases stop; activation interruptions reconcile the actual manifest. One coordinator owns the job; no cross-process commit transaction. See [RSI](../lab/rsi/README.md).
-
-Run exposes an optional `configuration.model_setup` service to the terminal. Model additions and hidden credentials stay in memory until configuration save; reset discards them. The factory's secret environment is updated after successful save, so explicit configuration application or a later start can use the model without restarting. Existing configuration-controller consumers can omit this service. Use [Configuration](../../CONFIGURATION.md) and [Providers](../providers/README.md) for supported APIs, generated key-variable names, and persistence limits.
-
-```bash
-.venv/bin/python -m unittest discover -s tests/run -t . -v
-```
 
 ## Bind host permission policy
 
@@ -271,3 +250,12 @@ retained-state overlays and maintenance services. The one-shot CLI selects this
 host mode. Frozen component documents still load through ordinary assembly, so
 isolated tasks consume their declared initial S without learning from other tasks.
 A configuration file's location alone does not select this isolation policy.
+
+## Configure models interactively
+
+Run exposes an optional `configuration.model_setup` service to the terminal.
+Model additions and hidden credentials stay in memory until configuration save;
+reset discards them. The factory's secret environment is updated after successful
+save. Explicit configuration application or a later start uses the model without
+restarting. See [Configuration](../../CONFIGURATION.md) and
+[Providers](../providers/README.md).

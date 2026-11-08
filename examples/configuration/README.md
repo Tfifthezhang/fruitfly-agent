@@ -14,7 +14,7 @@ system/model files from installed templates, without an experiment executor. It 
 the shared `models.yaml` only when absent, preserves daily files and existing
 regular model catalogs/secrets, and rejects other conflicting configuration files.
 Use `--source task-set --benchmark terminal-bench-4` for benchmark request/host
-and experiment templates. See [system setup](../experiments/README.md#initialize-system-configuration)
+and experiment templates. See [system setup](../experiments/README.md#initialize-and-prepare)
 or the [remote Linux walkthrough](../experiments/TB4_SERVER.md). No model or
 container starts during initialization.
 
@@ -48,7 +48,7 @@ The lazy `models.roles.memory_maintenance` reference inherits executor by defaul
 See [memory behavior](../../fruitfly_agent/lab/context_manager/augmentation/memory/methods/file_memory/README.md)
 and [Skill optimization](../../fruitfly_agent/lab/context_manager/augmentation/skills/README.md#improve-descriptions-and-bodies).
 Candidate editing additionally needs an explicit
-[experiment grant](../../fruitfly_agent/experiments/CONFIGURATION.md#grant-component-changes).
+[experiment grant](../../fruitfly_agent/experiments/CONFIGURATION.md#inspect-configuration-before-models).
 
 The Eval host template is independent of daily/default Agent configuration and
 contains no model/key preferences. See [Harbor preparation](../../fruitfly_eval/harbor/README.md)

@@ -6,15 +6,15 @@ from fruitfly_agent.improvement.contracts.lifecycle import ContextContribution
 from fruitfly_agent.improvement.contracts.tasks import Resource
 from fruitfly_agent.improvement.contracts.failures import StageFailure
 from fruitfly_agent.improvement.extensions import HookRegistry
-from fruitfly_agent.improvement.workflow.services import WorkflowServices
+from fruitfly_agent.improvement.stages.services import StageServices
 from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
-from tests.support.pipeline import build_pipeline
+from tests.support.stages import proposal_fixture
 
 
 class KernelTests(unittest.IsolatedAsyncioTestCase):
     async def test_hook_order_immutability_and_invalid_results_are_isolated(self):
-        _, plan, _, _ = build_pipeline()
+        _, plan, _, _ = proposal_fixture()
         hooks, order = HookRegistry(), []
         artifacts = MemoryArtifacts()
         resource = Resource('context.json', artifacts.put(b'{}'), 'application/json', 'input')
@@ -27,7 +27,7 @@ class KernelTests(unittest.IsolatedAsyncioTestCase):
         hooks.register('before_proposal', active, active=True)
         hooks.register('before_proposal', lambda e: ContextContribution((resource,)), active=True)
         hooks.register('before_proposal', lambda e: 'bad control result')
-        services = WorkflowServices(plan, hooks=hooks)
+        services = StageServices(plan, hooks=hooks)
         try:
             result = await services.emit('before_proposal')
             self.assertEqual(result.resources, (resource,))
@@ -36,24 +36,10 @@ class KernelTests(unittest.IsolatedAsyncioTestCase):
         finally:
             await services.close()
 
-    async def test_required_hook_stops_job_and_optional_timeout_does_not(self):
-        for required in (False, True):
-            flow, plan, baseline, _ = build_pipeline()
-            plan = replace(plan, timeouts={'editor_seconds':.01,'execution_seconds':.01,'evaluator_seconds':.01})
-            services = WorkflowServices(plan)
-            async def hanging(event):
-                await asyncio.Event().wait()
-            services.hooks.register('before_proposal', hanging, required=required)
-            try:
-                result = await flow.run(plan, TaskMaterial('task', 'Work'), baseline, services)
-                self.assertEqual(result.stop_reason, 'stage_failed.hook' if required else 'completed')
-                self.assertIsNotNone(result.selected)
-            finally:
-                await services.close()
 
     async def test_cancellation_is_not_swallowed_by_optional_hook(self):
-        _, plan, _, _ = build_pipeline()
-        services = WorkflowServices(plan)
+        _, plan, _, _ = proposal_fixture()
+        services = StageServices(plan)
         entered = asyncio.Event()
         async def hanging(event):
             entered.set(); await asyncio.Event().wait()
@@ -68,8 +54,8 @@ class KernelTests(unittest.IsolatedAsyncioTestCase):
             await services.close()
 
     async def test_long_sequence_bounds_events_without_quota_control(self):
-        _,plan,_,_=build_pipeline()
-        services=WorkflowServices(plan)
+        _,plan,_,_=proposal_fixture()
+        services=StageServices(plan)
         for index in range(3000):
             services.observe('model')
             services.record('transition',index=index)
@@ -79,9 +65,9 @@ class KernelTests(unittest.IsolatedAsyncioTestCase):
         await services.close()
 
     async def test_long_sequence_of_stage_transitions_isolates_deterministic_faults(self):
-        from fruitfly_agent.improvement.workflow.operations import run_stage, require_type
-        _, plan, _, _ = build_pipeline()
-        services = WorkflowServices(plan)
+        from fruitfly_agent.improvement.stages.operations import run_stage, require_type
+        _, plan, _, _ = proposal_fixture()
+        services = StageServices(plan)
         failures = 0
         try:
             for index in range(1000):

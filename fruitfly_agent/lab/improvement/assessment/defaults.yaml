@@ -15,16 +15,15 @@ parameters:
     assess: Inspect the overview and event catalog, then search and read relevant
       original spans. Judge each applicable dimension with reasons, uncertainty and
       precise citations. A successful tool status does not establish success of every
-      enclosed command. Explain observed process signals and concrete next modification
-      hypotheses, including evidence that would refute them. Check supplied expected
+      enclosed command. Describe observed behavior and assess only hypotheses supplied by the editor.
+      Finding optimization signals and proposing changes belong to the editor. Check supplied expected
       effects against behavior; do not infer causation from one run. Distinguish infrastructure
       failures from task failures. Do not invent a total numeric score or unreported
       cost.
-    compare: Compare existing runs with identical dimensions and criteria. Respect
-      official measurements and fixed regression requirements. Prioritize task quality
-      and reliability before efficiency. When quality is supported as equal, consider
+    compare: Compare existing runs with identical dimensions and criteria. Consider
+      measurements alongside other observations without automatic priority. When quality is supported as equal, consider
       resource, progress and completion efficiency with uncertainty. Fewer model calls
       do not establish lower token use or elapsed time. Explain tradeoffs, hypothesis
-      outcomes and next optimization directions with source citations. Retain the
+      outcomes and unresolved observations with source citations. Retain the
       incumbent or report no clear choice when evidence is insufficient. Selection
       does not grant independent adoption.

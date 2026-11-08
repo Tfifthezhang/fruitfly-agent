@@ -52,7 +52,6 @@ class WorkflowExecutionView:
 @runtime_checkable
 class ComponentImprovementClient(Protocol):
     def workflow_configuration(self) -> WorkflowConfiguration | None: ...
-    def workflow_preview(self, request: object) -> 'ImprovementPreview': ...
 
 
 @dataclass(frozen=True)
@@ -77,8 +76,6 @@ class ImprovementTargetView:
 
 class ImprovementService(Protocol):
     def workflow_configuration(self) -> WorkflowConfiguration: ...
-    def workflow_preview(self, request: object) -> ImprovementPreview: ...
-    async def improve(self, manifest: Mapping[str, object], direction: str, *, preview_token="") -> tuple[CandidateView, ...]: ...
     def cancel_improvement(self) -> bool: ...
 
 
@@ -115,7 +112,6 @@ class ImprovementProgress:
 @runtime_checkable
 class ImprovementClient(ComponentImprovementClient, Protocol):
     """Frontend operations implemented by an Application with an injected service."""
-    def start_improvement(self, direction: str, *, preview_token=""): ...
 
 
 
@@ -162,6 +158,4 @@ class ImprovementLogService(Protocol):
 
 
 class ImprovementSubmissionService(Protocol):
-    """Optional host receipts; Application retains all execution authority."""
-    def improvement_submitted(self, manifest: Mapping[str, object], direction: str, *, preview_token: str = '') -> str: ...
-    def improvement_finished(self, preview_token: str, status: str, error: str = '') -> None: ...
+    """Historical submission records; no execution operation is exposed."""

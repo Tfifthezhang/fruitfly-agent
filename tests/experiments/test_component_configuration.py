@@ -40,13 +40,11 @@ class ComponentExperimentTests(unittest.TestCase):
             return prepare_experiment(load_configuration(self.root), 'improvement', require_credentials=False)
 
     def test_component_search_and_feedback_are_consumed_and_grants_are_visible(self):
-        self.change('experiment.yaml', lambda value: value.update(stopping={'max_rounds': 2},
-            evidence={'read': {'default_characters': 8000}}))
+        self.change('experiment.yaml', lambda value: value.update(evidence={'read': {'default_characters': 8000}}))
         self.change('experiment.yaml', lambda value: value.setdefault('edit', {}).update({'layered-compaction': {
             'fields': ['parameters.settings.tail_tokens'],
             'bounds': {'parameters.settings.tail_tokens': {'minimum': 256, 'maximum': 16384}}}}))
         prepared = self.prepare()
-        self.assertEqual(prepared.request.rounds, 2)
         self.assertEqual(prepared.config.evidence_settings['read']['default_characters'], 8000)
         self.assertIn('layered-compaction', prepared.request.component_ids)
         self.assertEqual(prepared.config.improvement.component_options['layered-compaction']['editable_fields'],

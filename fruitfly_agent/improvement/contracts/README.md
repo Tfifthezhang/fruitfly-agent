@@ -24,7 +24,7 @@ belong to the object owner. Role metadata does not supply execution or activatio
 Run uses the same version contracts for persistent publication and recovery.
 
 ```bash
-.venv/bin/python -m unittest tests.lab.test_improvement_pipeline tests.lab.test_experiment_contracts tests.contracts.test_signatures
+.venv/bin/python -m unittest tests.lab.test_detached_editor tests.lab.test_experiment_contracts tests.contracts.test_signatures
 ```
 
 ## Freeze experiments and execution capabilities
@@ -42,8 +42,8 @@ views rather than exposing Lab implementations to Interactive.
 
 `ProposalRequest.feedback` supplies permitted development measurements. `ImprovementOutcome.verification` references independent proof when available. Job plan schema 2 records execution identity and normalized request. A preview never authorizes replay of uncertain work.
 
-See [execution](../../lab/improvement/execution/README.md), [editor experiments](../../lab/improvement/improver/README.md)
-and [time/stop behavior](../../lab/improvement/workflow/README.md).
+See [execution](../../lab/improvement/execution/README.md), [Independent stages](../../lab/improvement/DEVELOPER_GUIDE.md)
+and [Independent stages](../../lab/improvement/DEVELOPER_GUIDE.md).
 
 ## Import contracts by responsibility
 
@@ -114,3 +114,13 @@ values with public parameter paths, meaning, type, current/default values, unit,
 bounds, choices and owner constraints. Descriptions are read-only evidence; edit
 grants and owner validators remain authoritative. Hosted plans bind the metadata
 identity through `component_description_id`.
+
+Research contracts are separate from search outcomes: `activities.py` declares
+activity inputs, dependencies and retained outputs; `research.py` declares immutable
+configuration revisions and serializable batches; `organization.py` declares
+readability requests and views. Measurements remain optional observations.
+
+`bundles.py` declares portable typed research output manifests and producer/config
+links. `configuration.py` reports field additions, removals and changes without
+turning them into continuation admission decisions. The host owns path resolution
+and immutable dependency copying.

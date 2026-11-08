@@ -27,7 +27,8 @@ SCHEMA = ('Return exactly JSON {"evaluations":[{"run_id":"existing-id","dimensio
 class ModelEvaluator:
     implementation_id = 'model-evaluator'
 
-    def __init__(self, config, artifacts, *, instructions=None, settings=None, reader_factory=None):
+    def __init__(self, config, artifacts, *, instructions=None, settings=None, reader_factory=None, context=()):
+        self.context = tuple(context)
         self.config = config
         self.artifacts=artifacts
         self.instructions=instructions or EvaluatorInstructions()
@@ -42,6 +43,8 @@ class ModelEvaluator:
             if event == 'evidence-page':
                 supplied.add(fields['citation_id'])
             services.record(event, **fields)
+        for resource in self.context:
+            references['context/organized/' + resource.path] = resource.artifact_id
         for resource in task.inputs:
             references['context/inputs/' + resource.path] = resource.artifact_id
         for record in records:
@@ -95,21 +98,49 @@ class ModelEvaluator:
                 supplied.add(row['facts_id'])
         mission += '\nIf the initial execution list is incomplete, page context/executions.json for every run. Read context/task.md for the complete task. Cover every supplied run in the final judgment.'
         initial = canonical_json(initial_value)
-        try:
-            response = await services.operation(self.session.session(mission, workspace, services, writable=False, system=SYSTEM, initial_content=initial), stage='evaluator')
+        response_id = ''
+        rejection_id = ''
+        accepted = None
+        def accept(response):
+            nonlocal response_id, rejection_id, accepted
+            raw = response if isinstance(response, str) else canonical_json(response)
+            response_id = self.artifacts.put(raw.encode('utf-8'))
+            services.record('evaluation-response', artifact_id=response_id,
+                            run_ids=[r.run_id for r in records])
             def unique(pairs):
                 result = {}
                 for key, value in pairs:
                     if key in result:
-                        raise ValueError('duplicate evaluator result field')
+                        raise ValueError('duplicate evaluator result field: ' + key)
                     result[key] = value
                 return result
-            data = json.loads(response, object_pairs_hook=unique)
-            self.validate(data, records, supplied | workspace.provided_ids)
+            try:
+                data = json.loads(raw, object_pairs_hook=unique)
+                self.validate(data, records, supplied | workspace.provided_ids)
+            except (ValueError, TypeError, KeyError) as exc:
+                rejection_id = self.artifacts.put(canonical_json({
+                    'reason': type(exc).__name__, 'detail': str(exc), 'response_id': response_id,
+                    'run_ids': [r.run_id for r in records],
+                    'supplied_citations': sorted(supplied | workspace.provided_ids)}).encode())
+                services.record('evaluation-rejected', reason=type(exc).__name__, detail=str(exc),
+                    response_id=response_id, evidence=rejection_id)
+                raise
+            accepted = data
+        from .submission import submission_tool
+        name = 'submit_assessment' if len(records) == 1 else 'submit_comparison'
+        mission += '\nPrefer ' + name + ' to finish. In tool submissions use an empty string for no choice. Correct validation errors within this invocation.'
+        try:
+            await services.operation(self.session.session(mission, workspace, services, writable=False,
+                system=SYSTEM, initial_content=initial, extra_tools=(submission_tool(name, accept),),
+                validate_final=accept, submission_result=lambda: canonical_json(accepted) if accepted is not None else None), stage='evaluator')
+            if accepted is None:
+                raise ValueError('evaluation ended without an accepted judgment')
+            data = accepted
         except IntegrityError:
             raise
         except (ValueError, TypeError, KeyError, TimeoutError, RuntimeError) as exc:
-            services.record('evaluation-unavailable', reason=type(exc).__name__)
+            services.record('evaluation-unavailable', reason=type(exc).__name__, detail=str(exc),
+                response_id=response_id, evidence=rejection_id)
             raise AssessmentUnavailable('evaluator did not produce a supported final judgment') from exc
         reference = self.artifacts.put(canonical_json(data).encode())
         services.record('evaluation-result', artifact_id=reference, run_ids=[r.run_id for r in records],

@@ -8,7 +8,7 @@ import unittest
 
 from fruitfly_agent.lab.improvement.execution import ExecutionContext
 from fruitfly_agent.improvement.contracts.experiments import ExecutionRequest
-from fruitfly_agent.improvement.workflow.services import WorkflowServices
+from fruitfly_agent.improvement.stages.services import StageServices
 from fruitfly_agent.improvement.contracts.tasks import TaskMaterial, Resource
 from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
 from fruitfly_agent.lab.improvement.execution import tasks
@@ -16,13 +16,13 @@ from fruitfly_agent.lab.improvement.execution.deliverables import DeliverySpec, 
 from fruitfly_agent.lab.improvement.verification.delivery import (CommandDeliveryBackend, DeliveryValidationRunner)
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
 from fruitfly_agent.improvement.execution.facts import read_facts, ensure_facts
-from tests.support.pipeline import build_pipeline
+from tests.support.stages import proposal_fixture
 
 
 class DeliveryTests(unittest.IsolatedAsyncioTestCase):
     async def test_missing_sidecar_is_rejected_and_standalone_bundle_runs_in_clean_directory(self):
-        flow, plan, baseline, _ = build_pipeline()
-        artifacts, services = MemoryArtifacts(), WorkflowServices(plan)
+        flow, plan, baseline, _ = proposal_fixture()
+        artifacts, services = MemoryArtifacts(), StageServices(plan)
         script = b'from pathlib import Path\nprint(Path("weights.dat").read_text())\n'
         def reference(path, data):
             return Resource('deliverables/' + path, artifacts.put(data), 'application/octet-stream', 'deliverable')
@@ -59,7 +59,7 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
             await services.close()
 
     async def test_undeclared_dependency_cannot_be_borrowed_from_working_directory(self):
-        flow, plan, baseline, _ = build_pipeline()
+        flow, plan, baseline, _ = proposal_fixture()
         artifacts = MemoryArtifacts()
         task = TaskMaterial('task', 'Work')
         code = b'from pathlib import Path\nprint(Path("ambient-only.dat").read_text())\n'
@@ -74,8 +74,8 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('FileNotFoundError', result.stderr)
 
     async def test_explicit_file_manifest_is_preflighted_and_wraps_actual_runner(self):
-        flow, plan, baseline, _ = build_pipeline()
-        artifacts, services = MemoryArtifacts(), WorkflowServices(plan)
+        flow, plan, baseline, _ = proposal_fixture()
+        artifacts, services = MemoryArtifacts(), StageServices(plan)
         with tempfile.TemporaryDirectory() as directory:
             (Path(directory) / 'delivery.json').write_text(json.dumps({'entrypoint': 'answer.txt'}))
             context = ExecutionContext(directory, artifacts, flow.components, None, None, None,
@@ -108,7 +108,7 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
                 DeliverySpec.parse(value)
 
     def test_backend_command_parameters_join_frozen_identity(self):
-        from fruitfly_agent.lab.improvement.workflow.mechanisms import extension_spec
+        from fruitfly_agent.lab.improvement.stages.extensions import extension_spec
         backend = CommandDeliveryBackend(('/bin/cat',))
         frozen = extension_spec(backend)
         backend.command = ('/bin/echo',)

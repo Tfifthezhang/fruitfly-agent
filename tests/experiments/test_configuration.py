@@ -27,7 +27,7 @@ class ConfigurationTests(unittest.TestCase):
         self.assertFalse(hasattr(prepared.request, 'strategy_id'))
         self.assertEqual(prepared.request.component_ids, ('base_prompt',))
         self.assertFalse(prepared.request.retain_experience)
-        self.assertEqual(prepared.model_roles, dict.fromkeys(('executor', 'editor', 'assessor'), 'executor'))
+        self.assertEqual(prepared.model_roles, dict.fromkeys(('executor', 'editor', 'assessor', 'organizer'), 'executor'))
         self.assertEqual(before, {p: p.read_bytes() for p in self.root.rglob('*') if p.is_file()})
         self.assertNotIn('offline-placeholder', json.dumps(prepared.summary()))
 
@@ -35,7 +35,7 @@ class ConfigurationTests(unittest.TestCase):
         self.path = workspace(self.root, models={'editor': 'editor', 'assessor': 'assessor'})
         original = (self.root / '.fruitfly/default-config.yaml').read_bytes()
         prepared = prepare_experiment(load_configuration(self.root), 'improvement')
-        self.assertEqual(prepared.model_roles, {'executor': 'executor', 'editor': 'editor', 'assessor': 'assessor'})
+        self.assertEqual(prepared.model_roles, {'executor': 'executor', 'editor': 'editor', 'assessor': 'assessor', 'organizer': 'executor'})
         self.assertEqual((self.root / '.fruitfly/default-config.yaml').read_bytes(), original)
         self.assertFalse(any(m.mechanism_id == 'component-improvement' for m in prepared.profile.mechanisms))
         self.assertEqual(prepared.profile.model_roles['editor'], 'editor')
@@ -55,11 +55,11 @@ class ConfigurationTests(unittest.TestCase):
         source = self.root / 'source.txt'
         source.write_text('Explicit source')
         workspace(self.root, task={'source': 'files', 'instruction': 'Read the source', 'input_paths': ['../source.txt']})
-        config = load_configuration(self.root, overrides={'improvement': {'rounds': 2}})
+        config = load_configuration(self.root, overrides={'improvement': {'direction': 'Inspect explicit inputs'}})
         prepared = prepare_experiment(config, 'improvement')
         self.assertEqual(prepared.request.input_paths, ('source.txt',))
-        self.assertEqual(prepared.request.rounds, 2)
-        self.assertEqual(config.sources['improvement.rounds'], 'command line')
+        self.assertEqual(prepared.request.direction, 'Inspect explicit inputs')
+        self.assertEqual(config.sources['improvement.direction'], 'command line')
 
     def test_missing_explicit_file_and_model_are_actionable(self):
         with self.assertRaisesRegex(ValueError, 'not found'):
@@ -94,8 +94,10 @@ class ConfigurationTests(unittest.TestCase):
         with patch('fruitfly_agent.providers.registry.ProviderRegistry.create',
                    side_effect=AssertionError('Provider constructed')), \
                 redirect_stdout(io.StringIO()), redirect_stderr(output):
-            self.assertEqual(main(['improvement', 'run', '--cwd', str(self.root)]), 3)
-        self.assertIn('No built-in task executor', output.getvalue())
+            with self.assertRaises(SystemExit) as stopped:
+                main(['improvement', 'run', '--cwd', str(self.root)])
+            self.assertEqual(stopped.exception.code, 2)
+        self.assertIn('invalid choice', output.getvalue())
         self.assertFalse((self.root / '.fruitfly/experiments/runs').exists())
 
     def test_metadata_change_invalidates_frozen_source(self):

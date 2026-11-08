@@ -1,73 +1,30 @@
 # Improvement Runtime
 
-[Up: Runtime Architecture](../README.md)
+[Up: Runtime architecture](../README.md)
 
-Run bounded improvement stages through injected capabilities. This module is a
-peer of Core and Lab. It depends only on Python's standard library, Core and its
-own contracts. It constructs no editor, Provider, benchmark, configuration loader,
-Application, filesystem store or activation service.
+Execute independent research stages through injected implementations. One activity
+retains its inputs, configuration identity, intent and outputs; it never schedules
+another stage or runs an automatic search loop. Scores are optional observations.
 
-## Separate responsibilities
-
-| Owner | Responsibility |
+| Module | Responsibility |
 |---|---|
-| Improvement | Stage transitions, evidence identity, independent stage times, scheduling, lifecycle hooks and result retention |
-| [Core](../core/README.md) | Existing messages, tools, Provider and Agent loop contracts |
-| [Lab](../lab/improvement/README.md) | Editors, assessors, selection, soft stopping, evidence navigation, delivery validation and adapters |
-| [Catalog](../lab/catalog/README.md) | Configuration, supported fields, dependencies and assembly |
-| [Run](../run/improvement/README.md) / Application | Composition, durable records, publication and explicit activation |
-| [Eval](../../fruitfly_eval/improvement/README.md) | Optional benchmark runners and benchmark episode adapters |
+| [Contracts](contracts/README.md) | Immutable inputs, candidates, receipts and research bundles |
+| [Stages](stages/README.md) | Single-activity lifecycle, clocks, resources and recovery |
+| [Execution](execution/README.md) | Batch scheduling, leaf execution and immutable facts |
+| [Components](components/README.md) | General optimization registration and admission |
+| [Evidence](evidence/README.md) | Receipts and reporting contracts |
+| [Extensions](extensions/README.md) | Injected lifecycle observation and bounded context |
 
-A generator proposes an evidence-grounded candidate; an executor supplies its
-receipt; a selector chooses an existing completed result; an independent verifier
-may grant persistent eligibility. No stage activates a candidate. Editing uses the
-existing Core Agent loop supplied by Lab, rather than a second model loop here.
+Concrete roles belong to [Lab](../lab/improvement/README.md). Configuration,
+Providers and persistence belong to the [Run host](../run/improvement/README.md).
+Benchmarks remain optional [external consumers](../../fruitfly_eval/improvement/README.md).
+The runtime imports only Core, its own contracts and the standard library.
 
-## Use the public ports
-
-[api.py](api.py) exposes immutable values and runtime services. Construct
-`ImprovementWorkflow` with selection/stop policies, components, generators and a
-runner. The engine executes one reference, then at most one candidate per round.
-Optional measurement, assessment, reflection and verification retain separate responsibilities.
-Lab's workflow assembly supplies built-in defaults. Use `async with WorkflowServices`
-or close it explicitly; borrowed ports remain caller-owned.
-
-| Module | Purpose |
-|---|---|
-| [Contracts](contracts/README.md) | Materials, snapshots, stages, receipts, failures and identities |
-| [Workflow](workflow/README.md) | Shared search engine, controller and usage observation |
-| [Execution](execution/README.md) | Bounded queues, handles, immutable events and batch execution |
-| [Components](components/README.md) | Owner registry, exact component set and publication binding validation |
-| [Evidence](evidence/README.md) | Immutable receipt/report reading |
-| [Extensions](extensions/README.md) | Immutable lifecycle snapshots and bounded context contributions |
-
-[Lab termination](../lab/improvement/termination/README.md) supplies concrete soft
-stop conditions. [Lab evidence](../lab/improvement/evidence/README.md) supplies navigation and
-cross-round references. Concrete retrieval policy stays outside the kernel.
-
-## Handle failure without inventing success
-
-Ordinary stage exceptions and local operation timeouts become attributable
-`StageFailure` records. Proposal failure preserves earlier candidates;
-execution failure preserves a failed receipt; missing measurement prevents an
-unsupported promotion; failed selection retains the incumbent. A failed reference
-can support diagnosis only when its granted facts explicitly mark useful observed
-execution. Diagnostic evidence supplies no missing score or verification.
-
-User cancellation, mismatched immutable identities,
-failed persistence and unconfirmed cleanup stop work. Cancellation propagates;
-unknown model work is never automatically replayed. The host journals execution
-receipts, validated candidates and selection checkpoints as work completes.
-Checkpoints support inspection, not transparent resumption of uncertain work.
-Cleanup attempts all owned resources and reports failures.
-Trusted plugins must cooperate with cancellation; Python cannot forcibly stop an
-arbitrary plugin or certify external process termination.
-
-## Verify offline
+`api.py` exposes `ResearchController`, `StageInputs`, `ResearchProposalRequest`
+and `StageServices`. Configuration changes do not invalidate retained input
+artifacts. An unresolved external request requires reconciliation or explicit
+retry; another stage may independently consume already retained outputs.
 
 ```bash
-.venv/bin/python -m unittest tests.improvement.test_reliability tests.architecture.test_improvement_boundaries tests.eval.test_improvement
+.venv/bin/python -m unittest tests.improvement.test_stage_contracts tests.improvement.test_research_recovery tests.improvement.test_stage_timing
 ```
-
-Fake Providers and rewards establish covered control flow, isolation and accounting.
-They do not establish model quality, benchmark gains or live service compatibility.

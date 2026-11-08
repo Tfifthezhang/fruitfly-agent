@@ -15,20 +15,6 @@ from tests.support.task_packs import install
 
 
 class UnifiedPackApplicationTests(unittest.IsolatedAsyncioTestCase):
-    async def test_each_declared_file_invalidates_preview_before_model_calls(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root=Path(tmp).resolve();path=install(root,coding_pack())
-            app,_,provider=await fixtures.open_task_app(self,root)
-            for filename in ('pack.json','cases.json','holdout.json'):
-                preview=app.workflow_preview(WorkflowRequest(component_ids=('base_prompt',), task_pack_id='coding', direction='improve'))
-                file=path.parent/filename
-                original=file.read_bytes()
-                # Even a valid formatting edit is a different declared material version.
-                file.write_bytes(original+b'\n')
-                with self.subTest(file=filename), self.assertRaisesRegex(ValueError,'package changed'):
-                    await app.improve('improve',preview_token=preview.preview_token)
-                self.assertEqual([],provider.calls)
-                file.write_bytes(original)
 
 
     async def test_coding_correction_saves_checks_without_request_or_reference_code(self):

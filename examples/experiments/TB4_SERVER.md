@@ -106,55 +106,49 @@ without constructing Providers or starting containers. It does not establish
 successful model access or task quality. Review the selected task and exact image
 identities; see [preparation evidence](../../fruitfly_eval/SERVER_GUIDE.md#8-prepare-check-and-run-the-smoke).
 
-The [smoke experiment template](benchmark-smoke.example.yaml) automatically discovers legal targets supported by the runtime and task material. Add `edit` only to narrow that set. Check resolved fields and owner descriptions before running. Configure independent editor, execution and evaluator seconds under `execution` and `evaluation`; counts and tokens are observations without admission quotas.
+The [smoke template](benchmark-smoke.example.yaml) is a research main file.
+Its initial `next` selects one fixed baseline execution. `optimization` controls
+legal editing scope; `stages` supplies independent phase settings.
 
-## Run and inspect the search
+## Execute one stage and inspect it
 
-The following `run` makes model requests and executes official verification;
-charges may apply. Use a persistent terminal on disconnect-prone connections:
+This command executes only `next.stage`; model/task work incurs charges:
 
 ```bash
-"$FRUITFLY_LAB" --cwd "$FRUITFLY_EXPERIMENT" improvement run --events jsonl
-"$FRUITFLY_LAB" --cwd "$FRUITFLY_EXPERIMENT" improvement list
+"$FRUITFLY_LAB" --cwd "$FRUITFLY_EXPERIMENT" improvement show
+"$FRUITFLY_LAB" --cwd "$FRUITFLY_EXPERIMENT" improvement step --events jsonl
+"$FRUITFLY_LAB" --cwd "$FRUITFLY_EXPERIMENT" improvement inspect
 "$FRUITFLY_LAB" --cwd "$FRUITFLY_EXPERIMENT" improvement report '<RUN_ID>' --json
-# If needed, request scoped cancellation and wait for confirmed cleanup:
-"$FRUITFLY_LAB" --cwd "$FRUITFLY_EXPERIMENT" improvement stop '<RUN_ID>'
 ```
 
-Use the actual run ID. Candidate settings stay in the experiment's isolated run
-copy; they do not edit the source checkout or baseline defaults. Official task
-scores select results. The shared model evaluator assesses completed evidence. The
-[experiment guide](../../fruitfly_agent/experiments/README.md#use-completed-process-feedback)
-explains dimensions, evidence and authoritative score handling.
+Edit `next` to select organization, assessment, proposal, execution or comparison.
+Consume the named outputs from `observed` or `references.json`. No phase runs
+another phase automatically. Use Ctrl+C for cancellation and inspect uncertain
+external effects before retrying. Scores remain observations and do not select
+research continuation or authorize production activation.
 
-Edit model-role selections and H/S/I references in `default-config.yaml`.
-Use an explicit inline or custom file component for execution settings or I
-instructions; `{default: true}` keeps following the registered owner document. `experiment.yaml` selects the baseline, task document and comparison,
-grants changes and bounds the job. The [field guide](../../fruitfly_agent/experiments/CONFIGURATION.md)
-describes the complete configuration tree. Refresh preparation after runtime changes.
-
-| Evidence | Workspace location |
+| Evidence | Location under the configured research output root |
 |---|---|
-| Operation status, frozen configuration and links | `.fruitfly/experiments/runs/<id>/record.json` |
-| Search plan, candidate executions, comparisons and result | Linked `.fruitfly/improvement/jobs/<job-id>/` |
-| Benchmark reports, trials, Agent trajectory and verifier output | Linked `.fruitfly/eval/<evaluation-id>/` |
-| Preparation receipts and caches | `.fruitfly/eval-cache/` and `.fruitfly/experiments/prepared/` |
+| Per-stage configuration and reports | `runs/<id>/` |
+| Branch references and activity history | `references.json`, `research-events.jsonl` |
+| Reading guides | `evidence/<id>/` |
+| Full candidate configs and changes | `candidates/<id>/` |
+| Execution batches and comparisons | `results/`, `comparisons/` |
 
-Follow recorded links; a run can include several benchmark evaluations. Keep these
-directories together. Failed/interrupted runs can have partial evidence; container
-filesystems and Docker images are not complete archived copies of the experiment.
+Keep the complete root together for portable inputs. See the
+[stage guide](../../fruitfly_agent/lab/improvement/DEVELOPER_GUIDE.md).
 
 ## Expand the material or choose another operation
 
 Change the request's variant or exact task names, then repeat preparation and
-checks. Before moving beyond smoke, choose bounded sampling and task concurrency
+checks. Before moving beyond smoke, choose task concurrency
 using the [joint template](multi-task.example.yaml). Multiple collections can
 reference different registered benchmarks while sharing
 one compatible baseline. Candidate parallelism currently stays at 1.
 
 `eval prepare` prepares task-set collections. Fixed-version `eval run` instead
 requires `task.source: eval` with `request`, `host` and optional `model_calls` at
-the task level; it never starts Improvement. `rsi run` needs an independent
+the task level; it never starts Improvement. Persistent adoption needs an independent
 adoption verifier, which benchmark development rewards alone do not provide.
 The [Python function pack](../improvement/python_functions/README.md) supplies holdout
 material for embeddings with an explicitly registered task backend.

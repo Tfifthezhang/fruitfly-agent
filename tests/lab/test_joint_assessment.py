@@ -10,7 +10,7 @@ from fruitfly_agent.improvement.contracts.versions import content_hash
 from fruitfly_agent.lab.improvement.assessment.joint import assess_batch
 from fruitfly_agent.lab.improvement.assessment.promotion import compare_candidates
 from tests.support.task_sets import collection
-from tests.support.pipeline import fixture, version
+from tests.support.stages import fixture, version
 
 
 class JointAssessmentTests(unittest.TestCase):

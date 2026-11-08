@@ -19,3 +19,6 @@ Editors and evaluators provide their own tools and result validation. No model
 request occurs during construction. Explicit invocation can incur model cost.
 
 Offline check: `tests.lab.test_agent_runner`.
+
+Failed role invocations retain Core error details in `agent-finished` observations,
+so a research report can distinguish Provider failure from submission rejection.

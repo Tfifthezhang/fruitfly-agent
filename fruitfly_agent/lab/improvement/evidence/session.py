@@ -13,7 +13,7 @@ class EvidenceSession:
         self.settings = EvidenceSettings.from_dict(settings)
         self.reader_factory = reader_factory
 
-    async def session(self, mission, workspace, services, *, writable=False, system='', submit=None, initial_content=None):
+    async def session(self, mission, workspace, services, *, writable=False, system='', submit=None, initial_content=None, extra_tools=(), validate_final=None, submission_result=None):
         if not hasattr(workspace,'access'):
             raise ValueError('workspace must provide evidence access receipts')
         workspace.record=services.record
@@ -29,15 +29,34 @@ class EvidenceSession:
         if writable:
             from ..editor.tools import editing_tools
             tools.extend(editing_tools(workspace,submit=seal if submit is not None else None,settings=self.settings))
+        tools.extend(extra_tools)
         role_config=replace(self.config,env=None,hooks=None,prepare_next_turn=None,before_tool_call=None,after_tool_call=None,
             on_partial=None,on_tool_result=None,should_stop_after_turn=None)
-        result=await AgentRunner(role_config).run([UserMessage(initial_content or 'Use catalog to discover the granted workspace, then read relevant evidence.')],
-            tools=tools,system_prompt=system+'\n'+mission,signal=services.signal,observe=services.observe,record=services.record)
-        services.check()
-        if submitted is not None:return submitted
-        answers=[m for m in result.messages if isinstance(m,AssistantMessage)]
-        if result.is_error:
-            raise RuntimeError('Agent runtime failed: '+str(result.error_details))
-        if not answers or answers[-1].stop_reason!='stop' or answers[-1].tool_calls:
-            raise RuntimeError('Agent did not finish its role invocation')
-        return answers[-1].text
+        messages = [UserMessage(initial_content or 'Use catalog to discover the granted workspace, then read relevant evidence.')]
+        while True:
+            services.check()
+            result=await AgentRunner(role_config).run(messages,
+                tools=tools,system_prompt=system+'\n'+mission,signal=services.signal,observe=services.observe,record=services.record)
+            services.check()
+            if submitted is not None:return submitted
+            if submission_result is not None:
+                value = submission_result()
+                if value is not None:
+                    return value
+            answers=[m for m in result.messages if isinstance(m,AssistantMessage)]
+            if result.is_error:
+                raise RuntimeError('Agent runtime failed: '+str(result.error_details))
+            if not answers or answers[-1].stop_reason!='stop' or answers[-1].tool_calls:
+                raise RuntimeError('Agent did not finish its role invocation')
+            response = answers[-1].text
+            if validate_final is None:
+                return response
+            try:
+                validate_final(response)
+                return response
+            except (ValueError, TypeError, KeyError) as exc:
+                services.record('role-submission-rejected', detail=str(exc))
+                messages = [*result.messages, UserMessage(
+                    'The judgment was rejected: ' + str(exc)[:4000] +
+                    '. Repair the submission using the declared schema and supplied citations. '
+                    'Do not restart investigation or invent evidence.')]

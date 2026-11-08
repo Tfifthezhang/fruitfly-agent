@@ -1,0 +1,77 @@
+# Copy this document into a research directory and adjust its references.
+# Import/show need no model. Organizer/assessor/editor calls incur model costs.
+# Execute/Eval additionally require a registered and prepared task backend.
+research:
+  id: retained-research
+  title: Retained batch research
+  output_root: ./research-output
+  branch: main
+
+baseline:
+  config: ../configuration/default-config.example.yaml
+  profile: baseline
+
+# Model aliases must exist in the baseline's model catalog.
+# Omission inherits the corresponding system role.
+roles: {}
+
+# Ordinary profile fields; mappings merge, lists/scalars replace.
+# Applied to the explicitly selected baseline/candidate, never to source files.
+overrides: {}
+
+optimization:
+  scope: defaults
+  include: {}
+  exclude: []
+
+stages:
+  import:
+    source: eval
+    path: /path/to/completed-eval
+    # related_records: /path/to/associated-records
+  organize:
+    timeout_seconds: 1200
+    instruction: Organize the supplied batch for readable, traceable inspection.
+  assess:
+    timeout_seconds: 1200
+  propose:
+    timeout_seconds: 1200
+    generator: agent-editor-v1
+    direction: Improve the enabled mechanisms using supplied observations.
+  execute:
+    tasks:
+      file: /path/to/tasks.yaml
+    task_seconds: 3600
+  compare:
+    timeout_seconds: 1200
+
+evidence:
+  read:
+    default_characters: 12000
+    max_characters: 24000
+
+next:
+  stage: import
+  publish_as: original-batch
+  attempt: reuse
+  inputs: {}
+  context: []
+
+# After import, replace next with:
+# next:
+#   stage: organize
+#   publish_as: original-evidence
+#   inputs:
+#     batches: [{artifact: original-batch}]
+#
+# Proposal consumes an existing batch; evidence/assessment are optional:
+# next:
+#   stage: propose
+#   publish_as: candidate-a
+#   inputs:
+#     batches: [{artifact: original-batch}]
+#     evidence: [{artifact: original-evidence}]
+#
+# Continue editing candidate-a by adding:
+#     harness: {candidate: candidate-a}
+# Use a new publish_as for a different result. No global latest is selected.

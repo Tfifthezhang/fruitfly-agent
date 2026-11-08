@@ -179,13 +179,13 @@ class TaskRunnerFixture:
 
 
 from fruitfly_agent.run import RunApplicationFactory
-from fruitfly_agent.lab.improvement.api import WorkflowBindings
+from fruitfly_agent.lab.improvement.api import StageBindings
 
 
 class TaskApplicationFixture(RunApplicationFactory):
     """Register the controlled test executor explicitly at the host boundary."""
     def __init__(self, *args, **kwargs):
-        bindings = kwargs.pop('improvement_bindings', None) or WorkflowBindings()
+        bindings = kwargs.pop('improvement_bindings', None) or StageBindings()
         if bindings.runner is None:
             def runner(plan, components, artifacts, services):
                 if plan != services.plan:

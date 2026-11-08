@@ -8,7 +8,7 @@ Own application state, execution permission, queued inputs, runtime switching, a
 |---|---|
 | [application.py](application.py): AgentApplication | Submit/queue/steer/cancel work; start, restore, rebuild, activate, and close runtimes |
 | [runtime.py](runtime.py): RuntimeHandle | Concrete resource owner; start once per component identity and close in reverse order |
-| [jobs.py](jobs.py): ImprovementJob | Own improvement tasks, progress, cancellation, and completion callbacks |
+| [Application](application.py): ImprovementJob | Own improvement tasks, progress, cancellation, and completion callbacks |
 
 Construct AgentApplication with a [RuntimeFactory](../contracts/runtime.py). Application consumes the public handle protocol; the RuntimeHandle exported by this package is its default concrete implementation. Inject search, candidate, activation, task material, and authorization capabilities independently. Run performs concrete assembly.
 

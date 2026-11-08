@@ -121,7 +121,7 @@ algorithm, rather than adding it after runtime implementation. See
 
 A mechanism uses `configuration_edit`; a separate surface can use `edit_options`.
 Both resolve
-the [experiment's field grants](../../experiments/CONFIGURATION.md#grant-component-changes)
+the [experiment's field grants](../../experiments/CONFIGURATION.md#inspect-configuration-before-models)
 through the owner. The corresponding target must validate each candidate and
 actually apply it in a supported runner.
 

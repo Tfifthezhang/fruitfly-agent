@@ -51,8 +51,8 @@ owner definitions without host dispatch.
 
 Offline checks: `tests.lab.test_layered_compaction`,
 `tests.lab.test_layered_compaction_failures`, `tests.lab.test_working_memory`,
-`tests.workflows.test_layered_compaction_improvement` and
-`tests.workflows.test_working_memory_improvement`.
+`tests.run.test_layered_compaction` and
+`tests.lab.test_working_memory`.
 
 ## Reuse shared services
 

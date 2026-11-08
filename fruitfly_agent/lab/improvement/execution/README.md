@@ -19,10 +19,10 @@ and cost notice. Discovery starts no models or task execution.
 | [File memory learning](../../context_manager/augmentation/memory/methods/file_memory/README.md) | H learning trials over isolated S updates |
 | [tasks.py](tasks.py) | Task material, optional task-package scoring and holdout; requires an injected runner |
 | [Experiment contracts](../../../improvement/contracts/experiments.py) | Requests, prepared material and stage ports |
-| [Editor experiments](../improver/README.md) | Fixed-depth I comparison with an explicit episode/task backend |
+| [Independent stages](../DEVELOPER_GUIDE.md) | Fixed-depth I comparison with an explicit episode/task backend |
 
 `agent-task` is a material adapter, not an Agent executor. Supply
-`WorkflowBindings.runner(plan, components, artifacts, services)` when constructing
+`StageBindings.runner(plan, components, artifacts, services)` when constructing
 `RunApplicationFactory`. The factory must declare truthful `capabilities`.
 Preparation rejects a missing backend before model work. The optional
 [Eval adapter](../../../../fruitfly_eval/improvement/README.md) supplies executable
@@ -36,7 +36,7 @@ verifier and selector, and an experience-retention policy.
 
 ## Bind execution explicitly
 
-`WorkflowBindings.executions` replaces the registry; `runner` supplies task
+`StageBindings.executions` replaces the registry; `runner` supplies task
 execution for definitions with `accepts_runner_override`. Its capabilities cannot
 replace those of unrelated definitions. Stage factories, injected measurements and
 verifiers remain independent; `stop_policy` replaces only stopping decisions.
@@ -96,7 +96,7 @@ unknown or duplicate keys fail. Outputs must come from collected deliverables;
 inputs must come from frozen material.
 
 A manifest requires both a task runner and an explicitly supplied
-`WorkflowBindings.delivery_backend`. Task packages without file inputs reject it.
+`StageBindings.delivery_backend`. Task packages without file inputs reject it.
 [Delivery verification](../verification/README.md#validate-delivery-bundles) owns
 clean-directory execution, results and limits. No ambient file is an implicit
 dependency and no delivery result authorizes production activation.
@@ -104,7 +104,7 @@ dependency and no delivery result authorizes production activation.
 ## Check offline
 
 ```bash
-.venv/bin/python -m unittest tests.lab.test_execution_registration tests.lab.test_improver tests.workflows.test_improvement_pipeline tests.eval.test_improvement
+.venv/bin/python -m unittest tests.lab.test_execution_registration tests.improvement.test_research_service tests.experiments.test_stage_cli tests.eval.test_improvement
 ```
 
 Fake Providers test contracts and orchestration. Real backend execution may call

@@ -43,6 +43,7 @@ def evidence_tools(workspace, *, settings=None, reader=None):
             reference='sha256:'+hashlib.sha256(data).hexdigest()
             workspace.access.provided(path,data)
             workspace.provided_ids.add(reference)
+            workspace.provided_paths.setdefault(path, set()).add(reference)
             workspace.record('evidence-image',path=path,artifact_id=reference)
             return AgentToolResult(content=[ImageBlock(data=base64.b64encode(data).decode(),media_type=mime),TextBlock(reference)])
         return result(reader.read(path,offset=ctx.args.get('offset',0),limit=ctx.args.get('limit',settings.read.default_characters)))

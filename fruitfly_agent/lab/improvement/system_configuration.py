@@ -30,7 +30,8 @@ def evaluator_parameters(parameters):
 
 
 def configuration_surfaces():
-    return (
+    from .organizer.registration import surface
+    return (surface(),
         ConfigurationSurface('improvement-editor', 'I', 'settings', 'editor', editor_parameters,
                              edit_options=editor_edit_options, restore=restore_editor, default_resource=('fruitfly_agent.lab.improvement.editor', 'defaults.yaml'),
                              standalone=True, optimization=EditorInstructionTarget.optimization,
@@ -81,6 +82,8 @@ def validate_component_options(name, options, inventory):
     from .editor.instructions import EditorInstructionTarget
     targets: dict[str, Callable[[], Any]] = {'improvement-editor': lambda: EditorInstructionTarget(EditorInstructions(**inventory.settings.get('editor', {}).get('instructions', {}))),
         'improvement-evaluator': lambda: EvaluatorInstructionTarget(EvaluatorInstructions(**inventory.settings.get('evaluator', {}).get('instructions', {})))}
+    from .organizer.instructions import instruction_target
+    targets['improvement-organizer'] = lambda: instruction_target()
     if name not in targets:
         raise ValueError('unknown improvement component options: ' + name)
     targets[name]().validate_options(options)

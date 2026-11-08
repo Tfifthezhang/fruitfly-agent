@@ -39,6 +39,7 @@ class WorkspaceEvidence:
         if page or not text:
             self.workspace.access.provided(path, page, offset=start)
             self.workspace.provided_ids.add(span.citation_id)
+            self.workspace.provided_paths.setdefault(path, set()).add(span.citation_id)
         value = {'path': path, 'artifact_id': reference, 'citation_id': span.citation_id,
             'start': start, 'end': end, 'characters': len(text), 'text': page,
             'status': 'text', 'next_offset': end if end < len(text) else None}

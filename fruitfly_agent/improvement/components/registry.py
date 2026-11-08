@@ -73,6 +73,15 @@ class ComponentRegistry:
             if document.component_id in self.options:
                 adapter.validate_change(document, self.options[document.component_id])
 
+    def normalize_execution(self, snapshot):
+        """Reconcile equivalent persisted parameter encodings for execution only."""
+        if {c.component_id for c in snapshot.components} != set(self.adapters):
+            raise ValueError('harness must preserve its registered component set')
+        result = HarnessSnapshot(tuple(getattr(self.adapters[c.component_id], 'canonicalize', lambda x: x)(c)
+            for c in snapshot.components))
+        self.validate(result)
+        return result
+
     def export(self, snapshot, *, changed_only=True):
         self.validate(snapshot)
         values = []

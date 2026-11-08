@@ -10,13 +10,13 @@ from fruitfly_agent.core.session import Session
 from fruitfly_agent.lab.catalog import builtin_catalog
 from tests.support.task_execution import TaskRunnerFixture
 from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
-from fruitfly_agent.improvement.workflow.services import WorkflowServices
+from fruitfly_agent.improvement.stages.services import StageServices
 from fruitfly_agent.improvement.execution.facts import read_facts
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
 from fruitfly_agent.run import HarnessConfig, HarnessProfile, build_runtime, load_harness_config, save_harness_config
 from fruitfly_agent.run.runtime.manifest import execution_version_payload
 from tests.support.faux_provider import FauxProvider
-from tests.support.pipeline import fixture, version
+from tests.support.stages import fixture, version
 from tests.support.run import _write_catalog
 from fruitfly_agent.improvement.contracts.plans import RunPlan
 
@@ -57,7 +57,7 @@ class ExecutionLimitTests(unittest.IsolatedAsyncioTestCase):
         provider.respond_tool_call('write', {'path': 'other.txt', 'content': 'second'})
         provider.respond_text('done')
         plan = RunPlan('limits', version(), ('prompt',))
-        services = WorkflowServices(plan)
+        services = StageServices(plan)
         runner = TaskRunnerFixture(AgentLoopConfig(provider=provider, max_tool_calls_per_turn=1), registry, artifacts, services)
         try:
             result = await runner.execute(plan, TaskMaterial('task', 'Create an answer.'), baseline)

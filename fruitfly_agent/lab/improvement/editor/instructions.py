@@ -39,7 +39,7 @@ class EditorInstructions:
 
 
 class EditorInstructionTarget:
-    optimization = OptimizationSpec('I', 'parameters', required_capabilities=frozenset({'improver-comparison'}))
+    optimization = OptimizationSpec('I', 'parameters', required_capabilities=frozenset({'improver-comparison'}), default_selected=False)
     structured_parameters = True
     label = 'Improvement editor instructions'
     component_kind = 'improvement-instructions'

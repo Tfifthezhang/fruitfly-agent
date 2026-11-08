@@ -35,8 +35,8 @@ fixed-I inner searches; instructions do not replace themselves during a call.
 | `tools.py`, `submission.py` | Candidate operations and attribution validation |
 | `generators.py` | Registered zero-or-one candidate generation |
 
-Offline checks: `tests.lab.test_improvement_pipeline`,
-`tests.lab.test_improvement_configuration`, `tests.workflows.test_editor_evolution`.
+Offline checks: `tests.lab.test_detached_editor`,
+`tests.lab.test_improvement_configuration`, `tests.experiments.test_stage_cli`.
 
 ## Maintain I parameter defaults
 

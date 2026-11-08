@@ -68,7 +68,7 @@ class ModelRoleTests(unittest.IsolatedAsyncioTestCase):
         catalog = catalog.extended((custom,))
         profile = component_profile(HarnessProfile('default', model_profile='main'), catalog)
         bindings = profile.to_dict()['models']['roles']
-        expected = {'editor', 'assessor', 'working_memory', 'context_query', 'context_summary', 'custom_memory', 'memory_maintenance'}
+        expected = {'organizer', 'editor', 'assessor', 'working_memory', 'context_query', 'context_summary', 'custom_memory', 'memory_maintenance'}
         self.assertEqual(expected, set(bindings) - {'executor'})
         self.assertTrue(all(bindings[role] == {'inherit': 'executor'} for role in expected))
         resolved = catalog.resolve_model_roles((), {'executor': 'main'})

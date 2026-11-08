@@ -25,7 +25,7 @@ I comparisons require a runner supporting downstream improvement, not an ordinar
 task score. Mixed changes require the runner's actual capabilities.
 
 ```bash
-.venv/bin/python -m unittest tests.lab.test_evolution_policies tests.workflows.test_editor_evolution tests.workflows.test_decoupling
+.venv/bin/python -m unittest tests.rsi.test_recovery tests.experiments.test_stage_cli tests.run.test_host_services
 ```
 
 ## Match edit scope to the configured harness

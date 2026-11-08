@@ -13,7 +13,7 @@ Use `task.source: task-set` in the [experiment configuration](../../../experimen
 The [annotated template](../../../../examples/experiments/multi-task.example.yaml)
 combines prepared Eval collections. Other sources require explicit registration. Paths and IDs are
 placeholders. `improvement check` reads material and validates declarations without
-constructing Providers. `improvement run` starts models and may incur charges.
+constructing Providers. `improvement step` starts models and may incur charges.
 For Eval collections, explicitly run `eval prepare` first; it can download/build
 and start preparation containers. Custom sources need no Eval installation.
 
@@ -26,7 +26,7 @@ and start preparation containers. Custom sources need no Eval installation.
 | [Contracts](../../../improvement/contracts/README.md) | Task entries, snapshots, batch receipts and editing requests |
 | [Execution](../execution/README.md#schedule-task-batches) | One bounded queue and independent leaf phases |
 | [Assessment](../assessment/README.md) | Declared utilities, promotion and supported process comparison |
-| [Workflow](../workflow/README.md) | One shared round engine |
+| [Independent stages](../DEVELOPER_GUIDE.md) | One shared round engine |
 
 ## Freeze tasks and conditions
 
@@ -37,7 +37,8 @@ preserved. Editing receives only development entries, never private acceptance,
 selection/confirmation inputs or verifier files. No automatic conversation mining
 or synthetic summary is performed.
 
-Every collection must expose a task objective to participate in joint ranking.
+Collections declare objectives to attribute optional measurement observations.
+Absent or failed measurements do not gate candidate generation or comparison.
 A custom material format supplies a source, execution backend and scorer through
 the public ports; no local collection executor is installed by default. Task-set CLI search uses the fixed flow, task scope, no retained
 experience, and one candidate per round. Other component kinds and I experiments
@@ -47,18 +48,19 @@ capability checks.
 ## Compare batches and promote
 
 Each round evaluates the retained development incumbent and its challenger on the same
-task keys, attempts and conditions. The next seed defaults to the better complete
-result on that shared development batch; supported process comparisons can resolve official-score ties.  Search scores from different batches are not directly ranked.
+task keys, attempts and conditions. The independent assessor compares the supplied
+records across dimensions. Numeric score magnitude, equality and availability do
+not choose seeds or gate comparison. Unsupported judgments retain the incumbent.
 
 Formal selection runs every `promotion.every_rounds` and at search completion,
 using the complete common selection set. For each collection, explicit selection
 entries are used when present; otherwise all its development entries are used.
 Thus a pack's private validation cannot accidentally exclude another benchmark.
-The previous formal harness survives incomplete or worse comparisons. Reports
+The previous formal harness survives unavailable or unsupported judgments. Reports
 distinguish official evaluation, collection utilities and coverage.
 `selected` is development assurance, not independent verification or adoption.
 
-Final comparison uses fresh evaluator invocations. No-gain patience advances only after a complete comparable promotion. Repeating a harness on another sampled batch does not itself stop search. Leaf process metrics do not implicitly become task-set stop conditions.
+Final comparison uses fresh evaluator invocations. Missing scores do not advance failure counters or trigger score-based stopping. Repeating a harness on another sampled batch does not itself stop search. Leaf process metrics do not implicitly become task-set stop conditions.
 
 Confirmation material stays private and unused by this development search.
 Task-set persistent scope/RSI are rejected until an independent adoption policy is
@@ -91,8 +93,14 @@ Interrupted batches retain completed receipts and explicitly incomplete coverage
 No unknown paid work is automatically replayed.
 
 ```bash
-.venv/bin/python -m unittest tests.lab.test_task_sets tests.improvement.test_scheduler tests.lab.test_joint_assessment tests.lab.test_task_set_search tests.experiments.test_multi_task
+.venv/bin/python -m unittest tests.lab.test_task_sets tests.improvement.test_scheduler tests.lab.test_joint_assessment tests.lab.test_task_sets tests.experiments.test_multi_task
 ```
 
 Fake rewards validate orchestration, coverage, isolation and accounting only.
 Real container compatibility and quality gains require an authorized experiment.
+
+Before each shared proposal, the independent [Organizer](../organizer/README.md)
+creates a readable batch guide with attributable source references. The editor
+owns optimization signals. A failed organization retains raw evidence for editing.
+The independent [Independent stages](../DEVELOPER_GUIDE.md)
+can also consume imported batches and reuse individual stage outputs.

@@ -30,4 +30,4 @@ def native_tool(definition, fields=()):
             ParameterDescriptor('description', 'string', 'Tool instructions',
                 'Model-facing operation description. Schema, permission and implementation are protected.', description))),
         parameter_paths={**paths, 'description': 'instructions.description'})
-    return editable_parameters(result, {*fields, 'description'}, default_selected=False)
+    return editable_parameters(result, {*fields, 'description'}, default_selected=True)

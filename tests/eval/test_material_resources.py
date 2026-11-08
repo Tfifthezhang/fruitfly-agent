@@ -120,7 +120,7 @@ receipt = capture_module.capture(work, saved)
 assert receipt['status'] == 'complete'
 assert (saved / receipt['files'][0]['archive_path']).read_text() == 'changed output'
 from fruitfly_agent.lab.improvement.execution import builtin_executions
-assert {d.execution_id for d in builtin_executions().definitions()} == {'agent-task', 'improver-comparison', 'memory-learning'}
+assert {d.execution_id for d in builtin_executions().definitions()} == {'agent-task', 'memory-learning'}
 from fruitfly_agent.run import main
 sys.argv = ['fruitfly-agent', '--help']
 main()

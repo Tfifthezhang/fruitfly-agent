@@ -50,7 +50,7 @@ without transport probes. See [MCP](../../lab/mcp/README.md).
 No module-specific environment variables.
 
 ```bash
-.venv/bin/python -m unittest tests.run.test_assembly tests.run.test_resources tests.run.test_cli tests.workflows.test_resume_history tests.workflows.test_decoupling -v
+.venv/bin/python -m unittest tests.run.test_assembly tests.run.test_resources tests.run.test_cli tests.workflows.test_resume_history tests.run.test_host_services -v
 ```
 
 Checks use fake Providers and temporary state.

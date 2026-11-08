@@ -18,8 +18,13 @@ def run(prepared, record, records, emit):
             record['links']['eval'] = event['evaluation_id']
             records.save(record)
         emit(event)
+    output_root = prepared.config.workspace / '.fruitfly/eval'
+    from fruitfly_agent.runtime_spec.documents import DocumentReader
+    if 'research' in DocumentReader().read(prepared.config.path):
+        from fruitfly_agent.run.improvement.configuration import ResearchDocument
+        output_root = ResearchDocument(prepared.config.path).root / 'eval'
     report, store = run_evaluation(benchmark.request,
-        output_root=prepared.config.workspace / '.fruitfly/eval',
+        output_root=output_root,
         host_config_path=str(benchmark.require_host()), progress=progress)
     record['links'].update(eval=report.evaluation_id, report=str(store.path / 'report.json'))
     record['status'] = report.status

@@ -96,8 +96,8 @@ surface alongside explicitly allowed settings. There is no independent tool
 catalog policy, resource loader or extra read requirement.
 
 Tool names, schemas, implementations and permissions remain protected. Parameter
-targets default to `default_selected: false`; explicit grants and a capable
-isolated runner are required. Candidate assembly replaces only the declared fields
+targets default to `default_selected: true`; a capable isolated runner is still
+required. An explicit experiment scope can exclude them or narrow their fields. Candidate assembly replaces only the declared fields
 and records actual description/schema fingerprints in `harness.tool_contracts`.
 MCP remains a service source producing distinct native tools. External schemas,
 transport and authorization are protected, and unsupported isolated trials fail.

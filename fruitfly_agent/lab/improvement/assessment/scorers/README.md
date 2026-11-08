@@ -18,5 +18,5 @@ are not a general code sandbox. Model judgments can incur charges; rule/function
 tests use no credentials or network.
 
 ```bash
-.venv/bin/python -m unittest tests.lab.test_coding_tasks tests.lab.test_pack_format tests.lab.test_evolution_policies
+.venv/bin/python -m unittest tests.lab.test_coding_tasks tests.lab.test_pack_format tests.rsi.test_recovery
 ```
