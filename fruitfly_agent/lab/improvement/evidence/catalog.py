@@ -12,6 +12,8 @@ class WorkspaceEvidence:
     def __init__(self, workspace, *, settings=None):
         self.workspace = workspace
         self.settings = EvidenceSettings.from_dict(settings)
+        self.supplied_characters = 0
+        self.supplied_pages = 0
 
     def catalog(self, *, prefix='', cursor=0, limit=None):
         limit = self.settings.catalog.default_entries if limit is None else limit
@@ -25,6 +27,12 @@ class WorkspaceEvidence:
         limit = self.settings.read.default_characters if limit is None else limit
         if type(offset) is not int or offset < 0 or type(limit) is not int or not 1 <= limit <= self.settings.read.max_characters:
             raise ValueError('read needs a nonnegative offset and page size 1..24000')
+        remaining = self.settings.supply.max_characters - self.supplied_characters
+        if remaining <= 0 or self.supplied_pages >= self.settings.supply.max_pages:
+            self.workspace.record("evidence-budget-exhausted", characters=self.supplied_characters, pages=self.supplied_pages)
+            return {"status": "budget_exhausted", "text": "", "next_offset": None,
+                    "note": "Reading budget exhausted. Submit using supplied evidence and declare uncovered scope."}
+        limit = min(limit, remaining)
         self.workspace.access.grant(self.workspace.paths())
         try:
             data = self.workspace.read(path)
@@ -36,6 +44,8 @@ class WorkspaceEvidence:
         start, end = min(offset, len(text)), min(offset+limit, len(text))
         span = EvidenceSpan(reference, start, end)
         page = text[start:end]
+        self.supplied_pages += 1
+        self.supplied_characters += len(page)
         if page or not text:
             self.workspace.access.provided(path, page, offset=start)
             self.workspace.provided_ids.add(span.citation_id)
@@ -50,8 +60,11 @@ class WorkspaceEvidence:
         limit = self.settings.search.default_matches if limit is None else limit
         if not isinstance(query, str) or not 1 <= len(query) <= 500 or type(limit) is not int or not 1 <= limit <= self.settings.search.max_matches:
             raise ValueError('search requires literal query and page size 1..50')
+        if (self.supplied_characters >= self.settings.supply.max_characters
+                or self.supplied_pages >= self.settings.supply.max_pages):
+            return {'status': 'budget_exhausted', 'matches': [], 'unavailable': [], 'next_cursor': None, 'complete': False}
         available = self.workspace.paths()
-        selected = tuple(sorted(paths or (p for p in available if not p.startswith('harness/'))))
+        selected = tuple(sorted(paths or (p for p in available if not p.startswith(('harness/', 'originals/')) and '/originals/' not in p)))
         if set(selected) - set(available):
             raise ValueError('search path is outside the evidence grant')
         scope = hashlib.sha256(json.dumps([query, selected], separators=(',', ':')).encode()).hexdigest()
@@ -84,9 +97,11 @@ class WorkspaceEvidence:
             if matches and (len(matches) >= limit or characters + end-start > self.settings.search.max_characters):
                 break
             match = self.read(path, offset=start, limit=max(1,end-start))
+            if match.get('status') == 'budget_exhausted':
+                break
             match['match_offset'] = found
             matches.append(match)
-            characters += end-start
+            characters += match['end'] - match['start']
             offset = found+len(query)
         next_cursor = json.dumps({'scope':scope,'file':index,'offset':offset}) if index<len(selected) else None
         return {'matches':matches, 'unavailable':unavailable, 'next_cursor':next_cursor, 'complete':next_cursor is None}

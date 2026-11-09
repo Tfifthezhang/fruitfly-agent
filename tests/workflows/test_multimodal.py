@@ -111,17 +111,16 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
         finally:
             await app.close()
 
-    async def test_terminal_attachment_commands_and_image_only_submission(self):
+    async def test_terminal_image_reference_and_retired_commands(self):
         provider = FauxProvider()
         provider.respond_text('seen')
         session = InteractiveSession(AgentLoopConfig(provider=provider), load_attachment=lambda _: image())
         output = io.StringIO()
         frontend = TerminalFrontend(session, input_stream=io.StringIO(
-            '/attach "image with spaces.png"\n/attachments\n/detach 1\n/attach image.png\n\n/exit\n'), output_stream=output)
+            '@"image with spaces.png"\n/exit\n'), output_stream=output)
+        self.assertFalse({'attach', 'attachments', 'detach'} & {v.name for v in frontend.command_descriptions()})
         await frontend.run()
         self.assertEqual(provider.calls[0]['messages'][0].content, [image()])
-        self.assertIn('image with spaces.png', output.getvalue())
-        self.assertIn('Attachment removed', output.getvalue())
         self.assertNotIn(image().data, output.getvalue())
 
     async def test_cli_image_only_uses_single_task_flow_and_current_workspace(self):
@@ -192,7 +191,7 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
         session = InteractiveSession(AgentLoopConfig(provider=FauxProvider()), load_attachment=lambda _: image())
         output = io.StringIO()
         frontend = TerminalFrontend(session, input_stream=io.StringIO(
-            '/attach image.png\ninspect this\n/attachments\n/resume other\n/attachments\n/exit\n'), output_stream=output)
+            'inspect @image.png\n\n/resume other\n/exit\n'), output_stream=output)
         def reject(content):
             raise ValueError('fixture input unavailable')
         frontend.bindings = replace(frontend.bindings, validate_input=reject)
@@ -202,9 +201,9 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
         frontend.commands.register('resume', change)
         await frontend.run()
         text = output.getvalue()
-        self.assertIn('Unsent text: inspect this', text)
+        self.assertEqual(text.count('fixture input unavailable'), 2)
         self.assertIn('Session changed; pending attachments and unsent draft cleared', text)
-        self.assertIn('No pending attachments.', text)
+        self.assertFalse(frontend._composer.pending)
 
     async def test_save_media_keeps_host_write_permissions(self):
         with tempfile.TemporaryDirectory() as tmp:

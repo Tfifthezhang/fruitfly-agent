@@ -47,20 +47,29 @@ filesystem or command-handler requests.
 
 ## Attach local images
 
-Use `/attach "LOCAL_IMAGE_PATH"` to freeze an image for the next submission.
-Attachment commands appear only when the host supplies a local attachment reader.
-Relative paths resolve from the local workspace, including when file tools use
-SSH. `/attachments` lists pending images and retained rejected text. `/detach N`
-removes one image; `/detach all` clears images and the unsent draft. Enter submits
-pending images without text. A successfully submitted/queued/steered message clears
-its draft; preflight failure retains it and Enter retries. A Session path change
-clears pending input with a notice. `/cancel` stops submitted work; it does not
-silently discard pending attachments.
+Paste a clipboard image with Ctrl+V in the live editor, or drag image files
+into the prompt. Quoted and shell-escaped dropped paths are supported. In plain
+input and redirected streams, use `@"local/image.png"`; a complete standalone
+image path is also accepted. Ordinary prose mentioning `file.png` and fenced code
+are not image selections.
 
-The host reads files and checks the active model's vision declaration. Limits:
-eight images, 10 MiB each, 32 MiB combined; PNG, JPEG, GIF and WebP. Clipboard
-binary images, automatic path detection and audio/video input are not implemented.
-See [Run image input](../../run/README.md#submit-images) for CLI use.
+The input shows numbered image markers. Left/Right treats each selected marker as
+one item; Backspace/Delete removes it. Markers are backed by frozen image bytes;
+manually typing a marker does not attach a file. Enter submits text and images,
+including an image-only message. Rejected input stays editable for retry. Successful
+submission clears the draft; switching sessions or Ctrl+C clears pending input.
+
+Paths resolve in the local workspace even when tools execute over SSH. Clipboard
+reads occur on the machine running the CLI: a CLI launched on a remote SSH host
+cannot read the client computer's clipboard. macOS uses osascript; Linux uses an
+available wl-paste or xclip. Missing clipboard support retains path input; no
+system tools are installed automatically. Plain/readline input uses paths.
+
+The host validates the active model's vision declaration and existing limits:
+eight images, 10 MiB each, 32 MiB combined; PNG, JPEG, GIF and WebP. Audio/video
+input is not implemented. See [Composer](features/composer/README.md) and
+[Run image input](../../run/README.md#submit-images). The CLI `--image` option
+remains available for one-shot tasks.
 
 ## Restore a conversation
 

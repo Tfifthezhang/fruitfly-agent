@@ -487,3 +487,9 @@ An explicit `edit` map replaces this scope. Inspect the effective field-level ta
 with `improvement defaults --config EXPERIMENT` before model work. Generation
 retains `configuration/optimization.json` and `optimization.md`. See
 [experiment configuration](fruitfly_agent/experiments/CONFIGURATION.md#inspect-configuration-before-models).
+
+Evidence reading has separate per-response and cumulative supply limits. Research
+import task selection and original path/hash supplements belong to
+[Experiments configuration](fruitfly_agent/experiments/CONFIGURATION.md#select-imported-evidence);
+[Lab evidence](fruitfly_agent/lab/improvement/evidence/README.md#bound-an-investigation)
+owns reading semantics.

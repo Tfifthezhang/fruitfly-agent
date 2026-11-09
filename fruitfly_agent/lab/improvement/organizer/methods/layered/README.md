@@ -16,3 +16,8 @@ The method adopts progressive disclosure as described in
 It does not implement semantic clustering, a vector database, or the learning and
 update procedures of prompt optimization papers. The current shared reader still
 loads selected source bytes in host memory.
+
+Reading is bounded by the shared evidence supply and request-space checks.
+Submit a compact guide using supplied citations and declare uncovered scope when
+reading is exhausted. Invocation requirements are delivered directly in the role
+mission. Offline Eval indexing does not invoke this model role.

@@ -15,7 +15,7 @@ from fruitfly_agent.interactive.terminal.bindings import TerminalBindings, Termi
 from fruitfly_agent.interactive.terminal.commands import TerminalCommandRegistry, TerminalCommandHandler, effective_commands, complete_command
 from fruitfly_agent.interactive.contracts.commands import CommandDescription, CommandResult, format_command_help
 from fruitfly_agent.interactive.terminal.features.assembly import bind_commands
-from fruitfly_agent.interactive.terminal.features.attachments import AttachmentDraft
+from fruitfly_agent.interactive.terminal.features.composer import Composer
 
 from fruitfly_agent.interactive.contracts.configuration import ConfigurationController
 from fruitfly_agent.interactive.interaction.commands import CommandRouter, parse_command
@@ -69,15 +69,14 @@ class TerminalFrontend:
         self._reading_authorization = False
         self.session.set_event_sink(self._render_event)
         self.commands = TerminalCommandRegistry()
-        self._attachments = AttachmentDraft(self.bindings.load_attachment)
-        self._attachment_session: str | None = None
-        if self.bindings.load_attachment is not None:
-            self.commands.register('attach', self._attachments.attach, summary='attach a local image to the next message', usage='/attach "PATH"')
-            self.commands.register('attachments', self._attachments.show, summary='show pending attachments')
-            self.commands.register('detach', self._attachments.detach, summary='remove pending attachments', usage='/detach N | /detach all')
+        self._composer = Composer(self.bindings.load_attachment, self.bindings.clipboard_image)
+        self._composer_session: str | None = None
+        configure_input = getattr(self.line_editor, 'set_input_adapter', None)
+        if callable(configure_input):
+            configure_input(self._composer)
         bind_commands(
             self.commands, bindings=self.bindings, configuration=lambda: self.configuration,
-            status=lambda: self.session.status, cancel=self.bindings.cancel,
+            status=lambda: self.session.status, cancel=self._cancel_input,
             menu_scope=self.menu_scope, input_stream=self.input, output_stream=self.output,
             line_editor=lambda: self.line_editor, write=self.renderer.write_system,
             welcome=self.renderer.show_welcome, show_history=self.show_history,
@@ -131,11 +130,11 @@ class TerminalFrontend:
         while True:
             await asyncio.sleep(0)
             current_session = self.session.status.session_path
-            if current_session != self._attachment_session:
-                if self._attachments.pending:
+            if current_session != self._composer_session:
+                if self._composer.pending:
                     self.renderer.write_system('Session changed; pending attachments and unsent draft cleared.\n')
-                self._attachments.clear()
-                self._attachment_session = current_session
+                self._composer.clear()
+                self._composer_session = current_session
             if self._interrupt_exit:
                 return 0
             try:
@@ -159,23 +158,23 @@ class TerminalFrontend:
             self._last_interrupt = 0.0
             submitted = line.rstrip("\r\n")
             text = submitted.strip()
-            if not text and not self._attachments.pending:
+            if not text and not self._composer.pending:
                 continue
             if self._inline_display is not None:
                 self.renderer.write_user_input(submitted)
             command = parse_command(text)
             if command is None:
                 try:
-                    content = self._attachments.prepare(text)
+                    content = self._composer.prepare(submitted)
                     validate = self.bindings.validate_input
                     if validate is not None:
                         validate(content)
                     if self.session.running and self.session.steer(content):
-                        self._attachments.clear()
+                        self._composer.clear()
                         self.renderer.write_system("message added to current run\n")
                         continue
                 except (OSError, RuntimeError, TypeError, ValueError) as exc:
-                    self.renderer.write_system(f'cannot submit: {exc}. Draft retained; /attachments shows it; Enter retries.\n')
+                    self.renderer.write_system(f'cannot submit: {exc}. Draft retained; edit the input or press Enter to retry.\n')
                     continue
                 enqueue = self.bindings.enqueue
                 if enqueue is None:
@@ -186,7 +185,7 @@ class TerminalFrontend:
                     except (OSError, RuntimeError, TypeError, ValueError) as exc:
                         self.renderer.write_system(f'cannot submit: {exc}. Draft retained.\n')
                         continue
-                    self._attachments.clear()
+                    self._composer.clear()
                 else:
                     was_running = self.session.running
                     try:
@@ -194,7 +193,7 @@ class TerminalFrontend:
                     except (RuntimeError, ValueError) as exc:
                         self.renderer.write_system(f"cannot submit: {exc}\n")
                         continue
-                    self._attachments.clear()
+                    self._composer.clear()
                     if was_running or position > 1:
                         self.renderer.write_system(
                             f"queued prompt ({position} pending)\n"
@@ -209,6 +208,7 @@ class TerminalFrontend:
                 if self._inline_display is None:
                     self.renderer.finish_line()
                 continue
+            self._composer.release_command(submitted)
             result = await self.commands.execute(command)
             if result is None:
                 result = self.command_router.execute(command, self.session)
@@ -282,7 +282,12 @@ class TerminalFrontend:
                 task.cancel()
                 await asyncio.gather(task, return_exceptions=True)
 
+    def _cancel_input(self) -> bool:
+        self._composer.clear()
+        return self.bindings.cancel()
+
     def _handle_interrupt(self) -> bool:
+        self._composer.clear()
         now = time.monotonic()
         second = self._last_interrupt > 0 and now - self._last_interrupt <= 3.0
         self._last_interrupt = now

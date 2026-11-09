@@ -13,9 +13,21 @@ from .configuration import EvidenceSettings
 def evidence_tools(workspace, *, settings=None, reader=None):
     settings = EvidenceSettings.from_dict(settings)
     reader = reader if reader is not None else WorkspaceEvidence(workspace, settings=settings)
+    calls = 0
+    def allow():
+        nonlocal calls
+        calls += 1
+        if calls > settings.supply.max_pages:
+            workspace.record('evidence-budget-exhausted', pages=calls - 1)
+            return False
+        return True
+    def exhausted():
+        return result({'status': 'budget_exhausted', 'note': 'Submit with existing citations; declare uncovered scope.'})
     def result(value):
         return AgentToolResult(content=[TextBlock(text=json.dumps(value,ensure_ascii=False))])
     async def catalog(ctx):
+        if not allow():
+            return exhausted()
         args=ctx.args
         path=args.get('path')
         if path:
@@ -36,6 +48,8 @@ def evidence_tools(workspace, *, settings=None, reader=None):
                 'note':'Navigation metadata; read source spans for semantic claims.'})
         return result(reader.catalog(prefix=args.get('prefix',''),cursor=args.get('cursor',0),limit=args.get('limit',settings.catalog.default_entries)))
     async def read(ctx):
+        if not allow():
+            return exhausted()
         path=ctx.args['path']
         data=workspace.read(path)
         if image_type(data) is not None:
@@ -48,6 +62,8 @@ def evidence_tools(workspace, *, settings=None, reader=None):
             return AgentToolResult(content=[ImageBlock(data=base64.b64encode(data).decode(),media_type=mime),TextBlock(reference)])
         return result(reader.read(path,offset=ctx.args.get('offset',0),limit=ctx.args.get('limit',settings.read.default_characters)))
     async def search(ctx):
+        if not allow():
+            return exhausted()
         return result(reader.search(ctx.args['query'],paths=tuple(ctx.args.get('paths',())),cursor=ctx.args.get('cursor',''),limit=ctx.args.get('limit',settings.search.default_matches)))
     return (AgentTool(name='catalog',label='Browse evidence',description='Page granted files or an event index. Overview and event indexes navigate to immutable originals.',
         parameters={'type':'object','properties':{'prefix':{'type':'string'},'path':{'type':'string'},'kind':{'type':'string'},

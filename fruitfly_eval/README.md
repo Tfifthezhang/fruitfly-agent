@@ -206,14 +206,15 @@ Catalog path. Later owner-default changes do not alter an already staged config.
 ## Organize retained evidence
 
 Ordinary `run` automatically organizes available evidence after execution retirement
-and archival. It uses the same Lab organizer as Improvement. Organization produces
+and archival. It uses deterministic extraction and the shared Lab evidence indexer,
+without the model Organizer role. Organization produces
 no model requests, Docker jobs or new scores. Its status is reported separately
 from official outcomes.
 
 ```bash
 # Offline. Replace the placeholder with an existing evaluation directory.
 .venv/bin/python -m fruitfly_eval organize --run /path/to/evaluation
-# Copy permitted originals into a relocatable evidence export.
+# Copy registered compact materials into a relocatable evidence export.
 .venv/bin/python -m fruitfly_eval organize --run /path/to/evaluation --output /path/to/export --portable
 ```
 
@@ -226,8 +227,10 @@ from official outcomes.
 | `evidence/<trial>/sources.json` | Resource hashes and locations relative to the evidence directory |
 | `evidence/material-inventory.json` | Availability of referenced external runtime/task material |
 
-Normal output references retained originals without copying them. `--portable`
-copies only permitted registered evidence, including generated facts. Private
+Normal output freezes compact reading materials and references available retained
+diagnostics. `--portable` copies registered materials, including generated facts;
+it does not copy all original trajectories or captured file bodies. External source
+paths/hashes remain in `diagnostics/reading-scope.json`. Private
 verifier inputs, external runtime/task snapshots and container image bytes are not
 included. Original reports and scores remain unchanged when organizing history.
 Organization cannot recover files that were never archived. An active or

@@ -37,3 +37,8 @@ invocation. Use `show` for the next invocation after editing the file. The posit
 ```bash
 .venv/bin/python -m unittest tests.run.test_research_configuration tests.experiments.test_stage_cli
 ```
+
+Import settings admit task-name lists and archive-relative path/hash supplements
+through the existing strict research grammar. They are source adapter inputs;
+`evidence.supply` configures role-wide limits. See the
+[configuration owner](../../../experiments/CONFIGURATION.md#select-imported-evidence).

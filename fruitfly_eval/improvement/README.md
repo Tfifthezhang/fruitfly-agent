@@ -113,19 +113,28 @@ task-set experiment prepares its Eval sources through derived hosts;
 custom non-Eval sources own their preparation. No additional benchmark adapter or
 package is installed by declaring a collection name.
 
-## Register complete permitted evidence
+## Register compact permitted evidence
 
-The bridge registers native Session, archived events (or an interrupted live
-stream), operation originals, usage receipts, trajectory conversion status and
-verified captured files. Failed trials without a Session remain discoverable;
-startup sidecars are diagnostic evidence. Complete tool-output files are diagnostic
-resources, while captured task files are deliverables. Hash-mismatched or unavailable
-captured bytes cannot establish complete coverage.
+The bridge extracts task instructions and a single reading trajectory from the
+native Session, falling back to converted ATIF when native evidence is absent.
+Each step contains visible text/tool calls/results with 2000-character excerpts,
+original lengths, truncation markers and original source spans. Provider replay
+state, thinking blocks and duplicate event streams are excluded from default input.
+Usage receipts, process status, final answer and execution facts remain separate.
+Failed trials without a Session remain discoverable through explicit gaps and
+startup observation summaries.
+
+`materials.py` owns Eval layout adaptation. `diagnostics/reading-scope.json` lists
+permitted source paths, hashes, sizes, external/retained/invalid states and parse
+gaps. Captured files are indexed without copying their bodies by default. Explicit
+`stages.import.evidence_paths` supplements freeze selected files after hash checks.
+Original trajectories supplied this way are diagnostic sources, not extra runs.
+See [import settings](../../fruitfly_agent/experiments/CONFIGURATION.md#select-imported-evidence).
 
 `diagnostics/final-answer.json` records whether the last retained assistant answer
 is final, partial or absent, together with its original source span. The execution
-output uses the actual answer rather than a generic runner sentence. Original
-Session pages remain available for answers exceeding the bounded output field.
+output uses the actual answer rather than a generic runner sentence. The complete extracted answer is available in the final-answer resource;
+original Session pages require an explicit supplement.
 Usage extraction is independent of ATIF conversion and retains known subtotals
 when full totals are unknown.
 
@@ -140,7 +149,7 @@ Neither an organized directory nor a human analysis report bypasses resource gra
 `history.import_history(run, artifacts)` converts permitted retained Harbor task
 evidence into a benchmark-neutral `ResearchBatch`. It preserves available task
 instructions, separate execution status and official reward observations, immutable
-originals and diagnostic provenance. Verifier answers remain excluded. Missing
+reading materials, original source locators and diagnostic provenance. Verifier answers remain excluded. Missing
 instructions are explicitly marked; previous harness, source and initial learning
 state are not reconstructed. Import supports diagnosis and proposal, without a
 fresh baseline or an assumption of comparable execution conditions.
@@ -150,3 +159,10 @@ Available configuration declarations and runtime receipts are retained as separa
 provenance resources. Missing original source or learning-state reconstruction
 remains explicit. The associated report is not a second independent execution
 batch and its conclusions do not replace original trajectories.
+
+Default import and new Eval executions use the same compact collector. They need
+no model organizer before assess/propose. Portable exports retain their registered
+materials, while unselected original bytes remain external dependencies. Historical
+batches are immutable; explicitly reimport to create a compact batch or supplement.
+Offline checks include `tests.eval.test_reading_materials` and
+`tests.workflows.test_improvement_evidence`.

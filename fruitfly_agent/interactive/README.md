@@ -138,3 +138,7 @@ The operation service exposes bounded statuses and scoped cancellation without
 importing Lab. `ManagedOperationChanged` carries initiating run and tool-call IDs,
 state and elapsed time. Frontends may display completion while normal input
 continues. Observation does not resume a model or infer a task conclusion.
+
+Terminal image input uses [structured prompt drafts](terminal/features/composer/README.md).
+Images enter through clipboard paste, dropped paths or explicit `@` references;
+submission still uses the ordinary image blocks and Application lifecycle.

@@ -77,3 +77,19 @@ class ResearchConfigurationTests(unittest.TestCase):
             self.assertEqual(ResearchContext.resolve(path).stage, 'import')
             with self.assertRaises(ValueError):
                 ResearchDocument(path).settings('execute')
+
+    def test_import_selection_has_strict_task_and_original_identity_fields(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.document(Path(directory))
+            raw = yaml.safe_load(path.read_text())
+            settings = raw['stages']['import']
+            settings.update(task_names=['fixture'], evidence_paths={'artifacts/answer.txt': 'sha256:' + 'a' * 64})
+            path.write_text(yaml.safe_dump(raw))
+            self.assertEqual(ResearchDocument(path).settings('import')['task_names'], ['fixture'])
+            for field, value in (('task_names', 'fixture'), ('evidence_paths', {'answer': 'bad-hash'}), ('unknown', 1)):
+                with self.subTest(field=field):
+                    invalid = dict(settings); invalid[field] = value
+                    raw['stages']['import'] = invalid
+                    path.write_text(yaml.safe_dump(raw))
+                    with self.assertRaises(ValueError):
+                        ResearchDocument(path).settings('import')

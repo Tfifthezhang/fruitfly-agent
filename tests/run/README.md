@@ -60,3 +60,5 @@ The usual Application configuration tests retain ownership of activation rollbac
 rejection. `test_memory_lifecycle.py` covers threshold generation, same-Session
 review, isolated H/S/I identity, verified content activation and restart.
 `test_retained_resources.py` checks packaged resources in frozen execution.
+
+`test_clipboard.py` covers bounded platform clipboard access with fake subprocesses. Frozen-source tests import and execute compact materials and composer code without checkout fallback.

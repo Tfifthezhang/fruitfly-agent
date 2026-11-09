@@ -78,6 +78,7 @@ async def _dispatch(args, workspace, outputs, reporting):
         return {'study': args.study, 'fork': args.target}
     if args.command == 'import':
         configuration = {'action': 'import', 'source': str(Path(args.path).resolve()), 'related_records': getattr(args, 'related_records', None),
+            'task_names': getattr(args, 'task_names', ()), 'evidence_paths': getattr(args, 'evidence_paths', {}),
             'historical_configuration': {'status': 'Retained in source artifacts where available; not reconstructed from current settings.'}}
         if getattr(args, 'config', None):
             configuration['authored'] = yaml.safe_load(Path(args.config).read_text())
@@ -85,7 +86,8 @@ async def _dispatch(args, workspace, outputs, reporting):
         _capture_configuration(outputs, reporting)
         if args.source == 'eval':
             from fruitfly_eval.improvement.history import import_history
-            batch = import_history(Path(args.path).resolve(), artifacts, related_records=getattr(args, 'related_records', None))
+            batch = import_history(Path(args.path).resolve(), artifacts, related_records=getattr(args, 'related_records', None),
+                task_names=getattr(args, 'task_names', ()), evidence_paths=getattr(args, 'evidence_paths', None))
         else:
             from fruitfly_agent.improvement.contracts.research import ResearchBatch
             batch = ResearchBatch.from_dict(json.loads(Path(args.path).read_text()))

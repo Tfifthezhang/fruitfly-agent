@@ -159,7 +159,9 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
             artifacts = MemoryArtifacts()
             resources, calls = collect(root, artifacts, interrupted=True)
             self.assertIsNone(calls)
-            self.assertTrue(any(r.path.endswith('session.jsonl') for r in resources))
+            self.assertTrue(any(r.path.endswith('reading-trajectory.jsonl') for r in resources))
+            scope = json.loads(artifacts.read(next(r.artifact_id for r in resources if r.path == 'diagnostics/reading-scope.json')))
+            self.assertTrue(scope['gaps'])
             task = TaskMaterial('task', 'Work')
             plan = RunPlan('partial', version(), ('base_prompt',))
             from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
@@ -173,4 +175,4 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
             (agent / 'model-usage.json').write_text('{"schema_version":1,"used":1,"requests":[{}]}')
             resources, calls = collect(root, artifacts, interrupted=True)
             self.assertIsNone(calls)
-            self.assertTrue(any(r.path.endswith('session.jsonl') for r in resources))
+            self.assertTrue(any(r.path.endswith('reading-trajectory.jsonl') for r in resources))

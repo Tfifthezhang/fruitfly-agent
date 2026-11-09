@@ -29,3 +29,7 @@ search scores or baseline trials. See the [developer guide](../DEVELOPER_GUIDE.m
 ```bash
 .venv/bin/python -m unittest tests.improvement.test_research_service tests.experiments.test_stage_cli tests.experiments.test_research_continuation
 ```
+
+`assess` and `propose` accept imported batches without an organize result.
+`organize` is an explicit optional model invocation. Deterministic Eval material
+extraction occurs before these stages and needs no Organizer Provider.

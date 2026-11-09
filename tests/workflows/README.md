@@ -44,3 +44,5 @@ and hybrid summary-prompt candidates through real isolated execution, trial
 artifacts, independent fake verification, activation and Session recovery.
 
 `test_improvement_evidence.py` verifies the real Eval collector, facts, organizer and both role workspaces through paged source reads and citation receipts.
+
+Multimodal workflows use explicit image references and preserve save/recovery, rejection, queueing and cancellation behavior. Evidence workflows supplement selected original bytes before granting them to both editing and assessment.

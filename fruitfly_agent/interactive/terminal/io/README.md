@@ -105,3 +105,11 @@ returns to input history. Tab accepts a candidate; Enter always submits the draf
 Permission choices and copy controls take priority and clear candidates. Field
 and hidden input do not query completion. Paste payloads bypass shortcut handling.
 Candidate rows are transient display state outside the transcript and Session.
+
+## Adapt structured input
+
+`IsolatedLineEditor.set_input_adapter()` accepts a generic adapter for atomic
+ranges, text updates, paste and explicit clipboard actions. I/O interprets no
+image formats or paths. Fields and authorization choices bypass the adapter.
+The existing reader owns Ctrl+V and bracketed paste; no second stdin reader runs.
+See [Composer](../features/composer/README.md) for image draft policy.

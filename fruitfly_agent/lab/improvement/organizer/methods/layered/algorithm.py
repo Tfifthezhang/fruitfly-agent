@@ -60,7 +60,10 @@ class LayeredOrganizer:
             description='Submit attributable navigation and summaries; no optimization advice.',
             parameters={'type': 'object', 'properties': {'sections': {'type': 'array', 'items': section}},
                 'required': ['sections'], 'additionalProperties': False}, execute=submit, requires_exclusive_batch=True)
-        await self.session.session(self.instructions.organize, workspace, services, system=self.instructions.system,
+        mission = self.instructions.organize
+        if request.instruction.strip():
+            mission += '\n\nInvocation requirements:\n' + request.instruction
+        await self.session.session(mission, workspace, services, system=self.instructions.system,
             extra_tools=(tool,), validate_final=accept,
             submission_result=lambda: canonical_json(accepted) if accepted is not None else None,
             initial_content=canonical_json({'batch_path': 'context/batch.json', 'task_count': len(request.tasks)}))

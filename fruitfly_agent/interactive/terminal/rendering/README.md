@@ -83,3 +83,7 @@ summaries. The renderer retains category/status colors and output bounds; it add
 no classifier model. Managed starts display Running. `ManagedOperationChanged`
 reports terminal background state with a handle and elapsed time, without changing
 Agent control flow or generating a conclusion.
+
+Image draft markers use the ordinary input surface and cursor offsets. They are
+transient editor state, not additional Session messages. See
+[Composer](../features/composer/README.md) for selection and deletion behavior.

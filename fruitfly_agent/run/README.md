@@ -65,7 +65,7 @@ Image-only input is a single task, not interactive startup. Paths resolve from
 with a 10 MiB bound and container checks; full pixel decoding is not performed.
 PNG dimensions are limited to 40 megapixels. At most eight images and 32 MiB may
 be submitted together. BMP, audio/video and implicit format conversion are not
-supported. In chat use [attachment commands](../interactive/terminal/README.md#attach-local-images).
+supported. In chat use [composer image input](../interactive/terminal/README.md#attach-local-images).
 
 Run stores selected images and image tool outputs as immutable resources in
 `.fruitfly/artifacts/`, with Session grants recording their IDs, origin, type and
@@ -259,3 +259,7 @@ reset discards them. The factory's secret environment is updated after successfu
 save. Explicit configuration application or a later start uses the model without
 restarting. See [Configuration](../../CONFIGURATION.md) and
 [Providers](../providers/README.md).
+
+Clipboard selection uses the same image validation and frozen submission as file
+selection. It reads the clipboard of the CLI host, not a remote tool environment.
+Missing platform clipboard support leaves explicit local path input available.

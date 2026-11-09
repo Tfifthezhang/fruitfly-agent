@@ -51,9 +51,10 @@ def organize_evidence(task, record, artifacts):
         'elapsed_seconds': facts.elapsed_seconds if facts is not None else None,
         'usage': asdict(facts)['usage'] if facts is not None else [],
         'counters': dict(facts.counters) if facts is not None else {},
-        'deliverables': [asdict(r) for r in originals if r.kind == 'deliverable'],
+        'deliverable_count': sum(r.kind == 'deliverable' for r in originals),
+        'sources_path': SOURCES_PATH, 'source_count': len(sources),
         'deliverable_scope': 'Captured file versions; consult the capture manifest for stage and final-state relationships.',
-        'event_count': len(events), 'events_path': EVENTS_PATH, 'sources': sources,
+        'event_count': len(events), 'events_path': EVENTS_PATH,
         'coverage_path': COVERAGE_PATH, 'coverage': coverage,
         'complete': coverage['evidence_complete'],
         'execution_diagnostics_complete': coverage['execution_diagnostics_complete']}

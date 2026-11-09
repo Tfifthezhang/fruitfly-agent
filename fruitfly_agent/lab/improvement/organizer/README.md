@@ -28,9 +28,13 @@ to real role execution. Fixed-I studies that select this component install the c
 reading role before editing. An isolated trial is not proof for persistent adoption;
 that still requires an independent comparison through the owning host.
 
-Run invokes organization before task-set editing and exposes the view in the
-editor context. Embeddings can inject `StageBindings.organizer`. Standalone
+Model organization is optional. Assessors and editors can consume imported
+batches directly. Explicit organization exposes a reading guide in editor context. Embeddings can inject `StageBindings.organizer`. Standalone
 research activities can organize retained batches without preparing containers.
+
+An explicit `OrganizationRequest.instruction` is included in the role mission
+as invocation requirements. Its copy in `context/batch.json` remains provenance;
+reading that file is not required to receive the invocation requirements.
 
 Offline checks: `tests.lab.test_organizer`, `tests.improvement.test_research_recovery`.
 Fake outputs prove candidate application and attribution, not model summary quality.

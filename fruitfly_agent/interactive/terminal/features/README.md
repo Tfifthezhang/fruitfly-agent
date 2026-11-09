@@ -12,7 +12,7 @@ Keep each user-facing function's command flow and menus in one package. Features
 | [tool_services/approval.py](tool_services/approval.py) | TTY-only external process startup review while ordinary terminal input is suspended |
 | [Retained state](retained_state/README.md) | Memory and Skill inspection and batch review |
 | [assembly.py](assembly.py): bind_commands | Bind available built-in features and cancellation to the terminal registry |
-| [attachments.py](attachments.py): `AttachmentDraft` | Pending frozen images, retained rejected text and attachment command handlers |
+| [Composer](composer/README.md) | Structured text/image drafts, paste, path selection and rejected-input recovery |
 
 Each feature exports its menu entry and a handler factory. Factories return synchronous/asynchronous handlers accepted by [TerminalCommandRegistry](../commands.py). CommandResult lets the input loop display output and handle exit. Application's public methods remain authoritative for work exclusion and runtime switching.
 

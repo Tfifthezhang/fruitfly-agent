@@ -1,5 +1,9 @@
 """Compose workspace access with a shared Agent invocation; roles own policy."""
 from dataclasses import replace
+from fruitfly_agent.core.context.budget import forward_context_capabilities
+from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone
+from fruitfly_agent.lab.context_manager.measurement import new_measurement_scope
+from fruitfly_agent.lab.context_manager.measurement.budget import MeasurementService
 from fruitfly_agent.core.data_model import AssistantMessage, UserMessage
 from fruitfly_agent.lab.agents import AgentRunner
 from .access import EvidenceAccess
@@ -30,7 +34,29 @@ class EvidenceSession:
             from ..editor.tools import editing_tools
             tools.extend(editing_tools(workspace,submit=seal if submit is not None else None,settings=self.settings))
         tools.extend(extra_tools)
-        role_config=replace(self.config,env=None,hooks=None,prepare_next_turn=None,before_tool_call=None,after_tool_call=None,
+        meter = new_measurement_scope(self.config.context_meter) or MeasurementService()
+        requests = 0
+        def bounded_provider(view, *, signal=None):
+            async def events():
+                nonlocal requests
+                requests += 1
+                if requests > self.settings.supply.max_pages + 8:
+                    raise RuntimeError('evidence_request_budget_exhausted: role did not submit within its reading budget')
+                measurement = await meter.measure(view, self.config.provider, signal=signal)
+                if not measurement.fits(self.config.context_window):
+                    services.record('evidence-context-budget-exhausted', input_tokens=measurement.input_tokens,
+                        output_reserve=measurement.output_reserve, quality=measurement.quality)
+                    raise RuntimeError('evidence_context_budget_exhausted: input and output reserve exceed context window')
+                inner = self.config.provider(view, signal=signal)
+                try:
+                    async for event in inner:
+                        yield event
+                    yield StreamDone(await inner.result())
+                finally:
+                    await inner.aclose()
+            return AssistantMessageEventStream(events())
+        forward_context_capabilities(bounded_provider, self.config.provider)
+        role_config=replace(self.config,provider=bounded_provider,env=None,hooks=None,prepare_next_turn=None,before_tool_call=None,after_tool_call=None,
             on_partial=None,on_tool_result=None,should_stop_after_turn=None)
         messages = [UserMessage(initial_content or 'Use catalog to discover the granted workspace, then read relevant evidence.')]
         while True:

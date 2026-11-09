@@ -23,13 +23,20 @@ class SearchSettings:
 
 
 @dataclass(frozen=True)
+class SupplySettings:
+    max_characters: int = 256000
+    max_pages: int = 64
+
+
+@dataclass(frozen=True)
 class EvidenceSettings:
     read: ReadSettings = field(default_factory=ReadSettings)
     catalog: CatalogSettings = field(default_factory=CatalogSettings)
     search: SearchSettings = field(default_factory=SearchSettings)
+    supply: SupplySettings = field(default_factory=SupplySettings)
 
     def __post_init__(self):
-        for name, kind in (('read', ReadSettings), ('catalog', CatalogSettings), ('search', SearchSettings)):
+        for name, kind in (('read', ReadSettings), ('catalog', CatalogSettings), ('search', SearchSettings), ('supply', SupplySettings)):
             value = getattr(self, name)
             if isinstance(value, dict):
                 value = kind(**mapping(value, kind.__dataclass_fields__, 'evidence.' + name))

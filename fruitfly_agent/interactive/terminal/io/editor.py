@@ -30,6 +30,16 @@ class EditorDisplay(Protocol):
     def resume_live(self) -> None: ...
     def set_completions(self, view: CompletionView) -> None: ...
 
+class InputAdapter(Protocol):
+    text: str
+    notice: str
+    def ranges(self) -> tuple[tuple[int, int], ...]: ...
+    def update(self, text: str) -> None: ...
+    def transform(self, text: str, cursor: int) -> tuple[str, int]: ...
+    def paste(self, text: str, cursor: int, payload: str) -> tuple[str, int]: ...
+    def paste_image(self, text: str, cursor: int) -> tuple[str, int]: ...
+
+
 @dataclass
 class _InputBuffer:
     """One line's text, cursor, and temporary history navigation state."""
@@ -110,6 +120,33 @@ class IsolatedLineEditor:
         self._choice_request = ""
         self._field_input = False
         self._completion: CompletionState | None = None
+        self._input_adapter: InputAdapter | None = None
+
+    def set_input_adapter(self, adapter: InputAdapter | None) -> None:
+        self._input_adapter = adapter
+
+    def _atomic_edit(self, buffer: _InputBuffer, key: bytes) -> bool:
+        adapter = self._input_adapter
+        if adapter is None or self._field_input:
+            return False
+        backwards = key in {b'\x7f', b'\x08'}
+        forwards = key in {b'\x04', b'\x1b[3~'}
+        left = key in {b'\x1b[D', b'\x1bOD'}
+        right = key in {b'\x1b[C', b'\x1bOC'}
+        for start, end in adapter.ranges():
+            if (backwards or left) and start < buffer.cursor <= end:
+                if backwards:
+                    del buffer.characters[start:end]
+                buffer.cursor = start
+                return True
+            if (forwards or right) and start <= buffer.cursor < end:
+                if forwards:
+                    del buffer.characters[start:end]
+                    buffer.cursor = start
+                else:
+                    buffer.cursor = end
+                return True
+        return False
 
     def set_completion_provider(self, provider: CompletionProvider | None) -> None:
         self._completion = CompletionState(provider) if provider is not None else None
@@ -181,13 +218,17 @@ class IsolatedLineEditor:
     def read_line(self) -> str | None:
         descriptor = self.input.fileno()
         buffer = _InputBuffer(len(self._history))
+        adapter = None if self._field_input else self._input_adapter
+        if adapter is not None:
+            buffer.characters = list(adapter.text)
+            buffer.cursor = len(buffer.characters)
         encoding = getattr(self.input, "encoding", None) or "utf-8"
         decoder = codecs.getincrementaldecoder(encoding)(errors="replace")
         owns_terminal_state = self._previous_terminal_state is None
         try:
             if owns_terminal_state:
                 self.start()
-            self.display.set_input("", 0)
+            self.display.set_input("".join(buffer.characters), buffer.cursor)
             while True:
                 if self._interrupted.is_set():
                     self._interrupted.clear()
@@ -225,6 +266,8 @@ class IsolatedLineEditor:
                     continue
                 if first in {b"\r", b"\n"}:
                     value = "".join(buffer.characters)
+                    if adapter is not None:
+                        value, buffer.cursor = adapter.transform(value, buffer.cursor)
                     if value and (not self._history or self._history[-1] != value):
                         self._history.append(value)
                     self.display.set_input("", 0)
@@ -257,15 +300,29 @@ class IsolatedLineEditor:
                             self._completion.move(-1 if sequence.endswith(b'A') else 1)
                             self.display.set_completions(self._completion.view)
                             continue
-                    buffer.escape(sequence, descriptor, encoding, self._history)
+                    if adapter is not None and sequence == _BRACKETED_PASTE_START:
+                        payload = _decode_paste(_read_bracketed_paste(descriptor), encoding)
+                        value, buffer.cursor = adapter.paste(''.join(buffer.characters), buffer.cursor, payload)
+                        buffer.characters = list(value)
+                    elif not self._atomic_edit(buffer, sequence):
+                        buffer.escape(sequence, descriptor, encoding, self._history)
                 elif first in {b"\x04", b"\x7f", b"\x08", b"\x01", b"\x05", b"\x15", b"\x17"}:
-                    buffer.control(first)
+                    if not self._atomic_edit(buffer, first):
+                        buffer.control(first)
+                elif first == b'\x16' and adapter is not None:
+                    value, buffer.cursor = adapter.paste_image(''.join(buffer.characters), buffer.cursor)
+                    buffer.characters = list(value)
                 else:
                     decoded = decoder.decode(first, final=False)
                     for character in decoded:
                         if character.isprintable():
                             buffer.characters.insert(buffer.cursor, character)
                             buffer.cursor += 1
+                if adapter is not None:
+                    adapter.update(''.join(buffer.characters))
+                    if adapter.notice:
+                        self.display.write(adapter.notice + '\n')
+                        adapter.notice = ''
                 self.display.set_input("".join(buffer.characters), buffer.cursor)
         finally:
             self._clear_completion()

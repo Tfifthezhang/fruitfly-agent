@@ -121,3 +121,9 @@ injected state projection and frontend adapters; leaf runtime services do not
 import improvement-host or adapter implementations. A prepared replacement starts
 no maintenance requests. One-shot tasks disable mutable workspace state services;
 normal and candidate content still use the shared assembler.
+
+[clipboard.py](clipboard.py) reads local clipboard images through available
+platform tools with a three-second deadline and the existing image byte limits.
+The CLI injects this capability into terminal bindings. It makes no model request
+and does not access the Agent's SSH execution environment. See
+[image input](../../interactive/terminal/README.md#attach-local-images).

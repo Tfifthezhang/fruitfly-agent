@@ -47,14 +47,24 @@ class ResearchDocument:
             raise ValueError('unknown independent stage')
         allowed = {
             'eval': {'tasks', 'task_seconds'},
-            'import': {'source', 'path', 'related_records'},
+            'import': {'source', 'path', 'related_records', 'task_names', 'evidence_paths'},
             'organize': {'timeout_seconds', 'instruction'},
             'assess': {'timeout_seconds'},
             'propose': {'timeout_seconds', 'generator', 'direction'},
             'execute': {'tasks', 'attempts', 'concurrency', 'task_seconds'},
             'compare': {'timeout_seconds'},
         }
-        return mapping(self.stages.get(stage, {}), allowed[stage], 'stages.' + stage)
+        result = mapping(self.stages.get(stage, {}), allowed[stage], 'stages.' + stage)
+        if stage == 'import':
+            names = result.get('task_names', [])
+            paths = result.get('evidence_paths', {})
+            if not isinstance(names, list) or any(not isinstance(v, str) or not v for v in names):
+                raise ValueError('import.task_names must contain task names')
+            if result.get('source') != 'eval' and (names or paths):
+                raise ValueError('task_names and evidence_paths require an Eval import')
+            if not isinstance(paths, dict) or any(not isinstance(k, str) or not isinstance(v, str) or not re.fullmatch(r'sha256:[0-9a-f]{64}', v) for k, v in paths.items()):
+                raise ValueError('import.evidence_paths must map archive paths to sha256 identities')
+        return result
 
     def experiment(self, stage):
         """Project into existing owner validators, without a second component grammar."""

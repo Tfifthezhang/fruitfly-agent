@@ -88,3 +88,8 @@ Different configuration is reported, not used as a continuation gate.
 Offline tests use fake Providers and executors. They do not establish benchmark
 quality or external connectivity. Generic materials require a registered executor;
 a file instruction alone does not install a task runner.
+
+For retained Eval results, import produces compact evidence without model calls.
+Select assess or propose next; model organize is optional. Task selection and
+explicit hash-checked original supplements are described in
+[stage settings](CONFIGURATION.md#configure-stage-settings).

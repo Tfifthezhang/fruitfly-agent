@@ -209,7 +209,8 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
         captured: list[tuple[int, object]] = []
 
         class FakeFrontend:
-            def __init__(self, app) -> None:
+            def __init__(self, app, *, bindings) -> None:
+                assert callable(bindings.clipboard_image)
                 captured.append(
                     (app.status.message_count, app.configuration)
                 )

@@ -125,7 +125,7 @@ class EvidenceWorkspace:
         if path not in self.files:
             raise ValueError('file is outside the evidence grant')
         data = self.files[path]
-        self.record('editor-read', path=path, artifact_id='sha256:' + hashlib.sha256(data).hexdigest())
+        self.record('evidence-host-read', path=path, artifact_id='sha256:' + hashlib.sha256(data).hexdigest())
         return data
 
     def _write_path(self, path):

@@ -33,7 +33,7 @@ inspectable mechanisms and controlled comparisons. Its runtime is adapted from
 | Version | 0.1 |
 | Runtime | Python 3.11+, macOS or Linux (POSIX) |
 | Model APIs | Responses, Chat Completions and Messages; service then protocol setup with automatic SDK selection |
-| Image input | Local attachments, image tool results and optional resource saving; requires a declared vision model. See [Run](fruitfly_agent/run/README.md#submit-images). |
+| Image input | Clipboard paste, dropped local images, image tool results and optional resource saving; requires a declared vision model. See [Run](fruitfly_agent/run/README.md#submit-images). |
 | License | [MIT](LICENSE) · [Third-party notices](THIRD_PARTY_NOTICES.md) |
 
 ## Quickstart
@@ -182,3 +182,7 @@ phase judgments alone do not prove improvement or activate a version.
 Eval automatically organizes retained execution evidence and supports an offline
 [organization/export command](fruitfly_eval/README.md#organize-retained-evidence).
 Evidence coverage is separate from official benchmark outcomes.
+
+Eval imports provide compact task and trajectory evidence for direct assessment
+and proposal. Model organization is optional. See
+[retained evidence](fruitfly_eval/README.md#organize-retained-evidence).

@@ -116,3 +116,33 @@ class EvidenceIndexTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((event['kind'], event['tool_name'], event['is_error'], event['elapsed_seconds']),
                          ('tool-finished', 'bash', True, 318))
         self.assertEqual(raw[event['start']:event['end']], raw)
+
+    async def test_read_and_search_share_cumulative_supply_and_stop_before_scanning(self):
+        _, _, baseline, _ = proposal_fixture()
+        workspace = EvidenceWorkspace(baseline=baseline, files={'a': b'0123456789', 'b': b'0123456789'}, writable_ids=())
+        reader = WorkspaceEvidence(workspace, settings={'supply': {'max_characters': 5, 'max_pages': 2}})
+        page = reader.read('a', limit=3)
+        self.assertEqual(page['text'], '012')
+        matches = reader.search('012', paths=('b',))
+        self.assertEqual(matches['matches'][0]['text'], '01')
+        self.assertEqual(reader.supplied_characters, 5)
+        from unittest.mock import patch
+        with patch.object(workspace, 'read', side_effect=AssertionError('exhausted search scanned files')):
+            self.assertEqual(reader.read('b')['status'], 'budget_exhausted')
+            self.assertEqual(reader.search('012')['status'], 'budget_exhausted')
+
+    async def test_role_reserves_output_before_calling_provider(self):
+        from types import SimpleNamespace
+        import asyncio
+        from fruitfly_agent.core.config import AgentLoopConfig
+        from fruitfly_agent.lab.improvement.evidence.session import EvidenceSession
+        from tests.support.faux_provider import FauxProvider
+        _, _, baseline, _ = proposal_fixture()
+        provider = FauxProvider()
+        workspace = EvidenceWorkspace(baseline=baseline, files={}, writable_ids=())
+        services = SimpleNamespace(check=lambda: None, observe=lambda *args: None,
+            record=lambda *args, **kwargs: None, signal=asyncio.Event())
+        with self.assertRaisesRegex(RuntimeError, 'evidence_context_budget_exhausted'):
+            await EvidenceSession(AgentLoopConfig(provider, context_window=100, max_tokens=100), None).session(
+                'Inspect evidence', workspace, services)
+        self.assertEqual(provider.calls, [])

@@ -70,6 +70,7 @@ class EvalTaskRunner:
             completed = report.get('status') == 'completed' and not report.get('errors')
             reward = next((m.get('value') for m in report.get('metrics', []) if m.get('name') == 'official_reward'), None)
             answer = answer_evidence(artifacts, context.artifacts)
+            artifacts = tuple(r for r in artifacts if r.path != 'diagnostics/answer-material.json')
             from fruitfly_agent.improvement.contracts.tasks import Resource
             artifacts = (*artifacts, Resource('diagnostics/final-answer.json',
                 context.artifacts.put(json.dumps(answer).encode()), 'application/json', 'diagnostic'))
@@ -89,6 +90,7 @@ class EvalTaskRunner:
                 try:
                     artifacts, calls = collect(root, context.artifacts, interrupted=True)
                     answer = answer_evidence(artifacts, context.artifacts)
+                    artifacts = tuple(r for r in artifacts if r.path != 'diagnostics/answer-material.json')
                     from fruitfly_agent.improvement.contracts.tasks import Resource
                     artifacts = (*artifacts, Resource('diagnostics/final-answer.json',
                         context.artifacts.put(json.dumps(answer).encode()), 'application/json', 'diagnostic'))

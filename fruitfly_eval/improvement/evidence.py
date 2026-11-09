@@ -1,7 +1,6 @@
 """Collect permitted Agent evidence, keeping official private grading separate."""
 from pathlib import Path
 import json
-import mimetypes
 from typing import Any
 from fruitfly_agent.improvement.contracts.tasks import Resource
 from fruitfly_agent.lab.improvement.evidence.decoding import decode_rows
@@ -19,83 +18,17 @@ def trial_directories(root):
                  and ((path / 'agent').is_dir() or (path / 'result.json').is_file()))
 
 
-def collect(root, artifacts, *, interrupted=False, trial=None, origins=None):
-    root = Path(root).resolve()
-    trials = (Path(trial),) if trial is not None else trial_directories(root)
-    resources, calls, known = [], 0, True
-    for index, directory in enumerate(trials):
-        if directory.is_symlink() or not directory.resolve().is_relative_to(root):
-            raise ValueError('trial evidence escapes evaluation root')
-        agent = directory / 'agent'
-        if agent.is_symlink():
-            raise ValueError('Agent evidence directory must not be a symlink')
-        def add(path, logical, kind='diagnostic'):
-            if path.is_file() and safe_path(path, root):
-                media = mimetypes.guess_type(path.name)[0] or 'application/octet-stream'
-                resources.append(Resource(logical, artifacts.put(path.read_bytes()), media, kind))
-                if origins is not None:
-                    origins[logical] = path
-        for name in ('session.jsonl', 'trajectory.json', 'events.jsonl'):
-            add(agent / name, f'agent/{index}/{name}', 'trajectory')
-        if not (agent / 'events.jsonl').is_file():
-            add(agent / 'live-events.jsonl', f'agent/{index}/live-events.jsonl', 'trajectory')
-        for name in ('trajectory-status.json', 'model-usage.json', 'process.json'):
-            add(agent / name, f'agent/{index}/{name}')
-        for path in sorted((agent / 'session.jsonl.operations').glob('*.jsonl')):
-            add(path, f'agent/{index}/operations-originals/{path.name}', 'trajectory')
-        receipt = agent / 'model-usage.json'
-        if not receipt.is_file() or not safe_path(receipt, root):
-            known = False
-        else:
-            try:
-                value = json.loads(receipt.read_text())
-                if (value.get('schema_version') != 1 or type(value.get('used')) is not int
-                        or value['used'] < 0 or not isinstance(value.get('requests'), list)
-                        or len(value['requests']) != value['used']
-                        or len({v['id'] for v in value['requests']}) != value['used']):
-                    raise ValueError('invalid model-call receipt')
-                calls += value['used']
-            except (ValueError, TypeError, KeyError, AttributeError, UnicodeDecodeError):
-                if not interrupted:
-                    raise
-                known = False
-        captured = agent / 'evidence-capture'
-        manifest = captured / 'manifest.json'
-        add(manifest, 'diagnostics/capture-manifest.json')
-        add(captured / 'baseline.json', 'diagnostics/capture-baseline.json')
-        if manifest.is_file() and safe_path(manifest, root):
-            try:
-                capture = json.loads(manifest.read_bytes())
-                if not isinstance(capture, dict) or not isinstance(capture.get('files'), list):
-                    raise ValueError('invalid capture manifest')
-                for entry in capture.get('files', []):
-                    if entry.get('status') != 'collected':
-                        continue
-                    relative = Path(entry['archive_path'])
-                    path = captured / relative
-                    if relative.is_absolute() or '..' in relative.parts or path.is_symlink() or not path.resolve().is_relative_to(captured.resolve()):
-                        raise ValueError('unsafe capture entry')
-                    data = path.read_bytes()
-                    from hashlib import sha256
-                    if sha256(data).hexdigest() != entry['sha256']:
-                        raise ValueError('capture content hash mismatch')
-                    kind = 'diagnostic' if relative.parts[0] == 'tool-output' else 'deliverable'
-                    add(path, f'deliverables/{index}/' + relative.as_posix() if kind == 'deliverable'
-                        else 'diagnostics/' + relative.as_posix(), kind)
-            except (OSError, ValueError, KeyError, TypeError, AttributeError):
-                if not interrupted:
-                    raise
-        collected = directory / 'artifacts'
-        if collected.is_dir() and not collected.is_symlink():
-            add(collected / 'manifest.json', f'agent/{index}/artifact-collection.json')
-            for path in sorted(collected.rglob('*')):
-                if path.name != 'manifest.json' and path.resolve().is_relative_to(collected.resolve()):
-                    add(path, f'deliverables/{index}/harbor/' + path.relative_to(collected).as_posix(), 'deliverable')
-    return tuple(resources), calls if known and trials else None
+def collect(root, artifacts, *, interrupted=False, trial=None, origins=None, evidence_paths=None):
+    from .materials import collect_materials
+    return collect_materials(root, artifacts, interrupted=interrupted, trial=trial,
+                             origins=origins, evidence_paths=evidence_paths)
 
 
 def answer_evidence(resources, artifacts):
     """Reference the last committed assistant response without inventing a final."""
+    retained = next((r for r in resources if r.path in {'diagnostics/final-answer.json', 'diagnostics/answer-material.json'}), None)
+    if retained is not None:
+        return json.loads(artifacts.read(retained.artifact_id))
     answer: dict[str, Any] = {'state': 'absent', 'text': '', 'source': None}
     for resource in resources:
         if not resource.path.endswith('/session.jsonl'):

@@ -20,6 +20,6 @@ class ReferenceWorkspace(EvidenceWorkspace):
         if path in self.references:
             reference = self.references[path]
             data = self.artifacts.read(reference)
-            self.record('editor-read', path=path, artifact_id=reference)
+            self.record('evidence-host-read', path=path, artifact_id=reference)
             return data
         return super().read(path)

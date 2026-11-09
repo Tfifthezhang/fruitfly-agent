@@ -25,7 +25,9 @@ def extract_events(resource, rows, source_format):
                 'parent_id': raw.get('parentId', payload.get('parent_id')),
                 'sequence': raw.get('position', {}).get('sequence') if isinstance(raw.get('position'), dict) else None,
                 'phase': payload.get('stage', payload.get('phase')),
-                'status': payload.get('status'), 'derived': source_format == 'atif',
+                'status': payload.get('status'),
+                'derived': source_format == 'atif' or isinstance(raw.get('source'), dict),
+                'original_source': raw.get('source') if isinstance(raw.get('source'), dict) else None,
                 'tool_call_id': message.get('toolCallId', payload.get('tool_call_id')),
                 'tool_name': payload.get('tool_name', message.get('toolName', message.get('tool_name'))),
                 'is_error': message.get('isError', message.get('is_error', payload.get('is_error')))}

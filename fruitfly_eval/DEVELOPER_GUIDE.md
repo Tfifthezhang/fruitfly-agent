@@ -229,7 +229,8 @@ regenerate a complete content-bound runtime.
 
 `python -m fruitfly_eval organize --run /path/to/evaluation` runs offline and shares
 the ordinary run's post-processing implementation. `--output /path/to/export
---portable` retains permitted original bytes in a relocatable package. See the
+--portable` retains registered compact materials in a relocatable package;
+external originals remain source dependencies. See the
 [artifact layout and limits](README.md#organize-retained-evidence).
 
 Adapters should retain attributable original evidence before teardown. Harbor
@@ -238,3 +239,9 @@ time. A source collection failure, unsupported format or missing output must rem
 explicit; organizing an archive cannot repair unavailable original bytes. Do not
 change official reports or rewards while rebuilding evidence. `api.organize_evaluation`
 is the public embedding entry and starts no model, verifier or environment.
+
+The Improvement adapter [materials.py](improvement/materials.py) extracts one reading
+trajectory, task/final-answer material and a hash catalog. It excludes duplicate
+streams, Provider internals and thinking content. Original Session bytes stay
+authoritative. Explicit supplements validate catalog scope and content identity;
+private verifier paths never enter the permitted catalog.

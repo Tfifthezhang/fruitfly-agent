@@ -45,3 +45,5 @@ coverage and common Agent observation collection without changing official rewar
 Task-batch checks include zero-result reports and review-required resume drafts.
 
 `test_evidence_capture.py` owns scoped file bytes, limits, protected paths and public hook binding. `test_organization.py` owns independent CLI organization, hash-preserving portable export, failed-start visibility and active-run rejection. `test_trajectory.py` also protects physical Unicode-containing JSONL and usage independence from conversion.
+
+`test_reading_materials.py` covers compact default imports, original source spans, duplicate exclusion, partial records and explicit hash-checked supplements. Private verifier content stays excluded.

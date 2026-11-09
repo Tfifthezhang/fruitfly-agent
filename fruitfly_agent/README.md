@@ -203,3 +203,9 @@ are separate from observed wall time, and unfinished operations remain unknown.
 Eval's [evidence post-processing](../fruitfly_eval/README.md#organize-retained-evidence)
 materializes the shared Lab evidence layers after execution and through an offline
 organization command. Runtime and generic Improvement remain independent of Eval.
+
+Eval emits compact reading materials through its source adapter. Generic Lab
+readers enforce cumulative evidence supply and request-space limits; original
+supplements require explicit identities. Model organization is optional before
+assessment/proposal. Terminal image drafts accept clipboard paste and dropped
+paths through the existing single input owner and Application submission.

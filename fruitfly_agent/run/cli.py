@@ -118,7 +118,11 @@ async def run_cli(args: argparse.Namespace) -> int:
                 if event_stream is not None:
                     event_stream.close()
 
-        frontend = TerminalFrontend(application)
+        from dataclasses import replace
+        from fruitfly_agent.interactive.terminal.bindings import TerminalBindings
+        from .runtime.clipboard import read_clipboard_image
+        frontend = TerminalFrontend(application, bindings=replace(
+            TerminalBindings.from_session(application), clipboard_image=read_clipboard_image))
         if extensions.registrations:
             from fruitfly_agent.run.extensions.commands import bind_extension_commands
             bind_extension_commands(frontend.commands, application, factory)

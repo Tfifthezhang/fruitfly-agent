@@ -32,3 +32,8 @@ The selected registered backend owns fresh execution state and retirement.
 ```bash
 .venv/bin/python -m unittest tests.run.test_research_configuration tests.experiments.test_stage_cli tests.experiments.test_research_continuation
 ```
+
+Research import passes explicit task names and original path/hash selections to
+the source adapter. The stage service does not require model organization before
+assessment/proposal. Evidence budgets are shared role settings, not Eval branches
+in the runtime. See [configuration](../../experiments/CONFIGURATION.md).

@@ -69,3 +69,8 @@ Do not make one stage import and invoke another stage's service.
 Offline fakes establish protocol behavior, not model quality or benchmark gains.
 I prompt targets remain available for explicit proposal; automatic nested I
 comparison/search is not an installed execution backend.
+
+Historical Eval imports contain deterministic compact materials. The normal path
+is import followed by assess or propose; model organize is optional. See
+[bounded evidence](evidence/README.md#bound-an-investigation) for supply limits,
+source references and explicit original supplements.

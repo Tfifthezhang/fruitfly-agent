@@ -65,7 +65,8 @@ async def dispatch(args, workspace):
         fresh=attempt == 'fresh', retry_unresolved=attempt == 'retry-unresolved',
         source=settings.get('source'), path=str(context.document.resolve(settings['path'])) if 'path' in settings else None,
         related_records=str(context.document.resolve(settings['related_records'])) if settings.get('related_records') else None,
-        instruction=settings.get('instruction', ''), named_inputs=inputs,
+        instruction=settings.get('instruction', ''), task_names=settings.get('task_names', []),
+        evidence_paths=settings.get('evidence_paths', {}), named_inputs=inputs,
         harness_bundle=inputs.get('harness_bundle'))
     from .research import dispatch as perform
     result = await perform(invocation, workspace)

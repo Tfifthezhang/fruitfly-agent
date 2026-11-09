@@ -186,8 +186,23 @@ from fruitfly_agent.lab.context_manager.reduction.methods.working_memory import 
 assert Path(config.__file__).is_relative_to(root)
 assert config.WorkingMemoryConfig().maintenance_ratio == .5
 catalog = builtin_catalog()
-for name, role in [('base_prompt','H'), ('skill-library','S'), ('improvement-editor','I')]:
+for name, role in [('base_prompt','H'), ('skill-library','S'), ('improvement-editor','I'), ('improvement-organizer','I')]:
     assert read_default(catalog, name)[0].role == role
+from fruitfly_eval.improvement import materials
+from fruitfly_agent.interactive.terminal.features import composer
+from fruitfly_agent.run.runtime import clipboard
+from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
+from fruitfly_eval.improvement.evidence import answer_evidence
+for module in (materials, composer, clipboard):
+    assert Path(module.__file__).is_relative_to(root)
+archive = root / 'fixture-archive'
+agent = archive / 'artifacts/harbor/job/trial/agent'
+agent.mkdir(parents=True, exist_ok=True)
+(agent / 'session.jsonl').write_text('{"message":{"role":"assistant","content":"done","stopReason":"stop"}}')
+artifacts = MemoryArtifacts()
+resources, _ = materials.collect_materials(archive, artifacts)
+assert answer_evidence(resources, artifacts)['text'] == 'done'
+assert composer.Composer(None).prepare('text') == 'text'
 '''
         result = subprocess.run([sys.executable, '-I', '-B', '-c', code, str(frozen)],
                                 cwd=self.root, capture_output=True, text=True, timeout=20)

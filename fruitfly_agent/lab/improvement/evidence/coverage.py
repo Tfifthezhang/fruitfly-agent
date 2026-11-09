@@ -28,6 +28,16 @@ def build_coverage(record, sources, artifacts, facts):
             gaps.append({'source_path': capture.path, 'reason': 'invalid capture manifest'})
     else:
         gaps.append({'source_path': 'deliverables', 'reason': 'capture scope/receipt unavailable'})
+    scope = next((r for r in record.artifacts if r.path == 'diagnostics/reading-scope.json'), None)
+    if scope:
+        material = json.loads(artifacts.read(scope.artifact_id))
+        gaps.extend(material.get('gaps', []))
+        external = [v for v in material.get('sources', []) if v['status'] != 'retained']
+        if external:
+            collection = 'partial'
+            gaps.append({'source_path': scope.path, 'reason': 'originals remain external; see source catalog'})
+        if material.get('gaps'):
+            parsing = 'partial'
     answer = next((r for r in record.artifacts if r.path == 'diagnostics/final-answer.json'), None)
     answer_state = 'unknown'
     if answer:

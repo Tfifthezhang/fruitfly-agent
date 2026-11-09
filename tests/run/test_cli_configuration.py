@@ -143,7 +143,8 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
         captured_paths: list[str] = []
 
         class FakeFrontend:
-            def __init__(self, app) -> None:
+            def __init__(self, app, *, bindings) -> None:
+                assert callable(bindings.clipboard_image)
                 self.app = app
                 captured_paths.append(app.status.session_path)
 

@@ -36,6 +36,7 @@ class TerminalBindings:
     enable_authorization: Callable | None
     apply_configuration: Callable[[], Awaitable[None]] | None = None
     load_attachment: Callable[[str], ImageAttachment] | None = None
+    clipboard_image: Callable[[], ImageAttachment | None] | None = None
     validate_input: Callable[[UserContent], UserContent] | None = None
     operations: Callable | None = None
     retained_state: Callable | None = None

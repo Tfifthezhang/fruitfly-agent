@@ -10,7 +10,6 @@ from fruitfly_agent.improvement.contracts.tasks import TaskMaterial, Resource
 from fruitfly_agent.improvement.contracts.versions import canonical_json, content_hash
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
 from fruitfly_agent.lab.improvement.evidence.indexing import organize_evidence, DERIVED_PATHS
-from fruitfly_agent.lab.improvement.evidence.decoding import decode_rows
 from fruitfly_agent.lab.improvement.evidence import decoding, events, indexing
 from fruitfly_agent.lab.improvement.evidence import coverage as coverage_module
 from .harbor.material import write_json
@@ -38,7 +37,7 @@ def organize_run(run, *, output=None, portable=False):
                 'portable': portable, 'status': 'complete',
                 'scope': 'permitted retained evidence; archive identities do not reconstruct missing runtime state'}
     implementation_files = [Path(__file__), Path(__file__).parent / 'trajectory.py',
-        Path(__file__).parent / 'improvement/evidence.py', Path(__file__).parent / 'improvement/facts.py',
+        Path(__file__).parent / 'improvement/evidence.py', Path(__file__).parent / 'improvement/materials.py', Path(__file__).parent / 'improvement/facts.py',
         *(Path(module.__file__) for module in (decoding, events, coverage_module, indexing))]
     manifest['implementation_files'] = {p.relative_to(Path(__file__).parent.parent).as_posix():
         hashlib.sha256(p.read_bytes()).hexdigest() for p in implementation_files}
@@ -51,30 +50,12 @@ def organize_run(run, *, output=None, portable=False):
         artifacts, origins = MemoryArtifacts(), {}
         try:
             resources, calls = collect(root, artifacts, interrupted=True, trial=trial, origins=origins)
-            if not any(r.path.endswith('/trajectory.json') for r in resources):
-                native = next((r for r in resources if r.path.endswith('/session.jsonl')), None)
-                if native:
-                    from .trajectory import session_trajectory
-                    try:
-                        projection = session_trajectory(origins[native.path])
-                        projection['extra']['canonical_source'] = native.artifact_id
-                        resources = (*resources, Resource('agent/0/trajectory-reprocessed.json',
-                            artifacts.put(canonical_json(projection).encode()), 'application/json', 'trajectory'))
-                    except (ValueError, TypeError, KeyError, OSError, AttributeError):
-                        pass  # Native parse gaps remain visible; no original is replaced.
-            instruction = ''
-            for resource in resources:
-                if resource.path.endswith('/session.jsonl'):
-                    rows, _, _ = decode_rows(artifacts.read(resource.artifact_id).decode('utf-8'))
-                    for row in rows:
-                        message = row.value.get('message', {})
-                        if message.get('role') == 'user':
-                            content = message.get('content', [])
-                            instruction = content if isinstance(content, str) else ''.join(b.get('text', '') for b in content if b.get('type') == 'text')
-                            break
+            material = next(r for r in resources if r.path == 'diagnostics/task.json')
+            instruction = json.loads(artifacts.read(material.artifact_id))['instruction']
             task = TaskMaterial('archive-task', instruction or 'Task instruction unavailable in retained conversation.')
             identity = content_hash(canonical_json([asdict(r) for r in resources]))
             answer = answer_evidence(resources, artifacts)
+            resources = tuple(r for r in resources if r.path != 'diagnostics/answer-material.json')
             resources = (*resources, Resource('diagnostics/final-answer.json',
                 artifacts.put(canonical_json(answer).encode()), 'application/json', 'diagnostic'))
             result = trial / 'result.json'

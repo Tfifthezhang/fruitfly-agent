@@ -28,6 +28,8 @@ stages:
   import:
     source: eval
     path: /path/to/completed-eval
+    # task_names: [exact-retained-task-name]
+    # evidence_paths: {}  # Archive-relative paths mapped to recorded sha256 identities.
     # related_records: /path/to/associated-records
   organize:
     timeout_seconds: 1200
@@ -46,6 +48,9 @@ stages:
     timeout_seconds: 1200
 
 evidence:
+  supply:
+    max_characters: 256000
+    max_pages: 64
   read:
     default_characters: 12000
     max_characters: 24000
@@ -57,6 +62,7 @@ next:
   inputs: {}
   context: []
 
+# Optional model guide; assess/propose can consume original-batch directly:
 # After import, replace next with:
 # next:
 #   stage: organize

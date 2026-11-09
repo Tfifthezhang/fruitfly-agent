@@ -19,7 +19,7 @@ owner admission belongs to [Catalog](../lab/catalog/CONFIGURATION.md).
 | `optimization.include` | Owner IDs with `fields` and optional numeric `bounds` |
 | `optimization.exclude` | Owner IDs removed from the edit scope |
 | `stages` | Parameters for each separately invoked stage |
-| `evidence` | Shared read/catalog/search response limits |
+| `evidence` | Shared read/catalog/search limits and cumulative `supply.max_characters` / `supply.max_pages` |
 | `next` | One stage, named inputs, context, attempt and optional immutable output alias |
 | `observed` | Generated projection; ignored for execution |
 
@@ -55,7 +55,7 @@ retained even if projection/alias publication needs attention.
 
 | Stage | Parameters |
 |---|---|
-| `import` | `source: eval|batch`, `path`, optional `related_records` |
+| `import` | `source: eval|batch`, `path`, optional `related_records`, `task_names`, `evidence_paths` |
 | `eval` | `tasks`, `task_seconds`; fixed prepared benchmark execution |
 | `organize` | `timeout_seconds`, `instruction` |
 | `assess` | `timeout_seconds` |
@@ -94,3 +94,31 @@ These project through the same system loader and owner validators. They do not
 provide stopping rounds, automatic promotion or automatic RSI composition.
 A nonempty `edit` explicitly replaces the default scope in this direct projection.
 Use the research main file for normal staged work.
+
+## Select imported evidence
+
+Eval import defaults to compact materials. `stages.import.task_names` is a list
+of exact retained task names. `evidence_paths` maps permitted archive-relative
+file paths to their recorded `sha256:` identities. Copy both from the source
+catalog in `diagnostics/reading-scope.json`; placeholders below must be replaced:
+
+```yaml
+stages:
+  import:
+    source: eval
+    path: /path/to/completed-eval
+    task_names: [example-task]
+    evidence_paths:
+      artifacts/harbor/JOB/TRIAL/artifacts/answer.txt: "sha256:REPLACE_WITH_64_HEX_DIGITS"
+evidence:
+  supply:
+    max_characters: 256000
+    max_pages: 64
+```
+
+Import is offline. Unknown, private, missing, changed and unsafe source paths fail;
+only requested originals are frozen into the new batch. Other originals remain
+external, including after portable bundle export. `source: batch` retains its
+existing supplied batch and does not recollect Eval evidence. Supply settings are
+positive integers; [Lab evidence](../lab/improvement/evidence/README.md#bound-an-investigation)
+owns their execution semantics. Do not add configuration version fields.

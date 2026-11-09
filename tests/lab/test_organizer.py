@@ -24,9 +24,10 @@ class OrganizerTests(unittest.IsolatedAsyncioTestCase):
         artifacts = MemoryArtifacts()
         task = TaskMaterial('task', 'Supply the fixture output')
         record = await Runner().execute(plan, task, baseline)
-        request = OrganizationRequest((task,), (record,))
+        request = OrganizationRequest((task,), (record,), instruction='Keep the guide compact for this invocation.')
         provider = FauxProvider()
         def answer(view, signal=None):
+            self.assertIn('Invocation requirements:\nKeep the guide compact for this invocation.', view.system_prompt)
             tool_result = json.loads(view.messages[-1].text)
             guide = {'sections': [{'title': 'Candidate view' if 'CANDIDATE GUIDE' in view.system_prompt else 'Task view',
                 'summary': 'One retained execution; inspect the output.',

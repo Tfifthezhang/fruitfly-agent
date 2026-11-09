@@ -23,11 +23,13 @@ A successful tool status does not establish success of every command it contains
 | `search` | Literal search over one or more granted sources, with continuation |
 | `read` | Original text pages or supported images |
 
-Results carry original identities and character intervals. A text citation ID
+Results carry the returned resource identity and character intervals. Projections
+separately retain original source locators; reading a projection does not prove
+that its original bytes were supplied. A text citation ID
 identifies the actual returned source span, not the whole file. Catalog entries
 are navigation, not proof that their source contents were read. Empty matches,
 unsupported binary data and collection failures remain distinct. Page sizes bound
-individual responses, not cumulative reading. Private verification inputs remain
+individual responses; cumulative supply is bounded separately. Private verification inputs remain
 outside development grants.
 
 | File | Responsibility |
@@ -72,7 +74,8 @@ results. Request, operation, phase and status fields survive where recorded.
 ATIF is marked as a derived view; navigation entries must not be counted as extra
 executions. Existing execution facts remain the authority for aggregate counters. Consecutive streaming deltas share one navigation range with a record count; their full original text remains pageable.
 
-The overview includes actual output, final-answer state, deliverables and gaps.
+The overview includes actual output, final-answer state, file counts and gaps.
+Source lists remain behind `sources_path`; file catalogs are paged separately.
 Reorganization derives views from current original identities and invalidates stale
 overviews. Original bytes remain unchanged. `catalog` can additionally filter an
 event directory by tool name/call ID, request ID, operation ID, phase or status;
@@ -97,9 +100,34 @@ or met; file scope and exclusions remain visible in the capture manifest.
 The task-set `INDEX.json` lists the task directory, evaluation metadata, edit
 grants and organized-view references. It records reference/task counts rather
 than repeating every archived file path. Use `catalog` with a task prefix to
-load further paths. All original resources remain granted through the existing
-reader; compact navigation does not truncate the evidence collection.
+load further paths. All registered resources remain granted through the existing reader. External
+source locators require explicit supplementation before their bytes are granted.
 
 Single-task root indexes likewise keep source paths behind paged catalog access
 and describe component identities without embedding complete component text.
 See the [development guide](../DEVELOPER_GUIDE.md) for portable stage bundles.
+
+## Bound an investigation
+
+`evidence.supply.max_characters` defaults to 256000 and `max_pages` to 64.
+The bundled reader shares those cumulative limits across read/search, including
+repeated pages. The tool facade additionally bounds catalog/read/search calls.
+Exhausted reads return `budget_exhausted`, no source citation, and a request to
+submit using existing evidence with uncovered scope declared. Invocation request
+count is bounded by max_pages plus eight opportunities to finish. A request
+measurement checks input, uncertainty margin and output reserve before Provider
+execution; estimates retain their declared quality. Context exhaustion stops with
+`evidence_context_budget_exhausted` instead of sending another oversized request.
+
+Search defaults exclude harness content and explicitly supplemented `originals/`.
+Specify granted paths to search those originals. Host reads emit
+`evidence-host-read`; `evidence-page` and supply receipts identify content actually
+returned to the role. Neither event proves semantic understanding or citation.
+
+Eval supplies one compact reading trajectory, task and final-answer material,
+execution facts and an external source catalog. Text/argument excerpts declare
+original lengths and truncation; each step locates its original source span.
+The catalog is metadata, not an original-byte grant. Deep reads require an explicit
+hash-checked supplement through the [Eval adapter](../../../../fruitfly_eval/improvement/README.md).
+Unpacked external bytes remain unavailable after source removal. Existing retained
+batches remain immutable; rebuilding never reconstructs unknown historical state.

@@ -1,6 +1,7 @@
 """Real collection and organization reach both roles through one evidence reader."""
 from dataclasses import replace
 import json
+import hashlib
 from pathlib import Path
 import tempfile
 import unittest
@@ -34,7 +35,8 @@ class ImprovementEvidenceTests(unittest.IsolatedAsyncioTestCase):
             (outputs / 'answer.txt').write_text('actual delivered bytes')
             artifacts = MemoryArtifacts(); task = TaskMaterial('task', 'Check output')
             _, plan, baseline, _ = proposal_fixture()
-            resources, calls = collect(root, artifacts)
+            resources, calls = collect(root, artifacts, evidence_paths={
+                'artifacts/harbor/job/trial/artifacts/answer.txt': 'sha256:' + hashlib.sha256(b'actual delivered bytes').hexdigest()})
             record = await Runner().execute(plan, task, baseline)
             record = replace(record, artifacts=resources, model_calls=calls,
                 output=answer_evidence(resources, artifacts)['text'])
@@ -45,7 +47,7 @@ class ImprovementEvidenceTests(unittest.IsolatedAsyncioTestCase):
             request = ProposalRequest(plan, task, baseline, (record,), 'task', 0)
             editor_workspace = EvidenceWorkspace.build(request, artifacts)
             prefix = 'context/executions/' + record.run_id + '/'
-            original = prefix + 'deliverables/0/harbor/answer.txt'
+            original = prefix + 'originals/artifacts/harbor/job/trial/artifacts/answer.txt'
             editor = WorkspaceEvidence(editor_workspace)
             editor.catalog()
             self.assertEqual(editor_workspace.provided_ids, set())
@@ -61,7 +63,7 @@ class ImprovementEvidenceTests(unittest.IsolatedAsyncioTestCase):
                 JointAssessment(None, (), (), 1, 0, 'fixture'))
             joint = TaskSetProposalRequest(plan, snapshot.snapshot_id, (entry,), baseline, (evaluation,), 'task', 0)
             joint_workspace = EvidenceWorkspace.build(joint, artifacts)
-            joint_path = 'context/tasks/sample/executions/' + record.run_id + '/deliverables/0/harbor/answer.txt'
+            joint_path = 'context/tasks/sample/executions/' + record.run_id + '/originals/artifacts/harbor/job/trial/artifacts/answer.txt'
             self.assertEqual(WorkspaceEvidence(joint_workspace).read(joint_path)['artifact_id'], editor_page['artifact_id'])
             with self.assertRaises(ValueError):
                 EvidenceWorkspace.build(replace(joint, tasks=(replace(entry, partition='confirmation'),)), artifacts)
@@ -70,7 +72,7 @@ class ImprovementEvidenceTests(unittest.IsolatedAsyncioTestCase):
                 self.assertFalse(kwargs['writable'])
                 self.assertEqual(workspace.writable_ids, frozenset())
                 reader = WorkspaceEvidence(workspace)
-                self.assertIn(prefix + 'agent/0/events.jsonl', workspace.paths())
+                self.assertIn(prefix + 'agent/0/reading-trajectory.jsonl', workspace.paths())
                 page = reader.read(original)
                 self.assertEqual(page['artifact_id'], editor_page['artifact_id'])
                 with self.assertRaises(ValueError):

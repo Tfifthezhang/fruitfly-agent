@@ -211,3 +211,13 @@ another role, that changed configuration can consume old outputs, and that a
 candidate inherits the selected parent's unchanged values. Test concurrent edits,
 branch ambiguity, interrupted effects, feedback rejection and complete exported
 resource loading. Offline tests do not establish model quality or benchmark gains.
+
+## Read compact benchmark materials
+
+Import an Eval archive, then select assess or propose directly. Model organize is
+optional; offline extraction has already supplied task, outcome, one reading
+trajectory, execution facts and source navigation. Original files stay in Eval.
+Use [import settings](../../experiments/CONFIGURATION.md#configure-stage-settings)
+to select tasks or supplement exact archive-relative paths with recorded hashes.
+The new import is immutable; earlier batch bundles remain valid and unchanged.
+See [evidence limits](evidence/README.md#bound-an-investigation).

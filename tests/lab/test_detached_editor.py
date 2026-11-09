@@ -62,7 +62,7 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(candidate.changed_ids, ('prompt',))
         self.assertEqual(services.used['model'], 4)
         self.assertEqual(baseline.component('prompt').files[0].text, 'prompt')
-        self.assertTrue(any(event == 'editor-read' for event, _ in services.events))
+        self.assertTrue(any(event == 'evidence-host-read' for event, _ in services.events))
         self.assertTrue(any(event == 'component-descriptions' and fields['artifact_id'] in artifacts.values
             for event, fields in services.events))
         descriptions = json.loads(json.loads(provider.calls[1]['messages'][-1].content[0].text)['text'])
