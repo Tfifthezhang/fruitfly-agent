@@ -66,10 +66,13 @@ class BenchmarkEntryTests(unittest.TestCase):
         main.write_text(yaml.safe_dump({
             'research': {'id': 'historical-research', 'output_root': 'results'},
             'baseline': {'config': '.fruitfly/default-config.yaml', 'profile': 'baseline'},
-            'roles': {'executor': 'executor', 'editor': 'future-editor'},
             'stages': {'eval': {'tasks': {'inline': {'source': 'eval',
                 'request': 'request.json', 'host': 'host.yaml'}}}},
             'next': {'stage': 'eval'}}))
+        system_path = self.root / '.fruitfly/default-config.yaml'
+        system = yaml.safe_load(system_path.read_text())
+        system['profiles']['baseline']['models']['roles']['editor'] = 'editor'
+        system_path.write_text(yaml.safe_dump(system))
         config = load_configuration(self.root, main, stage='eval')
         self.assertTrue(config.runtime_override)
         self.assertEqual(config.models, {})

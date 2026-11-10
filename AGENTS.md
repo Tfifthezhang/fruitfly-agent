@@ -43,6 +43,27 @@ Follow the dependency table in [Runtime architecture](fruitfly_agent/README.md#m
 | Add configuration versions or fallback readers | Keep one current configuration grammar; reject unknown fields and update callers, fixtures and guides together. |
 | Leave shadow packages after a directory move | Update imports, examples, and tests; add compatibility only when explicitly chosen. |
 
+## Own configuration and optimization surfaces
+
+These rules apply to every new or changed selectable module before delivery.
+
+| Concern | Required contract |
+|---|---|
+| Algorithm defaults | Declare instructions and numeric/policy defaults once in the owning registered `defaults.yaml`. Derive constructor and descriptor defaults from it. Python owns types, constraints and validation. |
+| Main configuration | Keep profiles, component references, enablement and `models.roles` here. Ordinary interactive saves must not expand algorithm instructions/settings into inline documents. |
+| User customization | Save changed component content in a workspace component YAML and reference it with `file`. Preserve existing file locations and authored content; do not edit installed defaults. |
+| Save safety | Preserve unchanged references. Check concurrent source changes, prepare component files before publishing references, and roll back failed writes. Never infer default inheritance merely from equal explicit text. |
+| Frozen execution | Candidate/export snapshots retain complete effective values and declared resources. This is distinct from ordinary configuration saving. |
+| Model dependencies | Declare roles through Catalog and bind them only in `models.roles`. Use explicit `{inherit: executor}` defaults where supported; never duplicate aliases in component parameters. |
+| Optimization | Provide an owner entry, normally `improvement.py`, with exact public editable paths, protected fields, constraints, default selection, state isolation and execution/activation requirements. Configuration visibility does not grant editing authority. |
+| Candidate proof | Test that an authorized edit changes actual isolated execution and identity, forbidden edits fail, and source configuration remains unchanged. Protected/shared infrastructure must explain its coverage through the existing contract. |
+| Research controls | `.fruitfly/improvement.yaml` owns study inputs, directions, phase allowances and field grants. Algorithm prompts/defaults stay with their component; generated observations never authorize execution. |
+| Shared discovery | Configuration inspection, menus and Improvement consume the same Catalog declarations. Do not add another parameter registry, optimization taxonomy or algorithm-specific terminal branch. |
+
+Update [Catalog configuration](fruitfly_agent/lab/catalog/CONFIGURATION.md) and the
+owning guide with any contract change. Cover these rules through registration,
+configuration round-trip and candidate-execution checks before admitting a module.
+
 ## Protect the workspace
 
 | Do not | Use this path instead |

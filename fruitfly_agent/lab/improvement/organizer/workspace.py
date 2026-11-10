@@ -3,6 +3,7 @@ from dataclasses import asdict
 from fruitfly_agent.improvement.contracts.components import ComponentDocument, HarnessSnapshot
 from fruitfly_agent.improvement.contracts.versions import canonical_json
 from ..evidence.resources import ReferenceWorkspace
+from ..evidence.batch import batch_view, context_observations
 
 
 def build_workspace(request, artifacts, *, record=None):
@@ -16,7 +17,8 @@ def build_workspace(request, artifacts, *, record=None):
         for receipt in request.records:
             if receipt.task_id != task.task_id:
                 continue
-            prefix = 'context/tasks/' + task.task_id + '/executions/' + receipt.run_id
+            prefix = 'context/executions/' + receipt.run_id
+            references[prefix + '/metadata.json'] = artifacts.put(canonical_json(asdict(receipt)).encode())
             output = prefix + '/output.txt'
             references[output] = artifacts.put(receipt.output.encode())
             for resource in receipt.artifacts:
@@ -29,7 +31,11 @@ def build_workspace(request, artifacts, *, record=None):
             rows.append({'run_id': receipt.run_id, 'status': receipt.status, 'output': output,
                 'sources': sources, 'overview': overview if overview in references else None})
         tasks.append({'task_id': task.task_id, 'task': path, 'executions': rows})
-    batch = {'tasks': tasks, 'instruction': request.instruction,
+    for name, value in batch_view(request.tasks, request.records,
+            context_observations(request.context, artifacts), artifacts).items():
+        references['context/' + name] = artifacts.put(canonical_json(value).encode())
+    batch = {'overview': 'context/overview.json', 'executions': 'context/executions.json',
+        'coverage': 'context/coverage.json', 'tasks': tasks, 'instruction': request.instruction,
         'scope': 'Granted records for reading. Execution status and measurements are observations, not judgments.'}
     references['context/batch.json'] = artifacts.put(canonical_json(batch).encode())
     placeholder = HarnessSnapshot((ComponentDocument('organization', 'organization', 'I', 'organization-v1', ()),))

@@ -3,7 +3,7 @@
 [Up: Improvement](../README.md)
 
 `AgentEditor` uses the shared [Agent runner](../../agents/README.md). It reads
-[evidence](../evidence/README.md), discovers legal optimization targets on demand,
+[evidence](../evidence/README.md), receives bounded owner descriptions and discovers remaining target details on demand,
 and changes only granted candidate paths. It has no Bash, production Session,
 adoption operation or permission to alter field descriptions.
 
@@ -53,3 +53,9 @@ Inspect relevant originals through the shared reader before attributing a defect
 Missing files, partial indexing and unknown usage limit the supported conclusion;
 they are distinct from demonstrated task failure. The editor cannot modify source
 receipts or coverage to change an apparent outcome. See [evidence](../evidence/README.md).
+
+Repair retains the exact authorized resources, component descriptions, current
+candidate files and supplied citations. It shares the original cumulative reading
+allowance rather than granting a new investigation budget. A format error does
+not make retained observations disappear. Evidence supply and context request
+limits remain separate from the overall editing deadline.

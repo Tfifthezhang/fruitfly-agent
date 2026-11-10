@@ -34,3 +34,6 @@ Finite input and TTY streams come from [terminal support](../support/terminal.py
 ```
 
 `test_composer.py` owns structured image draft selection, marker authenticity and atomic deletion; its PTY check injects clipboard bytes through the single input reader.
+
+`test_subagents` owns read-only child status, list/detail rendering, unknown
+measurements and terminal text sanitization.

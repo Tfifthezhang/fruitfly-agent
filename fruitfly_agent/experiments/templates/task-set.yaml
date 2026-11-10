@@ -1,3 +1,6 @@
+# Independent stages; only next.stage is executed. Paths resolve from this file.
+# Model roles and algorithm instructions belong to the referenced system profile.
+# Input files and named outputs must exist before their stage is selected.
 research:
   id: benchmark-research
   title: Fixed benchmark and independent Improvement stages
@@ -6,43 +9,38 @@ research:
 baseline:
   config: default-config.yaml
   profile: baseline
-roles: {}
-overrides: {}
-optimization:
-  scope: defaults
-  include: {}
-  exclude: []
 stages:
   execute:
     tasks:
       file: tasks/tb4-smoke.yaml
-    task_seconds: 3600
     concurrency: 1
     attempts: 1
+    inputs:
+      harness:
+        config: default-config.yaml
+    attempt: reuse
+    publish_as: baseline-results
+    allowance:
+      task_seconds: 3600
   organize:
-    timeout_seconds: 1200
+    allowance:
+      seconds: 1200
+    attempt: reuse
   assess:
-    timeout_seconds: 1200
+    allowance:
+      seconds: 1200
+    attempt: reuse
   propose:
-    timeout_seconds: 1200
-    generator: agent-editor-v1
+    optimization:
+      scope: defaults
+      include: {}
+      exclude: []
+    allowance:
+      seconds: 1200
+    attempt: reuse
   compare:
-    timeout_seconds: 1200
-evidence:
-  read:
-    default_characters: 12000
-    max_characters: 24000
-  catalog:
-    default_entries: 50
-    max_entries: 100
-  search:
-    default_matches: 20
-    max_matches: 50
-    max_characters: 12000
+    allowance:
+      seconds: 1200
+    attempt: reuse
 next:
   stage: execute
-  publish_as: baseline-results
-  inputs:
-    harness:
-      config: default-config.yaml
-  attempt: reuse

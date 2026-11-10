@@ -61,7 +61,7 @@ Every invocation retains `runs/<id>/configuration/`, inputs, outputs and reports
 Bundles retain immutable producer/configuration references and transitive
 artifacts. Complete candidate exports use the normal Catalog materializer.
 `references.json` resolves names inside the explicitly selected branch.
-Generated `observed` content shows recent activity but never controls execution.
+Output `configuration/observed.json` shows recent activity but never controls execution.
 
 Advanced explicit input commands accept `--study`, `--output-root` and bundle paths.
 The main research file supplies these values for normal use. `improvement inspect`

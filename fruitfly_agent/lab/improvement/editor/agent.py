@@ -59,6 +59,8 @@ class AgentEditor:
             conditions_id=request.plan.conditions_id,baseline_id=request.baseline.snapshot_id,
             artifact_id=self.artifacts.put(description_text.encode()))
         mission = self.instructions.propose
+        if len(description_text) <= self.workspace_session.settings.read.max_characters:
+            mission += '\nAuthorized component descriptions and current values:\n' + description_text
         mission += '\nUse list_targets and describe_target to load parameter semantics on demand. Read context/edit-grants.json for this experiment’s scope.'
         mission += ('\nAfter editing return only JSON {"reasons":[{"component_id":"...",'
             '"explanation":"...","expected_effect":"observable change and disconfirming evidence","evidence_ids":["run-id"]}]}. Each changed component needs a supplied run ID; no changes is valid.')

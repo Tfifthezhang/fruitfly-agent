@@ -19,7 +19,9 @@ from .registration import ORGANIZER_CONFIG, SETTINGS, EDITOR_CONFIG, ASSESSOR_CO
 from .experience import entry_to_dict, entry_from_dict, experience_id
 from .execution import ExecutionContext, ExecutionRegistry, builtin_executions
 from .stages.extensions import extension_spec
-from .stages.registry import StageContext, builtin_stage_handlers
+from .stages.registry import StageContext, StageDefinition, stage_definitions, builtin_stage_handlers
+from .evidence.configuration import EvidenceSettings
+from .evidence.batch import batch_view
 from fruitfly_agent.improvement.contracts.stopping import StopPolicy
 from fruitfly_agent.improvement.evidence.reporting import SearchReport, TokenUsage
 
@@ -88,7 +90,7 @@ __all__ = [
     'SearchCompletion',
     'SearchCompletionSource',
     'StageBindings',
-    'StageContext',
+    'StageContext', 'StageDefinition', 'stage_definitions', 'EvidenceSettings', 'batch_view',
     'builtin_stage_handlers',
     'builtin_executions',
     'bundle_target',

@@ -165,3 +165,63 @@ class ComponentConfigurationTests(unittest.TestCase):
                     self.assertEqual(expected, runtime.manifest.model_roles['working_memory']['model'])
                 projected = component_profile(profile, builtin_catalog())
                 self.assertEqual(binding, projected.to_dict()['models']['roles']['working_memory'])
+
+    def test_ordinary_save_externalizes_explicit_content_and_keeps_default_references(self):
+        from fruitfly_agent.run.configuration.profile import save_harness_config
+        self.write()
+        config = load_system_config(self.path)
+        expected = config.select().to_runtime_dict()
+        save_harness_config(self.path, config)
+        raw = yaml.safe_load(self.path.read_text())['profiles']['baseline']
+        self.assertEqual(raw['H']['read-tool'], {'default': True})
+        self.assertIn('file', raw['H']['base_prompt'])
+        self.assertNotIn('inline', raw['I']['improvement-editor'])
+        self.assertEqual(load_system_config(self.path).select().to_runtime_dict(), expected)
+        self.assertEqual(raw['H']['layered-compaction'], {'file': 'reduction.yaml'})
+
+    def test_ordinary_save_rolls_back_component_files_when_main_write_fails(self):
+        from unittest.mock import patch
+        from fruitfly_agent.run.configuration.profile import save_harness_config
+        self.write()
+        config = load_system_config(self.path)
+        before = self.path.read_bytes()
+        with patch('fruitfly_agent.run.configuration.profile.save_specification', side_effect=OSError('disk')):
+            with self.assertRaises(OSError):
+                save_harness_config(self.path, config)
+        self.assertEqual(self.path.read_bytes(), before)
+        self.assertFalse(list((self.root / 'components').rglob('*.yaml')))
+
+    def test_ordinary_save_rejects_concurrently_changed_component(self):
+        from fruitfly_agent.run.configuration.profile import save_harness_config
+        self.write()
+        config = load_system_config(self.path)
+        (self.root / 'reduction.yaml').write_text('user edited concurrently')
+        with self.assertRaisesRegex(ValueError, 'source changed'):
+            save_harness_config(self.path, config)
+
+    def test_newly_enabled_default_component_stays_a_default_reference(self):
+        from fruitfly_agent.runtime_spec import HarnessConfig
+        from fruitfly_agent.runtime_spec.selections import MechanismSelection
+        from fruitfly_agent.run.configuration.profile import save_harness_config
+        self.write()
+        config = load_system_config(self.path)
+        profile = config.select()
+        profile = replace(profile, mechanisms=(*profile.mechanisms, MechanismSelection('subagent')))
+        save_harness_config(self.path, HarnessConfig('baseline', {'baseline': profile}))
+        raw = yaml.safe_load(self.path.read_text())['profiles']['baseline']
+        self.assertEqual(raw['H']['subagent'], {'default': True})
+        self.assertEqual(raw['models']['roles']['subagent'], {'inherit': 'executor'})
+
+    def test_changed_file_component_keeps_its_location_and_repeated_saves_work(self):
+        from fruitfly_agent.runtime_spec import HarnessConfig
+        from fruitfly_agent.run.configuration.profile import save_harness_config
+        self.write()
+        profile = load_system_config(self.path).select()
+        profile = replace(profile, mechanisms=tuple(replace(m, parameters={**m.parameters, 'tail_tokens': 768})
+            if m.mechanism_id == 'layered-compaction' else m for m in profile.mechanisms))
+        save_harness_config(self.path, HarnessConfig('baseline', {'baseline': profile}))
+        reloaded = load_system_config(self.path)
+        save_harness_config(self.path, reloaded)
+        raw = yaml.safe_load(self.path.read_text())['profiles']['baseline']
+        self.assertEqual(raw['H']['layered-compaction'], {'file': 'reduction.yaml'})
+        self.assertEqual(yaml.safe_load((self.root / 'reduction.yaml').read_text())['parameters']['settings']['tail_tokens'], 768)

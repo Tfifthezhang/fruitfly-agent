@@ -2,6 +2,7 @@
 from fruitfly_agent.interactive.contracts.commands import CommandResult
 from fruitfly_agent.interactive.terminal.features.retained_state.commands import retained_handler
 from fruitfly_agent.interactive.terminal.features.operations import operations_handler
+from fruitfly_agent.interactive.terminal.features.subagent import subagent_handler
 from fruitfly_agent.interactive.terminal.features.configuration.command import configuration_handler
 from fruitfly_agent.interactive.terminal.features.resume.command import resume_handler
 
@@ -15,6 +16,9 @@ def bind_commands(registry, *, bindings, configuration, status, cancel,
                 read=bindings.retained_document, review=bindings.retained_action),
                 summary='inspect retained documents and review pending updates',
                 usage='/' + name + ' [read ID|commit UPDATE|reject UPDATE' + ('|retry OPERATION' if kind == 'memory' else '') + ']')
+    if bindings.subagents is not None:
+        registry.register('subagent', subagent_handler(bindings.subagents),
+            summary='inspect subagent executions', usage='/subagent [AGENT_ID [RUN_ID]]')
     if bindings.operations is not None:
         registry.register('operations', operations_handler(bindings.operations),
             summary='inspect or cancel background operations', usage='/operations [cancel HANDLE]')

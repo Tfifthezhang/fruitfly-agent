@@ -59,8 +59,11 @@ class SshRunTests(unittest.IsolatedAsyncioTestCase):
         text = (self.root / '.fruitfly/config.yaml').read_text()
         for secret in self.secrets.values():
             self.assertNotIn(secret, text)
+        component_text = '\n'.join(path.read_text() for path in (self.root / '.fruitfly/components').rglob('*.yaml'))
+        for secret in self.secrets.values():
+            self.assertNotIn(secret, component_text)
         for name in ('FRUITFLY_SSH_USERNAME', 'FRUITFLY_SSH_PASSWORD'):
-            self.assertIn(name, text)
+            self.assertIn(name, component_text)
         saved = load_harness_config(self.root / '.fruitfly/config.yaml').select()
         remote = next(m for m in saved.mechanisms if m.mechanism_id == 'remote-env')
         self.assertEqual(2222, remote.parameters['port'])

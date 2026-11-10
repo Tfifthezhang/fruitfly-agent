@@ -25,7 +25,7 @@ def record_result(context, result):
                 references[context.branch + ':' + config.parent.parent.name] = entry
             if len(configs) == 1:
                 row['candidate_config'] = os.path.relpath(configs[0], root)
-        alias = document.next.get('publish_as', result['run_id'])
+        alias = context.settings.get('publish_as', result['run_id'])
         from fruitfly_agent.improvement.contracts.validation import identifier
         identifier(alias)
         key = context.branch + ':' + alias
@@ -59,11 +59,11 @@ def record_result(context, result):
             'settings': authored.get('stages', {}).get(value['action'], {}),
             'origin': ({'historical_source': configuration.get('source'),
                 **configuration.get('historical_configuration', {})} if value['action'] == 'import'
-                else authored.get('next', {}).get('inputs', {}).get('harness', authored.get('baseline'))),
+                else authored.get('stages', {}).get(value['action'], {}).get('inputs', {}).get('harness', authored.get('baseline'))),
             'outputs': value.get('outputs', []),
             'differences': os.path.relpath(report.parent / 'configuration/differences.json', root)})
     observed['last_invocation'] = {key: value for key, value in context.preview().items() if key != 'observed'}
-    limit = document.research.get('history_entries', 10)
+    limit = 10
     observed['history_count'] = len(observed['recent'])
     observed['recent'] = observed['recent'][-limit:]
     observed['reference_count'] = len(observed['available'])
@@ -80,5 +80,6 @@ def record_result(context, result):
     table.extend(['', '## Captured invocation', '', '```json',
         json.dumps(observed['last_invocation'], ensure_ascii=False, indent=2), '```', ''])
     write_bytes(root / 'configuration/current.md', '\n'.join(table).encode())
-    updated = document.update_observed(observed)
-    return {'observed_updated': updated, 'references': str(index_path)}
+    projection = root / 'configuration/observed.json'
+    write_bytes(projection, (json.dumps(observed, ensure_ascii=False, indent=2) + '\n').encode())
+    return {'observed_updated': True, 'observations': str(projection), 'references': str(index_path)}

@@ -46,3 +46,8 @@ callback, including errors and cancellation, rather than success-only rewrite ho
 The bridge correlates descriptions and monotonic elapsed time by call ID and retains
 previous result callbacks. Unknown tools and results without a start event still
 produce completion observations, with unavailable elapsed time left unset.
+
+The host can inject a scope-aware `run_loop` for [subagent delegation](../../lab/agents/subagent/README.md).
+It retains the same Core invocation shape and owns child finalization before the
+submission returns. Session still owns its normal steering, cancellation and
+frontend bridge, without importing Lab or implementing scheduling.

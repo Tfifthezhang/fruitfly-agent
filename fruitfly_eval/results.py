@@ -54,15 +54,11 @@ def parse_harbor_job_result(
     latencies: list[float] = []
     for index, raw in enumerate(raw_trials):
         trial = _mapping(raw, "Harbor trial")
-        exception = trial.get("exception_info")
-        reward = _official_reward(trial)
+        outcome = trial_outcome(trial)
+        reward = outcome['reward']
         agent_result = trial.get("agent_result")
-        status, error, timed_out = _trial_status(exception, reward)
-        diagnostics = trial_diagnostics(trial, reward=reward)
-        if diagnostics["state"] == "error" and error is None:
-            status = "error"
-            error = {"type": str(diagnostics["exceptions"][0]["type"]),
-                     "message": str(diagnostics["exceptions"][0]["message"])}
+        status, error, timed_out = outcome['status'], outcome['error'], outcome['timed_out']
+        diagnostics = outcome['execution']
         errors += int(error is not None)
         timeouts += int(timed_out)
         if error is None and reward is not None:
@@ -111,6 +107,21 @@ def parse_harbor_job_result(
         "latency_ms": sum(latencies) / len(latencies) if latencies else None,
     }
     return trials, _benchmark_metrics(values, count)
+
+
+def trial_outcome(trial: Mapping[str, Any]) -> dict[str, Any]:
+    """Share official interpretation without confusing raw reward and success."""
+    reward = _official_reward(trial)
+    status, error, timed_out = _trial_status(trial.get('exception_info'), reward)
+    diagnostics = trial_diagnostics(trial, reward=reward)
+    if diagnostics['state'] == 'error' and error is None:
+        status = 'error'
+        error = {'type': str(diagnostics['exceptions'][0]['type']),
+            'message': str(diagnostics['exceptions'][0]['message'])}
+    return {'status': status, 'reward': reward, 'error': error,
+        'timed_out': timed_out, 'execution': diagnostics,
+        'eligible': error is None and reward is not None,
+        'agent_elapsed_seconds': (duration / 1000 if (duration := _duration_ms(trial.get('agent_execution'))) is not None else None)}
 
 
 def _official_reward(trial: Mapping[str, Any]) -> float | None:

@@ -81,3 +81,11 @@ Managed-command tests cover independent work, isolated listeners and retirement.
 `test_memory_comparison.py` covers H learning instructions, isolated S updates,
 owner-registered task material and independent paired verification.
 `test_memory_maintenance.py` checks thresholds and model-call suppression.
+
+Subagent behavior belongs to `test_subagent_service`, `test_subagent_execution` and
+`test_subagent_tools`: bounded scheduling, independent Core execution, model tools,
+message delivery and confirmed resource retirement use fake Providers.
+
+`test_subagent_improvement` proves authorized instruction candidates change
+materialized child requests and individual tool declarations while protected
+model, permission and limit fields remain rejected.

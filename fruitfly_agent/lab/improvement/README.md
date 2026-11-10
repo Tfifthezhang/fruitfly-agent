@@ -15,9 +15,9 @@ fruitfly-agent-lab improvement check --config experiment.yaml
 fruitfly-agent-lab improvement step --config experiment.yaml
 ```
 
-The main configuration shows retained history and controls the next stage. It
+The main configuration keeps each stage's inputs and controls together. It
 selects explicit named batches, evidence, feedback and configuration origins.
-Generated `observed` content never selects work. Every stage retains its own
+Output-only history never selects work. Every stage retains its own
 configuration snapshot; differences do not block using old records.
 
 | Module | Responsibility |
@@ -48,7 +48,7 @@ Editor or task execution to fill missing evidence.
 Defaults include every enabled supported owner except `file-memory` and the three
 I instruction roles. Native tool instructions/parameters, `base_prompt`, current
 context-policy fields, Skills and retained memory/skill libraries participate.
-`optimization.include` sets an owner's field grant; `exclude` removes owners;
+`stages.propose.optimization.include` sets an owner's field grant; `exclude` removes owners;
 `scope: explicit` starts empty. Mechanism activation and edit permission remain
 separate. Owner validators protect schemas, implementations, credentials and
 inactive mode fields. A proposal is not independent verification or activation.

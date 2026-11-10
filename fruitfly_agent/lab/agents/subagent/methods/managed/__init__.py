@@ -1,0 +1,1 @@
+"""Bounded single-level delegation."""

@@ -67,7 +67,7 @@ class ConfigurationApplicationTest(unittest.IsolatedAsyncioTestCase):
                 elif phase == 'startup':
                     failure = patch.object(RuntimeHandle, 'start', AsyncMock(side_effect=RuntimeError('injected failure')))
                 elif phase == 'saving':
-                    failure = patch('fruitfly_agent.run.configuration.controller.save_harness_config', side_effect=OSError('injected failure'))
+                    failure = patch('fruitfly_agent.runtime_spec.profiles.save_harness_config', side_effect=OSError('injected failure'))
                 else:
                     def fail_after_record(*args, **kwargs):
                         record_session_manifest(*args, **kwargs)
@@ -104,7 +104,7 @@ class ConfigurationApplicationTest(unittest.IsolatedAsyncioTestCase):
                 if failure == 'startup':
                     fault = patch.object(RuntimeHandle, 'start', AsyncMock(side_effect=RuntimeError('injected failure')))
                 elif failure == 'saving':
-                    fault = patch('fruitfly_agent.run.configuration.controller.save_harness_config', side_effect=OSError('injected failure'))
+                    fault = patch('fruitfly_agent.runtime_spec.profiles.save_harness_config', side_effect=OSError('injected failure'))
                 else:
                     fault = patch('fruitfly_agent.run.runtime.preparation.record_session_manifest', side_effect=OSError('injected failure'))
                 with fault, self.assertRaisesRegex((RuntimeError, OSError), 'injected failure'):

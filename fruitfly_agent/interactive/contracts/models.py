@@ -51,6 +51,8 @@ class ResumableSession:
     prompt_hash: str = ""
     available: bool = True
     reason: str = ""
+    title: str = ""
+    user_turns: int = 0
 
 
 @dataclass(frozen=True)

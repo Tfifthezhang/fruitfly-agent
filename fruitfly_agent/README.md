@@ -209,3 +209,12 @@ readers enforce cumulative evidence supply and request-space limits; original
 supplements require explicit identities. Model organization is optional before
 assessment/proposal. Terminal image drafts accept clipboard paste and dropped
 paths through the existing single input owner and Application submission.
+
+## Delegate child tasks
+
+[Subagent](lab/agents/subagent/README.md) is a Lab collaboration capability enabled in the installed default profile. Run constructs
+independent child runtimes through the shared assembler; Core retains the loop.
+A parent submission owns scheduling, attributed results and bounded retirement.
+Interactive consumes a read-only monitor; Provider adapters contain no delegation
+policy. Children have private Sessions and context state but may share file effects.
+The model role defaults to executor inheritance and can select another catalog alias.

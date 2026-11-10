@@ -32,3 +32,8 @@ output preview bounds.
 
 Offline checks: `tests.lab.test_rlm` uses local subprocesses and fake Providers.
 No network or real model calls are part of those checks.
+
+The ordinary configuration menu exposes only the enable switch. Query model
+selection stays in `models.roles.context_query`, defaulting to `{inherit: executor}`.
+Python execution needs no model; only explicit `llm_query` calls use that role.
+Instructions and tuning remain in owner/default or referenced user component YAML.

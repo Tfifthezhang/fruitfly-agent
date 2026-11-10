@@ -30,7 +30,7 @@ class ReliabilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(provider.calls), 3)
         self.assertFalse(provider.script)
 
-    async def test_format_repair_keeps_draft_and_removes_large_evidence(self):
+    async def test_format_repair_keeps_draft_and_source_access_without_replaying_evidence(self):
         flow, plan, baseline, runner = proposal_fixture()
         task = TaskMaterial('task', 'Work')
         record = await runner.execute(plan, task, baseline)
@@ -48,7 +48,10 @@ class ReliabilityTests(unittest.IsolatedAsyncioTestCase):
         messages = provider.calls[-1]['messages']
         listing = next(message for message in messages if getattr(message, 'role', '') == 'toolResult' and 'context/repair.json' in str(message))
         self.assertIn('context/repair.json', str(listing))
-        self.assertNotIn('context/executions/', str(listing))
+        self.assertIn('context/executions/', str(listing))
+        self.assertEqual(sum(event == 'evidence-page' and fields.get('path') == 'context/executions.json'
+            for event, fields in services.events), 1)
+        self.assertNotIn(record.output, str(messages))
         self.assertEqual(sum(event == 'editor-invalid' for event, _ in services.events), 1)
 
     def test_search_has_source_offsets_and_bounded_excerpts(self):

@@ -43,6 +43,8 @@ class TerminalBindings:
     retained_document: Callable | None = None
     retained_action: Callable | None = None
 
+    subagents: Callable | None = None
+
     @classmethod
     def from_session(cls, session: Any) -> TerminalBindings:
         # Compatibility discovery is confined to assembly, not command flows.
@@ -64,6 +66,7 @@ class TerminalBindings:
                              if getattr(session, 'attachments_available', True) else None),
             validate_input=getattr(session, 'validate_input', None),
             operations=lambda: getattr(session, 'operations', None),
+            subagents=lambda: getattr(session, 'subagents', None),
             retained_state=getattr(session, 'retained_state', None),
             retained_document=getattr(session, 'retained_document', None),
             retained_action=getattr(session, 'retained_action', None),

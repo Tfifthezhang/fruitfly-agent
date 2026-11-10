@@ -21,6 +21,8 @@ class EvidenceAccess:
     def __init__(self, run_ids=(), *, record=None):
         self.run_ids = frozenset(run_ids)
         self.supplied = set()
+        self.supply_characters = 0
+        self.supply_responses = 0
         self.paths: dict[str, str] = {}
         self.receipts: deque[AccessReceipt] = deque(maxlen=256)
         self.record = record or (lambda *args, **kwargs: None)

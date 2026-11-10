@@ -493,8 +493,7 @@ class RunConfigurationController:
         )
         for profile in candidate.profiles.values():
             for source in profile.source_files:
-                if source.path.startswith('package:'):
-                    source.check()
+                source.check()
             self._catalog.resolve(profile.mechanisms)
             if self.mechanism_setup is not None:
                 for item in profile.mechanisms:
@@ -516,9 +515,13 @@ class RunConfigurationController:
         setup = self.model_setup
         payloads = setup.payloads() if setup is not None else {}
         secrets = dict(setup.credentials.values) if setup is not None else {}
+        from .component_files import prepare_component_files
+        candidate, components = prepare_component_files(self._path, candidate, self._catalog, self._artifact_store.read_text)
+        payloads = {**payloads, **{path: data.decode('utf-8') for path, data in components.items()}}
         profile = candidate.select()
         models = deepcopy(self._models(profile))
-        files = FileTransaction.capture((*payloads, self._path, model_catalog_path(profile, self._path)))
+        files = FileTransaction.capture((*payloads, self._path, model_catalog_path(profile, self._path),
+            *(Path(source.path) for source in profile.source_files if not source.path.startswith('package:'))))
         draft = deepcopy(self._draft)
         selected = self._selected
 
@@ -527,13 +530,13 @@ class RunConfigurationController:
                 if source.path.startswith('package:'):
                     source.check()
             if (self._draft != draft or self._selected != selected or
-                    setup is not None and (setup.payloads() != payloads or setup.credentials.values != secrets)):
+                    setup is not None and (setup.payloads() != {path: text for path, text in payloads.items() if path not in components} or setup.credentials.values != secrets)):
                 raise ValueError('configuration draft changed while preparing; retry application')
             with files.writing((*payloads, self._path)):
                 for path, text in payloads.items():
                     write_bytes(path, text.encode('utf-8'))
-                save_harness_config(self._path, candidate, catalog=self._catalog,
-                    artifact_reader=self._artifact_store.read_text)
+                from fruitfly_agent.runtime_spec.profiles import save_harness_config as save_prepared
+                save_prepared(self._path, candidate)
                 activate()
             if setup is not None:
                 setup.environment.update(secrets)
@@ -559,6 +562,18 @@ class RunConfigurationController:
         )
 
     def _accept_saved(self, candidate: HarnessConfig) -> None:
+        import hashlib
+        from fruitfly_agent.runtime_spec.documents import DocumentSource
+        from .component_files import prepare_component_files
+        _, payloads = prepare_component_files(self._path, candidate, self._catalog, self._artifact_store.read_text)
+        profiles = {}
+        for key, profile in candidate.profiles.items():
+            sources = {source.path: source for source in profile.source_files}
+            paths = {Path(source.path) for source in profile.source_files if not source.path.startswith('package:')}
+            for path in (*paths, *payloads, self._path):
+                sources[str(path)] = DocumentSource(str(path), hashlib.sha256(path.read_bytes()).hexdigest())
+            profiles[key] = replace(profile, source_files=tuple(sources.values()))
+        candidate = replace(candidate, profiles=profiles)
         self._draft = candidate
         self._original = candidate
         self._original_selected = self._selected

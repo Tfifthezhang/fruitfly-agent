@@ -56,6 +56,8 @@ class AssemblyContext:
     model_requirements: Mapping[str, ModelRoleRequirement] = field(default_factory=dict)
     model_parameters: Mapping[str, Any] = field(default_factory=dict)
     component_id: str = ''
+    child_runtime_factory: Any = None
+    artifact_store: Any = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "workspace", self.workspace.resolve())

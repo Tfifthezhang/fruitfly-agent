@@ -25,3 +25,7 @@ No new environment variables or model training. Existing confirmation steps gove
 ```bash
 .venv/bin/python -m unittest tests.interactive.test_extensions tests.interactive.test_terminal tests.workflows.test_resume_history tests.workflows.test_optional_eval -v
 ```
+
+[subagent.py](subagent.py) registers read-only child execution list/detail views.
+It consumes the optional monitor binding and works independently of configuration
+menus and the input loop.

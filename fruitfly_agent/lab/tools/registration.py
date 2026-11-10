@@ -100,7 +100,7 @@ _definition(
                 'instructions.query' if name == 'query_instructions' else 'settings.' + name
                 for name in IpythonToolConfig.__dataclass_fields__},
             model_role_parameters={'context_query': ModelRoleRequirement('query_model_profile', 'Answer bounded IPython model queries.')},
-            input_parameters=('query_model_profile',),
+            input_parameters=(),
             effects=MechanismEffects(
                 uses_provider=True,
                 uses_network=True,

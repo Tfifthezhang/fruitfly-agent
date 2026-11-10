@@ -68,6 +68,7 @@ Independent experiment phase times are declared in experiment files.
 
 | File | Responsibility |
 |---|---|
+| [component_files.py](component_files.py) | Prepare component files and preserve references for ordinary saves |
 | [profile.py](profile.py) | Shared profile types and registered loading/saving |
 | [inspection.py](inspection.py) | Offline effective values, model aliases and source documents |
 | [export.py](export.py) | Explicit selected-profile export to a new complete component bundle |
@@ -153,8 +154,9 @@ create a portable container or restore a Session.
 Candidate and Eval builders use Catalog's public `materialize_system` and
 `bind_component_changes` ports. Generated candidates contain ordinary configs,
 frozen catalogs and exact text bindings. File references are retained on ordinary
-save when unchanged; changed documents are written inline in the config rather
-than overwriting shared component files. Source inputs remain intact.
+save when unchanged; explicit documents are saved in workspace component files. Existing file positions
+are retained when edited. Conflicting writers and concurrent source changes fail.
+Component files are committed before the main references and rolled back on failure.
 
 Follow [the configuration tree](../../../CONFIGURATION.md#navigate-the-configuration-tree)
 for syntax, registration and experiment grants; this guide owns persistence and

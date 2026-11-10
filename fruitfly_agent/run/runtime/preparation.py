@@ -37,7 +37,7 @@ class PreparedRuntime:
 class RuntimePreparer:
     def __init__(self, *, workspace, catalog, environment, artifacts, provider_registry,
                  pinned_bindings, task_pack_sources, permission_policy, build, describe, describe_environment,
-                 describe_services=None, approve_start=None, adapt_operations=None, retained_store=None, prepare_retained_profile=None, adapt_retained=None):
+                 describe_services=None, approve_start=None, adapt_operations=None, retained_store=None, prepare_retained_profile=None, adapt_retained=None, adapt_subagents=None):
         self.cwd = workspace
         self.catalog = catalog
         self.environment = environment
@@ -52,6 +52,7 @@ class RuntimePreparer:
         self.describe_services = describe_services
         self.approve_start = approve_start
         self.adapt_operations = adapt_operations
+        self.adapt_subagents = adapt_subagents
         self.sessions = SessionLeases()
         self.retained_store = retained_store
         self.prepare_retained_profile = prepare_retained_profile
@@ -139,8 +140,10 @@ class RuntimePreparer:
                         if isinstance(component, RecoveryValidator):
                             component.validate_recovery(tuple(messages))
                 visible_mechanism_ids, details, tool_categories = self.describe(runtime)
+                from fruitfly_agent.core.loop import run_agent_loop
                 interaction = InteractiveSession(
                     runtime.config,
+                    run_loop=runtime.run_loop or run_agent_loop,
                     context_pipeline=runtime.context_pipeline,
                     messages=messages,
                     working_directory=self.cwd,
@@ -184,6 +187,8 @@ class RuntimePreparer:
                     task_packs=task_pack_service,
                     authorization=approvals,
                     operations=operation_service,
+                    subagents=self.adapt_subagents(runtime.components['subagent-monitor'])
+                        if self.adapt_subagents is not None and 'subagent-monitor' in runtime.components else None,
                     observation_context=context,
                     maintenance=retained, retained_state=self.adapt_retained(retained) if retained is not None and self.adapt_retained is not None else None,
                 )

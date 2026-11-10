@@ -5,7 +5,7 @@ from fruitfly_agent.run.improvement.context import ResearchContext
 
 
 async def dispatch(args, workspace):
-    path = Path(args.config) if args.config else Path(workspace) / '.fruitfly/experiment.yaml'
+    path = Path(args.config) if args.config else Path(workspace) / '.fruitfly/improvement.yaml'
     if not path.is_absolute():
         path = Path(workspace) / path
     if args.command in {'inspect', 'resume', 'list', 'report'}:
@@ -49,7 +49,14 @@ async def dispatch(args, workspace):
                     require_prepared=False, require_credentials=False)
                 result.update(available=prepared.summary()['available'], execution=prepared.summary())
             return result
-        return context.preview()
+        result = context.preview()
+        if args.command == 'check':
+            source = context.document.resolve(context.settings.get('path', ''))
+            available = source.is_file() if context.settings.get('source') == 'batch' else source.is_dir()
+            result.update(available=available, source_path=str(source))
+            if not available:
+                result['unavailable_reason'] = 'Selected import source is missing or has the wrong file type.'
+        return result
     inputs = context.inputs
     ordered = []
     if context.stage == 'execute':
@@ -57,7 +64,7 @@ async def dispatch(args, workspace):
     ordered.extend(inputs.get('batches', []))
     for name in ('evidence', 'assessments', 'context'):
         ordered.extend(inputs.get(name, []))
-    attempt = context.document.next.get('attempt', 'reuse')
+    attempt = context.settings.get('attempt', 'reuse')
     settings = context.settings
     invocation = SimpleNamespace(command=context.stage, config=str(path),
         study=context.document.research['id'], output_root=str(context.document.root),

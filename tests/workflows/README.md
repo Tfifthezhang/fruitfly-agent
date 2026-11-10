@@ -46,3 +46,7 @@ artifacts, independent fake verification, activation and Session recovery.
 `test_improvement_evidence.py` verifies the real Eval collector, facts, organizer and both role workspaces through paged source reads and citation receipts.
 
 Multimodal workflows use explicit image references and preserve save/recovery, rejection, queueing and cancellation behavior. Evidence workflows supplement selected original bytes before granting them to both editing and assessment.
+
+`test_subagents` covers the complete public Application path: one capability switch,
+parent/child result integration, monitor rebinding after configuration replacement,
+running inspection and parent cancellation with confirmed child retirement.

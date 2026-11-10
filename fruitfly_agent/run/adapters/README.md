@@ -52,3 +52,7 @@ The adapter owns no tasks, cleanup, model requests or scheduling decisions.
 
 [retained_state.py](retained_state.py) exposes borrowed document inspection and
 batch review without constructing a model or choosing an algorithm.
+
+[subagents.py](subagents.py) projects borrowed child status into immutable
+Interactive snapshots and details. It owns no scheduling, message consumption,
+model requests or resources.

@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 import uuid
 from fruitfly_agent.core.errors import SessionCorruptError
-from fruitfly_agent.core.data_model import AgentMessage
+from fruitfly_agent.core.data_model import AgentMessage, UserMessage
 from fruitfly_agent.core.session.storage import Session, SessionSnapshot
 from fruitfly_agent.interactive import ResumableSession
 from .assembly import RuntimeAssembly
@@ -98,6 +98,13 @@ def discover_resumable_sessions(cwd: Path, *, current_path: Path | None = None) 
             if not messages:
                 continue
             session.messages()
+            users = [m for m in messages if isinstance(m, UserMessage)]
+            content = users[0].content if users else ''
+            title = content if isinstance(content, str) else ' '.join(getattr(b, 'text', '') for b in content)
+            title = ''.join(c if c.isprintable() else ' ' for c in title)
+            title = ' '.join(title.split())[:100]
+            timestamps = [entry.timestamp for entry in session.read_all() if entry.type == 'message' and entry.timestamp > 0]
+            modified = max(timestamps) if timestamps else modified
             manifests = session_manifests(session)
             manifest = manifests[-1] if manifests else {}
             models = manifest.get("models", {})
@@ -107,6 +114,7 @@ def discover_resumable_sessions(cwd: Path, *, current_path: Path | None = None) 
                 raise ValueError("session runtime metadata is malformed")
             candidates.append(ResumableSession(
                 path=str(resolved), modified_at=modified, message_count=len(messages),
+                title=title, user_turns=len(users),
                 profile=str(manifest.get("profile", "")), model=str(main.get("model", "")),
                 prompt_label=str(prompt.get("label", "")), prompt_hash=str(prompt.get("content_hash", "")),
                 available=not session.locked,

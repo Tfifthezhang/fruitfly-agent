@@ -76,7 +76,7 @@ class ConfigurationTests(unittest.TestCase):
     def test_cli_check_json_and_report_do_not_load_models_or_run_tasks(self):
         output = io.StringIO()
         with redirect_stdout(output):
-            self.assertEqual(main(['improvement', 'check', '--cwd', str(self.root), '--json']), 3)
+            self.assertEqual(main(['improvement', 'check', '--cwd', str(self.root), '--config', str(self.path), '--json']), 3)
         summary = json.loads(output.getvalue())
         self.assertEqual(summary['model_roles']['executor'], 'executor')
         self.assertFalse(summary['available'])

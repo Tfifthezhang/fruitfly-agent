@@ -185,3 +185,12 @@ It survives materialization and participates in profile identity. Run owns loadi
 the pure specification parser never executes extension code. See
 [Developer Extensions](../extensions/README.md) and
 [Run hosting](../run/extensions/README.md). No configuration version is added.
+
+## Select a delegated model
+
+`models.roles.subagent: {inherit: executor}` follows the current main model;
+`models.roles.subagent: secondary-model` pins an existing catalog alias. The alias
+is a placeholder until registered. This uses the same role grammar and model menu
+as other roles. [Subagent](../lab/agents/subagent/README.md) owns its one H toggle,
+settings, execution limits and tools. The component is disabled in the default
+profile; its model position remains available for configuration.

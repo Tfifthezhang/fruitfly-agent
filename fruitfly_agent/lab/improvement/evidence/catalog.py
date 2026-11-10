@@ -12,8 +12,22 @@ class WorkspaceEvidence:
     def __init__(self, workspace, *, settings=None):
         self.workspace = workspace
         self.settings = EvidenceSettings.from_dict(settings)
-        self.supplied_characters = 0
-        self.supplied_pages = 0
+
+    @property
+    def supplied_characters(self):
+        return self.workspace.access.supply_characters
+
+    @supplied_characters.setter
+    def supplied_characters(self, value):
+        self.workspace.access.supply_characters = value
+
+    @property
+    def supplied_pages(self):
+        return self.workspace.access.supply_responses
+
+    @supplied_pages.setter
+    def supplied_pages(self, value):
+        self.workspace.access.supply_responses = value
 
     def catalog(self, *, prefix='', cursor=0, limit=None):
         limit = self.settings.catalog.default_entries if limit is None else limit
@@ -24,11 +38,14 @@ class WorkspaceEvidence:
             'next_cursor': cursor+limit if cursor+limit < len(paths) else None}
 
     def read(self, path, *, offset=0, limit=None):
+        return self._read(path, offset=offset, limit=limit, count_response=True)
+
+    def _read(self, path, *, offset=0, limit=None, count_response):
         limit = self.settings.read.default_characters if limit is None else limit
         if type(offset) is not int or offset < 0 or type(limit) is not int or not 1 <= limit <= self.settings.read.max_characters:
             raise ValueError('read needs a nonnegative offset and page size 1..24000')
         remaining = self.settings.supply.max_characters - self.supplied_characters
-        if remaining <= 0 or self.supplied_pages >= self.settings.supply.max_pages:
+        if remaining <= 0 or count_response and self.supplied_pages >= self.settings.supply.max_pages:
             self.workspace.record("evidence-budget-exhausted", characters=self.supplied_characters, pages=self.supplied_pages)
             return {"status": "budget_exhausted", "text": "", "next_offset": None,
                     "note": "Reading budget exhausted. Submit using supplied evidence and declare uncovered scope."}
@@ -44,7 +61,8 @@ class WorkspaceEvidence:
         start, end = min(offset, len(text)), min(offset+limit, len(text))
         span = EvidenceSpan(reference, start, end)
         page = text[start:end]
-        self.supplied_pages += 1
+        if count_response:
+            self.supplied_pages += 1
         self.supplied_characters += len(page)
         if page or not text:
             self.workspace.access.provided(path, page, offset=start)
@@ -76,6 +94,7 @@ class WorkspaceEvidence:
             index, offset = value['file'], value['offset']
             if type(index) is not int or type(offset) is not int or not 0 <= index <= len(selected) or offset < 0:
                 raise ValueError('invalid search cursor')
+        self.supplied_pages += 1
         matches: list[dict] = []
         unavailable: list[dict] = []
         characters = 0
@@ -96,7 +115,7 @@ class WorkspaceEvidence:
             end = min(len(text), found+len(query)+160, start+budget)
             if matches and (len(matches) >= limit or characters + end-start > self.settings.search.max_characters):
                 break
-            match = self.read(path, offset=start, limit=max(1,end-start))
+            match = self._read(path, offset=start, limit=max(1,end-start), count_response=False)
             if match.get('status') == 'budget_exhausted':
                 break
             match['match_offset'] = found

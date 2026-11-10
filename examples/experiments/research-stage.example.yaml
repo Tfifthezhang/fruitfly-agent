@@ -1,83 +1,73 @@
-# Copy this document into a research directory and adjust its references.
-# Import/show need no model. Organizer/assessor/editor calls incur model costs.
-# Execute/Eval additionally require a registered and prepared task backend.
+# Independent stages; only next.stage is executed. Paths resolve from this file.
+# Model roles and algorithm instructions belong to the referenced system profile.
+# Input files and named outputs must exist before their stage is selected.
 research:
   id: retained-research
   title: Retained batch research
   output_root: ./research-output
   branch: main
-
 baseline:
   config: ../configuration/default-config.example.yaml
   profile: baseline
-
-# Model aliases must exist in the baseline's model catalog.
-# Omission inherits the corresponding system role.
-roles: {}
-
-# Ordinary profile fields; mappings merge, lists/scalars replace.
-# Applied to the explicitly selected baseline/candidate, never to source files.
-overrides: {}
-
-optimization:
-  scope: defaults
-  include: {}
-  exclude: []
-
 stages:
   import:
     source: eval
     path: /path/to/completed-eval
-    # task_names: [exact-retained-task-name]
-    # evidence_paths: {}  # Archive-relative paths mapped to recorded sha256 identities.
-    # related_records: /path/to/associated-records
+    attempt: reuse
+    publish_as: original-batch
   organize:
-    timeout_seconds: 1200
+    inputs:
+      batches: [{artifact: original-batch}]
+    publish_as: organized-evidence
     instruction: Organize the supplied batch for readable, traceable inspection.
+    allowance:
+      seconds: 1200
+      evidence_characters: 256000
+      evidence_responses: 64
+    attempt: reuse
   assess:
-    timeout_seconds: 1200
+    inputs:
+      batches: [{artifact: original-batch}]
+      evidence: [{artifact: organized-evidence}]
+    publish_as: original-assessment
+    allowance:
+      seconds: 1200
+      evidence_characters: 256000
+      evidence_responses: 64
+    attempt: reuse
   propose:
-    timeout_seconds: 1200
-    generator: agent-editor-v1
+    inputs:
+      batches: [{artifact: original-batch}]
+      evidence: [{artifact: organized-evidence}]
+      assessments: [{artifact: original-assessment}]
+    publish_as: candidate-a
     direction: Improve the enabled mechanisms using supplied observations.
+    optimization:
+      scope: defaults
+      include: {}
+      exclude: []
+    allowance:
+      seconds: 1200
+      evidence_characters: 256000
+      evidence_responses: 64
+    attempt: reuse
   execute:
+    inputs:
+      harness: {candidate: candidate-a}
+    publish_as: candidate-a-results
     tasks:
       file: /path/to/tasks.yaml
-    task_seconds: 3600
+    allowance:
+      task_seconds: 3600
+    attempt: reuse
   compare:
-    timeout_seconds: 1200
-
-evidence:
-  supply:
-    max_characters: 256000
-    max_pages: 64
-  read:
-    default_characters: 12000
-    max_characters: 24000
-
+    inputs:
+      batches: [{artifact: original-batch}, {artifact: candidate-a-results}]
+    publish_as: candidate-a-comparison
+    allowance:
+      seconds: 1200
+      evidence_characters: 256000
+      evidence_responses: 64
+    attempt: reuse
 next:
   stage: import
-  publish_as: original-batch
-  attempt: reuse
-  inputs: {}
-  context: []
-
-# Optional model guide; assess/propose can consume original-batch directly:
-# After import, replace next with:
-# next:
-#   stage: organize
-#   publish_as: original-evidence
-#   inputs:
-#     batches: [{artifact: original-batch}]
-#
-# Proposal consumes an existing batch; evidence/assessment are optional:
-# next:
-#   stage: propose
-#   publish_as: candidate-a
-#   inputs:
-#     batches: [{artifact: original-batch}]
-#     evidence: [{artifact: original-evidence}]
-#
-# Continue editing candidate-a by adding:
-#     harness: {candidate: candidate-a}
-# Use a new publish_as for a different result. No global latest is selected.

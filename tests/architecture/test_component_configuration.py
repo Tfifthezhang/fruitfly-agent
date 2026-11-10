@@ -70,3 +70,15 @@ class ComponentAdmissionTests(unittest.TestCase):
             self.assertEqual(row['effective']['capacity'], 7)
             self.assertFalse(row['field_editing_declared'])
             self.assertEqual(profile.mechanisms[0].mechanism_id, 'custom-owner')
+
+    def test_builtin_parameter_defaults_and_optimization_have_owners(self):
+        catalog = builtin_catalog()
+        catalog.require_optimization()
+        for definition in catalog.definitions():
+            with self.subTest(component=definition.descriptor.mechanism_id):
+                model_fields = {r.parameter for r in definition.model_role_parameters.values()}
+                fields = {p.name for p in definition.descriptor.parameters} - model_fields
+                if fields:
+                    self.assertIsNotNone(definition.default_resource)
+                if definition.configuration_edit is not None:
+                    self.assertTrue(definition.parameter_paths)

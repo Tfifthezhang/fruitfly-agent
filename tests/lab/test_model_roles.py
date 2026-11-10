@@ -57,6 +57,7 @@ class ModelRoleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((), required_profiles({'memory': requirement}, {}))
         self.assertEqual('main', role_alias('memory', requirement, {}, {'executor': 'main'}))
         self.assertEqual('small', role_alias('memory', requirement, {'model': 'small'}, {'executor': 'main'}))
+        self.assertEqual('selected', role_alias('memory', requirement, {}, {'executor': 'main', 'memory': 'selected'}))
 
     def test_export_keeps_slots_for_every_owner_declared_executor_fallback(self):
         from fruitfly_agent.lab.catalog import builtin_catalog, component_profile
@@ -68,7 +69,7 @@ class ModelRoleTests(unittest.IsolatedAsyncioTestCase):
         catalog = catalog.extended((custom,))
         profile = component_profile(HarnessProfile('default', model_profile='main'), catalog)
         bindings = profile.to_dict()['models']['roles']
-        expected = {'organizer', 'editor', 'assessor', 'working_memory', 'context_query', 'context_summary', 'custom_memory', 'memory_maintenance'}
+        expected = {'organizer', 'editor', 'assessor', 'working_memory', 'context_query', 'context_summary', 'custom_memory', 'memory_maintenance', 'subagent'}
         self.assertEqual(expected, set(bindings) - {'executor'})
         self.assertTrue(all(bindings[role] == {'inherit': 'executor'} for role in expected))
         resolved = catalog.resolve_model_roles((), {'executor': 'main'})

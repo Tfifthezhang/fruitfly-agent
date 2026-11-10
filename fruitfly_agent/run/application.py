@@ -26,6 +26,7 @@ from .runtime.assembly import build_runtime
 from .runtime.manifest import RuntimeManifest
 from .runtime.preparation import RuntimePreparer, PreparedRuntime
 from .adapters.operations import ManagedOperationAdapter
+from .adapters.subagents import SubagentMonitorAdapter
 from .runtime.recovery import (check_session_manifest, discover_resumable_sessions,
     new_session_path, record_session_manifest, resolve_session_path)
 from .improvement.candidates import RunCandidates
@@ -128,7 +129,7 @@ class RunApplicationFactory:
             describe=lambda runtime: describe_runtime(runtime, self.catalog),
             describe_environment=describe_execution_environment,
             describe_services=describe_tool_services,
-            adapt_operations=ManagedOperationAdapter,
+            adapt_operations=ManagedOperationAdapter, adapt_subagents=SubagentMonitorAdapter,
             retained_store=self.retained_store if self.retained_state_enabled else None,
             prepare_retained_profile=lambda profile, store: retained_profile(profile, store, catalog=self.catalog), adapt_retained=RetainedStateAdapter,
             approve_start=self._approve_tool_service,

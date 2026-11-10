@@ -111,3 +111,8 @@ Interaction and Terminal; terminal completion data belongs to I/O.
 [maintenance.py](maintenance.py) describes optional idle maintenance and cancellation.
 [retained_state.py](retained_state.py) describes document inspection and batch review.
 These ports contain no algorithm IDs. Hosts can omit them.
+
+[subagents.py](subagents.py) defines `SubagentMonitor`, `SubagentSnapshot` and
+`SubagentStatus`. This optional RuntimeHandle capability provides read-only
+revisioned snapshots and execution details. It distinguishes execution state,
+cleanup, model identity and unknown measurements; it grants no control authority.

@@ -18,3 +18,10 @@ Input and terminal control come from [I/O](../../io/README.md); display comes fr
 ```bash
 .venv/bin/python -m unittest tests.interactive.test_terminal tests.workflows.test_resume_history -v
 ```
+
+The picker uses a bounded, deterministic preview of the first user request, the
+latest recorded message time, model, user-turn and total message counts, and
+availability. It makes no title-generation requests. Profile/prompt hashes remain
+in the read model rather than the normal row. Older histories without message
+timestamps use file modification time. Artifact loading alone does not imply a
+research candidate.

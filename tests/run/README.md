@@ -62,3 +62,9 @@ review, isolated H/S/I identity, verified content activation and restart.
 `test_retained_resources.py` checks packaged resources in frozen execution.
 
 `test_clipboard.py` covers bounded platform clipboard access with fake subprocesses. Frozen-source tests import and execute compact materials and composer code without checkout fallback.
+
+`test_subagents` owns grouped capability assembly, model inheritance and explicit
+role selection, independent child resources and parent Session writer reuse.
+
+`test_subagent_resources` executes a child from frozen package material in an
+isolated process, including its declared default YAML and without checkout imports.

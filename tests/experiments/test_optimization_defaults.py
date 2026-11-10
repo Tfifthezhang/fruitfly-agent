@@ -19,7 +19,7 @@ from tests.support.task_execution import TaskRunnerFixture
 PROFILE = Path(__file__).resolve().parents[2] / 'examples/configuration/default-config.example.yaml'
 EXCLUDED = {'file-memory','improvement-editor','improvement-evaluator','improvement-organizer'}
 EXPECTED = {'base_prompt','layered-compaction','skills','memory-library','skill-library',
-    'read-tool','write-tool','edit-tool','bash-tool'}
+    'read-tool','write-tool','edit-tool','bash-tool','subagent'}
 
 
 class OptimizationDefaultsTests(unittest.IsolatedAsyncioTestCase):
@@ -43,7 +43,7 @@ class OptimizationDefaultsTests(unittest.IsolatedAsyncioTestCase):
                 prepared=prepare_experiment(load_configuration(root),'improvement')
                 args=parser().parse_args(['improvement','defaults','--config',str(config)])
                 preview=defaults(args,root)
-            self.assertEqual(set(prepared.request.component_ids),EXPECTED)
+            self.assertEqual(set(prepared.request.component_ids),EXPECTED - {'subagent'})
             self.assertEqual(set(preview['components']),EXPECTED)
             self.assertFalse(set(preview['components']) & EXCLUDED)
             rows={r['component_id']:r for r in preview['optimization_table']}
@@ -56,7 +56,7 @@ class OptimizationDefaultsTests(unittest.IsolatedAsyncioTestCase):
             from fruitfly_agent.experiments.records import RunRecords
             records=RunRecords(root);record=records.create('improvement',prepared.summary())
             table=records.directory(record['id'])/'configuration/optimization.json'
-            self.assertEqual({r['component_id'] for r in json.loads(table.read_text()) if r['selected']},EXPECTED)
+            self.assertEqual({r['component_id'] for r in json.loads(table.read_text()) if r['selected']},EXPECTED - {'subagent'})
             self.assertTrue(table.with_suffix('.md').exists())
 
     def test_explicit_scope_replaces_defaults_and_excluded_roles_can_opt_in(self):

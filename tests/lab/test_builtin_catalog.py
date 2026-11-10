@@ -78,6 +78,7 @@ class CatalogTest(unittest.TestCase):
                 'layered-compaction',
                 'rlm-ipython',
                 'component-improvement',
+                'subagent',
             },
         )
 

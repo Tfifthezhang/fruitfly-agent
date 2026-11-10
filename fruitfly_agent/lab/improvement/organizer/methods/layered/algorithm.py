@@ -1,5 +1,6 @@
 """Independent organizer Agent; all role output remains attributable derived text."""
 from dataclasses import asdict
+from typing import Any
 import json
 from fruitfly_agent.core.data_model import AgentToolResult, TextBlock
 from fruitfly_agent.core.tool_runtime import AgentTool
@@ -25,7 +26,7 @@ class LayeredOrganizer:
     async def _organize(self, request, services):
         workspace, batch = build_workspace(request, self.artifacts, record=services.record)
         accepted = None
-        source_rows = []
+        source_rows: list[dict[str, Any]] = []
         def accept(value):
             nonlocal accepted, source_rows
             raw = value if isinstance(value, str) else canonical_json(value)

@@ -9,6 +9,7 @@ from fruitfly_agent.improvement.contracts.versions import canonical_json, conten
 from fruitfly_agent.lab.improvement.evidence.indexing import organize_evidence
 from .evidence import collect, answer_evidence, trial_directories, safe_path
 from .facts import attach_benchmark_facts
+from fruitfly_eval.results import trial_outcome
 
 
 def import_history(run, artifacts, *, task_names=(), related_records=None, evidence_paths=None):
@@ -35,7 +36,8 @@ def import_history(run, artifacts, *, task_names=(), related_records=None, evide
                     return item
                 reference = artifacts.put(canonical_json(scrub(value)).encode())
                 configurations.append({'path': str(path), 'artifact_id': reference})
-    wanted, tasks, records, observations = set(task_names), {}, [], []
+    tasks: dict[str, TaskMaterial] = {}
+    wanted, records, observations = set(task_names), [], []
     for directory in trial_directories(root):
         result = directory / 'result.json'
         official = json.loads(result.read_bytes()) if result.is_file() and safe_path(result, root) else {}
@@ -70,7 +72,12 @@ def import_history(run, artifacts, *, task_names=(), related_records=None, evide
             answer['text'][:120000], resources, calls)
         receipt = attach_benchmark_facts(receipt, root, artifacts, interrupted=True, trial=directory)
         records.append(organize_evidence(task, receipt, artifacts))
+        outcome = trial_outcome(official)
         observations.append({'run_id': receipt.run_id, 'name': 'official_reward',
+            'official_status': outcome['status'], 'eligible': outcome['eligible'],
+            'exception_type': outcome['error']['type'] if outcome['error'] else None,
+            'agent_elapsed_seconds': outcome['agent_elapsed_seconds'],
+            'interpretation': 'Shared Eval result rules; raw reward is not an execution-success certificate.',
             'value': (official.get('verifier_result') or {}).get('rewards'),
             'source': str(result), 'source_identity': content_hash(result.read_bytes().decode())
                 if result.is_file() and safe_path(result, root) else None})

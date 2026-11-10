@@ -19,6 +19,7 @@ from fruitfly_agent.interactive.contracts.improvement import ImprovementService
 from fruitfly_agent.interactive.contracts.candidates import CandidateActivationService, CandidateService
 from fruitfly_agent.interactive.contracts.task_packs import TaskPackService
 from fruitfly_agent.interactive.contracts.operations import OperationService
+from fruitfly_agent.interactive.contracts.subagents import SubagentMonitor
 
 
 class RuntimeCleanupError(RuntimeError):
@@ -70,6 +71,8 @@ class RuntimeHandle(Protocol):
     def authorization(self) -> RuntimeAuthorization | None: ...
     @property
     def operations(self) -> OperationService | None: ...
+    @property
+    def subagents(self) -> SubagentMonitor | None: ...
     @property
     def observation_context(self) -> ObservationContext | None: ...
     @property

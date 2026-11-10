@@ -275,3 +275,13 @@ Use `/memory` or `/skills` to list active documents and pending batches. `read I
 displays a document; `commit UPDATE` or `reject UPDATE` reviews a batch while idle.
 The [retained-state feature](features/retained_state/README.md) uses injected public
 operations and starts no search or model request during inspection.
+
+## Inspect subagents
+
+`/subagent` reads the latest child execution snapshot, including while the main
+task runs. `/subagent AGENT_ID [RUN_ID]` shows execution state, cleanup, actual
+model, activity, known usage and bounded results. Disabled and empty states are
+explicit. Listing shows at most the latest 50 executions; exact IDs can inspect
+older records. [The handler](features/subagent.py) uses a public monitor only,
+starts no model work and does not create another stdin reader. `/help` and command
+completion discover it through the ordinary command registry.

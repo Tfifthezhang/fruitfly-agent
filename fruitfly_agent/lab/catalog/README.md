@@ -298,3 +298,9 @@ owner grant expansion and candidate configuration tables. Consumers do not encod
 component-name exclusions. Owner declarations default native tools on, File memory
 and I roles off; explicit experiment scopes retain precedence. Research parameter
 targets use the same owner-admitted fields as normal runtime targets.
+
+[agent_runtime.py](agent_runtime.py) defines `PreparedAgentRuntime`, the host-prepared
+Core configuration, context pipeline, manifest and start/close callbacks consumed
+by child executors. AssemblyContext optionally supplies a child runtime factory
+and artifact service. Consumers must not shallow-copy mutable tool or context
+state from a running parent.

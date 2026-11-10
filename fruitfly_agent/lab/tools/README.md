@@ -180,3 +180,9 @@ Assembly fingerprints actual tool descriptions and schemas without shortening
 them. These identities describe instructions/contracts, not evidence of tool use
 or model quality. Runtime resources retire when their owning runtime closes.
 
+## Delegate work
+
+[Subagent tools](../agents/subagent/README.md#call-the-tools) are one optional
+configuration group: spawn, send, wait, status and cancel. Each tool has distinct
+model-facing instructions. They manage child Agent executions; Bash handles and
+`/operations` continue to describe background tool operations.

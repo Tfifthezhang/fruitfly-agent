@@ -45,6 +45,8 @@ def role_alias(role: str, requirement: ModelRoleRequirement, values: Mapping[str
         raise ValueError('model role alias must be a string: ' + role)
     if alias:
         return alias
+    if roles is not None and roles.get(role):
+        return roles[role]
     if requirement.fallback_role is not None:
         if roles is None:
             return None  # Offline alias discovery has no host executor selection.

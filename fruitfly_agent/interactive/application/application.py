@@ -113,6 +113,10 @@ class AgentApplication:
         return self._require_handle().operations
 
     @property
+    def subagents(self):
+        return self._require_handle().subagents
+
+    @property
     def pending_count(self) -> int:
         return len(self._pending)
 

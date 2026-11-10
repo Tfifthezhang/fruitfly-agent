@@ -166,3 +166,10 @@ materials, while unselected original bytes remain external dependencies. Histori
 batches are immutable; explicitly reimport to create a compact batch or supplement.
 Offline checks include `tests.eval.test_reading_materials` and
 `tests.workflows.test_improvement_evidence`.
+
+Historical official observations retain raw reward separately from `official_status`
+and metric eligibility using the same result interpretation as Eval reports.
+`agent_elapsed_seconds` is populated only from recorded Agent timestamps.
+`diagnostics/termination.json` distinguishes native terminal diagnostics from
+missing-diagnostic fallback; `execution_interrupted` alone does not establish a
+wall-clock timeout or its cause.

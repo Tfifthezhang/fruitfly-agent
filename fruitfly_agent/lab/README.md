@@ -130,3 +130,12 @@ Lab has no shared environment variables and does not read ambient API keys. Host
 
 
 Shared model role invocation: [Agent runner](agents/README.md).
+
+[Managed subagents](agents/subagent/README.md) expose one independently classified collaboration capability over
+independent Core executions. Agents owns the service and instruction candidates;
+Catalog supplies host construction contracts, not a second execution loop.
+
+Algorithm configuration must follow the mandatory [ownership rules](../../AGENTS.md#own-configuration-and-optimization-surfaces).
+Defaults belong to owner resources; user overrides belong to referenced workspace
+component documents. Every new algorithm must prove its declared optimization surface
+changes isolated execution before delivery.

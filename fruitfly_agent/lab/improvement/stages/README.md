@@ -1,35 +1,149 @@
-# Independent Stage Bindings
+# Navigate Execution Evidence
 
 [Up: Improvement](../README.md)
 
-These handlers adapt a single research operation to its owning role or injected
-execution backend. They do not invoke one another or schedule another activity.
+Existing Agent and execution hosts retain raw records. This module organizes
+those records without another recorder or model request. Editors and evaluators
+share the same granted evidence service.
+
+| Layer | Content |
+|---|---|
+| Overview | Task, output excerpt/reference, deliverables, termination and usage |
+| Event directory | Source spans, event kinds, timestamps and reported durations/status |
+| Originals | Complete messages, commands, outputs, files and execution facts |
+
+`organize_evidence` derives immutable `evidence/overview.json` and
+`evidence/events.json` resources after collection. They are rebuildable views;
+originals remain authoritative. Incomplete or unindexed sources are explicit.
+A successful tool status does not establish success of every command it contains.
+
+| Operation | Behavior |
+|---|---|
+| `catalog` | Page granted paths or filter/sort an event directory |
+| `search` | Literal search over one or more granted sources, with continuation |
+| `read` | Original text pages or supported images |
+
+Results carry the returned resource identity and character intervals. Projections
+separately retain original source locators; reading a projection does not prove
+that its original bytes were supplied. A text citation ID
+identifies the actual returned source span, not the whole file. Catalog entries
+are navigation, not proof that their source contents were read. Empty matches,
+unsupported binary data and collection failures remain distinct. Page sizes bound
+individual responses; cumulative supply is bounded separately. Private verification inputs remain
+outside development grants.
 
 | File | Responsibility |
 |---|---|
-| `registry.py` | Narrow injected `StageContext` and default handler mapping |
-| `organize.py` | Batch readability request, optional auxiliary context and guide output |
-| `assess.py` | Per-record structured feedback, including explicit unavailable results |
-| `propose.py` | Direct retained-batch proposal request and owner-validated candidate output |
-| `execute.py` | One injected fixed-config execution batch and derived-config attribution |
-| `compare.py` | Explicit batch comparison without selecting research continuation |
-| `context.py` | Expand explicitly granted feedback resources for role consumption |
-| `extensions.py` | Immutable identity of injected extension settings |
-| `control.py` | Separate optional online execution control; no research scheduling |
+| `configuration.py` | Strict read/catalog/search limits shared by editor and evaluator |
+| `rounds.py` | Cross-round references to hypotheses, receipts, assessments and selections |
+| `batch.py` | Compact execution table, observation supply and deterministic batch coverage |
+| `indexing.py` | Deterministic overview and event extraction |
+| `catalog.py`, `query.py` | Paged navigation and literal retrieval |
+| `resources.py`, `access.py` | Immutable access and supply receipts |
+| `tools.py`, `session.py` | Agent-facing access and role invocation composition |
+| `__init__.py`, `task_sets.py` | Detached single-task and task-set workspaces |
 
-Run supplies artifact callbacks, role instances and stage services. These modules
-import neither Run, Experiments nor Eval. External benchmark formats remain in
-their adapters. Algorithms remain with Organizer, Editor, Assessment and execution
-owners; this directory defines no parallel mechanism configuration registry.
+The public `EvidenceReader` contract is in
+[Improvement contracts](../../../improvement/contracts/evidence.py). Retrieval can
+be replaced through `reader_factory(workspace, settings=EvidenceSettings(...))` on
+`AgentEditor` or `ModelEvaluator`, without changing evaluator policy. The reader
+must preserve grant checks, exact source spans and supply receipts. The bundled
+reader loads source files in host memory; a disk index is not implemented. The bundled implementation uses
+no vector database, generated summary or extra retrieval Agent.
 
-Missing scores never prevent invocation. Feedback unavailability is retained as
-data. The Editor receives granted historical records directly, without fabricated
-search scores or baseline trials. See the [developer guide](../DEVELOPER_GUIDE.md).
+Offline checks: `tests.lab.test_evidence_index`, `tests.lab.test_search_reporting`,
+`tests.lab.test_improvement_configuration`.
 
-```bash
-.venv/bin/python -m unittest tests.improvement.test_research_service tests.experiments.test_stage_cli tests.experiments.test_research_continuation
-```
+Cross-round navigation contains relationships and references, not a second ledger
+of copied observations. Existing candidate manifests retain `expected_effect`;
+assessment and selection artifacts retain their own judgments and assurance.
 
-`assess` and `propose` accept imported batches without an organize result.
-`organize` is an explicit optional model invocation. Deterministic Eval material
-extraction occurs before these stages and needs no Organizer Provider.
+## Inspect coverage and source relationships
+
+The organizer also produces `evidence/coverage.json` and `evidence/sources.json`.
+Coverage separates collection, parsing, indexing, outputs, usage and identity.
+Each dimension is complete, partial, unknown or not applicable. Summary `complete`
+means scoped evidence completeness; `execution_diagnostics_complete` preserves
+the separate execution fact. A missing capture receipt, unindexed required source
+or unknown usage cannot become complete merely because terminal diagnostics exist.
+
+JSONL splits only at physical LF boundaries, preserving CRLF and Unicode character
+coordinates. A malformed record remains an explicit gap; valid records are still
+indexed. Formatted ATIF steps, JSON arrays and request-receipt arrays retain original
+source ranges. Tool calls/results join by source and call ID, including unmatched
+results. Request, operation, phase and status fields survive where recorded.
+ATIF is marked as a derived view; navigation entries must not be counted as extra
+executions. Existing execution facts remain the authority for aggregate counters. Consecutive streaming deltas share one navigation range with a record count; their full original text remains pageable.
+
+The overview includes actual output, final-answer state, file counts and gaps.
+Source lists remain behind `sources_path`; file catalogs are paged separately.
+Reorganization derives views from current original identities and invalidates stale
+overviews. Original bytes remain unchanged. `catalog` can additionally filter an
+event directory by tool name/call ID, request ID, operation ID, phase or status;
+cataloging still grants no source-content citation.
+
+| File | Additional responsibility |
+|---|---|
+| `decoding.py` | Format recognition and original character ranges |
+| `events.py` | Event normalization and source-local relationships |
+| `coverage.py` | Separate evidence dimensions and explicit gaps |
+
+[Eval](../../../../fruitfly_eval/README.md#organize-retained-evidence) can materialize
+these views offline after a benchmark. This module has no Harbor dependency and
+performs no collection, model request or container operation.
+
+Evidence completeness applies to registered records and selected captured file
+versions. It does not prove that every task-specific output requirement is known
+or met; file scope and exclusions remain visible in the capture manifest.
+
+## Keep batch entry points compact
+
+The task-set `INDEX.json` lists the task directory, evaluation metadata, edit
+grants and organized-view references. It records reference/task counts rather
+than repeating every archived file path. Use `catalog` with a task prefix to
+load further paths. All registered resources remain granted through the existing reader. External
+source locators require explicit supplementation before their bytes are granted.
+
+Single-task root indexes likewise keep source paths behind paged catalog access
+and describe component identities without embedding complete component text.
+See the [development guide](../DEVELOPER_GUIDE.md) for portable stage bundles.
+
+## Bound an investigation
+
+`evidence.supply.max_characters` defaults to 256000 and `max_pages` to 64.
+The bundled reader shares those cumulative limits across read/search, including
+repeated pages. A search response counts once regardless of its number of matched
+source spans; every returned character and exact citation still counts. The tool facade additionally bounds catalog/read/search calls.
+Exhausted reads return `budget_exhausted`, no source citation, and a request to
+submit using existing evidence with uncovered scope declared. Invocation request
+count is bounded by max_pages plus eight opportunities to finish. A request
+measurement checks input, uncertainty margin and output reserve before Provider
+execution; estimates retain their declared quality. Context exhaustion stops with
+`evidence_context_budget_exhausted` instead of sending another oversized request.
+
+Search defaults exclude harness content and explicitly supplemented `originals/`.
+Specify granted paths to search those originals. Host reads emit
+`evidence-host-read`; `evidence-page` and supply receipts identify content actually
+returned to the role. Neither event proves semantic understanding or citation.
+
+Eval supplies one compact reading trajectory, task and final-answer material,
+execution facts and an external source catalog. Text/argument excerpts declare
+original lengths and truncation; each step locates its original source span.
+The catalog is metadata, not an original-byte grant. Deep reads require an explicit
+hash-checked supplement through the [Eval adapter](../../../../fruitfly_eval/improvement/README.md).
+Unpacked external bytes remain unavailable after source removal. Existing retained
+batches remain immutable; rebuilding never reconstructs unknown historical state.
+
+Organizer and historical Editor workspaces share `context/overview.json`,
+`context/executions.json` and `context/coverage.json`. Execution resources use
+`context/executions/<run-id>/` in both roles, so newly organized references are
+readable by the Editor without changing their source identity. Batch counts cover
+all supplied records; they do not imply all trajectories were read. Per-record
+observations stay distinct from status and missing diagnostics remain unknown.
+
+Historical official observations retain raw reward separately from `official_status`
+and metric eligibility using the same result interpretation as Eval reports.
+`agent_elapsed_seconds` is populated only from recorded Agent timestamps.
+`diagnostics/termination.json` distinguishes native terminal diagnostics from
+missing-diagnostic fallback; `execution_interrupted` alone does not establish a
+wall-clock timeout or its cause.

@@ -105,7 +105,7 @@ LAB_HOST_PUBLIC_API = {
     "LayeredOrganizer", "OrganizerInstructions", "EDITOR_CONFIG", "EDITOR_INSTRUCTIONS", "ORGANIZER_CONFIG", "ExecutionContext",
     "GeneratorRegistry",  "ReadOnlyInspector", "SETTINGS",
     "SYSTEM_SETTINGS", "SearchActivity", "SearchActivitySource", "SearchCompletion",
-    "SearchCompletionSource", "StageBindings", "StageContext", "builtin_stage_handlers",
+    "SearchCompletionSource", "StageBindings", "StageContext", "StageDefinition", "stage_definitions", "EvidenceSettings", "batch_view", "builtin_stage_handlers",
     "builtin_executions", "bundle_target",
     "bundle_text", "component_registry", "entry_from_dict", "entry_to_dict", "experience_id",
     "extension_spec", "model_completion", "policy_spec",

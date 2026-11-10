@@ -24,11 +24,11 @@ class StageCliTests(unittest.IsolatedAsyncioTestCase):
             (trial / 'result.json').write_text('{"task_name":"fixture"}')
             (trial / 'agent/session.jsonl').write_text(json.dumps({'message': {'role': 'user', 'content': 'Inspect deliverables'}}) + '\n')
             authored = {'research': {'id': 'study', 'output_root': '../study'},
-                'baseline': old['baseline'], 'roles': {},
-                'optimization': {'scope': 'explicit', 'include': old['edit']},
-                'stages': {'import': {'source': 'eval', 'path': '../archive'},
-                    'propose': {'direction': 'Verify actual results'}},
-                'next': {'stage': 'import', 'publish_as': 'baseline'}}
+                'baseline': old['baseline'],
+                'stages': {'import': {'source': 'eval', 'path': '../archive', 'publish_as': 'baseline'},
+                    'propose': {'direction': 'Verify actual results',
+                        'optimization': {'scope': 'explicit', 'include': old['edit']}}},
+                'next': {'stage': 'import'}}
             path.write_text('# Research controls\n' + yaml.safe_dump(authored, sort_keys=False))
             async def invoke(command='step'):
                 args = parser().parse_args(['improvement', command, '--config', str(path)])
@@ -37,7 +37,9 @@ class StageCliTests(unittest.IsolatedAsyncioTestCase):
                 await invoke()
                 repeated = await invoke()
                 self.assertTrue(repeated['observed_updated'])
-            self.assertEqual(yaml.safe_load(path.read_text())['next'], authored['next'])
+            self.assertEqual(yaml.safe_load(path.read_text()), authored)
+            self.assertNotIn('observed:', path.read_text())
+            self.assertTrue(Path(repeated['observations']).is_file())
             self.assertIn('# Research controls', path.read_text())
             provider = RoleProvider()
             def script(view, signal=None):
@@ -60,12 +62,11 @@ class StageCliTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(role, 'editor')
                 return AgentLoopConfig(provider, context_window=64000)
             for generation in (1, 2):
-                authored['next'] = {'stage': 'propose', 'publish_as': 'candidate-' + str(generation),
-                    'inputs': {'batches': [{'artifact': 'baseline'}]}}
+                authored['next'] = {'stage': 'propose'}
+                authored['stages']['propose'].update(publish_as='candidate-' + str(generation),
+                    inputs={'batches': [{'artifact': 'baseline'}]})
                 if generation == 2:
-                    authored['next']['inputs']['harness'] = {'candidate': 'candidate-1'}
-                    authored['overrides'] = {'H': {'base_prompt': {'inline': {
-                        'parameters': {'instructions': {'system': text + '\nHuman proposal adjustment.'}}}}}}
+                    authored['stages']['propose']['inputs']['harness'] = {'candidate': 'candidate-1'}
                 path.write_text('# Research controls\n' + yaml.safe_dump(authored, sort_keys=False))
                 provider.script = [script] * 12
                 with patch('fruitfly_agent.run.improvement.roles.ResearchRoles.configuration', role_config):
@@ -75,13 +76,6 @@ class StageCliTests(unittest.IsolatedAsyncioTestCase):
                 candidate = yaml.safe_load(configs[0].read_text())
                 text = candidate['profiles'][candidate['default_profile']]['H']['base_prompt']['inline']['parameters']['instructions']['system']
                 self.assertEqual(text.count('Verify the actual deliverable.'), generation)
-                if generation == 2:
-                    self.assertTrue((configs[0].parent.parent / 'origin/config.yaml').exists())
-                    human = json.loads((configs[0].parent.parent / 'human-changes.json').read_text())
-                    total = json.loads((configs[0].parent.parent / 'total-changes.json').read_text())
-                    self.assertTrue(human)
-                    self.assertTrue(total)
-                    self.assertIn('Human proposal adjustment.', json.dumps(human))
                 self.assertEqual(yaml.safe_load(path.read_text())['next'], authored['next'])
                 if generation == 1:
                     # Reusing the completed activity must not require a model
@@ -90,14 +84,20 @@ class StageCliTests(unittest.IsolatedAsyncioTestCase):
                             side_effect=AssertionError('cached proposal constructed a Provider')):
                         reused = await invoke()
                     self.assertTrue(reused['observed_updated'])
-            # A fresh invocation executes the selected complete candidate plus
-            # explicit human overrides; no editor or assessor request is made.
-            authored['overrides'] = {'H': {'base_prompt': {'inline': {
-                'parameters': {'instructions': {'system': text + '\nHuman execution adjustment.'}}}}}}
+            # Explicit source configuration customization remains separate from
+            # research controls; execute resolves that complete system file.
+            import shutil
+            customized = root / 'customized'
+            shutil.copytree(configs[0].parent, customized)
+            changed_system = yaml.safe_load((customized / 'config.yaml').read_text())
+            selected_profile = changed_system['profiles'][changed_system['default_profile']]
+            selected_profile['H']['base_prompt']['inline']['parameters']['instructions']['system'] += '\nHuman execution adjustment.'
+            (customized / 'config.yaml').write_text(yaml.safe_dump(changed_system))
             authored['stages']['execute'] = {'tasks': {'inline': {
-                'source': 'files', 'instruction': 'Inspect deliverables'}}}
-            authored['next'] = {'stage': 'execute', 'publish_as': 'candidate-2-results',
-                'inputs': {'harness': {'candidate': 'candidate-2'}}}
+                'source': 'files', 'instruction': 'Inspect deliverables'}},
+                'publish_as': 'candidate-2-results',
+                'inputs': {'harness': {'config': str(customized / 'config.yaml')}}}
+            authored['next'] = {'stage': 'execute'}
             path.write_text(yaml.safe_dump(authored, sort_keys=False))
             from tests.support.task_execution import TaskApplicationFixture
             from unittest.mock import Mock
@@ -128,8 +128,8 @@ class StageCliTests(unittest.IsolatedAsyncioTestCase):
             report = root / 'eval-output/report.json'; report.write_text('{}')
             path.write_text(yaml.safe_dump({'research': {'id': 'study', 'output_root': '../study'},
                 'baseline': original['baseline'],
-                'stages': {'eval': {'tasks': {'inline': {'source': 'files', 'instruction': 'Fixed Eval'}}}},
-                'next': {'stage': 'eval', 'publish_as': 'eval-baseline'}}))
+                'stages': {'eval': {'tasks': {'inline': {'source': 'files', 'instruction': 'Fixed Eval'}}, 'publish_as': 'eval-baseline'}},
+                'next': {'stage': 'eval'}}))
             prepared = SimpleNamespace(summary=lambda: {'operation': 'eval'})
             args = parser().parse_args(['improvement', 'step', '--config', str(path)])
             with patch('fruitfly_agent.experiments.composition.prepare_experiment', return_value=prepared), \
@@ -139,3 +139,42 @@ class StageCliTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(evaluate.call_count, 1)
             self.assertEqual(json.loads(Path(result['bundle']).read_text())['kind'], 'eval')
             self.assertEqual(len(list((root / 'study/runs').iterdir())), 1)
+
+    async def test_import_check_reports_missing_input_without_running_a_stage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / 'improvement.yaml'
+            path.write_text(yaml.safe_dump({'research': {'id': 'check-input', 'output_root': '.'},
+                'stages': {'import': {'source': 'batch', 'path': 'missing.json'}},
+                'next': {'stage': 'import'}}))
+            args = parser().parse_args(['improvement', 'check', '--config', str(path)])
+            with patch('fruitfly_agent.providers.registry.ProviderRegistry.create', side_effect=AssertionError('Provider')):
+                result = await dispatch(args, root)
+            self.assertFalse(result['available'])
+            self.assertIn('missing', result['unavailable_reason'])
+            self.assertEqual(list(root.iterdir()), [path])
+
+    async def test_cli_defaults_to_improvement_entry_and_honors_explicit_config(self):
+        import io
+        from contextlib import redirect_stdout
+        from fruitfly_agent.experiments.cli import dispatch as dispatch_cli
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / '.fruitfly').mkdir()
+            entry = root / '.fruitfly/improvement.yaml'
+            raw = {'research': {'id': 'default-entry', 'output_root': '.'},
+                'stages': {'import': {'source': 'batch', 'path': 'missing.json'}},
+                'next': {'stage': 'import'}}
+            entry.write_text(yaml.safe_dump(raw))
+            explicit = root / 'other.yaml'
+            raw['research']['id'] = 'explicit-entry'
+            explicit.write_text(yaml.safe_dump(raw))
+            for extra, expected in (([], 'default-entry'), (['--config', str(explicit)], 'explicit-entry')):
+                args = parser().parse_args(['improvement', 'show', '--cwd', str(root), *extra])
+                output = io.StringIO()
+                # Synchronous CLI owns its event loop; run outside this async test loop.
+                import asyncio
+                with redirect_stdout(output):
+                    code = await asyncio.to_thread(dispatch_cli, args)
+                self.assertEqual(code, 0)
+                self.assertEqual(json.loads(output.getvalue())['research']['id'], expected)

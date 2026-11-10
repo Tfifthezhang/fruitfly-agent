@@ -4,6 +4,8 @@ profiles:
     models:
       catalog: models.yaml
       roles:
+        subagent:
+          inherit: executor
         executor: deepseek-flash-openai
         editor:
           inherit: executor
@@ -20,6 +22,8 @@ profiles:
         memory_maintenance:
           inherit: executor
     H:
+      subagent:
+        default: true
       local-env:
         default: true
       read-tool:

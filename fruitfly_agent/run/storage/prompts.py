@@ -8,7 +8,7 @@ def resolve_base_prompt(reference: str, store: DataArtifactStore, *, contents=No
         content = contents[reference] if contents is not None and reference in contents else store.read_text(reference)
         identity = {
             "reference": reference,
-            "label": f"Candidate {reference[7:15]}",
+            "label": f"Custom prompt {reference[7:15]}",
             "source": "artifact",
             "content_hash": reference,
         }

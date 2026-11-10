@@ -38,22 +38,24 @@ research example for a history-only study.
 ## Continue from existing outputs
 
 ```yaml
+stages:
+  propose:
+    publish_as: candidate-b
+    inputs:
+      harness: {candidate: candidate-a}
+      batches: [{artifact: candidate-a-results}]
+      evidence: [{artifact: candidate-a-evidence}]
 next:
   stage: propose
-  publish_as: candidate-b
-  inputs:
-    harness: {candidate: candidate-a}
-    batches: [{artifact: candidate-a-results}]
-    evidence: [{artifact: candidate-a-evidence}]
 ```
 
 Names refer to outputs in the selected branch. A complete candidate is inherited
-before human overrides and owner-validated Editor changes. Optional evidence and
+before owner-validated Editor changes. Human adjustments use a separately
+selected complete system configuration. Optional evidence and
 feedback do not require rerunning the organizer/assessor. No score is required.
-Each invocation retains its configuration and differences; generated `observed`
-content summarizes recent history without changing the next operation.
+Each invocation retains its configuration and differences; output-only history summarizes recent activity without rewriting authored YAML.
 
-The system file still owns H/S/I and shared model definitions. `roles` selects
-stage aliases from that catalog. Credentials stay outside configuration/report
+The system file still owns H/S/I and shared model definitions. `models.roles` selects
+stage aliases in that system profile. Credentials stay outside configuration/report
 files. Paths resolve from their declaring document. Generic file tasks need an
 explicit registered backend; they do not install a local task executor.

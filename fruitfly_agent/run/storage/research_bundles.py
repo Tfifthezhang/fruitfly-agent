@@ -74,8 +74,8 @@ class ResearchOutputs:
         used, normalized = set(), []
         from dataclasses import replace
         for i, resource in enumerate(resources):
-            path = resource.path if resource.path not in used else 'inputs/' + str(i) + '/' + resource.path
-            used.add(path); normalized.append(replace(resource, path=path))
+            logical_path = resource.path if resource.path not in used else 'inputs/' + str(i) + '/' + resource.path
+            used.add(logical_path); normalized.append(replace(resource, path=logical_path))
         return tuple(normalized), producers
 
     def publish(self, kind, run_id, result, inputs, configuration_id):

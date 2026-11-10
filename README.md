@@ -186,3 +186,7 @@ Evidence coverage is separate from official benchmark outcomes.
 Eval imports provide compact task and trajectory evidence for direct assessment
 and proposal. Model organization is optional. See
 [retained evidence](fruitfly_eval/README.md#organize-retained-evidence).
+
+Managed subagents delegate independent tasks through one optional configuration
+component, with private conversations and `/subagent` inspection. See
+[Subagent usage](fruitfly_agent/lab/agents/subagent/README.md).

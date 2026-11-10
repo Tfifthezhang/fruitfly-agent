@@ -19,6 +19,29 @@ from tests.support.configuration import with_component_text, component_text
 
 
 class OrganizerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_stage_supplies_official_observations_to_organizer(self):
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock
+        from fruitfly_agent.lab.improvement.stages.organize import organize
+        from fruitfly_agent.improvement.contracts.stages import StageInputs
+        from fruitfly_agent.improvement.contracts.organization import EvidenceView
+        from fruitfly_agent.improvement.contracts.tasks import Resource
+        _, plan, _, _ = proposal_fixture()
+        artifacts = MemoryArtifacts()
+        observation = {'run_id': 'execution', 'name': 'official_reward',
+            'value': {'reward': 1.0}}
+        def put(path, value, kind='diagnostic'):
+            return Resource(path, artifacts.put(json.dumps(value).encode()),
+                'application/json', kind)
+        worker = SimpleNamespace(organize=AsyncMock(return_value=EvidenceView((), (), 'fixture', 'fixture')))
+        ports = SimpleNamespace(organizer=worker, put=put,
+            input_batch=lambda resources: SimpleNamespace(tasks=(TaskMaterial('task', 'Inspect'),), records=(), observations=(observation,)),
+            create_services=lambda: StageServices(plan))
+        await organize(ports, SimpleNamespace(parameters={}), StageInputs())
+        request = worker.organize.call_args.args[0]
+        resource = next(r for r in request.context if r.path == 'observations.json')
+        self.assertEqual([observation], json.loads(artifacts.read(resource.artifact_id)))
+
     async def test_readable_batch_and_authorized_i_candidate_reach_actual_model(self):
         _, plan, baseline, _ = proposal_fixture()
         artifacts = MemoryArtifacts()

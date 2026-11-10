@@ -8,6 +8,7 @@ from fruitfly_agent.interactive.contracts.improvement import ImprovementService
 from fruitfly_agent.interactive.contracts.candidates import CandidateActivationService, CandidateService
 from fruitfly_agent.interactive.contracts.task_packs import TaskPackService
 from fruitfly_agent.interactive.contracts.operations import OperationService
+from fruitfly_agent.interactive.contracts.subagents import SubagentMonitor
 from fruitfly_agent.interactive.contracts.maintenance import MaintenanceService
 from fruitfly_agent.interactive.contracts.retained_state import RetainedStateService
 from fruitfly_agent.core.observation import ObservationContext, bind_observation, current_observation, operation, start_operation, FailureInfo
@@ -39,6 +40,8 @@ class RuntimeHandle:
     observation_context: ObservationContext | None = None
     maintenance: MaintenanceService | None = None
     retained_state: RetainedStateService | None = None
+    subagents: SubagentMonitor | None = None
+
     _closed: bool = field(default=False, init=False, repr=False)
 
     async def start(self) -> None:

@@ -20,6 +20,7 @@ class FeatureNode:
 
 EXECUTION = FeatureNode('execution', 'Execution', 0)
 ENVIRONMENT = FeatureNode('environment', 'Environment', 10)
+AGENTS = FeatureNode('agents', 'Agent collaboration', 25)
 TOOLS = FeatureNode('tools', 'Tools', 20)
 CONTEXT = FeatureNode('context', 'Context', 30)
 IMPROVEMENT = FeatureNode('improvement', 'Improvement', 40)

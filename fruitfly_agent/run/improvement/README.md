@@ -7,7 +7,7 @@ configuration and portable outputs. The host does not run a continuous search.
 
 | File or module | Responsibility |
 |---|---|
-| [Configuration](configuration/README.md) | Editable main document, overrides and generated observations |
+| [Configuration](configuration/README.md) | Stage-oriented intent and output-only history |
 | `context.py` | Branch-scoped named references and selected stage inputs |
 | `service.py` | Independent stage bindings over the injected controller |
 | `roles.py` | Shared model catalog and requested-role construction |

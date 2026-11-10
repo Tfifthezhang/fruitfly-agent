@@ -107,7 +107,7 @@ successful model access or task quality. Review the selected task and exact imag
 identities; see [preparation evidence](../../fruitfly_eval/SERVER_GUIDE.md#8-prepare-check-and-run-the-smoke).
 
 The [smoke template](benchmark-smoke.example.yaml) is a research main file.
-Its initial `next` selects one fixed baseline execution. `optimization` controls
+Its initial `next` selects one fixed baseline execution. `stages.propose.optimization` controls
 legal editing scope; `stages` supplies independent phase settings.
 
 ## Execute one stage and inspect it
@@ -122,7 +122,7 @@ This command executes only `next.stage`; model/task work incurs charges:
 ```
 
 Edit `next` to select organization, assessment, proposal, execution or comparison.
-Consume the named outputs from `observed` or `references.json`. No phase runs
+Consume named outputs from `references.json` or the output-only history projection. No phase runs
 another phase automatically. Use Ctrl+C for cancellation and inspect uncertain
 external effects before retrying. Scores remain observations and do not select
 research continuation or authorize production activation.

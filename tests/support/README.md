@@ -39,3 +39,6 @@ Both retire children on failures and use bounded waits.
 
 `compaction.py` supplies mounted temporary history and deterministic evidence for
 context tests; it owns no behavior assertions or TestCases.
+
+`subagents.py` supplies an offline independent runtime factory with private
+Sessions, scripted Providers and observable start/close counters.

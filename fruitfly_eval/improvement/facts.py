@@ -18,6 +18,7 @@ def attach_benchmark_facts(record, root, artifacts, *, interrupted=False, trial=
     sessions = [Path(trial) / 'agent/session.jsonl'] if trial is not None else list(Path(root).glob('artifacts/harbor/*/*/agent/session.jsonl'))
     evidence = list(record.artifacts)
     values = {}
+    termination_source = 'unavailable'
     collected = []
     if (len(sessions) == 1 and sessions[0].is_file() and not sessions[0].is_symlink()
             and sessions[0].resolve().is_relative_to(Path(root).resolve())):
@@ -47,6 +48,7 @@ def attach_benchmark_facts(record, root, artifacts, *, interrupted=False, trial=
                         if not interrupted:
                             raise
                         diagnostics = None
+        termination_source = 'native_terminal_diagnostics' if diagnostics is not None else 'missing_terminal_diagnostics'
         values = loop_fact_values(diagnostics)
         if interrupted and diagnostics is None:
             values.update(termination_reason='execution_interrupted', diagnosable=tool_results > 0)
@@ -135,6 +137,11 @@ def attach_benchmark_facts(record, root, artifacts, *, interrupted=False, trial=
         'Agent usage receipt; includes main and auxiliary Providers'))
     if collected:
         values['artifacts'] = tuple(collected)
+    evidence.append(Resource('diagnostics/termination.json', artifacts.put(json.dumps({
+        'termination_reason': values.get('termination_reason', 'unknown'),
+        'source': termination_source,
+        'scope': 'Missing terminal diagnostics do not establish a timeout or its cause.'}).encode()),
+        'application/json', 'diagnostic'))
     # Keep the same granted evidence in the record and facts. No verifier files enter either.
     record = replace(record, artifacts=tuple(evidence))
     facts = receipt_facts(record, artifacts, **values)

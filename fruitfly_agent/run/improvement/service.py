@@ -135,7 +135,10 @@ class ResearchService:
         if len(resources) != 1:
             raise ValueError('import requires one named batch.json resource')
         batch = self.input_batch(resources)
-        return ActivityResult((self.put('batch.json', batch.to_dict()),))
+        from fruitfly_agent.lab.improvement.api import batch_view
+        views = batch_view(batch.tasks, batch.records, batch.observations, self.artifacts)
+        return ActivityResult((self.put('batch.json', batch.to_dict()),
+            *(self.put(name, value) for name, value in views.items())))
 
 
 

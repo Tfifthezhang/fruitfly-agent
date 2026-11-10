@@ -254,3 +254,26 @@ When deriving a new mechanism from an existing definition, register its own
 `default_resource` or explicitly clear that field and supply descriptor defaults.
 A resource declaring another component ID or role is rejected; cloning a Python
 dataclass does not transfer ownership of the original component document.
+
+## Register a grouped delegation capability
+
+[Subagent](../agents/subagent/README.md) registers one H component whose declared
+effects include five distinct tool names. Its model requirement supplies the
+`subagent` role with executor fallback. Each tool instruction and the child
+instruction has a separate owner field; parameter targets protect model bindings,
+limits, schema, authorization and lifecycle invariants.
+
+## Bind stage-oriented research controls
+
+Research intent lives in `.fruitfly/improvement.yaml`: `research`, `baseline`,
+`stages` and `next.stage`. Stage-local inputs, allowances, output aliases and
+proposal grants do not duplicate component parameters or model bindings.
+Stage definitions are exposed through the public Lab host API; Catalog remains
+the authority for H/S/I fields, defaults, model roles and candidate validation.
+See [research controls](../../experiments/CONFIGURATION.md) and
+[the operational developer guide](../improvement/DEVELOPER_GUIDE.md).
+
+Changing research controls does not rewrite component source files. Ordinary
+component saves preserve references; frozen candidate exports materialize all
+values. Published history is an output projection and never modifies authored
+research intent.

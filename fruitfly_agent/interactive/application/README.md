@@ -59,3 +59,8 @@ before foreground work or runtime replacement. Maintenance holds the submission
 lock; it cannot activate a new state. `retained_action` prepares a replacement
 before a commit, then uses the ordinary checked activation boundary. Inspection
 uses frozen active documents. Hosts without maintenance retain existing behavior.
+
+Optional `subagents` exposes a read-only host monitor. The injected session loop
+owns the parent execution scope and retires children before the submission ends;
+Application retains its existing cancellation and runtime replacement authority.
+No child monitor starts work or consumes a result.

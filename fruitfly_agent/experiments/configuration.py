@@ -72,23 +72,17 @@ def load_configuration(workspace, path=None, *, overrides=None, material_only=Fa
         research_document = ResearchDocument(target)
         document = research_document.experiment(stage or research_document.next['stage'])
         selected_stage = stage or research_document.next['stage']
-        if selected_stage in {'propose', 'execute'} and research_document.next.get('inputs', {}).get('harness'):
+        if selected_stage in {'propose', 'execute'} and research_document.settings(selected_stage).get('inputs', {}).get('harness'):
             from fruitfly_agent.run.improvement.context import ResearchContext
             resolved = ResearchContext.resolve(target, selected_stage).inputs
             selected = resolved.get('harness_configuration', resolved['harness'])
             if not selected.endswith(('.yaml', '.yml')):
                 raise ValueError('proposal harness must select a candidate configuration')
             document['baseline'] = {'config': selected}
-        from fruitfly_agent.run.improvement.configuration.resolution import derive_configuration
-        document['baseline'] = derive_configuration(research_document, document['baseline'], workspace)
     from .comparison import normalize_experiment
     raw, references, _ = normalize_experiment(document, target, material_only=material_only, stage=stage)
-    if research_document is not None:
-        raw['models'] = {**raw.get('models', {}), **research_document.raw.get('roles', {})}
-        if selected_stage in {'execute', 'eval'}:
-            # Executor selection is projected into the complete system profile;
-            # future auxiliary-role selections do not constrain task execution.
-            raw['models'] = {}
+    if research_document is not None and selected_stage in {'eval', 'execute'}:
+        raw['models'] = {}
     source_files = (*reader.sources.values(), *references)
     sources = {section + '.' + name: str(target) for section, value in raw.items()
         if isinstance(value, dict) for name in value}

@@ -59,6 +59,26 @@ class ReadingMaterialsTests(unittest.TestCase):
                     collect(root, artifacts, interrupted=True, evidence_paths={denied: identity})
             self.assertEqual((agent / 'session.jsonl').read_text(), original)
 
+    def test_import_keeps_raw_reward_separate_from_official_error_and_termination_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            trial = root / 'artifacts/harbor/job/trial'
+            agent = trial / 'agent'; agent.mkdir(parents=True)
+            (agent / 'session.jsonl').write_text(json.dumps({'message': {'role': 'user', 'content': 'Inspect'}}) + '\n')
+            (trial / 'result.json').write_text(json.dumps({'task_name': 'fixture',
+                'exception_info': {'exception_type': 'AgentTimeoutError', 'exception_message': 'Interrupted'},
+                'verifier_result': {'rewards': {'reward': 1.0}}}))
+            artifacts = MemoryArtifacts()
+            batch = import_history(root, artifacts)
+            observation = next(o for o in batch.observations if o['name'] == 'official_reward')
+            self.assertEqual(observation['value'], {'reward': 1.0})
+            self.assertEqual(observation['official_status'], 'error')
+            self.assertFalse(observation['eligible'])
+            self.assertIsNone(observation['agent_elapsed_seconds'])
+            record = batch.records[0]
+            resource = next(r for r in record.artifacts if r.path == 'diagnostics/termination.json')
+            self.assertEqual(json.loads(artifacts.read(resource.artifact_id))['source'], 'missing_terminal_diagnostics')
+
     def test_missing_and_torn_native_records_remain_explicit_without_invented_final(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

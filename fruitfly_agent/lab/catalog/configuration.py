@@ -306,6 +306,11 @@ def component_profile(profile, catalog, *, artifact_reader=None, freeze=False):
             definition.configuration_role, selection.mechanism_id, encode_parameters(definition,parameters), selection.enabled,
             artifacts=artifacts)
         old = documents.get(selection.mechanism_id)
+        if old is None and definition.default_resource is not None and not artifacts:
+            from .defaults import read_default
+            default, _ = read_default(catalog, selection.mechanism_id)
+            if definition.descriptor.normalize_parameters(decode_parameters(definition, dict(default.parameters))) == definition.descriptor.normalize_parameters(decode_parameters(definition, dict(fresh.parameters))):
+                fresh = replace(fresh, reference={'default': True, **({'enabled': False} if not selection.enabled else {})})
         unchanged = (old is not None and old.artifacts == fresh.artifacts
             and definition.descriptor.normalize_parameters(decode_parameters(definition, dict(old.parameters)))
                 == definition.descriptor.normalize_parameters(decode_parameters(definition, dict(fresh.parameters))))

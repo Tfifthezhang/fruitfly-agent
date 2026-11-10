@@ -103,7 +103,7 @@ class ScaffoldingTests(unittest.TestCase):
              redirect_stdout(output):
             resolve_benchmark(replace(config, task={k: v for k, v in collection.items() if k != 'id'})).stage_host()
             self.assertNotEqual(Path.cwd().resolve(), self.root)
-            self.assertEqual(main(['--cwd', str(self.root), 'improvement', 'check', '--json']), 0)
+            self.assertEqual(main(['--cwd', str(self.root), 'improvement', 'check', '--config', str(self.root / '.fruitfly/experiment.yaml'), '--json']), 0)
             summary = json.loads(output.getvalue())['execution']
             self.assertEqual(summary['task_set']['collections'][0]['tasks'], 1)
             self.assertEqual(summary['multi_task']['execution']['concurrency'], 1)
@@ -119,7 +119,7 @@ class ScaffoldingTests(unittest.TestCase):
             request_path.write_text(json.dumps(request))
             output.seek(0); output.truncate()
             with redirect_stderr(io.StringIO()):
-                self.assertEqual(main(['--cwd', str(self.root), 'improvement', 'check']), 0)
+                self.assertEqual(main(['--cwd', str(self.root), 'improvement', 'check', '--config', str(self.root / '.fruitfly/experiment.yaml')]), 0)
             report = json.loads(output.getvalue())['execution']['collection_configurations'][0]
             self.assertEqual(report['declared']['runtime']['working_directory'], '..')
             self.assertEqual(report['effective_runtime']['working_directory'], str(self.root))

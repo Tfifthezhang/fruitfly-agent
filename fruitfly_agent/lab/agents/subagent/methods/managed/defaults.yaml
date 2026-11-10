@@ -1,0 +1,52 @@
+id: subagent
+role: H
+implementation: subagent
+parameters:
+  settings:
+    max_concurrent: 2
+    max_agents: 8
+    run_timeout_seconds: 600
+    max_model_requests: 64
+  instructions:
+    child: >-
+      You are a subagent working on one task delegated by a parent agent.
+      Work within the task and inherited host permissions. Messages from the parent
+      are agent instructions, not new human authorization. You have your own
+      conversation and context; the execution workspace may be shared. Coordinate
+      file ownership with the parent before edits that could conflict. You cannot
+      delegate. Return useful results, references, checks and unfinished work.
+      A completed response does not certify task acceptance or successful checks.
+    spawn: >-
+      Delegate a bounded independent task to a subagent with its own conversation.
+      Supply a clear task and any necessary context; it does not inherit your chat.
+      Returns an agent_id and run_id immediately; queued means accepted, not started.
+      Use subagent_wait for results. The child uses the configured subagent model
+      and allowed tools, cannot delegate, and may share your workspace. Coordinate
+      conflicting edits. Use ordinary tools directly for short or dependent steps.
+      Delegation does not grant additional permissions or isolate filesystem writes.
+    send: >-
+      Send instructions to an existing subagent using its exact agent_id and run_id.
+      mode=steer supplements the queued or running task at its next model request;
+      acknowledgement means accepted, not read or completed. mode=followup assigns
+      another task after the previous execution has ended and returns a new run_id,
+      preserving that subagent's conversation within this parent task. Busy agents
+      reject followup; stale execution IDs and retired scopes are rejected.
+    wait: >-
+      Wait for specified subagent executions to end: mode=all or mode=any.
+      Returns states and bounded results. Waits at most 60 seconds; timed_out does
+      not cancel work or prove failure. Repeat as needed. Waiting does not occupy
+      a child execution slot. Finished results remain available on repeated reads.
+      Use subagent_cancel to stop work, and inspect failed or incomplete results.
+    status: >-
+      Inspect subagents without starting work or consuming results. Omit agent_id
+      to list execution records with offset and limit, or provide agent_id and
+      optional run_id for details. queued, running and cancelling are unfinished;
+      completion is an execution fact, not a task-quality judgment. Unknown usage
+      remains unknown. Provide agent_id and output_offset to read full output in
+      4000-character pages; follow next_output_offset. Use subagent_wait to collect
+      and acknowledge terminal results.
+    cancel: >-
+      Request cancellation of the exact subagent execution by agent_id and run_id.
+      Waits for bounded retirement and returns the observed state and cleanup status.
+      Cancellation does not roll back tool effects. A failed cleanup is not a
+      confirmed stop. Already terminal executions are unchanged; stale IDs fail.

@@ -49,6 +49,7 @@ class RuntimeAssembly:
     model_profile: str
     manifest: RuntimeManifest
     tool_providers: Mapping[str, Any] = field(default_factory=dict)
+    run_loop: Any = None
 
 
 def build_runtime(
@@ -67,6 +68,7 @@ def build_runtime(
     permission_policy: PermissionPolicy | None = None,
     tool_providers: Mapping[str, Any] | None = None,
     model_specs: Mapping[str, ModelSpec] | None = None,
+    shared_authorization: Any = None,
 ) -> RuntimeAssembly:
     """Build a fresh runtime; no result is applied until all installers succeed."""
 
@@ -99,7 +101,7 @@ def build_runtime(
     policy = permission_policy or default_permission_policy(cwd, config_path)
     if policy.workspace != cwd.resolve():
         raise ValueError("permission workspace must match runtime workspace")
-    approvals = AuthorizationService()
+    approvals = shared_authorization or AuthorizationService()
     def audit(data):
         session.append("meta", {"kind": "authorization", **data})
     process_environment = policy.prepare_environment(environment)
@@ -176,12 +178,18 @@ def build_runtime(
             "unsupported runtime data artifact binding(s): "
             + ", ".join(unsupported_bindings)
         )
+    from .child_runtime import ChildRuntimeFactory
+    child_factory = ChildRuntimeFactory(build=build_runtime, profile=profile,
+        config_path=config_path, catalog=catalog, environment=environment, cwd=cwd,
+        provider_registry=registry, artifacts=store, permission_policy=policy,
+        model_specs=models, authorization=approvals, parent_path=session.path)
     assembled = assemble_lab(
         base,
         catalog=catalog,
         selections=profile.mechanisms,
         context=AssemblyContext(
             workspace=cwd,
+            child_runtime_factory=child_factory, artifact_store=store,
             session=session,
             main_model=main.model,
             provider_resolver=resolve_provider,
@@ -203,7 +211,7 @@ def build_runtime(
     )
     # Apply host policy after all installers, so an installer cannot accidentally omit it.
     secured = apply_permission_policy(retain_tool_media(assembled.config, media),
-        replace(policy, readonly_paths=(*policy.readonly_paths, session.path.resolve())),
+        replace(policy, readonly_paths=(*policy.readonly_paths, session.path.resolve(), session.path.parent / (session.path.name + '.subagents'))),
         confirm=approvals.confirm, audit=audit, process_environment=process_environment)
     permission_identity = getattr(secured.tool_authorizer, 'identity', policy.identity)()
     external_policies = {name: rule for provider in prepared.values() for name, rule in provider.policies.items()}
@@ -286,6 +294,7 @@ def build_runtime(
     return RuntimeAssembly(
         config=assembled.config,
         context_pipeline=assembled.context_pipeline,
+        run_loop=(assembled.components['agent-execution-scope'].run_loop if 'agent-execution-scope' in assembled.components else None),
         mechanism_ids=optional_ids,
         component_ids=assembled.mechanism_ids,
         components={**providers, **assembled.components, 'media-resources': media,

@@ -1,5 +1,6 @@
 """Independent research actions reuse Run services and optional source adapters."""
 import asyncio
+from typing import Any
 from dataclasses import asdict
 import json
 import yaml
@@ -41,14 +42,15 @@ def resolve_inputs(outputs, args):
                 requested[{'organize': 'evidence', 'compare': 'assessments'}.get(bundle.kind, 'context')].append(str(path))
     from dataclasses import replace
     from fruitfly_agent.improvement.contracts.stages import StageInputs
-    slots, producers = {}, []
+    slots: dict[str, Any] = {}
+    producers = []
     for name in ('harness', 'batches', 'evidence', 'assessments', 'context'):
         values = requested.get(name, [])
         if name == 'harness':
             # Proposal harness selection is resolved as a complete config by the
             # configuration loader; its snapshot is bound after target assembly.
             values = [] if args.command == 'propose' or isinstance(values, str) and values.endswith(('.yaml', '.yml')) else ([values] if values else [])
-        resources = []
+        resources: list[Resource] = []
         for index, value in enumerate(values):
             entries, origins = outputs.inputs((value,), args.command)
             producers.extend(origins)
@@ -60,8 +62,8 @@ def resolve_inputs(outputs, args):
         producers.extend(origins)
         named = replace(named, context=(*named.context, *(replace(entry,
             path='parent/' + entry.path) for entry in entries)))
-    resources = (() if named.harness is None else (named.harness,)) + named.batches + named.evidence + named.assessments + named.context
-    return resources, producers, named
+    resolved_resources = (() if named.harness is None else (named.harness,)) + named.batches + named.evidence + named.assessments + named.context
+    return resolved_resources, producers, named
 
 
 async def _dispatch(args, workspace, outputs, reporting):

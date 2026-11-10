@@ -131,6 +131,19 @@ class EvidenceIndexTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(reader.read('b')['status'], 'budget_exhausted')
             self.assertEqual(reader.search('012')['status'], 'budget_exhausted')
 
+    async def test_search_matches_share_one_response_allowance_with_exact_citations(self):
+        _, _, baseline, _ = proposal_fixture()
+        workspace = EvidenceWorkspace(baseline=baseline,
+            files={str(i): b'observed failure' for i in range(8)}, writable_ids=())
+        reader = WorkspaceEvidence(workspace, settings={'supply': {'max_pages': 2}})
+        result = reader.search('failure')
+        self.assertEqual(len(result['matches']), 8)
+        self.assertEqual(reader.supplied_pages, 1)
+        for match in result['matches']:
+            self.assertIn(match['citation_id'], workspace.provided_paths[match['path']])
+        self.assertEqual(reader.read('0')['text'], 'observed failure')
+        self.assertEqual(reader.search('failure')['status'], 'budget_exhausted')
+
     async def test_role_reserves_output_before_calling_provider(self):
         from types import SimpleNamespace
         import asyncio

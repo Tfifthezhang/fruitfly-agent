@@ -9,7 +9,8 @@ async def organize(ports, spec, inputs):
     if ports.organizer is None:
         raise ValueError('register an Organizer role before organizing')
     batch = ports.input_batch(inputs.batches)
-    context = readable_context(ports, inputs)
+    context = (*readable_context(ports, inputs),
+        ports.put('observations.json', batch.observations, 'input'))
     async with ports.create_services() as services:
         view = await ports.organizer.organize(OrganizationRequest(batch.tasks, batch.records,
             spec.parameters.get('instruction') or 'Organize the supplied batch for reading.', context), services)

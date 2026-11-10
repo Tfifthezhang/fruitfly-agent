@@ -91,10 +91,11 @@ class TerminalResumeFrontend:
             f"{timestamp:%Y-%m-%d %H:%M:%S} · "
             f"{session.message_count} messages"
         )
-        runtime = " · ".join(
-            value for value in (session.profile, session.model, f"{session.prompt_label} {session.prompt_hash[:15]}…" if session.prompt_label else "") if value
-        )
-        detail = f"{runtime} · {session.path}" if runtime else session.path
+        if session.title:
+            label = session.title
+        detail = f"{timestamp:%Y-%m-%d %H:%M:%S} · {session.model} · {session.user_turns} user turns · {session.message_count} messages · Available"
+        if not session.title:
+            detail += ' · ' + session.path
         if not session.available:
             detail = f"Unavailable: {session.reason} · {session.path}"
         return MenuRow(label, detail)

@@ -421,8 +421,9 @@ credentials remain independent tool settings.
 
 ## Configure independent research stages
 
-Use one editable experiment document for historical inputs, role models,
-configuration overrides and the explicitly selected next stage. See the
+Use `.fruitfly/improvement.yaml` for stage-local inputs, directions, allowances,
+field grants and one explicit `next.stage`. Models and components stay in the
+referenced system profile. See the
 [Improvement developer guide](fruitfly_agent/lab/improvement/DEVELOPER_GUIDE.md).
 Each invocation performs one stage; no automatic baseline/search runner is exposed.
 
@@ -493,3 +494,22 @@ import task selection and original path/hash supplements belong to
 [Experiments configuration](fruitfly_agent/experiments/CONFIGURATION.md#select-imported-evidence);
 [Lab evidence](fruitfly_agent/lab/improvement/evidence/README.md#bound-an-investigation)
 owns reading semantics.
+
+## Configure subagents
+
+[Subagent](fruitfly_agent/lab/agents/subagent/README.md#enable-delegation-and-choose-a-model)
+is one H component and one toggle under Agent collaboration. Its five tools are enabled
+and disabled together. `models.roles.subagent` defaults to `{inherit: executor}`;
+choose an existing catalog alias to change its model through the ordinary model
+menu. See [component model bindings](fruitfly_agent/runtime_spec/COMPONENTS.md#bind-models-once).
+
+## Edit Improvement research controls
+
+Improvement commands default to `.fruitfly/improvement.yaml`; an explicit `--config`
+selects another document. Eval retains its independent experiment entry. The
+[research configuration guide](fruitfly_agent/experiments/CONFIGURATION.md) owns stage
+inputs, directions, allowances and field grants. Algorithm defaults stay in their
+registered owner resources; daily customizations use referenced component files.
+Import source and task paths must exist before the corresponding stage executes.
+Reading/showing configuration performs no model work; explicitly running model or
+execution stages can incur charges.

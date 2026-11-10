@@ -185,3 +185,12 @@ model is needed. Auxiliary calls may use the network and incur model charges. Se
 
 The Eval host example includes bounded [file-capture settings](../../fruitfly_eval/harbor/README.md#capture-task-evidence).
 They apply during benchmark execution and do not run when loading this example.
+
+## Enable subagents
+
+The default configuration example includes the complete `subagent` group disabled
+and its model role set to executor inheritance. Enable the group in Tools through
+`/config`, or change that component's `enabled` to true. Select a different existing
+model alias through `models.roles.subagent`. Running delegated tasks can incur
+model and tool effects; configuring or inspecting them does not. See
+[Subagent configuration](../../fruitfly_agent/lab/agents/subagent/README.md#enable-delegation-and-choose-a-model).

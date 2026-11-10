@@ -186,7 +186,7 @@ class ResumeHistoryTest(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(Path(app.status.session_path), path)
                     self.assertEqual(len(provider.calls), 1)
                     text = output.getvalue()
-                    self.assertEqual(text.count("old question"), 1)
+                    self.assertEqual(text.count("old question"), 2 if picker else 1)
                     self.assertEqual(text.count("old answer"), 1)
                     self.assertLess(text.index("old question"), text.index("old answer"))
                     self.assertEqual(path.read_bytes(), before)
@@ -262,7 +262,7 @@ class ResumeHistoryTest(unittest.IsolatedAsyncioTestCase):
                             await TerminalFrontend(app, input_stream=io.StringIO(), output_stream=output, line_editor=lines).run()
                         self.assertIn("could not resume session", output.getvalue())
                     self.assertEqual(app.status.session_path, current)
-                    self.assertNotIn("old question", output.getvalue())
+                    self.assertEqual("old question" in output.getvalue(), cancel)
                     self.assertNotIn("old answer", output.getvalue())
                     self.assertEqual(len(provider.calls), 1)
                 finally:

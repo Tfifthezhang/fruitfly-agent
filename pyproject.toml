@@ -54,6 +54,7 @@ where = ["."]
 include = ["fruitfly_agent*", "fruitfly_eval*"]
 
 [tool.setuptools.package-data]
+"fruitfly_agent.lab.agents.subagent.methods.managed" = ["defaults.yaml"]
 "fruitfly_agent.providers" = ["services.yaml"]
 "fruitfly_agent.experiments" = ["templates/*.yaml", "templates/tasks/*.yaml"]
 "fruitfly_agent.run.configuration" = ["templates/*.yaml"]
@@ -131,7 +132,10 @@ files = [
     "fruitfly_agent/interactive/contracts/experience.py",
     "fruitfly_agent/interactive/contracts/candidates.py",
     "fruitfly_agent/interactive/contracts/task_packs.py",
-    "fruitfly_agent/interactive/application/jobs.py",
+    "fruitfly_agent/interactive/contracts/subagents.py",
+    "fruitfly_agent/interactive/terminal/features/subagent.py",
+    "fruitfly_agent/lab/agents/subagent",
+    "fruitfly_agent/run/runtime/child_runtime.py",
     "fruitfly_agent/interactive/session/materials.py",
     "fruitfly_agent/interactive/terminal/commands.py",
     "fruitfly_agent/interactive/terminal/bindings.py",
@@ -150,7 +154,7 @@ files = [
     "fruitfly_agent/run/runtime/usage.py",
     "fruitfly_agent/run/evolution.py",
     "fruitfly_agent/run/improvement/evolution.py",
-    "fruitfly_agent/run/improvement/pipeline.py",
+    "fruitfly_agent/run/improvement/execution_host.py",
     "fruitfly_agent/interactive/terminal/io/live.py",
     "fruitfly_agent/interactive/terminal/io/display.py",
     "fruitfly_agent/interactive/terminal/io/editor.py",

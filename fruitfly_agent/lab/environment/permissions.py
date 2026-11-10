@@ -165,6 +165,9 @@ class PermissionAuthorizer:
         try:
             if signal is not None and signal.is_set():
                 raise asyncio.CancelledError
+            if descriptor is not None and operation == 'agent_control':
+                yield AuthorizationDecision(True, 'host-managed agent operation; child calls retain host authorization')
+                return
             if descriptor is not None and operation == 'network_read':
                 allowed = self.policy.allow_network
                 reason = 'network reads allowed by host policy' if allowed else 'network reads disabled by host policy'

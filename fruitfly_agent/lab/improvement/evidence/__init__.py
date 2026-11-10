@@ -108,11 +108,20 @@ class EvidenceWorkspace:
         files = {'context/submission.txt': response.encode('utf-8')[:120000],
                  'context/repair.json': canonical_json({'error': reason, 'evidence_ids': sorted(evidence_ids),
                      'writable_components': sorted(self.writable_ids)}).encode('utf-8')}
-        for path in ('context/edit-grants.json', 'context/component-descriptions.json'):
-            if path in self.files:
-                files[path] = self.files[path]
-        repair = EvidenceWorkspace(baseline=self.baseline, files=files,
+        # Retain the exact authorized context and owner descriptions. Repair must
+        # not turn unread observations into unavailable evidence.
+        files.update({path: data for path, data in self.files.items() if path.startswith('context/')
+            and path not in files})
+        parameters = dict(baseline=self.baseline, files=files,
             writable_ids=self.writable_ids, record=self.record, max_bytes=self.max_bytes, access=self.access)
+        from .resources import ReferenceWorkspace
+        repair: EvidenceWorkspace
+        if isinstance(self, ReferenceWorkspace):
+            repair = ReferenceWorkspace(artifacts=self.artifacts, references=self.references, **parameters)
+        else:
+            repair = EvidenceWorkspace(**parameters)
+        repair.provided_ids = set(self.provided_ids)
+        repair.provided_paths = {path: set(ids) for path, ids in self.provided_paths.items()}
         repair.files = {p: data for p, data in repair.files.items() if not p.startswith('harness/')}
         repair.files.update({p: data for p, data in self.files.items() if p.startswith('harness/')})
         return repair

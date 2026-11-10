@@ -2,6 +2,7 @@
 from dataclasses import asdict
 from .resources import ReferenceWorkspace
 from .access import EvidenceAccess
+from .batch import batch_view, context_observations
 from fruitfly_agent.improvement.contracts.versions import canonical_json
 
 
@@ -29,12 +30,14 @@ def build_workspace(request, artifacts, *, record=None):
         rows.append({'run_id': receipt.run_id, 'task_id': receipt.task_id,
             'harness_id': receipt.harness_id, 'status': receipt.status,
             'metadata': prefix + '/metadata.json'})
-    put('context/executions.json', rows)
+    for name, value in batch_view(request.tasks, request.records,
+            context_observations(request.context, artifacts), artifacts).items():
+        put('context/' + name, value)
     put('context/tasks.json', tasks)
     for resource in request.context:
         references['context/extensions/' + resource.path] = resource.artifact_id
     put('INDEX.json', {'files': ['context/tasks.json', 'context/executions.json',
-        'context/edit-grants.json'], 'task_count': len(tasks), 'execution_count': len(rows),
+        'context/edit-grants.json', 'context/overview.json', 'context/coverage.json'], 'task_count': len(tasks), 'execution_count': len(rows),
         'navigation': 'Search and read selected original evidence; observations do not establish causes.'})
     return ReferenceWorkspace(artifacts=artifacts, references=references, baseline=request.baseline,
         files={}, writable_ids=request.plan.component_ids, record=record,

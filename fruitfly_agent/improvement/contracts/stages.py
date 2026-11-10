@@ -1,5 +1,6 @@
 """Named immutable inputs for independently invoked research stages."""
 from dataclasses import dataclass, fields
+from typing import Any
 from .tasks import Resource
 
 
@@ -46,6 +47,7 @@ class StageInputs:
     def from_dict(cls, value):
         if not isinstance(value, dict) or set(value) - {f.name for f in fields(cls)}:
             raise ValueError('unknown stage input fields')
-        return cls(**{name: (Resource(**items) if name == 'harness' and items is not None
+        parameters: dict[str, Any] = {name: (Resource(**items) if name == 'harness' and items is not None
             else None if name == 'harness' else tuple(Resource(**item) for item in items))
-            for name, items in value.items()})
+            for name, items in value.items()}
+        return cls(**parameters)

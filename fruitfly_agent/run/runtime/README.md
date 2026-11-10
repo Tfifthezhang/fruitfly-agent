@@ -127,3 +127,18 @@ platform tools with a three-second deadline and the existing image byte limits.
 The CLI injects this capability into terminal bindings. It makes no model request
 and does not access the Agent's SSH execution environment. See
 [image input](../../interactive/terminal/README.md#attach-local-images).
+
+## Prepare child executions
+
+[child_runtime.py](child_runtime.py) consumes the public Catalog prepared-runtime
+contract and reconstructs the frozen profile with the owner's excluded delegation
+component. Child Session, context state, Providers and stateful tools are independent.
+The parent confirmation service is borrowed and never closed by a child. Actual
+child manifests are retained with child history. External tool transports without
+an independent inheritance contract are rejected before child model work.
+
+RuntimeAssembly optionally supplies `run_loop`. Preparation injects it into the
+ordinary InteractiveSession for both interactive and headless submissions. This
+entry wraps Core execution with the Lab-owned scope and its final cleanup; no
+algorithm-specific lifecycle state is added to Application. See
+[Subagent lifecycle](../../lab/agents/subagent/README.md#own-the-execution-scope).

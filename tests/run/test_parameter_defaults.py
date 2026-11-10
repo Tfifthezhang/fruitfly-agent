@@ -118,7 +118,8 @@ class ParameterDefaultTests(unittest.IsolatedAsyncioTestCase):
         original = await self.execute(config.select(), label='explicit')
         save_harness_config(self.path, config)
         saved = yaml.safe_load(self.path.read_text())['profiles']['test']['H']['base_prompt']
-        self.assertEqual(set(saved), {'inline'})
+        self.assertEqual(set(saved), {'file'})
+        self.assertNotIn('default', saved)
         with self.changed_defaults():
             prompt, _ = await self.execute(load_system_config(self.path).select(), label='still-explicit')
             self.assertEqual(prompt, original[0])

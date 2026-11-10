@@ -85,6 +85,28 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
 
 
 
+    def test_repair_preserves_authorized_sources_descriptions_and_reading_allowance(self):
+        from fruitfly_agent.lab.improvement.evidence.resources import ReferenceWorkspace
+        from fruitfly_agent.lab.improvement.evidence.catalog import WorkspaceEvidence
+        _, baseline = fixture()
+        artifacts = MemoryArtifacts()
+        reference = artifacts.put(b'official observations')
+        workspace = ReferenceWorkspace(artifacts=artifacts,
+            references={'context/extensions/observations.json': reference},
+            baseline=baseline, files={'context/components.json': b'owner descriptions'},
+            writable_ids=('prompt',))
+        workspace.write('harness/prompt/instructions.txt', 'Candidate edit')
+        reader = WorkspaceEvidence(workspace, settings={'supply': {'max_pages': 1}})
+        supplied = reader.read('context/extensions/observations.json')
+        repair = workspace.repair_view('invalid submission', 'invalid field type', ())
+        self.assertEqual(repair.read('context/extensions/observations.json'), b'official observations')
+        self.assertEqual(repair.read('context/components.json'), b'owner descriptions')
+        self.assertEqual(repair.collect().component('prompt').files[0].text, 'Candidate edit')
+        self.assertIn(supplied['citation_id'], repair.provided_ids)
+        second = WorkspaceEvidence(repair, settings={'supply': {'max_pages': 1}})
+        self.assertEqual(second.read('context/extensions/observations.json')['status'], 'budget_exhausted')
+        self.assertEqual(baseline.component('prompt').files[0].text, 'prompt')
+
     def test_discovery_does_not_construct_generators_and_instances_are_job_local(self):
         constructed = []
         def create():

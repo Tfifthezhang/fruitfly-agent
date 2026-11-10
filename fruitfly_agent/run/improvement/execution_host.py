@@ -252,7 +252,7 @@ class RunExecutionHost:
                 raise ValueError('registered backend exposes no research executor')
             record = await runner.execute(plan, prepared.task, harness)
             record = services.prepare_evidence(prepared.task, record, research_artifacts)
-            observations = ()
+            observations: tuple[dict, ...] = ()
             if ports.measurements is not None:
                 measurement = await ports.measurements.measure(prepared.task, record)
                 observations = (asdict(measurement),) if measurement else ()

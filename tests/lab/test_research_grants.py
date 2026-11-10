@@ -30,3 +30,25 @@ class ResearchGrantTests(unittest.TestCase):
         workspace = EvidenceWorkspace.build(request, artifacts)
         self.assertLess(len(workspace.read('INDEX.json')), 2000)
         self.assertGreater(len(workspace.paths()), 5000)
+
+    def test_batch_view_separates_status_reward_and_unknown_diagnostics(self):
+        from fruitfly_agent.lab.improvement.evidence.batch import batch_view
+        from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
+        from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
+        from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
+        from tests.support.stages import proposal_fixture
+        _, plan, baseline, _ = proposal_fixture()
+        task = TaskMaterial('task', 'Inspect facts')
+        records = tuple(ExecutionRecord('run-' + str(i), task.task_id, task.material_id,
+            baseline.snapshot_id, plan.parent.state, plan.conditions_id, status, '')
+            for i, status in enumerate(('error', 'completed', 'completed')))
+        observations = ({'run_id': 'run-0', 'name': 'official_reward', 'value': {'reward': 1.0}},
+            {'run_id': 'run-1', 'name': 'official_reward', 'value': {'reward': 0.0}})
+        views = batch_view((task,), records, observations, MemoryArtifacts())
+        rows = views['executions.json']
+        self.assertEqual(views['overview.json']['execution_status_counts'], {'error': 1, 'completed': 2})
+        self.assertEqual(rows[0]['observations'][0]['value'], {'reward': 1.0})
+        self.assertEqual(rows[0]['termination_reason'], 'unknown')
+        self.assertIsNone(rows[0]['elapsed_seconds'])
+        self.assertEqual(rows[2]['observation_supply'], 'not_supplied')
+        self.assertEqual(views['coverage.json']['original_reading'], 'not_established')

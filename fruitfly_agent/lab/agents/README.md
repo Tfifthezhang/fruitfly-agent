@@ -15,6 +15,9 @@ caller owns its stage time. Providers and injected services remain caller-owned.
 | `runner.py` | Core invocation and attributed request/response observations |
 | `__init__.py` | Public `AgentRunner` entry |
 
+[Child execution contracts](subagent/README.md) separately describe host-managed
+execution identity and resource ownership. They do not change `AgentRunner`.
+
 Editors and evaluators provide their own tools and result validation. No model
 request occurs during construction. Explicit invocation can incur model cost.
 
@@ -22,3 +25,10 @@ Offline check: `tests.lab.test_agent_runner`.
 
 Failed role invocations retain Core error details in `agent-finished` observations,
 so a research report can distinguish Provider failure from submission rejection.
+
+## Run managed child conversations
+
+[Subagent](subagent/README.md) adds parent-scoped scheduling, explicit identities,
+private Sessions, steering, bounded execution and monitoring. It invokes the Core
+loop through its own execution contract and does not change AgentRunner's one-shot
+research-role semantics.

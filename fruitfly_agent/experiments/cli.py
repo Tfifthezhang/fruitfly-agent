@@ -15,7 +15,7 @@ from .records import RunRecords
 def _options(parser, *, suppress=False):
     default = argparse.SUPPRESS if suppress else None
     parser.add_argument('--cwd', default=default, help='experiment workspace (default: current directory)')
-    parser.add_argument('--config', default=default, help='experiment YAML (default: .fruitfly/experiment.yaml)')
+    parser.add_argument('--config', default=default, help='configuration YAML (Improvement: .fruitfly/improvement.yaml; Eval: .fruitfly/experiment.yaml)')
     parser.add_argument('--request', default=default, help='use an Eval request JSON as the task source')
     parser.add_argument('--events', choices=('jsonl',), default=default, help='emit structured progress')
     parser.add_argument('--json', action='store_true', default=argparse.SUPPRESS if suppress else False)
@@ -86,6 +86,8 @@ def dispatch(args):
             for step in result['next_steps']:
                 print(step)
         return 0
+    if args.operation == 'improvement' and args.config is None:
+        args.config = str(workspace / '.fruitfly/improvement.yaml')
     if ((args.operation == 'improvement' and args.command in {'show', 'step', 'check', 'import', 'organize', 'assess', 'propose', 'execute', 'compare', 'inspect', 'resume', 'list', 'report'})
             or (args.operation == 'eval' and args.command == 'run')):
         from fruitfly_agent.runtime_spec.documents import DocumentReader

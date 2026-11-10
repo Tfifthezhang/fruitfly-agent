@@ -20,8 +20,8 @@ class ResearchContext:
         if selected != document.next['stage']:
             raise ValueError('stage differs from next.stage; edit next to select its named inputs')
         from fruitfly_agent.runtime_spec.documents import mapping
-        inputs = mapping(document.next.get('inputs', {}),
-            {'harness', 'batches', 'evidence', 'assessments'}, 'next.inputs')
+        inputs = mapping(document.settings(selected).get('inputs', {}),
+            {'harness', 'batches', 'evidence', 'assessments'}, 'stages.' + selected + '.inputs')
         resolved = {}
         index_path = document.root / 'references.json'
         index = json.loads(index_path.read_text()) if index_path.exists() else {}
@@ -57,12 +57,11 @@ class ResearchContext:
             return str((document.root / row[field]).resolve())
         for name, value in inputs.items():
             resolved[name] = reference(value, harness=True) if name == 'harness' else [reference(item) for item in value]
-        resolved['context'] = [reference(item) for item in document.next.get('context', [])]
-        required = {'eval': (), 'import': (), 'organize': ('batches',), 'assess': ('batches',),
-            'propose': ('batches',), 'execute': ('harness',), 'compare': ('batches',)}[selected]
+        resolved['context'] = [reference(item) for item in document.settings(selected).get('context', [])]
+        required = document.definitions[selected].required_inputs
         for name in required:
             if not resolved.get(name):
-                raise ValueError(selected + ' requires next.inputs.' + name)
+                raise ValueError(selected + ' requires stages.' + selected + '.inputs.' + name)
         if selected == 'compare' and len(resolved['batches']) < 2:
             raise ValueError('compare requires at least two batches')
         return cls(document, selected, resolved, document.settings(selected), document.research.get('branch', 'main'))
@@ -71,8 +70,8 @@ class ResearchContext:
         from .configuration.snapshot import redact
         return redact({'research': self.document.research, 'stage': self.stage,
             'inputs': self.inputs, 'settings': self.settings,
-            'roles': self.document.raw.get('roles', {}),
             'baseline': self.document.raw.get('baseline'),
-            'optimization': self.document.raw.get('optimization', {}),
-            'overrides': self.document.raw.get('overrides', {}),
-            'observed': self.document.raw.get('observed', {})})
+            'optimization': self.settings.get('optimization', {}),
+            'definition': {'description': self.document.definitions[self.stage].description,
+                'model_role': self.document.definitions[self.stage].model_role,
+                'effects': self.document.definitions[self.stage].effects}})

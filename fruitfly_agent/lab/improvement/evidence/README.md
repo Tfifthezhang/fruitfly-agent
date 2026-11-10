@@ -36,6 +36,7 @@ outside development grants.
 |---|---|
 | `configuration.py` | Strict read/catalog/search limits shared by editor and evaluator |
 | `rounds.py` | Cross-round references to hypotheses, receipts, assessments and selections |
+| `batch.py` | Compact execution table, observation supply and deterministic batch coverage |
 | `indexing.py` | Deterministic overview and event extraction |
 | `catalog.py`, `query.py` | Paged navigation and literal retrieval |
 | `resources.py`, `access.py` | Immutable access and supply receipts |
@@ -111,7 +112,8 @@ See the [development guide](../DEVELOPER_GUIDE.md) for portable stage bundles.
 
 `evidence.supply.max_characters` defaults to 256000 and `max_pages` to 64.
 The bundled reader shares those cumulative limits across read/search, including
-repeated pages. The tool facade additionally bounds catalog/read/search calls.
+repeated pages. A search response counts once regardless of its number of matched
+source spans; every returned character and exact citation still counts. The tool facade additionally bounds catalog/read/search calls.
 Exhausted reads return `budget_exhausted`, no source citation, and a request to
 submit using existing evidence with uncovered scope declared. Invocation request
 count is bounded by max_pages plus eight opportunities to finish. A request
@@ -131,3 +133,10 @@ The catalog is metadata, not an original-byte grant. Deep reads require an expli
 hash-checked supplement through the [Eval adapter](../../../../fruitfly_eval/improvement/README.md).
 Unpacked external bytes remain unavailable after source removal. Existing retained
 batches remain immutable; rebuilding never reconstructs unknown historical state.
+
+Organizer and historical Editor workspaces share `context/overview.json`,
+`context/executions.json` and `context/coverage.json`. Execution resources use
+`context/executions/<run-id>/` in both roles, so newly organized references are
+readable by the Editor without changing their source identity. Batch counts cover
+all supplied records; they do not imply all trajectories were read. Per-record
+observations stay distinct from status and missing diagnostics remain unknown.
