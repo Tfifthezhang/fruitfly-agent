@@ -16,6 +16,12 @@ stages:
     attempt: reuse
     publish_as: original-batch
   organize:
+    incremental:
+      enabled: true
+      reuse: true
+    delegation:
+      enabled: true
+      workers: [evidence-reader, record-organizer, cross-record-reader, counterexample-reader]
     inputs:
       batches: [{artifact: original-batch}]
     publish_as: organized-evidence
@@ -26,6 +32,9 @@ stages:
       evidence_responses: 64
     attempt: reuse
   assess:
+    delegation:
+      enabled: true
+      workers: [evidence-reader, record-organizer, cross-record-reader, counterexample-reader]
     inputs:
       batches: [{artifact: original-batch}]
       evidence: [{artifact: organized-evidence}]
@@ -36,6 +45,9 @@ stages:
       evidence_responses: 64
     attempt: reuse
   propose:
+    delegation:
+      enabled: true
+      workers: [evidence-reader, record-organizer, cross-record-reader, counterexample-reader]
     inputs:
       batches: [{artifact: original-batch}]
       evidence: [{artifact: organized-evidence}]
@@ -61,6 +73,9 @@ stages:
       task_seconds: 3600
     attempt: reuse
   compare:
+    delegation:
+      enabled: true
+      workers: [evidence-reader, record-organizer, cross-record-reader, counterexample-reader]
     inputs:
       batches: [{artifact: original-batch}, {artifact: candidate-a-results}]
     publish_as: candidate-a-comparison

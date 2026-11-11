@@ -45,7 +45,8 @@ def normalize_experiment(raw, target, *, material_only=False, stage=None):
     execution = mapping(raw.get('execution', {}), {'generator', 'organizer_seconds', 'editor_seconds', 'task_seconds', 'direction', 'trial'}, 'execution')
     evaluation = mapping(raw.get('evaluation', {}), {'evaluator_seconds', 'scope', 'comparison'}, 'evaluation')
     comparison = mapping(evaluation.get('comparison', {}), {'minimum_gain', 'max_collection_regression', 'aggregation', 'weights'}, 'evaluation.comparison')
-    timeouts = StageTimeouts(execution.get('editor_seconds', 1200), execution.get('task_seconds', 3600), evaluation.get('evaluator_seconds', 1200), execution.get('organizer_seconds', 1200))
+    defaults = StageTimeouts()
+    timeouts = StageTimeouts(execution.get('editor_seconds', defaults.editor_seconds), execution.get('task_seconds', defaults.execution_seconds), evaluation.get('evaluator_seconds', defaults.evaluator_seconds), execution.get('organizer_seconds', defaults.organizer_seconds))
     grants = raw.get('edit', {})
     if not isinstance(grants, dict):
         raise ValueError('edit must map component IDs to field grants')

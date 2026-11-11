@@ -68,3 +68,19 @@ role selection, independent child resources and parent Session writer reuse.
 
 `test_subagent_resources` executes a child from frozen package material in an
 isolated process, including its declared default YAML and without checkout imports.
+
+`test_research_delegation` owns parent-model delegation into independent evidence
+children, exact grants, source attribution, shared allowances, candidate editing
+from delegated evidence and cancellation/Provider retirement. CLI material
+publication stays in `tests.experiments.test_stage_cli`.
+
+`test_organization_parts` owns durable part round-trips, idempotent saves, corrupt
+locators and forged citation rejection. `test_research_delegation` additionally
+covers named worker execution/configuration and partial-result reuse after parent
+failure, including invalidation after material, mission or model changes. Frozen
+research execution and retained parts are covered by `test_subagent_resources`.
+
+`test_parameter_defaults` also checks role presentation-setting round-trips,
+complete frozen values, method imports and shared stage-default resources without
+checkout fallback. `tests.improvement.test_stage_timing` verifies runtime default
+updates and explicit overrides; Lab owns actual prompt/tool and preview behavior.

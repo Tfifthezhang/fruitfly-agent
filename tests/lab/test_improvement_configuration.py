@@ -66,3 +66,19 @@ class ImprovementConfigurationTests(unittest.IsolatedAsyncioTestCase):
         value['max_tool_calls']=1
         with self.assertRaises(ValueError):target.validate(json.dumps(value))
         with self.assertRaises(ValueError):target.validate_options({'editable_fields':['max_turns']})
+
+    def test_role_settings_are_strict_configurable_and_protected_from_candidate_edits(self):
+        from fruitfly_agent.lab.improvement.editor.configuration import EditorSettings
+        from fruitfly_agent.lab.improvement.assessment.configuration import EvaluatorSettings
+        for target in (EditorInstructionTarget(), EvaluatorInstructionTarget()):
+            value = json.loads(target.snapshot().text)
+            key = 'target_page_entries' if isinstance(target, EditorInstructionTarget) else 'output_preview_characters'
+            value['settings'][key] = 1
+            with self.subTest(target=type(target).__name__), self.assertRaisesRegex(ValueError, 'protected'):
+                target.validate_change(json.dumps(value), {})
+        for kind, values in ((EditorSettings, {'target_page_entries': True}),
+                             (EditorSettings, {'target_page_entries': 4, 'max_target_entries': 3}),
+                             (EvaluatorSettings, {'output_preview_characters': 0}),
+                             (EvaluatorSettings, {'unknown': 1})):
+            with self.subTest(values=values), self.assertRaises(ValueError):
+                kind.from_dict(values)

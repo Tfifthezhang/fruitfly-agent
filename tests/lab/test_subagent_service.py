@@ -123,6 +123,9 @@ class SubagentServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual('host_interrupted', restored.rows[row['run_id']]['error'])
 
     async def test_parent_final_response_collects_children_before_final_integration(self):
+        from fruitfly_agent.lab.agents.subagent.configuration import ProtocolSettings
+        # Nonblocking public waits must not turn automatic collection into a busy loop.
+        self.service.protocol = ProtocolSettings(default_wait_seconds=0, max_wait_seconds=.02)
         await self.service.end()
         parent = FauxProvider()
         captured = []
@@ -252,3 +255,36 @@ class SubagentServiceTests(unittest.IsolatedAsyncioTestCase):
         release.set()
         await self.finish(first); await self.finish(second)
         self.assertEqual(2, self.fixture.closed)
+
+    async def test_queued_context_limit_rejects_without_persisting_parent_message(self):
+        from fruitfly_agent.lab.agents.subagent.configuration import ProtocolSettings
+        self.service.protocol = ProtocolSettings(max_context_characters=8)
+        self.service.slots = asyncio.Semaphore(0)
+        row = self.service.spawn('Inspect', 'context')
+        before = len(self.fixture.store.index.read_all())
+        with self.assertRaisesRegex(SubagentError, 'context_capacity_exceeded'):
+            self.service.send(row['agent_id'], row['run_id'], 'steer', 'More')
+        self.assertEqual(before, len(self.fixture.store.index.read_all()))
+        self.assertEqual('context', self.service.requests[row['run_id']].context)
+        with self.assertRaisesRegex(SubagentError, 'invalid_task_material'):
+            self.service.spawn('Inspect', 'x' * 9)
+
+    async def test_uncontrolled_terminal_tool_does_not_certify_worker_completion(self):
+        from dataclasses import replace
+        from fruitfly_agent.core.tool_runtime import AgentTool
+        from fruitfly_agent.core.data_model import AgentToolResult
+        def provider(request):
+            result = FauxProvider()
+            result.respond_tool_call('finish', {})
+            return result
+        self.fixture.provider = provider
+        async def finish(ctx):
+            return AgentToolResult([TextBlock('unvalidated')], terminate=True)
+        tool = AgentTool('finish', 'Finish', 'Finish', {'type': 'object'}, finish)
+        async def prepare(request):
+            runtime = await self.fixture.prepare(request)
+            return replace(runtime, config=replace(runtime.config, tools=(tool,)))
+        self.service.prepare = prepare
+        result = await self.finish(self.service.spawn('Inspect'))
+        self.assertEqual(('failed', 'tool_terminated'), (result['state'], result['error']))
+        self.assertEqual('confirmed', result['cleanup'])

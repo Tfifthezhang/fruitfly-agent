@@ -42,6 +42,8 @@ class EvidenceWorkspace:
         self.max_bytes = max_bytes
         self.provided_ids = set()
         self.provided_paths = {}
+        self.delegated_paths = {}
+        self.retained_parts = {}
         self.access = access or EvidenceAccess(record=record)
         self.record = record or (lambda event, **fields: None)
         if self.writable_ids - {c.component_id for c in baseline.components}:
@@ -120,11 +122,20 @@ class EvidenceWorkspace:
             repair = ReferenceWorkspace(artifacts=self.artifacts, references=self.references, **parameters)
         else:
             repair = EvidenceWorkspace(**parameters)
+        repair.retained_parts = dict(self.retained_parts)
+        repair.delegated_paths = {path: set(ids) for path, ids in self.delegated_paths.items()}
         repair.provided_ids = set(self.provided_ids)
         repair.provided_paths = {path: set(ids) for path, ids in self.provided_paths.items()}
         repair.files = {p: data for p, data in repair.files.items() if not p.startswith('harness/')}
         repair.files.update({p: data for p, data in self.files.items() if p.startswith('harness/')})
         return repair
+
+    def eligible_paths(self, path):
+        return self.provided_paths.get(path, set()) | self.delegated_paths.get(path, set())
+
+    @property
+    def eligible_ids(self):
+        return self.provided_ids | {citation for values in self.delegated_paths.values() for citation in values}
 
     def paths(self):
         return tuple(sorted(self.files))

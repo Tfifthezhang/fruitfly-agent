@@ -192,5 +192,13 @@ the pure specification parser never executes extension code. See
 `models.roles.subagent: secondary-model` pins an existing catalog alias. The alias
 is a placeholder until registered. This uses the same role grammar and model menu
 as other roles. [Subagent](../lab/agents/subagent/README.md) owns its one H toggle,
-settings, execution limits and tools. The component is disabled in the default
-profile; its model position remains available for configuration.
+settings, execution limits and tools. The installed default profile enables the component. Its
+[protocol/result controls](../lab/agents/subagent/README.md#configure-protocol-and-result-controls)
+and [component inheritance](../lab/agents/subagent/README.md#restrict-inherited-components)
+use ordinary owner parameters; models remain bound only through `models.roles`.
+
+Owner declarations may use an `object` parameter for a structured mapping, such
+as named research workers. Values must be finite JSON-shaped data with string
+keys. The component owner validates its exact schema and execution constraints.
+YAML retains a readable mapping; the generic interactive value editor accepts a
+JSON object. Defaults are copied rather than shared between configurations.

@@ -75,3 +75,18 @@ The loop persists them separately from canonical messages and concise run record
 Context stages, authorization wait, execution and Provider work retain separate
 intervals. Consumers must distinguish overlapping stage totals, interval-union wall
 time and unfinished operations. Observation is not execution or retry policy.
+
+`ParameterDescriptor` supports structured `object` parameters with finite
+JSON-shaped values and string keys. Defaults and validated values are copied.
+Owners retain schema validation and authorization; generic menus and persistence
+consume the same declaration.
+
+## Read shared configuration data
+
+[configuration_resources.py](configuration_resources.py) owns one strict YAML
+decoder and bounded installed-resource reads. It rejects duplicate/non-string map
+keys, returns detached values, and accepts only explicit package/resource names
+chosen by code. It contains no owner schemas, algorithm defaults or execution policy.
+Runtime specification owns file references and source receipts; owners validate
+parameter types and authority. PyYAML supplies decoding through this shared helper.
+Offline checks: `tests.core.test_configuration_resources`.

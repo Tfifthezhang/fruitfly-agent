@@ -118,3 +118,20 @@ class ResearchConfigurationTests(unittest.TestCase):
                     path.write_text(yaml.safe_dump(raw))
                     with self.assertRaises(ValueError):
                         ResearchDocument(path).settings('import')
+
+    def test_delegation_is_stage_local_strict_and_does_not_resolve_future_inputs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.document(Path(directory), 'propose')
+            raw = yaml.safe_load(path.read_text())
+            raw['stages']['propose']['delegation'] = {'enabled': True, 'workers': ['evidence-reader']}
+            raw['stages']['propose']['inputs'] = {'batches': [{'artifact': 'future-batch'}]}
+            path.write_text(yaml.safe_dump(raw))
+            document = ResearchDocument(path)
+            self.assertTrue(document.experiment('propose')['evidence']['delegation']['enabled'])
+            for delegation in ({'enabled': 'yes'}, {'enabled': True, 'workers': []},
+                    {'workers': ['invalid/worker']}, {'permissions': 'unrestricted'}):
+                with self.subTest(delegation=delegation):
+                    raw['stages']['propose']['delegation'] = delegation
+                    path.write_text(yaml.safe_dump(raw))
+                    with self.assertRaises(ValueError):
+                        ResearchDocument(path)

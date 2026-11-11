@@ -178,3 +178,67 @@ class StageCliTests(unittest.IsolatedAsyncioTestCase):
                     code = await asyncio.to_thread(dispatch_cli, args)
                 self.assertEqual(code, 0)
                 self.assertEqual(json.loads(output.getvalue())['research']['id'], expected)
+
+    async def test_organize_stage_uses_delegated_sources_and_publishes_attributable_guide(self):
+        from tests.support.faux_provider import FauxProvider
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            path = workspace(root)
+            baseline = yaml.safe_load(path.read_text())['baseline']
+            system = path.parent / baseline['config']
+            raw_system = yaml.safe_load(system.read_text())
+            raw_system['profiles'][raw_system['default_profile']]['H']['subagent'] = {'default': True}
+            system.write_text(yaml.safe_dump(raw_system))
+            trial = root / 'archive/artifacts/harbor/job/task'
+            (trial / 'agent').mkdir(parents=True)
+            (trial / 'result.json').write_text('{"task_name":"fixture"}')
+            (trial / 'agent/session.jsonl').write_text(json.dumps({'message': {'role': 'user', 'content': 'Inspect task'}}) + '\n')
+            authored = {'research': {'id': 'delegated', 'output_root': '../study'}, 'baseline': baseline,
+                'stages': {'import': {'source': 'eval', 'path': '../archive', 'publish_as': 'batch'},
+                    'organize': {'inputs': {'batches': [{'artifact': 'batch'}]},
+                        'delegation': {'enabled': True, 'workers': ['evidence-reader']},
+                        'incremental': {'enabled': True, 'reuse': True}, 'publish_as': 'guide'}},
+                'next': {'stage': 'import'}}
+            path.write_text(yaml.safe_dump(authored))
+            args = parser().parse_args(['improvement', 'step', '--config', str(path)])
+            await dispatch(args, root)
+            parent, child = FauxProvider(), FauxProvider()
+            def stream(message):
+                return AssistantMessageEventStream(FauxProvider._message_stream(message))
+            parent.respond_tool_call('subagent_spawn', {'task': 'Read the batch navigation and summarize its scope.',
+                'worker': 'evidence-reader', 'materials': ['context/batch.json']})
+            parent.respond_text('Waiting for the reader')
+            def integrate(view, signal=None):
+                notice = next(m for m in reversed(view.messages) if getattr(m, 'kind', '') == 'subagent-result')
+                row = json.loads(notice.text.split('\n', 1)[1])
+                findings = json.loads(row['summary'])['findings']
+                guide = {'sections': [{'title': 'Batch scope', 'summary': findings['summary'], 'sources': findings['sources']}]}
+                return stream(AssistantMessage([TextBlock(json.dumps(guide))], 'stop'))
+            parent.script.append(integrate)
+            child.respond_tool_call('read', {'path': 'context/batch.json'})
+            def submit(view, signal=None):
+                page = json.loads(view.messages[-1].text)
+                return stream(AssistantMessage([ToolCallBlock('submit-findings', 'submit_findings', {
+                    'summary': 'One granted batch; inspect individual executions for details.',
+                    'sources': [{'path': 'context/batch.json', 'citation_id': page['citation_id']}],
+                    'unknowns': ['Full trajectories were not read.']})], 'toolUse'))
+            child.script.append(submit)
+            def configuration(roles, role, *, resources=None):
+                provider = parent if role == 'organizer' else child
+                if resources is not None:
+                    resources.append(provider)
+                return AgentLoopConfig(provider, model='offline', context_window=64000)
+            authored['next']['stage'] = 'organize'
+            path.write_text(yaml.safe_dump(authored))
+            before = path.read_bytes()
+            with patch('fruitfly_agent.run.improvement.roles.ResearchRoles.configuration', configuration):
+                result = await dispatch(args, root)
+            guide = json.loads((Path(result['bundle']).parent / 'organization/guide.json').read_text())
+            self.assertEqual('Batch scope', guide['sections'][0]['title'])
+            self.assertEqual('context/batch.json', guide['sections'][0]['sources'][0]['path'])
+            parts = json.loads((Path(result['bundle']).parent / 'organization/parts.json').read_text())
+            self.assertEqual(1, len(parts['parts']))
+            self.assertTrue(list((root / 'study/organization-parts/main').glob('*.json')))
+            self.assertNotIn('write_file', child.calls[0]['tools'])
+            self.assertTrue(list((root / 'study/runs').glob('*/roles/organizer/*.subagents/*/session.jsonl')))
+            self.assertEqual(before, path.read_bytes())

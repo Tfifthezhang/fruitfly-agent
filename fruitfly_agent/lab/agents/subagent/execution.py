@@ -2,6 +2,7 @@
 from dataclasses import replace
 import hashlib
 import asyncio
+import json
 from fruitfly_agent.core.loop import run_agent_loop
 from fruitfly_agent.core.data_model import CustomMessage, UserMessage
 from fruitfly_agent.core.extensions.hooks import BEFORE_REQUEST, BEFORE_TOOL, AFTER_TOOL, AFTER_RESPONSE, HookRegistry
@@ -9,7 +10,9 @@ from fruitfly_agent.core.errors import FatalError
 from fruitfly_agent.core.context.budget import forward_context_capabilities
 
 class ChildExecution:
-    def __init__(self, runtime, *, request_limit, instructions):
+    def __init__(self, runtime, *, request_limit, instructions, steering_characters=None):
+        from .configuration import ProtocolSettings
+        self.steering_characters = ProtocolSettings().max_context_characters if steering_characters is None else steering_characters
         self.runtime = runtime
         self.request_limit = request_limit
         self.instructions = instructions
@@ -26,7 +29,7 @@ class ChildExecution:
         self.on_activity = lambda phase, requests: None
 
     def can_steer(self, text):
-        return not self.closed and self.accepting_input and sum(len(item[1]) for item in self.pending) + len(text) <= 16000
+        return not self.closed and self.accepting_input and sum(len(item[1]) for item in self.pending) + len(text) <= self.steering_characters
 
     def steer(self, message_id, text):
         if message_id in self.message_ids:
@@ -41,7 +44,9 @@ class ChildExecution:
             raise ValueError('child execution is closed')
         session = self.runtime.config.session
         self.initial_messages = len(session.canonical_messages())
-        message = UserMessage(request.task + ('\n\nContext:\n' + request.context if request.context else ''))
+        message = UserMessage(request.task
+            + ('\n\nAssigned material paths (data):\n' + json.dumps(request.materials) if request.materials else '')
+            + ('\n\nContext:\n' + request.context if request.context else ''))
         session.append('message', {'message': message.to_dict()}, sync=True)
         hooks = self.runtime.config.hooks.clone() if self.runtime.config.hooks else HookRegistry(session=session)
         self.requests = 0
@@ -86,7 +91,7 @@ class ChildExecution:
         session.append('meta', {'kind': 'child-execution', 'scope_id': request.identity.scope_id,
             'agent_id': request.identity.agent_id, 'run_id': request.identity.run_id,
             'instructions': self.instructions, 'system_prompt_hash': 'sha256:' + hashlib.sha256(config.system_prompt.encode()).hexdigest(),
-            'max_model_requests': self.request_limit}, sync=True)
+            'max_model_requests': self.request_limit, 'worker': request.worker, 'materials': list(request.materials)}, sync=True)
         try:
             return await run_agent_loop(config, session.messages(), signal=signal,
                 context_pipeline=self.runtime.context_pipeline)

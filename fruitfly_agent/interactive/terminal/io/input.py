@@ -55,6 +55,7 @@ def field_prompt(spec: FieldSpec, current: object) -> str:
         f'Choices: {json.dumps(spec.choices, ensure_ascii=False)}' if spec.choices else '') if text)
     return (f'{spec.label}\n{spec.description}\nCurrent: {current}\nType: {spec.kind}'
         + (f' · {bounds}' if bounds else '')
+        + ('\nEnter a JSON object; component YAML uses the same mapping.' if spec.kind == 'object' else '')
         + ('\nUse comma-separated items.' if spec.kind == 'string_list' else '')
         + '\nEnter submits; blank keeps current; /clear sets empty text; Esc or /cancel returns.')
 
@@ -84,6 +85,11 @@ def parse_field_value(spec: FieldSpec, text: str) -> object:
             value = text
         if value not in spec.choices:
             raise ValueError('choose one of the displayed values')
+    elif spec.kind == 'object':
+        value = json.loads(text)
+        if not isinstance(value, dict):
+            raise ValueError('enter a JSON object')
+        json.dumps(value, allow_nan=False)
     elif spec.kind == 'string_list':
         value = tuple(item.strip() for item in text.split(',') if item.strip())
     elif spec.kind in {'string', 'path'}:

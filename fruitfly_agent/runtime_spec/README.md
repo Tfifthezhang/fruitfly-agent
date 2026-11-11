@@ -20,7 +20,7 @@ Start with [configuration responsibilities](../../CONFIGURATION.md). The guide t
 | `model_roles.py` | Strict alias/inheritance grammar and pure late binding |
 | `profiles.py` | `HarnessProfile`, `HarnessConfig`, `load_harness_config`, `save_harness_config` |
 | `components.py` | Serializable H/S/I instance envelopes and explicit references |
-| `documents.py` | Strict YAML parsing, explicit references, bounded owner-resource reads and file/package receipts |
+| `documents.py` | Explicit references, owner-resource access and file/package receipts over the Core YAML decoder |
 | `selections.py` | `MechanismSelection`; Catalog validates registered IDs and dependencies |
 | `execution.py` | Validation, effective defaults, Core keyword projection and configuration bindings |
 | `references.py` | One baseline path/profile; conflicting explicit references fail |

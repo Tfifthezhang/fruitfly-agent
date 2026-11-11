@@ -3,6 +3,7 @@ from fruitfly_agent.runtime_spec.documents import parameter_default
 from fruitfly_agent.improvement.contracts.optimization import OptimizationSpec, OptimizationField
 from dataclasses import asdict, dataclass, field
 import json
+from .configuration import EditorSettings
 
 from fruitfly_agent.improvement.contracts.optimization import TargetBinding, TargetSnapshot
 from fruitfly_agent.improvement.contracts.versions import canonical_json
@@ -11,9 +12,22 @@ from fruitfly_agent.improvement.contracts.validation import bounded
 
 @dataclass(frozen=True)
 class EditorInstructions:
-    system: str = (field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'instructions.system')))
-    reflect: str = (field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'instructions.reflect')))
-    propose: str = (field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'instructions.propose')))
+    system: str = (field(default_factory=lambda: parameter_default(__package__ + '.methods.workspace', 'defaults.yaml', 'instructions.system')))
+    reflect: str = (field(default_factory=lambda: parameter_default(__package__ + '.methods.workspace', 'defaults.yaml', 'instructions.reflect')))
+    propose: str = (field(default_factory=lambda: parameter_default(__package__ + '.methods.workspace', 'defaults.yaml', 'instructions.propose')))
+
+    component_context: str = field(default_factory=lambda: parameter_default(__package__ + '.methods.workspace', 'defaults.yaml', 'instructions.component_context'))
+    navigation: str = field(default_factory=lambda: parameter_default(__package__ + '.methods.workspace', 'defaults.yaml', 'instructions.navigation'))
+    submission: str = field(default_factory=lambda: parameter_default(__package__ + '.methods.workspace', 'defaults.yaml', 'instructions.submission'))
+    direction: str = field(default_factory=lambda: parameter_default(__package__ + '.methods.workspace', 'defaults.yaml', 'instructions.direction'))
+    recover_evidence: str = field(default_factory=lambda: parameter_default(__package__ + '.methods.workspace', 'defaults.yaml', 'instructions.recover_evidence'))
+    no_evidence: str = field(default_factory=lambda: parameter_default(__package__ + '.methods.workspace', 'defaults.yaml', 'instructions.no_evidence'))
+    repair: str = field(default_factory=lambda: parameter_default(__package__ + '.methods.workspace', 'defaults.yaml', 'instructions.repair'))
+    write_file: str = field(default_factory=lambda: parameter_default(__package__ + '.methods.workspace', 'defaults.yaml', 'instructions.write_file'))
+    delete_file: str = field(default_factory=lambda: parameter_default(__package__ + '.methods.workspace', 'defaults.yaml', 'instructions.delete_file'))
+    list_targets: str = field(default_factory=lambda: parameter_default(__package__ + '.methods.workspace', 'defaults.yaml', 'instructions.list_targets'))
+    describe_target: str = field(default_factory=lambda: parameter_default(__package__ + '.methods.workspace', 'defaults.yaml', 'instructions.describe_target'))
+    submit_candidate: str = field(default_factory=lambda: parameter_default(__package__ + '.methods.workspace', 'defaults.yaml', 'instructions.submit_candidate'))
 
     def __post_init__(self):
         for value in asdict(self).values():
@@ -46,10 +60,11 @@ class EditorInstructionTarget:
     required_capabilities = frozenset({'improver-comparison'})
     adoption_roles = frozenset({'I'})
 
-    def __init__(self, instructions=None, *, text=None):
+    def __init__(self, instructions=None, *, text=None, settings=None):
         self.instructions = instructions or EditorInstructions()
-        self.text = canonical_json({'instructions':asdict(self.instructions)}) if text is None else text
-        if self.parse_document(self.text) != self.instructions:
+        self.settings = EditorSettings.from_dict(settings)
+        self.text = canonical_json({'instructions':asdict(self.instructions), 'settings':asdict(self.settings)}) if text is None else text
+        if self.parse_document(self.text) != self.instructions or EditorSettings.from_dict(json.loads(self.text)['settings']) != self.settings:
             raise ValueError('editor source differs from installed instructions')
 
     def snapshot(self):
@@ -61,7 +76,7 @@ class EditorInstructionTarget:
             'system':'Overall editor analysis, evidence use and candidate procedure.',
             'propose':'Form a testable behavioral hypothesis from observed evidence.',
             'reflect':'Derive reusable lessons with limitations from executed contrasts.'}
-        return tuple(OptimizationField('parameters.instructions.'+name,'string',descriptions[name],value,
+        return tuple(OptimizationField('parameters.instructions.'+name,'string',descriptions.get(name, 'Configure ' + name.replace('_', ' ') + ' guidance.'),value,
             getattr(EditorInstructions(),name),unit='characters',minimum=1,maximum=16000) for name,value in asdict(instructions).items())
 
     @staticmethod
@@ -73,12 +88,15 @@ class EditorInstructionTarget:
                 result[key]=value
             return result
         value=json.loads(text,object_pairs_hook=unique)
-        if not isinstance(value,dict) or set(value)!={'instructions'} or not isinstance(value['instructions'],dict) or set(value['instructions'])!=set(EditorInstructions.__dataclass_fields__):
+        if not isinstance(value,dict) or set(value)!={'instructions', 'settings'} or not isinstance(value['instructions'],dict) or set(value['instructions'])!=set(EditorInstructions.__dataclass_fields__):
             raise ValueError('editor candidate requires exactly its instructions')
+        EditorSettings.from_dict(value['settings'])
         return EditorInstructions(**value['instructions'])
 
     def validate(self,text):
         self.parse_document(text)
+        if EditorSettings.from_dict(json.loads(text)['settings']) != self.settings:
+            raise ValueError('candidate changed protected role settings')
 
     def prepare_trial(self,config,text):
         raise ValueError('editor changes require an independent improver comparison')
@@ -90,6 +108,7 @@ class EditorInstructionTarget:
             raise ValueError('editor grants permit instruction fields only')
 
     def validate_change(self,text,options):
+        self.validate(text)
         value=self.parse_document(text)
         allowed=options.get('editable_fields',['parameters.instructions.'+name for name in EditorInstructions.__dataclass_fields__])
         for name in EditorInstructions.__dataclass_fields__:

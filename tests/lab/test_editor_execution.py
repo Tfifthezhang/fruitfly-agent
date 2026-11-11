@@ -94,3 +94,36 @@ class ReliabilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(facts.diagnosable)
         self.assertFalse(facts.complete)
         await services.close()
+
+    async def test_configured_repair_and_tool_guidance_reach_candidate_execution(self):
+        import json
+        from fruitfly_agent.lab.improvement.editor.instructions import EditorInstructionTarget
+        owner = EditorInstructionTarget()
+        source = json.loads(owner.snapshot().text)
+        source['instructions']['repair'] = 'CUSTOM REPAIR: finish the existing draft using retained evidence.'
+        source['instructions']['submit_candidate'] = 'CUSTOM TOOL: submit a supported hypothesis.'
+        owner.validate_change(json.dumps(source), {'editable_fields': [
+            'parameters.instructions.repair', 'parameters.instructions.submit_candidate']})
+        instructions = owner.parse_document(json.dumps(source))
+        flow, plan, baseline, runner = proposal_fixture()
+        task = TaskMaterial('task', 'Work')
+        record = await runner.execute(plan, task, baseline)
+        provider = FauxProvider()
+        observed = []
+        from fruitfly_agent.core.data_model import AssistantMessage, ToolCallBlock
+        from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone
+        def read(view, signal=None):
+            observed.extend(t.description for t in view.tools if t.name == 'submit_candidate')
+            async def events():
+                yield StreamDone(AssistantMessage([ToolCallBlock('read', 'read', {'path': 'context/executions.json'})], 'toolUse'))
+            return AssistantMessageEventStream(events())
+        provider.script.append(read)
+        provider.respond_text('invalid submission')
+        provider.respond_tool_call('submit_candidate', {'reasons': []})
+        editor = AgentEditor(AgentLoopConfig(provider), MemoryArtifacts(), flow.components, instructions=instructions)
+        async with StageServices(plan) as services:
+            result = await editor.edit('propose', ProposalRequest(plan, task, baseline, (record,), 'invariant', 0), services)
+        self.assertEqual((), result.changed_ids)
+        self.assertIn('CUSTOM REPAIR', provider.calls[-1]['system_prompt'])
+        self.assertIn('CUSTOM TOOL', observed[0])
+        self.assertNotIn('CUSTOM TOOL', owner.instructions.submit_candidate)

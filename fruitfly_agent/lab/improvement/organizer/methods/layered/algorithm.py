@@ -15,10 +15,10 @@ from ....evidence.session import EvidenceSession
 class LayeredOrganizer:
     implementation_id = 'layered-organizer-v1'
 
-    def __init__(self, config, artifacts, *, instructions=None, settings=None):
+    def __init__(self, config, artifacts, *, instructions=None, settings=None, runtime_factory=None):
         self.artifacts = artifacts
         self.instructions = instructions or OrganizerInstructions()
-        self.session = EvidenceSession(config, artifacts, settings=settings)
+        self.session = EvidenceSession(config, artifacts, settings=settings, runtime_factory=runtime_factory)
 
     async def organize(self, request, services):
         return await services.operation(self._organize(request, services), stage='organizer')
@@ -44,7 +44,7 @@ class LayeredOrganizer:
                     raise ValueError('summary requires attributable sources')
                 for source in section['sources']:
                     if (set(source) != {'path', 'citation_id'} or source['path'] not in workspace.paths()
-                            or source['citation_id'] not in workspace.provided_paths.get(source['path'], set())):
+                            or source['citation_id'] not in workspace.eligible_paths(source['path'])):
                         raise ValueError('organizer cited unavailable or unread evidence')
                     source_rows.append(source)
             accepted = data
@@ -71,6 +71,8 @@ class LayeredOrganizer:
         if accepted is None:
             raise ValueError('organizer did not submit a view')
         values = {'batch.json': batch, 'guide.json': accepted,
+            'parts.json': {'parts': list(workspace.retained_parts.values()),
+                'scope': 'Selected/new child findings; directory coverage is not full original reading.'},
             'sources.json': {'sources': source_rows, 'scope': 'Derived summaries do not certify downstream original reading.'}}
         resources = tuple(Resource('organization/' + path, self.artifacts.put(canonical_json(value).encode()), 'application/json', 'diagnostic')
             for path, value in values.items())

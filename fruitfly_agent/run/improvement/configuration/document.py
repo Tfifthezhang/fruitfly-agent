@@ -86,6 +86,10 @@ class ResearchDocument:
             tasks = mapping(result['tasks'], {'file', 'inline'}, 'stage tasks')
             if len(tasks) != 1 or ('file' in tasks and (not isinstance(tasks['file'], str) or not tasks['file'].strip())) or ('inline' in tasks and not isinstance(tasks['inline'], dict)):
                 raise ValueError('tasks requires exactly one file or inline document')
+        if 'incremental' in result:
+            EvidenceSettings.from_dict({'retention': result['incremental'], **({'delegation': result['delegation']} if 'delegation' in result else {})})
+        if 'delegation' in result:
+            EvidenceSettings.from_dict({'delegation': result['delegation']})
         if stage == 'propose':
             scope = mapping(result.get('optimization', {}), {'scope', 'include', 'exclude'}, 'optimization')
             if scope.get('scope', 'defaults') not in {'defaults', 'explicit'} or not isinstance(scope.get('include', {}), dict) or not isinstance(scope.get('exclude', []), list) or any(not isinstance(v, str) or not v for v in scope.get('exclude', [])):
@@ -119,7 +123,8 @@ class ResearchDocument:
             execution['task_seconds'] = allowance.get('task_seconds', timeouts.execution_seconds)
             if 'attempts' in settings or 'concurrency' in settings:
                 execution['trial'] = {k: settings[k] for k in ('attempts', 'concurrency') if k in settings}
-        evidence = EvidenceSettings().to_dict()
+        evidence = EvidenceSettings.from_dict({**({'delegation': settings['delegation']} if 'delegation' in settings else {}),
+            **({'retention': settings['incremental']} if 'incremental' in settings else {})}).to_dict()
         for control, field in (('evidence_characters', 'max_characters'), ('evidence_responses', 'max_pages')):
             if control in allowance:
                 evidence['supply'][field] = allowance[control]

@@ -18,14 +18,43 @@ class AccessReceipt:
 
 
 class EvidenceAccess:
-    def __init__(self, run_ids=(), *, record=None):
+    def __init__(self, run_ids=(), *, record=None, budget=None, limits=None):
         self.run_ids = frozenset(run_ids)
         self.supplied = set()
-        self.supply_characters = 0
-        self.supply_responses = 0
+        self.budget = budget if budget is not None else {'characters': 0, 'responses': 0, 'model_requests': 0, 'tool_calls': 0}
+        self.delegated_supplied = set()
+        self.limits = dict(limits or {})
+        self.local_characters = 0
+        self.local_responses = 0
         self.paths: dict[str, str] = {}
         self.receipts: deque[AccessReceipt] = deque(maxlen=256)
         self.record = record or (lambda *args, **kwargs: None)
+
+    @property
+    def supply_characters(self):
+        return self.budget['characters']
+
+    @supply_characters.setter
+    def supply_characters(self, value):
+        self.local_characters += max(0, value - self.budget['characters'])
+        self.budget['characters'] = value
+
+    @property
+    def supply_responses(self):
+        return self.budget['responses']
+
+    @supply_responses.setter
+    def supply_responses(self, value):
+        self.local_responses += max(0, value - self.budget['responses'])
+        self.budget['responses'] = value
+
+    def remaining_characters(self, maximum):
+        return min(maximum - self.supply_characters,
+            self.limits.get('characters', maximum) - self.local_characters)
+
+    def remaining_responses(self, maximum):
+        return min(maximum - self.supply_responses,
+            self.limits.get('responses', maximum) - self.local_responses)
 
     def failed(self, path):
         self.paths[path] = 'unavailable'
@@ -55,5 +84,5 @@ class EvidenceAccess:
 
     def validate_citations(self, reasons):
         cited = {name for reason in reasons for name in reason.evidence_ids}
-        if cited - self.supplied:
+        if cited - (self.supplied | self.delegated_supplied):
             raise EvidenceUnavailable('candidate cites executions not successfully supplied to this editing stage')

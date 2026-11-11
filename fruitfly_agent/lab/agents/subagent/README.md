@@ -38,11 +38,77 @@ Unknown aliases and incompatible model capabilities fail before child model work
 | `max_agents` | 8 | Child conversations admitted in one parent scope |
 | `run_timeout_seconds` | 600 | Per-execution queue, construction and work deadline |
 | `max_model_requests` | 64 | Main child loop request limit per execution |
+| `retirement_timeout` | 10 | Seconds to confirm owned resource cleanup |
 
 The owner validates strict parameters. Host permissions, model limits and inherited
 Core tool allowances still apply. Requests made by auxiliary context components
 remain subject to the execution deadline and their own controls. Request counts
 and reported usage are observations, not exact monetary billing.
+
+## Configure protocol and result controls
+
+The registered [default document](methods/managed/defaults.yaml) owns every numeric
+service, protocol and result default, plus the child and five tool instructions.
+Constructors, Catalog descriptors, model tool schemas and actual service calls
+consume these values. `configuration.py` validates cross-field constraints;
+Python retains hard identity, text and wait bounds. These controls are protected
+from Improvement edits even when visible in configuration.
+
+Customize a workspace component document using the ordinary `file` reference:
+
+```yaml
+# In the selected system profile:
+H:
+  subagent:
+    file: components/config/default/H/subagent.yaml
+```
+
+The following is a valid partial component document. Omitted values resolve from
+the owner defaults; frozen exports contain complete effective values.
+
+```yaml
+id: subagent
+role: H
+implementation: subagent
+parameters:
+  settings:
+    max_concurrent: 2
+    retirement_timeout: 10
+    protocol:
+      max_task_characters: 8000
+      max_context_characters: 8000
+      max_message_characters: 4000
+      default_wait_seconds: 10
+      max_wait_seconds: 30
+    results:
+      output_page_characters: 2000
+      default_list_entries: 10
+      max_list_entries: 25
+```
+
+| Group and field | Default | Meaning |
+|---|---|---|
+| `protocol.max_task_characters` | 16000 | Spawn and followup task length |
+| `protocol.max_context_characters` | 16000 | Initial context and accumulated queued context; running pending steering text |
+| `protocol.max_message_characters` | 16000 | Individual steering/followup message length |
+| `protocol.default_wait_seconds` | 30 | Omitted wait timeout |
+| `protocol.max_wait_seconds` | 60 | Maximum accepted wait timeout |
+| `results.output_page_characters` | 4000 | Full result output page size |
+| `results.summary_characters` | 4000 | Retained index summary size; full output remains in the artifact |
+| `results.task_preview_characters` | 400 | Task text preview size |
+| `results.summary_preview_characters` | 2000 | Summary preview size |
+| `results.max_preview_characters` | 24000 | Serialized aggregate threshold for omitting row previews; identity metadata remains |
+| `results.default_list_entries` | 20 | Omitted model status list size |
+| `results.max_list_entries` | 50 | Maximum model status list size |
+
+Default wait/list sizes cannot exceed their maxima. Summary previews cannot exceed
+the retained summary size. Text controls are positive integers up to 16000;
+default waits are finite values in 0..60 seconds and maximum waits are in .01..60 seconds. Result character controls are positive
+integers up to 24000 and list sizes up to 50. Queue steering includes its attribution
+prefix in the context length check and rejects overflow before durable admission.
+The running steering limit counts pending message text. These controls bound
+individual material and result exchanges, not total conversation context or billing.
+The interactive monitor retains its own fixed display pagination.
 
 ## Call the tools
 
@@ -50,11 +116,11 @@ and reported usage are observations, not exact monetary billing.
 |---|---|---|
 | `subagent_spawn` | `task`, optional `context` | Returns `agent_id`, `run_id` and queued state immediately |
 | `subagent_send` | Both IDs, `mode`, `message` | `steer` supplements queued/running work; `followup` starts another execution after retirement |
-| `subagent_wait` | `executions` containing both IDs, optional `mode=all/any`, `timeout_seconds=30` | Waits at most 60 seconds, returning terminal results or actual unfinished states |
-| `subagent_status` | Optional IDs; list `offset`, `limit`; detail `output_offset` | Reads status without work or result consumption; pages full result text in 4,000-character blocks |
+| `subagent_wait` | `executions` containing both IDs, optional `mode=all/any`, `timeout_seconds=30` | Uses configured default/maximum waits, returning actual execution states |
+| `subagent_status` | Optional IDs; list `offset`, `limit`; detail `output_offset` | Reads status without work or result consumption; pages full result text at the configured size |
 | `subagent_cancel` | Both IDs | Requests stop and waits for bounded confirmation |
 
-Tasks, context and messages are bounded to 16,000 characters. Schemas reject unknown
+Tasks, context and messages use the configured limits, each at most 16,000 characters. Schemas reject unknown
 arguments, invalid identities, invalid modes, null required values and non-finite
 waits. Tool descriptions are independent owner resources. Status and result previews
 are bounded; long result text is available through `subagent_status` with
@@ -71,6 +137,44 @@ Acceptance of a steering message does not establish that the model read it.
 a new execution ID and retains the conversation's committed history. A busy child
 rejects followup; stale IDs cannot steer or cancel newer work. One child has one
 active execution. There is no implicit queue of followup tasks.
+
+## Restrict inherited components
+
+`settings.inheritance.mode` is `parent` by default. This retains the parent's
+assembled components while excluding delegation. Select `explicit` to rebuild a
+child from only the enabled parent component IDs listed in
+`settings.inheritance.components`. An empty explicit list constructs a child with
+no inherited tools or context components. Host Core execution limits and
+permission policy remain in force.
+
+```yaml
+id: subagent
+role: H
+implementation: subagent
+parameters:
+  settings:
+    inheritance:
+      mode: explicit
+      components: [local-env, read-tool]
+```
+
+Component IDs come from the same Catalog and selected parent profile. This example
+requires both components enabled in the parent. Unknown, absent, disabled,
+duplicate or delegation IDs fail before child work. Nonempty lists in `parent`
+mode are rejected. A host without explicit-grant support rejects that mode.
+
+The host re-projects selected component documents through the ordinary loader.
+Removed owners do not retain their prompts, artifact bindings or context
+installers. Selected owners retain their effective parameters. The actual child
+manifest records the resulting runtime. Dependencies are validated normally;
+select the required environment/context dependencies explicitly.
+
+This is a component subset, not per-task evidence authorization. For example,
+`read-tool` still reads the inherited execution workspace under host policy.
+This control alone does not provide assigned-artifact grants, read-only file
+scope or filesystem isolation. Do not use it as a substitute for research evidence
+tools with exact resource grants. All children of this component use its selected
+inheritance policy; tool arguments cannot replace it.
 
 ## Own the execution scope
 
@@ -134,9 +238,33 @@ Missing or corrupt required artifacts fail explicitly. Historical results remain
 queryable, but a later parent scope cannot continue old child executions.
 Cross-file writes do not constitute a crash-atomic transaction.
 
+## Host research investigations
+
+[Improvement research](../../improvement/DEVELOPER_GUIDE.md#delegate-read-only-evidence-investigation)
+can explicitly install the same service/tools over a restricted prepared runtime.
+Its spawn schema additionally requires `worker` and exact `materials` paths;
+ordinary daily spawn arguments remain task/context. Unsupported material grants
+are rejected by hosts without an admission capability.
+
+`settings.research.tools` is a distinct subset of catalog/search/read. The owner
+requires `resources: assigned`, `writes: deny` and
+`conversation: explicit_materials`. These visible invariant fields reject broader
+values. `instructions.evidence_parent` and `instructions.evidence_child` describe
+the protocol. These research bridge fields are configurable by users but remain
+protected from ordinary task candidate grants: ordinary task execution does not
+consume them. Existing child/control instructions retain their admitted edit
+surface; I role instructions own research strategy. Resource policy, model
+bindings and limits remain protected. The read-only host does not inherit
+daily tools or state based on `settings.inheritance`.
+
+A followup retains the original worker/material grant. Admission is checked before
+scheduling and snapshots source identities. Validated worker submission can finish
+through a terminal tool; ordinary uncontrolled tool termination remains a failed
+execution. Invalid worker output is recorded as failed and supplies no citations.
+
 ## Improve instructions
 
-`improvement.py` registers the child instruction and the five independent tool
+`improvement.py` registers the ordinary child and five independent tool
 instructions through ordinary parameter targets and configuration materialization.
 The component remains H. Authorized candidates must change actual request content
 or tool declarations in an isolated runtime. Model bindings, limits, authorization,
@@ -147,6 +275,7 @@ is established by fake Provider tests.
 
 | File | Responsibility |
 |---|---|
+| `configuration.py` | Typed protocol/result controls and owner default loading |
 | `contracts.py` | Identity, task and child factory protocols |
 | `execution.py` | Independent Core invocation and steering input |
 | `service.py` | Scope, scheduling, result delivery and retirement |
@@ -165,3 +294,30 @@ These checks use temporary state and fake Providers. See
 Enabled Subagent instruction surfaces enter the default Improvement scope. The parent
 model can delegate without a separate human request by calling the registered tools.
 The runtime does not invent tasks or launch children without a model tool call.
+
+## Configure named research workers
+
+`settings.workers` is one owner-validated YAML mapping. Installed definitions are
+`evidence-reader`, `record-organizer`, `cross-record-reader` and
+`counterexample-reader`. They select reading strategies, not separate schedulers.
+Copy a full definition from [defaults](methods/managed/defaults.yaml) into a workspace
+component to customize or add a stable worker name. Each definition requires:
+
+| Field | Runtime effect |
+|---|---|
+| `description`, `instructions` | Spawn menu guidance and actual child instructions |
+| `model_role` | Registered `models.roles` binding, or executor; no inline model alias |
+| `capabilities.tools` | Subset of catalog/search/read, intersected with global research tools |
+| `capabilities.resources/writes/delegation` | Fixed assigned/deny/disabled authority |
+| `inheritance.conversation/state` | Fixed explicit_materials/independent isolation |
+| `limits.seconds/model_requests` | Intersected with service and stage execution controls |
+| `limits.evidence_characters/evidence_responses` | Local supply intersected with shared stage supply |
+| `result.contract/max_characters` | Validated evidence_findings and bounded final output |
+
+Every worker has all fields; unknown fields fail. Stage `delegation.workers` lists
+allowed names. The model selects one name and exact materials in its tool call;
+arguments cannot broaden the configured authority. Actual worker, model, tools and
+effective limits enter the child manifest. Worker definitions remain protected
+from ordinary task candidate edits. Ordinary daily spawn retains its existing
+interface and inheritance policy; named workers belong to the research host.
+

@@ -9,8 +9,9 @@ from fruitfly_agent.core.model_stream import AssistantMessageEventStream, Stream
 
 
 class AgentRunner:
-    def __init__(self, config):
+    def __init__(self, config, *, runtime=None):
         self.config = config
+        self.runtime = runtime
 
     async def run(self, messages, *, tools=(), system_prompt=None, signal=None, observe=None, record=None):
         record = record or (lambda *args, **kwargs: None)
@@ -41,12 +42,16 @@ class AgentRunner:
             return AssistantMessageEventStream(events())
         forward_context_capabilities(provider, config.provider)
         from fruitfly_agent.lab.context_manager.measurement import new_measurement_scope
-        invocation = replace(config, provider=provider, tools=tuple(tools), session=None,
+        invocation = replace(config, provider=provider, tools=tuple(tools), session=config.session if self.runtime is not None else None,
             context_meter=new_measurement_scope(config.context_meter),
             system_prompt=config.system_prompt if system_prompt is None else system_prompt,
-            max_turns=None, max_tool_calls_per_turn=None,
-            get_follow_up_messages=None, get_steering_messages=None)
-        result = await run_agent_loop(invocation, list(messages), signal=signal)
+            max_turns=config.max_turns if self.runtime is not None else None,
+            max_tool_calls_per_turn=config.max_tool_calls_per_turn if self.runtime is not None else None,
+            get_follow_up_messages=config.get_follow_up_messages if self.runtime is not None else None,
+            get_steering_messages=config.get_steering_messages if self.runtime is not None else None)
+        loop = self.runtime.run_loop if self.runtime is not None and self.runtime.run_loop is not None else run_agent_loop
+        result = await loop(invocation, list(messages), signal=signal,
+            context_pipeline=self.runtime.context_pipeline if self.runtime is not None else None)
         record('agent-finished', usage=result.usage.to_dict(), error_details=result.error_details if result.is_error else None,
             diagnostics=asdict(result.diagnostics) if result.diagnostics is not None else None,
             status='error' if result.is_error else result.stop_reason)

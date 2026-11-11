@@ -27,7 +27,7 @@ class OptimizationField:
     def __post_init__(self):
         if not self.path.startswith(('parameters.instructions.', 'parameters.settings.', 'parameters.content.')) or not re.fullmatch(r'[A-Za-z0-9_.-]+', self.path):
             raise ValueError('optimization field requires an exact parameters path')
-        if not self.description.strip() or self.kind not in {'string', 'integer', 'number', 'boolean', 'choice', 'path', 'string_list', 'documents'}:
+        if not self.description.strip() or self.kind not in {'string', 'integer', 'number', 'boolean', 'choice', 'path', 'string_list', 'object', 'documents'}:
             raise ValueError('optimization field requires its type and owner description')
         object.__setattr__(self, 'choices', tuple(self.choices))
 

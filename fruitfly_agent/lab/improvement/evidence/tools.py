@@ -13,10 +13,9 @@ from .configuration import EvidenceSettings
 def evidence_tools(workspace, *, settings=None, reader=None):
     settings = EvidenceSettings.from_dict(settings)
     reader = reader if reader is not None else WorkspaceEvidence(workspace, settings=settings)
-    calls = 0
     def allow():
-        nonlocal calls
-        calls += 1
+        workspace.access.budget['tool_calls'] += 1
+        calls = workspace.access.budget['tool_calls']
         if calls > settings.supply.max_pages:
             workspace.record('evidence-budget-exhausted', pages=calls - 1)
             return False
@@ -53,6 +52,9 @@ def evidence_tools(workspace, *, settings=None, reader=None):
         path=ctx.args['path']
         data=workspace.read(path)
         if image_type(data) is not None:
+            if workspace.access.remaining_responses(settings.supply.max_pages) <= 0:
+                return exhausted()
+            workspace.access.supply_responses += 1
             mime=validate_image(data)
             reference='sha256:'+hashlib.sha256(data).hexdigest()
             workspace.access.provided(path,data)
@@ -65,11 +67,11 @@ def evidence_tools(workspace, *, settings=None, reader=None):
         if not allow():
             return exhausted()
         return result(reader.search(ctx.args['query'],paths=tuple(ctx.args.get('paths',())),cursor=ctx.args.get('cursor',''),limit=ctx.args.get('limit',settings.search.default_matches)))
-    return (AgentTool(name='catalog',label='Browse evidence',description='Page granted files or an event index. Overview and event indexes navigate to immutable originals.',
+    return (AgentTool(name='catalog',label='Browse evidence',description=settings.instructions.catalog,
         parameters={'type':'object','properties':{'prefix':{'type':'string'},'path':{'type':'string'},'kind':{'type':'string'},
             **{key: {'type': 'string'} for key in ('tool_name', 'tool_call_id', 'request_id', 'operation_id', 'phase', 'status')},
             'order':{'type':'string','enum':['elapsed_seconds']},'cursor':{'type':'integer'},'limit':{'type':'integer'}}},execute=catalog),
-        AgentTool(name='read',label='Read evidence',description='Read a granted original page or image. Cite the returned citation_id; continue with next_offset. Offsets are source characters.',
+        AgentTool(name='read',label='Read evidence',description=settings.instructions.read,
         parameters={'type':'object','properties':{'path':{'type':'string'},'offset':{'type':'integer'},'limit':{'type':'integer'}},'required':['path']},execute=read),
-        AgentTool(name='search',label='Search evidence',description='Literal search across granted files or selected paths. Returns source spans, citation IDs, failures and a continuation cursor.',
+        AgentTool(name='search',label='Search evidence',description=settings.instructions.search,
         parameters={'type':'object','properties':{'query':{'type':'string'},'paths':{'type':'array','items':{'type':'string'}},'cursor':{'type':'string'},'limit':{'type':'integer'}},'required':['query']},execute=search))

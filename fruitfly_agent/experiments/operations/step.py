@@ -34,6 +34,9 @@ async def dispatch(args, workspace):
             extensions = configured_extensions(system_path, profile_id=config.runtime.get('profile'))
             catalog = extensions.catalog(builtin_catalog()) if extensions.registrations else builtin_catalog()
             profile = load_system_config(system_path, catalog=catalog).select(config.runtime.get('profile'))
+            from fruitfly_agent.lab.improvement.api import EvidenceSettings, EvidenceDelegation
+            if EvidenceSettings.from_dict(config.evidence_settings).delegation.enabled:
+                EvidenceDelegation.configuration(profile, catalog, EvidenceSettings.from_dict(config.evidence_settings).delegation.workers)
             if context.stage == 'propose':
                 from .research import defaults
                 scope = defaults(SimpleNamespace(config=str(path)), workspace)

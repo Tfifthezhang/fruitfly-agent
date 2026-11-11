@@ -109,10 +109,12 @@ reading. Both organize and propose expose official observations separately.
 For proposal, configure `stages.propose.inputs.batches`; evidence and assessments
 are optional. Set its direction, field grants, allowance and a new output alias.
 Set `next.stage: propose`, inspect `show` and `defaults`, then run `step` explicitly.
-Organize/propose make model requests and may incur charges. Current research roles
-use evidence tools; enabling daily Subagent alone does not add delegation to these
-roles. Inspect the supplied tools and retained role records rather than assuming
-that reading has been parallelized.
+Organize/propose make model requests and may incur charges. To permit independent
+read-only investigations, enable Subagent in the selected system profile and set
+`delegation.enabled: true` on the selected research stage. See
+[research delegation](#delegate-read-only-evidence-investigation). Enabling daily
+Subagent alone does not enable research delegation. A configured capability does
+not start children; the parent model chooses whether and how to delegate.
 
 When checking efficiency, compare the same selected inputs and grants. Read
 stage wall time separately from per-request/operation times. Inspect evidence
@@ -127,6 +129,67 @@ Inspect the complete candidate under `candidates/<run>/<candidate-id>/`:
 and `total-changes.json`. Verify each change's evidence, parameter semantics,
 expected effect and disconfirming conditions. A valid candidate is not an executed
 or independently verified improvement. A proposal may legitimately retain baseline.
+
+## Delegate read-only evidence investigation
+
+Organize, propose, assess and compare admit the following stage-local control:
+
+```yaml
+stages:
+  propose:
+    delegation:
+      enabled: true
+      workers: [evidence-reader]
+```
+
+Merge it into a complete research document; inputs and edit grants are still
+required by their stages. The installed component must be enabled as
+`H.subagent` in the selected baseline/candidate profile. `show` and `check` reject
+a missing enabled component offline. Keep the model binding in
+`models.roles.subagent`; it defaults to executor inheritance.
+
+Run `show`, `check`, then explicitly `step`. Delegation adds independently billed
+model work when the parent calls `subagent_spawn`. In that call the parent selects
+an allowed named `worker` and supplies `materials` as exact granted workspace paths.
+There are no prefix/wildcard or arbitrary artifact-store grants. The child has its
+own Session, context pipeline, measurement and Provider lifecycle. Its tools are
+only the configured read-only evidence subset plus `submit_findings`; it has no
+shell, candidate writes, daily memory/Skills or nested delegation.
+
+[Subagent defaults](../agents/subagent/methods/managed/defaults.yaml) own
+`settings.research.tools`, fixed assigned-resource/write/conversation policies,
+protocol/result controls and parent/child evidence instructions. Daily
+`settings.inheritance` does not broaden this research scope. The evidence default
+file owns delegation enablement and its default worker selection. Named worker
+definitions belong to `H.subagent.settings.workers`; stage YAML selects allowed
+names. Unknown workers and undeclared model roles are rejected offline.
+
+The parent can investigate directly, spawn several independent questions or use
+`send` followup within the same material grant. A different grant needs a new
+child. Followup preserves prior child history; it cannot erase already read data.
+Children submit summary, exact source citations and unknowns. Unassigned reads,
+unread citations and unvalidated final prose do not supply eligible findings.
+Original-reading receipts remain attributed to children; parents receive derived
+findings and can use their validated references. Missing evidence stays unknown.
+
+The selected stage's reading/tool and model-request counters are shared by parent,
+children, repairs and repeated role invocations through that stage host. A new
+child does not reset them. Each child also keeps Subagent execution/request limits;
+parent cancellation retires its children. Full findings use immutable artifacts,
+with bounded previews and paged result access.
+
+Inspect `runs/<run-id>/roles/<role>/*.jsonl` and adjacent
+`*.jsonl.subagents/<agent-id>/session.jsonl`. Child metadata records its exact
+material hashes, tools, model and permissions. `delegation-granted`,
+`delegated-evidence-page` and `delegation-findings` events connect findings to
+source reads. Run reports retain role events; raw role Sessions remain under the
+run directory and are not automatically standalone portable bundles.
+
+This capability supplies read-only investigation. It does not implement a
+mandatory brief/implementation/review pipeline or automatic task splitting.
+Propose children investigate evidence; the parent integrates findings and edits
+one coherent candidate through the existing edit contract. Offline fakes establish these execution contracts,
+not faster real-model runs or better proposals.
 
 ## Prepare and execute a benchmark comparison
 
@@ -428,3 +491,76 @@ Use [import settings](../../experiments/CONFIGURATION.md#configure-stage-setting
 to select tasks or supplement exact archive-relative paths with recorded hashes.
 The new import is immutable; earlier batch bundles remain valid and unchanged.
 See [evidence limits](evidence/README.md#bound-an-investigation).
+
+## Reuse completed organization parts
+
+Merge this into the selected organize stage, alongside its inputs and delegation:
+
+```yaml
+stages:
+  organize:
+    incremental: {enabled: true, reuse: true}
+    delegation:
+      enabled: true
+      workers: [record-organizer, cross-record-reader]
+```
+
+Run the ordinary offline `show` and `check` commands before explicitly running
+`step`. The parent chooses partitions and calls children with exact material paths.
+Each validated child result is retained immediately, even if the parent later
+fails to publish a guide. No mandatory per-record or multi-pass pipeline is added.
+
+The parent can use `catalog_parts` to browse applicable historical questions and
+`read_part` to receive paged derived findings. These reads consume the current
+stage's evidence allowance. Reuse requires unchanged assigned source identities,
+worker configuration, model, mission, evidence controls and implementation identity.
+Adding unrelated material does not invalidate an existing part. Changed or missing
+dependencies make a part unavailable. Followup or steered conversations are retained
+with reuse disabled because the original question alone cannot describe their history.
+
+Find locators under `organization-parts/<branch>/` in the study output root.
+Immutable records and their source dependencies use the study artifact store.
+Published guides include `organization/parts.json` with the selected/new parts and
+original producer identities. A reused part is historical child reading; it does
+not claim that the current parent read original bytes. No successful final guide,
+quality improvement or complete batch coverage is inferred from a retained part.
+Set `reuse: false` to retain fresh child results without offering historical reuse.
+Retain the whole study root when moving environments; a locator alone is insufficient.
+Interrupted work is never automatically replayed.
+
+
+## Locate complete role defaults
+
+| Responsibility | Owner file | Workspace customization |
+|---|---|---|
+| Shared independent stage times | `fruitfly_agent/improvement/contracts/defaults.yaml` | Selected stage `allowance.seconds` or `allowance.task_seconds` |
+| Candidate editing and repair | `fruitfly_agent/lab/improvement/editor/methods/workspace/defaults.yaml` | I `improvement-editor` component file |
+| Assessment and comparison | `fruitfly_agent/lab/improvement/assessment/methods/model/defaults.yaml` | I `improvement-evaluator` component file |
+| Readable organization | `fruitfly_agent/lab/improvement/organizer/methods/layered/defaults.yaml` | I `improvement-organizer` component file |
+| Evidence navigation and incremental retention | `fruitfly_agent/lab/improvement/evidence/defaults.yaml` | Stage allowances, delegation and incremental controls |
+| Child runtime, workers and permissions | `fruitfly_agent/lab/agents/subagent/methods/managed/defaults.yaml` | H `subagent` component file |
+
+Use a workspace component file rather than editing installed resources for an
+experiment. Keep `models.roles` in the system configuration. Partial component
+configuration resolves current defaults; a frozen candidate/export retains complete
+effective values. Research YAML selects work and grants, not algorithm prompt bodies.
+Editor/evaluator settings are visible but remain outside prompt-only candidate grants.
+
+For example, point I `improvement-evaluator` to a component file containing:
+
+```yaml
+id: improvement-evaluator
+role: I
+implementation: improvement-evaluator
+parameters:
+  settings:
+    output_preview_characters: 1000
+  instructions:
+    compare: Compare supported quality and process evidence, and state uncertainty.
+```
+
+Load and check this configuration offline before explicitly running a model stage.
+Use public package imports `from fruitfly_agent.lab.improvement.editor import
+AgentEditor` and `from fruitfly_agent.lab.improvement.assessment import
+ModelEvaluator`. Frozen-source regressions execute the moved methods and load their
+resources in an isolated process without checkout fallback.

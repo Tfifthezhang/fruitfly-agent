@@ -2,6 +2,7 @@
 import asyncio
 from dataclasses import replace, asdict
 import inspect
+import hashlib
 import json
 import math
 import time
@@ -11,10 +12,11 @@ from fruitfly_agent.core.extensions.hooks import BEFORE_REQUEST, HookRegistry
 from fruitfly_agent.core.loop import run_agent_loop
 from fruitfly_agent.core.errors import FatalError
 from fruitfly_agent.core.extensions.operations import OperationSupervisor, OperationCleanupError
-from .contracts import ChildRequest, ExecutionIdentity
+from .contracts import ChildRequest, ExecutionIdentity, ChildExecutionPolicy
 from fruitfly_agent.lab.catalog.agent_runtime import AgentRuntimeError
 from .execution import ChildExecution
 from .views import bounded
+from .configuration import ProtocolSettings, ResultSettings, default
 
 ACTIVE = {'queued', 'running', 'cancelling'}
 
@@ -24,8 +26,19 @@ class SubagentError(ValueError):
         self.code = code
 
 class SubagentService:
-    def __init__(self, prepare, store, *, max_concurrent=2, max_agents=8,
-                 run_timeout_seconds=600, max_model_requests=64, instructions='', retirement_timeout=10):
+    def __init__(self, prepare, store, *, max_concurrent=None, max_agents=None,
+                 run_timeout_seconds=None, max_model_requests=None, instructions=None, retirement_timeout=None,
+                 protocol=None, results=None, admit=None, finalize=None, policy=None):
+        max_concurrent = default('settings.max_concurrent') if max_concurrent is None else max_concurrent
+        max_agents = default('settings.max_agents') if max_agents is None else max_agents
+        run_timeout_seconds = default('settings.run_timeout_seconds') if run_timeout_seconds is None else run_timeout_seconds
+        max_model_requests = default('settings.max_model_requests') if max_model_requests is None else max_model_requests
+        retirement_timeout = default('settings.retirement_timeout') if retirement_timeout is None else retirement_timeout
+        instructions = default('instructions.child') if instructions is None else instructions
+        self.protocol = protocol if protocol is not None else ProtocolSettings()
+        self.results = results if results is not None else ResultSettings()
+        if not isinstance(self.protocol, ProtocolSettings) or not isinstance(self.results, ResultSettings):
+            raise ValueError('subagent protocol/results require typed settings')
         for value in (max_concurrent, max_agents, max_model_requests):
             if type(value) is not int or value < 1:
                 raise ValueError('subagent limits must be positive integers')
@@ -33,6 +46,8 @@ class SubagentService:
             raise ValueError('subagent timeout must be finite and positive')
         OperationSupervisor(retirement_timeout=retirement_timeout)
         self.prepare, self.store = prepare, store
+        self.admit, self.finalize, self.policy = admit, finalize, policy
+        self.policies = {}
         self.max_concurrent, self.max_agents = max_concurrent, max_agents
         self.timeout, self.request_limit = run_timeout_seconds, max_model_requests
         self.instructions, self.retirement_timeout = instructions, retirement_timeout
@@ -95,21 +110,40 @@ class SubagentService:
             raise SubagentError('stale_run')
         return row
 
-    def spawn(self, task, context=''):
+    def spawn(self, task, context='', *, worker='', materials=()):
         self._admit()
         if len(self.agents) >= self.max_agents:
             raise SubagentError('capacity_exceeded')
         assert self.scope_id is not None
         agent_id = uuid4().hex
+        if (not isinstance(task, str) or not task.strip() or len(task) > self.protocol.max_task_characters
+                or not isinstance(context, str) or len(context) > self.protocol.max_context_characters):
+            raise SubagentError('invalid_task_material')
         identity = ExecutionIdentity(self.scope_id, agent_id, uuid4().hex)
-        request = ChildRequest(identity, task, context)
+        request = ChildRequest(identity, task, context, worker, materials)
+        row = self._launch(request)
         self.agents.add(agent_id)
-        return self._launch(request)
+        return row
 
     def _launch(self, request):
+        if self.admit is not None:
+            self.admit(request)
+        elif request.worker or request.materials:
+            raise SubagentError('unsupported_material_grant')
+        requested = self.policy(request) if self.policy is not None else None
+        if requested is not None and not isinstance(requested, ChildExecutionPolicy):
+            raise ValueError('host child policy must be typed')
+        effective = ChildExecutionPolicy(
+            min(self.timeout, requested.timeout_seconds) if requested is not None else self.timeout,
+            min(self.request_limit, requested.max_model_requests) if requested is not None else self.request_limit,
+            self.instructions + '\n' + requested.instructions if requested is not None else self.instructions)
         identity = request.identity
+        self.policies[identity.run_id] = effective
         row = dict(scope_id=identity.scope_id, agent_id=identity.agent_id, run_id=identity.run_id,
-            task=request.task, state='queued', cleanup='pending', activity='queued',
+            task=request.task, worker=request.worker, materials=list(request.materials),
+            continuation=identity.agent_id in self.agents, steered=False,
+            policy={'timeout_seconds': effective.timeout_seconds, 'max_model_requests': effective.max_model_requests,
+                'instructions_id': 'sha256:' + hashlib.sha256(effective.instructions.encode()).hexdigest()}, state='queued', cleanup='pending', activity='queued',
             created_at=time.time(), started_at=None, ended_at=None, elapsed_seconds=None,
             model='', model_profile='', result_reference=None, summary='', error=None,
             input_tokens=None, output_tokens=None, model_requests=0, tool_calls=0, delivered=False,
@@ -122,15 +156,19 @@ class SubagentService:
 
     def send(self, agent_id, run_id, mode, message):
         row = self._current(agent_id, run_id)
-        if not isinstance(message, str) or not message.strip() or len(message) > 16000:
+        if not isinstance(message, str) or not message.strip() or len(message) > self.protocol.max_message_characters:
             raise SubagentError('invalid_message')
         if mode == 'followup':
+            if len(message) > self.protocol.max_task_characters:
+                raise SubagentError('invalid_message')
             if row['state'] in ACTIVE:
                 raise SubagentError('agent_busy')
             if row['cleanup'] != 'confirmed':
                 raise SubagentError('cleanup_failed')
             assert self.scope_id is not None
-            return self._launch(ChildRequest(ExecutionIdentity(self.scope_id, agent_id, uuid4().hex), message))
+            previous = self.requests[run_id]
+            return self._launch(ChildRequest(ExecutionIdentity(self.scope_id, agent_id, uuid4().hex), message,
+                worker=previous.worker, materials=previous.materials))
         if mode != 'steer' or row['state'] not in {'queued', 'running'}:
             raise SubagentError('invalid_state')
         message_id = uuid4().hex
@@ -142,9 +180,13 @@ class SubagentService:
     def executions_pending(self, agent_id, run_id, message_id, message):
         request = self.requests[run_id]
         runtime = self.executions.get(agent_id)
-        amended = replace(request, context=request.context + '\nParent message ' + message_id + ': ' + message) if runtime is None else None
+        amended_context = request.context + '\nParent message ' + message_id + ': ' + message
+        if runtime is None and len(amended_context) > self.protocol.max_context_characters:
+            raise SubagentError('context_capacity_exceeded')
+        amended = replace(request, context=amended_context) if runtime is None else None
         if runtime is not None and not runtime.can_steer(message):
             raise SubagentError('invalid_state')
+        self._save({**self.store.rows[run_id], 'steered': True})
         try:
             self.store.index.append('meta', {'kind': 'subagent-message', 'schema': 1,
                 'agent_id': agent_id, 'run_id': run_id, 'message_id': message_id, 'text': message}, sync=True)
@@ -159,6 +201,7 @@ class SubagentService:
     async def _work(self, request):
         run_id, agent_id = request.identity.run_id, request.identity.agent_id
         signal = self.signals[run_id]
+        policy = self.policies[run_id]
         started = time.monotonic()
         supervisor = OperationSupervisor(retirement_timeout=self.retirement_timeout)
         acquired = False
@@ -171,7 +214,7 @@ class SubagentService:
             runtime = self.executions.get(agent_id)
             if runtime is None:
                 prepared = await self.prepare(request)
-                runtime = ChildExecution(prepared, request_limit=self.request_limit, instructions=self.instructions)
+                runtime = ChildExecution(prepared, request_limit=policy.max_model_requests, instructions=policy.instructions, steering_characters=self.protocol.max_context_characters)
                 self.executions[agent_id] = runtime
                 runtime.on_activity = lambda phase, requests: self._save({**self.store.rows[run_id], 'activity': phase, 'model_requests': requests})
                 await prepared.start()
@@ -183,9 +226,10 @@ class SubagentService:
             return result
         state, error, result = 'failed', None, None
         try:
-            result = await supervisor.run(invoke, timeout=self.timeout, signal=signal)
+            result = await supervisor.run(invoke, timeout=policy.timeout_seconds, signal=signal)
             state = 'failed' if result.is_error else 'cancelled' if result.stop_reason == 'aborted' else 'completed'
-            if result.diagnostics and result.diagnostics.termination_reason not in {'model_complete', 'cancelled'}:
+            allowed_stops = {'model_complete', 'cancelled'} | ({'tool_terminated'} if self.finalize is not None else set())
+            if result.diagnostics and result.diagnostics.termination_reason not in allowed_stops:
                 state, error = 'failed', result.diagnostics.termination_reason
             if result.is_error:
                 runtime = self.executions.get(agent_id)
@@ -217,13 +261,23 @@ class SubagentService:
             if result is not None:
                 current_messages = result.canonical_messages[runtime.initial_messages:] if runtime else ()
                 summary = next((m.text for m in reversed(current_messages) if isinstance(m, AssistantMessage)), '')
+            if state == 'completed' and self.finalize is not None:
+                try:
+                    summary = self.finalize(request, result, summary)
+                    if not isinstance(summary, str):
+                        raise TypeError('worker finalization must return text')
+                except (ValueError, TypeError, KeyError):
+                    state, error, summary = 'failed', 'invalid_worker_result', ''
+                except BaseException:
+                    self._poison()
+                    raise
             payload = {'state': state, 'output': summary, 'error': error,
                 'usage': result.usage.to_dict() if result and runtime and runtime.usage_known else None,
                 'diagnostics': asdict(result.diagnostics) if result and result.diagnostics else None}
             try:
                 reference = self.store.result(row, payload)
                 self._save({**row, 'state': state, 'activity': state, 'error': error,
-                    'summary': summary[:4000], 'result_reference': reference,
+                    'summary': summary[:self.results.summary_characters], 'result_reference': reference,
                     'ended_at': time.time(), 'elapsed_seconds': time.monotonic() - started,
                     'cleanup': 'failed' if agent_id in self.unconfirmed else 'confirmed',
                     'model_requests': requests,
@@ -237,8 +291,9 @@ class SubagentService:
                 if acquired and agent_id not in self.unconfirmed:
                     self.slots.release()
 
-    async def wait(self, refs, *, mode='all', timeout_seconds=30, signal=None, deliver=False):
-        if mode not in {'all', 'any'} or isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, (int, float)) or not math.isfinite(timeout_seconds) or not 0 <= timeout_seconds <= 60:
+    async def wait(self, refs, *, mode='all', timeout_seconds=None, signal=None, deliver=False):
+        timeout_seconds = self.protocol.default_wait_seconds if timeout_seconds is None else timeout_seconds
+        if mode not in {'all', 'any'} or isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, (int, float)) or not math.isfinite(timeout_seconds) or not 0 <= timeout_seconds <= self.protocol.max_wait_seconds:
             raise SubagentError('invalid_wait')
         if not refs or len(refs) > self.max_agents:
             raise SubagentError('invalid_wait')
@@ -325,6 +380,7 @@ class SubagentService:
             self.tasks.clear()
             self.signals.clear()
             self.requests.clear()
+            self.policies.clear()
         if self.poisoned:
             raise OperationCleanupError('subagent resources could not be confirmed retired')
 
@@ -345,7 +401,7 @@ class SubagentService:
             output = []
             for row in tuple(self.store.rows.values()):
                 if row['scope_id'] == self.scope_id and row['state'] not in ACTIVE and not row['delivered'] and row['run_id'] not in self.offered_results:
-                    message = CustomMessage('subagent-result', 'Subagent execution result (derived agent output):\n' + json.dumps(bounded(row)))
+                    message = CustomMessage('subagent-result', 'Subagent execution result (derived agent output):\n' + json.dumps(bounded(row, settings=self.results)))
                     self.offered_results[row['run_id']] = message
                     output.append(message)
             return output
@@ -354,7 +410,7 @@ class SubagentService:
         async def follow(context):
             while any(r['scope_id'] == self.scope_id and r['state'] in ACTIVE for r in self.store.rows.values()):
                 refs = [(r['agent_id'], r['run_id']) for r in self.store.rows.values() if r['scope_id'] == self.scope_id and r['state'] in ACTIVE]
-                await self.wait(refs, mode='any', signal=signal)
+                await self.wait(refs, mode='any', timeout_seconds=self.protocol.max_wait_seconds, signal=signal)
             extra = await inherited(previous_follow, context)
             return [*extra, *notices()]
         hooks = config.hooks.clone() if config.hooks else HookRegistry(session=config.session)

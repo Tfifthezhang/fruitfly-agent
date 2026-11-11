@@ -38,3 +38,13 @@ reading that file is not required to receive the invocation requirements.
 
 Offline checks: `tests.lab.test_organizer`, `tests.improvement.test_research_recovery`.
 Fake outputs prove candidate application and attribution, not model summary quality.
+
+## Keep partial work
+
+With stage `incremental.enabled`, completed research child findings survive a
+later parent failure. The parent decides useful partitions, optionally reads
+applicable retained parts, and submits one integrated guide. Published
+`organization/parts.json` records new and reused references separately from final
+sections. It does not assert complete evidence coverage. See the
+[developer recipe](../DEVELOPER_GUIDE.md#reuse-completed-organization-parts).
+

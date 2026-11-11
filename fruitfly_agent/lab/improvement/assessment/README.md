@@ -22,27 +22,26 @@ and findings classified as process signals, hypothesis checks or evidence limita
 it does not invent an aggregate quality score. Official measurements remain
 unchanged. Unsupported or malformed judgment retains the incumbent.
 
-`improvement-evaluator` exposes `parameters.instructions.{criteria,assess,compare}`.
+`improvement-evaluator` exposes `parameters.instructions.*`: criteria, assess,
+compare, system, schema guidance, coverage, catalog and submission instructions.
 Each instruction contains 1–16000 characters. I trials use a fixed outer reference
 and independent checks; a candidate evaluator cannot authorize its own adoption.
 
-Each assessment or comparison has its own evaluator time. There are no model-call,
-tool-call or cumulative token quotas and no forced final request. Search and read
-pages as needed. Missing evidence remains unknown; timeout is unavailable judgment.
+Each assessment or comparison has its own evaluator time. The shared evidence supply, request-space checks and selected delegation controls
+also apply. Search and read pages within those explicit controls. Missing evidence remains unknown; timeout is unavailable judgment.
 
 | File | Responsibility |
 |---|---|
-| `evaluator.py`, `instructions.py` | Shared model judgment and editable instructions |
+| [Model method](methods/model/README.md), `instructions.py` | Shared model judgment, editable instructions and complete owner defaults |
 | `completed.py` | Completed feedback persistence and comparisons |
 | `selection.py`, `measured.py`, `promotion.py` | Evidence selection and explicit objective-analysis helpers |
 | `verification.py`, [Scorers](scorers/README.md) | Independent checks and declared objective sources |
 
-Offline checks: `tests.lab.test_evaluator`, `tests.lab.test_evaluator`,
-`tests.lab.test_evaluator`.
+Offline checks: `tests.lab.test_evaluator`, `tests.lab.test_improvement_configuration`.
 
 ## Maintain I parameter defaults
 
-[defaults.yaml](defaults.yaml) is the single default I instruction document.
+[defaults.yaml](methods/model/defaults.yaml) is the single default I instruction document.
 Typed instruction constructors derive values from it. Isolated editors modify
 `parameters.yaml` with a protected `role: I`; ordinary H/S task execution cannot
 supply I acceptance. Frozen comparisons and verified activation retain the
@@ -77,3 +76,9 @@ Default search selection always invokes the configured selector for multiple
 completed results. Measurement absence, equality or magnitude does not bypass
 that judgment. Numeric ranking helpers remain explicit analysis utilities, outside
 the default research and search stage control.
+
+`parameters.settings` controls output/task previews and initial input allocation.
+These values are configurable, recorded and frozen, but protected from ordinary
+candidate grants. `ModelEvaluator(..., options=...)` consumes them; `settings=...`
+continues to mean shared evidence configuration. Submission guidance may change;
+the Python schema, run coverage and supplied-citation validator remain authoritative.

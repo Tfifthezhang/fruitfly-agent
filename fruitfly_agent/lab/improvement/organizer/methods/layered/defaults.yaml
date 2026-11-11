@@ -13,5 +13,8 @@ parameters:
       timeline and topic entries where useful. Summaries must cite supplied source
       spans. Distinguish original facts, derived summaries and missing material.
       Do not infer root causes, rank optimization opportunities or suggest changes.
+      When retained-part tools are available, inspect applicable prior work and
+      delegate bounded factual questions as useful. Preserve partial findings and
+      integrate their citations without claiming unread scope is covered.
       Keep rare records discoverable. Return sections with title, summary and sources;
       each source has a granted path and a citation_id actually returned by read/search.

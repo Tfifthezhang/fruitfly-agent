@@ -216,22 +216,28 @@ async def _dispatch(args, workspace, outputs, reporting):
     inputs, producers, named = resolve_inputs(outputs, args)
     reporting.update(inputs=inputs, producers=producers)
     _capture_configuration(outputs, reporting)
+    role_name = {'organize': 'organizer', 'propose': 'editor', 'assess': 'assessor', 'compare': 'assessor'}[args.command]
+    from fruitfly_agent.run.storage.organization_parts import OrganizationPartStore
+    from fruitfly_agent.lab.improvement.api import EvidenceSettings
+    part_store = OrganizationPartStore(outputs.root / 'organization-parts' / getattr(args, 'branch', 'main'), outputs.artifacts) if EvidenceSettings.from_dict(config.evidence_settings).retention.enabled else None
+    runtime_factory = roles.runtime_factory(role_name, outputs.root / 'runs' / reporting['run_id'] / 'roles' / role_name,
+        outputs.artifacts, config.evidence_settings, parts=part_store)
     try:
         if args.command == 'organize':
             from fruitfly_agent.lab.improvement.organizer import LayeredOrganizer, OrganizerInstructions
             instructions = roles.profile.component_settings.get('organizer', {}).get('instructions', {})
             service.organizer = LayeredOrganizer(roles.configuration('organizer'), artifacts,
-                instructions=OrganizerInstructions(**instructions), settings=config.evidence_settings)
+                instructions=OrganizerInstructions(**instructions), settings=config.evidence_settings, runtime_factory=runtime_factory)
             service.role_identity['organize'] = {'model': roles.identity('organizer'), 'instructions': instructions,
-                'evidence': config.evidence_settings}
+                'evidence': config.evidence_settings, 'delegation': runtime_factory.identity if runtime_factory else None}
         elif args.command in {'assess', 'compare'}:
             from fruitfly_agent.lab.improvement.assessment.completed import CompletedAssessmentService
             role_config = roles.configuration('assessor')
             instructions = roles.profile.component_settings.get('evaluator', {})
             service.assessor = lambda services: CompletedAssessmentService(config=role_config, artifacts=artifacts,
-                services=services, instructions=instructions, evidence_settings=config.evidence_settings)
+                services=services, instructions=instructions, evidence_settings=config.evidence_settings, runtime_factory=runtime_factory)
             service.role_identity[args.command] = {'model': roles.identity('assessor'), 'instructions': instructions,
-                'evidence': config.evidence_settings}
+                'evidence': config.evidence_settings, 'delegation': runtime_factory.identity if runtime_factory else None}
         elif args.command == 'propose':
             from fruitfly_agent.lab.catalog import optimization_grants, optimization_table
             from fruitfly_agent.lab.catalog.research import configuration_targets
@@ -271,13 +277,15 @@ async def _dispatch(args, workspace, outputs, reporting):
                 generator_id=full.improvement.generator)
             from fruitfly_agent.lab.improvement.editor.instructions import EditorInstructions
             editor = AgentEditor(role_config, artifacts, components,
-                instructions=EditorInstructions(**roles.profile.component_settings.get('editor', {}).get('instructions', {})), settings=config.evidence_settings)
+                instructions=EditorInstructions(**roles.profile.component_settings.get('editor', {}).get('instructions', {})), settings=config.evidence_settings, runtime_factory=runtime_factory,
+                options=roles.profile.component_settings.get('editor', {}).get('settings'))
             generators = roles.extensions.bindings().generators
             service.proposal = ProposalStage(generators=generators, components=components)
             service.services_factory = lambda plan: StageServices(plan, edit=editor.edit)
-            service.role_identity['propose'] = {'model': roles.identity('editor'), 'instructions': asdict(editor.instructions),
+            service.role_identity['propose'] = {'model': roles.identity('editor'), 'instructions': asdict(editor.instructions), 'settings': asdict(editor.options),
                 'grants': options, 'direction': service.plan.direction,
-                'generator': service.plan.generator_id, 'extensions': roles.extensions.identities}
+                'generator': service.plan.generator_id, 'extensions': roles.extensions.identities,
+                'delegation': runtime_factory.identity if runtime_factory else None}
             baseline = service.put('baseline.json', components.snapshot().to_dict())
             named = replace(named, harness=baseline)
             inputs = (baseline, *inputs)

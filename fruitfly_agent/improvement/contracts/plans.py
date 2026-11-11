@@ -2,6 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, asdict, field
 from typing import Protocol
+from fruitfly_agent.core.configuration_resources import package_parameter
 from fruitfly_agent.improvement.contracts.validation import identifier, relative_path, bounded
 from fruitfly_agent.improvement.contracts.versions import canonical_json, content_hash, require_hash
 import math
@@ -9,12 +10,20 @@ from typing import Literal
 from fruitfly_agent.improvement.contracts.components import HarnessSnapshot
 from fruitfly_agent.improvement.contracts.versions import SystemVersion
 
+
+def _timeout_default(name):
+    values = package_parameter(__package__, 'defaults.yaml', 'timeouts')
+    if not isinstance(values, dict) or set(values) != set(StageTimeouts.__dataclass_fields__):
+        raise ValueError('runtime defaults require exactly the independent stage times')
+    return values[name]
+
+
 @dataclass(frozen=True)
 class StageTimeouts:
-    editor_seconds: float = 1200
-    execution_seconds: float = 3600
-    evaluator_seconds: float = 1200
-    organizer_seconds: float = 1200
+    editor_seconds: float = field(default_factory=lambda: _timeout_default('editor_seconds'))
+    execution_seconds: float = field(default_factory=lambda: _timeout_default('execution_seconds'))
+    evaluator_seconds: float = field(default_factory=lambda: _timeout_default('evaluator_seconds'))
+    organizer_seconds: float = field(default_factory=lambda: _timeout_default('organizer_seconds'))
 
     def __post_init__(self):
         for value in asdict(self).values():

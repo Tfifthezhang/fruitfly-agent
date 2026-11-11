@@ -2,6 +2,7 @@
 from fruitfly_agent.runtime_spec.documents import parameter_default
 from dataclasses import asdict, dataclass, field
 import json
+from .configuration import EvaluatorSettings
 from fruitfly_agent.improvement.contracts.optimization import OptimizationSpec, OptimizationField, TargetSnapshot, TargetBinding
 from fruitfly_agent.improvement.contracts.versions import canonical_json
 
@@ -9,11 +10,18 @@ from fruitfly_agent.improvement.contracts.versions import canonical_json
 @dataclass(frozen=True)
 class EvaluatorInstructions:
     criteria: str = (
-        field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'instructions.criteria')))
+        field(default_factory=lambda: parameter_default(__package__ + '.methods.model', 'defaults.yaml', 'instructions.criteria')))
     assess: str = (
-        field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'instructions.assess')))
+        field(default_factory=lambda: parameter_default(__package__ + '.methods.model', 'defaults.yaml', 'instructions.assess')))
     compare: str = (
-        field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'instructions.compare')))
+        field(default_factory=lambda: parameter_default(__package__ + '.methods.model', 'defaults.yaml', 'instructions.compare')))
+
+    system: str = field(default_factory=lambda: parameter_default(__package__ + '.methods.model', 'defaults.yaml', 'instructions.system'))
+    schema: str = field(default_factory=lambda: parameter_default(__package__ + '.methods.model', 'defaults.yaml', 'instructions.schema'))
+    coverage: str = field(default_factory=lambda: parameter_default(__package__ + '.methods.model', 'defaults.yaml', 'instructions.coverage'))
+    submit: str = field(default_factory=lambda: parameter_default(__package__ + '.methods.model', 'defaults.yaml', 'instructions.submit'))
+    catalog: str = field(default_factory=lambda: parameter_default(__package__ + '.methods.model', 'defaults.yaml', 'instructions.catalog'))
+    submit_judgment: str = field(default_factory=lambda: parameter_default(__package__ + '.methods.model', 'defaults.yaml', 'instructions.submit_judgment'))
 
     def __post_init__(self):
         for value in asdict(self).values():
@@ -29,10 +37,11 @@ class EvaluatorInstructionTarget:
     adoption_roles = frozenset({'I'})
     label = 'Improvement evaluator'
 
-    def __init__(self, instructions=None, *, text=None):
+    def __init__(self, instructions=None, *, text=None, settings=None):
         self.instructions = instructions or EvaluatorInstructions()
-        self.text = canonical_json({'instructions': asdict(self.instructions)}) if text is None else text
-        if self.parse(self.text) != self.instructions:
+        self.settings = EvaluatorSettings.from_dict(settings)
+        self.text = canonical_json({'instructions': asdict(self.instructions), 'settings': asdict(self.settings)}) if text is None else text
+        if self.parse(self.text) != self.instructions or EvaluatorSettings.from_dict(json.loads(self.text)['settings']) != self.settings:
             raise ValueError('evaluator source differs from installed instructions')
 
     def snapshot(self):
@@ -44,7 +53,7 @@ class EvaluatorInstructionTarget:
         descriptions = {'criteria': 'Define what task outcomes and dimensions to evaluate from the original requirements.',
             'assess': 'Explain how to judge one execution, including per-dimension reasons, uncertainty, and observed evidence.',
             'compare': 'Compare executed alternatives using common criteria; resolve tradeoffs or retain an uncertain incumbent.'}
-        return tuple(OptimizationField('parameters.instructions.' + key, 'string', descriptions[key], value,
+        return tuple(OptimizationField('parameters.instructions.' + key, 'string', descriptions.get(key, 'Configure ' + key.replace('_', ' ') + ' guidance.'), value,
             getattr(EvaluatorInstructions(), key), unit='characters', minimum=1, maximum=16000)
             for key, value in asdict(instructions).items())
 
@@ -58,12 +67,15 @@ class EvaluatorInstructionTarget:
                 value[key] = item
             return value
         value = json.loads(text, object_pairs_hook=unique)
-        if not isinstance(value, dict) or set(value) != {'instructions'} or set(value['instructions']) != set(EvaluatorInstructions.__dataclass_fields__):
+        if not isinstance(value, dict) or set(value) != {'instructions', 'settings'} or set(value['instructions']) != set(EvaluatorInstructions.__dataclass_fields__):
             raise ValueError('evaluator requires exactly its instruction fields')
+        EvaluatorSettings.from_dict(value['settings'])
         return EvaluatorInstructions(**value['instructions'])
 
     def validate(self, text):
         self.parse(text)
+        if EvaluatorSettings.from_dict(json.loads(text)['settings']) != self.settings:
+            raise ValueError('candidate changed protected role settings')
 
     def validate_options(self, options):
         allowed = {'parameters.instructions.' + key for key in EvaluatorInstructions.__dataclass_fields__}
@@ -74,6 +86,7 @@ class EvaluatorInstructionTarget:
             raise ValueError('invalid evaluator prompt grant')
 
     def validate_change(self, text, options):
+        self.validate(text)
         value = self.parse(text)
         allowed = set(options.get('editable_fields', ('parameters.instructions.' + key for key in asdict(self.instructions))))
         for key, before in asdict(self.instructions).items():

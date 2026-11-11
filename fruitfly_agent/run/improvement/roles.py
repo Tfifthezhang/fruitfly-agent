@@ -46,7 +46,7 @@ class ResearchRoles:
             raise ValueError('unknown research model alias: ' + alias)
         return alias
 
-    def configuration(self, role):
+    def configuration(self, role, *, resources=None):
         alias = self.alias(role)
         spec = self.specs[alias]
         spec.require(streaming=True, tools=True)
@@ -55,7 +55,7 @@ class ResearchRoles:
             nonlocal provider
             if provider is None:
                 actual = self.registry.create(spec, self.environment)
-                self.providers.append(actual)
+                (self.providers if resources is None else resources).append(actual)
                 provider = RoleProvider(actual, 'component-improvement', role)
             return provider
         class DeferredProvider:
@@ -65,6 +65,13 @@ class ResearchRoles:
                 return getattr(binding(), name)
         return AgentLoopConfig(provider=DeferredProvider(),
             model=spec.model, max_tokens=spec.max_output_tokens, context_window=spec.context_window)
+
+    def runtime_factory(self, role, directory, artifacts, settings, *, parts=None):
+        from fruitfly_agent.lab.improvement.api import EvidenceSettings
+        if not EvidenceSettings.from_dict(settings).delegation.enabled:
+            return None
+        from .research_runtime import ResearchRuntimeFactory
+        return ResearchRuntimeFactory(self, role, directory, artifacts, settings, parts=parts)
 
     def identity(self, role):
         alias = self.alias(role)

@@ -43,3 +43,20 @@ class StageTimingTests(unittest.IsolatedAsyncioTestCase):
         for value in (0,-1,True,float('inf'),float('nan')):
             with self.subTest(value=value),self.assertRaises(ValueError):StageTimeouts(editor_seconds=value)
         self.assertEqual(StageTimeouts(editor_seconds=100000).editor_seconds,100000)
+
+    def test_owner_yaml_changes_shared_defaults_and_explicit_values_remain_fixed(self):
+        from unittest.mock import patch
+        import yaml
+        from fruitfly_agent.core import configuration_resources
+        original = configuration_resources.package_bytes
+        def read(package, resource):
+            data = original(package, resource)
+            if package == 'fruitfly_agent.improvement.contracts':
+                value = yaml.safe_load(data)
+                value['parameters']['timeouts']['editor_seconds'] = 7
+                return yaml.safe_dump(value).encode()
+            return data
+        with patch.object(configuration_resources, 'package_bytes', side_effect=read):
+            self.assertEqual(7, StageTimeouts().editor_seconds)
+            self.assertEqual(9, StageTimeouts(editor_seconds=9).editor_seconds)
+        self.assertEqual(1200, StageTimeouts().editor_seconds)

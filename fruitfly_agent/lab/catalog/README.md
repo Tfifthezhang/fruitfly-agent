@@ -301,6 +301,8 @@ targets use the same owner-admitted fields as normal runtime targets.
 
 [agent_runtime.py](agent_runtime.py) defines `PreparedAgentRuntime`, the host-prepared
 Core configuration, context pipeline, manifest and start/close callbacks consumed
-by child executors. AssemblyContext optionally supplies a child runtime factory
+by child executors. Its optional `run_loop` lets an explicitly prepared role
+retain a managed delegation scope; the default remains the ordinary Core loop.
+AssemblyContext optionally supplies a child runtime factory
 and artifact service. Consumers must not shallow-copy mutable tool or context
 state from a running parent.

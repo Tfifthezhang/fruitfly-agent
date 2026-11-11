@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import re
+import json
+import math
 from typing import Any, Literal, Mapping
 
 
 ParameterKind = Literal[
-    "boolean", "integer", "number", "string", "choice", "path", "string_list"
+    "boolean", "integer", "number", "string", "choice", "path", "string_list", "object"
 ]
 MechanismLayer = Literal["capability", "online", "improvement"]
 MechanismFamily = Literal["environment", "tools", "context", "workflow"]
@@ -43,7 +45,9 @@ class ParameterDescriptor:
         if self.minimum is not None and self.maximum is not None:
             if self.minimum > self.maximum:
                 raise ValueError("parameter minimum cannot exceed maximum")
-        self.validate(self.default)
+        normalized = self.validate(self.default)
+        if self.kind == "object":
+            object.__setattr__(self, "default", normalized)
 
     def validate(self, value: Any) -> Any:
         if value is None:
@@ -81,6 +85,10 @@ class ParameterDescriptor:
                     f"parameter {self.name!r} must be a list of non-empty strings"
                 )
             normalized = tuple(value)
+        elif self.kind == "object":
+            if not isinstance(value, dict):
+                raise ValueError(f"parameter {self.name!r} must be an object")
+            normalized = _object_value(value)
         else:
             raise ValueError(f"unsupported parameter kind: {self.kind!r}")
         if self.kind in ("integer", "number"):
@@ -108,6 +116,18 @@ class ParameterDescriptor:
                 value = float(text.strip())
             except ValueError as exc:
                 raise ValueError("value must be a number") from exc
+        elif self.kind == "object":
+            def unique(pairs):
+                values = {}
+                for key, item in pairs:
+                    if key in values:
+                        raise ValueError('duplicate object key: ' + key)
+                    values[key] = item
+                return values
+            try:
+                value = json.loads(text, object_pairs_hook=unique)
+            except (ValueError, TypeError) as exc:
+                raise ValueError('enter an object with unique keys and JSON values') from exc
         elif self.kind == "string_list":
             value = tuple(item.strip() for item in text.split(",") if item.strip())
         else:
@@ -115,7 +135,7 @@ class ParameterDescriptor:
         return self.validate(value)
 
     def to_dict(self) -> dict[str, Any]:
-        default = list(self.default) if isinstance(self.default, tuple) else self.default
+        default = self.validate(self.default) if self.kind == "object" else list(self.default) if isinstance(self.default, tuple) else self.default
         return {
             "name": self.name,
             "kind": self.kind,
@@ -128,6 +148,23 @@ class ParameterDescriptor:
             "nullable": self.nullable,
             "advanced": self.advanced,
         }
+
+
+def _object_value(value: Any, depth: int = 0) -> Any:
+    """Copy bounded JSON-shaped data; owning modules validate its field grammar."""
+    if depth > 64:
+        raise ValueError('object parameter exceeds supported nesting depth')
+    if isinstance(value, dict):
+        if any(not isinstance(key, str) for key in value):
+            raise ValueError('object parameter keys must be strings')
+        return {key: _object_value(item, depth + 1) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_object_value(item, depth + 1) for item in value]
+    if value is None or isinstance(value, (str, bool, int)):
+        return value
+    if isinstance(value, float) and math.isfinite(value):
+        return value
+    raise ValueError('object parameters require finite JSON values')
 
 
 @dataclass(frozen=True)

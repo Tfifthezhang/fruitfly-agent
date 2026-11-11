@@ -11,6 +11,7 @@ class PreparedAgentRuntime:
     manifest: Mapping[str, Any]
     start: Callable[[], Awaitable[None]]
     close: Callable[[], Awaitable[None]]
+    run_loop: Callable[..., Awaitable[Any]] | None = None
 
 
 class AgentRuntimeError(RuntimeError):

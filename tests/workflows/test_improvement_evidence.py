@@ -17,7 +17,7 @@ from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
 from fruitfly_agent.lab.improvement.evidence import EvidenceWorkspace, MemoryArtifacts
 from fruitfly_agent.lab.improvement.evidence.catalog import WorkspaceEvidence
 from fruitfly_agent.lab.improvement.evidence.indexing import organize_evidence
-from fruitfly_agent.lab.improvement.assessment.evaluator import ModelEvaluator
+from fruitfly_agent.lab.improvement.assessment import ModelEvaluator
 from fruitfly_eval.improvement.evidence import collect, answer_evidence
 from fruitfly_eval.improvement.facts import attach_benchmark_facts
 from tests.support.stages import proposal_fixture, Runner

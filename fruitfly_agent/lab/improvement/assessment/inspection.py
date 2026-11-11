@@ -15,7 +15,7 @@ class ReadOnlyInspector:
         self.artifacts = artifacts
         self.instructions = instructions or InspectionInstructions()
         self.workspace_session = EvidenceSession(config, artifacts, settings=evidence_settings)
-        from .evaluator import ModelEvaluator
+        from .methods.model.algorithm import ModelEvaluator
         self.evaluator = ModelEvaluator(config, artifacts, instructions=evaluator_instructions, settings=evidence_settings)
 
     async def session(self, mission, workspace, services, *, writable=False):

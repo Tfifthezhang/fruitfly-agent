@@ -10,7 +10,7 @@ from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
 from fruitfly_agent.improvement.contracts.tasks import TaskMaterial, Resource
 from fruitfly_agent.improvement.contracts.plans import RunPlan
 from fruitfly_agent.improvement.stages.services import StageServices
-from fruitfly_agent.lab.improvement.assessment.evaluator import ModelEvaluator
+from fruitfly_agent.lab.improvement.assessment import ModelEvaluator
 from fruitfly_agent.lab.improvement.assessment.instructions import EvaluatorInstructions, EvaluatorInstructionTarget
 from fruitfly_agent.lab.improvement.evidence import MemoryArtifacts
 from tests.support.faux_provider import FauxProvider
@@ -120,3 +120,26 @@ class EvaluatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(['run-0', 'run-1'], choices)
         self.assertEqual(target.instructions, EvaluatorInstructions())
         self.assertTrue(all('no editing' in c['system_prompt'] for c in provider.calls))
+
+    async def test_configured_preview_and_system_guidance_reach_actual_judgment(self):
+        from fruitfly_agent.lab.improvement.assessment.configuration import EvaluatorSettings
+        evaluator, task, records, services, provider, _ = self.setup_evaluation()
+        target = EvaluatorInstructionTarget()
+        text = json.loads(target.snapshot().text)
+        text['instructions']['system'] = 'CUSTOM SYSTEM: judge only granted evidence.'
+        target.validate_change(json.dumps(text), {'editable_fields': ['parameters.instructions.system']})
+        instructions = target.parse(json.dumps(text))
+        from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone
+        def reply(view, signal=None):
+            initial = json.loads(view.messages[0].content)
+            self.assertEqual(3, len(initial['executions'][0]['output']))
+            self.assertEqual(4, len(initial['task']))
+            async def events(): yield StreamDone(judgment(view))
+            return AssistantMessageEventStream(events())
+        provider.script = [reply]
+        instance = ModelEvaluator(AgentLoopConfig(provider), evaluator.artifacts, instructions=instructions,
+            options=EvaluatorSettings(output_preview_characters=3, task_preview_characters=4))
+        result, _ = await instance.evaluate(task, records, services)
+        self.assertEqual('run-1', result['choice'])
+        self.assertIn('CUSTOM SYSTEM', provider.calls[0]['system_prompt'])
+        self.assertNotIn('CUSTOM SYSTEM', target.instructions.system)

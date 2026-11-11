@@ -92,3 +92,12 @@ even when the marker file remains. Unresolved external work still requires an
 explicit retry decision. The journal is validated before a writer starts;
 role-event appends use the validated owner cache instead of reparsing the complete
 journal on every evidence read.
+
+`organization_parts.py` stores immutable validated `OrganizationPart` records in
+the supplied artifact store and atomic per-part locators under the study output
+root's `organization-parts/<branch>/`. Parts retain question/context, exact grants,
+findings, citation spans, producer and reuse conditions. Discovery does not replay
+work or choose a latest result. Source/default resource identities invalidate reuse
+conservatively after implementation changes. Missing/corrupt dependencies cannot
+become applicable findings.
+

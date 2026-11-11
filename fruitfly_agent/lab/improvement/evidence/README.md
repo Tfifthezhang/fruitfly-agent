@@ -110,13 +110,18 @@ See the [development guide](../DEVELOPER_GUIDE.md) for portable stage bundles.
 
 ## Bound an investigation
 
+`defaults.yaml` owns all read, catalog, search and supply numeric defaults.
+Typed settings derive their defaults from this package resource; Python retains
+validation and hard response-size limits. Stage allowances override cumulative
+supply for an invocation.
+
 `evidence.supply.max_characters` defaults to 256000 and `max_pages` to 64.
 The bundled reader shares those cumulative limits across read/search, including
 repeated pages. A search response counts once regardless of its number of matched
 source spans; every returned character and exact citation still counts. The tool facade additionally bounds catalog/read/search calls.
 Exhausted reads return `budget_exhausted`, no source citation, and a request to
 submit using existing evidence with uncovered scope declared. Invocation request
-count is bounded by max_pages plus eight opportunities to finish. A request
+count is bounded by max_pages plus supply.completion_requests (default eight) opportunities to finish. A request
 measurement checks input, uncertainty margin and output reserve before Provider
 execution; estimates retain their declared quality. Context exhaustion stops with
 `evidence_context_budget_exhausted` instead of sending another oversized request.
@@ -140,3 +145,32 @@ Organizer and historical Editor workspaces share `context/overview.json`,
 readable by the Editor without changing their source identity. Batch counts cover
 all supplied records; they do not imply all trajectories were read. Per-record
 observations stay distinct from status and missing diagnostics remain unknown.
+
+## Delegate assigned evidence
+
+`delegation.py` builds immutable child views from exact parent-granted paths. It
+uses the existing Subagent service and exposes only its configured read-only tool
+subset plus validated findings submission. Parent and child workspaces keep
+separate direct-reading/citation receipts while sharing supply and request
+counters. Accepted findings record delegated citations separately; copying a
+citation into prose or reading a directory does not authorize it.
+
+Run supplies explicit persistent role/child Sessions and Provider lifecycles.
+Enable the stage control through the [developer guide](../DEVELOPER_GUIDE.md#delegate-read-only-evidence-investigation).
+Offline execution checks are in `tests.run.test_research_delegation`; CLI wiring
+and guide publication are covered by `tests.experiments.test_stage_cli`.
+
+`defaults.yaml` also owns session entry/repair guidance and evidence/findings tool
+descriptions. `instructions.repair` substitutes the literal `{error}` marker; it
+does not evaluate templates. Typed settings validate bounded nonempty text.
+
+## Retain incremental organization
+
+`parts.py` supplies `catalog_parts` and `read_part` only when the host provides a
+durable part store and retention is enabled. Owner defaults declare retention and
+tool instructions. Validated child findings are saved before parent integration.
+Current grants, exact source hashes, worker/model settings and mission/implementation
+conditions determine eligibility. Historical source citations remain delegated
+provenance; reading a derived part never becomes a direct original-reading receipt.
+See [reuse operations](../DEVELOPER_GUIDE.md#reuse-completed-organization-parts).
+

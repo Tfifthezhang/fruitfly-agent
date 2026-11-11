@@ -1,0 +1,7 @@
+# Protected runtime defaults. Stage YAML may override independent invocation times.
+parameters:
+  timeouts:
+    editor_seconds: 1200
+    execution_seconds: 3600
+    evaluator_seconds: 1200
+    organizer_seconds: 1200

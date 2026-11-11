@@ -6,8 +6,9 @@
 Callers supply configuration, messages, tools, instructions, cancellation and
 observation callbacks. It owns no editing, assessment, adoption or scheduling policy.
 
-Each invocation starts with its supplied history and tools, without an ambient
-Session or interactive steering. Model and tool counts are observations; the
+By default each invocation starts with supplied history/tools and no ambient
+Session or steering. An explicitly supplied `PreparedAgentRuntime` retains its
+host-owned Session, hooks, context pipeline and optional `run_loop`. Model and tool counts are observations; the
 caller owns its stage time. Providers and injected services remain caller-owned.
 
 | File | Responsibility |
@@ -16,7 +17,7 @@ caller owns its stage time. Providers and injected services remain caller-owned.
 | `__init__.py` | Public `AgentRunner` entry |
 
 [Child execution contracts](subagent/README.md) separately describe host-managed
-execution identity and resource ownership. They do not change `AgentRunner`.
+execution identity and resource ownership. The optional prepared-runtime path uses the same Core loop.
 
 Editors and evaluators provide their own tools and result validation. No model
 request occurs during construction. Explicit invocation can incur model cost.
@@ -29,6 +30,6 @@ so a research report can distinguish Provider failure from submission rejection.
 ## Run managed child conversations
 
 [Subagent](subagent/README.md) adds parent-scoped scheduling, explicit identities,
-private Sessions, steering, bounded execution and monitoring. It invokes the Core
-loop through its own execution contract and does not change AgentRunner's one-shot
-research-role semantics.
+private Sessions, steering, bounded execution and monitoring. An explicit prepared runtime lets research roles use that scope without another
+Agent loop. The caller owns startup/retirement; AgentRunner records requests and
+results through the same observation callbacks.

@@ -57,7 +57,7 @@ class TextComponentAdapter:
 
     def _read(self, document):
         import yaml
-        from fruitfly_agent.runtime_spec.documents import UniqueLoader
+        from fruitfly_agent.core.configuration_resources import UniqueLoader
         from fruitfly_agent.runtime_spec.components import ComponentConfiguration
         if len(document.files) != 1 or document.files[0].path != 'parameters.yaml':
             raise ValueError('this owner requires one parameters.yaml document')

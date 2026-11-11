@@ -40,12 +40,12 @@ def completed_input(task, record, artifacts):
 
 class CompletedAssessmentService:
     """One model evaluator for completed feedback and comparisons."""
-    def __init__(self, *, config, artifacts, services, instructions=None, evidence_settings=None):
+    def __init__(self, *, config, artifacts, services, instructions=None, evidence_settings=None, runtime_factory=None):
         from .instructions import EvaluatorInstructions
-        from .evaluator import ModelEvaluator
+        from .methods.model.algorithm import ModelEvaluator
         self.config, self.artifacts, self.services = config, artifacts, services
         self.instructions = instructions if isinstance(instructions, EvaluatorInstructions) else EvaluatorInstructions(**(instructions or {}).get('instructions', {}))
-        self.evaluator = ModelEvaluator(config, artifacts, instructions=self.instructions, settings=evidence_settings)
+        self.evaluator = ModelEvaluator(config, artifacts, instructions=self.instructions, settings=evidence_settings, runtime_factory=runtime_factory, options=(instructions or {}).get('settings') if isinstance(instructions, dict) else None)
         self.values = {}
 
     async def assess(self, task, record):

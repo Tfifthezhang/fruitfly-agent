@@ -1,6 +1,6 @@
 """Final model choice delegates to the shared dimension-based evaluator."""
 from fruitfly_agent.improvement.contracts.assessment import SelectionDecision, AssessmentUnavailable
-from .evaluator import ModelEvaluator
+from .methods.model.algorithm import ModelEvaluator
 from .instructions import EvaluatorInstructions
 from .completed import completed_input
 from fruitfly_agent.lab.improvement.assessment.measured import measured_selection

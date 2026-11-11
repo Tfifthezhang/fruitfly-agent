@@ -54,6 +54,7 @@ where = ["."]
 include = ["fruitfly_agent*", "fruitfly_eval*"]
 
 [tool.setuptools.package-data]
+"fruitfly_agent.improvement.contracts" = ["defaults.yaml"]
 "fruitfly_agent.lab.agents.subagent.methods.managed" = ["defaults.yaml"]
 "fruitfly_agent.providers" = ["services.yaml"]
 "fruitfly_agent.experiments" = ["templates/*.yaml", "templates/tasks/*.yaml"]
@@ -70,8 +71,9 @@ include = ["fruitfly_agent*", "fruitfly_eval*"]
 "fruitfly_agent.lab.context_manager.reduction.methods.layered_compaction" = ["defaults.yaml"]
 "fruitfly_agent.lab.context_manager.reduction.methods.working_memory" = ["defaults.yaml"]
 "fruitfly_agent.lab.environment.methods.remote" = ["defaults.yaml"]
-"fruitfly_agent.lab.improvement.assessment" = ["defaults.yaml"]
-"fruitfly_agent.lab.improvement.editor" = ["defaults.yaml"]
+"fruitfly_agent.lab.improvement.assessment.methods.model" = ["defaults.yaml"]
+"fruitfly_agent.lab.improvement.editor.methods.workspace" = ["defaults.yaml"]
+"fruitfly_agent.lab.improvement.evidence" = ["defaults.yaml"]
 "fruitfly_agent.lab.improvement.organizer.methods.layered" = ["defaults.yaml"]
 "fruitfly_agent.lab.mcp" = ["defaults.yaml"]
 "fruitfly_agent.lab.tools.methods.read" = ["defaults.yaml"]
@@ -89,6 +91,7 @@ check_untyped_defs = true
 no_implicit_optional = true
 warn_unused_ignores = true
 files = [
+    "fruitfly_agent/core/configuration_resources.py",
     "fruitfly_agent/core/context",
     "fruitfly_agent/core/context_runtime.py",
     "fruitfly_agent/lab/context_manager/reduction",

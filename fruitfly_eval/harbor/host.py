@@ -9,7 +9,7 @@ from typing import Any, Mapping
 from urllib.parse import urlsplit
 
 import yaml
-from fruitfly_agent.runtime_spec.documents import UniqueLoader
+from fruitfly_agent.core.configuration_resources import UniqueLoader
 from .evidence_capture import capture_policy
 
 

@@ -261,7 +261,11 @@ dataclass does not transfer ownership of the original component document.
 effects include five distinct tool names. Its model requirement supplies the
 `subagent` role with executor fallback. Each tool instruction and the child
 instruction has a separate owner field; parameter targets protect model bindings,
-limits, schema, authorization and lifecycle invariants.
+limits, schema, authorization and lifecycle invariants. Nested
+`settings.protocol.*` and `settings.results.*` paths are ordinary owner-declared
+parameter paths, shared by inspection, component loading and freezing. Cross-field
+validation rejects default waits/list sizes above maxima and oversized summary
+previews before runtime work. See [Subagent controls](../agents/subagent/README.md#configure-protocol-and-result-controls).
 
 ## Bind stage-oriented research controls
 
@@ -277,3 +281,17 @@ Changing research controls does not rewrite component source files. Ordinary
 component saves preserve references; frozen candidate exports materialize all
 values. Published history is an output projection and never modifies authored
 research intent.
+
+Owner declarations may use an `object` parameter for a structured mapping, such
+as named research workers. Values must be finite JSON-shaped data with string
+keys. The component owner validates its exact schema and execution constraints.
+YAML retains a readable mapping; the generic interactive value editor accepts a
+JSON object. Defaults are copied rather than shared between configurations.
+
+Editor and evaluator I surfaces register defaults from their concrete `methods/`
+packages. Their complete effective documents include `instructions` and protected
+presentation `settings`. Ordinary workspace customization can set both; candidate
+grants admit instruction fields only. Runtime stage-time defaults are protected
+infrastructure owned by Improvement contracts, outside selectable Catalog surfaces.
+Both use the same strict Core YAML decoder; references and receipts remain owned
+by Runtime specification.

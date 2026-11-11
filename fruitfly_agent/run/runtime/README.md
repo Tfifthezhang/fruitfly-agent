@@ -132,7 +132,12 @@ and does not access the Agent's SSH execution environment. See
 
 [child_runtime.py](child_runtime.py) consumes the public Catalog prepared-runtime
 contract and reconstructs the frozen profile with the owner's excluded delegation
-component. Child Session, context state, Providers and stateful tools are independent.
+component. Its explicit component-grant path validates an enabled parent subset,
+freezes selected owner values, and re-projects documents without retaining removed
+owners' prompts, artifacts or context installers. Host Core limits and permission
+policy remain unchanged. Unsupported grants fail before child work. See
+[inheritance controls](../../lab/agents/subagent/README.md#restrict-inherited-components).
+Child Session, context state, Providers and stateful tools are independent.
 The parent confirmation service is borrowed and never closed by a child. Actual
 child manifests are retained with child history. External tool transports without
 an independent inheritance contract are rejected before child model work.

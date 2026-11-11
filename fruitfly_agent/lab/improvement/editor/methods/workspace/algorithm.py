@@ -6,11 +6,12 @@ import json
 from fruitfly_agent.core.data_model import UserMessage, ProviderView
 from fruitfly_agent.improvement.contracts.candidates import CandidateBundle, EditReason
 from fruitfly_agent.improvement.contracts.failures import IntegrityError
-from ..evidence import EvidenceWorkspace
-from ..evidence.access import EvidenceUnavailable
-from .instructions import EditorInstructions
-from ..evidence.session import EvidenceSession
-from .submission import submission
+from ....evidence import EvidenceWorkspace
+from ....evidence.access import EvidenceUnavailable
+from ...instructions import EditorInstructions
+from ...configuration import EditorSettings
+from ....evidence.session import EvidenceSession
+from ...submission import submission
 from fruitfly_agent.improvement.contracts.versions import canonical_json, content_hash
 
 
@@ -32,14 +33,15 @@ def model_completion(config):
 class AgentEditor:
     implementation_id = 'workspace-editor-v1'
 
-    def __init__(self, config, artifacts, components, *, instructions=None, settings=None, reader_factory=None):
+    def __init__(self, config, artifacts, components, *, instructions=None, settings=None, reader_factory=None, runtime_factory=None, options=None):
         self.config, self.artifacts, self.components = config, artifacts, components
         self.instructions = instructions or EditorInstructions()
-        self.workspace_session = EvidenceSession(config, artifacts, settings=settings, reader_factory=reader_factory)
+        self.options = EditorSettings.from_dict(options)
+        self.workspace_session = EvidenceSession(config, artifacts, settings=settings, reader_factory=reader_factory, runtime_factory=runtime_factory)
 
     async def session(self, mission, workspace, services, *, writable=True, submit=None):
         return await self.workspace_session.session(mission, workspace, services,
-            writable=writable, system=self.instructions.system, submit=submit)
+            writable=writable, system=self.instructions.system, submit=submit, editing_instructions=self.instructions, editing_options=self.options)
 
     async def edit(self, stage, request, services):
         return await services.operation(self._edit(stage,request,services),stage='editor')
@@ -60,15 +62,9 @@ class AgentEditor:
             artifact_id=self.artifacts.put(description_text.encode()))
         mission = self.instructions.propose
         if len(description_text) <= self.workspace_session.settings.read.max_characters:
-            mission += '\nAuthorized component descriptions and current values:\n' + description_text
-        mission += '\nUse list_targets and describe_target to load parameter semantics on demand. Read context/edit-grants.json for this experiment’s scope.'
-        mission += ('\nAfter editing return only JSON {"reasons":[{"component_id":"...",'
-            '"explanation":"...","expected_effect":"observable change and disconfirming evidence","evidence_ids":["run-id"]}]}. Each changed component needs a supplied run ID; no changes is valid.')
-        mission += '\nUse context/extensions/ for organizer reading guides when present. Discover optimization signals yourself; derived guides are readable summaries, not verified causes or recommendations.'
-        mission += '\nUser guidance: ' + request.plan.direction
-        mission += '\nPrefer submit_candidate to finish without a prose/JSON handoff. Search large evidence before reading selected pages.'
-        mission += '\nRead execution metadata or relevant execution pages before citing a run. Listing paths alone does not supply evidence.'
-        mission += '\nRead available evidence/overview.json and evidence/coverage.json for each relevant execution. Missing outputs, partial indexing and unknown usage limit conclusions; distinguish these gaps from demonstrated task failures.'
+            mission += '\n' + self.instructions.component_context + '\n' + description_text
+        mission += '\n' + self.instructions.navigation + '\n' + self.instructions.submission
+        mission += '\n' + self.instructions.direction + ' ' + request.plan.direction
         sealed = None
         def seal(value):
             nonlocal sealed
@@ -85,13 +81,11 @@ class AgentEditor:
                 raise
             except EvidenceUnavailable as exc:
                 services.record('editor-evidence-unavailable', attempt=attempt)
-                mission = 'Recover evidence access before proposing changes. Read context/executions.json and available execution resources. Cite only evidence successfully supplied. Retain the baseline if necessary evidence is unavailable.'
+                mission = self.instructions.recover_evidence
             except (ValueError, TypeError, KeyError) as exc:
                 services.record('editor-invalid', attempt=attempt, reason=str(exc))
                 if not workspace.access.supplied:
-                    mission = 'This editing stage did not finish with usable evidence. Inspect context/executions.json and recover access before editing; retain the baseline if evidence remains unavailable.'
+                    mission = self.instructions.no_evidence
                     continue
                 workspace = workspace.repair_view(response, str(exc), workspace.access.supplied)
-                mission = ('Repair only the existing candidate and submission. Previously supplied evidence remains eligible; '
-                    'do not restart investigation. Read context/repair.json and context/submission.txt, inspect '
-                    'the current harness files, then submit_candidate or return only the required reasons JSON.')
+                mission = self.instructions.repair

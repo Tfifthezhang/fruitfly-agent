@@ -4,7 +4,7 @@ import json
 
 def reprocess_response(artifacts, response_id, records, supplied_citations):
     """Do not normalize malformed JSON, move fields, request models or fabricate citations."""
-    from .evaluator import ModelEvaluator
+    from .methods.model.algorithm import ModelEvaluator
     def unique(pairs):
         values = {}
         for key, value in pairs:

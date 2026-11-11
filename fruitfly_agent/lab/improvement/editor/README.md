@@ -19,18 +19,19 @@ Each changed component supplies a reason, observed execution IDs and an
 Successful loading proves installation, not behavioral improvement.
 
 The editor has one independent stage time, including evidence recovery and format
-repair. There are no request, tool or turn quotas. Runtime failure ends the stage;
+repair. Evidence supply, request-space checks and any selected delegation controls also apply. Runtime failure ends the stage;
 invalid submissions can be repaired within the same stage time. Completed earlier
 executions survive a failed later proposal.
 
 `improvement-editor` exposes
-`parameters.instructions.{system,propose,reflect}`.
+`parameters.instructions.*`: system/propose/reflect, navigation and submission,
+component/direction labels, evidence recovery, repair and candidate-tool guidance.
 Owners validate instructions and experiment scope. I comparisons run fresh
 fixed-I inner searches; instructions do not replace themselves during a call.
 
 | File | Responsibility |
 |---|---|
-| `agent.py` | Editing mission and repair |
+| [Workspace method](methods/workspace/README.md) | Editing mission, repair and complete owner defaults |
 | `instructions.py` | Owner-described mutable instructions |
 | `tools.py`, `submission.py` | Candidate operations and attribution validation |
 | `generators.py` | Registered zero-or-one candidate generation |
@@ -40,7 +41,7 @@ Offline checks: `tests.lab.test_detached_editor`,
 
 ## Maintain I parameter defaults
 
-[defaults.yaml](defaults.yaml) is the single default I instruction document.
+[defaults.yaml](methods/workspace/defaults.yaml) is the single default I instruction document.
 Typed instruction constructors derive values from it. Isolated editors modify
 `parameters.yaml` with a protected `role: I`; ordinary H/S task execution cannot
 supply I acceptance. Frozen comparisons and verified activation retain the
@@ -59,3 +60,9 @@ candidate files and supplied citations. It shares the original cumulative readin
 allowance rather than granting a new investigation budget. A format error does
 not make retained observations disappear. Evidence supply and context request
 limits remain separate from the overall editing deadline.
+
+`parameters.settings.target_page_entries` and `max_target_entries` control the
+optimization-target directory. Values are positive integers with default <= maximum
+<= 100. They are configurable and frozen with the component, but protected from
+ordinary candidate grants. `AgentEditor(..., options=...)` consumes these controls;
+`settings=...` remains the separate shared evidence configuration.

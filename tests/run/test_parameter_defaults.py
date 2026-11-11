@@ -173,7 +173,9 @@ class ParameterDefaultTests(unittest.IsolatedAsyncioTestCase):
         snapshot = capture_source_tree(Path(__file__).resolve().parents[2])
         paths = {entry.path for entry in snapshot.files}
         self.assertIn('fruitfly_agent/lab/base_prompt/defaults.yaml', paths)
-        self.assertIn('fruitfly_agent/lab/improvement/editor/defaults.yaml', paths)
+        self.assertIn('fruitfly_agent/improvement/contracts/defaults.yaml', paths)
+        self.assertIn('fruitfly_agent/lab/improvement/assessment/methods/model/defaults.yaml', paths)
+        self.assertIn('fruitfly_agent/lab/improvement/editor/methods/workspace/defaults.yaml', paths)
         store = SnapshotStore(DataArtifactStore(self.root / 'source-artifacts'))
         frozen = store.materialize(store.put(snapshot), self.root / 'source')
         code = '''
@@ -186,6 +188,13 @@ from fruitfly_agent.lab.catalog.defaults import read_default
 from fruitfly_agent.lab.context_manager.reduction.methods.working_memory import config
 assert Path(config.__file__).is_relative_to(root)
 assert config.WorkingMemoryConfig().maintenance_ratio == .5
+from fruitfly_agent.improvement.contracts.plans import StageTimeouts
+from fruitfly_agent.lab.improvement.editor import AgentEditor
+from fruitfly_agent.lab.improvement.assessment import ModelEvaluator
+assert StageTimeouts().editor_seconds == 1200
+for cls in (AgentEditor, ModelEvaluator):
+    module = sys.modules[cls.__module__]
+    assert Path(module.__file__).is_relative_to(root)
 catalog = builtin_catalog()
 for name, role in [('base_prompt','H'), ('skill-library','S'), ('improvement-editor','I'), ('improvement-organizer','I')]:
     assert read_default(catalog, name)[0].role == role
@@ -213,3 +222,22 @@ assert composer.Composer(None).prepare('text') == 'text'
                                  cwd=self.root, capture_output=True, text=True, timeout=20)
         self.assertNotEqual(missing.returncode, 0)
         self.assertIn('defaults.yaml', missing.stderr)
+
+    def test_role_settings_roundtrip_and_frozen_defaults_preserve_authored_configuration(self):
+        for role_id, values in (('improvement-editor', {'target_page_entries': 3}),
+                                ('improvement-evaluator', {'output_preview_characters': 5})):
+            self.raw['profiles']['test']['I'][role_id] = {'inline': {
+                'id': role_id, 'role': 'I', 'implementation': role_id,
+                'parameters': {'settings': values}}}
+        self.write()
+        config = load_system_config(self.path)
+        save_harness_config(self.path, config)
+        original = self.path.read_bytes()
+        selected = load_system_config(self.path).select()
+        self.assertEqual(3, selected.component_settings['editor']['settings']['target_page_entries'])
+        self.assertEqual(5, selected.component_settings['evaluator']['settings']['output_preview_characters'])
+        destination = self.root / 'role-frozen/config.yaml'
+        materialize_system(selected, destination, model_source=self.workspace.model_path)
+        restored = load_system_config(destination).select()
+        self.assertEqual(selected.component_settings, restored.component_settings)
+        self.assertEqual(original, self.path.read_bytes())

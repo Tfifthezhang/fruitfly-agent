@@ -52,8 +52,8 @@ def _prepare_targets(state, context):
     state = state.with_component(TASK_PACK_COMPONENT, TaskPackCatalog(context.workspace, context.task_pack_sources))
     editor = state.components[TEXT_TARGET_PREFIX + 'improvement-editor'].instructions
     evaluator = state.components[TEXT_TARGET_PREFIX + 'improvement-evaluator'].instructions
-    settings = {'editor': {'model_role': 'editor', 'instructions': asdict(editor)},
-        'evaluator': {'instructions': asdict(evaluator)}}
+    settings = {'editor': {'model_role': 'editor', 'instructions': asdict(editor), 'settings': asdict(state.components[TEXT_TARGET_PREFIX + 'improvement-editor'].settings)},
+        'evaluator': {'instructions': asdict(evaluator), 'settings': asdict(state.components[TEXT_TARGET_PREFIX + 'improvement-evaluator'].settings)}}
     organizer = state.components[TEXT_TARGET_PREFIX + 'improvement-organizer'].instructions
     settings['organizer'] = {'instructions': asdict(organizer)}
     for role, key in (('organizer', ORGANIZER_CONFIG), ('editor', EDITOR_CONFIG), ('assessor', ASSESSOR_CONFIG)):

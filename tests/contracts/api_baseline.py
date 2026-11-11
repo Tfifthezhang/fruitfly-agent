@@ -101,7 +101,7 @@ LAB_ENV_PUBLIC_API = {"LocalEnv"}
 
 LAB_HOST_PUBLIC_API = {
     "ASSESSOR_CONFIG", "AgentEditor", "AgentGenerator",
-    "AgentReflector", "AgentSelector", "CompletedAssessmentService",
+    "AgentReflector", "AgentSelector", "CompletedAssessmentService", "EvidenceDelegation",
     "LayeredOrganizer", "OrganizerInstructions", "EDITOR_CONFIG", "EDITOR_INSTRUCTIONS", "ORGANIZER_CONFIG", "ExecutionContext",
     "GeneratorRegistry",  "ReadOnlyInspector", "SETTINGS",
     "SYSTEM_SETTINGS", "SearchActivity", "SearchActivitySource", "SearchCompletion",

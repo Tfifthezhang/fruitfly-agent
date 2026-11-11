@@ -44,8 +44,8 @@ class WorkspaceEvidence:
         limit = self.settings.read.default_characters if limit is None else limit
         if type(offset) is not int or offset < 0 or type(limit) is not int or not 1 <= limit <= self.settings.read.max_characters:
             raise ValueError('read needs a nonnegative offset and page size 1..24000')
-        remaining = self.settings.supply.max_characters - self.supplied_characters
-        if remaining <= 0 or count_response and self.supplied_pages >= self.settings.supply.max_pages:
+        remaining = self.workspace.access.remaining_characters(self.settings.supply.max_characters)
+        if remaining <= 0 or count_response and self.workspace.access.remaining_responses(self.settings.supply.max_pages) <= 0:
             self.workspace.record("evidence-budget-exhausted", characters=self.supplied_characters, pages=self.supplied_pages)
             return {"status": "budget_exhausted", "text": "", "next_offset": None,
                     "note": "Reading budget exhausted. Submit using supplied evidence and declare uncovered scope."}
@@ -78,8 +78,8 @@ class WorkspaceEvidence:
         limit = self.settings.search.default_matches if limit is None else limit
         if not isinstance(query, str) or not 1 <= len(query) <= 500 or type(limit) is not int or not 1 <= limit <= self.settings.search.max_matches:
             raise ValueError('search requires literal query and page size 1..50')
-        if (self.supplied_characters >= self.settings.supply.max_characters
-                or self.supplied_pages >= self.settings.supply.max_pages):
+        if (self.workspace.access.remaining_characters(self.settings.supply.max_characters) <= 0
+                or self.workspace.access.remaining_responses(self.settings.supply.max_pages) <= 0):
             return {'status': 'budget_exhausted', 'matches': [], 'unavailable': [], 'next_cursor': None, 'complete': False}
         available = self.workspace.paths()
         selected = tuple(sorted(paths or (p for p in available if not p.startswith(('harness/', 'originals/')) and '/originals/' not in p)))

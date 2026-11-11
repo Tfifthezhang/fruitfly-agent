@@ -112,3 +112,107 @@ class SubagentAssemblyTests(unittest.IsolatedAsyncioTestCase):
             # The failing provider is a fake with no external resource. Release
             # the test-owned Session lease after verifying the retained failure.
             prepared.config.session.close()
+
+    async def test_component_protocol_controls_real_service_and_round_trips_nested_paths(self):
+        parameters = {'max_task_characters': 7, 'max_context_characters': 12,
+            'output_page_characters': 3, 'default_wait_seconds': 0,
+            'retirement_timeout': .2}
+        runtime = self.assemble(parameters=parameters)
+        service = runtime.components['subagent-monitor']
+        self.assertEqual((7, 3, .2), (service.protocol.max_task_characters,
+            service.results.output_page_characters, service.retirement_timeout))
+        service.begin()
+        from fruitfly_agent.lab.agents.subagent.service import SubagentError
+        with self.assertRaisesRegex(SubagentError, 'invalid_task_material'):
+            service.spawn('Long task')
+        self.assertFalse(service.tasks)
+        profile = component_profile(HarnessProfile('test', model_profile='offline',
+            mechanisms=(MechanismSelection('subagent', True, parameters),)), self.catalog, freeze=True)
+        document = profile.to_dict()['H']['subagent']['inline']
+        self.assertEqual(7, document['parameters']['settings']['protocol']['max_task_characters'])
+        self.assertEqual(3, document['parameters']['settings']['results']['output_page_characters'])
+        self.assertNotIn('max_task_characters', document['parameters']['settings'])
+        await service.end()
+
+    async def test_explicit_component_grant_changes_actual_child_tools_and_preserves_parent(self):
+        runtime = self.assemble(parameters={'inheritance_mode': 'explicit',
+            'inherited_components': ['local-env']})
+        parent_tools = [t.name for t in runtime.config.tools]
+        children = []
+        def create(spec, environment):
+            provider = FauxProvider()
+            provider.respond_text('restricted result')
+            children.append(provider)
+            return provider
+        self.workspace.registry.create.side_effect = create
+        service = runtime.components['subagent-monitor']
+        service.begin()
+        row = service.spawn('Inspect only supplied task text')
+        result = await service.wait([(row['agent_id'], row['run_id'])], timeout_seconds=2)
+        self.assertEqual('completed', result['executions'][0]['state'])
+        self.assertEqual([], children[0].calls[0]['tools'])
+        self.assertIn('read', parent_tools)
+        self.assertEqual(parent_tools, [t.name for t in runtime.config.tools])
+        await service.end()
+
+    def test_explicit_component_grant_cannot_enable_absent_components(self):
+        with self.assertRaisesRegex(ValueError, 'enabled parent subset'):
+            self.assemble(parameters={'inheritance_mode': 'explicit',
+                'inherited_components': ['bash-tool']})
+        self.assertFalse((self.root / 'root.jsonl.subagents').exists())
+
+    async def test_empty_explicit_component_grant_still_runs_independent_child(self):
+        runtime = self.assemble(parameters={'inheritance_mode': 'explicit',
+            'inherited_components': []})
+        self.workspace.registry.create.side_effect = lambda *args: self.child_answer()
+        service = runtime.components['subagent-monitor']
+        service.begin()
+        row = service.spawn('Answer using only this task')
+        result = await service.wait([(row['agent_id'], row['run_id'])], timeout_seconds=2)
+        self.assertEqual('completed', result['executions'][0]['state'])
+        await service.end()
+
+    @staticmethod
+    def child_answer():
+        provider = FauxProvider()
+        provider.respond_text('answer')
+        return provider
+
+    async def test_explicit_grant_drops_parent_prompt_but_keeps_host_execution_limits(self):
+        from fruitfly_agent.run.storage.artifacts import DataArtifactStore
+        store = DataArtifactStore(self.root / 'artifacts')
+        reference = store.put_text('PARENT PRIVATE INSTRUCTIONS').artifact_id
+        profile = HarnessProfile('test', model_profile='offline', prompt=reference,
+            execution={'max_tool_calls_per_turn': 2},
+            mechanisms=(MechanismSelection('subagent', parameters={
+                'inheritance_mode': 'explicit', 'inherited_components': []}),))
+        runtime = self.workspace.assemble(profile, self.session, catalog=self.catalog,
+            artifact_store=store, permission_policy=PermissionPolicy.unrestricted(self.root))
+        self.addAsyncCleanup(RuntimeHandle(None, {}, components=runtime.components).close)
+        self.assertIn('PARENT PRIVATE', runtime.config.system_prompt)
+        children = []
+        def create(*args):
+            provider = self.child_answer()
+            children.append(provider)
+            return provider
+        self.workspace.registry.create.side_effect = create
+        service = runtime.components['subagent-monitor']
+        service.begin()
+        row = service.spawn('Inspect only this task')
+        result = await service.wait([(row['agent_id'], row['run_id'])], timeout_seconds=2)
+        self.assertEqual('completed', result['executions'][0]['state'])
+        self.assertNotIn('PARENT PRIVATE', children[0].calls[0]['system_prompt'])
+        path = self.root / 'root.jsonl.subagents' / row['agent_id'] / 'session.jsonl'
+        with Session(path) as child:
+            metadata = next(e.payload for e in child.read_all() if e.payload.get('kind') == 'child-runtime')
+            self.assertEqual(2, metadata['manifest']['execution']['max_tool_calls_per_turn'])
+        await service.end()
+
+    def test_improvement_cannot_grant_inheritance_or_protocol_edits(self):
+        definition = self.catalog.get('subagent')
+        for field in ('parameters.settings.inheritance.mode',
+                'parameters.settings.inheritance.components',
+                'parameters.settings.protocol.max_wait_seconds',
+                'parameters.instructions.evidence_child', 'parameters.instructions.evidence_parent'):
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                definition.configuration_edit([field], {})

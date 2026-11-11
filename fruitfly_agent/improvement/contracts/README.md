@@ -5,7 +5,7 @@
 [Pipeline](pipeline.py) defines immutable task materials, component file sets,
 candidate bundles, execution records, optional measurements, plans, stage requests,
 selection decisions and attributed experience. Stage protocols are exported through
-[the public API](../api.py). There are no model requests or filesystem operations.
+[the public API](../api.py). There are no model requests or workspace writes; default constructors may read declared package data.
 
 | Contract | Invariant |
 |---|---|
@@ -124,3 +124,20 @@ readability requests and views. Measurements remain optional observations.
 links. `configuration.py` reports field additions, removals and changes without
 turning them into continuation admission decisions. The host owns path resolution
 and immutable dependency copying.
+
+`organization.py` also defines `OrganizationPart`: one attributed child finding
+with its exact source grant, citation spans, producer and reuse conditions. It is
+a historical evidence record, not a final guide or execution authorization.
+
+## Set shared stage defaults
+
+[defaults.yaml](defaults.yaml) owns independent editor, execution, evaluator and
+organizer invocation times. `StageTimeouts` reads these values through Core's shared
+resource decoder and validates finite positive seconds. Stage-specific research
+allowances override individual times; there is no second copy in experiment
+normalization. The effective values enter plan identity and configuration snapshots.
+This infrastructure is protected, not a selectable algorithm or candidate surface.
+The resource is build-declared and included in frozen source material.
+
+Constructor defaults read installed package data; constructing contracts still makes
+no model request or workspace mutation. Runtime does not import Lab or host loaders.

@@ -22,6 +22,7 @@ from .stages.extensions import extension_spec
 from .stages.registry import StageContext, StageDefinition, stage_definitions, builtin_stage_handlers
 from .evidence.configuration import EvidenceSettings
 from .evidence.batch import batch_view
+from .evidence.delegation import EvidenceDelegation
 from fruitfly_agent.improvement.contracts.stopping import StopPolicy
 from fruitfly_agent.improvement.evidence.reporting import SearchReport, TokenUsage
 
@@ -75,7 +76,7 @@ __all__ = [
     'AgentGenerator',
     'AgentReflector',
     'AgentSelector',
-    'CompletedAssessmentService', 'organize_evidence',
+    'CompletedAssessmentService', 'organize_evidence', 'EvidenceDelegation',
     'ORGANIZER_CONFIG',
     'LayeredOrganizer', 'OrganizerInstructions',
     'EDITOR_CONFIG',

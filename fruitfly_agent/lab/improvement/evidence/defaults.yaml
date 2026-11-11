@@ -1,0 +1,38 @@
+# Shared evidence defaults. Types and hard safety limits remain in Python.
+parameters:
+  read:
+    default_characters: 12000
+    max_characters: 24000
+  catalog:
+    default_entries: 50
+    max_entries: 100
+  search:
+    default_matches: 20
+    max_matches: 50
+    max_characters: 12000
+  supply:
+    max_characters: 256000
+    max_pages: 64
+    completion_requests: 8
+  delegation:
+    enabled: false
+    workers:
+    - evidence-reader
+  instructions:
+    initial: Use catalog to discover the granted workspace, then read relevant evidence.
+    repair: 'The judgment was rejected: {error}. Repair the submission using the declared
+      schema and supplied citations. Do not restart investigation or invent evidence.'
+    catalog: Page granted files or an event index. Overview and event indexes navigate
+      to immutable originals.
+    read: Read a granted original page or image. Cite the returned citation_id; continue
+      with next_offset. Offsets are source characters.
+    search: Literal search across granted files or selected paths. Returns source
+      spans, citation IDs, failures and a continuation cursor.
+    submit_findings: Submit a compact summary, exact supplied citations and remaining
+      unknowns.
+    catalog_parts: Browse still-applicable retained child findings without supplying original evidence.
+    read_part: Read a retained part with original producer and source references. Continue with next_offset; this is derived historical evidence.
+  retention:
+    enabled: false
+    reuse: true
+    preview_characters: 400

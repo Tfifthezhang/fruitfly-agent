@@ -74,6 +74,14 @@ retained even if projection/alias publication needs attention.
 | `execute` | `tasks`, task-set `attempts`, `concurrency` | `task_seconds` |
 | `compare` | At least two batches | Same reading allowance |
 
+Organize, assess, propose and compare additionally accept `delegation` with
+`enabled` (boolean) and `workers` (distinct names declared by the selected Subagent component). Omitted
+controls use Evidence owner defaults: disabled, with the declared reader available
+when explicitly enabled. An enabled stage requires the selected system profile's
+enabled Subagent component. Models, tools and protocol controls remain in that
+component's configuration, not research YAML. See
+[execution and material grants](../lab/improvement/DEVELOPER_GUIDE.md#delegate-read-only-evidence-investigation).
+
 All stages also admit `inputs`, `context`, `publish_as` and `attempt`. A proposal
 without a harness input uses `baseline`; execute requires an explicit harness.
 `seconds` is the whole role invocation time, including format repair. Evidence
@@ -141,3 +149,9 @@ owns their execution semantics. Do not add configuration version fields.
 The default Improvement entry is `.fruitfly/improvement.yaml`; `--config` overrides
 it. Stage controls are study intent, not another home for algorithm instructions.
 Keep algorithm instructions in the referenced H/S/I component owner documents.
+
+Organize additionally accepts `incremental: {enabled: true, reuse: true}`. Both
+fields are strict booleans. Enabling retention requires delegation. Completed child
+findings are stored independently of final guide publication; reuse remains
+conditional on current source and execution identities. See the
+[operational guide](../lab/improvement/DEVELOPER_GUIDE.md#reuse-completed-organization-parts).

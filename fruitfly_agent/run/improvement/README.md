@@ -11,6 +11,7 @@ configuration and portable outputs. The host does not run a continuous search.
 | `context.py` | Branch-scoped named references and selected stage inputs |
 | `service.py` | Independent stage bindings over the injected controller |
 | `roles.py` | Shared model catalog and requested-role construction |
+| `research_runtime.py` | Persistent research roles and assigned-evidence child runtime ownership |
 | `configuration/snapshot.py` | Immutable snapshots, differences and complete candidate export |
 | `execution_host.py` | Registered backend preparation and one execution batch |
 | `candidates.py`, `versions.py`, `startup_versions.py` | Separate candidate review, identity and activation checks |
@@ -37,3 +38,10 @@ Research import passes explicit task names and original path/hash selections to
 the source adapter. The stage service does not require model organization before
 assessment/proposal. Evidence budgets are shared role settings, not Eval branches
 in the runtime. See [configuration](../../experiments/CONFIGURATION.md).
+
+Explicit stage delegation constructs an independent research Session and managed
+Subagent scope. Lab's public EvidenceDelegation capability owns material grants,
+read-only tools and source validation. Run owns Sessions, independent Providers,
+context state and retirement. The same stage factory shares allowance counters
+across repeated role invocations; child completion never implies parent original
+reading. See [operational controls](../../lab/improvement/DEVELOPER_GUIDE.md#delegate-read-only-evidence-investigation).

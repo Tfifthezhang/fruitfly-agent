@@ -3,8 +3,10 @@ from fruitfly_agent.core.data_model import AgentToolResult, TextBlock
 from fruitfly_agent.core.tool_runtime import AgentTool
 
 
-def submission_tool(name, submit):
+def submission_tool(name, submit, *, instructions=None):
     """The same owner validator accepts tool submissions and final text responses."""
+    from .instructions import EvaluatorInstructions
+    instructions = instructions or EvaluatorInstructions()
     text = {'type': 'string'}
     citations = {'type': 'array', 'items': text}
     def obj(fields):
@@ -21,7 +23,5 @@ def submission_tool(name, submit):
     async def seal(ctx):
         submit({**ctx.args, 'choice': ctx.args.get('choice') or None})
         return AgentToolResult(content=[TextBlock('Judgment validated and retained.')], terminate=True)
-    return AgentTool(name=name, label='Submit judgment', description=(
-        'Submit the complete judgment. The host checks identities, structure and supplied citations. '
-        'Correct any reported validation errors and resubmit; success finishes this invocation.'),
+    return AgentTool(name=name, label='Submit judgment', description=instructions.submit_judgment,
         parameters=schema, execute=seal, requires_exclusive_batch=True)

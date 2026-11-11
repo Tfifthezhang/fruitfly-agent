@@ -23,14 +23,26 @@ stages:
     allowance:
       task_seconds: 3600
   organize:
+    incremental:
+      enabled: true
+      reuse: true
+    delegation:
+      enabled: true
+      workers: [evidence-reader, record-organizer, cross-record-reader, counterexample-reader]
     allowance:
       seconds: 1200
     attempt: reuse
   assess:
+    delegation:
+      enabled: true
+      workers: [evidence-reader, record-organizer, cross-record-reader, counterexample-reader]
     allowance:
       seconds: 1200
     attempt: reuse
   propose:
+    delegation:
+      enabled: true
+      workers: [evidence-reader, record-organizer, cross-record-reader, counterexample-reader]
     optimization:
       scope: defaults
       include: {}
@@ -39,6 +51,9 @@ stages:
       seconds: 1200
     attempt: reuse
   compare:
+    delegation:
+      enabled: true
+      workers: [evidence-reader, record-organizer, cross-record-reader, counterexample-reader]
     allowance:
       seconds: 1200
     attempt: reuse
