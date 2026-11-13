@@ -52,7 +52,10 @@ class OrganizerTests(unittest.IsolatedAsyncioTestCase):
         def answer(view, signal=None):
             self.assertIn('Invocation requirements:\nKeep the guide compact for this invocation.', view.system_prompt)
             tool_result = json.loads(view.messages[-1].text)
-            guide = {'sections': [{'title': 'Candidate view' if 'CANDIDATE GUIDE' in view.system_prompt else 'Task view',
+            source = {'path': 'context/batch.json', 'citation_id': tool_result['citation_id']}
+            guide = {'findings': [{'issue_id': 'missing-diagnostics', 'signal': 'Unknown execution diagnostics',
+                'facts': ['One retained execution'], 'hypotheses': ['Collection may be incomplete'],
+                'counterevidence': [], 'unknowns': ['No terminal reason supplied'], 'sources': [source]}], 'sections': [{'title': 'Candidate view' if 'CANDIDATE GUIDE' in view.system_prompt else 'Task view',
                 'summary': 'One retained execution; inspect the output.',
                 'sources': [{'path': 'context/batch.json', 'citation_id': tool_result['citation_id']}]}]}
             async def events():
@@ -75,7 +78,9 @@ class OrganizerTests(unittest.IsolatedAsyncioTestCase):
             async with StageServices(plan) as services:
                 view = await organizer.organize(request, services)
                 guide = next(r for r in view.resources if r.path == 'organization/guide.json')
-                titles.append(json.loads(artifacts.read(guide.artifact_id))['sections'][0]['title'])
+                document = json.loads(artifacts.read(guide.artifact_id))
+                titles.append(document['sections'][0]['title'])
+                self.assertEqual('missing-diagnostics', document['findings'][0]['issue_id'])
                 self.assertTrue(any(fields.get('role') == 'organizer' for _, fields in services.events))
         self.assertEqual(titles, ['Task view', 'Candidate view'])
         self.assertEqual(record.output, '\n'.join(c.files[0].text for c in baseline.components))

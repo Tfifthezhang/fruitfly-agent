@@ -264,6 +264,9 @@ class RunApplicationFactory:
     def resumable_sessions(self, *, current_path: Path) -> tuple[ResumableSession, ...]:
         return discover_resumable_sessions(self.cwd, current_path=current_path)
 
+    def resumable_sessions_progress(self, *, current_path: Path, on_update):
+        return discover_resumable_sessions(self.cwd, current_path=current_path, on_update=on_update)
+
     def _resolve(self) -> HarnessSelection:
         return resolve_harness_selection(
             cwd=self.cwd,

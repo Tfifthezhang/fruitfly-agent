@@ -10,8 +10,10 @@ async def organize(ports, spec, inputs):
         raise ValueError('register an Organizer role before organizing')
     batch = ports.input_batch(inputs.batches)
     context = (*readable_context(ports, inputs),
-        ports.put('observations.json', batch.observations, 'input'))
+        ports.put('observations.json', batch.observations, 'input'),
+        *(ports.select_evidence(batch) if getattr(ports, 'select_evidence', None) else ()))
     async with ports.create_services() as services:
         view = await ports.organizer.organize(OrganizationRequest(batch.tasks, batch.records,
             spec.parameters.get('instruction') or 'Organize the supplied batch for reading.', context), services)
-        return ActivityResult((ports.put('view.json', asdict(view)), *view.resources))
+        return ActivityResult((ports.put('view.json', asdict(view)), *view.resources,
+            *(r for r in context if r.path == 'selection.json')))

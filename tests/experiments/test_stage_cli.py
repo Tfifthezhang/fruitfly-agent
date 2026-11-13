@@ -212,7 +212,7 @@ class StageCliTests(unittest.IsolatedAsyncioTestCase):
                 notice = next(m for m in reversed(view.messages) if getattr(m, 'kind', '') == 'subagent-result')
                 row = json.loads(notice.text.split('\n', 1)[1])
                 findings = json.loads(row['summary'])['findings']
-                guide = {'sections': [{'title': 'Batch scope', 'summary': findings['summary'], 'sources': findings['sources']}]}
+                guide = {'findings': [], 'sections': [{'title': 'Batch scope', 'summary': findings['summary'], 'sources': findings['sources']}]}
                 return stream(AssistantMessage([TextBlock(json.dumps(guide))], 'stop'))
             parent.script.append(integrate)
             child.respond_tool_call('read', {'path': 'context/batch.json'})

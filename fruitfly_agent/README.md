@@ -218,3 +218,9 @@ A parent submission owns scheduling, attributed results and bounded retirement.
 Interactive consumes a read-only monitor; Provider adapters contain no delegation
 policy. Children have private Sessions and context state but may share file effects.
 The model role defaults to executor inheritance and can select another catalog alias.
+
+Research [evidence selection](lab/improvement/evidence_selection/README.md) is a
+replaceable I policy over full compact batch summaries. Organize/propose expose
+only selected detailed cases and materials; structured findings separate facts,
+hypotheses, counterevidence and unknowns. Candidate reasons retain issue and
+original-execution attribution. Archive scope and reading coverage stay distinct.

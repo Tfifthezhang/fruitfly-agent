@@ -109,6 +109,7 @@ class ExtensionAPI:
     agent_observers: list = field(default_factory=list)
     improvement_observers: list = field(default_factory=list)
     agent_interceptors: list = field(default_factory=list)
+    evidence_selector: object = None
     _sealed: bool = False
 
     def check(self):
@@ -122,6 +123,13 @@ class ExtensionAPI:
     def register_generator(self, identity, factory, **metadata):
         self.check()
         self.generators.append((identity, factory, metadata))
+
+    def register_evidence_selector(self, factory):
+        """Bind the existing evidence-selection port; settings stay in Catalog."""
+        self.check()
+        if self.evidence_selector is not None or not callable(factory):
+            raise ValueError('duplicate or invalid evidence selector')
+        self.evidence_selector = factory
 
 
     def register_command(self, name, handler, *, summary=''):
@@ -194,6 +202,11 @@ class ExtensionSet:
 
     def bindings(self, base=None):
         base = base or StageBindings()
+        selectors = [api.evidence_selector for api in self.registrations if api.evidence_selector is not None]
+        if len(selectors) + int(base.evidence_selector is not None) > 1:
+            raise ValueError('evidence selector binding collision')
+        if selectors:
+            base = replace(base, evidence_selector=selectors[0])
         generators = GeneratorRegistry()
         if base.generators is not None:
             for item in base.generators.definitions():

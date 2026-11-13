@@ -60,6 +60,14 @@ class RunActivityChanged(FrontendEvent):
 
 
 @dataclass(frozen=True, kw_only=True)
+class AssistantMessageStarted(FrontendEvent):
+    """One visible model response, timed from the accepted submission."""
+    event_type: ClassVar[str] = 'assistant_message_started'
+    request_index: int
+    elapsed_seconds: float | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
 class AssistantTextDelta(FrontendEvent):
     event_type: ClassVar[str] = "assistant_text_delta"
     text: str
@@ -122,6 +130,7 @@ class RunFinished(FrontendEvent):
     output_tokens: int
     is_error: bool
     error_details: dict[str, Any] | None
+    elapsed_seconds: float | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -158,6 +167,7 @@ InteractiveEvent = (
     | AuthorizationResolved
     | RunStarted
     | RunActivityChanged
+    | AssistantMessageStarted
     | AssistantTextDelta
     | AssistantThinkingDelta
     | ToolStarted
@@ -176,6 +186,7 @@ _EVENT_TYPES = {
         AuthorizationResolved,
         RunStarted,
         RunActivityChanged,
+        AssistantMessageStarted,
         AssistantTextDelta,
         AssistantThinkingDelta,
         ToolStarted,
@@ -206,6 +217,7 @@ __all__ = [
     "AuthorizationResolved",
     "RunStarted",
     "RunActivityChanged",
+    "AssistantMessageStarted",
     "AssistantTextDelta",
     "AssistantThinkingDelta",
     "ToolStarted",

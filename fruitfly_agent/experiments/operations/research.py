@@ -217,6 +217,11 @@ async def _dispatch(args, workspace, outputs, reporting):
     reporting.update(inputs=inputs, producers=producers)
     _capture_configuration(outputs, reporting)
     role_name = {'organize': 'organizer', 'propose': 'editor', 'assess': 'assessor', 'compare': 'assessor'}[args.command]
+    from fruitfly_agent.lab.improvement.evidence_selection import RepresentativeSelector, SelectionSettings
+    selector_factory = roles.extensions.bindings().evidence_selector
+    service.evidence_selector = (selector_factory(roles.profile.component_settings) if selector_factory else
+        RepresentativeSelector(SelectionSettings.from_parameters(
+            roles.profile.component_settings.get('evidence_selection', {}))))
     from fruitfly_agent.run.storage.organization_parts import OrganizationPartStore
     from fruitfly_agent.lab.improvement.api import EvidenceSettings
     part_store = OrganizationPartStore(outputs.root / 'organization-parts' / getattr(args, 'branch', 'main'), outputs.artifacts) if EvidenceSettings.from_dict(config.evidence_settings).retention.enabled else None
@@ -292,6 +297,8 @@ async def _dispatch(args, workspace, outputs, reporting):
             reporting.update(inputs=inputs, profile=roles.profile, catalog=roles.catalog,
                 components=components, artifact_reader=read_artifact, model_source=roles.model_path,
                 system_source=str(roles.config_path))
+        if args.command in {'organize', 'propose'}:
+            service.role_identity[args.command]['evidence_selector'] = service.evidence_selector.identity
         parameters = {'instruction': getattr(args, 'instruction', '')} if args.command == 'organize' else {}
         return await service.perform_named(args.command, named, parameters=parameters, fresh=args.fresh, retry_unresolved=args.retry_unresolved)
     finally:

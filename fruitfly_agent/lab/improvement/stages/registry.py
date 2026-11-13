@@ -54,6 +54,7 @@ class StageContext:
     read_batch: Callable
     input_batch: Callable
     create_services: Callable
+    select_evidence: Callable | None = None
 
 
 def builtin_stage_handlers(context):

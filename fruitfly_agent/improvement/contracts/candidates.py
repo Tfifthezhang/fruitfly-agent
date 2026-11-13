@@ -97,12 +97,18 @@ class EditReason:
     explanation: str
     evidence_ids: tuple[str, ...]
     expected_effect: str
+    issue_ids: tuple[str, ...] = ()
 
     def __post_init__(self):
         identifier(self.component_id)
         bounded(self.explanation, 4000)
         bounded(self.expected_effect, 4000)
         object.__setattr__(self, 'evidence_ids', tuple(self.evidence_ids))
+        object.__setattr__(self, 'issue_ids', tuple(self.issue_ids))
+        if len(self.issue_ids) != len(set(self.issue_ids)):
+            raise ValueError('edit issue identities must be distinct')
+        for issue in self.issue_ids:
+            identifier(issue)
         if not self.evidence_ids or any(not isinstance(v, str) or not v for v in self.evidence_ids):
             raise ValueError('edits need attributable evidence')
 

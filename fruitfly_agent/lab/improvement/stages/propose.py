@@ -19,6 +19,8 @@ async def propose(ports, spec, inputs):
     baseline = HarnessSnapshot.from_dict(ports.read(inputs.harness))
     context = list(readable_context(ports, inputs))
     context.append(ports.put('observations.json', batch.observations, 'input'))
+    if getattr(ports, 'select_evidence', None):
+        context.extend(ports.select_evidence(batch))
     request = proposal_request(batch, ports.plan, baseline, context=tuple(context))
     ports.proposal.components.configure(ports.plan.component_options)
     ports.proposal.components.validate(baseline)
@@ -30,4 +32,5 @@ async def propose(ports, spec, inputs):
         result = await run_stage(services, 'propose', lambda: generator.propose(request, GeneratorServices(services)))
         for candidate in result.candidates:
             ports.proposal.validate(candidate, plan=ports.plan, baseline=baseline, records=request.records)
-        return ActivityResult((ports.put('proposal.json', asdict(result)),))
+        return ActivityResult((ports.put('proposal.json', asdict(result)),
+            *(r for r in context if r.path == 'selection.json')))

@@ -98,7 +98,7 @@ class TerminalScrollbackTests(unittest.TestCase):
         process.resize(14, 80)
         process.read_until('❯ ')
         process.send(b'first turn\r')
-        process.read_until('10 in / 5 out]')
+        process.read_until('10 in / 5 out |')
         before_menu = process.output.decode(errors='replace')
         self.assertNotIn('\x1b[?1049h', before_menu)
         for index in range(60):
@@ -107,7 +107,7 @@ class TerminalScrollbackTests(unittest.TestCase):
         process.read_until('MENU-RETURNED')
         offset = len(process.output)
         process.send(b'second turn\r')
-        process.read_until('10 in / 5 out]', start=offset)
+        process.read_until('10 in / 5 out |', start=offset)
         process.send(b'/exit\r')
         output = process.finish()
         for prefix in ('first', 'second'):

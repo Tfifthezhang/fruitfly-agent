@@ -5,11 +5,14 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import uuid
+import time
 from collections import deque
 from collections.abc import Awaitable, Callable
 
 from fruitfly_agent.interactive.contracts.events import (
     FrontendEvent,
+    AssistantMessageStarted,
+    RunFinished,
     InteractiveEvent,
     AuthorizationRequested,
     EventSink,
@@ -28,6 +31,7 @@ class EventDispatcher:
         self._sink = sink
         self._run_id = ""
         self._sequence = 0
+        self._started_at = time.monotonic()
         self._trace: deque[InteractiveEvent] = deque(
             maxlen=max(1, trace_capacity)
         )
@@ -41,6 +45,7 @@ class EventDispatcher:
             raise RuntimeError("an interactive run is already active")
         self._run_id = uuid.uuid4().hex
         self._sequence = 0
+        self._started_at = time.monotonic()
 
     def end_run(self) -> None:
         self._run_id = ""
@@ -55,6 +60,8 @@ class EventDispatcher:
         if not self.active:
             return
         self._sequence += 1
+        if isinstance(event, (AssistantMessageStarted, RunFinished)):
+            event = dataclasses.replace(event, elapsed_seconds=max(0.0, time.monotonic() - self._started_at))
         emitted = dataclasses.replace(
             event,
             run_id=self._run_id,

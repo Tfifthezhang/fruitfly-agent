@@ -25,3 +25,14 @@ availability. It makes no title-generation requests. Profile/prompt hashes remai
 in the read model rather than the normal row. Older histories without message
 timestamps use file modification time. Artifact loading alone does not imply a
 research candidate.
+
+Session discovery runs in a worker thread. Hosts can publish progressive metadata
+snapshots; the picker renders them through its existing input owner. ANSI menus
+allow selection/cancellation before discovery finishes. Numbered fallback menus
+wait for the completed list. Background scanning never renders or reads input. Run may use disposable
+metadata caches; selecting a row still performs complete recovery validation.
+
+Restoration renders the newest 40 canonical messages. `/history older` appends
+preceding pages in chronological order; `/history` refreshes the current snapshot
+and newest page. Paging changes presentation only, preserves the active model
+context, and never replays tools or requests. A resumed session resets the page.

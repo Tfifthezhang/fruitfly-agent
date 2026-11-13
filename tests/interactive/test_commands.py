@@ -44,6 +44,17 @@ class CommandRouterTest(unittest.TestCase):
         self.context = _Context()
         self.router = CommandRouter()
 
+    def test_help_separates_diagnostics_and_expands_registered_usage(self):
+        normal = self.router.execute(InteractiveCommand('help'), self.context)
+        self.assertNotIn('/trace', normal.text)
+        self.assertIsNotNone(normal.panel)
+        all_commands = self.router.execute(InteractiveCommand('help', ('all',)), self.context)
+        self.assertIn('/trace', all_commands.text)
+        detail = self.router.execute(InteractiveCommand('help', ('trace',)), self.context)
+        self.assertIn('/trace [N]', detail.text)
+        alias = self.router.execute(InteractiveCommand('help', ('quit',)), self.context)
+        self.assertEqual(alias.panel.title, '/exit')
+
     def test_parser_preserves_arguments_and_quit_alias(self) -> None:
         self.assertEqual(
             parse_command("/trace 5"),

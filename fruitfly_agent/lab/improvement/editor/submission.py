@@ -25,4 +25,19 @@ def submission(text, workspace, request, components):
             or any(set(r.evidence_ids) - known for r in reasons)):
         raise ValueError('each authorized changed component must cite supplied executions exactly once')
     workspace.access.validate_citations(reasons)
+    findings: dict[str, dict] = {}
+    for resource in request.context:
+        if resource.path.rsplit('/', 1)[-1] != 'guide.json':
+            continue
+        path = 'context/extensions/' + resource.path
+        guide = json.loads(workspace.read(path))
+        for finding in guide.get('findings', ()):
+            issue = finding['issue_id']
+            if issue in findings and findings[issue] != finding:
+                raise ValueError('conflicting issue identity across organization inputs')
+            findings[issue] = finding
+    for reason in reasons:
+        if (set(reason.issue_ids) - findings.keys()
+                or findings and not reason.issue_ids):
+            raise ValueError('candidate changes must link to supplied investigation findings')
     return candidate

@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Protocol, runtime_checkable
 
 from fruitfly_agent.improvement.contracts.execution import TaskRunner
+from fruitfly_agent.improvement.contracts.investigation import EvidenceSelector
 from fruitfly_agent.improvement.contracts.assessment import Selector, MeasurementSource, VerificationPolicy
 from fruitfly_agent.improvement.contracts.editing import Reflector, EditorSession, EvidenceInspector
 from .components import ComponentRegistry, component_registry, bundle_target, bundle_text
@@ -41,6 +42,7 @@ class StageBindings:
     hooks: Callable[[ExecutionContext], None] | None = None
     delivery_backend: Any = None
     evidence_settings: dict | None = None
+    evidence_selector: Callable[[dict], EvidenceSelector] | None = None
 
 @dataclass(frozen=True)
 class SearchActivity:

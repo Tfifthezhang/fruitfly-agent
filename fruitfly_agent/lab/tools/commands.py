@@ -19,8 +19,15 @@ class CommandManager:
 
     async def start_command(self, execute, context, *, wait_seconds):
         async def work(update):
-            return await execute(replace(context, on_update=update))
-        handle = await self.operations.submit(work, signal=context.signal, is_error=lambda result: result.is_error)
+            try:
+                result = await execute(replace(context, on_update=update))
+            except Exception as exc:
+                await update(str(exc))
+                raise
+            await update('\n'.join(block.text for block in result.content if isinstance(block, TextBlock)))
+            return result
+        handle = await self.operations.submit(work, signal=context.signal, is_error=lambda result: result.is_error,
+            description=context.args.get('command', ''))
         return await self.poll(handle, wait_seconds=wait_seconds)
 
     async def poll(self, handle, *, wait_seconds=0):

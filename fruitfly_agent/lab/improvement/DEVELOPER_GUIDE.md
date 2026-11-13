@@ -357,7 +357,8 @@ survive materialization. Research selection does not authorize activation.
 
 `stages.propose.optimization.scope` is `defaults` or `explicit`. Include grants
 replace an owner's fields; exclude removes owners. Defaults include enabled
-supported components except File memory and the three I instruction roles.
+supported components except File memory, the three I instruction roles and the
+evidence-selection I policy.
 Disabled components stay disabled. Protected and mode-dependent owner validation
 still applies. I grants do not create an independent I comparison backend.
 
@@ -536,6 +537,7 @@ Interrupted work is never automatically replayed.
 | Shared independent stage times | `fruitfly_agent/improvement/contracts/defaults.yaml` | Selected stage `allowance.seconds` or `allowance.task_seconds` |
 | Candidate editing and repair | `fruitfly_agent/lab/improvement/editor/methods/workspace/defaults.yaml` | I `improvement-editor` component file |
 | Assessment and comparison | `fruitfly_agent/lab/improvement/assessment/methods/model/defaults.yaml` | I `improvement-evaluator` component file |
+| Evidence case/material selection | `fruitfly_agent/lab/improvement/evidence_selection/methods/representative/defaults.yaml` | I `improvement-evidence-selection` component file |
 | Readable organization | `fruitfly_agent/lab/improvement/organizer/methods/layered/defaults.yaml` | I `improvement-organizer` component file |
 | Evidence navigation and incremental retention | `fruitfly_agent/lab/improvement/evidence/defaults.yaml` | Stage allowances, delegation and incremental controls |
 | Child runtime, workers and permissions | `fruitfly_agent/lab/agents/subagent/methods/managed/defaults.yaml` | H `subagent` component file |
@@ -564,3 +566,24 @@ Use public package imports `from fruitfly_agent.lab.improvement.editor import
 AgentEditor` and `from fruitfly_agent.lab.improvement.assessment import
 ModelEvaluator`. Frozen-source regressions execute the moved methods and load their
 resources in an isolated process without checkout fallback.
+
+## Bound multi-batch investigation
+
+Bind multiple explicit `stages.organize.inputs.batches` or
+`stages.propose.inputs.batches`. Matching task/run identities deduplicate;
+conflicting identities fail. Identical observations deduplicate separately.
+All compact rows retain status, official outcomes, time, scoped usage and
+conditions. Import and later manifest loading do not pre-read every original;
+actual selected reads validate artifact content hashes.
+
+The system I component `improvement-evidence-selection` controls bounded detailed
+cases through its [owner settings](evidence_selection/README.md). Organize and
+propose publish `selection.json` beside their normal outputs. Inspect selected
+reasons, signal counts and omitted scope before interpreting findings. A new
+explicit investigation can select more cases; archives remain unchanged.
+
+Organization returns sourced facts, hypotheses, counterevidence and unknowns.
+Proposal reasons reference supplied issue IDs when available, plus read original
+execution IDs and a falsifiable expected effect. Imported completion is not task
+success, and fewer steps are not automatically an improvement. Candidate execution
+and independent verification remain separate requested stages.

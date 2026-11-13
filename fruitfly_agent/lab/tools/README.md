@@ -186,3 +186,7 @@ or model quality. Runtime resources retire when their owning runtime closes.
 configuration group: spawn, send, wait, status and cancel. Each tool has distinct
 model-facing instructions. They manage child Agent executions; Bash handles and
 `/operations` continue to describe background tool operations.
+
+Managed operation observations include a bounded command description and output
+snapshot. Completed shell output is retained even when no live chunk was emitted.
+Read-only observers do not consume Bash poll results or alter process lifecycle.

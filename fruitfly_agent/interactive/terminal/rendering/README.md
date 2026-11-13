@@ -87,3 +87,10 @@ Agent control flow or generating a conclusion.
 Image draft markers use the ordinary input surface and cursor offsets. They are
 transient editor state, not additional Session messages. See
 [Composer](../features/composer/README.md) for selection and deletion behavior.
+
+## Read elapsed time and usage
+
+Visible response boundaries retain an elapsed-time marker before the answer.
+Completed, cancelled and failed submissions show total elapsed time when supplied.
+`formatting.py` formats duration and compact token units without changing events.
+Parallel child durations are not added to the parent wall time.

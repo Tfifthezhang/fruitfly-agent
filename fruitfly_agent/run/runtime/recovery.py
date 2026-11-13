@@ -8,6 +8,7 @@ from fruitfly_agent.core.errors import SessionCorruptError
 from fruitfly_agent.core.data_model import AgentMessage, UserMessage
 from fruitfly_agent.core.session.storage import Session, SessionSnapshot
 from fruitfly_agent.interactive import ResumableSession
+from fruitfly_agent.run.storage.session_index import SessionIndex
 from .assembly import RuntimeAssembly
 from .manifest import digest_manifest
 
@@ -78,7 +79,7 @@ def resolve_session_path(*, cwd: Path, session_path: str | None, resume: bool) -
     return new_session_path(cwd)
 
 
-def discover_resumable_sessions(cwd: Path, *, current_path: Path | None = None) -> tuple[ResumableSession, ...]:
+def discover_resumable_sessions(cwd: Path, *, current_path: Path | None = None, on_update=None) -> tuple[ResumableSession, ...]:
     """Read history without repairing files; show unavailable sessions with reasons."""
     state_dir = cwd / ".fruitfly"
     paths = list((state_dir / "sessions").glob("*.jsonl"))
@@ -87,39 +88,16 @@ def discover_resumable_sessions(cwd: Path, *, current_path: Path | None = None) 
         paths.append(legacy)
     current = current_path.resolve() if current_path is not None else None
     candidates = []
+    index = SessionIndex(state_dir / 'cache' / 'session-index')
+    paths.sort(key=lambda path: path.name, reverse=True)
     for path in paths:
         resolved = path.resolve()
         if resolved == current:
             continue
         try:
-            modified = path.stat().st_mtime
-            session = Session.inspect(resolved)
-            messages = session.canonical_messages()
-            if not messages:
-                continue
-            session.messages()
-            users = [m for m in messages if isinstance(m, UserMessage)]
-            content = users[0].content if users else ''
-            title = content if isinstance(content, str) else ' '.join(getattr(b, 'text', '') for b in content)
-            title = ''.join(c if c.isprintable() else ' ' for c in title)
-            title = ' '.join(title.split())[:100]
-            timestamps = [entry.timestamp for entry in session.read_all() if entry.type == 'message' and entry.timestamp > 0]
-            modified = max(timestamps) if timestamps else modified
-            manifests = session_manifests(session)
-            manifest = manifests[-1] if manifests else {}
-            models = manifest.get("models", {})
-            main = models.get("main", {})
-            prompt = manifest.get("base_prompt", {})
-            if not isinstance(main, dict) or not isinstance(prompt, dict):
-                raise ValueError("session runtime metadata is malformed")
-            candidates.append(ResumableSession(
-                path=str(resolved), modified_at=modified, message_count=len(messages),
-                title=title, user_turns=len(users),
-                profile=str(manifest.get("profile", "")), model=str(main.get("model", "")),
-                prompt_label=str(prompt.get("label", "")), prompt_hash=str(prompt.get("content_hash", "")),
-                available=not session.locked,
-                reason="session is locked by another process" if session.locked else "",
-            ))
+            candidate = index.discover(resolved, lambda: _inspect_candidate(path, resolved))
+            if candidate is not None:
+                candidates.append(candidate)
         except (OSError, SessionCorruptError, TypeError, ValueError) as exc:
             if not path.exists():
                 continue
@@ -127,9 +105,42 @@ def discover_resumable_sessions(cwd: Path, *, current_path: Path | None = None) 
                 path=str(resolved), modified_at=path.stat().st_mtime,
                 message_count=0, profile="", model="", available=False, reason=str(exc),
             ))
+        if on_update is not None:
+            on_update(tuple(sorted(candidates, key=lambda item: (item.modified_at, item.path), reverse=True)))
     return tuple(sorted(candidates, key=lambda item: (item.modified_at, item.path), reverse=True))
 
 
 def new_session_path(cwd: Path) -> Path:
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     return cwd / ".fruitfly" / "sessions" / f"{timestamp}-{uuid.uuid4().hex[:8]}.jsonl"
+
+
+def _inspect_candidate(path: Path, resolved: Path) -> ResumableSession | None:
+    modified = path.stat().st_mtime
+    session = Session.inspect(resolved)
+    messages = session.canonical_messages()
+    if not messages:
+        return None
+    session.messages()
+    users = [m for m in messages if isinstance(m, UserMessage)]
+    content = users[0].content if users else ''
+    title = content if isinstance(content, str) else ' '.join(getattr(b, 'text', '') for b in content)
+    title = ''.join(c if c.isprintable() else ' ' for c in title)
+    title = ' '.join(title.split())[:100]
+    timestamps = [entry.timestamp for entry in session.read_all() if entry.type == 'message' and entry.timestamp > 0]
+    modified = max(timestamps) if timestamps else modified
+    manifests = session_manifests(session)
+    manifest = manifests[-1] if manifests else {}
+    models = manifest.get("models", {})
+    main = models.get("main", {})
+    prompt = manifest.get("base_prompt", {})
+    if not isinstance(main, dict) or not isinstance(prompt, dict):
+        raise ValueError("session runtime metadata is malformed")
+    return ResumableSession(
+        path=str(resolved), modified_at=modified, message_count=len(messages),
+        title=title, user_turns=len(users),
+        profile=str(manifest.get("profile", "")), model=str(main.get("model", "")),
+        prompt_label=str(prompt.get("label", "")), prompt_hash=str(prompt.get("content_hash", "")),
+        available=not session.locked,
+        reason="session is locked by another process" if session.locked else "",
+    )

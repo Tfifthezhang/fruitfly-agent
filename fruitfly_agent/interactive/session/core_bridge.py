@@ -38,6 +38,7 @@ from fruitfly_agent.core.model_stream import (
 from fruitfly_agent.interactive.interaction.dispatch import EventDispatcher
 from fruitfly_agent.interactive.contracts.events import (
     AssistantTextDelta,
+    AssistantMessageStarted,
     AssistantThinkingDelta,
     CompactionStarted,
     FrontendEvent,
@@ -152,6 +153,8 @@ class _ObservableProvider:
         subject: str = "",
         activity_id: str = "",
     ) -> None:
+        if phase == "receiving_answer":
+            await self._emit(AssistantMessageStarted(run_id="", request_index=request_index))
         await self._emit(
             RunActivityChanged(
                 run_id="",

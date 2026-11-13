@@ -15,6 +15,7 @@ import fcntl
 import json
 import os
 import time
+from threading import RLock
 from contextlib import contextmanager
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -147,6 +148,8 @@ class Session(_SessionReader):
     """Append-only session log. Holds an exclusive flock for its lifetime."""
 
     def __init__(self, path: str | Path, *, lane: str = "main") -> None:
+        self._mutex = RLock()
+        self._closed = False
         self.path = Path(path)
         self.lane = lane
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -172,6 +175,26 @@ class Session(_SessionReader):
                 pass
             self._lock_fd.close()
             raise
+
+    def read_all(self) -> list[SessionEntry]:
+        with self._mutex:
+            return super().read_all()
+
+    def tail(self, n: int = 100) -> list[SessionEntry]:
+        with self._mutex:
+            return super().tail(n)
+
+    def messages(self) -> list[AgentMessage]:
+        with self._mutex:
+            return super().messages()
+
+    def canonical_messages(self) -> list[AgentMessage]:
+        with self._mutex:
+            return super().canonical_messages()
+
+    def context_items(self) -> list[ContextItem]:
+        with self._mutex:
+            return super().context_items()
 
     # -- load / validation --------------------------------------------------
 
@@ -279,36 +302,40 @@ class Session(_SessionReader):
     # -- append ---------------------------------------------------------------
 
     def check_writable(self) -> None:
-        if self._write_failed:
-            raise SessionCorruptError('session writer failed; close and reopen to validate the durable prefix',
-                details={'kind': 'session_write_failed'})
+        with self._mutex:
+            if self._closed:
+                raise SessionCorruptError('session writer is closed')
+            if self._write_failed:
+                raise SessionCorruptError('session writer failed; close and reopen to validate the durable prefix',
+                    details={'kind': 'session_write_failed'})
 
     @contextmanager
     def transaction(self) -> Iterator[None]:
         """Commit synchronous appends together under the existing writer lease.
 
-        The owner must serialize all work and must not await inside this scope.
+        The scope serializes threads and must not contain an await.
         Failed rollback leaves the writer poisoned, as with an ordinary append.
         """
-        self.check_writable()
-        size = self.path.stat().st_size if self.path.exists() else None
-        count = len(self._entries)
-        repair = self._repair_newline
-        try:
-            yield
-        except BaseException:
-            self._write_failed = True
-            if size is None:
-                self.path.unlink(missing_ok=True)
-            else:
-                with self.path.open('r+b') as stream:
-                    stream.truncate(size)
-                    stream.flush()
-                    os.fsync(stream.fileno())
-            del self._entries[count:]
-            self._repair_newline = repair
-            self._write_failed = False
-            raise
+        with self._mutex:
+            self.check_writable()
+            size = self.path.stat().st_size if self.path.exists() else None
+            count = len(self._entries)
+            repair = self._repair_newline
+            try:
+                yield
+            except BaseException:
+                self._write_failed = True
+                if size is None:
+                    self.path.unlink(missing_ok=True)
+                else:
+                    with self.path.open('r+b') as stream:
+                        stream.truncate(size)
+                        stream.flush()
+                        os.fsync(stream.fileno())
+                del self._entries[count:]
+                self._repair_newline = repair
+                self._write_failed = False
+                raise
 
     def append(
         self,
@@ -320,44 +347,49 @@ class Session(_SessionReader):
         sync: bool = False,
     ) -> SessionEntry:
         """Append an entry. Idempotent when entry_id is given and already exists."""
-        self.check_writable()
-        if entry_id is not None:
-            for existing in self._entries:
-                if existing.id == entry_id:
-                    return existing
-        next_id = entry_id if entry_id is not None else (self._entries[-1].id + 1 if self._entries else 1)
-        entry = SessionEntry(
-            id=next_id,
-            parent_id=parent_id,
-            type=type,
-            timestamp=time.time(),
-            payload=payload,
-        )
-        self._validate_entry(entry, len(self._entries) + 1)
-        line = entry.to_json_line()
-        try:
-            if self._repair_newline:
+        with self._mutex:
+            self.check_writable()
+            if entry_id is not None:
+                for existing in self._entries:
+                    if existing.id == entry_id:
+                        return existing
+            next_id = entry_id if entry_id is not None else (self._entries[-1].id + 1 if self._entries else 1)
+            entry = SessionEntry(
+                id=next_id,
+                parent_id=parent_id,
+                type=type,
+                timestamp=time.time(),
+                payload=payload,
+            )
+            self._validate_entry(entry, len(self._entries) + 1)
+            line = entry.to_json_line()
+            try:
+                if self._repair_newline:
+                    with self.path.open("ab") as f:
+                        f.write(b"\n")
+                    self._repair_newline = False
                 with self.path.open("ab") as f:
-                    f.write(b"\n")
-                self._repair_newline = False
-            with self.path.open("ab") as f:
-                f.write(line.encode("utf-8"))
-                f.flush()
-                if sync:
-                    os.fsync(f.fileno())
-        except BaseException:
-            # Some or all bytes may already exist. Never reuse the unconfirmed ID.
-            self._write_failed = True
-            raise
-        self._entries.append(entry)
-        return entry
+                    f.write(line.encode("utf-8"))
+                    f.flush()
+                    if sync:
+                        os.fsync(f.fileno())
+            except BaseException:
+                # Some or all bytes may already exist. Never reuse the unconfirmed ID.
+                self._write_failed = True
+                raise
+            self._entries.append(entry)
+            return entry
 
     def close(self) -> None:
-        try:
-            fcntl.flock(self._lock_fd, fcntl.LOCK_UN)
-        except OSError:
-            pass
-        self._lock_fd.close()
+        with self._mutex:
+            if self._closed:
+                return
+            self._closed = True
+            try:
+                fcntl.flock(self._lock_fd, fcntl.LOCK_UN)
+            except OSError:
+                pass
+            self._lock_fd.close()
 
     def __enter__(self) -> "Session":
         return self

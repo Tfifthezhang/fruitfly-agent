@@ -15,6 +15,7 @@ class CommandDescription:
     usage: str = ''
     discoverable: bool = True
     aliases: tuple[str, ...] = ()
+    help_group: str = 'commands'
 
     def __post_init__(self) -> None:
         for name in (self.name, *self.aliases):
@@ -72,3 +73,26 @@ class CommandContext(Protocol):
 CommandHandler = Callable[[InteractiveCommand, CommandContext], CommandResult]
 
 
+
+
+def command_help_result(descriptions: tuple[CommandDescription, ...], arguments: tuple[str, ...] = ()) -> CommandResult:
+    """Use effective declarations for both compact discovery and detailed help."""
+    if len(arguments) > 1:
+        return CommandResult(text='usage: /help [COMMAND|all]\n')
+    requested = arguments[0].lstrip('/') if arguments else ''
+    visible = tuple(item for item in descriptions if item.discoverable)
+    if requested and requested != 'all':
+        item = next((item for item in visible if requested in (item.name, *item.aliases)), None)
+        if item is None:
+            return CommandResult(text=f'unknown command: /{requested}; use /help\n')
+        text = format_command_help((item,))
+        return CommandResult(text=text, panel=CommandPanel('/' + item.name, (
+            CommandSection('commands', 'Usage', ((item.usage or '/' + item.name, item.summary),)),),
+            'Aliases: ' + ', '.join('/' + name for name in item.aliases) if item.aliases else ''))
+    selected = tuple(item for item in visible if requested == 'all' or item.help_group != 'diagnostics')
+    groups = sorted({item.help_group for item in selected})
+    sections = tuple(CommandSection(group, group.replace('-', ' ').title(), tuple(
+        ('/' + item.name, item.summary) for item in sorted(selected, key=lambda item: item.name)
+        if item.help_group == group)) for group in groups)
+    return CommandResult(text=format_command_help(selected), panel=CommandPanel('Commands:', sections,
+        '/help COMMAND for arguments · /help all for diagnostics'))

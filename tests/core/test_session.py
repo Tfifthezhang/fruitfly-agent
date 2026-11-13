@@ -30,6 +30,51 @@ class TestSession(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
+    def test_worker_append_is_serialized_and_history_remains_recoverable(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Event
+        from fruitfly_agent.core.session.storage import SessionEntry
+
+        entered, release, competing, encoded = Event(), Event(), Event(), Event()
+        original = SessionEntry.to_json_line
+
+        def encode(entry):
+            if entry.payload['worker'] == 'first':
+                entered.set()
+                if not release.wait(5):
+                    raise TimeoutError('first writer was not released')
+            else:
+                encoded.set()
+            return original(entry)
+
+        with Session(self.path) as session, ThreadPoolExecutor(2) as workers:
+            def second():
+                competing.set()
+                return session.append('meta', {'worker': 'second'})
+            with patch.object(SessionEntry, 'to_json_line', encode):
+                first = workers.submit(session.append, 'meta', {'worker': 'first'})
+                try:
+                    self.assertTrue(entered.wait(5))
+                    other = workers.submit(second)
+                    self.assertTrue(competing.wait(5))
+                    self.assertFalse(encoded.wait(.1))
+                finally:
+                    release.set()
+                self.assertEqual(first.result(5).id, 1)
+                self.assertEqual(other.result(5).id, 2)
+            self.assertEqual(session.append('meta', {}).id, 3)
+        self.assertEqual([1, 2, 3], [e.id for e in Session.inspect(self.path).read_all()])
+
+    def test_closed_writer_rejects_append_without_changing_disk(self):
+        session = Session(self.path)
+        session.append('meta', {})
+        session.close()
+        before = self.path.read_bytes()
+        session.close()
+        with self.assertRaisesRegex(SessionCorruptError, 'closed'):
+            session.append('meta', {})
+        self.assertEqual(before, self.path.read_bytes())
+
     def test_transaction_rolls_back_appends_and_keeps_writer_usable(self):
         with Session(self.path) as session:
             session.append('message', _msg_entry(UserMessage(content='retained')))

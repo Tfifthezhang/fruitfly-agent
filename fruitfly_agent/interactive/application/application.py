@@ -203,6 +203,15 @@ class AgentApplication:
             current_path=Path(handle.session.status.session_path),
         )
 
+    def resumable_sessions_progress(self, on_update):
+        """Optional progressive discovery; callbacks contain metadata only."""
+        discover = getattr(self._factory, 'resumable_sessions_progress', None)
+        if discover is None:
+            sessions = self.resumable_sessions()
+            on_update(sessions)
+            return sessions
+        return discover(current_path=Path(self._require_handle().session.status.session_path), on_update=on_update)
+
     def _check_submission_state(self, operation: str) -> None:
         if self._state not in {ApplicationState.IDLE, ApplicationState.RUNNING}:
             raise RuntimeError(f"cannot {operation} while application is {self._state}")

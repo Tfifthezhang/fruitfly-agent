@@ -173,3 +173,9 @@ and metric eligibility using the same result interpretation as Eval reports.
 `diagnostics/termination.json` distinguishes native terminal diagnostics from
 missing-diagnostic fallback; `execution_interrupted` alone does not establish a
 wall-clock timeout or its cause.
+
+Recorded Agent execution timestamps also populate `ExecutionFacts.elapsed_seconds`,
+per-record overviews and compact batch rows. They reuse the shared Eval result
+interpretation; missing timestamps remain unknown. This is Agent wall time, not
+container setup/verifier time or the sum of overlapping operation durations.
+Import does not change original reports or official outcomes.

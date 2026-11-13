@@ -52,7 +52,7 @@ class RoleProvider(FauxProvider):
 
     @staticmethod
     def _guide(page):
-        return AssistantMessage([TextBlock(json.dumps({'sections': [{'title': 'Batch records',
+        return AssistantMessage([TextBlock(json.dumps({'findings': [], 'sections': [{'title': 'Batch records',
             'summary': 'Retained task and execution navigation.', 'sources': [
                 {'path': page['path'], 'citation_id': page['citation_id']}]}]}))], stop_reason='stop')
 

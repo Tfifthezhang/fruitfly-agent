@@ -31,7 +31,7 @@ class TerminalReflowTest(unittest.TestCase):
         process.resize(20, 32)
         process.read_until('❯ ')
         process.send(b'show\r')
-        process.read_until('10 in / 5 out]')
+        process.read_until('10 in / 5 out |')
         process.send(b'unsent draft')
         process.read_until('unsent draft')
         offset = len(process.output)

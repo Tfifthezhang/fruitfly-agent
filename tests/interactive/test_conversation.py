@@ -21,6 +21,42 @@ from tests.support.terminal import TtyStringIO
 
 
 class ConversationTest(unittest.IsolatedAsyncioTestCase):
+    async def test_history_pages_are_bounded_and_do_not_change_model_context(self):
+        from fruitfly_agent.interactive.terminal.frontend import TerminalFrontend
+        from fruitfly_agent.interactive.contracts.commands import InteractiveCommand
+        from fruitfly_agent.interactive.terminal.features.resume.command import history_handler
+        messages = [UserMessage(f'QUESTION-{i:03d}') for i in range(95)]
+        session = offline_session(messages=messages)
+        output = io.StringIO()
+        frontend = TerminalFrontend(session, input_stream=io.StringIO(), output_stream=output)
+        await frontend.show_history()
+        self.assertNotIn('QUESTION-054', output.getvalue())
+        self.assertIn('QUESTION-055', output.getvalue())
+        self.assertIn('QUESTION-094', output.getvalue())
+        output.seek(0)
+        output.truncate()
+        await history_handler(frontend.show_history)(InteractiveCommand('history', ('older',)))
+        self.assertIn('QUESTION-015', output.getvalue())
+        self.assertIn('QUESTION-054', output.getvalue())
+        self.assertNotIn('QUESTION-055', output.getvalue())
+        self.assertEqual(messages, session.messages)
+        self.assertEqual([], session.trace())
+        await frontend.renderer.close()
+
+    def test_progressive_picker_can_select_before_discovery_finishes(self):
+        from fruitfly_agent.interactive.terminal.features.resume.menu import TerminalResumeFrontend
+        from fruitfly_agent.interactive.contracts.models import ResumableSession
+        from fruitfly_agent.interactive.terminal.io.menu import MenuAction, MenuEvent
+        item = ResumableSession('/saved.jsonl', 1., 2, '', 'offline')
+        class PollInput:
+            def poll_event(self, timeout):
+                return MenuEvent(MenuAction.ACTIVATE, 0)
+            def read_event(self):
+                raise AssertionError('picker waited for full discovery')
+        picker = TerminalResumeFrontend((), input_stream=io.StringIO(), output_stream=io.StringIO(),
+            menu_input=PollInput())
+        self.assertEqual(item, picker.run(updates=lambda: ((item,), True, '')))
+
     async def test_history_uses_original_messages_after_context_reduction(self):
         original = [UserMessage("original question"), AssistantMessage([TextBlock("original answer")])]
         projection = [UserMessage("context summary only")]

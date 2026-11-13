@@ -285,3 +285,13 @@ explicit. Listing shows at most the latest 50 executions; exact IDs can inspect
 older records. [The handler](features/subagent.py) uses a public monitor only,
 starts no model work and does not create another stdin reader. `/help` and command
 completion discover it through the ordinary command registry.
+
+## Find commands and observe background output
+
+`/help` uses effective command declarations and compact grouped panels. Use
+`/help COMMAND` for arguments or `/help all` to include diagnostic commands such
+as `/trace`. Custom and overridden help handlers retain dispatch priority.
+`/operations` lists descriptions and three recent nonempty output lines.
+`/operations HANDLE [OFFSET]` reads at most 12000 characters of retained output
+without consuming model polling state. Offsets refer to the current bounded
+output snapshot, which can change while running. Cancellation remains explicit.

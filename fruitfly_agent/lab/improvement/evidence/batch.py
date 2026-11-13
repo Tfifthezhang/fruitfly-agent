@@ -2,6 +2,7 @@
 from collections import Counter
 import json
 from fruitfly_agent.improvement.execution.facts import read_facts
+from .summaries import execution_summary
 
 
 def context_observations(context, artifacts):
@@ -23,11 +24,8 @@ def batch_view(tasks, records, observations, artifacts):
         facts = read_facts(receipt, artifacts)
         termination = next((r for r in receipt.artifacts if r.path == 'diagnostics/termination.json'), None)
         provenance = json.loads(artifacts.read(termination.artifact_id)) if termination else {}
-        rows.append({'run_id': receipt.run_id, 'task_id': receipt.task_id,
-            'harness_id': receipt.harness_id, 'status': receipt.status,
-            'termination_reason': facts.termination_reason if facts else 'unknown',
+        rows.append({**execution_summary(receipt, facts),
             'termination_source': provenance.get('source', 'unavailable'),
-            'elapsed_seconds': facts.elapsed_seconds if facts else None,
             'observations': by_run.get(receipt.run_id, []),
             'observation_supply': 'available' if receipt.run_id in by_run else 'not_supplied',
             'metadata': prefix + '/metadata.json',

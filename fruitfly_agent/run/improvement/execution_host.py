@@ -37,7 +37,8 @@ class RunExecutionHost:
                  verifier=None, measurements=None,
                  tasks=None, publish=None, editor=None, components=None, executions=None,
                  component_options=None, hooks=None, delivery_backend=None, evidence_settings=None,
-                 resource_factories=None, organizer=None):
+                 resource_factories=None, organizer=None, evidence_selector=None):
+        self.evidence_selector_factory = evidence_selector
         self.resource_factories: Callable[[], dict[str, Any]] = resource_factories or (lambda: {})
         self.evidence_settings = dict(evidence_settings or {})
         self.component_options = json.loads(json.dumps(component_options or {}, allow_nan=False))
@@ -259,6 +260,8 @@ class RunExecutionHost:
             return ResearchBatch((prepared.task,), (record,), observations)
         return ResearchService(self.workspace, research_id, research_artifacts, plan=plan, harness=baseline,
             executor=execute, services_factory=make_services,
+            evidence_selector=(self.evidence_selector_factory(self.system_settings())
+                if self.evidence_selector_factory else None),
             role_identity={'execute': {'source': prepared.source_id,
                 'execution': definition.implementation_id, 'parent_state': plan.parent.state,
                 'timeouts': plan.timeouts.execution_seconds}})

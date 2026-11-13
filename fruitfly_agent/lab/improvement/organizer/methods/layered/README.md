@@ -4,8 +4,9 @@
 
 The method supplies a batch directory first, then allows paged catalog, search and
 original reads. `submit_organization` validates readable sections and supplied
-citations. Invalid final text can be repaired within the organizer invocation.
-The role creates navigation, not root-cause claims or optimization suggestions.
+citations, plus bounded structured findings with distinct issue IDs. Invalid final text can be repaired within the organizer invocation.
+The role labels causal hypotheses separately from facts, counterevidence and
+unknowns. It cannot edit candidates or certify a cause.
 
 `defaults.yaml` owns the registered I instructions and is a frozen runtime resource.
 The output contains batch, guide and source resources. Originals remain references

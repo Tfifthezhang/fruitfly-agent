@@ -43,6 +43,7 @@ class TerminalBindings:
     retained_document: Callable | None = None
     retained_action: Callable | None = None
 
+    discover_progress: Callable | None = None
     subagents: Callable | None = None
 
     @classmethod
@@ -55,6 +56,7 @@ class TerminalBindings:
             rebuild=getattr(session, "rebuild", None),
             resume=getattr(session, "resume", None),
             discover=getattr(session, "resumable_sessions", None),
+            discover_progress=getattr(session, "resumable_sessions_progress", None),
             conversation=getattr(session, "conversation", None),
             configuration=lambda: getattr(session, "configuration", None),
             busy=lambda: bool(getattr(session, "running", False) or getattr(session, "pending_count", 0)

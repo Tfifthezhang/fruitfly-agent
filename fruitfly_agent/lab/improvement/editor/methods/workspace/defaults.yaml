@@ -22,13 +22,14 @@ parameters:
     component_context: 'Authorized component descriptions and current values:'
     navigation: |-
       Use list_targets and describe_target to load parameter semantics on demand. Read context/edit-grants.json for this experiment’s scope.
-      Use context/extensions/ for organizer reading guides when present. Discover optimization signals yourself; derived guides are readable summaries, not verified causes or recommendations.
+      Read context/extensions/selection.json when present. Full compact summaries describe the distribution; only selected cases grant detailed materials.
+      Use context/extensions/ for organizer findings when present. Check their facts, hypotheses, counterevidence and unknowns. Link each change explanation to a supported issue_id when available, and name its scope and exceptions; derived findings are not verified causes.
       Prefer submit_candidate to finish without a prose/JSON handoff. Search large evidence before reading selected pages.
       Read execution metadata or relevant execution pages before citing a run. Listing paths alone does not supply evidence.
       Read available evidence/overview.json and evidence/coverage.json for each relevant execution. Missing outputs, partial indexing and unknown usage limit conclusions; distinguish these gaps from demonstrated task failures.
     submission: After editing return only JSON {"reasons":[{"component_id":"...","explanation":"...","expected_effect":"observable
-      change and disconfirming evidence","evidence_ids":["run-id"]}]}. Each changed component
-      needs a supplied run ID; no changes is valid.
+      change and disconfirming evidence","evidence_ids":["run-id"],"issue_ids":["supplied-issue-id"]}]}. Each changed component
+      needs a supplied run ID. When organizer findings exist, each change also needs supplied issue_ids; otherwise use an empty list. No changes is valid.
     direction: 'User guidance:'
     recover_evidence: Recover evidence access before proposing changes. Read context/executions.json
       and available execution resources. Cite only evidence successfully supplied. Retain the

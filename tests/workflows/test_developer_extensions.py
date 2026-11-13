@@ -28,6 +28,27 @@ class EchoGuidance(FauxProvider):
 
 
 class DeveloperExtensionTests(unittest.IsolatedAsyncioTestCase):
+    def test_evidence_selector_extension_uses_shared_binding_and_rejects_collisions(self):
+        from fruitfly_agent.extensions.api import ExtensionAPI, ExtensionSet
+        from fruitfly_agent.lab.improvement.evidence_selection import RepresentativeSelector, SelectionSettings
+        api = ExtensionAPI('selection-extension')
+        observed = []
+        def factory(settings):
+            observed.append(settings)
+            return RepresentativeSelector(SelectionSettings(max_cases=2))
+        api.register_evidence_selector(factory)
+        with self.assertRaises(ValueError):
+            api.register_evidence_selector(factory)
+        extensions = ExtensionSet((api,), identities=({'source': 'fixture', 'sha256': 'fixture'},))
+        bindings = extensions.bindings()
+        selector = bindings.evidence_selector({'owned-policy': {}})
+        self.assertEqual([{'owned-policy': {}}], observed)
+        self.assertEqual(2, selector.settings.max_cases)
+        with self.assertRaisesRegex(ValueError, 'collision'):
+            extensions.bindings(StageBindings(evidence_selector=factory))
+        with self.assertRaisesRegex(RuntimeError, 'closed'):
+            api.register_evidence_selector(factory)
+
 
     async def test_late_owned_resources_close_in_reverse_order_even_after_failure(self):
         closed = []

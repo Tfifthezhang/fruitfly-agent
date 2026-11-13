@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 import sys
+import time
 from typing import TextIO
 
 from fruitfly_agent.interactive.contracts.models import ResumableSession
@@ -40,31 +41,49 @@ class TerminalResumeFrontend:
         )
         self.renderer = TerminalMenuRenderer(self.output)
 
-    def run(self) -> ResumableSession | None:
+    def run(self, *, updates=None) -> ResumableSession | None:
         selected = 0
         notice = ""
-        rows = tuple(self._row(item) for item in self.sessions) + (
-            MenuRow("Back", "Keep using the current session"),
-        )
+        loading = updates is not None
+        rendered = None
         while True:
-            self.renderer.render(
-                title="FruitFlyAgent · resume",
-                subtitle=(
-                    "Continue saved history using the selected current configuration."
-                ),
-                rows=rows,
-                selected=selected,
-                notice=notice,
-                instructions=(
-                    "↑↓ move · Enter resume · Esc back · q close menu"
-                    if self.renderer.ansi
-                    else (
-                        "Enter an option number; blank selects highlighted; "
-                        "q closes the menu"
-                    )
-                ),
-            )
-            event = self.menu_input.read_event()
+            selected_path = self.sessions[selected].path if selected < len(self.sessions) else None
+            if updates is not None:
+                sessions, loading, error = updates()
+                if error:
+                    raise RuntimeError(error)
+                if sessions is not None:
+                    self.sessions = sessions
+                    if selected_path:
+                        selected = next((i for i, item in enumerate(sessions) if item.path == selected_path), 0)
+            rows = tuple(self._row(item) for item in self.sessions) + (
+                MenuRow('Back', 'Keep using the current session'),)
+            selected = min(selected, len(rows) - 1)
+            state = (rows, selected, notice, loading)
+            if state != rendered:
+                self.renderer.render(
+                    title="FruitFlyAgent · resume",
+                    subtitle=(
+                        "Continue saved history using the selected current configuration."
+                    ),
+                    rows=rows,
+                    selected=selected,
+                    notice=notice or ('Loading saved sessions…' if loading else ''),
+                    instructions=(
+                        "↑↓ move · Enter resume · Esc back · q close menu"
+                        if self.renderer.ansi
+                        else (
+                            "Enter an option number; blank selects highlighted; "
+                            "q closes the menu"
+                        )
+                    ),
+                )
+                rendered = state
+            poll = getattr(self.menu_input, 'poll_event', None)
+            if loading and poll is None:
+                time.sleep(.05)
+                continue
+            event = poll(.1) if loading else self.menu_input.read_event()
             if event.index is not None and 0 <= event.index < len(rows):
                 selected = event.index
             elif event.action == MenuAction.UP:

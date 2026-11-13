@@ -23,6 +23,39 @@ class _ActivityTtyStringIO(TtyStringIO):
 
 
 class TerminalRendererTests(unittest.IsolatedAsyncioTestCase):
+    async def test_elapsed_response_marker_and_compact_finish_keep_exact_events(self):
+        from fruitfly_agent.interactive.contracts.events import AssistantMessageStarted, event_from_dict
+        event = replace(run_finished(), input_tokens=18400, output_tokens=2100, elapsed_seconds=222.)
+        output = await self.render_events(
+            AssistantMessageStarted(run_id='run-1', request_index=2, elapsed_seconds=138.),
+            AssistantTextDelta(run_id='run-1', text='Progress'), event,
+        )
+        self.assertIn('[elapsed 2m 18s]', output)
+        self.assertIn('18.4k in / 2.1k out | 3m 42s', output)
+        self.assertEqual(event_from_dict(event.to_dict()), event)
+        self.assertEqual(event.input_tokens, 18400)
+
+    async def test_dispatcher_times_markers_from_submission_and_resets_each_run(self):
+        from fruitfly_agent.interactive.interaction.dispatch import EventDispatcher
+        from fruitfly_agent.interactive.contracts.events import AssistantMessageStarted
+        events = []
+        dispatcher = EventDispatcher(events.append)
+        with patch('fruitfly_agent.interactive.interaction.dispatch.time.monotonic', side_effect=[10., 15., 23., 30., 32.]):
+            dispatcher.begin_run()
+            await dispatcher.emit(AssistantMessageStarted(run_id='', request_index=1))
+            await dispatcher.emit(run_finished())
+            dispatcher.end_run()
+            dispatcher.begin_run()
+            await dispatcher.emit(run_finished())
+        self.assertEqual([e.elapsed_seconds for e in events], [5., 13., 2.])
+        self.assertNotEqual(events[0].run_id, events[-1].run_id)
+
+    def test_counter_units_promote_at_rounding_boundary(self):
+        from fruitfly_agent.interactive.terminal.rendering.formatting import format_tokens, format_duration
+        self.assertEqual([format_tokens(v) for v in (0, 999, 1000, 999999, 1000000)],
+                         ['0', '999', '1k', '1m', '1m'])
+        self.assertEqual(format_duration(3661), '1h 1m 1s')
+
     def test_submission_history_has_no_width_dependent_frame(self):
         output = io.StringIO()
         renderer = TerminalRenderer(output)

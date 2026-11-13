@@ -10,6 +10,23 @@ from fruitfly_agent.lab.tools.commands import CommandManager
 
 
 class ManagedCommandsTests(unittest.IsolatedAsyncioTestCase):
+    async def test_background_observation_keeps_completed_output_and_polling_unchanged(self):
+        async def execute(command, options):
+            return Result.success(ExecResult('one\ntwo\nthree\nfour', '', 0))
+        manager = CommandManager()
+        self.addAsyncCleanup(manager.aclose)
+        tool = create_bash_tool(manager=manager)
+        result = await tool.execute(ToolCallContext('call', 'bash',
+            {'action': 'start', 'command': 'work'}, env=SimpleNamespace(cwd='.', exec=execute)))
+        handle = result.details['handle']
+        status = manager.operations.status(handle)
+        self.assertEqual(status.description, 'work')
+        self.assertIn('four', status.recent_output)
+        self.assertEqual(manager.operations.output(handle, offset=4, limit=3), 'two')
+        self.assertEqual((await manager.poll(handle)).content, result.content)
+        with self.assertRaises(ValueError):
+            manager.operations.output(handle, offset=-1)
+
     async def test_default_timeout_reaches_backend_and_managed_capacity_tolerates_four_jobs(self):
         from fruitfly_agent.lab.catalog import builtin_catalog
         seen = []

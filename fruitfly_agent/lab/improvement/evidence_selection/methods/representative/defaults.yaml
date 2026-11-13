@@ -1,0 +1,13 @@
+id: improvement-evidence-selection
+role: I
+implementation: improvement-evidence-selection
+parameters:
+  settings:
+    max_cases: 8
+    controls: 1
+    max_per_task: 2
+    slow_seconds: 120
+    many_calls: 40
+    many_tools: 80
+    high_tokens: 200000
+    material_policy: focused

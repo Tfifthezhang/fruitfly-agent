@@ -86,3 +86,11 @@ or bypass a poisoned Session writer.
 through this same codec. It imposes no directory policy. Run may retain rejected
 or idle lifecycle facts in adjacent observation sidecars; those files never
 participate in canonical conversation or recovery decisions.
+
+## Share one writer across threads
+
+Session serializes synchronous appends, transactions, snapshot reads and close with
+a reentrant instance lock. The file lease separately excludes other writers.
+Transactions may nest appends but must never await. Closed writers reject appends;
+read snapshots remain available. Observation worker threads use the same writer
+contract as the main loop.

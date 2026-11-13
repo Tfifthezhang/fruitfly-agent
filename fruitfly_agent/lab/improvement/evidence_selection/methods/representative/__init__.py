@@ -1,0 +1,1 @@
+"""Deterministic representative evidence selection."""

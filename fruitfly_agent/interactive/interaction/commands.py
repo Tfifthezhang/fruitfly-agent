@@ -9,6 +9,7 @@ from dataclasses import replace as replace_description
 from fruitfly_agent.interactive.contracts.commands import (
     CommandDescription,
     format_command_help,
+    command_help_result,
     InteractiveCommand,
     CommandResult,
     CommandPanel,
@@ -49,10 +50,10 @@ class CommandRouter:
             self.register(name, handler, replace=True)
 
     def register(self, name: str, handler: CommandHandler, *, replace: bool = False,
-                 summary: str = '', usage: str = '', discoverable: bool = True) -> None:
+                 summary: str = '', usage: str = '', discoverable: bool = True, help_group: str = 'commands') -> None:
         if not callable(handler):
             raise TypeError('command handler must be callable')
-        description = CommandDescription(name, summary, usage, discoverable)
+        description = CommandDescription(name, summary, usage, discoverable, help_group=help_group)
         with self._lock:
             if name in self._entries and not replace:
                 raise ValueError(f'command already registered: {name}')
@@ -71,7 +72,7 @@ class CommandRouter:
             return self._entries['help'][1] == self._show_help
 
     def _show_help(self, command: InteractiveCommand, context: CommandContext) -> CommandResult:
-        return CommandResult(text=format_command_help(self.descriptions()))
+        return command_help_result(self.descriptions(), command.arguments)
 
     def execute(
         self,
@@ -304,7 +305,7 @@ _BUILTIN_ENTRIES: tuple[tuple[CommandDescription, CommandHandler | None], ...] =
     (CommandDescription('help', 'show this help'), None),
     (CommandDescription('status', 'show model, workspace, session, and context state'), _status),
     (CommandDescription('lab', 'inspect active context, tools, environment, and capabilities'), _lab),
-    (CommandDescription('trace', 'show the latest N frontend events (default: 12)', '/trace [N]'), _trace),
+    (CommandDescription('trace', 'show the latest N frontend events (default: 12)', '/trace [N]', help_group='diagnostics'), _trace),
     (CommandDescription('permissions', 'revoke temporary approvals', '/permissions clear'), _permissions),
     (CommandDescription('exit', 'leave the interactive session', aliases=('quit',)), _exit),
     (CommandDescription('config', 'requires a configuration frontend', '/config', False), _configuration_unavailable),

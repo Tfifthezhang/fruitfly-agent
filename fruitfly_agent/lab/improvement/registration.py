@@ -34,7 +34,7 @@ def definition():
         model_role_parameters={'organizer': ModelRoleRequirement('organizer_profile', 'Organize experiment records for reading.', fallback_role='executor', lazy=True), 'editor': ModelRoleRequirement('editor_profile', 'Generate candidates.', fallback_role='executor', lazy=True),
             'assessor': ModelRoleRequirement('assessor_profile', 'Assess candidate evidence.', fallback_role='executor', lazy=True)},
         component_validator=validate_component_options,
-        artifact_slots=frozenset({'improvement-editor', 'improvement-evaluator', 'improvement-organizer'}), prepare_targets=_prepare_targets,
+        artifact_slots=frozenset({'improvement-editor', 'improvement-evaluator', 'improvement-organizer', 'improvement-evidence-selection'}), prepare_targets=_prepare_targets,
         implementation_path='fruitfly_agent/lab/improvement/registration.py',
         documentation_path='fruitfly_agent/lab/improvement/README.md')
 
@@ -56,6 +56,7 @@ def _prepare_targets(state, context):
         'evaluator': {'instructions': asdict(evaluator), 'settings': asdict(state.components[TEXT_TARGET_PREFIX + 'improvement-evaluator'].settings)}}
     organizer = state.components[TEXT_TARGET_PREFIX + 'improvement-organizer'].instructions
     settings['organizer'] = {'instructions': asdict(organizer)}
+    settings['evidence_selection'] = {'settings': asdict(state.components[TEXT_TARGET_PREFIX + 'improvement-evidence-selection'].settings)}
     for role, key in (('organizer', ORGANIZER_CONFIG), ('editor', EDITOR_CONFIG), ('assessor', ASSESSOR_CONFIG)):
         state = state.with_component(key, _lazy_role_config(state.config, context, role))
     return (state.with_component(SYSTEM_SETTINGS, settings)

@@ -17,6 +17,7 @@ algorithm whose instructions support isolated trials and persistent activation.
 |---|---|
 | `register_mechanism(definition)` | Catalog definition, strict configuration, installer and optimization targets |
 | `register_generator(id, factory, **metadata)` | Per-job generator registry |
+| `register_evidence_selector(factory)` | One per-job `EvidenceSelector` port; factory receives Catalog component settings |
 | `observe_agent(event, handler, timeout=10)` | Private Core event snapshots, bounded optional callbacks |
 | `intercept_agent(event, handler, required=True, timeout=10)` | Active Core handlers; required failures block the operation |
 | `observe_improvement(event, handler)` | Job-local immutable Improvement events and stage deadlines |
@@ -71,3 +72,9 @@ setup before execution. Nested editor episodes use the same registry path.
 Catalog assembly and declared trial setups share one hook owner. Extension
 bindings mark hooks supplied by the host; Catalog then avoids installing them a
 second time. Every trial still gets fresh contexts and retires them independently.
+
+Evidence selector replacements use [the existing I selection contract](../lab/improvement/evidence_selection/README.md),
+not a separate registry. A host binding and another extension cannot both claim
+the port. Extensions must register their policy configuration and optimization
+surface through Catalog; binding a factory does not grant candidate edits or
+activation. Factories start fresh policy state for each research invocation.

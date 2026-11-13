@@ -37,6 +37,7 @@ outside development grants.
 | `configuration.py` | Strict read/catalog/search limits shared by editor and evaluator |
 | `rounds.py` | Cross-round references to hypotheses, receipts, assessments and selections |
 | `batch.py` | Compact execution table, observation supply and deterministic batch coverage |
+| `summaries.py` | Backend-neutral facts, accounting scopes and condition identities without evidence bodies |
 | `indexing.py` | Deterministic overview and event extraction |
 | `catalog.py`, `query.py` | Paged navigation and literal retrieval |
 | `resources.py`, `access.py` | Immutable access and supply receipts |
@@ -174,3 +175,19 @@ conditions determine eligibility. Historical source citations remain delegated
 provenance; reading a derived part never becomes a direct original-reading receipt.
 See [reuse operations](../DEVELOPER_GUIDE.md#reuse-completed-organization-parts).
 
+
+## Inspect compact execution facts
+
+Batch execution rows include recorded elapsed time, model calls, scoped usage,
+tool counters and material/harness/condition/state identities. Missing facts and
+usage remain unknown. Turn-level counts remain separate from execution totals.
+The summary contains output identity/length and evidence count, not output bodies
+or full resource catalogs. It performs no ranking or causal attribution. Outcome
+observations remain separate from execution status; completed does not mean passed.
+Offline checks: `tests.lab.test_evidence_summaries`.
+
+Detailed research workspaces apply the injected [I evidence selector](../evidence_selection/README.md).
+All execution summaries remain available; detailed task and execution paths are
+limited to selected cases. Metadata links to output bodies instead of copying
+them. Selection reasons and omitted scope are separate from original-reading
+coverage.

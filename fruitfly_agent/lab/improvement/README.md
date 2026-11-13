@@ -23,6 +23,7 @@ configuration snapshot; differences do not block using old records.
 | Module | Responsibility |
 |---|---|
 | [Stages](stages/README.md) | Independent role/backend bindings over injected capabilities |
+| [Evidence selection](evidence_selection/README.md) | Bounded detailed cases from complete compact summaries |
 | [Organizer](organizer/README.md) | Readability, hierarchy, citations and source coverage |
 | [Editor](editor/README.md) | Discover optimization signals and generate detached candidates |
 | [Assessment](assessment/README.md) | Structured feedback and comparison; optional official observations |
@@ -45,8 +46,8 @@ Editor or task execution to fill missing evidence.
 
 ## Select editable surfaces
 
-Defaults include every enabled supported owner except `file-memory` and the three
-I instruction roles. Native tool instructions/parameters, `base_prompt`, current
+Defaults include every enabled supported owner except `file-memory`, the three
+I instruction roles and the I evidence-selection policy. Native tool instructions/parameters, `base_prompt`, current
 context-policy fields, Skills and retained memory/skill libraries participate.
 `stages.propose.optimization.include` sets an owner's field grant; `exclude` removes owners;
 `scope: explicit` starts empty. Mechanism activation and edit permission remain

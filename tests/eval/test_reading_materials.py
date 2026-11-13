@@ -11,6 +11,30 @@ from fruitfly_eval.improvement.history import import_history
 
 
 class ReadingMaterialsTests(unittest.TestCase):
+    def test_recorded_agent_time_reaches_facts_and_compact_batch_without_changing_outcome(self):
+        from fruitfly_agent.improvement.execution.facts import read_facts
+        from fruitfly_agent.lab.improvement.evidence.batch import batch_view
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            trial = root / 'artifacts/harbor/job/trial'
+            agent = trial / 'agent'; agent.mkdir(parents=True)
+            (agent / 'session.jsonl').write_text(json.dumps({'message': {'role': 'user', 'content': 'Finish'}}) + '\n')
+            result = {'task_name': 'fixture', 'verifier_result': {'rewards': {'reward': 0}},
+                'agent_execution': {'started_at': '2026-01-01T00:00:00Z', 'finished_at': '2026-01-01T00:00:42Z'}}
+            path = trial / 'result.json'; path.write_text(json.dumps(result))
+            before = path.read_bytes()
+            artifacts = MemoryArtifacts(); batch = import_history(root, artifacts)
+            record = batch.records[0]
+            self.assertEqual(read_facts(record, artifacts).elapsed_seconds, 42.)
+            row = batch_view(batch.tasks, batch.records, batch.observations, artifacts)['executions.json'][0]
+            self.assertEqual(row['elapsed_seconds'], 42.)
+            self.assertEqual(row['status'], 'completed')
+            self.assertEqual(row['observations'][0]['official_status'], 'failed')
+            self.assertIsNone(row['model_calls'])
+            overview = next(r for r in record.artifacts if r.path == 'evidence/overview.json')
+            self.assertEqual(json.loads(artifacts.read(overview.artifact_id))['elapsed_seconds'], 42.)
+            self.assertEqual(path.read_bytes(), before)
+
     def test_default_has_one_projection_and_supplements_only_verified_permitted_bytes(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

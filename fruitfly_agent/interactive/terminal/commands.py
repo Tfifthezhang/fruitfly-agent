@@ -22,8 +22,8 @@ class TerminalCommandRegistry:
             self.register(name, handler)
 
     def register(self, name: str, handler: TerminalCommandHandler, *, replace: bool = False,
-                 summary: str = '', usage: str = '', discoverable: bool = True) -> None:
-        description = CommandDescription(name, summary, usage, discoverable)
+                 summary: str = '', usage: str = '', discoverable: bool = True, help_group: str = 'commands') -> None:
+        description = CommandDescription(name, summary, usage, discoverable, help_group=help_group)
         if not callable(handler):
             raise TypeError('terminal command handler must be callable')
         with self._lock:

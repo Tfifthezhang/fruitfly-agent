@@ -48,6 +48,8 @@ profiles:
       skill-library:
         default: true
     I:
+      improvement-evidence-selection:
+        default: true
       improvement-organizer:
         default: true
       improvement-editor:

@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from fruitfly_agent.interactive.contracts.events import AuthorizationRequested, AuthorizationResolved
 from fruitfly_agent.interactive.terminal.bindings import TerminalBindings, TerminalSession
 from fruitfly_agent.interactive.terminal.commands import TerminalCommandRegistry, TerminalCommandHandler, effective_commands, complete_command
-from fruitfly_agent.interactive.contracts.commands import CommandDescription, CommandResult, format_command_help
+from fruitfly_agent.interactive.contracts.commands import CommandDescription, CommandResult, command_help_result
 from fruitfly_agent.interactive.terminal.features.assembly import bind_commands
 from fruitfly_agent.interactive.terminal.features.composer import Composer
 
@@ -46,6 +46,8 @@ class TerminalFrontend:
         bindings: TerminalBindings | None = None,
     ) -> None:
         self.session = session
+        self._history_snapshot = ()
+        self._history_before = 0
         self._last_interrupt = 0.0
         self._interrupt_exit = False
         self._reader_interrupt = threading.Event()
@@ -85,7 +87,7 @@ class TerminalFrontend:
             self.commands.register(name, handler)
         if self.command_router.uses_default_help and not any(item.name == 'help' for item in self.commands.descriptions()):
             help_description = next(item for item in self.command_router.descriptions() if item.name == 'help')
-            self.commands.register('help', lambda command: CommandResult(text=format_command_help(self.command_descriptions())),
+            self.commands.register('help', lambda command: command_help_result(self.command_descriptions(), command.arguments),
                 summary=help_description.summary)
         configure_completion = getattr(self.line_editor, 'set_completion_provider', None)
         if self._inline_display is not None and callable(configure_completion):
@@ -348,11 +350,21 @@ class TerminalFrontend:
         finally:
             self._activate_inline_terminal()
 
-    async def show_history(self) -> None:
+    async def show_history(self, *, older: bool = False) -> None:
         # History is optional for existing embedding hosts implementing TerminalSession.
         conversation = self.bindings.conversation
         if callable(conversation):
-            await self.renderer.show_history(conversation())
+            if not older:
+                self._history_snapshot = conversation()
+                self._history_before = len(self._history_snapshot)
+            end = self._history_before
+            start = max(0, end - 40)
+            await self.renderer.show_history(self._history_snapshot[start:end])
+            self._history_before = start
+            if start:
+                self.renderer.write_system(f'[messages {start + 1}–{end} of {len(self._history_snapshot)}; /history older for previous messages]\n')
+            elif older:
+                self.renderer.write_system('[start of saved history]\n')
 
     def _activate_inline_terminal(self) -> None:
         if self._inline_display is None:

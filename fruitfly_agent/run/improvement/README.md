@@ -45,3 +45,9 @@ read-only tools and source validation. Run owns Sessions, independent Providers,
 context state and retirement. The same stage factory shares allowance counters
 across repeated role invocations; child completion never implies parent original
 reading. See [operational controls](../../lab/improvement/DEVELOPER_GUIDE.md#delegate-read-only-evidence-investigation).
+
+Batch loading validates immutable manifests without pre-reading all original
+attachments. Actual artifact access verifies content hashes. Case/material
+selection is an injected Lab policy; the host records its identity and selection
+receipt. Multi-batch input rejects conflicting task/run identities and deduplicates
+identical observations. See [bounded investigation](../../lab/improvement/evidence_selection/README.md).

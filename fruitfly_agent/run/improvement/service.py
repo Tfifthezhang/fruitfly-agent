@@ -15,13 +15,14 @@ from fruitfly_agent.run.storage.research import ResearchStore
 class ResearchService:
     def __init__(self, workspace, research_id, artifacts, *, plan=None, proposal=None, harness=None,
                  organizer=None, assessor=None, executor=None, services_factory=None, role_identity=None, journal=None,
-                 external_stages=None):
+                 external_stages=None, evidence_selector=None):
         self.store = journal or ResearchStore(workspace, research_id)
         self.artifacts, self.plan, self.proposal = artifacts, plan, proposal
         self.harness = harness
         self.organizer, self.assessor, self.executor = organizer, assessor, executor
         self.services_factory = services_factory
         self.role_identity = dict(role_identity or {})
+        self.evidence_selector = evidence_selector
         self.source_id = None
         self.external_stages = dict(external_stages or {})
         self.controller = self.build_controller()
@@ -29,12 +30,23 @@ class ResearchService:
     def build_controller(self):
         from fruitfly_agent.lab.improvement.api import StageContext, builtin_stage_handlers
         context = StageContext(self.plan, self.proposal, self.organizer, self.assessor, self.executor,
-            self.put, self.read, self.read_batch, self.input_batch, self.create_services)
+            self.put, self.read, self.read_batch, self.input_batch, self.create_services, self.select_evidence)
         implementations = {('import', 'research-import-v1'): self._import,
             **builtin_stage_handlers(context)}
         for name, implementation in self.external_stages.items():
             implementations[(name, 'research-' + name + '-v1')] = implementation
         return ResearchController(self.store, self.artifacts, implementations)
+
+    def select_evidence(self, batch):
+        if self.evidence_selector is None:
+            return ()
+        from fruitfly_agent.lab.improvement.api import batch_view
+        rows = batch_view(batch.tasks, batch.records, batch.observations, self.artifacts)['executions.json']
+        selection = self.evidence_selector.select(tuple(rows),
+            resources={r.run_id: r.artifacts for r in batch.records})
+        if {item['run_id'] for item in selection['selected']} - {row['run_id'] for row in rows}:
+            raise ValueError('evidence selector exceeded execution grant')
+        return (self.put('selection.json', selection, 'input'),)
 
     def put(self, path, value, kind='diagnostic'):
         return Resource(path, self.artifacts.put(canonical_json(value).encode()), 'application/json', kind)
@@ -43,21 +55,13 @@ class ResearchService:
         return json.loads(self.artifacts.read(resource.artifact_id))
 
     def read_batch(self, resource):
-        batch = ResearchBatch.from_dict(self.read(resource))
-        issues = []
-        for references in (*(t.inputs for t in batch.tasks), *(r.artifacts for r in batch.records)):
-            for reference in references:
-                try:
-                    self.artifacts.read(reference.artifact_id)
-                except (ValueError, KeyError, OSError) as exc:
-                    issue = {'name': 'unavailable_evidence', 'path': reference.path,
-                        'artifact_id': reference.artifact_id, 'error': type(exc).__name__}
-                    if issue not in batch.observations and issue not in issues:
-                        issues.append(issue)
-        return ResearchBatch(batch.tasks, batch.records, (*batch.observations, *issues))
+        # Validate the immutable manifest now. Original bytes are hash-checked
+        # by the artifact reader when a selected investigation requests them.
+        return ResearchBatch.from_dict(self.read(resource))
 
     def input_batch(self, resources):
         tasks, records, observations = {}, {}, []
+        observation_ids = set()
         for resource in resources:
             batch = self.read_batch(resource)
             for task in batch.tasks:
@@ -68,7 +72,11 @@ class ResearchService:
                 if record.run_id in records and records[record.run_id] != record:
                     raise ValueError('conflicting execution identity: ' + record.run_id)
                 records[record.run_id] = record
-            observations.extend(batch.observations)
+            for observation in batch.observations:
+                identity = canonical_json(observation)
+                if identity not in observation_ids:
+                    observations.append(observation)
+                    observation_ids.add(identity)
         return ResearchBatch(tuple(tasks.values()), tuple(records.values()), tuple(observations))
 
     async def perform_named(self, kind, inputs, *, parameters=None, fresh=False, retry_unresolved=False):

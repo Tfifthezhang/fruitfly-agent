@@ -116,3 +116,16 @@ These ports contain no algorithm IDs. Hosts can omit them.
 `SubagentStatus`. This optional RuntimeHandle capability provides read-only
 revisioned snapshots and execution details. It distinguishes execution state,
 cleanup, model identity and unknown measurements; it grants no control authority.
+
+## Observe submission time
+
+`AssistantMessageStarted` identifies a visible model response by request index.
+Its elapsed seconds and `RunFinished.elapsed_seconds` use the submission's
+monotonic clock, including preparation, tools and approvals, excluding queued
+waiting. Missing durations remain unknown. Event serialization retains exact
+token integers; compact units are terminal presentation only.
+
+Command descriptions include a presentation-only `help_group`; diagnostics remain
+executable and discoverable through detailed help. Operation status exposes a
+bounded description and output preview. `OperationService.output` reads a snapshot
+without executing, waiting for, cancelling or advancing an operation.

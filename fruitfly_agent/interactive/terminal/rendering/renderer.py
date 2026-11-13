@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import sys
 import time
+from .formatting import format_tokens, format_duration
 from collections.abc import Callable
 from typing import TextIO
 
@@ -12,6 +13,7 @@ from fruitfly_agent.interactive.contracts.events import (
     AuthorizationRequested,
     AuthorizationResolved,
     AssistantTextDelta,
+    AssistantMessageStarted,
     ManagedOperationChanged,
     AssistantThinkingDelta,
     CompactionStarted,
@@ -211,6 +213,12 @@ class TerminalRenderer:
         if isinstance(event, RunActivityChanged):
             self._set_activity(_format_activity_label(event))
             return
+        if isinstance(event, AssistantMessageStarted):
+            self._flush_markdown()
+            self._newline()
+            if event.elapsed_seconds is not None:
+                self._write(f'[elapsed {format_duration(event.elapsed_seconds)}]\n', _DIM)
+            return
         if isinstance(event, AssistantThinkingDelta):
             # RunActivityChanged carries progress; reasoning never enters the transcript.
             return
@@ -325,10 +333,11 @@ class TerminalRenderer:
                 self._write("[run cancelled; completed effects are retained]\n", _YELLOW)
             if event.is_error:
                 self._write(f"[run failed] {event.error_details}\n", _RED)
+            duration = f" | {format_duration(event.elapsed_seconds)}" if event.elapsed_seconds is not None else ""
             self._write(
                 f"[{event.model} | {event.turn_count} turns | "
-                f"{event.tool_call_count} tool calls | {event.input_tokens} in / "
-                f"{event.output_tokens} out]\n",
+                f"{event.tool_call_count} tool calls | {format_tokens(event.input_tokens)} in / "
+                f"{format_tokens(event.output_tokens)} out{duration}]\n",
                 _DIM,
             )
 

@@ -4,12 +4,15 @@ from fruitfly_agent.interactive.terminal.features.retained_state.commands import
 from fruitfly_agent.interactive.terminal.features.operations import operations_handler
 from fruitfly_agent.interactive.terminal.features.subagent import subagent_handler
 from fruitfly_agent.interactive.terminal.features.configuration.command import configuration_handler
-from fruitfly_agent.interactive.terminal.features.resume.command import resume_handler
+from fruitfly_agent.interactive.terminal.features.resume.command import resume_handler, history_handler
 
 
 def bind_commands(registry, *, bindings, configuration, status, cancel,
                   menu_scope, input_stream, output_stream, line_editor, write,
                   welcome, show_history):
+    if bindings.conversation is not None:
+        registry.register('history', history_handler(show_history),
+            summary='show recent saved messages or the preceding page', usage='/history [older]')
     if bindings.retained_state is not None:
         for name, kind in (('memory', 'memory'), ('skills', 'skill')):
             registry.register(name, retained_handler(kind=kind, describe=bindings.retained_state,
@@ -21,7 +24,7 @@ def bind_commands(registry, *, bindings, configuration, status, cancel,
             summary='inspect subagent executions', usage='/subagent [AGENT_ID [RUN_ID]]')
     if bindings.operations is not None:
         registry.register('operations', operations_handler(bindings.operations),
-            summary='inspect or cancel background operations', usage='/operations [cancel HANDLE]')
+            summary='inspect or cancel background operations', usage='/operations [HANDLE [OFFSET]|cancel HANDLE]')
 
     def cancel_command(command):
         if command.arguments:
@@ -39,7 +42,7 @@ def bind_commands(registry, *, bindings, configuration, status, cancel,
         ), summary='open the model and mechanism selection menu')
     if bindings.resume is not None:
         registry.register("resume", resume_handler(
-            resume=bindings.resume, discover=bindings.discover, status=status,
+            resume=bindings.resume, discover=bindings.discover, discover_progress=bindings.discover_progress, status=status,
             busy=bindings.busy, menu_scope=menu_scope, input_stream=input_stream,
             output_stream=output_stream, line_editor=line_editor, write=write,
             welcome=welcome, show_history=show_history,

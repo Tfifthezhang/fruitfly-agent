@@ -3,9 +3,9 @@
 [Up: Improvement](../README.md)
 
 The organizer is a peer of the editor and assessor. It structures granted records
-into batch directories, task entries, timelines and attributable summaries. Finding
-optimization signals, interpreting causes and proposing candidate changes belong
-to the editor. The organizer has no candidate writes, task executor or activation.
+into compact navigation and attributable investigation findings. Each finding
+separates facts, causal hypotheses, counterevidence and unknowns. Hypotheses are
+unverified leads; proposing candidate changes belongs to the editor. The organizer has no candidate writes, task executor or activation.
 
 `LayeredOrganizer.organize(OrganizationRequest, StageServices)` returns an
 immutable `EvidenceView`. It uses the existing Core Agent runner, shared evidence
@@ -48,3 +48,11 @@ applicable retained parts, and submits one integrated guide. Published
 sections. It does not assert complete evidence coverage. See the
 [developer recipe](../DEVELOPER_GUIDE.md#reuse-completed-organization-parts).
 
+
+The strict guide contains `sections` and `findings`. Findings have distinct
+`issue_id`, `signal`, nonempty `facts`, `hypotheses`, `counterevidence`, `unknowns`
+and cited `sources`. At most 16 findings are accepted. Empty findings explicitly
+allow insufficient evidence. Detailed grants come from the independent
+[evidence selector](../evidence_selection/README.md), while full compact summaries
+remain available. Neither selected scope nor a directory read establishes full
+original coverage.

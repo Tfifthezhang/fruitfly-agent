@@ -295,3 +295,8 @@ grants admit instruction fields only. Runtime stage-time defaults are protected
 infrastructure owned by Improvement contracts, outside selectable Catalog surfaces.
 Both use the same strict Core YAML decoder; references and receipts remain owned
 by Runtime specification.
+
+The standalone [evidence-selection I surface](../improvement/evidence_selection/README.md)
+uses the same settings projection, field grants, frozen snapshots and candidate
+adapter as other owned research components. It selects investigation materials;
+it does not alter task execution or observation authority.

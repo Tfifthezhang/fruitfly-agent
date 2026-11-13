@@ -101,3 +101,11 @@ work or choose a latest result. Source/default resource identities invalidate re
 conservatively after implementation changes. Missing/corrupt dependencies cannot
 become applicable findings.
 
+
+## Cache session discovery
+
+`session_index.py` keeps disposable metadata in `.fruitfly/cache/session-index/`.
+Entries bind resolved path, device, inode, size, modification and change times.
+Discovery refreshes changed files and probes writer locks on every call. Cache
+errors fall back to source inspection; selected recovery always validates actual
+history and required artifacts. Cache data grants no recovery authority.

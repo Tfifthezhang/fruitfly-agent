@@ -13,6 +13,7 @@ selection decisions and attributed experience. Stage protocols are exported thro
 | `HarnessSnapshot` / `ComponentDocument` | Distinct stable IDs, declared kind, axis and schema |
 | `CandidateBundle` | Frozen parent, complete component set and per-edit evidence |
 | `ExecutionRecord` | Task, material, harness, initial state and conditions identities |
+| [`EvidenceSelector`](investigation.py) | Research case/material selection over summaries; no execution or activation authority |
 | `SelectionDecision` | Existing run ID; output selection differs from verification |
 | `JobServices` / `JobResource` | Observed usage, cancellation, operations and optional asynchronous cleanup |
 | `RunPlan` | Exact component scope, generator, rounds and independent phase times |
@@ -141,3 +142,7 @@ The resource is build-declared and included in frozen source material.
 
 Constructor defaults read installed package data; constructing contracts still makes
 no model request or workspace mutation. Runtime does not import Lab or host loaders.
+
+Candidate `EditReason.issue_ids` attribute changes to supplied investigation
+findings when present. They supplement original execution `evidence_ids` and
+testable `expected_effect`; derived findings do not replace original-reading proof.

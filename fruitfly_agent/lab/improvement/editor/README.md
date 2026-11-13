@@ -66,3 +66,8 @@ optimization-target directory. Values are positive integers with default <= maxi
 <= 100. They are configurable and frozen with the component, but protected from
 ordinary candidate grants. `AgentEditor(..., options=...)` consumes these controls;
 `settings=...` remains the separate shared evidence configuration.
+
+When supplied organization guides contain findings, each changed component must
+reference existing `issue_ids` as well as original `evidence_ids` and a testable
+`expected_effect`. Conflicting issue identities fail explicitly. Reading derived
+findings alone never supplies the original execution citation required for edits.

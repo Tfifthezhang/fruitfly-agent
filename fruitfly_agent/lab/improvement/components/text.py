@@ -56,6 +56,11 @@ class TextComponentAdapter:
             (ComponentFile('parameters.yaml', yaml.safe_dump(parameters, sort_keys=False, allow_unicode=True)),))
 
     def _read(self, document):
+        expected_document = self.snapshot()
+        if (document.component_id, document.role, document.kind, document.schema) != (
+                expected_document.component_id, expected_document.role,
+                expected_document.kind, expected_document.schema):
+            raise ValueError('component ownership cannot change')
         import yaml
         from fruitfly_agent.core.configuration_resources import UniqueLoader
         from fruitfly_agent.runtime_spec.components import ComponentConfiguration

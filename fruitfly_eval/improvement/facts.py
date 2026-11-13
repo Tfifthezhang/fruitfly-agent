@@ -133,6 +133,18 @@ def attach_benchmark_facts(record, root, artifacts, *, interrupted=False, trial=
                 collected.append(ArtifactFact(str(item.get('path', 'unknown')), status, 'Scoped pre-verifier capture'))
         except (ValueError, KeyError, TypeError):
             collected.append(ArtifactFact('scoped outputs', 'collection_failed', 'Invalid capture receipt'))
+    if trial is not None:
+        from .evidence import safe_path
+        from fruitfly_eval.results import trial_outcome
+        result_path = Path(trial) / 'result.json'
+        if result_path.is_file() and safe_path(result_path, Path(root).resolve()):
+            try:
+                elapsed = trial_outcome(json.loads(result_path.read_bytes()))['agent_elapsed_seconds']
+                if elapsed is not None:
+                    values['elapsed_seconds'] = elapsed
+            except (ValueError, KeyError, TypeError, OSError):
+                if not interrupted:
+                    raise
     values['usage'] = (*values.get('usage', ()), UsageFact('model_calls', 'execution', record.model_calls,
         'Agent usage receipt; includes main and auxiliary Providers'))
     if collected:

@@ -9,6 +9,7 @@ from fruitfly_agent.improvement.contracts.tasks import Resource
 from fruitfly_agent.improvement.contracts.versions import canonical_json, content_hash
 from ...instructions import OrganizerInstructions
 from ...workspace import build_workspace
+from ...findings import validate_findings, FINDING_FIELDS
 from ....evidence.session import EvidenceSession
 
 
@@ -33,8 +34,9 @@ class LayeredOrganizer:
             reference = self.artifacts.put(raw.encode())
             services.record('organization-response', artifact_id=reference)
             data = json.loads(raw)
-            if not isinstance(data, dict) or set(data) != {'sections'} or not isinstance(data['sections'], list):
-                raise ValueError('organizer must submit exactly a sections array')
+            if not isinstance(data, dict) or set(data) != {'sections', 'findings'} or not isinstance(data['sections'], list):
+                raise ValueError('organizer must submit sections and findings arrays')
+            validate_findings(data['findings'])
             source_rows = []
             for section in data['sections']:
                 if set(section) != {'title', 'summary', 'sources'} or not all(
@@ -47,6 +49,12 @@ class LayeredOrganizer:
                             or source['citation_id'] not in workspace.eligible_paths(source['path'])):
                         raise ValueError('organizer cited unavailable or unread evidence')
                     source_rows.append(source)
+            for finding in data['findings']:
+                for source in finding['sources']:
+                    if (set(source) != {'path', 'citation_id'} or source['path'] not in workspace.paths()
+                            or source['citation_id'] not in workspace.eligible_paths(source['path'])):
+                        raise ValueError('finding cited unavailable or unread evidence')
+                    source_rows.append(source)
             accepted = data
         async def submit(ctx):
             accept(ctx.args)
@@ -57,10 +65,16 @@ class LayeredOrganizer:
         section = {'type': 'object', 'properties': {'title': text, 'summary': text,
             'sources': {'type': 'array', 'items': source}},
             'required': ['title', 'summary', 'sources'], 'additionalProperties': False}
+        finding = {'type': 'object', 'properties': {
+            **{key: text for key in ('issue_id', 'signal')},
+            **{key: {'type': 'array', 'items': text, 'maxItems': 16} for key in ('facts', 'hypotheses', 'counterevidence', 'unknowns')},
+            'sources': {'type': 'array', 'items': source}},
+            'required': list(FINDING_FIELDS), 'additionalProperties': False}
         tool = AgentTool(name='submit_organization', label='Submit readable view',
-            description='Submit attributable navigation and summaries; no optimization advice.',
-            parameters={'type': 'object', 'properties': {'sections': {'type': 'array', 'items': section}},
-                'required': ['sections'], 'additionalProperties': False}, execute=submit, requires_exclusive_batch=True)
+            description='Submit sourced facts, testable hypotheses, counterevidence and unknowns; no candidate edits.',
+            parameters={'type': 'object', 'properties': {'sections': {'type': 'array', 'items': section},
+                    'findings': {'type': 'array', 'items': finding, 'maxItems': 16}},
+                'required': ['sections', 'findings'], 'additionalProperties': False}, execute=submit, requires_exclusive_batch=True)
         mission = self.instructions.organize
         if request.instruction.strip():
             mission += '\n\nInvocation requirements:\n' + request.instruction

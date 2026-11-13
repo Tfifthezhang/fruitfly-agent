@@ -22,6 +22,8 @@ class ManagedStatus:
     elapsed_seconds: float
     run_id: str
     tool_call_id: str
+    description: str = ''
+    recent_output: str = ''
 
 
 class ManagedOperations:
@@ -48,7 +50,7 @@ class ManagedOperations:
             except Exception:
                 logger.warning('managed operation listener failed', exc_info=True)
 
-    async def submit(self, work, *, signal=None, is_error=lambda result: False):
+    async def submit(self, work, *, signal=None, is_error=lambda result: False, description=''):
         if self.closed or self.supervisor.poisoned:
             raise ValueError('command manager is closed or cleanup is unconfirmed')
         if signal is not None and signal.is_set():
@@ -64,7 +66,7 @@ class ManagedOperations:
         context = current_observation()
         job = {'task': None, 'watcher': None, 'output': '', 'started': time.monotonic(),
             'finished': None, 'state': 'running', 'run_id': context.run_id,
-            'tool_call_id': context.tool_call_id}
+            'tool_call_id': context.tool_call_id, 'description': str(description)[:800]}
         async def output(text):
             job['output'] = text[-self.output_characters:]
         async def invoke():
@@ -109,10 +111,19 @@ class ManagedOperations:
             raise ValueError('unknown or retired command handle')
         job = self.jobs[handle]
         return ManagedStatus(handle, job['state'], max(0., (job['finished'] or time.monotonic()) - job['started']),
-            job['run_id'], job['tool_call_id'])
+            job['run_id'], job['tool_call_id'], job['description'],
+            '\n'.join(line for line in job['output'].splitlines() if line.strip())[-1200:])
 
     def statuses(self):
         return tuple(self.status(handle) for handle in self.jobs)
+
+    def output(self, handle, *, offset=0, limit=12000):
+        """Read a bounded snapshot without consuming tool polling state."""
+        self.status(handle)
+        if type(offset) is not int or offset < 0 or type(limit) is not int or not 1 <= limit <= 24000:
+            raise ValueError('output requires a nonnegative offset and limit 1..24000')
+        text = self.jobs[handle]['output']
+        return text[offset:offset + limit]
 
     async def wait(self, handle, seconds=0):
         if type(seconds) not in (int, float) or not math.isfinite(seconds) or not 0 <= seconds <= 30:

@@ -187,6 +187,20 @@ class ToolPresentationTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Running', output.getvalue())
         self.assertNotIn('Completed', output.getvalue())
 
+    async def test_background_output_is_observed_without_executing_or_cancelling(self):
+        from types import SimpleNamespace
+        from fruitfly_agent.interactive.terminal.features.operations import operations_handler
+        from fruitfly_agent.interactive.contracts.commands import InteractiveCommand
+        calls = []
+        def output(handle, *, offset=0):
+            calls.append((handle, offset))
+            return '\x1b[31mretained output'
+        handler = operations_handler(lambda: SimpleNamespace(output=output))
+        result = await handler(InteractiveCommand('operations', ('command-test', '3')))
+        self.assertEqual(calls, [('command-test', 3)])
+        self.assertIn('retained output', result.text)
+        self.assertNotIn('\x1b', result.text)
+
     async def test_operations_command_lists_and_cancels_through_optional_binding(self):
         from types import SimpleNamespace
         from fruitfly_agent.interactive.contracts.operations import OperationStatus
