@@ -1,5 +1,6 @@
 """Public three-stage context pipeline."""
 
+from .budget import ContextBudget
 from .manager import ContextPipeline
 from .models import (
     ContextFrame, ContextPhase, ContextPipelineProfile, ContextProvenance,
@@ -7,7 +8,7 @@ from .models import (
 )
 
 __all__ = [
-    "ContextPipeline", "ContextPipelineProfile", "ContextPhase", "ContextFrame",
+    "ContextBudget", "ContextPipeline", "ContextPipelineProfile", "ContextPhase", "ContextFrame",
     "ContextProvenance", "ContextTransform", "ContextTransformer", "ContextReducer",
     "ContextStage",
 ]

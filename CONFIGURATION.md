@@ -513,3 +513,11 @@ registered owner resources; daily customizations use referenced component files.
 Import source and task paths must exist before the corresponding stage executes.
 Reading/showing configuration performs no model work; explicitly running model or
 execution stages can incur charges.
+
+## Bound working context
+
+Use the shared `H.context-budget` component independently of the selected
+compression method. [Context budget](fruitfly_agent/lab/context_manager/budget/README.md)
+owns its settings and defaults; [component syntax](fruitfly_agent/runtime_spec/COMPONENTS.md)
+owns authoring. Keep actual model capacity in the model catalog. An omitted
+budget component retains Core enforcement with registered defaults.

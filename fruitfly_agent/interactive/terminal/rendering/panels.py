@@ -1,7 +1,7 @@
 """Render read-only command panels without knowing the originating command."""
 from __future__ import annotations
 
-from fruitfly_agent.interactive.contracts.commands import CommandPanel
+from fruitfly_agent.interactive.contracts.commands import CommandPanel, CommandResult
 from fruitfly_agent.interactive.terminal.io.text import (
     cell_width, pad_cells, safe_terminal_text, truncate_cells,
 )
@@ -60,3 +60,8 @@ def render_command_panel(panel: CommandPanel, *, columns: int = 80, color: bool 
         for line in _wrap(panel.footer, width):
             lines.append(f"\x1b[2m{line}\x1b[0m" if color else line)
     return "\n".join(lines) + "\n"
+
+
+def panel_result(panel: CommandPanel) -> CommandResult:
+    """Supply the same sections to structured and plain command consumers."""
+    return CommandResult(text=render_command_panel(panel), panel=panel)

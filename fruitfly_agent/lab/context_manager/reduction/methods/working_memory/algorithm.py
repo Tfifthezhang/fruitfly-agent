@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, replace
 import asyncio
-from fruitfly_agent.core.data_model import ContextDecision, CustomMessage, UserMessage, CUSTOM_KIND_COMPACTION, ProviderView
+from fruitfly_agent.core.data_model import AgentMessage, ContextDecision, CustomMessage, UserMessage, CUSTOM_KIND_COMPACTION, ProviderView
 from fruitfly_agent.core.context.validation import valid_tool_links
 from ....resources import SessionHistory, public_message
 from ....measurement.budget import MeasurementService, MeasurementConfig
@@ -25,8 +25,9 @@ class WorkingMemoryReducer:
         self.auxiliary = AuxiliaryText(provider, model=memory_model, context_window=memory_context_window,
             output_limit=memory_output_limit, meter=meter)
         self.meter = MeasurementService(MeasurementConfig(margin_tokens=0, margin_ratio=0))
-        self.policy = digest({'config': asdict(config), 'model': memory_identity or {'model': memory_model,
-            'context_window': memory_context_window, 'output_limit': memory_output_limit}})
+        self.policy_base = {'config': asdict(config), 'model': memory_identity or {'model': memory_model,
+            'context_window': memory_context_window, 'output_limit': memory_output_limit}}
+        self.policy = digest(self.policy_base)
 
     def estimate(self, snapshot):
         return self.meter.estimate(ProviderView(snapshot.system_prompt, list(snapshot.messages), list(snapshot.tools),
@@ -46,6 +47,7 @@ class WorkingMemoryReducer:
         return await self._prepare(snapshot, force=True)
 
     async def _prepare(self, snapshot, *, force):
+        self.policy = digest({**self.policy_base, 'budget': asdict(snapshot.context_budget)})
         items = snapshot.canonical_items
         self.history.bind(items)
         if not items or not valid_tool_links(list(snapshot.messages)):
@@ -53,20 +55,22 @@ class WorkingMemoryReducer:
         previous = snapshot.context_state.get(self.mechanism_id)
         checkpoint = self._load(previous, items)
         measured = snapshot.measurement
-        allowance = snapshot.context_window - (measured.output_reserve if measured else snapshot.max_tokens) - (measured.margin if measured else 0)
+        allowance = snapshot.context_budget.input_allowance(snapshot.context_window, measured, snapshot.max_tokens)
         if snapshot.signal is not None and snapshot.signal.is_set():
             raise asyncio.CancelledError
         if allowance <= 0:
             return None
         occupancy = max(self.estimate(snapshot), measured.input_tokens or 0 if measured else 0) / allowance
-        switch = force or occupancy >= self.config.switch_ratio
+        switch = force or occupancy >= snapshot.context_budget.trigger_ratio
         catching_up = checkpoint.covered < checkpoint.target_count
         if not switch and (occupancy < self.config.maintenance_ratio or
                 previous is not None and not catching_up
                 and len(items) - checkpoint.covered < self.config.update_every_messages):
             return None
         sources = self._sources(items)
-        checkpoint, updated = await maintain(snapshot, checkpoint, sources, self.config,
+        effective_config = replace(self.config, memory_tokens=max(1, min(self.config.memory_tokens,
+            int(allowance * snapshot.context_budget.target_ratio))))
+        checkpoint, updated = await maintain(snapshot, checkpoint, sources, effective_config,
             self.auxiliary, self.meter.text_tokens, self.policy)
         if not updated:
             return None
@@ -75,11 +79,11 @@ class WorkingMemoryReducer:
         state = save_checkpoint(checkpoint, items, sources, self.policy, self.history)
         memory, covered, offset = checkpoint.memory, checkpoint.covered, checkpoint.offset
         reference = state['artifact']
-        candidate = None
+        candidate: tuple[AgentMessage, ...] | None = None
         # Unprocessed evidence never disappears, even when the update's page allowance is exhausted.
         if switch and snapshot.rebase_allowed and covered == len(items) and not offset:
-            task = next((item.message for item in items if isinstance(item.message, UserMessage)), None)
-            anchors = (task,) if task is not None else ()
+            users: list[UserMessage] = [item.message for item in items if isinstance(item.message, UserMessage)]
+            anchors = tuple(users[:1] + users[max(1, len(users) - 3):])
             candidate = (CustomMessage(CUSTOM_KIND_COMPACTION, memory + '\n[Context artifact ' + reference + ']' + ('\n' + self.config.readback_instructions + '\nHistory index: ' + self.history.resource_prefix + 'index' if getattr(self.history, 'resource_prefix', '') else '')), *anchors)
             after = self.estimate(replace(snapshot, messages=candidate))
             if after >= self.estimate(snapshot) or after > allowance:

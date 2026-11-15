@@ -1,4 +1,5 @@
 """Core validates final projections and persists state before replacing live context."""
+from fruitfly_agent.lab.context_manager.measurement.budget import MeasurementService
 from dataclasses import replace
 from pathlib import Path
 import tempfile
@@ -38,7 +39,7 @@ class ContextCommitTests(unittest.IsolatedAsyncioTestCase):
             def failing(kind, *args, **kwargs):
                 if kind == 'compaction': raise OSError('offline disk failure')
                 return append(kind, *args, **kwargs)
-            config = AgentLoopConfig(provider, session=session, max_tokens=32)
+            config = AgentLoopConfig(provider, session=session, max_tokens=32, context_meter=MeasurementService())
             with patch.object(session, 'append', side_effect=failing):
                 result = await run_agent_loop(config, [UserMessage('original task')], context_pipeline=Reducer())
             self.assertTrue(result.is_error)
@@ -53,7 +54,7 @@ class ContextCommitTests(unittest.IsolatedAsyncioTestCase):
             provider = FauxProvider(); provider.respond_text('done')
             hooks = HookRegistry(); observed = []
             hooks.add(BEFORE_COMPACTION, lambda event: observed.append(event))
-            result = await run_agent_loop(AgentLoopConfig(provider, session=session, hooks=hooks),
+            result = await run_agent_loop(AgentLoopConfig(provider, session=session, hooks=hooks, context_meter=MeasurementService()),
                 [UserMessage('original task')], context_pipeline=Reducer(state_only=True))
             self.assertFalse(result.is_error)
             self.assertEqual('original task', result.messages[0].content)
@@ -90,7 +91,7 @@ class ContextCommitTests(unittest.IsolatedAsyncioTestCase):
             return []
         def change(event): current[0].revision += 1
         hooks = HookRegistry(); hooks.add(BEFORE_COMPACTION, change)
-        result = await run_agent_loop(AgentLoopConfig(provider, hooks=hooks, get_steering_messages=prepare),
+        result = await run_agent_loop(AgentLoopConfig(provider, hooks=hooks, get_steering_messages=prepare, context_meter=MeasurementService()),
             [UserMessage('original task')], context_pipeline=Reducer())
         self.assertFalse(result.is_error)
         self.assertEqual('original task', result.messages[0].content)
@@ -101,7 +102,7 @@ class ContextCommitTests(unittest.IsolatedAsyncioTestCase):
             path = Path(directory) / 'session.jsonl'
             provider = FauxProvider(); provider.respond_text('done after recovery')
             with Session(path) as session:
-                config = AgentLoopConfig(provider, session=session)
+                config = AgentLoopConfig(provider, session=session, context_meter=MeasurementService())
                 with patch('fruitfly_agent.core.session.storage.os.fsync', side_effect=OSError('offline fsync failure')):
                     result = await run_agent_loop(config, [UserMessage('original task')], context_pipeline=Reducer())
                 self.assertTrue(result.is_error)

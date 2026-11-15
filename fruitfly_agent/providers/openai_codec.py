@@ -17,7 +17,7 @@ from fruitfly_agent.core.data_model import (
 )
 
 
-def convert_to_openai(messages: list[AgentMessage], *, replay: Callable | None = None) -> list[dict]:
+def convert_to_openai(messages: list[AgentMessage], *, replay: Callable | None = None, input_fallback: bool = True) -> list[dict]:
     out: list[dict] = []
     for message in messages:
         if isinstance(message, UserMessage):
@@ -61,7 +61,7 @@ def convert_to_openai(messages: list[AgentMessage], *, replay: Callable | None =
             })
         elif isinstance(message, CustomMessage):
             out.append({"role": "user", "content": message.text})
-    if not out:
+    if not out and input_fallback:
         out.append({"role": "user", "content": "Continue."})
     return out
 

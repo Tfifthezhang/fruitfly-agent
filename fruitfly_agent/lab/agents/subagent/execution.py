@@ -85,7 +85,9 @@ class ChildExecution:
             self.on_activity('model', self.requests)
             return self.runtime.config.provider(view, signal=signal)
         forward_context_capabilities(provider, self.runtime.config.provider)
+        from fruitfly_agent.lab.context_manager.measurement import new_measurement_scope
         config = replace(self.runtime.config, provider=provider, hooks=hooks,
+            context_meter=new_measurement_scope(self.runtime.config.context_meter),
             system_prompt=self.runtime.config.system_prompt + '\n\n' + self.instructions,
             get_steering_messages=drain, get_follow_up_messages=drain)
         session.append('meta', {'kind': 'child-execution', 'scope_id': request.identity.scope_id,

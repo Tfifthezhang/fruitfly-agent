@@ -11,3 +11,4 @@ parameters:
     many_tools: 80
     high_tokens: 200000
     material_policy: focused
+    sampling_policy: balanced

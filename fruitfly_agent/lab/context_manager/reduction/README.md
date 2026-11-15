@@ -62,3 +62,12 @@ passive activity, stable digests and retry admission shared by reduction methods
 It reuses Core's operation supervisor for cancellation retirement. Methods retain
 their prompts, source coverage, thresholds and state semantics; shared services
 do not decide when to reduce context or grant an overflow retry.
+
+## Follow the common working budget
+
+Every method consumes `ContextSnapshot.context_budget`; Core performs final
+admission even if a method returns no decision or fails. See
+[shared context budget](../budget/README.md) for capacity, threshold ownership,
+bounded state catch-up, configuration and failure behavior. Method-local tail
+or memory targets are not request ceilings. Do not derive another working
+capacity from `context_window` or override the shared ceiling in a reducer.

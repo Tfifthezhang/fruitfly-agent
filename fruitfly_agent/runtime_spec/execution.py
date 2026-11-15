@@ -4,13 +4,14 @@ from collections.abc import Mapping
 import json
 
 from fruitfly_agent.core.config import AgentLoopConfig, ToolExecutionConfig
+from fruitfly_agent.core.context.budget import ContextBudget
 
 LIMITS = {'max_turns': 0, 'max_tool_calls_per_turn': 0, 'max_context_recovery_attempts': 1}
 TOOL_FIELDS = frozenset({'max_parallel', 'default_execution_mode'})
 
 
 def validate_execution(value):
-    if not isinstance(value, Mapping) or set(value) - {*LIMITS, 'tool_execution'}:
+    if not isinstance(value, Mapping) or set(value) - {*LIMITS, 'tool_execution', 'context_budget'}:
         raise ValueError('execution contains unsupported fields')
     result = dict(value)
     for key, minimum in LIMITS.items():
@@ -29,24 +30,30 @@ def validate_execution(value):
         if not isinstance(mode, str) or mode not in {'parallel', 'sequential'}:
             raise ValueError('execution.tool_execution.default_execution_mode is invalid')
         result['tool_execution'] = tools
+    if 'context_budget' in result:
+        budget = result['context_budget']
+        if not isinstance(budget, Mapping) or set(budget) - {'max_input_tokens', 'trigger_ratio', 'target_ratio'}:
+            raise ValueError('execution.context_budget contains unsupported fields')
+        result['context_budget'] = asdict(ContextBudget(**budget))
     return result
 
 
 def execution_values(value):
     supplied = validate_execution(value)
     defaults = {f.name: f.default for f in fields(AgentLoopConfig) if f.name in LIMITS}
-    return {**defaults, **supplied, 'tool_execution': {
+    return {**defaults, **supplied, 'context_budget': asdict(ContextBudget(**supplied.get('context_budget', {}))), 'tool_execution': {
         **asdict(ToolExecutionConfig()), **supplied.get('tool_execution', {})}}
 
 
 def execution_kwargs(value):
     result = execution_values(value)
     result['tool_execution'] = ToolExecutionConfig(**result['tool_execution'])
+    result['context_budget'] = ContextBudget(**result['context_budget'])
     return result
 
 
 def effective_execution(config):
-    return {**{name: getattr(config, name) for name in LIMITS}, 'tool_execution': asdict(config.tool_execution)}
+    return {**{name: getattr(config, name) for name in LIMITS}, 'tool_execution': asdict(config.tool_execution), 'context_budget': asdict(config.context_budget)}
 
 
 def parse_execution(text):
@@ -66,8 +73,9 @@ def parse_execution(text):
 
 def flatten_execution(value):
     value = execution_values(value)
-    return {**{key: item for key, item in value.items() if key != 'tool_execution'},
-            **{'tool_execution.' + key: item for key, item in value['tool_execution'].items()}}
+    return {**{key: item for key, item in value.items() if key not in {'tool_execution', 'context_budget'}},
+            **{'tool_execution.' + key: item for key, item in value['tool_execution'].items()},
+            **{'context_budget.' + key: item for key, item in value['context_budget'].items()}}
 
 
 def apply_profile_binding(profile, kind, key, text):

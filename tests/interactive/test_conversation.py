@@ -1,5 +1,6 @@
 """Canonical history snapshots and static terminal presentation."""
 
+from fruitfly_agent.lab.context_manager.measurement.budget import MeasurementService
 import io
 import os
 import tempfile
@@ -65,7 +66,7 @@ class ConversationTest(unittest.IsolatedAsyncioTestCase):
                 durable.append("message", {"message": message.to_dict()})
             durable.append("compaction", {"messages": [m.to_dict() for m in projection]})
             session = InteractiveSession(
-                AgentLoopConfig(provider=FauxProvider(), model="offline", session=durable),
+                AgentLoopConfig(provider=FauxProvider(), model="offline", session=durable, context_meter=MeasurementService()),
                 messages=durable.messages(),
             )
             before = durable.read_all()

@@ -3,6 +3,7 @@ from collections import Counter
 import json
 from fruitfly_agent.improvement.execution.facts import read_facts
 from .summaries import execution_summary
+from .statistics import batch_statistics
 
 
 def context_observations(context, artifacts):
@@ -30,9 +31,10 @@ def batch_view(tasks, records, observations, artifacts):
             'observation_supply': 'available' if receipt.run_id in by_run else 'not_supplied',
             'metadata': prefix + '/metadata.json',
             'overview': prefix + '/evidence/overview.json' if any(r.path == 'evidence/overview.json' for r in receipt.artifacts) else None})
-    return {'overview.json': {'task_count': len(tasks), 'execution_count': len(records),
+    return {'statistics.json': batch_statistics(rows, observations), 'overview.json': {'task_count': len(tasks), 'execution_count': len(records),
         'execution_status_counts': dict(Counter(r.status for r in records)),
         'observation_name_counts': dict(Counter(o.get('name', 'unknown') for o in observations if isinstance(o, dict))),
+        'statistics': 'context/statistics.json',
         'scope': 'Deterministic facts over supplied records; no original-reading or quality claim.'},
         'executions.json': rows,
         'coverage.json': {'directory_complete': True, 'execution_count': len(rows),

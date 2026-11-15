@@ -2,6 +2,9 @@
 import asyncio
 from dataclasses import asdict
 from uuid import uuid4
+from contextvars import ContextVar
+
+active_activity = ContextVar("active_research_activity", default=None)
 from ..contracts.activities import ActivitySpec, ActivityResult, UnresolvedActivity
 from .recovery import reconstruct
 
@@ -58,6 +61,7 @@ class ResearchController:
         attempt = uuid4().hex
         self.journal.append({'type': 'activity-started', 'data': {'attempt_id': attempt,
             'revision_id': state.revisions[-1]['identity'], 'spec_identity': spec.identity, 'spec': spec.to_dict()}})
+        context_token = active_activity.set({'attempt_id': attempt, 'activity_id': spec.identity, 'stage': spec.kind})
         try:
             result = await implementation(spec)
             if not isinstance(result, ActivityResult):
@@ -78,3 +82,5 @@ class ResearchController:
                 'status': 'interrupted' if isinstance(exc, asyncio.CancelledError) else 'failed',
                 'error_type': type(exc).__name__, 'detail': str(exc)}})
             raise
+        finally:
+            active_activity.reset(context_token)

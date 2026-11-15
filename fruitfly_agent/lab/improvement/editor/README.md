@@ -69,5 +69,47 @@ ordinary candidate grants. `AgentEditor(..., options=...)` consumes these contro
 
 When supplied organization guides contain findings, each changed component must
 reference existing `issue_ids` as well as original `evidence_ids` and a testable
-`expected_effect`. Conflicting issue identities fail explicitly. Reading derived
+`expected_effect`. Local issue IDs are accepted only when unambiguous. Use `<guide-artifact-id>/<issue-id>`
+when multiple supplied guides share a local ID. Reading derived
 findings alone never supplies the original execution citation required for edits.
+
+The `submit_candidate` tool accepts `issue_ids` in each change reason. Tool and
+text submissions use the same finding association checks. A finding reference
+does not replace the required execution evidence. The Core tool execution
+regression lives in `tests.lab.test_editor_execution`.
+
+## Submit an explicit decision
+
+[schema.py](schema.py) supplies one schema for tool and text submissions.
+[decision.py](decision.py) validates intent separately from component identity.
+Submit `reasons` plus a `decision` with `kind`, `explanation`,
+`baseline_applicability`, optional `issues` and `required_materials`.
+
+| Decision kind | Behavior |
+|---|---|
+| `candidate` | Actual component changes; each referenced issue is selected in the decision |
+| `retain_baseline` | No changes; explain why the available evidence does not justify editing |
+| `needs_evidence` | No changes; name relative material paths needed to investigate further |
+
+Each issue decision contains `issue_id`, `disposition` (`selected`, `rejected`,
+`deferred`) and `explanation`. Explicit candidate decisions select every issue
+used by edit reasons. Requests for materials grant no additional read authority.
+`baseline_applicability` explains the relationship between historical execution
+and current component values; unavailable historical state stays unknown.
+
+Changed legacy text submissions without a decision retain their supplied edit
+reasons and mark applicability as unreported. Empty submissions require an explicit
+decision. The built-in generator returns no new candidate for retain/needs-evidence;
+`stop` remains an independent workflow control. Independent stages publish
+`decision.json`; custom generators without decisions are marked `not_reported`.
+
+Read deterministic `context/statistics.json`, discover organization indexes through
+`catalog`, and inspect a bounded issue and contrasting cases before broad searches.
+Per-execution summaries are also available under `context/summaries/` without
+expanding detailed grants. Derived findings do not establish causal truth.
+
+`parameters.settings.max_repair_attempts` bounds separate format/evidence repair
+invocations (default 3). Like directory presentation settings, it is configurable
+but protected from candidate instruction grants. Repairs retain the draft, exact
+authorized sources and original cumulative allowance. Exhaustion is a runtime
+failure, never an implicit retain-baseline decision.

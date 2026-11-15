@@ -8,8 +8,6 @@ import math
 class LayeredCompactionConfig:
     mode: str = field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'settings.mode'), metadata={'description': 'Deterministic archiving, or hybrid with an explicitly bound summary model.', 'choices': ('deterministic', 'hybrid'), 'advanced': False})
     summary_model_profile: str = field(default='', metadata={'description': 'Protected summary role; default inherits executor in hybrid mode.', 'advanced': False})
-    trigger_ratio: float = field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'settings.trigger_ratio'), metadata={'description': 'Fraction of available input capacity that triggers history compaction.', 'minimum': .1, 'maximum': .95})
-    target_ratio: float = field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'settings.target_ratio'), metadata={'description': 'Target input-capacity fraction after compaction; lower than trigger_ratio.', 'minimum': .05, 'maximum': .9})
     tool_result_min_chars: int = field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'settings.tool_result_min_chars'), metadata={'description': 'Minimum old tool-result text length eligible for preview and reference replacement.', 'minimum': 256, 'maximum': 64000})
     preview_chars: int = field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'settings.preview_chars'), metadata={'description': 'Total head and tail characters retained in an abbreviated tool result.', 'minimum': 128, 'maximum': 8192})
     keep_recent_groups: int = field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'settings.keep_recent_groups'), metadata={'description': 'Minimum recent complete message groups retained; tool calls and results stay together.', 'minimum': 1, 'maximum': 32})
@@ -38,12 +36,9 @@ class LayeredCompactionConfig:
             value = getattr(self, name)
             if type(value) is not int or not lower <= value <= upper:
                 raise ValueError('invalid layered-compaction ' + name)
-        for name, minimum, maximum in (('trigger_ratio', .1, .95), ('target_ratio', .05, .9),
-                                   ('summary_timeout_seconds', 1., 60.)):
+        for name, minimum, maximum in (('summary_timeout_seconds', 1., 60.),):
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not minimum <= value <= maximum:
                 raise ValueError('invalid layered-compaction ' + name)
-        if self.target_ratio >= self.trigger_ratio:
-            raise ValueError('target_ratio must be lower than trigger_ratio')
         if self.summary_target_tokens > self.summary_max_output_tokens:
             raise ValueError('summary target cannot exceed its output allowance')

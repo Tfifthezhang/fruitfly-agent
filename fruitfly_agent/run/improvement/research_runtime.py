@@ -19,8 +19,9 @@ class ResearchRuntimeFactory:
         self.parts = parts if self.settings.retention.enabled else None
         if self.settings.retention.enabled and (parts is None or not self.settings.delegation.enabled):
             raise ValueError('incremental organization requires delegation and a durable part store')
-        self.parameters = EvidenceDelegation.configuration(roles.profile, roles.catalog, self.settings.delegation.workers)
-        worker_roles = {self.parameters['workers'][name]['model_role'] for name in self.settings.delegation.workers}
+        self.parameters = (EvidenceDelegation.configuration(roles.profile, roles.catalog, self.settings.delegation.workers)
+            if self.settings.delegation.enabled else {'workers': {}})
+        worker_roles = {self.parameters['workers'][name]['model_role'] for name in self.settings.delegation.workers if self.settings.delegation.enabled}
         for role_name in worker_roles:
             roles.specs[roles.alias(role_name)].require(streaming=True, tools=True)
         self.budget = None
@@ -37,6 +38,28 @@ class ResearchRuntimeFactory:
         token = uuid4().hex
         path = self.directory / (token + '.jsonl')
         parent = Session(path)
+        if not self.settings.delegation.enabled:
+            manifest = {**self.identity, 'session_id': token,
+                'tools': [tool.name for tool in tools], 'model': config.model, 'max_tokens': config.max_tokens,
+                'context_budget': asdict(config.context_budget)}
+            parent.append('meta', {'kind': 'research-runtime', 'manifest': manifest}, sync=True)
+            runtime_config = replace(config, session=parent, tools=tools, system_prompt=system_prompt,
+                max_turns=None, max_tool_calls_per_turn=None)
+            async def start_single():
+                services.check()
+            async def close_single():
+                pass
+            runtime = PreparedAgentRuntime(runtime_config, ContextPipeline(), manifest, start_single, close_single)
+            try:
+                services.record('research-runtime', session=str(path), session_id=token,
+                    identity=content_hash(canonical_json(manifest)))
+                await runtime.start()
+                yield runtime
+            finally:
+                parent.close()
+                reference = self.artifacts.put_bytes(path.read_bytes()).artifact_id
+                services.record('research-session', session_id=token, artifact_id=reference)
+            return
         port = ArtifactPort(self.artifacts)
         evidence_conditions = self.settings.to_dict()
         evidence_conditions.pop('delegation'); evidence_conditions.pop('retention')
@@ -44,7 +67,7 @@ class ResearchRuntimeFactory:
             tools=self.parameters['evidence_tools'], record=services.record, workers=self.parameters['workers'],
             parts=self.parts, conditions={'role': self.role, 'mission_id': content_hash(system_prompt),
                 'implementation_id': self.parts.implementation_id if self.parts else None,
-                'evidence': evidence_conditions, 'parent_instructions': self.parameters['evidence_parent_instructions'],
+                'evidence': evidence_conditions, 'context_budget': asdict(config.context_budget), 'parent_instructions': self.parameters['evidence_parent_instructions'],
                 'child_instructions': self.parameters['evidence_child_instructions'],
                 'execution': {k: self.parameters[k] for k in ('run_timeout_seconds', 'max_model_requests')}},
             models=self.identity['worker_models'])
@@ -57,9 +80,11 @@ class ResearchRuntimeFactory:
                 child = prepare_config(self.roles.configuration(worker['model_role'], resources=owned), delegated=True)
                 child_tools = scope.child_tools(request)
                 child = replace(child, session=session, env=None, tools=child_tools, system_prompt='',
+                    context_budget=config.context_budget,
                     max_turns=None, max_tool_calls_per_turn=None)
                 manifest = {'implementation': 'assigned-evidence-runtime', 'model_profile': self.roles.alias(worker['model_role']),
                     'model': child.model, 'max_tokens': child.max_tokens, 'context_window': child.context_window,
+                    'context_budget': asdict(child.context_budget),
                     'tools': [{'name': t.name, 'parameters': t.parameters} for t in child_tools],
                     'permissions': {'read': 'assigned', 'write': 'deny', 'delegate': 'deny'},
                     'grant': scope.grants[request.identity.agent_id], 'worker': worker,
@@ -83,7 +108,8 @@ class ResearchRuntimeFactory:
             runtime_config = replace(config, session=parent, tools=parent_tools,
                 system_prompt=system_prompt + '\n' + self.parameters['evidence_parent_instructions'],
                 max_turns=None, max_tool_calls_per_turn=None)
-            manifest = {**self.identity, 'session_id': token, 'tools': [t.name for t in parent_tools]}
+            manifest = {**self.identity, 'context_budget': asdict(config.context_budget),
+                'session_id': token, 'tools': [t.name for t in parent_tools]}
             parent.append('meta', {'kind': 'research-runtime', 'manifest': manifest}, sync=True)
             services.record('research-runtime', session=str(path), identity=content_hash(canonical_json(manifest)))
             async def start():
@@ -94,9 +120,22 @@ class ResearchRuntimeFactory:
             await runtime.start()
             yield runtime
         finally:
-            if service is not None:
-                await service.close()
-            parent.close()
+            try:
+                if service is not None:
+                    await service.close()
+            finally:
+                workspace.investigation_children = [{key: row.get(key) for key in
+                    ('agent_id', 'run_id', 'state', 'error', 'cleanup')}
+                    for row in service.snapshot()['executions']] if service is not None else []
+                try:
+                    parent.close()
+                finally:
+                    for child_path in path.parent.glob(path.name + '.subagents/*/session.jsonl'):
+                        child_reference = self.artifacts.put_bytes(child_path.read_bytes()).artifact_id
+                        services.record('research-child-session', agent_id=child_path.parent.name,
+                            artifact_id=child_reference, scope='Retained durable prefix; inspect child cleanup state.')
+                    reference = self.artifacts.put_bytes(path.read_bytes()).artifact_id
+                    services.record('research-session', session_id=token, artifact_id=reference)
 
     @staticmethod
     async def _close(resources):

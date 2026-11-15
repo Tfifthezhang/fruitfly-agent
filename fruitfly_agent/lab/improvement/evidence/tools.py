@@ -33,7 +33,8 @@ def evidence_tools(workspace, *, settings=None, reader=None):
             if not path.endswith('/evidence/events.json') and path != 'evidence/events.json':
                 raise ValueError('event catalog requires a granted event index')
             value=json.loads(workspace.read(path))
-            events=value['events']
+            events=[{**event, 'source_granted': (path.rsplit('/evidence/', 1)[0] + '/' + event['source_path']) in workspace.paths()}
+                for event in value['events']]
             if args.get('kind'):events=[v for v in events if v['kind']==args['kind']]
             for field in ('tool_name', 'tool_call_id', 'request_id', 'operation_id', 'phase', 'status'):
                 if field in args:

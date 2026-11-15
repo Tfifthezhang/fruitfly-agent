@@ -1,4 +1,5 @@
 """Real collection and organization reach both roles through one evidence reader."""
+from fruitfly_agent.lab.context_manager.measurement.budget import MeasurementService
 from dataclasses import replace
 import json
 import hashlib
@@ -67,7 +68,7 @@ class ImprovementEvidenceTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(WorkspaceEvidence(joint_workspace).read(joint_path)['artifact_id'], editor_page['artifact_id'])
             with self.assertRaises(ValueError):
                 EvidenceWorkspace.build(replace(joint, tasks=(replace(entry, partition='confirmation'),)), artifacts)
-            evaluator = ModelEvaluator(AgentLoopConfig(provider=None), artifacts)
+            evaluator = ModelEvaluator(AgentLoopConfig(provider=None, context_meter=MeasurementService()), artifacts)
             async def inspect(mission, workspace, services, **kwargs):
                 self.assertFalse(kwargs['writable'])
                 self.assertEqual(workspace.writable_ids, frozenset())

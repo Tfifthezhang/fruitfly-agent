@@ -8,6 +8,8 @@ on tool, environment, and Session contracts.
 from __future__ import annotations
 
 import asyncio
+from fruitfly_agent.core.context.budget import ContextBudget
+
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -35,6 +37,7 @@ class AgentLoopContext:
     max_context_recovery_attempts: int
     model: str
     max_tokens: int
+    context_budget: ContextBudget = field(default_factory=ContextBudget)
     context_meter: Any = None
     provider: Any = None
     measurement: Any = None

@@ -8,6 +8,8 @@ fine-grained callbacks rather than a bundled subsystem.
 
 from __future__ import annotations
 
+from fruitfly_agent.core.context.budget import ContextBudget
+
 from dataclasses import dataclass, field
 from typing import Awaitable, Callable, Sequence
 
@@ -79,6 +81,7 @@ class AgentLoopConfig:
         | None
     ) = None
 
+    context_budget: ContextBudget = field(default_factory=ContextBudget)
     context_meter: ContextMeter | None = None
 
     # --- subsystems ---
@@ -98,6 +101,8 @@ class AgentLoopConfig:
     on_tool_result: Callable[[str, ToolResultMessage, bool], Awaitable[None] | None] | None = None
 
     def __post_init__(self) -> None:
+        if not isinstance(self.context_budget, ContextBudget):
+            raise ValueError('context_budget must be a ContextBudget')
         for name, minimum in (("max_context_recovery_attempts", 1), ("max_turns", 0),
                               ("max_tool_calls_per_turn", 0)):
             value = getattr(self, name)

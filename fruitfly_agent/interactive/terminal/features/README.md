@@ -12,6 +12,7 @@ Keep each user-facing function's command flow and menus in one package. Features
 | [tool_services/approval.py](tool_services/approval.py) | TTY-only external process startup review while ordinary terminal input is suspended |
 | [Retained state](retained_state/README.md) | Memory and Skill inspection and batch review |
 | [assembly.py](assembly.py): bind_commands | Bind available built-in features and cancellation to the terminal registry |
+| [subagent.py](subagent.py), [operations.py](operations.py) | Snapshot counts, states and task blocks through optional read-only bindings; existing operation output/cancel routes |
 | [Composer](composer/README.md) | Structured text/image drafts, paste, path selection and rejected-input recovery |
 
 Each feature exports its menu entry and a handler factory. Factories return synchronous/asynchronous handlers accepted by [TerminalCommandRegistry](../commands.py). CommandResult lets the input loop display output and handle exit. Application's public methods remain authoritative for work exclusion and runtime switching.
@@ -29,3 +30,9 @@ No new environment variables or model training. Existing confirmation steps gove
 [subagent.py](subagent.py) registers read-only child execution list/detail views.
 It consumes the optional monitor binding and works independently of configuration
 menus and the input loop.
+
+Snapshot handlers build shared `CommandPanel` sections through
+[`panel_result`](../rendering/panels.py), keeping structured output and plain text
+consistent. Each list invocation reads its service once. Subagent details read
+only the requested execution; operation output and cancellation retain their
+separate explicit routes.

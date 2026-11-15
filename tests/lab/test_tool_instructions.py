@@ -5,6 +5,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from fruitfly_agent.lab.context_manager.measurement.budget import MeasurementService
 from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.core.data_model import UserMessage
 from fruitfly_agent.core.loop import run_agent_loop
@@ -75,7 +76,7 @@ class ToolInstructionTests(unittest.IsolatedAsyncioTestCase):
                               {'path': 'valid', 'content': ''}):
                 provider.respond_tool_call('write', arguments)
             provider.respond_text('done')
-            result = await run_agent_loop(AgentLoopConfig(provider, env=LocalEnv(str(root)),
+            result = await run_agent_loop(AgentLoopConfig(provider, context_meter=MeasurementService(), env=LocalEnv(str(root)),
                 tools=(create_write_tool(read_resource),)), [UserMessage('Write the requested files')])
             self.assertFalse(result.is_error)
             self.assertEqual([True, True, True, False],

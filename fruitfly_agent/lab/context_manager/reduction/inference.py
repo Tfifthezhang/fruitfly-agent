@@ -39,9 +39,9 @@ class AuxiliaryText:
             if self.meter is not None:
                 measured = await self.meter.measure(view, self.provider, signal=snapshot.signal)
                 tokens = measured.input_tokens
-                if self.context_window is not None and not measured.fits(self.context_window):
+                if not snapshot.context_budget.fits(self.context_window or snapshot.context_window, measured):
                     return AuxiliaryResult(reason='input_capacity')
-            if tokens is None or tokens > input_limit or self.context_window is not None and tokens + output > self.context_window:
+            if tokens is None or tokens > min(input_limit, snapshot.context_budget.max_input_tokens) or self.context_window is not None and tokens + output > self.context_window:
                 return AuxiliaryResult(reason='input_capacity')
             stream = self.provider(view, signal=snapshot.signal)
             try:

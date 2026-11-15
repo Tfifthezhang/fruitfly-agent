@@ -1,4 +1,5 @@
 """User cancellation terminates quiet work while preserving session facts."""
+from fruitfly_agent.lab.context_manager.measurement.budget import MeasurementService
 import asyncio
 from dataclasses import replace
 import tempfile
@@ -37,7 +38,7 @@ class RunControlTests(unittest.IsolatedAsyncioTestCase):
         provider.respond_text('next answer')
         events = []
         with tempfile.TemporaryDirectory() as directory, Session(Path(directory) / 'session.jsonl') as durable:
-            session = InteractiveSession(AgentLoopConfig(provider=provider, session=durable, model='offline'), event_sink=events.append)
+            session = InteractiveSession(AgentLoopConfig(provider=provider, session=durable, model='offline', context_meter=MeasurementService()), event_sink=events.append)
             submission = asyncio.create_task(session.submit('cancel me'))
             await asyncio.wait_for(entered.wait(), 1)
             self.assertTrue(session.cancel())
@@ -55,7 +56,7 @@ class RunControlTests(unittest.IsolatedAsyncioTestCase):
     async def test_external_task_cancellation_propagates_but_still_delivers_aborted_end(self):
         entered, closed = asyncio.Event(), asyncio.Event()
         events = []
-        session = InteractiveSession(AgentLoopConfig(provider=self.quiet(entered, closed), model='offline'), event_sink=events.append)
+        session = InteractiveSession(AgentLoopConfig(provider=self.quiet(entered, closed), model='offline', context_meter=MeasurementService()), event_sink=events.append)
         task = asyncio.create_task(session.submit('external'))
         await entered.wait()
         task.cancel()
@@ -73,7 +74,7 @@ class RunControlTests(unittest.IsolatedAsyncioTestCase):
         def observe(event):
             if event.event_type == 'run_started':
                 session.cancel()
-        session = InteractiveSession(AgentLoopConfig(provider=self.quiet(entered, closed), model='offline'), event_sink=observe)
+        session = InteractiveSession(AgentLoopConfig(provider=self.quiet(entered, closed), model='offline', context_meter=MeasurementService()), event_sink=observe)
         result = await asyncio.wait_for(session.submit('cancel early'), 1)
         self.assertEqual('aborted', result.stop_reason)
         self.assertFalse(entered.is_set())
@@ -99,7 +100,7 @@ class RunControlTests(unittest.IsolatedAsyncioTestCase):
                 tools = tuple(AgentTool(name=name, label=name, description='', parameters={'type': 'object'}, execute=fn)
                               for name, fn in (('fast', fast), ('wait', wait), ('later', later)))
                 config = AgentLoopConfig(provider=provider, model='offline', tools=tools,
-                                         tool_execution=ToolExecutionConfig(max_parallel=1, default_execution_mode='parallel' if parallel else 'sequential'))
+                                         tool_execution=ToolExecutionConfig(max_parallel=1, default_execution_mode='parallel' if parallel else 'sequential'), context_meter=MeasurementService())
                 session = InteractiveSession(config)
                 task = asyncio.create_task(session.submit('tools'))
                 await entered.wait()
@@ -127,7 +128,7 @@ class RunControlTests(unittest.IsolatedAsyncioTestCase):
             entered.set()
             await asyncio.Event().wait()
         hooks.on(AFTER_RESPONSE, after)
-        session = InteractiveSession(AgentLoopConfig(provider=provider, hooks=hooks, model='offline'))
+        session = InteractiveSession(AgentLoopConfig(provider=provider, hooks=hooks, model='offline', context_meter=MeasurementService()))
         task = asyncio.create_task(session.submit('stop before tools'))
         await entered.wait()
         session.cancel()
@@ -140,8 +141,8 @@ class RunControlTests(unittest.IsolatedAsyncioTestCase):
         for operation in ('cancel', 'close', 'rebuild'):
             with self.subTest(operation=operation):
                 entered, closed = asyncio.Event(), asyncio.Event()
-                first = InteractiveSession(AgentLoopConfig(provider=self.quiet(entered, closed), model='first'))
-                second = InteractiveSession(AgentLoopConfig(provider=FauxProvider(), model='second'))
+                first = InteractiveSession(AgentLoopConfig(provider=self.quiet(entered, closed), model='first', context_meter=MeasurementService()))
+                second = InteractiveSession(AgentLoopConfig(provider=FauxProvider(), model='second', context_meter=MeasurementService()))
                 application = AgentApplication(_Factory([first, second]))
                 await application.start()
                 application.enqueue('active')
@@ -172,7 +173,7 @@ class RunControlTests(unittest.IsolatedAsyncioTestCase):
                 except asyncio.CancelledError:
                     pass
             return AgentLoopResult(messages=list(messages), stop_reason='aborted')
-        session = InteractiveSession(AgentLoopConfig(provider=FauxProvider()), run_loop=uncooperative)
+        session = InteractiveSession(AgentLoopConfig(provider=FauxProvider(), context_meter=MeasurementService()), run_loop=uncooperative)
         application = AgentApplication(_Factory([session]), shutdown_timeout=0.08)
         await application.start()
         submission = asyncio.create_task(application.submit('wait'))

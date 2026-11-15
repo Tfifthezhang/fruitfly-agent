@@ -37,10 +37,21 @@ class EvidenceSession:
             tools.extend(editing_tools(workspace,submit=seal if submit is not None else None,settings=self.settings, instructions=editing_instructions, options=editing_options))
         tools.extend(extra_tools)
         def prepare_config(config, *, delegated=False):
+            repeated = {'key': None, 'count': 0}
+            def observe_tool(name, result, cancelled):
+                if result.is_error:
+                    key = (name, result.text)
+                    repeated['count'] = repeated['count'] + 1 if repeated['key'] == key else 1
+                    repeated['key'] = key
+                else:
+                    repeated.update(key=None, count=0)
+
             meter = new_measurement_scope(config.context_meter) or MeasurementService()
             def bounded_provider(view, *, signal=None):
                 async def events():
                     services.check()
+                    if repeated['count'] >= self.settings.supply.repeated_error_limit:
+                        raise RuntimeError('repeated_tool_error: identical errors exhausted recovery allowance')
                     workspace.access.budget['model_requests'] += 1
                     if workspace.access.budget['model_requests'] > self.settings.supply.max_pages + self.settings.supply.completion_requests:
                         raise RuntimeError('evidence_request_budget_exhausted: shared role request budget exhausted')
@@ -60,7 +71,7 @@ class EvidenceSession:
                         await inner.aclose()
                 return AssistantMessageEventStream(events())
             forward_context_capabilities(bounded_provider, config.provider)
-            return replace(config, provider=bounded_provider)
+            return replace(config, provider=bounded_provider, context_meter=meter, on_tool_result=observe_tool)
         role_config = prepare_config(replace(self.config, env=None, hooks=None,
             prepare_next_turn=None, before_tool_call=None, after_tool_call=None,
             on_partial=None, on_tool_result=None, should_stop_after_turn=None))

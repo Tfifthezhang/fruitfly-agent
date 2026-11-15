@@ -221,7 +221,7 @@ class RunExecutionHost:
             harness = baseline
             if 'candidates' in value:
                 if len(value['candidates']) != 1:
-                    raise ValueError('execution requires exactly one candidate')
+                    raise ValueError('execution requires exactly one candidate; a retained baseline or evidence request is not a new candidate')
                 candidate = CandidateBundle.from_dict(value['candidates'][0])
                 if candidate.base != baseline:
                     services.record('research-configuration-difference', base_id=candidate.base.snapshot_id, current_id=baseline.snapshot_id)

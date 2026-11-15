@@ -434,7 +434,8 @@ class SubagentService:
                     self.offered_results.pop(run_id, None)
         hooks.add(BEFORE_REQUEST, acknowledge, required=True, priority=-1000)
         try:
-            result = await run_agent_loop(replace(config, hooks=hooks, get_steering_messages=steering,
+            from fruitfly_agent.lab.context_manager.measurement import new_measurement_scope
+            result = await run_agent_loop(replace(config, hooks=hooks, context_meter=new_measurement_scope(config.context_meter), get_steering_messages=steering,
                 get_follow_up_messages=follow), messages, signal=signal, context_pipeline=context_pipeline)
             outstanding = any(r['scope_id'] == self.scope_id and (r['state'] in ACTIVE or not r['delivered']) for r in self.store.rows.values())
             if outstanding and result.stop_reason != 'aborted':

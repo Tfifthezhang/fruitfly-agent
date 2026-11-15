@@ -72,7 +72,7 @@ def anchors(items, tail):
     users = [item.message for item in items if isinstance(item.message, UserMessage)]
     present = {digest(message.to_dict()) for message in tail}
     result = []
-    for message in (users[:1] + users[-1:]):
+    for message in (users[:1] + users[-3:]):
         key = digest(message.to_dict())
         if key not in present:
             present.add(key)

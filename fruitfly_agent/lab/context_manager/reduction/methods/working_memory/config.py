@@ -14,7 +14,6 @@ class WorkingMemoryConfig:
     update_timeout_seconds: float = field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'settings.update_timeout_seconds'), metadata={'description': 'Total update budget across pages, measurement, retries and shortening.', 'minimum': .01, 'maximum': 600.})
     memory_tokens: int = field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'settings.memory_tokens'), metadata={'description': 'Target task-memory token capacity; larger memory retains more content but consumes request context.', 'advanced': False, 'minimum': 1, 'maximum': 32000})
     update_every_messages: int = field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'settings.update_every_messages'), metadata={'description': 'New canonical messages between memory updates; frequent updates can increase auxiliary model work.', 'advanced': False, 'minimum': 1, 'maximum': 1024})
-    switch_ratio: float = field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'settings.switch_ratio'), metadata={'description': 'Input-capacity ratio that triggers an update or projection switch; integrity and coverage checks still apply.', 'advanced': False, 'minimum': 0.1, 'maximum': 1})
     page_char_limit: int = field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'settings.page_char_limit'), metadata={'description': 'Maximum source characters per evidence page sent to a memory update.', 'advanced': True, 'minimum': 1, 'maximum': 120000})
     max_pages: int = field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'settings.max_pages'), metadata={'description': 'Maximum evidence pages per update; unprocessed pages never count as covered.', 'advanced': True, 'minimum': 1, 'maximum': 128})
     auxiliary_max_tokens: int = field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'settings.auxiliary_max_tokens'), metadata={'description': 'Maximum output tokens per auxiliary memory response; does not raise the main task allowance.', 'advanced': True, 'minimum': 1, 'maximum': 64000})
@@ -33,9 +32,7 @@ class WorkingMemoryConfig:
             value = getattr(self, name)
             if type(value) is not int or not 1 <= value <= maximum:
                 raise ValueError('invalid working-memory ' + name)
-        for name, minimum, maximum in (('maintenance_ratio', 0, 1), ('update_timeout_seconds', .01, 600), ('switch_ratio', .1, 1), ('auxiliary_timeout_seconds', .01, 600)):
+        for name, minimum, maximum in (('maintenance_ratio', 0, 1), ('update_timeout_seconds', .01, 600), ('auxiliary_timeout_seconds', .01, 600)):
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, (float, int)) or not math.isfinite(value) or not minimum <= value <= maximum:
                 raise ValueError('invalid working-memory ' + name)
-        if self.maintenance_ratio > self.switch_ratio:
-            raise ValueError('maintenance_ratio must not exceed switch_ratio')

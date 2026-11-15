@@ -1,4 +1,5 @@
 """RuntimeFactory and task-application fixtures with offline providers."""
+from fruitfly_agent.lab.context_manager.measurement.budget import MeasurementService
 from pathlib import Path
 from unittest.mock import Mock
 from fruitfly_agent.core.config import AgentLoopConfig
@@ -10,7 +11,7 @@ from tests.support.materials import _write_models
 
 def offline_session(*, provider=None, model="offline-model", **kwargs):
     return InteractiveSession(
-        AgentLoopConfig(provider=provider if provider is not None else FauxProvider(), model=model),
+        AgentLoopConfig(provider=provider if provider is not None else FauxProvider(), model=model, context_meter=MeasurementService()),
         **kwargs,
     )
 

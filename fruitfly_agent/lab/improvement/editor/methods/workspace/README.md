@@ -21,3 +21,9 @@ trials. Source/default changes enter frozen identity and retained-part condition
 
 Offline checks: `tests.lab.test_editor_execution`, `tests.lab.test_detached_editor`,
 `tests.run.test_parameter_defaults`. Fake Providers prove wiring, not proposal quality.
+
+The editor accepts the shared submission schema and records an explicit proposal
+decision. A no-change result must explain baseline retention or request exact
+materials. Format repair is bounded by the protected owner setting
+`max_repair_attempts` and retains the original stage time and evidence allowance.
+See [submission and decision fields](../../README.md#submit-an-explicit-decision).

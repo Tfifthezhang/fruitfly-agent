@@ -4,6 +4,7 @@ import unittest
 from tests.support.terminal_process import TerminalProcess
 
 CODE = '''
+from fruitfly_agent.lab.context_manager.measurement.budget import MeasurementService
 import asyncio, sys, termios
 from fruitfly_agent.interactive.contracts.events import AuthorizationRequested, RunFinished
 from fruitfly_agent.core.config import AgentLoopConfig
@@ -22,7 +23,7 @@ def provider(view, *, signal=None):
         yield StreamDone(AssistantMessage())
     return AssistantMessageEventStream(events())
 async def main():
-    session = InteractiveSession(AgentLoopConfig(provider=provider, model='offline'))
+    session = InteractiveSession(AgentLoopConfig(provider=provider, model='offline', context_meter=MeasurementService()))
     app = AgentApplication(_Factory([session]))
     await app.start()
     try:
@@ -107,7 +108,7 @@ class TerminalInterruptWorkflowTests(unittest.TestCase):
                 self.assertIn('TERMINAL-RESTORED=True', process.finish())
 
 PERMISSION_CODE = CODE.replace(
-    "    session = InteractiveSession(AgentLoopConfig(provider=provider, model='offline'))\n    app = AgentApplication(_Factory([session]))",
+    "    session = InteractiveSession(AgentLoopConfig(provider=provider, model='offline', context_meter=MeasurementService()))\n    app = AgentApplication(_Factory([session]))",
     """    import tempfile
     from pathlib import Path
     from fruitfly_agent.core.data_model import AgentToolResult, TextBlock
@@ -127,7 +128,7 @@ PERMISSION_CODE = CODE.replace(
         scripted.respond_text(result_text)
     service = AuthorizationService()
     authorizer = PermissionAuthorizer(PermissionPolicy(Path.cwd()), confirm=service.confirm)
-    session = InteractiveSession(AgentLoopConfig(provider=scripted, model='offline', tools=(tool,), tool_authorizer=authorizer))
+    session = InteractiveSession(AgentLoopConfig(provider=scripted, model='offline', tools=(tool,), tool_authorizer=authorizer, context_meter=MeasurementService()))
     service.emit = session.emit_frontend_event
     class Factory(_Factory):
         async def open(self, **kwargs):

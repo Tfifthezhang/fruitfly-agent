@@ -1,4 +1,5 @@
 """Custom tool validation participates in the existing dispatch and hook boundary."""
+from fruitfly_agent.lab.context_manager.measurement.budget import MeasurementService
 import unittest
 from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.core.data_model import AgentToolResult, TextBlock, UserMessage
@@ -23,7 +24,7 @@ class ToolValidationTests(unittest.IsolatedAsyncioTestCase):
             def change(event):
                 event.args['value'] = 'changed'
             hooks.add(BEFORE_TOOL, change)
-        result = await run_agent_loop(AgentLoopConfig(provider, tools=(tool,), hooks=hooks), [UserMessage('test')])
+        result = await run_agent_loop(AgentLoopConfig(provider, tools=(tool,), hooks=hooks, context_meter=MeasurementService()), [UserMessage('test')])
         return calls, next(message for message in result.messages if message.role == 'toolResult')
 
     async def test_nulls_are_preserved_by_custom_validation(self):

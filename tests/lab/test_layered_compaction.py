@@ -99,8 +99,7 @@ class LayeredCompactionTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(valid_tool_links(decision.messages))
 
     def test_configuration_rejects_unknown_modes_invalid_limits_and_cross_field_conflicts(self):
-        for values in ({'mode':'periodic'}, {'preview_chars':True}, {'trigger_ratio':float('nan')},
-                       {'target_ratio':.8}, {'summary_target_tokens':8192,'summary_max_output_tokens':512},
+        for values in ({'mode':'periodic'}, {'preview_chars':True}, {'summary_target_tokens':8192,'summary_max_output_tokens':512},
                        {'summary_timeout_seconds':0}, {'readback_instructions':' '}):
             with self.subTest(values=values), self.assertRaises(ValueError):
                 LayeredCompactionConfig(**values)

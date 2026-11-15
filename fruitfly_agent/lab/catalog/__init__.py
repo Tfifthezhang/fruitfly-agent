@@ -10,7 +10,8 @@ from .assembly import (
     assemble_lab,
     require_workspace_path,
 )
-from .agent_runtime import PreparedAgentRuntime, AgentRuntimeError
+from .agent_runtime import PreparedAgentRuntime, AgentRuntimeError, prepare_agent_config
+from .components import resolve_execution_conditions
 from .catalog import LabCatalog
 from .tool_providers import (PreparedToolProvider, ToolProviderContext, ToolServiceInfo,
                              ToolServiceStart, ProviderToolAuthorizer)
@@ -33,7 +34,7 @@ from .models import (
 
 
 __all__ = [
-    "AgentRuntimeError", "PreparedAgentRuntime", "PreparedToolProvider", "ToolProviderContext", "ToolServiceInfo", "ToolServiceStart", "ProviderToolAuthorizer",
+    "prepare_agent_config", "resolve_execution_conditions", "AgentRuntimeError", "PreparedAgentRuntime", "PreparedToolProvider", "ToolProviderContext", "ToolServiceInfo", "ToolServiceStart", "ProviderToolAuthorizer",
     "ComponentSpec", "ResolvedHarness", "resolve_harness", "verify_runtime",
     "PermissionPolicy", "apply_permission_policy",
     "EXECUTION_ENVIRONMENT_COMPONENT", "ExecutionEnvironmentDescription",

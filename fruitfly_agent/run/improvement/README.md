@@ -51,3 +51,28 @@ attachments. Actual artifact access verifies content hashes. Case/material
 selection is an injected Lab policy; the host records its identity and selection
 receipt. Multi-batch input rejects conflicting task/run identities and deduplicates
 identical observations. See [bounded investigation](../../lab/improvement/evidence_selection/README.md).
+
+Research roles use Catalog's public execution projection and isolated measurement
+entry. Assigned-evidence children inherit the parent's working context budget;
+the effective values enter their manifests and retained-part conditions. A
+changed budget cannot silently reuse parts attributed to other conditions.
+
+## Retain independent role diagnostics
+
+Every hosted research role owns a persistent Session, including when delegation
+is disabled. Single-role execution does not resolve or construct child workers.
+Tool calls, returned results and errors reuse Core messages and the Agent runner;
+no research-specific Agent loop is installed.
+
+Role events carry run, activity attempt, stage and role attribution. Terminal
+Sessions, including child Sessions, enter the immutable artifact store. Successful
+activities publish `diagnostics/trace.json` with references to their event bodies;
+failed activities retain the diagnostic manifest in the run report. Session
+snapshots survive normal failure/cancellation paths; abrupt process loss may leave
+only the durable live Session and unresolved activity intent.
+
+Portable publications retain diagnostic dependencies but exclude them from the
+next role's automatic evidence grant. See [storage](../storage/README.md#retain-research-activities).
+Proposal decisions are separate from candidate identity and activation. A stage
+that retains its baseline or requests evidence has no new executable candidate;
+select an explicit baseline configuration for a baseline execution.

@@ -89,3 +89,7 @@ message delivery and confirmed resource retirement use fake Providers.
 `test_subagent_improvement` proves authorized instruction candidates change
 materialized child requests and individual tool declarations while protected
 model, permission and limit fields remain rejected.
+
+`test_context_budget` proves authorized shared-threshold candidates change actual
+isolated execution while preserving source configuration and the protected
+ceiling. `test_long_context` covers early archiving with a 1M model window.

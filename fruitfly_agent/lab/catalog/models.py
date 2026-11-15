@@ -88,9 +88,12 @@ class MechanismDefinition:
     optimization_coverage: OptimizationCoverage | None = None
     parameter_paths: Mapping[str, str] = field(default_factory=dict)
     execution_description: Callable[[Mapping[str, Any], Path], ExecutionEnvironmentDescription] | None = None
+    execution_projection: Callable | None = None
     default_resource: tuple[str, str] | None = None
 
     def __post_init__(self) -> None:
+        if self.execution_projection is not None and not callable(self.execution_projection):
+            raise TypeError('execution_projection must be callable')
         if self.default_resource is not None:
             from fruitfly_agent.runtime_spec.documents import validate_default_resource
             validate_default_resource(self.default_resource)

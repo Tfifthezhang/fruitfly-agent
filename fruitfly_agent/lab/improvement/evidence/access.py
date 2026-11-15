@@ -27,6 +27,7 @@ class EvidenceAccess:
         self.local_characters = 0
         self.local_responses = 0
         self.paths: dict[str, str] = {}
+        self.reading = {}
         self.receipts: deque[AccessReceipt] = deque(maxlen=256)
         self.record = record or (lambda *args, **kwargs: None)
 
@@ -67,7 +68,17 @@ class EvidenceAccess:
     def available(self, path):
         self.paths[path] = 'available'
 
-    def provided(self, path, content, *, offset=0):
+    def provided(self, path, content, *, offset=0, reading_kind="read"):
+        ranges = self.reading.setdefault(path, {"read": [], "search": []})[reading_kind]
+        if isinstance(content, str):
+            ranges.append((offset, offset + len(content)))
+            merged = []
+            for start, end in sorted(ranges):
+                if merged and start <= merged[-1][1]:
+                    merged[-1] = (merged[-1][0], max(end, merged[-1][1]))
+                else:
+                    merged.append((start, end))
+            ranges[:] = merged
         self.paths[path] = 'provided'
         data = content if isinstance(content, bytes) else content.encode('utf-8')
         self._record(AccessReceipt(path, 'provided', 'sha256:' + hashlib.sha256(data).hexdigest(), offset, len(data)))
@@ -86,3 +97,10 @@ class EvidenceAccess:
         cited = {name for reason in reasons for name in reason.evidence_ids}
         if cited - (self.supplied | self.delegated_supplied):
             raise EvidenceUnavailable('candidate cites executions not successfully supplied to this editing stage')
+
+    def inspection(self):
+        return {'paths': {path: {kind: list(spans) for kind, spans in kinds.items()}
+                for path, kinds in sorted(self.reading.items())},
+            'execution_ids_supplied': sorted(self.supplied),
+            'execution_ids_delegated': sorted(self.delegated_supplied),
+            'scope': 'Returned text ranges; neither complete reading nor understanding is inferred.'}

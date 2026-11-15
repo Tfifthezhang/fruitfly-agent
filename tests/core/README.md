@@ -22,3 +22,6 @@ Temporary Session files and fake Providers; no Provider SDK or real network.
 `test_configuration_resources` owns strict YAML decoding, detached cached data,
 explicit package resource selection and path rejection. Runtime specification tests
 retain file-reference and source-receipt coverage.
+
+`test_context_budget` owns working-capacity admission, including absent, failed
+and state-only reducers, post-compaction expansion and unavailable measurement.

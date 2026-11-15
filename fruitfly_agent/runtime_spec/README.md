@@ -53,3 +53,9 @@ Offline checks: `tests.run.test_runtime_spec`, `tests.eval.test_runtime`.
 secret-state and symlink checks. Run source snapshots and Eval installation
 material share this inventory. Registered owner YAML joins hashing and copying;
 frozen imports require those resources and never fall back to the checkout.
+
+The shared H `context-budget` component projects working conditions into the
+internal execution receipt without adding a top-level YAML grammar.
+[Budget ownership](../lab/context_manager/budget/README.md) declares its protected
+ceiling and editable thresholds. Recorded `execution.context_budget` values are
+strictly validated and participate in runtime identity.

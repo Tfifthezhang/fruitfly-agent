@@ -62,7 +62,7 @@ class ResearchOutputs:
                     self.artifacts.put_bytes(source.read_bytes(reference))
             producers.append({'bundle': bundle.identity, 'producer': bundle.producer,
                 'configuration_id': bundle.configuration_id})
-            selected = bundle.outputs
+            selected = tuple(r for r in bundle.outputs if not r.path.startswith('diagnostics/'))
             if bundle.kind != 'organize':
                 selected = tuple(resource for resource in bundle.outputs if resource.path == bundle.primary_path)
                 if len(selected) != 1:
@@ -84,6 +84,9 @@ class ResearchOutputs:
         import re
         pending = [r.artifact_id for r in (*result.outputs, *inputs)] + [configuration_id]
         visited = set()
+        required = {r.artifact_id for r in (*result.outputs, *inputs)}
+        if configuration_id:
+            required.add(configuration_id)
         def refs(value):
             if isinstance(value, dict):
                 for child in value.values(): yield from refs(child)
@@ -99,10 +102,23 @@ class ResearchOutputs:
             except ValueError as exc:
                 if not isinstance(exc.__cause__, FileNotFoundError):
                     raise
-                continue  # Content identities such as task hashes need no stored bytes.
+                if reference in required:
+                    raise ValueError('required research artifact is missing: ' + reference) from exc
+                continue  # Content identities are not necessarily stored resources.
             visited.add(reference)
-            try: pending.extend(refs(json.loads(data)))
-            except (ValueError, UnicodeDecodeError): pass
+            try:
+                decoded = json.loads(data)
+            except (ValueError, UnicodeDecodeError):
+                continue
+            if isinstance(decoded, dict) and 'events' in decoded and 'run_id' in decoded:
+                for event in decoded['events']:
+                    if isinstance(event, dict) and 'artifact_id' in event:
+                        required.add(event['artifact_id'])
+            if isinstance(decoded, dict) and decoded.get('event') in {'research-session', 'research-child-session'}:
+                required.add(decoded['artifact_id'])
+            pending.extend(refs(decoded))
+        if required - visited:
+            raise ValueError('required research artifacts were not retained: ' + ', '.join(sorted(required - visited)))
         bundle = ResearchBundle(kind, run_id, result.outputs, tuple(r.artifact_id for r in inputs),
             configuration_id, tuple(sorted(visited)))
         prefix = {'import': 'inputs/historical-eval', 'organize': 'evidence', 'propose': 'candidates',

@@ -146,3 +146,22 @@ no model request or workspace mutation. Runtime does not import Lab or host load
 Candidate `EditReason.issue_ids` attribute changes to supplied investigation
 findings when present. They supplement original execution `evidence_ids` and
 testable `expected_effect`; derived findings do not replace original-reading proof.
+
+## Describe investigation and proposal intent
+
+`research.py` defines optional source-owned `ObservationSemantics`; unknown outcome
+or direction is never inferred from a number. `organization.py` defines
+`InvestigationFact` with per-fact spans and `InvestigationGap` with requested
+materials and availability. These values carry no scoring or editing authority.
+
+`editing.py` defines `ProposalDecision` separately from `CandidateBundle` identity.
+It describes candidate, retain-baseline or needs-evidence intent, applicability,
+issue dispositions and requested material paths. `ProposalResult.decision` is
+optional for registered third-party generators; absence stays unreported.
+The built-in generator supplies a decision and returns no new candidate for a
+retain/evidence request. `stop` does not encode either result.
+
+`EditReason.issue_ids` accepts a local identifier when unique across supplied
+guides, or `<guide-artifact-id>/<issue-id>` for explicit provenance. Existing
+unversioned guide records remain attributed input; current model submissions use
+versioned guide format 2. Configuration continues to use one current grammar.

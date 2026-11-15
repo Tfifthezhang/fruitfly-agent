@@ -587,3 +587,22 @@ Proposal reasons reference supplied issue IDs when available, plus read original
 execution IDs and a falsifiable expected effect. Imported completion is not task
 success, and fewer steps are not automatically an improvement. Candidate execution
 and independent verification remain separate requested stages.
+
+## Consume investigation results and proposal decisions
+
+Start with `context/statistics.json` and per-execution `context/summaries/` for
+bounded distributions. Model organization publishes a version-2 guide, compact
+index, per-issue details, reading coverage and unresolved gaps. Discover these
+through the existing catalog instead of assuming one large guide page is complete.
+Use qualified issue references when combining organization inputs.
+
+Built-in proposals publish an explicit decision separately from changes. A retained
+baseline or evidence request yields no new candidate. Custom generators can omit
+the decision but remain marked unreported. Executing such a no-candidate proposal
+fails explicitly; choose a baseline configuration if that is the desired execution.
+Neither research outcome invokes an automatic additional stage or grants access
+to requested materials. Runtime errors remain failed/interrupted invocations.
+
+All hosted roles retain Sessions without enabling delegation. Diagnostic manifests
+and snapshots travel with publications but are not automatically granted as
+research evidence. See [host diagnostics](../../run/improvement/README.md#retain-independent-role-diagnostics).

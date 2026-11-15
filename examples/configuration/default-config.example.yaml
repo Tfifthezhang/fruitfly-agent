@@ -22,6 +22,8 @@ profiles:
         memory_maintenance:
           inherit: executor
     H:
+      context-budget:
+        default: true
       subagent:
         default: true
       local-env:

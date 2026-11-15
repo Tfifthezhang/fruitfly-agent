@@ -29,6 +29,7 @@ class SupplySettings:
     max_pages: int = field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'supply.max_pages'))
     completion_requests: int = field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'supply.completion_requests'))
 
+    repeated_error_limit: int = field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'supply.repeated_error_limit'))
 
 @dataclass(frozen=True)
 class DelegationSettings:

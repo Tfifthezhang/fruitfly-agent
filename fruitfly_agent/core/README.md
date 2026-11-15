@@ -90,3 +90,14 @@ chosen by code. It contains no owner schemas, algorithm defaults or execution po
 Runtime specification owns file references and source receipts; owners validate
 parameter types and authority. PyYAML supplies decoding through this shared helper.
 Offline checks: `tests.core.test_configuration_resources`.
+
+## Enforce working input capacity
+
+Every main request must fit both the actual model window and the independent
+[working context budget](../lab/context_manager/budget/README.md). Core sends that
+budget to all reducers, remeasures after transformations and reduction hooks, and
+blocks unknown or oversized working input before a Provider call. Direct callers
+must inject `ContextMeter`; Lab assembly and role runners provide it automatically.
+`context_budget_exhausted` retains prior usage and completed tool counters and is
+not reported as model completion. Model-capacity overflow keeps its separate
+bounded recovery behavior.

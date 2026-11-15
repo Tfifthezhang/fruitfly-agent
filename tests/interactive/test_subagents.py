@@ -24,7 +24,8 @@ class SubagentCommandTests(unittest.TestCase):
         monitor.rows = (self.row(),)
         self.assertIn('running', handler(parse_command('/subagent')).text)
         detail = handler(parse_command('/subagent agent run')).text
-        self.assertIn('unknown input', detail)
+        self.assertIn('Input tokens', detail)
+        self.assertIn('unknown', detail)
         self.assertIn('pending', detail)
         self.assertNotIn('%', detail)
         self.assertIn('Unknown', handler(parse_command('/subagent missing')).text)
@@ -38,6 +39,53 @@ class SubagentCommandTests(unittest.TestCase):
         self.assertNotIn('\x1b', text)
         self.assertNotIn('\x00', text)
 
+
+    def test_snapshot_counts_all_records_and_keeps_latest_fifty_in_order(self):
+        from fruitfly_agent.interactive.terminal.rendering.panels import render_command_panel
+        from fruitfly_agent.interactive.terminal.io.text import cell_width
+        rows = tuple(replace(self.row(), run_id=f'run-{i}', task='Ｗide task ' + 'x' * 170,
+                             state='failed' if i == 0 else 'running') for i in range(51))
+        calls = []
+        class Monitor:
+            def snapshot(self):
+                calls.append('snapshot')
+                return SubagentSnapshot(7, 2, rows)
+        result = subagent_handler(lambda: Monitor())(parse_command('/subagent'))
+        self.assertEqual(calls, ['snapshot'])
+        sections = result.panel.sections
+        self.assertEqual(dict(sections[0].rows), {
+            'Agents': '1', 'Executions': '51', 'Shown': '50', 'Concurrency limit': '2', 'Revision': '7'})
+        self.assertEqual(dict(sections[1].rows), {'failed': '1', 'running': '50'})
+        self.assertEqual(dict(sections[2].rows)['Run ID'], 'run-1')
+        self.assertEqual(dict(sections[-1].rows)['Run ID'], 'run-50')
+        self.assertTrue(dict(sections[2].rows)['Task'].endswith('…'))
+        self.assertIn('Counts cover all retained', result.text)
+        for width in (12, 36, 80):
+            text = render_command_panel(result.panel, columns=width)
+            self.assertTrue(all(cell_width(line) < width for line in text.splitlines()))
+        self.assertEqual(result.text, render_command_panel(result.panel))
+
+    def test_empty_poisoned_snapshot_keeps_warning_and_zero_counts(self):
+        class Monitor:
+            def snapshot(self): return SubagentSnapshot(1, 2, (), poisoned=True)
+        result = subagent_handler(lambda: Monitor())(parse_command('/subagent'))
+        self.assertEqual(dict(result.panel.sections[0].rows)['Executions'], '0')
+        self.assertIn('further execution is blocked', result.text)
+        self.assertIn('No subagents', result.text)
+
+    def test_detail_retains_error_and_summary_and_reads_only_detail(self):
+        calls = []
+        row = replace(self.row(), error='failure detail', summary='retained summary')
+        class Monitor:
+            def detail(self, *args):
+                calls.append(args)
+                return row
+        result = subagent_handler(lambda: Monitor())(parse_command('/subagent agent run'))
+        self.assertEqual(calls, [('agent', 'run')])
+        self.assertEqual([section.title for section in result.panel.sections],
+                         ['Task', 'Status', 'Recorded usage', 'Result'])
+        self.assertIn('failure detail', result.text)
+        self.assertIn('retained summary', result.text)
 
     def test_command_is_discovered_by_help_and_completion_without_input_loop_branches(self):
         import io

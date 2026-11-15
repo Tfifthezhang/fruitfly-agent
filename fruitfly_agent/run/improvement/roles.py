@@ -3,7 +3,7 @@ from dataclasses import asdict
 from pathlib import Path
 import os
 from fruitfly_agent.core.config import AgentLoopConfig
-from fruitfly_agent.lab.catalog import builtin_catalog, load_system_config
+from fruitfly_agent.lab.catalog import builtin_catalog, load_system_config, prepare_agent_config, resolve_execution_conditions
 from fruitfly_agent.lab.catalog import RoleProvider
 from fruitfly_agent.providers.registry import default_registry, load_model_specs
 from fruitfly_agent.providers.config import load_env
@@ -63,13 +63,12 @@ class ResearchRoles:
                 return binding()(view, signal=signal)
             def __getattr__(self, name):
                 return getattr(binding(), name)
-        return AgentLoopConfig(provider=DeferredProvider(),
-            model=spec.model, max_tokens=spec.max_output_tokens, context_window=spec.context_window)
+        from fruitfly_agent.core.context.budget import ContextBudget
+        selected_budget = resolve_execution_conditions(self.profile, self.catalog)['context_budget']
+        return prepare_agent_config(AgentLoopConfig(provider=DeferredProvider(), context_budget=ContextBudget(**selected_budget),
+            model=spec.model, max_tokens=spec.max_output_tokens, context_window=spec.context_window))
 
     def runtime_factory(self, role, directory, artifacts, settings, *, parts=None):
-        from fruitfly_agent.lab.improvement.api import EvidenceSettings
-        if not EvidenceSettings.from_dict(settings).delegation.enabled:
-            return None
         from .research_runtime import ResearchRuntimeFactory
         return ResearchRuntimeFactory(self, role, directory, artifacts, settings, parts=parts)
 

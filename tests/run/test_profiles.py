@@ -40,6 +40,7 @@ class HarnessProfileTest(unittest.TestCase):
         self.assertEqual(
             tuple(item.definition.descriptor.mechanism_id for item in resolved),
             (
+                "context-budget",
                 "local-env",
                 "read-tool",
                 "bash-tool",

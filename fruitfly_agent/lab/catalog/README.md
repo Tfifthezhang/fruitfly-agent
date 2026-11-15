@@ -306,3 +306,17 @@ retain a managed delegation scope; the default remains the ordinary Core loop.
 AssemblyContext optionally supplies a child runtime factory
 and artifact service. Consumers must not shallow-copy mutable tool or context
 state from a running parent.
+
+## Resolve shared execution conditions
+
+`resolve_execution_conditions(profile, catalog)` projects declared execution
+conditions without constructing Providers or environments. An owner's optional
+`execution_projection` returns strictly validated execution values; changed paths
+must belong to its declared `execution_fields`. Duplicate ownership fails.
+`prepare_agent_config(config)` supplies an isolated shared measurement scope for
+independently hosted Agent invocations. Run consumes these public entries rather
+than importing concrete measurement implementations.
+
+[Context budget](../context_manager/budget/README.md) uses these contracts for all
+reduction methods and requests without reduction. Its complete effective values
+enter the execution receipt and frozen identity.

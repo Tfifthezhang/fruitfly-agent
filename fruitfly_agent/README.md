@@ -224,3 +224,15 @@ replaceable I policy over full compact batch summaries. Organize/propose expose
 only selected detailed cases and materials; structured findings separate facts,
 hypotheses, counterevidence and unknowns. Candidate reasons retain issue and
 original-execution attribution. Archive scope and reading coverage stay distinct.
+
+Working input capacity is independent of model capacity. Core enforces the
+[shared context budget](lab/context_manager/budget/README.md) after every request
+preparation, for all reduction methods and runs without a reducer. Long histories
+can trigger archiving well before the model window fills. Empty Responses
+completion is a Provider failure rather than a successful final answer.
+
+Research roles persist Sessions independently of delegation. Deterministic batch
+statistics preserve unknown denominators and source-declared outcome meaning;
+organization publishes scoped findings and gaps. Proposals retain explicit
+candidate/baseline/evidence decisions without changing activation authority.
+See [independent research](lab/improvement/DEVELOPER_GUIDE.md#consume-investigation-results-and-proposal-decisions).

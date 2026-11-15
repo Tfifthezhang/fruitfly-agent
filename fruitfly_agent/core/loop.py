@@ -108,6 +108,7 @@ async def _run_agent_loop(
         env=config.env,
         session=config.session,
         context_window=config.context_window,
+        context_budget=config.context_budget,
         max_context_recovery_attempts=config.max_context_recovery_attempts,
         model=config.model,
         max_tokens=config.max_tokens,
@@ -232,8 +233,15 @@ async def _run(
             if _aborted(signal):
                 return await _finish(config, ctx, hooks, "aborted", turn_count, tool_call_count)
 
-            with operation('request.prepare'):
-                request_ctx = await _prepare_request(ctx, hooks, context_pipeline, signal)
+            try:
+                with operation('request.prepare'):
+                    request_ctx = await _prepare_request(ctx, hooks, context_pipeline, signal)
+            except FatalError as exc:
+                if not isinstance(exc.details, dict) or exc.details.get('kind') != 'context_budget_exhausted':
+                    raise
+                return await _finish(config, ctx, hooks, 'error', turn_count, tool_call_count,
+                    is_error=True, error_details={**exc.details, 'error': str(exc)},
+                    termination_reason='context_budget_exhausted')
             if request_ctx is None:
                 return await _finish(config, ctx, hooks, "aborted", turn_count, tool_call_count)
 
@@ -457,7 +465,12 @@ async def _prepare_request(
         await measure_context(ctx)
     if ctx.measurement is not None:
         estimate, source = ctx.measurement.input_tokens, ctx.measurement.source
-        _append_session_record(ctx, 'input_measurement', asdict(ctx.measurement))
+        _append_session_record(ctx, 'input_measurement', {**asdict(ctx.measurement),
+            'working_input_limit': ctx.context_budget.max_input_tokens,
+            'effective_input_capacity': ctx.context_budget.capacity(ctx.context_window, ctx.measurement),
+            'reduction_trigger_ratio': ctx.context_budget.trigger_ratio,
+            'reduction_target_ratio': ctx.context_budget.target_ratio,
+            'fits_working_budget': ctx.context_budget.fits(ctx.context_window, ctx.measurement)})
     prepared = RequestPreparedEvent(ctx.model, ctx.context_window, ctx.max_tokens,
                                     estimate, source, time.time())
     _append_session_record(ctx, "request_context", asdict(prepared))
@@ -468,6 +481,13 @@ async def _prepare_request(
     check_writer = getattr(ctx.session, 'check_writable', None)
     if callable(check_writer):
         check_writer()
+    measured = ctx.measurement
+    if (measured is None or measured.input_tokens is None
+            or measured.fits(ctx.context_window) and not ctx.context_budget.fits(ctx.context_window, measured)):
+        raise FatalError('request exceeds working context budget or input measurement is unavailable',
+            details={'kind': 'context_budget_exhausted', 'max_input_tokens': ctx.context_budget.max_input_tokens,
+                     'measurement': asdict(measured) if measured is not None else None,
+                     'context_window': ctx.context_window})
     return request_ctx
 
 
@@ -575,7 +595,8 @@ async def _handle_failure(
     if is_context_overflow(error, ctx, context_pipeline):
         return await recover_from_overflow(error, ctx, hooks, context_pipeline)
     return {
-        "kind": type(error).__name__,
+        "kind": error.details.get("kind", type(error).__name__) if isinstance(error.details, dict) else type(error).__name__,
+        **({"usage": error.details["usage"]} if isinstance(error.details, dict) and "usage" in error.details else {}),
         "error": str(error),
         "model": ctx.model,
         **({'failure': error.details['failure']} if isinstance(error.details, dict) and 'failure' in error.details else {}),

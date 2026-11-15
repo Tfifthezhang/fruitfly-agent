@@ -1,6 +1,10 @@
 """Registered background-operation inspection through an injected capability."""
-from fruitfly_agent.interactive.contracts.commands import CommandResult
+from collections import Counter
+
+from fruitfly_agent.interactive.contracts.commands import CommandPanel, CommandResult, CommandSection
 from fruitfly_agent.interactive.terminal.io.text import safe_terminal_text
+from fruitfly_agent.interactive.terminal.rendering.formatting import format_duration
+from fruitfly_agent.interactive.terminal.rendering.panels import panel_result
 
 
 def operations_handler(query):
@@ -27,8 +31,21 @@ def operations_handler(query):
                 return CommandResult(text=f'Could not cancel background operation: {exc}\n')
             return CommandResult(text=f'{value.handle}: {value.state}\n')
         values = service.statuses()
-        return CommandResult(text=('\n'.join(f'{v.handle} · {v.state} · {v.elapsed_seconds:.1f}s' +
-            ('\n  ' + safe_terminal_text(v.description) if v.description else '') +
-            ''.join('\n    ' + safe_terminal_text(line) for line in v.recent_output.splitlines()[-3:]) for v in values)
-            if values else 'No background operations.') + '\n')
+        counts = Counter(value.state for value in values)
+        sections = [
+            CommandSection('environment', 'Counts', (('Operations', str(len(values))),)),
+            CommandSection('workflow', 'Statuses',
+                tuple((state, str(count)) for state, count in counts.items()) or (('States', 'none'),)),
+        ]
+        for index, value in enumerate(values, 1):
+            rows = [('Task', value.description or 'No description supplied.'),
+                    ('Handle', value.handle), ('State', value.state),
+                    ('Elapsed', format_duration(value.elapsed_seconds))]
+            rows.extend((f'Output {number}', line) for number, line in
+                        enumerate(value.recent_output.splitlines()[-3:], 1))
+            sections.append(CommandSection('tools', f'Task {index} · {value.state}', tuple(rows)))
+        footer = '/operations HANDLE [OFFSET] for retained output.'
+        if not values:
+            footer = 'No background operations. ' + footer
+        return panel_result(CommandPanel('Background operations', tuple(sections), footer))
     return execute

@@ -9,18 +9,23 @@ parameters:
       You have no editing, execution, scoring, selection or activation authority.
       Label causal interpretations as hypotheses. Candidate changes belong to the editor.
     organize: >-
-      Start with context/batch.json and its selection receipt. Inspect full compact
-      summaries for distribution, then investigate only selected detailed cases.
-      Build a compact readable guide for optimization investigation. Summaries must cite supplied source
-      spans. Distinguish original facts, derived summaries and missing material.
-      Separate observed facts, causal hypotheses, counterevidence and missing facts.
-      Do not present a hypothesis as an established cause or suggest candidate edits.
-      When retained-part tools are available, inspect applicable prior work and
-      delegate bounded factual questions as useful. Preserve partial findings and
-      integrate their citations without claiming unread scope is covered.
-      Keep rare records discoverable. Return sections with title, summary and sources;
-      each source has a granted path and a citation_id actually returned by read/search.
-      Also return findings, at most 16: each has issue_id, signal, facts, hypotheses,
-      counterevidence, unknowns and sources. All four evidence/uncertainty fields are
-      arrays of concise strings. Use stable distinct issue IDs. Empty findings are
-      valid if no supported lead exists. Preserve controls, exceptions and unread scope.
+      Start with context/batch.json, context/statistics.json and the selection receipt.
+      Use code-generated counts and known/unknown denominators; do not recompute totals by
+      paging a large JSON. Inspect outcome unmet, execution errors, resource anomalies and
+      contrasting cases when granted. Missing outcome semantics are unknown. Investigate
+      bounded factual questions and preserve task requirements, chronology and rare cases.
+      A selected case, directory read or search match does not establish complete reading.
+      Report observed facts separately from testable hypotheses, counterevidence and gaps.
+      A behavior in a successful case only refutes necessity of failure, not its cost or
+      potential for improvement. Never treat missing counters as zero or sum nested durations.
+      Do not propose candidate edits. Submit schema_version 2, sections and findings.
+      Sections contain title, summary and sources (path, citation_id). Each finding contains
+      issue_id, signal, facts (text and sources for every fact), hypotheses (strings),
+      counterevidence (strings), unknowns (question, materials, availability: not_read,
+      not_granted, unavailable or unknown), run_ids, control_ids and status
+      (ready_for_proposal, needs_evidence or not_supported). Cite only returned source spans.
+      Use at most 16 findings. Empty findings are valid with an explanation in sections.
+      Include material requests that would distinguish competing explanations. Do not
+      invent evidence or claim causal proof. When retained-part tools exist, reuse
+      applicable work and preserve useful partial findings. submit_findings ends a child;
+      never use it for probes. Integrate failures and uncovered questions explicitly.

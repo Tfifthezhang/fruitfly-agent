@@ -50,14 +50,50 @@ class TaskSetProposalRequest:
 
 
 @dataclass(frozen=True)
+class ProposalDecision:
+    kind: str
+    explanation: str
+    baseline_applicability: str
+    issues: tuple[dict, ...] = ()
+    required_materials: tuple[str, ...] = ()
+
+    def __post_init__(self):
+        if self.kind not in {'candidate', 'retain_baseline', 'needs_evidence'}:
+            raise ValueError('invalid proposal decision kind')
+        bounded(self.explanation, 4000)
+        bounded(self.baseline_applicability, 4000)
+        object.__setattr__(self, 'issues', tuple(self.issues))
+        object.__setattr__(self, 'required_materials', tuple(self.required_materials))
+        seen = set()
+        for issue in self.issues:
+            if (not isinstance(issue, dict) or set(issue) != {'issue_id', 'disposition', 'explanation'}
+                    or issue['disposition'] not in {'selected', 'rejected', 'deferred'}):
+                raise ValueError('invalid issue decision')
+            bounded(issue['issue_id'], 2000); bounded(issue['explanation'], 4000)
+            if issue['issue_id'] in seen:
+                raise ValueError('duplicate issue decision')
+            seen.add(issue['issue_id'])
+        for path in self.required_materials:
+            relative_path(path)
+        if self.kind == 'needs_evidence' and not self.required_materials:
+            raise ValueError('needs_evidence requires explicit material requests')
+
+
+@dataclass(frozen=True)
 class ProposalResult:
     candidates: tuple[CandidateBundle, ...] = ()
     stop: bool = False
+    decision: ProposalDecision | None = None
 
     def __post_init__(self):
         object.__setattr__(self, 'candidates', tuple(self.candidates))
         if len(self.candidates) > 1 or type(self.stop) is not bool or any(not isinstance(c, CandidateBundle) for c in self.candidates):
             raise ValueError('a proposal batch needs at most one candidate and an explicit stop flag')
+        if self.decision is not None:
+            if not isinstance(self.decision, ProposalDecision):
+                raise TypeError('proposal decision must use its public contract')
+            if (self.decision.kind == 'candidate') != bool(self.candidates):
+                raise ValueError('proposal decision differs from candidate presence')
 
 
 @dataclass(frozen=True)
@@ -73,6 +109,8 @@ class ResearchProposalRequest:
 
 
 class GenerationServices(Protocol):
+    @property
+    def proposal_decision(self) -> ProposalDecision | None: ...
     def check(self) -> None: ...
     def record(self, event: str, **fields: object) -> None: ...
     async def edit(self, stage: str, request: ProposalRequest) -> CandidateBundle: ...
@@ -83,6 +121,7 @@ class JobServices(GenerationServices, Protocol):
     """Execution/editor host ports; generators receive the narrower service view."""
     plan: RunPlan
     signal: asyncio.Event
+    def retain_proposal_decision(self, decision: ProposalDecision) -> None: ...
     def observe(self, kind: str, amount: int = 1) -> None: ...
     async def operation(self, awaitable: Awaitable[Any]) -> Any: ...
     def own(self, resource: Any) -> Any: ...

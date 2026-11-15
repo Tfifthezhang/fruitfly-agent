@@ -132,6 +132,7 @@ class HarnessSelectionTest(unittest.TestCase):
         self.assertEqual(
             {item.mechanism_id for item in selected.profile.mechanisms},
             {
+                "context-budget",
                 "local-env",
                 "read-tool",
                 "bash-tool",

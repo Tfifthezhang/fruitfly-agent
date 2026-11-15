@@ -137,7 +137,7 @@ class DeadlineTests(unittest.IsolatedAsyncioTestCase):
                     async def __anext__(self):
                         await asyncio.sleep(0.015)
                         return await super().__anext__()
-                sdk = Reasoning([delta(kind, thinking=True) for _ in range(5)],
+                sdk = Reasoning([*[delta(kind, thinking=True) for _ in range(5)], delta(kind)],
                                 NS(content=[], stop_reason='end_turn', usage=None))
                 provider, request = adapter(kind, [sdk], first_progress_timeout=0.06, stall_timeout=0.06)
                 stream = provider(view())

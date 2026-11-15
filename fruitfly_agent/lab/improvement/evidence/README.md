@@ -191,3 +191,28 @@ All execution summaries remain available; detailed task and execution paths are
 limited to selected cases. Metadata links to output bodies instead of copying
 them. Selection reasons and omitted scope are separate from original-reading
 coverage.
+
+## Inspect distributions and reading scope
+
+[statistics.py](statistics.py) derives `context/statistics.json` from supplied
+execution rows. Counts retain population, known and unknown denominators. Batch
+observations stay separate from execution observations. Counter distributions use
+execution totals; overlapping durations and differently scoped tokens are not
+summed. `context/summaries/<run-id>.json` provides each compact row independently.
+
+Sources can attach `ObservationSemantics` (`outcome`: `met`, `unmet`, `unknown`;
+`direction`: `higher`, `lower`, `none`, `unknown`; `scope`: `execution`, `batch`).
+Unknown semantics remain uninterpreted, regardless of numeric value or metric
+name. These declarations describe observations and grant no execution authority.
+
+Access receipts also derive merged character intervals for explicit reads and
+search excerpts. These are separate from selection, delegated source references
+and collection coverage. They do not establish complete understanding. Event
+catalog entries report `source_granted`; an index can describe an external source
+without granting its bytes.
+
+Repeated identical tool errors stop before another Provider request after
+`supply.repeated_error_limit` (default 3). Successful tool results reset the
+consecutive-error count. This bound shares the invocation's original time and
+reading allowance; it does not convert failures into accepted research decisions.
+No-read synthesis alone does not trigger this guard.

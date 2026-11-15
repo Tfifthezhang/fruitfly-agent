@@ -81,6 +81,7 @@ def snapshot(ctx: AgentLoopContext, trigger: ContextTrigger, *, report: ContextA
         system_prompt=ctx.system_prompt,
         tools=tuple(ctx.tools),
         context_window=ctx.context_window,
+        context_budget=ctx.context_budget,
         model=ctx.model,
         max_tokens=ctx.max_tokens,
         trigger=trigger,
@@ -104,15 +105,19 @@ async def check_budget(
 
     if reducer is None or ctx.overflow_attempt > 0:
         return
-    current = snapshot(ctx, "budget", report=_activity_reporter(ctx, hooks))
-    decision = await _call_reducer(
-        reducer.check_budget,
-        current,
-        label="reducer.check_budget",
-        default=None,
-    )
-    if decision is not None:
-        await _commit_decision(ctx, hooks, current, decision)
+    for _ in range(ctx.max_context_recovery_attempts):
+        current = snapshot(ctx, "budget", report=_activity_reporter(ctx, hooks))
+        decision = await _call_reducer(reducer.check_budget, current,
+            label="reducer.check_budget", default=None)
+        if not isinstance(decision, ContextDecision):
+            return
+        if decision.messages is None and decision.state == current.context_state.get(decision.mechanism_id):
+            return
+        if not await _commit_decision(ctx, hooks, current, decision):
+            return
+        await measure_context(ctx)
+        if ctx.measurement is None or ctx.context_budget.fits(ctx.context_window, ctx.measurement):
+            return
 
 
 def is_context_overflow(

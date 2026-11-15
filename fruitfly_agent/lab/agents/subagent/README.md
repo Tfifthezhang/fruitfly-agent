@@ -210,7 +210,11 @@ service and prevents further admission; stopping does not roll back tool effects
 
 ## Inspect executions
 
-`/subagent` lists up to the latest 50 execution records. `/subagent AGENT_ID` shows
+`/subagent` reads one snapshot on each invocation. Count and state sections cover
+all retained executions, distinguishing unique agent conversations from execution
+attempts. Task blocks preserve snapshot order and show up to the latest 50 records.
+The configured concurrency limit is separate from observed state counts. The
+command does not refresh automatically or start or stop children. `/subagent AGENT_ID` shows
 its latest execution; append `RUN_ID` for a particular attempt. These commands
 work during parent work, make no model requests and consume the public
 [monitor contract](../../../interactive/contracts/README.md). Snapshot revisions
@@ -219,7 +223,10 @@ allow consumers to detect changes without a second scheduling authority.
 Views distinguish queueing, running, cancelling and terminal states. Cleanup is
 reported separately. Main-loop requests, tool counts, actual model identity,
 reported tokens and bounded results remain attributed to the child. Missing usage
-and unfinished elapsed durations remain unknown. No progress percentage is inferred.
+and unfinished elapsed durations remain unknown. Recorded running usage may be
+incomplete. Detail sections retain errors and summaries together. No progress
+percentage is inferred. See [terminal inspection](../../../interactive/terminal/README.md#inspect-subagents)
+for presentation and command behavior.
 
 ## Retain and recover results
 

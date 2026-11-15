@@ -67,6 +67,11 @@ class ReplayBinding:
                 raise FatalError('Invalid persisted Provider continuation')
             if state.get('payload_hash') != digest(payload):
                 raise FatalError('Provider continuation content differs from its recorded digest')
+            # Historical empty Responses messages could contain an input fallback.
+            # Validate hashes first; rebuild only an empty message with that exact payload.
+            if (self.namespace == 'openai' and not message.content
+                    and payload == [{'role': 'user', 'content': 'Continue.'}]):
+                return []
             return wire_value(payload)
         return read
 

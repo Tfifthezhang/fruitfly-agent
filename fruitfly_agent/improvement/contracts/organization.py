@@ -105,3 +105,37 @@ class OrganizationPart:
         if not isinstance(value, dict) or set(value) != {f.name for f in fields(cls)}:
             raise ValueError('invalid organization part record')
         return cls(**value)
+
+
+@dataclass(frozen=True)
+class InvestigationFact:
+    text: str
+    sources: tuple[dict, ...]
+
+    def __post_init__(self):
+        from .validation import bounded, relative_path
+        from .versions import require_hash
+        bounded(self.text, 4000)
+        object.__setattr__(self, 'sources', tuple(self.sources))
+        if not self.sources:
+            raise ValueError('each investigation fact requires source spans')
+        for source in self.sources:
+            if not isinstance(source, dict) or set(source) != {'path', 'citation_id'}:
+                raise ValueError('invalid fact source')
+            relative_path(source['path']); require_hash(source['citation_id'])
+
+
+@dataclass(frozen=True)
+class InvestigationGap:
+    question: str
+    materials: tuple[str, ...]
+    availability: str
+
+    def __post_init__(self):
+        from .validation import bounded, relative_path
+        bounded(self.question, 4000)
+        object.__setattr__(self, 'materials', tuple(self.materials))
+        if self.availability not in {'not_read', 'not_granted', 'unavailable', 'unknown'}:
+            raise ValueError('invalid investigation gap availability')
+        for path in self.materials:
+            relative_path(path)

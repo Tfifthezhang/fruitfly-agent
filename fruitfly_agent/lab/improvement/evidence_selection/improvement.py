@@ -43,10 +43,11 @@ class SelectionTarget:
              'max_per_task': 'Maximum detailed cases for one task.', 'slow_seconds': 'Elapsed-time investigation threshold.',
              'many_calls': 'Model-call investigation threshold.', 'many_tools': 'Execution tool-start investigation threshold.',
              'high_tokens': 'Per-resource execution token investigation threshold.',
+             'sampling_policy': 'Cover execution/outcome strata or prioritize rare signals.',
              'material_policy': 'Focused evidence or every retained granted material.'}[key], value, defaults[key],
             minimum=LIMITS[key][0] if key in LIMITS else None,
             maximum=LIMITS[key][1] if key in LIMITS else None,
-            choices=() if key in LIMITS else ('focused', 'all-granted')) for key, value in values.items())
+            choices=() if key in LIMITS else ('balanced', 'rare-first') if key == 'sampling_policy' else ('focused', 'all-granted')) for key, value in values.items())
 
     def validate_options(self, options):
         fields = {'parameters.settings.' + k for k in asdict(self.settings)}
@@ -59,7 +60,7 @@ class SelectionTarget:
             raise ValueError('invalid evidence selection fields')
         for path, limits in bounds.items():
             if path.removeprefix('parameters.settings.') not in LIMITS:
-                raise ValueError('numeric bounds cannot constrain material policy')
+                raise ValueError('numeric bounds cannot constrain policy choices')
             low, high = LIMITS[path.removeprefix('parameters.settings.')]
             if (not isinstance(limits, dict) or not limits or set(limits) - {'minimum', 'maximum'}
                     or any(type(v) is not int for v in limits.values())

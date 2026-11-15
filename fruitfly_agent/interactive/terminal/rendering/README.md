@@ -16,7 +16,8 @@ Present frontend events, canonical history, Markdown, and status. Rendering obse
 Use [Contracts](../../contracts/README.md) for event/status/history inputs and [I/O](../io/README.md) for safe text, terminal capabilities, and inline display primitives. This layer never imports features or TerminalFrontend.
 
 `TerminalRenderer.write_command_result` renders an optional structured panel or
-the existing text fallback. Panel rendering knows no command names or algorithm
+the existing text fallback. `panels.panel_result` builds both representations
+from one panel, so snapshot commands retain identical sections in plain output. Panel rendering knows no command names or algorithm
 implementations. Category hints select short title background blocks with explicit
 foreground/background pairs; body text retains the terminal's ordinary colors.
 Unknown categories use a default style. `NO_COLOR`, dumb terminals and redirected

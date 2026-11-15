@@ -1,4 +1,5 @@
 """Offline independent child runtime factory with explicit lifecycle observations."""
+from fruitfly_agent.lab.context_manager.measurement.budget import MeasurementService
 from pathlib import Path
 from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.core.session import Session
@@ -33,7 +34,7 @@ class ChildFixture:
         async def close():
             self.closed += 1
             session.close()
-        return PreparedAgentRuntime(AgentLoopConfig(provider=provider, session=session, model='child-model'),
+        return PreparedAgentRuntime(AgentLoopConfig(provider=provider, session=session, model='child-model', context_meter=MeasurementService()),
             None, {'model_profile': 'child'}, start, close)
 
     def service(self, **kwargs):

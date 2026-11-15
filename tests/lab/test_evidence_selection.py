@@ -50,7 +50,7 @@ assert result['selected'][0]['run_id'] == 'frozen'
             self.assertEqual(0, result.returncode, result.stderr)
 
     def test_resource_signals_use_execution_scopes_without_double_counting(self):
-        selector = RepresentativeSelector()
+        selector = RepresentativeSelector(SelectionSettings(controls=0))
         turn = row('turn', 'a', usage=[{'resource': 'input_tokens', 'scope': 'turn', 'used': 999999}])
         execution = row('execution', 'b', usage=[{'resource': 'input_tokens', 'scope': 'execution', 'used': 999999}])
         tools = row('tools', 'c', counters={'tool_started': 90})
@@ -87,7 +87,7 @@ assert result['selected'][0]['run_id'] == 'frozen'
         trial = candidate_selector(candidate, options=grant)
         records = (row('fast', 'a'), row('calls', 'b', model_calls=3))
         self.assertEqual([], RepresentativeSelector().select(records)['selected'])
-        self.assertEqual('calls', trial.select(records)['selected'][0]['run_id'])
+        self.assertIn('calls', {r['run_id'] for r in trial.select(records)['selected']})
         self.assertNotEqual(trial.identity, RepresentativeSelector().identity)
         self.assertEqual(original, adapter.snapshot())
         with self.assertRaisesRegex(ValueError, 'protected'):
@@ -99,7 +99,7 @@ assert result['selected'][0]['run_id'] == 'frozen'
             candidate_selector(replace(candidate, role='H'), options=grant)
 
     def test_controls_rare_signals_unknowns_and_hard_limits(self):
-        rows = [row('control', 'control', observations=[{'name': 'official_reward', 'value': {'reward': 1}}])]
+        rows = [row('control', 'control', observations=[{'name': 'official_reward', 'value': {'reward': 1}, 'semantics': {'outcome': 'met'}}])]
         rows.extend(row('common-' + str(i), 'same', model_calls=99) for i in range(20))
         rows.extend((row('rare', 'rare', status='timeout'), row('unknown', 'unknown', diagnostics_complete=None)))
         selector = RepresentativeSelector(SelectionSettings(max_cases=4, max_per_task=1))
@@ -188,3 +188,58 @@ assert result['selected'][0]['run_id'] == 'frozen'
         surface.edit_options(['parameters.settings.max_cases'], {'parameters.settings.max_cases': {'maximum': 12}})
         with self.assertRaises(ValueError):
             surface.normalize({'settings': {'max_cases': True}})
+
+    def test_sampling_candidate_balances_outcomes_without_guessing_numeric_scores(self):
+        rows = tuple(row('error-' + str(i), 'a-' + str(i), status='error', model_calls=99) for i in range(2))
+        rows += tuple(row('unmet-' + str(i), 'z-' + str(i), observations=[{'name': 'loss',
+            'value': 5, 'semantics': {'outcome': 'unmet', 'direction': 'lower'}}]) for i in range(3))
+        settings = SelectionSettings(max_cases=2, controls=0, sampling_policy='rare-first')
+        owner = SelectionTarget(settings)
+        adapter = TextComponentAdapter(owner, owner.component_kind)
+        baseline = adapter.snapshot()
+        values = yaml.safe_load(baseline.files[0].text)
+        values['parameters']['settings']['sampling_policy'] = 'balanced'
+        document = replace(baseline, files=(ComponentFile('parameters.yaml', yaml.safe_dump(values)),))
+        trial = candidate_selector(document, options={'editable_fields': ['parameters.settings.sampling_policy']}, baseline=settings)
+        before = RepresentativeSelector(settings).select(rows)
+        after = trial.select(rows)
+        self.assertTrue(all(c['run_id'].startswith('error') for c in before['selected']))
+        self.assertTrue(any(c['run_id'].startswith('unmet') for c in after['selected']))
+        self.assertEqual(baseline, adapter.snapshot())
+        unknown = RepresentativeSelector().select((row('unknown', 'task', observations=[{'name': 'loss', 'value': 0}]),))
+        self.assertEqual([], unknown['selected'])
+
+    async def test_two_guides_with_same_local_issue_keep_distinct_provenance(self):
+        from fruitfly_agent.improvement.contracts.editing import ResearchProposalRequest
+        from fruitfly_agent.lab.improvement.evidence.research import build_workspace as editor_workspace
+        from fruitfly_agent.lab.improvement.evidence.catalog import WorkspaceEvidence
+        from fruitfly_agent.lab.improvement.editor.submission import submission
+        flow, plan, baseline, _ = proposal_fixture()
+        task, artifacts = TaskMaterial('task', 'Inspect'), MemoryArtifacts()
+        record = await Runner().execute(plan, task, baseline)
+        guides = tuple(Resource(f'evidence/{i}/organization/guide.json', artifacts.put(json.dumps({
+            'findings': [{'issue_id': 'same-id', 'signal': signal}]}).encode()))
+            for i, signal in enumerate(('First observation', 'Different observation')))
+        request = ResearchProposalRequest(plan, (task,), baseline, (record,), guides)
+        workspace = editor_workspace(request, artifacts)
+        workspace.write('harness/prompt/instructions.txt', 'Inspect before answering')
+        WorkspaceEvidence(workspace).read('context/executions/' + record.run_id + '/output.txt')
+        reason = {'component_id': 'prompt', 'explanation': 'Observed omission',
+            'expected_effect': 'Inspection precedes answers; another omission refutes it',
+            'evidence_ids': [record.run_id], 'issue_ids': ['same-id']}
+        with self.assertRaisesRegex(ValueError, 'findings'):
+            submission({'reasons': [reason]}, workspace, request, flow.components)
+        qualified = guides[0].artifact_id + '/same-id'
+        result = submission({'reasons': [{**reason, 'issue_ids': [qualified]}]}, workspace, request, flow.components)
+        self.assertEqual((qualified,), result.reasons[0].issue_ids)
+
+    def test_control_matching_requires_recorded_conditions_instead_of_task_name_guessing(self):
+        shared = {'harness_id': 'harness', 'conditions_id': 'conditions', 'initial_state_id': 'state'}
+        control = row('control', 'a', observations=[{'name': 'acceptance', 'value': True,
+            'semantics': {'outcome': 'met'}}], **shared)
+        matching = row('matching', 'b', status='error', **shared)
+        unknown = row('unknown', 'c', status='error')
+        selected = {r['run_id']: r for r in RepresentativeSelector().select((control, matching, unknown))['selected']}
+        self.assertEqual(['control'], selected['matching']['control_run_ids'])
+        self.assertEqual([], selected['unknown']['control_run_ids'])
+        self.assertEqual('not_established', selected['unknown']['comparison_basis'])

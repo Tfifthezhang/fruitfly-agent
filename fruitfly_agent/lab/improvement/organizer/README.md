@@ -49,10 +49,34 @@ sections. It does not assert complete evidence coverage. See the
 [developer recipe](../DEVELOPER_GUIDE.md#reuse-completed-organization-parts).
 
 
-The strict guide contains `sections` and `findings`. Findings have distinct
-`issue_id`, `signal`, nonempty `facts`, `hypotheses`, `counterevidence`, `unknowns`
-and cited `sources`. At most 16 findings are accepted. Empty findings explicitly
-allow insufficient evidence. Detailed grants come from the independent
-[evidence selector](../evidence_selection/README.md), while full compact summaries
-remain available. Neither selected scope nor a directory read establishes full
-original coverage.
+The model submits the current guide format with `schema_version: 2`, `sections`
+and `findings`. Each fact contains `text` and its own nonempty `sources` array.
+A finding contains `issue_id`, `signal`, `facts`, `hypotheses`, `counterevidence`,
+`unknowns`, `run_ids`, `control_ids` and `status`. At most 16 findings are accepted.
+Empty findings remain valid with a sourced explanation in sections.
+
+| Field | Meaning |
+|---|---|
+| `run_ids`, `control_ids` | Distinct affected and contrasting executions from supplied records |
+| `status` | `ready_for_proposal`, `needs_evidence` or `not_supported`; a research judgment, not verification |
+| `unknowns` | Objects with `question`, relative `materials` and `availability` (`not_read`, `not_granted`, `unavailable`, `unknown`) |
+| `hypotheses`, `counterevidence` | Concise strings; neither collection completeness nor causal proof is implied |
+
+[publication.py](publication.py) publishes `organization/index.json`, individual
+`findings/<issue-id>.json`, `coverage.json` and `gaps.json` alongside the readable
+guide, batch, parts and sources. Index entries include an immutable qualified
+`issue_ref`. Editors can read issue details instead of paging the whole guide.
+Historical unversioned guides remain readable as attributed input; they do not
+acquire per-fact citations or coverage retroactively.
+
+Coverage derives from actual returned ranges and child lifecycle snapshots. It
+separates selected cases, direct read ranges, search excerpts and delegated
+citations. Failed child investigations remain visible even when a parent publishes
+useful partial findings. No byte count establishes comprehension. Each fact's
+citation is checked for supply and scope, not semantic entailment.
+
+Use the deterministic batch statistics before investigation. Preserve unknown
+counters and account for exceptions. Observing expensive behavior in a successful
+case does not establish efficiency or exclude improvement. Detailed grants come
+from the independent [selector](../evidence_selection/README.md). Selection and
+catalog navigation never establish full original reading.

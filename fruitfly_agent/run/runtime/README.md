@@ -147,3 +147,9 @@ ordinary InteractiveSession for both interactive and headless submissions. This
 entry wraps Core execution with the Lab-owned scope and its final cleanup; no
 algorithm-specific lifecycle state is added to Application. See
 [Subagent lifecycle](../../lab/agents/subagent/README.md#own-the-execution-scope).
+
+[Shared context conditions](../../lab/context_manager/budget/README.md) are
+recorded in effective execution identity. New and resumed runtimes apply the
+current budget before their next request. Restricted child runtimes retain parent
+execution conditions even when their component subset omits the budget owner.
+Historical manifests are validated against their original contents.

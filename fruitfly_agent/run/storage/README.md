@@ -109,3 +109,11 @@ Entries bind resolved path, device, inode, size, modification and change times.
 Discovery refreshes changed files and probes writer locks on every call. Cache
 errors fall back to source inspection; selected recovery always validates actual
 history and required artifacts. Cache data grants no recovery authority.
+
+Research diagnostic manifests bind a run to its event artifacts and terminal
+Session snapshots. These declared dependencies must exist at publication; missing
+required diagnostics fail publication. Bare content identities remain distinct
+from stored resources. Cross-study copying retains diagnostics, while ordinary
+organization input projection excludes `diagnostics/` outputs from model grants.
+Failed runs reference retained diagnostics through their reports; no successful
+bundle is fabricated for a failed activity.

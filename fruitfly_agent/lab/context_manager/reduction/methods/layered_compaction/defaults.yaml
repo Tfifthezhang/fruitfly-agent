@@ -4,8 +4,6 @@ implementation: layered-compaction
 parameters:
   settings:
     mode: deterministic
-    trigger_ratio: 0.75
-    target_ratio: 0.5
     tool_result_min_chars: 4000
     preview_chars: 1024
     keep_recent_groups: 3
