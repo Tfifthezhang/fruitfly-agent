@@ -1,4 +1,5 @@
 """Configuration candidates execute in isolation and adopt as exact H-only versions."""
+from fruitfly_agent.lab.context_manager.measurement.budget import MeasurementService
 from tests.support.configuration import component_parameters, with_component_parameters, with_component_text, parameter_payload
 from dataclasses import replace
 import json
@@ -69,7 +70,7 @@ class ExecutionPolicyTests(unittest.IsolatedAsyncioTestCase):
         provider.respond(AssistantMessage([TextBlock('working')], stop_reason='stop',
             provider_state={'opaque': 'private-continuation'}, continue_turn=True))
         provider.respond_text('finished')
-        config = AgentLoopConfig(provider=provider)
+        config = AgentLoopConfig(provider=provider, context_meter=MeasurementService())
         components = ComponentRegistry((TextComponentAdapter(BasePromptTarget(config.system_prompt or 'base'), 'system-prompt'),))
         artifacts = MemoryArtifacts()
         plan = RunPlan('continuation-trial', version(), ('base_prompt',))
@@ -104,7 +105,7 @@ class ExecutionPolicyTests(unittest.IsolatedAsyncioTestCase):
         provider.respond_tool_call('write', {'path':'a', 'content':'a'})
         provider.respond_tool_call('write', {'path':'b', 'content':'b'})
         provider.respond_text('done')
-        config = AgentLoopConfig(provider, max_tool_calls_per_turn=1)
+        config = AgentLoopConfig(provider, max_tool_calls_per_turn=1, context_meter=MeasurementService())
         components = ComponentRegistry((TextComponentAdapter(BasePromptTarget('base'),'system-prompt'),))
         artifacts=MemoryArtifacts();plan=RunPlan('trial',version(),('base_prompt',));services=StageServices(plan)
         try:

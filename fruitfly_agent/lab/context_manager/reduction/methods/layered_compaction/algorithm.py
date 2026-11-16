@@ -46,6 +46,7 @@ class LayeredCompactionReducer:
     async def _prepare(self, snapshot, *, force):
         if snapshot.signal is not None and snapshot.signal.is_set():
             raise asyncio.CancelledError
+        self.policy = digest({'config': asdict(self.config), 'budget': asdict(snapshot.context_budget)})
         items = snapshot.canonical_items
         self.history.bind(items)
         previous = validate_state(snapshot.context_state.get(self.mechanism_id), items, self.history)
@@ -53,7 +54,7 @@ class LayeredCompactionReducer:
                 or not self.history.resource_prefix):
             return None
         measured = snapshot.measurement
-        allowance = snapshot.context_window - (measured.output_reserve if measured else snapshot.max_tokens) - (measured.margin if measured else 0)
+        allowance = snapshot.context_budget.input_allowance(snapshot.context_window, measured, snapshot.max_tokens)
         if allowance <= 0:
             return None
         raw_before = self.estimate(snapshot)
@@ -61,8 +62,8 @@ class LayeredCompactionReducer:
         scale = max(1., before / max(1, raw_before))
         def size(messages):
             return self.estimate(replace(snapshot, messages=tuple(messages))) * scale
-        target = allowance * self.config.target_ratio
-        triggered = force or before >= allowance * self.config.trigger_ratio
+        target = allowance * snapshot.context_budget.target_ratio
+        triggered = force or before >= allowance * snapshot.context_budget.trigger_ratio
         projected = shrink_results(snapshot.messages, items, self.history.resource_prefix, self.config)
         # A single oversized new result must also be externalized when the request cannot fit.
         if size(projected) > allowance:

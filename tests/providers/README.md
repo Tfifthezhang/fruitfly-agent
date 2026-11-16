@@ -21,3 +21,6 @@ No real API calls. Use the explicit Integration entry for network smoke.
 ```bash
 .venv/bin/python -m unittest discover -s tests/providers -t . -v
 ```
+
+`test_continuation.EmptyResponseTests` owns empty terminal response rejection,
+available usage retention, no automatic retry and safe historical fallback replay.

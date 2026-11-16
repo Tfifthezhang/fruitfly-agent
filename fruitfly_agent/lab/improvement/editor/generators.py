@@ -10,7 +10,9 @@ class AgentGenerator:
     async def propose(self, request, services):
         from fruitfly_agent.improvement.contracts.editing import ProposalResult
         candidate = await services.edit('propose', request)
-        return ProposalResult((candidate,))
+        decision = services.proposal_decision
+        return ProposalResult((candidate,) if decision is None or decision.kind == 'candidate' else (),
+            decision=decision)
 
 
 

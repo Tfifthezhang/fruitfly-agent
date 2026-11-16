@@ -8,6 +8,8 @@ class EditorSettings:
     target_page_entries: int = field(default_factory=lambda: parameter_default(__package__ + '.methods.workspace', 'defaults.yaml', 'settings.target_page_entries'))
     max_target_entries: int = field(default_factory=lambda: parameter_default(__package__ + '.methods.workspace', 'defaults.yaml', 'settings.max_target_entries'))
 
+    max_repair_attempts: int = field(default_factory=lambda: parameter_default(__package__ + '.methods.workspace', 'defaults.yaml', 'settings.max_repair_attempts'))
+
     def __post_init__(self):
         if any(type(v) is not int or not 1 <= v <= 24000 for v in asdict(self).values()):
             raise ValueError('role presentation settings require bounded positive integers')

@@ -37,6 +37,8 @@ def build_workspace(request, artifacts, *, record=None):
     for name, value in batch_view(request.tasks, request.records,
             context_observations(request.context, artifacts), artifacts).items():
         if name == 'executions.json':
+            for summary in value:
+                references['context/summaries/' + summary['run_id'] + '.json'] = artifacts.put(canonical_json(summary).encode())
             for row in value:
                 row['detailed_grant'] = row['run_id'] in {r.run_id for r in records}
                 if not row['detailed_grant']:
@@ -48,7 +50,7 @@ def build_workspace(request, artifacts, *, record=None):
     for resource in request.context:
         references['context/extensions/' + resource.path] = resource.artifact_id
     put('INDEX.json', {'files': ['context/tasks.json', 'context/executions.json',
-        'context/edit-grants.json', 'context/extensions/selection.json', 'context/overview.json', 'context/coverage.json'], 'task_count': len(tasks), 'execution_count': len(rows),
+        'context/edit-grants.json', 'context/extensions/selection.json', 'context/overview.json', 'context/coverage.json', 'context/statistics.json'], 'task_count': len(tasks), 'execution_count': len(rows),
         'navigation': 'Search and read selected original evidence; observations do not establish causes.'})
     return ReferenceWorkspace(artifacts=artifacts, references=references, baseline=request.baseline,
         files={}, writable_ids=request.plan.component_ids, record=record,

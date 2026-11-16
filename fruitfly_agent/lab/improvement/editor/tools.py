@@ -1,5 +1,6 @@
 """Candidate mutation and structured submission; evidence remains read-only."""
 import json
+from .schema import SUBMISSION
 from fruitfly_agent.core.data_model import AgentToolResult, TextBlock
 from fruitfly_agent.core.tool_runtime import AgentTool
 
@@ -42,7 +43,5 @@ def editing_tools(workspace, *, submit=None, settings=None, instructions=None, o
         parameters={'type':'object','properties':{'component_id':{'type':'string'},'offset':{'type':'integer'},'limit':{'type':'integer'}},'required':['component_id']},execute=describe)))
     if submit is not None:
         tools.append(AgentTool(name='submit_candidate',label='Submit candidate',description=instructions.submit_candidate,
-            parameters={'type':'object','properties':{'reasons':{'type':'array','items':{'type':'object','properties':{
-                'component_id':{'type':'string'},'explanation':{'type':'string'},'expected_effect':{'type':'string'},'evidence_ids':{'type':'array','items':{'type':'string'}}},
-                'required':['component_id','explanation','expected_effect','evidence_ids'],'additionalProperties':False}}},'required':['reasons'],'additionalProperties':False},execute=seal,requires_exclusive_batch=True))
+            parameters=SUBMISSION,execute=seal,requires_exclusive_batch=True))
     return tuple(tools)

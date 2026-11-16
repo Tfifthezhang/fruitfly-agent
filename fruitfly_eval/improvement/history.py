@@ -1,5 +1,5 @@
 """Freeze permitted historical Eval evidence as a benchmark-neutral research batch."""
-from dataclasses import asdict
+from dataclasses import asdict, replace
 import json
 from pathlib import Path
 from fruitfly_agent.improvement.contracts.research import ResearchBatch
@@ -23,7 +23,7 @@ def import_history(run, artifacts, *, task_names=(), related_records=None, evide
     configurations = []
     for base in (root, root.parent, *((Path(related_records).resolve(),) if related_records else ())):
         for relative in ('report.json', 'request.json', 'config/default-config.yaml', 'config/models.yaml',
-                         'config/eval-tb21-full-c3.json', 'config/eval-host-tb21-full.yaml', 'report/report.json'):
+                         'config/config.yaml', 'config/host.yaml', 'report/report.json'):
             path = base / relative
             if path.is_file() and safe_path(path, base):
                 # Configuration values are evidence, never executable instructions.
@@ -64,16 +64,29 @@ def import_history(run, artifacts, *, task_names=(), related_records=None, evide
             'configuration_sources': configurations,
             'unknown': ['original harness reconstruction', 'initial learning state'],
             'exception_type': (official.get('exception_info') or {}).get('exception_type')}
-        resources = (*resources, Resource('diagnostics/history.json', artifacts.put(canonical_json(provenance).encode()),
+        resources = (*resources, *(Resource('diagnostics/configuration/' + str(i) + '.json', entry['artifact_id'],
+            'application/json', 'diagnostic') for i, entry in enumerate(configurations)
+            if Path(entry['path']).suffix in {'.yaml', '.yml'} or Path(entry['path']).name == 'request.json'),
+            Resource('diagnostics/history.json', artifacts.put(canonical_json(provenance).encode()),
             'application/json', 'diagnostic'), Resource('diagnostics/final-answer.json',
             artifacts.put(canonical_json(answer).encode()), 'application/json', 'diagnostic'))
         receipt = ExecutionRecord('history-' + identity[7:31], key, task.material_id, identity, identity, identity,
             'error' if official.get('exception_info') else 'completed' if official else 'cancelled',
             answer['text'][:120000], resources, calls)
         receipt = attach_benchmark_facts(receipt, root, artifacts, interrupted=True, trial=directory)
-        records.append(organize_evidence(task, receipt, artifacts))
         outcome = trial_outcome(official)
-        observations.append({'run_id': receipt.run_id, 'name': 'official_reward',
+        public_result = {'status': outcome['status'], 'eligible': outcome['eligible'],
+            'reward': outcome['reward'], 'error': {'type': outcome['error']['type']} if outcome['error'] else None,
+            'agent_elapsed_seconds': outcome['agent_elapsed_seconds'],
+            'source_identity': content_hash(result.read_text()) if official else None,
+            'scope': 'Public outcome projection; verifier source and private answers excluded.'}
+        receipt = replace(receipt, artifacts=(*receipt.artifacts,
+            Resource('diagnostics/outcome.json', artifacts.put(canonical_json(public_result).encode()),
+                'application/json', 'diagnostic')))
+        records.append(organize_evidence(task, receipt, artifacts))
+        observations.append({'semantics': {'scope': 'execution', 'direction': 'higher',
+            'outcome': {'passed': 'met', 'failed': 'unmet'}.get(outcome['status'], 'unknown')},
+            'run_id': receipt.run_id, 'name': 'official_reward',
             'official_status': outcome['status'], 'eligible': outcome['eligible'],
             'exception_type': outcome['error']['type'] if outcome['error'] else None,
             'agent_elapsed_seconds': outcome['agent_elapsed_seconds'],

@@ -143,3 +143,46 @@ class EvaluatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual('run-1', result['choice'])
         self.assertIn('CUSTOM SYSTEM', provider.calls[0]['system_prompt'])
         self.assertNotIn('CUSTOM SYSTEM', target.instructions.system)
+
+    async def test_declared_no_choice_sentinel_is_consistent_in_direct_saved_and_text_submissions(self):
+        from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone
+        from fruitfly_agent.core.data_model import ToolCallBlock
+        from fruitfly_agent.lab.agents.submissions import saved_submission_tool
+        from fruitfly_agent.lab.improvement.assessment.responses import reprocess_response
+        from fruitfly_agent.core.tool_runtime import ToolCallContext
+        for mode in ('text', 'tool', 'saved'):
+            with self.subTest(mode=mode):
+                evaluator, task, records, services, provider, _ = self.setup_evaluation()
+                # A single execution cannot be chosen against itself; no-choice is legitimate.
+                records = records[:1]
+                def answer(view, signal=None):
+                    data = json.loads(judgment(view).text)
+                    data['choice'] = ''
+                    async def events():
+                        if mode == 'tool':
+                            yield StreamDone(AssistantMessage([ToolCallBlock('final', 'submit_assessment', data)], 'toolUse'))
+                        else:
+                            yield StreamDone(AssistantMessage([TextBlock(json.dumps(data))], 'stop'))
+                    return AssistantMessageEventStream(events())
+                if mode == 'saved':
+                    original = evaluator.session.session
+                    async def saved_session(*args, **kwargs):
+                        accept = kwargs['validate_final']
+                        def answer(view, signal=None):
+                            data = json.loads(judgment(view).text); data['choice'] = ''
+                            class Store:
+                                def read(self, producer, name, revision): return json.dumps(data)
+                            async def events():
+                                tool = saved_submission_tool(Store(), accept)
+                                await tool.execute(ToolCallContext('saved', tool.name,
+                                    {'producer': 'parent', 'name': 'assessment', 'revision': 1}, None))
+                                yield StreamDone(AssistantMessage([TextBlock('submitted')], 'stop'))
+                            return AssistantMessageEventStream(events())
+                        provider.script = [answer]
+                        return await original(*args, **kwargs)
+                    evaluator.session.session = saved_session
+                else:
+                    provider.script = [answer]
+                data, reference = await evaluator.evaluate(task, records, services)
+                self.assertIsNone(data['choice'])
+                self.assertEqual(data, reprocess_response(evaluator.artifacts, reference, records, data['evidence_ids']))

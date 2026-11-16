@@ -5,6 +5,7 @@ from uuid import uuid4
 
 from fruitfly_agent.core.context.budget import forward_context_capabilities
 from fruitfly_agent.core.loop import run_agent_loop
+from fruitfly_agent.core.data_model import ToolResultMessage
 from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone
 
 
@@ -17,7 +18,19 @@ class AgentRunner:
         record = record or (lambda *args, **kwargs: None)
         observe = observe or (lambda *args: None)
         config = self.config
+        supplied_results = set()
+        def record_results(messages):
+            for message in messages:
+                if isinstance(message, ToolResultMessage):
+                    value = message.to_dict()
+                    import json
+                    identity = json.dumps(value, ensure_ascii=False, sort_keys=True)
+                    if identity not in supplied_results:
+                        supplied_results.add(identity)
+                        record('tool-result', result=value)
+
         def provider(view, *, signal=None):
+            record_results(view.messages)
             request_id, started = uuid4().hex, time.monotonic()
             observe('model')
             record('request', id=request_id, model=view.model)
@@ -29,6 +42,7 @@ class AgentRunner:
                         yield event
                     message = await inner.result()
                     record('response', attempt_id=request_id, status='completed', text=message.text,
+                        tool_calls=[{'id': call.id, 'name': call.name, 'input': call.input} for call in message.tool_calls],
                         usage=message.usage.to_dict() if message.usage else None,
                         elapsed_seconds=time.monotonic() - started)
                     yield StreamDone(message)
@@ -52,6 +66,7 @@ class AgentRunner:
         loop = self.runtime.run_loop if self.runtime is not None and self.runtime.run_loop is not None else run_agent_loop
         result = await loop(invocation, list(messages), signal=signal,
             context_pipeline=self.runtime.context_pipeline if self.runtime is not None else None)
+        record_results(result.messages)
         record('agent-finished', usage=result.usage.to_dict(), error_details=result.error_details if result.is_error else None,
             diagnostics=asdict(result.diagnostics) if result.diagnostics is not None else None,
             status='error' if result.is_error else result.stop_reason)

@@ -281,8 +281,15 @@ operations and starts no search or model request during inspection.
 `/subagent` reads the latest child execution snapshot, including while the main
 task runs. `/subagent AGENT_ID [RUN_ID]` shows execution state, cleanup, actual
 model, activity, known usage and bounded results. Disabled and empty states are
-explicit. Listing shows at most the latest 50 executions; exact IDs can inspect
-older records. [The handler](features/subagent.py) uses a public monitor only,
+explicit. Each invocation takes one snapshot without automatic refresh. Counts
+separate unique agents, retained executions, displayed executions and configured
+concurrency. State totals cover all retained executions; task blocks keep the
+snapshot order and show at most the latest 50 records. Task previews are limited
+to 160 characters with an omission marker; full IDs wrap without truncation.
+Exact IDs can inspect older records. Details separate task, status, recorded usage
+and results, retaining both errors and summaries. Running usage may be incomplete;
+unknown values stay unknown. Resource retirement warnings remain visible even
+when the snapshot is empty. [The handler](features/subagent.py) uses a public monitor only,
 starts no model work and does not create another stdin reader. `/help` and command
 completion discover it through the ordinary command registry.
 
@@ -291,7 +298,11 @@ completion discover it through the ordinary command registry.
 `/help` uses effective command declarations and compact grouped panels. Use
 `/help COMMAND` for arguments or `/help all` to include diagnostic commands such
 as `/trace`. Custom and overridden help handlers retain dispatch priority.
-`/operations` lists descriptions and three recent nonempty output lines.
+`/operations` takes one snapshot per invocation and displays count, state totals
+and individual task blocks with full handles, descriptions, elapsed time and up to
+three recent output lines. Empty descriptions are explicit. Both inspection
+commands use responsive sections with the same plain-text fallback; neither
+starts work or refreshes automatically.
 `/operations HANDLE [OFFSET]` reads at most 12000 characters of retained output
 without consuming model polling state. Offsets refer to the current bounded
 output snapshot, which can change while running. Cancellation remains explicit.

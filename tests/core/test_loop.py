@@ -358,7 +358,7 @@ class TestLoop(unittest.IsolatedAsyncioTestCase):
                     [UserMessage(content="go")], signal=signal, context_pipeline=Reducer())
                 self.assertEqual("aborted", result.stop_reason)
                 self.assertEqual([], provider.calls)
-                self.assertEqual([] if cancel_at == "budget" else [7], observed)
+                self.assertEqual([] if cancel_at == "budget" else [13], observed)
 
     # --- G4: prepareNextTurn / steering / abort ------------------------------
 

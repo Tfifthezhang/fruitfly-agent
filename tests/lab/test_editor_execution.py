@@ -30,6 +30,33 @@ class ReliabilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(provider.calls), 3)
         self.assertFalse(provider.script)
 
+    async def test_submission_tool_links_organization_findings_through_core_validation(self):
+        import json
+        from fruitfly_agent.improvement.contracts.tasks import Resource
+        flow, plan, baseline, runner = proposal_fixture()
+        task = TaskMaterial('task', 'Work')
+        record = await runner.execute(plan, task, baseline)
+        artifacts = MemoryArtifacts()
+        guide = Resource('organization/guide.json', artifacts.put(json.dumps({
+            'findings': [{'issue_id': 'missing-inspection'}]}).encode()))
+        provider = FauxProvider()
+        provider.respond_tool_call('read', {'path': 'context/executions.json'})
+        provider.respond_tool_call('write_file', {
+            'path': 'harness/prompt/instructions.txt', 'content': 'Inspect the supplied material first.'})
+        provider.respond_tool_call('submit_candidate', {'reasons': [{
+            'component_id': 'prompt', 'explanation': 'An inspection step was omitted.',
+            'evidence_ids': [record.run_id], 'issue_ids': ['missing-inspection'],
+            'expected_effect': 'Inspection precedes the answer; another omission refutes the hypothesis.'}]})
+        editor = AgentEditor(AgentLoopConfig(provider=provider), artifacts, flow.components)
+        request = ProposalRequest(plan, task, baseline, (record,), 'invariant', 0, context=(guide,))
+        async with StageServices(plan) as services:
+            candidate = await editor.edit('propose', request, services)
+        self.assertEqual(('prompt',), candidate.changed_ids)
+        self.assertEqual(('missing-inspection',), candidate.reasons[0].issue_ids)
+        self.assertEqual(3, len(provider.calls))
+        self.assertFalse(provider.script)
+        self.assertEqual(baseline, flow.components.snapshot())
+
     async def test_format_repair_keeps_draft_and_source_access_without_replaying_evidence(self):
         flow, plan, baseline, runner = proposal_fixture()
         task = TaskMaterial('task', 'Work')
@@ -119,7 +146,9 @@ class ReliabilityTests(unittest.IsolatedAsyncioTestCase):
             return AssistantMessageEventStream(events())
         provider.script.append(read)
         provider.respond_text('invalid submission')
-        provider.respond_tool_call('submit_candidate', {'reasons': []})
+        provider.respond_tool_call('submit_candidate', {'reasons': [], 'decision': {
+            'kind': 'retain_baseline', 'explanation': 'The supplied record does not establish a useful change.',
+            'baseline_applicability': 'No behavioral defect in the current component is established.'}})
         editor = AgentEditor(AgentLoopConfig(provider), MemoryArtifacts(), flow.components, instructions=instructions)
         async with StageServices(plan) as services:
             result = await editor.edit('propose', ProposalRequest(plan, task, baseline, (record,), 'invariant', 0), services)
@@ -127,3 +156,63 @@ class ReliabilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('CUSTOM REPAIR', provider.calls[-1]['system_prompt'])
         self.assertIn('CUSTOM TOOL', observed[0])
         self.assertNotIn('CUSTOM TOOL', owner.instructions.submit_candidate)
+
+    async def test_no_change_requires_a_decision_and_generator_returns_no_new_candidate(self):
+        from fruitfly_agent.lab.improvement.editor.generators import AgentGenerator
+        from fruitfly_agent.improvement.stages.services import GeneratorServices
+        flow, plan, baseline, runner = proposal_fixture()
+        task = TaskMaterial('task', 'Work')
+        record = await runner.execute(plan, task, baseline)
+        provider = FauxProvider()
+        provider.respond_tool_call('submit_candidate', {'reasons': []})
+        provider.respond_tool_call('submit_candidate', {'reasons': [], 'decision': {
+            'kind': 'needs_evidence', 'explanation': 'The observed omission has no known cause.',
+            'baseline_applicability': 'Historical settings are unavailable.',
+            'required_materials': ['context/history/configuration.json']}})
+        editor = AgentEditor(AgentLoopConfig(provider), MemoryArtifacts(), flow.components)
+        request = ProposalRequest(plan, task, baseline, (record,), 'invariant', 0)
+        async with StageServices(plan, edit=editor.edit) as services:
+            result = await AgentGenerator().propose(request, GeneratorServices(services))
+        self.assertEqual((), result.candidates)
+        self.assertEqual('needs_evidence', result.decision.kind)
+        self.assertFalse(result.stop)
+        self.assertEqual(2, len(provider.calls))
+
+    async def test_repeated_identical_tool_errors_fail_without_becoming_a_baseline_decision(self):
+        flow, plan, baseline, _ = proposal_fixture()
+        provider = FauxProvider()
+        for index in range(4):
+            provider.respond_tool_call('read', {'path': 'outside-grant'})
+        provider.respond_text('Should never be requested')
+        editor = AgentEditor(AgentLoopConfig(provider), MemoryArtifacts(), flow.components,
+            settings={'supply': {'repeated_error_limit': 3}})
+        async with StageServices(plan) as services:
+            with self.assertRaisesRegex(RuntimeError, 'required hook failed'):
+                await editor.edit('propose', ProposalRequest(plan, TaskMaterial('task', 'Work'),
+                    baseline, (), 'invariant', 0), services)
+            self.assertIsNone(services.proposal_decision)
+            self.assertTrue(any(event == 'tool-recovery-exhausted' and fields['feedback_opportunities'] == 3
+                for event, fields in services.events))
+        self.assertEqual(4, len(provider.calls))
+
+    async def test_parallel_navigation_errors_allow_the_editor_to_read_feedback_and_recover(self):
+        from fruitfly_agent.core.data_model import AssistantMessage, ToolCallBlock
+        flow, plan, baseline, _ = proposal_fixture()
+        provider = FauxProvider()
+        provider.respond(AssistantMessage([ToolCallBlock('catalog-' + str(index), 'catalog',
+            {'path': 'context/executions'}) for index in range(4)], 'toolUse'))
+        provider.respond_tool_call('catalog', {'prefix': 'context/'})
+        provider.respond_tool_call('submit_candidate', {'reasons': [], 'decision': {
+            'kind': 'retain_baseline', 'explanation': 'Navigation alone supplies no support for a change.',
+            'baseline_applicability': 'No executable defect was established.'}})
+        editor = AgentEditor(AgentLoopConfig(provider), MemoryArtifacts(), flow.components,
+            settings={'supply': {'repeated_error_limit': 3}})
+        async with StageServices(plan) as services:
+            result = await editor.edit('propose', ProposalRequest(plan, TaskMaterial('task', 'Work'),
+                baseline, (), 'invariant', 0), services)
+            self.assertEqual('retain_baseline', services.proposal_decision.kind)
+            self.assertFalse(any(event == 'tool-recovery-exhausted' for event, _ in services.events))
+        self.assertFalse(result.changed_ids)
+        errors = [m for m in provider.calls[1]['messages'] if getattr(m, 'is_error', False)]
+        self.assertEqual(4, len(errors))
+        self.assertEqual(3, len(provider.calls))

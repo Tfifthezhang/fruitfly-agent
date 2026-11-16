@@ -160,3 +160,9 @@ citations. Auxiliary Providers, measurements and context state remain independen
 
 `build_runtime` accepts an optional `work_product_store` for an attributed child
 writer. Ordinary runtimes create a parent store beside their Session.
+
+[Shared context conditions](../../lab/context_manager/budget/README.md) are
+recorded in effective execution identity. New and resumed runtimes apply the
+current budget before their next request. Restricted child runtimes retain parent
+execution conditions even when their component subset omits the budget owner.
+Historical manifests are validated against their original contents.

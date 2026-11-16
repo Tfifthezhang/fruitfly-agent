@@ -3,6 +3,13 @@ from fruitfly_agent.core.data_model import AgentToolResult, TextBlock
 from fruitfly_agent.core.tool_runtime import AgentTool
 
 
+def normalize_no_choice(value):
+    """Decode the declared empty-string sentinel without repairing other fields."""
+    if isinstance(value, dict) and value.get('choice') == '':
+        return {**value, 'choice': None}
+    return value
+
+
 def submission_tool(name, submit, *, instructions=None):
     """The same owner validator accepts tool submissions and final text responses."""
     from .instructions import EvaluatorInstructions
@@ -21,7 +28,7 @@ def submission_tool(name, submit, *, instructions=None):
     schema = obj({'evaluations': {'type': 'array', 'items': row},
         'choice': {'type': 'string', 'description': 'Existing run ID, or empty string for no choice.'}, 'reason': text, 'uncertainty': text, 'evidence_ids': citations})
     async def seal(ctx):
-        submit({**ctx.args, 'choice': ctx.args.get('choice') or None})
+        submit(normalize_no_choice(ctx.args))
         return AgentToolResult(content=[TextBlock('Judgment validated and retained.')], terminate=True)
     return AgentTool(name=name, label='Submit judgment', description=instructions.submit_judgment,
         parameters=schema, execute=seal, requires_exclusive_batch=True)

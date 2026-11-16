@@ -30,7 +30,8 @@ async def main():
 asyncio.run(main())
 '''
 
-STREAM_CODE = '''
+STREAM_CODE = r'''
+from fruitfly_agent.lab.context_manager.measurement.budget import MeasurementService
 import asyncio
 from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.core.data_model import AssistantMessage, TextBlock
@@ -45,10 +46,10 @@ async def main():
         async def events():
             yield TextDelta(text='BEFORE-MENU')
             await menu_started.wait()
-            yield TextDelta(text='\\n\\nARRIVED-DURING-MENU')
-            yield StreamDone(AssistantMessage(content=[TextBlock('BEFORE-MENU\\n\\nARRIVED-DURING-MENU')]))
+            yield TextDelta(text='\n\nARRIVED-DURING-MENU')
+            yield StreamDone(AssistantMessage(content=[TextBlock('BEFORE-MENU\n\nARRIVED-DURING-MENU')]))
         return AssistantMessageEventStream(events())
-    session = InteractiveSession(AgentLoopConfig(provider=provider, model='offline'))
+    session = InteractiveSession(AgentLoopConfig(provider=provider, model='offline', context_meter=MeasurementService()))
     app = AgentApplication(_Factory([session]))
     await app.start()
     frontend = TerminalFrontend(app)
@@ -63,7 +64,7 @@ async def main():
             print('TEMPORARY-MENU', flush=True)
             menu_started.set()
             await asyncio.wait_for(run_finished.wait(), 3)
-        return CommandResult(text='MENU-RETURNED\\n')
+        return CommandResult(text='MENU-RETURNED\n')
     frontend.commands.register('menu', menu, summary='Open fixture menu')
     try:
         await frontend.run()

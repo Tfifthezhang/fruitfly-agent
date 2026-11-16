@@ -42,6 +42,7 @@ class ExecutionLimitTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(default.config.max_tool_calls_per_turn, 512)
             self.assertEqual(changed.manifest.to_dict()['execution'], {
                 'max_tool_calls_per_turn': 128, 'max_turns': 32, 'max_context_recovery_attempts': 6,
+                'context_budget': {'max_input_tokens': 65536, 'trigger_ratio': .75, 'target_ratio': .5},
                 'tool_execution': {'max_parallel': 8, 'default_execution_mode': 'parallel'}})
             self.assertNotEqual(execution_version_payload(changed.manifest.to_dict(), 'source'),
                 execution_version_payload(default.manifest.to_dict(), 'source'))

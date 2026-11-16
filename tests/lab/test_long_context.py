@@ -49,3 +49,32 @@ class LongContextTests(unittest.IsolatedAsyncioTestCase):
         decision = await reducer.check_budget(snapshot)
         self.assertIsNone(decision.messages)
         self.assertTrue(provider.calls)
+
+    async def test_large_model_window_still_archives_a_150k_working_history(self):
+        from fruitfly_agent.core.data_model import AssistantMessage
+        from fruitfly_agent.lab.context_manager.reduction import LayeredCompactionReducer, LayeredCompactionConfig
+        from tests.support.compaction import mounted_history
+        history, resources = mounted_history()
+        self.addCleanup(resources.close)
+        reducer = LayeredCompactionReducer(LayeredCompactionConfig(), history=history)
+        provider = FauxProvider(); provider.respond_text('verified completion')
+        task = UserMessage('Prepare the report; preserve evidence and verify results.')
+        current = UserMessage('Finish the report, identify the artifact and report checks.')
+        messages = [task]
+        for i in range(200):
+            messages.extend((AssistantMessage([TextBlock('old evidence ' * 250)]),
+                UserMessage('Keep correction ' + str(i))))
+        messages.append(current)
+        meter = MeasurementService()
+        result = await run_agent_loop(AgentLoopConfig(provider, context_window=1048576,
+            max_tokens=131072, context_meter=meter), messages, context_pipeline=reducer)
+        self.assertFalse(result.is_error, result.error_details)
+        self.assertEqual(len(messages) + 1, len(result.canonical_messages))
+        sent = provider.calls[0]['messages']
+        self.assertLess(len(sent), len(messages) // 2)
+        self.assertIn(task, sent)
+        self.assertIn(current, sent)
+        self.assertTrue(history.values)
+        from fruitfly_agent.core.data_model import ProviderView
+        measurement = await meter.measure(ProviderView('', sent, [], '', 131072), provider)
+        self.assertLessEqual(measurement.input_tokens + measurement.margin, 65536)

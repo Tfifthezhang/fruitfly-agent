@@ -120,3 +120,28 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNot(registry.create('rule-generator'), registry.create('rule-generator'))
 
 
+
+    async def test_tool_submission_accepts_supported_issue_ids_and_rejects_unknown_issues(self):
+        from fruitfly_agent.improvement.contracts.editing import ProposalRequest
+        from fruitfly_agent.improvement.contracts.tasks import Resource
+        registry, baseline = fixture()
+        artifacts = MemoryArtifacts()
+        guide = artifacts.put(json.dumps({'sections': [], 'findings': [{'issue_id': 'inspection-gap'}]}).encode())
+        plan = RunPlan('job', version(), ('prompt',))
+        task = TaskMaterial('task', 'Inspect the source')
+        record = ExecutionRecord('reference', task.task_id, task.material_id, baseline.snapshot_id,
+            plan.parent.state, plan.conditions_id, 'completed', 'Missing inspection')
+        request = ProposalRequest(plan, task, baseline, (record,), 'invariant', 0,
+            context=(Resource('guide.json', guide),))
+        provider = FauxProvider()
+        provider.respond_tool_call('read', {'path': 'context/executions.json'})
+        provider.respond_tool_call('write_file', {'path': 'harness/prompt/instructions.txt', 'content': 'New inspection procedure'})
+        reason = {'component_id': 'prompt', 'explanation': 'Observed omission', 'expected_effect': 'Inspect the omitted path',
+            'evidence_ids': ['reference'], 'issue_ids': ['unknown-issue']}
+        provider.respond_tool_call('submit_candidate', {'reasons': [reason]})
+        provider.respond_tool_call('submit_candidate', {'reasons': [{**reason, 'issue_ids': ['inspection-gap']}]})
+        async with StageServices(plan) as services:
+            candidate = await AgentEditor(AgentLoopConfig(provider), artifacts, registry).edit('propose', request, services)
+        self.assertEqual(('inspection-gap',), candidate.reasons[0].issue_ids)
+        self.assertIn('link to supplied investigation', provider.calls[-1]['messages'][-1].text)
+        self.assertEqual(baseline.component('prompt').files[0].text, 'prompt')

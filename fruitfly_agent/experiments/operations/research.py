@@ -70,6 +70,7 @@ async def _dispatch(args, workspace, outputs, reporting):
     artifacts = ArtifactPort(outputs.artifacts)
     service = ResearchService(workspace, args.study, artifacts, journal=outputs.journal())
     reporting['service'] = service
+    service.run_id = reporting.get('run_id', args.study)
     if args.command in {'inspect', 'resume'}:
         state = service.controller.state()
         return {'study': args.study, 'revisions': state.revisions, 'attempts': state.attempts,
@@ -144,6 +145,7 @@ async def _dispatch(args, workspace, outputs, reporting):
         service = ResearchService(workspace, args.study, artifacts, journal=outputs.journal(),
             external_stages={'eval': execute_eval})
         reporting['service'] = service
+        service.run_id = reporting.get('run_id', args.study)
         return await service.perform('eval', (), fresh=args.fresh, retry_unresolved=args.retry_unresolved)
     if args.command == 'execute':
         from ..configuration import load_configuration
@@ -358,6 +360,8 @@ async def dispatch(args, workspace):
         outputs.write(prefix + '/inputs.json', [asdict(r) for r in reporting['inputs']])
         raise
     finally:
+        if reporting.get('service') is not None and reporting['service'].last_diagnostics is not None:
+            run['diagnostics'] = asdict(reporting['service'].last_diagnostics)
         run['finished_at'] = datetime.now(timezone.utc).isoformat()
         outputs.write(prefix + '/run.json', run)
         outputs.write(prefix + '/report.json', run)

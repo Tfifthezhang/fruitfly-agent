@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from fruitfly_agent.lab.context_manager.measurement.budget import MeasurementService
 import asyncio
 import json
 import tempfile
@@ -65,7 +66,7 @@ class InteractiveSessionTest(unittest.IsolatedAsyncioTestCase):
                 model="offline-model",
                 session=durable,
                 hooks=HookRegistry(session=durable),
-            )
+             context_meter=MeasurementService())
             app = InteractiveSession(config, event_sink=events.append)
             await app.submit("one")
             await app.submit("two")
@@ -119,7 +120,7 @@ class InteractiveSessionTest(unittest.IsolatedAsyncioTestCase):
                 provider=provider,
                 model="offline-model",
                 tools=(tool,),
-            ),
+             context_meter=MeasurementService()),
             event_sink=events.append,
         )
 
@@ -181,7 +182,7 @@ class InteractiveSessionTest(unittest.IsolatedAsyncioTestCase):
             tools=[tool],
             hooks=hooks,
             on_partial=partials.append,
-        )
+         context_meter=MeasurementService())
         app = InteractiveSession(
             config,
             context_pipeline=_ObservedCompactor(hooks),
@@ -234,7 +235,7 @@ class InteractiveSessionTest(unittest.IsolatedAsyncioTestCase):
             model="offline-model",
             tools=[tool],
             hooks=hooks,
-        )
+         context_meter=MeasurementService())
         compactor = _ObservedCompactor(hooks)
         events = []
 
@@ -263,7 +264,7 @@ class InteractiveSessionTest(unittest.IsolatedAsyncioTestCase):
             raise RuntimeError("renderer broke")
 
         app = InteractiveSession(
-            AgentLoopConfig(provider=provider, model="offline-model"),
+            AgentLoopConfig(provider=provider, model="offline-model", context_meter=MeasurementService()),
             event_sink=broken_sink,
         )
         result = await app.submit("hello")
@@ -283,7 +284,7 @@ class InteractiveSessionTest(unittest.IsolatedAsyncioTestCase):
             )
 
         app = InteractiveSession(
-            AgentLoopConfig(provider=FauxProvider(), model="offline-model"),
+            AgentLoopConfig(provider=FauxProvider(), model="offline-model", context_meter=MeasurementService()),
             run_loop=wait_for_cancel,
         )
         task = asyncio.create_task(app.submit("long task"))
@@ -321,7 +322,7 @@ class InteractiveSessionTest(unittest.IsolatedAsyncioTestCase):
                 provider=provider,
                 model="offline-model",
                 tools=(tool,),
-            )
+             context_meter=MeasurementService())
         )
         task = asyncio.create_task(app.submit("start"))
         await entered_tool.wait()
@@ -367,7 +368,7 @@ class InteractiveSessionTest(unittest.IsolatedAsyncioTestCase):
                 AgentLoopConfig(
                     provider=provider, model="offline-model", session=durable,
                     get_follow_up_messages=previous_follow_up,
-                )
+                 context_meter=MeasurementService())
             )
             task = asyncio.create_task(app.submit("initial request"))
             await entered_response.wait()
@@ -398,7 +399,7 @@ class InteractiveSessionTest(unittest.IsolatedAsyncioTestCase):
             AgentLoopConfig(
                 provider=provider, model="offline-model",
                 should_stop_after_turn=should_stop,
-            )
+             context_meter=MeasurementService())
         )
         task = asyncio.create_task(app.submit("initial request"))
         await entered_stop.wait()

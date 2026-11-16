@@ -34,7 +34,11 @@ class ResearchRuntimeTests(unittest.IsolatedAsyncioTestCase):
         path = root / 'config.yaml'
         path.write_text(yaml.safe_dump({'default_profile': 'test', 'profiles': {'test': {
             'models': {'catalog': 'models.yaml', 'roles': {'executor': 'offline'}},
-            'H': {'local-env': {'default': True}, 'read-tool': {'default': True}, 'layered-compaction': {'default': True}, 'work-products': {'default': True}}, 'S': {}, 'I': {}}}}))
+            'H': {'local-env': {'default': True}, 'read-tool': {'default': True},
+                'context-budget': {'inline': {'id': 'context-budget', 'role': 'H',
+                    'implementation': 'context-budget', 'parameters': {'settings': {
+                        'max_input_tokens': 7000, 'trigger_ratio': .6, 'target_ratio': .4}}}},
+                'layered-compaction': {'default': True}, 'work-products': {'default': True}}, 'S': {}, 'I': {}}}}))
         roles = ResearchRoles(root, path, registry=assembly.registry, environment={})
         self.addAsyncCleanup(roles.aclose)
         artifacts = DataArtifactStore(root / 'artifacts')
@@ -73,7 +77,11 @@ class ResearchRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     entries = session.read_all()
                     self.assertTrue(any(e.type == 'compaction' for e in entries))
                     manifest = next(e.payload['manifest'] for e in entries if e.payload.get('kind') == 'research-runtime')
-                    self.assertEqual({'layered-compaction', 'work-products'}, {r['id'] for r in manifest['components']})
+                    self.assertEqual({'context-budget', 'layered-compaction', 'work-products'}, {r['id'] for r in manifest['components']})
+                    self.assertEqual(7000, manifest['context_budget']['max_input_tokens'])
+                    self.assertEqual(.6, manifest['context_budget']['trigger_ratio'])
+                retained = next(fields['artifact_id'] for event, fields in services.events if event == 'research-session')
+                self.assertEqual(session_path.read_bytes(), artifacts.read_bytes(retained))
                 # The final model projection has a recoverable, session-scoped archive reference.
                 serialized = str(provider.calls[-1]['messages'])
                 self.assertIn('resource://', serialized)
@@ -103,14 +111,23 @@ class ResearchRuntimeTests(unittest.IsolatedAsyncioTestCase):
         body = 'Factual navigation text. ' * 200
         def draft(view, signal=None):
             source = json.loads(view.messages[-1].text)
-            document = {'sections': [{'title': 'Observations', 'summary': body,
-                'sources': [{'path': source['path'], 'citation_id': source['citation_id']}], 'extra': None}], 'findings': []}
+            citation = {'path': source['path'], 'citation_id': source['citation_id']}
+            document = {'schema_version': 2, 'sections': [{'title': 'Observations', 'summary': body,
+                'sources': [citation]}], 'findings': [{'issue_id': 'inspect-scope',
+                'signal': 'Further evidence is needed.', 'facts': [{'text': 'A batch was supplied.', 'sources': [citation]}],
+                'hypotheses': [], 'counterevidence': [], 'unknowns': [{'question': 'Which historical settings applied?',
+                    'materials': ['/remote/history/configuration.json'], 'availability': 'not_granted'}],
+                'run_ids': [record.run_id], 'control_ids': [], 'status': 'needs_evidence', 'sources_note': 'unsupported field'}]}
             return tool_response('save_checkpoint', {'name': 'guide', 'content': json.dumps(document), 'expected_revision': 0})
         provider.script.append(draft)
         provider.respond_tool_call('submit_work_product', {'producer': 'parent', 'name': 'guide', 'revision': 1})
         provider.respond_tool_call('patch_checkpoint', {'name': 'guide', 'expected_revision': 1,
-            'changes': [{'path': ['sections', '0', 'extra'], 'operation': 'remove'}]})
+            'changes': [{'path': ['findings', '0', 'sources_note'], 'operation': 'remove'}]})
         provider.respond_tool_call('submit_work_product', {'producer': 'parent', 'name': 'guide', 'revision': 2})
+        provider.respond_tool_call('patch_checkpoint', {'name': 'guide', 'expected_revision': 2,
+            'changes': [{'path': ['findings', '0', 'unknowns', '0', 'materials'], 'operation': 'replace',
+                'value': '["context/history/configuration.json"]'}]})
+        provider.respond_tool_call('submit_work_product', {'producer': 'parent', 'name': 'guide', 'revision': 3})
         organizer = LayeredOrganizer(AgentLoopConfig(provider, max_tokens=128, context_window=16000), ArtifactPort(artifacts),
             runtime_factory=roles.runtime_factory('organizer', root / 'roles', artifacts, {}))
         async with StageServices(plan) as services:
@@ -118,7 +135,11 @@ class ResearchRuntimeTests(unittest.IsolatedAsyncioTestCase):
         guide = next(r for r in view.resources if r.path == 'organization/guide.json')
         result = json.loads(artifacts.read_bytes(guide.artifact_id))
         self.assertEqual(body, result['sections'][0]['summary'])
-        self.assertNotIn('extra', result['sections'][0])
+        self.assertNotIn('sources_note', result['findings'][0])
+        self.assertEqual(['context/history/configuration.json'], result['findings'][0]['unknowns'][0]['materials'])
+        errors = [fields['result'] for event, fields in services.events
+            if event == 'tool-result' and fields['result']['isError']]
+        self.assertEqual(2, len(errors))
         calls = [call for message in provider.calls[-1]['messages'] if isinstance(message, AssistantMessage)
                  for call in message.tool_calls if call.name == 'save_checkpoint']
         self.assertEqual(1, len(calls))

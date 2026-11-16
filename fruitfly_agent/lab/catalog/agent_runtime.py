@@ -22,3 +22,10 @@ class AgentRuntimeError(RuntimeError):
             raise ValueError('invalid runtime admission category')
         self.code = code
         super().__init__(code)
+
+
+def prepare_agent_config(config):
+    """Supply isolated shared measurement for an independently hosted Core invocation."""
+    from dataclasses import replace
+    from fruitfly_agent.lab.context_manager.measurement import new_measurement_scope
+    return replace(config, context_meter=new_measurement_scope(config.context_meter))

@@ -3,7 +3,7 @@ from dataclasses import asdict
 from pathlib import Path
 import os
 from fruitfly_agent.core.config import AgentLoopConfig
-from fruitfly_agent.lab.catalog import builtin_catalog, load_system_config
+from fruitfly_agent.lab.catalog import builtin_catalog, load_system_config, prepare_agent_config, resolve_execution_conditions
 from fruitfly_agent.lab.catalog import RoleProvider
 from fruitfly_agent.providers.registry import default_registry, load_model_specs
 from fruitfly_agent.providers.config import load_env
@@ -64,8 +64,9 @@ class ResearchRoles:
             def __getattr__(self, name):
                 return getattr(binding(), name)
         from fruitfly_agent.runtime_spec import execution_kwargs
-        return AgentLoopConfig(provider=DeferredProvider(),
-            model=spec.model, max_tokens=spec.max_output_tokens, context_window=spec.context_window, **execution_kwargs(self.profile.execution))
+        return prepare_agent_config(AgentLoopConfig(provider=DeferredProvider(),
+            model=spec.model, max_tokens=spec.max_output_tokens, context_window=spec.context_window,
+            **execution_kwargs(resolve_execution_conditions(self.profile, self.catalog))))
 
     def provider_binding(self, alias, maximum=None, *, resources):
         from dataclasses import replace

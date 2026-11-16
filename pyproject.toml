@@ -55,6 +55,7 @@ include = ["fruitfly_agent*", "fruitfly_eval*"]
 
 [tool.setuptools.package-data]
 "fruitfly_agent.lab.agents.work_products.methods.managed" = ["defaults.yaml"]
+"fruitfly_agent.core.context" = ["defaults.yaml"]
 "fruitfly_agent.improvement.contracts" = ["defaults.yaml"]
 "fruitfly_agent.lab.agents.subagent.methods.managed" = ["defaults.yaml"]
 "fruitfly_agent.providers" = ["services.yaml"]

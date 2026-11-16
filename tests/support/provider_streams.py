@@ -49,6 +49,8 @@ def adapter(kind, streams, **options):
         for sdk in streams:
             events = list(sdk.events)
             if not any(getattr(e, 'type', '') in {'response.completed', 'response.incomplete', 'response.failed'} for e in events):
+                if not events:
+                    events.append(NS(type='response.output_text.delta', delta='done'))
                 events.append(NS(type='response.completed', response=NS(usage=None, incomplete_details=None)))
             sdk.events = iter(events)
         client = NS(responses=NS(create=AsyncMock(side_effect=streams)))

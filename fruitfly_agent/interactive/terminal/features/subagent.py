@@ -1,8 +1,13 @@
 """Inspect child execution facts through a borrowed frontend capability."""
+from collections import Counter
 from typing import Callable
-from fruitfly_agent.interactive.contracts.commands import CommandResult, InteractiveCommand
+
+from fruitfly_agent.interactive.contracts.commands import (
+    CommandPanel, CommandResult, CommandSection, InteractiveCommand,
+)
 from fruitfly_agent.interactive.contracts.subagents import SubagentMonitor
-from fruitfly_agent.interactive.terminal.io.text import safe_terminal_text
+from fruitfly_agent.interactive.terminal.rendering.formatting import format_duration
+from fruitfly_agent.interactive.terminal.rendering.panels import panel_result
 
 
 def subagent_handler(query: Callable[[], SubagentMonitor | None]) -> Callable[[InteractiveCommand], CommandResult]:
@@ -20,24 +25,49 @@ def subagent_handler(query: Callable[[], SubagentMonitor | None]) -> Callable[[I
                 return CommandResult(text='Unknown subagent execution.\n')
             def known(number: object) -> str:
                 return 'unknown' if number is None else str(number)
-            text = (f'Subagent {value.agent_id} · {value.run_id}\n'
-                f'State: {value.state} · Cleanup: {value.cleanup}\n'
-                f'Task: {value.task}\nModel: {value.model_profile or "unknown"} · {value.model or "unknown"}\n'
-                f'Activity: {value.activity}\nElapsed seconds: {known(value.elapsed_seconds)}\n'
-                f'Main model requests: {value.model_requests} · Tool calls: {value.tool_calls}\n'
-                f'Tokens: {known(value.input_tokens)} input · {known(value.output_tokens)} output\n'
-                f'Result: {value.result_reference or "unavailable"}\n'
-                f'{value.error or value.summary or "No result yet."}\n')
-            return CommandResult(text=safe_terminal_text(text))
+            result_rows = [('Reference', value.result_reference or 'unavailable')]
+            if value.error:
+                result_rows.append(('Error', value.error))
+            if value.summary:
+                result_rows.append(('Summary', value.summary))
+            if not value.error and not value.summary:
+                result_rows.append(('Result', 'No result yet.'))
+            return panel_result(CommandPanel('Subagent execution', (
+                CommandSection('tools', 'Task', (
+                    ('Task', value.task), ('Agent ID', value.agent_id), ('Run ID', value.run_id),
+                    ('Model profile', value.model_profile or 'unknown'), ('Model', value.model or 'unknown'))),
+                CommandSection('workflow', 'Status', (
+                    ('State', value.state), ('Activity', value.activity), ('Cleanup', value.cleanup),
+                    ('Recorded elapsed', 'unknown' if value.elapsed_seconds is None else format_duration(value.elapsed_seconds)))),
+                CommandSection('environment', 'Recorded usage', (
+                    ('Main model requests', str(value.model_requests)), ('Tool calls', str(value.tool_calls)),
+                    ('Input tokens', known(value.input_tokens)), ('Output tokens', known(value.output_tokens)))),
+                CommandSection('improvement', 'Result', tuple(result_rows)),
+            ), 'Usage may be incomplete while execution is unfinished.'))
         snapshot = service.snapshot()
-        if not snapshot.executions:
-            return CommandResult(text='No subagents.\n')
-        rows = snapshot.executions[-50:]
-        text = f'Subagents · concurrency {snapshot.max_concurrent} · revision {snapshot.revision}\n'
+        executions = snapshot.executions
+        rows = executions[-50:]
+        counts = Counter(value.state for value in executions)
+        sections = [
+            CommandSection('environment', 'Counts', (
+                ('Agents', str(len({value.agent_id for value in executions}))),
+                ('Executions', str(len(executions))), ('Shown', str(len(rows))),
+                ('Concurrency limit', str(snapshot.max_concurrent)), ('Revision', str(snapshot.revision)))),
+            CommandSection('workflow', 'Statuses · all retained executions',
+                tuple((state, str(count)) for state, count in counts.items()) or (('States', 'none'),)),
+        ]
         if snapshot.poisoned:
-            text += 'Resource retirement is unconfirmed; further execution is blocked.\n'
-        text += '\n'.join(f'{v.agent_id} · {v.run_id} · {v.state} · {v.task[:160]}' for v in rows) + '\n'
-        if len(snapshot.executions) > 50:
-            text += 'Showing the latest 50 executions. Use an exact ID for earlier details.\n'
-        return CommandResult(text=safe_terminal_text(text))
+            sections.append(CommandSection('improvement', 'Resource warning', (
+                ('Admission', 'Resource retirement is unconfirmed; further execution is blocked.'),)))
+        for index, value in enumerate(rows, 1):
+            task = value.task[:160] + ('…' if len(value.task) > 160 else '')
+            sections.append(CommandSection('tools', f'Task {index} · {value.state}', (
+                ('Task', task), ('Agent ID', value.agent_id), ('Run ID', value.run_id),
+                ('State', value.state), ('Activity', value.activity))))
+        footer = '/subagent AGENT_ID [RUN_ID] for details.'
+        if not executions:
+            footer = 'No subagents. ' + footer
+        if len(executions) > 50:
+            footer = 'Counts cover all retained executions; showing the latest 50. Use exact IDs for earlier details. ' + footer
+        return panel_result(CommandPanel('Subagents', tuple(sections), footer))
     return execute

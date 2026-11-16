@@ -85,7 +85,8 @@ def install_work_products(state, context, parameters):
             from fruitfly_agent.core.data_model import ProviderView, CustomMessage
             measured = await meter.measure(ProviderView(event.system_prompt, list(event.messages),
                 list(event.tools), event.model, event.max_tokens), state.config.provider)
-            capacity = max(1, state.config.context_window - measured.output_reserve - measured.margin)
+            capacity = max(1, state.config.context_budget.input_allowance(
+                state.config.context_window, measured, state.config.max_tokens))
             pressure = measured.input_tokens is not None and measured.input_tokens >= capacity * parameters['pressure_ratio']
             if pressure and not notified:
                 event.messages = [*event.messages, CustomMessage('work-product-pressure',

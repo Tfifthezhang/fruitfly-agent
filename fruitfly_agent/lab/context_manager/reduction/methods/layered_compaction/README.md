@@ -12,13 +12,18 @@ is resolved in this mode.
 | Stage | Trigger and behavior |
 |---|---|
 | Preview old results | Eligible long text tool results become head/tail previews with an original-message URI; preserve status and call/result pairing. Recent groups stay intact unless an oversized request requires previews. Image results retain their original content. |
-| Archive history | At `trigger_ratio` of available input capacity, aim for `target_ratio`. Keep the first task, latest user input and recent complete groups; replace earlier history with an immutable manifest and readback instructions. |
+| Archive history | At the shared budget's `trigger_ratio`, aim for its `target_ratio`. Keep the first user task, three latest user inputs and recent complete groups; replace earlier history with an immutable manifest and readback instructions. |
 | Summarize evidence | Hybrid mode only: one bounded request over supplied evidence. Oversized entries become explicit source references; the representation ledger distinguishes supplied text, previews and references. |
 | Commit | Propose only a smaller fitting request. Core checks final measurement, pairing, replay permission, revision and cancellation before durable commit. |
 
-Capacity subtracts system/tool input, output reserve and measurement uncertainty.
+[Shared context budget](../../../budget/README.md) supplies capacity and thresholds.
+The complete request includes system instructions and tool definitions; output
+reserve and measurement uncertainty reduce available input capacity. This method
+has no independent trigger/target fields. A large model window does not postpone
+archiving until hundreds of thousands of tokens.
 The tail target is soft: the minimum complete groups and pinned user input can
-exceed it. A request that still cannot fit fails through ordinary Core preflight;
+exceed it. `tail_tokens` applies after archiving triggers; it is not a request cap.
+A request that still cannot fit fails through Core final admission;
 it does not silently truncate the task or invent a successful summary.
 
 Hybrid summaries require six sections: request/constraints, work/decisions,
@@ -32,14 +37,15 @@ uses the shared bounded cancellation contract.
 
 ## Configure and improve
 
-The strict dataclass in `config.py` owns defaults and bounds. Author component
+The strict dataclass in `config.py` owns method bounds and reads its registered defaults.
+Shared trigger/target ratios belong to `H.context-budget`, not this component. Author component
 syntax through [Catalog configuration](../../../../catalog/CONFIGURATION.md).
 The [example](../../../../../../examples/configuration/README.md#select-reduction-and-measurement)
 shows mode selection and field grants.
 
 | Surface | H candidate admission |
 |---|---|
-| Trigger/target ratios, preview size, old-result threshold, recent-group count and tail budget | Editable in both modes |
+| Preview size, old-result threshold, recent-group count and tail budget | Editable in both modes |
 | Readback instructions | Editable in both modes |
 | Summary instructions, desired size, input/output limits and timeout | Editable only in hybrid mode |
 | Mode and `models.roles.context_summary` | User configuration; protected from candidates |

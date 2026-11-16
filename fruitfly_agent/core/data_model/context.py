@@ -7,6 +7,8 @@ alone applies the decision to the live model projection and durable session.
 from __future__ import annotations
 
 import asyncio
+from fruitfly_agent.core.context.budget import ContextBudget
+
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, Awaitable, Callable
 
@@ -57,6 +59,7 @@ class ContextSnapshot:
     last_input_tokens: int | None = None
     overflow_attempt: int = 0
     signal: asyncio.Event | None = field(default=None, repr=False, compare=False)
+    context_budget: ContextBudget = field(default_factory=ContextBudget)
     measurement: Any = None
     context_state: dict[str, Any] = field(default_factory=dict)
     revision: int = 0

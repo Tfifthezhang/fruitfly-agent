@@ -132,3 +132,13 @@ Completed intervals use a monotonic clock. Attempt time excludes retry backoff;
 attempt children have explicit parent operation IDs. Nested stages can overlap
 and must not be summed as wall time. Interrupted
 operations without a completion record retain unknown duration.
+
+## Reject unusable Responses completion
+
+The Responses adapter rejects an otherwise completed response without usable
+text, tool calls, continuation or server-tool work as `empty_response`. Truncation
+retains its existing handling. This failure is not automatically retried or
+classified as context overflow. Available usage and bounded structural diagnostics
+remain in failure details. Output serialization never synthesizes user input.
+An exact historical empty-response `Continue.` fallback is excluded from replay
+after hash validation; canonical Session records remain unchanged.

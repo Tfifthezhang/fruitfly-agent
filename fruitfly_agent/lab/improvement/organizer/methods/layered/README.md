@@ -22,3 +22,9 @@ Reading is bounded by the shared evidence supply and request-space checks.
 Submit a compact guide using supplied citations and declare uncovered scope when
 reading is exhausted. Invocation requirements are delivered directly in the role
 mission. Offline Eval indexing does not invoke this model role.
+
+Current submissions use guide format 2 with per-fact citations, explicit execution
+scope, contrasting cases, investigation status and structured evidence gaps.
+Publication derives an index and per-issue detail files without extra model calls.
+Direct/search ranges and child outcomes remain separate coverage dimensions.
+See [the organizer contract](../../README.md#keep-partial-work).

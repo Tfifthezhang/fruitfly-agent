@@ -40,3 +40,30 @@ the same port through `register_evidence_selector(factory)`. The factory receive
 Catalog component settings and returns a fresh policy. Its `select` consumes
 summary rows plus immutable resource manifests and returns selected run IDs and
 optional exact `material_paths`. Out-of-grant material paths fail before access.
+
+## Balance distinct investigation strata
+
+`parameters.settings.sampling_policy` selects `balanced` (default) or `rare-first`.
+Balanced sampling reserves available controls, covers distinct execution/outcome
+strata and then fills remaining slots by rare signals. The same overall and
+per-task limits apply. The owner exposes this field through its ordinary I grant;
+`candidate_selector` applies it to actual isolated selection and identity.
+
+Outcome signals use source-declared semantics, never numeric reward conventions.
+`outcome_unmet` means explicit unmet acceptance. A `successful_control` requires
+explicit met acceptance. When investigations exist but no known successful control
+exists, an otherwise unremarkable unscored completed case can be a
+`contrasting_control`; success remains unknown. Historical observations without
+semantics remain readable and do not acquire a success label.
+
+Focused materials include retained overview, coverage, source/event directories,
+historical configuration declarations and public outcome projections in addition
+to trajectories and execution diagnostics. Unretained bytes and protected verifier
+inputs stay excluded. Event navigation identifies ungranted sources explicitly.
+Selection receipts include signal meanings and omitted scope.
+
+Selected cases expose `control_run_ids` only when a selected control shares the
+recorded harness, execution conditions and initial state. Otherwise
+`comparison_basis` is `not_established`. Matching identities do not imply equal
+task difficulty, identical outputs, reconstructed historical configuration or
+causal proof; task requirements and relevant differences still need inspection.

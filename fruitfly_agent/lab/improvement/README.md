@@ -75,3 +75,10 @@ Historical Eval imports contain deterministic compact materials. The normal path
 is import followed by assess or propose; model organize is optional. See
 [bounded evidence](evidence/README.md#bound-an-investigation) for supply limits,
 source references and explicit original supplements.
+
+Organization exposes compact issue indexes, per-fact sources, reading coverage
+and explicit gaps. Proposal records candidate, retain-baseline or needs-evidence
+intent independently of workflow stopping. See [organizer](organizer/README.md),
+[editor decisions](editor/README.md#submit-an-explicit-decision) and
+[deterministic statistics](evidence/README.md#inspect-distributions-and-reading-scope).
+No additional stage runs automatically.

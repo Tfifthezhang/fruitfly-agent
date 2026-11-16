@@ -58,6 +58,7 @@ class CatalogTest(unittest.TestCase):
         self.assertEqual(
             {item.mechanism_id for item in builtin_catalog().descriptors()},
             {
+                'context-budget',
                 'local-env',
                 'execution-instructions',
                 'remote-env',

@@ -82,7 +82,7 @@ class ResearchServiceTests(unittest.IsolatedAsyncioTestCase):
             imported = await service.perform('import', (service.put('batch.json', batch.to_dict()),))
             from fruitfly_agent.improvement.contracts.stages import StageInputs
             self.assertEqual({r.path for r in imported.outputs},
-                {'batch.json', 'overview.json', 'executions.json', 'coverage.json'})
+                {'batch.json', 'overview.json', 'executions.json', 'coverage.json', 'statistics.json'})
             overview = service.read(next(r for r in imported.outputs if r.path == 'overview.json'))
             self.assertEqual(overview['execution_count'], 1)
             assessed = await service.perform_named('assess', StageInputs(

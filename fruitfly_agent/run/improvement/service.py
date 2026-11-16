@@ -1,6 +1,7 @@
 """Public persistent research service; role factories and task executors are injected."""
 import json
 from pathlib import Path
+from dataclasses import replace
 from fruitfly_agent.improvement.contracts.activities import ActivitySpec, ActivityResult
 from fruitfly_agent.improvement.contracts.research import ResearchRevision, ResearchBatch
 from fruitfly_agent.improvement.contracts.tasks import Resource
@@ -24,6 +25,9 @@ class ResearchService:
         self.role_identity = dict(role_identity or {})
         self.evidence_selector = evidence_selector
         self.source_id = None
+        self.run_id = research_id
+        self.diagnostic_events = []
+        self.last_diagnostics = None
         self.external_stages = dict(external_stages or {})
         self.controller = self.build_controller()
 
@@ -35,7 +39,17 @@ class ResearchService:
             **builtin_stage_handlers(context)}
         for name, implementation in self.external_stages.items():
             implementations[(name, 'research-' + name + '-v1')] = implementation
-        return ResearchController(self.store, self.artifacts, implementations)
+        async def tracked(spec, handler):
+            self.diagnostic_events = []
+            try:
+                result = await handler(spec)
+            finally:
+                self.last_diagnostics = self.put('diagnostics/trace.json', {
+                    'run_id': self.run_id, 'events': self.diagnostic_events}, 'diagnostic')
+            return replace(result, outputs=(*result.outputs, self.last_diagnostics)) if self.diagnostic_events else result
+        from functools import partial
+        return ResearchController(self.store, self.artifacts,
+            {key: partial(tracked, handler=handler) for key, handler in implementations.items()})
 
     def select_evidence(self, batch):
         if self.evidence_selector is None:
@@ -132,8 +146,12 @@ class ResearchService:
         original = services.sink
         def record(event, **fields):
             original(event, **fields)
-            resource = self.put('event.json', {'event': event, **fields})
-            self.store.append({'type': 'role-event', 'data': {'artifact_id': resource.artifact_id}})
+            from fruitfly_agent.improvement.stages.controller import active_activity
+            attribution = {'run_id': self.run_id, **(active_activity.get() or {})}
+            resource = self.put('event.json', {**attribution, 'event': event, **fields})
+            self.diagnostic_events.append({'artifact_id': resource.artifact_id})
+            self.store.append({'type': 'role-event', 'data': {**attribution,
+                'role': fields.get('role'), 'artifact_id': resource.artifact_id}})
         services.sink = record
         return services
 

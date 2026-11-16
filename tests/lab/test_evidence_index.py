@@ -155,7 +155,7 @@ class EvidenceIndexTests(unittest.IsolatedAsyncioTestCase):
         workspace = EvidenceWorkspace(baseline=baseline, files={}, writable_ids=())
         services = SimpleNamespace(check=lambda: None, observe=lambda *args: None,
             record=lambda *args, **kwargs: None, signal=asyncio.Event())
-        with self.assertRaisesRegex(RuntimeError, 'evidence_context_budget_exhausted'):
+        with self.assertRaisesRegex(RuntimeError, 'context_overflow'):
             await EvidenceSession(AgentLoopConfig(provider, context_window=100, max_tokens=100), None).session(
                 'Inspect evidence', workspace, services)
         self.assertEqual(provider.calls, [])

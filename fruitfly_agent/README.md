@@ -230,3 +230,15 @@ through Catalog, including when delegation is disabled. The same reduction
 implementations and scoped archive readback serve parent and child loops.
 [Durable work products](lab/agents/work_products/README.md) provide attributed
 checkpoints for ordinary and research collaboration without granting file access.
+
+Working input capacity is independent of model capacity. Core enforces the
+[shared context budget](lab/context_manager/budget/README.md) after every request
+preparation, for all reduction methods and runs without a reducer. Long histories
+can trigger archiving well before the model window fills. Empty Responses
+completion is a Provider failure rather than a successful final answer.
+
+Research roles persist Sessions independently of delegation. Deterministic batch
+statistics preserve unknown denominators and source-declared outcome meaning;
+organization publishes scoped findings and gaps. Proposals retain explicit
+candidate/baseline/evidence decisions without changing activation authority.
+See [independent research](lab/improvement/DEVELOPER_GUIDE.md#consume-investigation-results-and-proposal-decisions).

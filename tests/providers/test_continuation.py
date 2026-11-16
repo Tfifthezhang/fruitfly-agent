@@ -1,4 +1,5 @@
 """Exact response replay survives tools, serialization and a new Provider instance."""
+from fruitfly_agent.lab.context_manager.measurement.budget import MeasurementService
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace as NS
@@ -27,7 +28,7 @@ class ContinuationTests(unittest.IsolatedAsyncioTestCase):
             usage=Usage(input_tokens=5, output_tokens=8, reasoning_tokens=3), continue_turn=True))
         provider.respond(AssistantMessage(content=[TextBlock('answer')], stop_reason='stop',
             usage=Usage(input_tokens=10, output_tokens=4, reasoning_tokens=1)))
-        result = await run_agent_loop(AgentLoopConfig(provider=provider), [UserMessage('task')])
+        result = await run_agent_loop(AgentLoopConfig(provider=provider, context_meter=MeasurementService()), [UserMessage('task')])
         self.assertFalse(result.is_error)
         self.assertEqual(result.messages[-1].text, 'answer')
         self.assertEqual(result.usage.reasoning_tokens, 4)
@@ -41,7 +42,7 @@ class ContinuationTests(unittest.IsolatedAsyncioTestCase):
         for _ in range(2):
             provider.respond(AssistantMessage(content=[TextBlock('working')], stop_reason='stop',
                 usage=Usage(input_tokens=1, output_tokens=2), continue_turn=True))
-        result = await run_agent_loop(AgentLoopConfig(provider=provider, max_turns=2), [UserMessage('task')])
+        result = await run_agent_loop(AgentLoopConfig(provider=provider, max_turns=2, context_meter=MeasurementService()), [UserMessage('task')])
         self.assertTrue(result.is_error)
         self.assertEqual(result.error_details['kind'], 'continuation_limit')
         self.assertIsNone(result.usage.reasoning_tokens)
@@ -244,3 +245,30 @@ class ChatTests(unittest.IsolatedAsyncioTestCase):
             else:
                 self.assertEqual((await provider(view()).result()).stop_reason, 'length')
             self.assertTrue(sdk.exited)
+
+
+class EmptyResponseTests(unittest.IsolatedAsyncioTestCase):
+    async def test_empty_terminal_is_error_with_receipt_and_no_retry(self):
+        for output in (None, [], [{'type': 'reasoning', 'summary': []}]):
+            with self.subTest(output=output):
+                response = NS(output=output, usage=NS(input_tokens=144257, output_tokens=47), status='completed')
+                provider, request = adapter('openai', [SDKStream([NS(type='response.completed', response=response)])])
+                with self.assertRaises(FatalError) as caught:
+                    await provider(view()).result()
+                self.assertEqual('empty_response', caught.exception.details['kind'])
+                self.assertEqual(47, caught.exception.details['usage']['outputTokens'])
+                self.assertEqual(1, request.call_count)
+
+    async def test_historical_fallback_never_becomes_user_input_again(self):
+        from fruitfly_agent.providers.openai_codec import convert_to_openai
+        provider, _ = adapter('openai', [])
+        current = view()
+        empty = AssistantMessage(content=[], stop_reason='stop')
+        legacy = provider._replay.attach(empty, current, [], convert_to_openai(current.messages),
+            [{'role': 'user', 'content': 'Continue.'}])
+        restored = AssistantMessage.from_dict(legacy.to_dict())
+        following = replace(current, messages=[*current.messages, restored, UserMessage('try again')])
+        payload, _, _, _ = provider._prepare_payload(following)
+        self.assertEqual([{'role': 'user', 'content': 'hello'}, {'role': 'user', 'content': 'try again'}], payload['input'])
+        self.assertEqual([{'role': 'user', 'content': 'Continue.'}], restored.provider_state['items'])
+        self.assertEqual([], convert_to_openai([empty], input_fallback=False))

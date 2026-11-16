@@ -1,4 +1,5 @@
 """Status observes prepared projections and receipts without preparing requests."""
+from fruitfly_agent.lab.context_manager.measurement.budget import MeasurementService
 import asyncio
 from dataclasses import replace
 from pathlib import Path
@@ -40,7 +41,7 @@ class ContextStatusTests(unittest.IsolatedAsyncioTestCase):
         provider = FauxProvider(); provider.respond_text('answer')
         events = []
         with tempfile.TemporaryDirectory() as directory, Session(Path(directory) / 'session.jsonl') as durable:
-            session = InteractiveSession(AgentLoopConfig(provider=provider, hooks=hooks, session=durable),
+            session = InteractiveSession(AgentLoopConfig(provider=provider, hooks=hooks, session=durable, context_meter=MeasurementService()),
                 context_pipeline=Reduce(), event_sink=events.append)
             await session.submit('original question')
             activity = [e for e in events if isinstance(e, RunActivityChanged) and e.phase == 'processing_context']
@@ -87,7 +88,7 @@ class ContextStatusTests(unittest.IsolatedAsyncioTestCase):
                 for message in (UserMessage('original question'), AssistantMessage([TextBlock('original answer')])):
                     durable.append('message', {'message': message.to_dict()})
                 durable.append('meta', {'kind': 'fixture'})
-                config = AgentLoopConfig(provider=provider, model='offline', session=durable)
+                config = AgentLoopConfig(provider=provider, model='offline', session=durable, context_meter=MeasurementService())
                 session = InteractiveSession(config, messages=durable.messages(), context_pipeline=pipeline,
                                              event_sink=events.append)
                 await session.submit('first task')
@@ -132,7 +133,7 @@ class ContextStatusTests(unittest.IsolatedAsyncioTestCase):
         provider.script.append(lambda view, signal=None: AssistantMessageEventStream(final_response()))
         tool = AgentTool('pause', 'pause', 'offline barrier', {'type': 'object'}, execute)
         with tempfile.TemporaryDirectory() as directory, Session(Path(directory) / 'session.jsonl') as durable:
-            session = InteractiveSession(AgentLoopConfig(provider=provider, model='offline', session=durable, tools=(tool,)))
+            session = InteractiveSession(AgentLoopConfig(provider=provider, model='offline', session=durable, tools=(tool,), context_meter=MeasurementService()))
             task = asyncio.create_task(session.submit('use the tool'))
             try:
                 await asyncio.wait_for(entered_tool.wait(), timeout=2)
@@ -167,7 +168,7 @@ class ContextStatusTests(unittest.IsolatedAsyncioTestCase):
 
         tool = AgentTool('pause', 'pause', 'offline cancellation barrier', {'type': 'object'}, execute)
         with tempfile.TemporaryDirectory() as directory, Session(Path(directory) / 'session.jsonl') as durable:
-            session = InteractiveSession(AgentLoopConfig(provider=provider, model='offline', session=durable, tools=(tool,)))
+            session = InteractiveSession(AgentLoopConfig(provider=provider, model='offline', session=durable, tools=(tool,), context_meter=MeasurementService()))
             task = asyncio.create_task(session.submit('cancel the tool'))
             try:
                 await asyncio.wait_for(entered_tool.wait(), timeout=2)
@@ -194,16 +195,16 @@ class ContextStatusTests(unittest.IsolatedAsyncioTestCase):
             path = Path(directory) / 'session.jsonl'
             with Session(path) as durable:
                 config = AgentLoopConfig(provider=provider, model='offline', context_window=1000, max_tokens=100,
-                                         session=durable, get_follow_up_messages=follow_up)
+                                         session=durable, get_follow_up_messages=follow_up, context_meter=MeasurementService())
                 session = InteractiveSession(config)
                 await session.submit('two requests')
                 status = session.status
                 self.assertEqual((12, 22, 4), (status.last_input_tokens, status.run_input_tokens, status.run_output_tokens))
-                self.assertIsNone(status.estimated_input_tokens)
+                self.assertEqual(36, status.estimated_input_tokens)
                 before = path.read_bytes()
                 text = CommandRouter().execute(InteractiveCommand('status'), session).text
-                self.assertIn('context usage: [--------------------] 1.2% (reported; last request)', text)
-                self.assertEqual(['context usage: [--------------------] 1.2% (reported; last request)', 'compactions: 0'],
+                self.assertIn('context usage: [--------------------] 3.6% (estimated; last request)', text)
+                self.assertEqual(['context usage: [--------------------] 3.6% (estimated; last request)', 'compactions: 0'],
                                  text.split('pending candidates: 0\n')[1].splitlines())
                 self.assertNotIn('2.2%', text)
                 self.assertEqual(before, path.read_bytes())
@@ -245,19 +246,19 @@ class ContextStatusTests(unittest.IsolatedAsyncioTestCase):
         provider = FauxProvider()
         self.receipt(provider, 30)
         tool = AgentTool('fixture', 'fixture', 'tool schema', {'type': 'object'}, lambda ctx: None)
-        session = InteractiveSession(AgentLoopConfig(provider=provider, model='offline', tools=(tool,), context_window=1000),
+        session = InteractiveSession(AgentLoopConfig(provider=provider, model='offline', tools=(tool,), context_window=1000, max_tokens=100, context_meter=MeasurementService()),
                                      context_pipeline=pipeline)
         await session.submit('original')
         self.assertEqual('augmented prompt', observations[-1].system_prompt)
         self.assertEqual('reduced projection', observations[-1].messages[0].content)
         self.assertEqual((tool,), observations[-1].tools)
         status = session.status
-        self.assertEqual(25, status.estimated_input_tokens)
-        self.assertEqual('reduce: offline exact fixture', status.estimate_source)
+        self.assertEqual(54, status.estimated_input_tokens)
+        self.assertEqual('heuristic_cjk', status.estimate_source)
         before = len(observations)
         for _ in range(3):
             text = CommandRouter().execute(InteractiveCommand('status'), session).text
-        self.assertIn('context usage: [--------------------] 2.5% (estimated; last request)', text)
+        self.assertIn('context usage: [#-------------------] 5.4% (estimated; last request)', text)
         self.assertIn('compactions: 1', text)
         self.assertEqual(before, len(observations))
         self.assertEqual(1, reducer.calls)
@@ -266,12 +267,12 @@ class ContextStatusTests(unittest.IsolatedAsyncioTestCase):
         provider = FauxProvider()
         self.receipt(provider, 10)
         self.receipt(provider, None)
-        session = InteractiveSession(AgentLoopConfig(provider=provider, model='offline'))
+        session = InteractiveSession(AgentLoopConfig(provider=provider, model='offline', context_meter=MeasurementService()))
         await session.submit('known')
         await session.submit('unknown')
         self.assertIsNone(session.status.last_input_tokens)
         self.assertIsNotNone(session.status.receipt_timestamp)
-        self.assertIn('context usage: unknown', CommandRouter().execute(InteractiveCommand('status'), session).text)
+        self.assertIn('(estimated; last request)', CommandRouter().execute(InteractiveCommand('status'), session).text)
 
     async def test_compaction_count_accumulates_restores_and_excludes_cancelled_proposals(self):
         from fruitfly_agent.core.extensions.hooks import BEFORE_COMPACTION, HookRegistry
@@ -296,7 +297,7 @@ class ContextStatusTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'session.jsonl'
             with Session(path) as durable:
-                config = AgentLoopConfig(provider=provider, model='offline', session=durable, hooks=hooks)
+                config = AgentLoopConfig(provider=provider, model='offline', session=durable, hooks=hooks, context_meter=MeasurementService())
                 session = InteractiveSession(config, context_pipeline=pipeline)
                 self.assertEqual(0, session.status.compaction_count)
                 await session.submit('first')
@@ -367,10 +368,10 @@ class ContextStatusTests(unittest.IsolatedAsyncioTestCase):
     async def test_no_reduction_does_not_report_zero_as_estimate(self):
         provider = FauxProvider()
         self.receipt(provider, 10)
-        session = InteractiveSession(AgentLoopConfig(provider=provider), context_pipeline=ContextPipeline())
+        session = InteractiveSession(AgentLoopConfig(provider=provider, context_meter=MeasurementService()), context_pipeline=ContextPipeline())
         await session.submit('no estimator')
-        self.assertIsNone(session.status.estimated_input_tokens)
-        self.assertEqual('', session.status.estimate_source)
+        self.assertEqual(15, session.status.estimated_input_tokens)
+        self.assertEqual('heuristic_cjk', session.status.estimate_source)
 
     async def test_retry_metadata_reaches_frontend_and_persistence_without_claiming_busy(self):
         def provider(view, *, signal=None):
@@ -381,7 +382,7 @@ class ContextStatusTests(unittest.IsolatedAsyncioTestCase):
             return AssistantMessageEventStream(final())
         events = []
         with tempfile.TemporaryDirectory() as directory, Session(Path(directory) / 'session.jsonl') as durable:
-            session = InteractiveSession(AgentLoopConfig(provider=provider, session=durable), event_sink=events.append)
+            session = InteractiveSession(AgentLoopConfig(provider=provider, session=durable, context_meter=MeasurementService()), event_sink=events.append)
             await session.submit('retry')
             retry = next(e for e in events if isinstance(e, RunActivityChanged) and e.phase == 'provider_retrying')
             self.assertEqual((1, 2, 0.25, 503), (retry.attempt, retry.max_attempts, retry.delay_seconds, retry.status_code))

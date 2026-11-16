@@ -1,4 +1,5 @@
 """Actual candidate directories and read results use one ordinary assembler."""
+from fruitfly_agent.lab.context_manager.measurement.budget import MeasurementService
 from copy import deepcopy
 import json
 from pathlib import Path
@@ -30,7 +31,7 @@ class MemorySkillWorkflowTests(unittest.IsolatedAsyncioTestCase):
         if skills is not None:
             changes['skill-library'] = {'documents': canonical_json(skills)}
         resources = []
-        result = assemble_lab(AgentLoopConfig(provider=self.provider, model='fake'), catalog=builtin_catalog(),
+        result = assemble_lab(AgentLoopConfig(provider=self.provider, model='fake', context_meter=MeasurementService()), catalog=builtin_catalog(),
             selections=tuple(selections) + extra,
             context=AssemblyContext(self.root, None, 'fake', lambda *_: self.fail('unexpected auxiliary model'), resource_sink=resources, component_settings={key: {'content': values} for key, values in changes.items()}))
         self.addCleanup(result.config.readable_resources.close)

@@ -314,3 +314,23 @@ state isolation apply to daily, child and research execution.
 
 The [work-products](../agents/work_products/README.md) H owner declares working-file
 tools and editable guidance. Runtime stores and integrity controls remain protected.
+
+## Declare shared context conditions
+
+`H.context-budget` configures the common working input ceiling and reduction
+thresholds through ordinary component documents. Its owner declares controlled
+`context_budget.*` execution fields and uses the common parameter adapter.
+Only trigger/target ratios are candidate editable; the ceiling is protected.
+See [budget ownership and defaults](../context_manager/budget/README.md).
+Reduction implementations cannot bypass final Core admission. Ordinary saves
+preserve references; candidate/export documents freeze effective values.
+
+Research role recovery settings use the existing owner surfaces.
+`improvement-editor.parameters.settings.max_repair_attempts` is configurable and
+frozen but protected from instruction candidate grants. The evidence-selection I
+surface also declares `parameters.settings.sampling_policy` with owner choices
+`balanced` and `rare-first`; ordinary grants, isolated trials and source/resource
+identity apply. Shared evidence error bounds and submission/source validation are
+protected infrastructure. No additional parameter registry or model-role binding
+is introduced. See [editor](../improvement/editor/README.md) and
+[evidence selection](../improvement/evidence_selection/README.md).

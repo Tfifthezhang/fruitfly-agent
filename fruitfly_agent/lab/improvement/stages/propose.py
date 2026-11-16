@@ -33,4 +33,6 @@ async def propose(ports, spec, inputs):
         for candidate in result.candidates:
             ports.proposal.validate(candidate, plan=ports.plan, baseline=baseline, records=request.records)
         return ActivityResult((ports.put('proposal.json', asdict(result)),
+            ports.put('decision.json', asdict(result.decision) if result.decision is not None else
+                {'kind': 'not_reported', 'explanation': 'The registered generator supplied no decision.'}),
             *(r for r in context if r.path == 'selection.json')))

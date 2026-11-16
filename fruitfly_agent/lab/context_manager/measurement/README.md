@@ -64,3 +64,9 @@ use this entry through `new_measurement_scope`. Registered candidate backends
 must likewise reset measurement state between independent trials. Custom
 meters may provide the same method; otherwise their initial object state is copied.
 These lifecycle operations do not add a configuration or optimization target.
+
+Core additionally checks working input occupancy including margin against the
+[shared context budget](../budget/README.md). A valid model-capacity measurement
+does not imply a request fits the smaller working ceiling. Direct Core callers
+must provide a meter; ordinary Lab assembly and independent role runners supply
+one. Missing/unknown measurement cannot authorize a main request.

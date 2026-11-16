@@ -179,3 +179,12 @@ per-record overviews and compact batch rows. They reuse the shared Eval result
 interpretation; missing timestamps remain unknown. This is Agent wall time, not
 container setup/verifier time or the sum of overlapping operation durations.
 Import does not change original reports or official outcomes.
+
+Imported observations declare execution-level acceptance semantics through the
+shared research contract. Official passed/failed map to met/unmet; errors retain
+unknown acceptance regardless of raw reward. A public `diagnostics/outcome.json`
+projection preserves status, eligibility, reward, error, observed Agent duration
+and source identity. It contains no verifier source or private answers.
+Sanitized retained configuration declarations are readable through
+`diagnostics/configuration/`; they do not reconstruct the historical effective
+harness or initial learning state. Generic research remains usable without Eval.

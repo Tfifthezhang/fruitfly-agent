@@ -117,3 +117,11 @@ content and atomically replaces the locator. Parent views inspect the shared
 collaboration scope; child writers access their own namespace. Research role
 repairs reuse a stage-scoped `roles/<role>/shared.work/` store. Working files
 survive failure, but persistence does not authorize automatic execution or reuse.
+
+Research diagnostic manifests bind a run to its event artifacts and terminal
+Session snapshots. These declared dependencies must exist at publication; missing
+required diagnostics fail publication. Bare content identities remain distinct
+from stored resources. Cross-study copying retains diagnostics, while ordinary
+organization input projection excludes `diagnostics/` outputs from model grants.
+Failed runs reference retained diagnostics through their reports; no successful
+bundle is fabricated for a failed activity.

@@ -166,3 +166,11 @@ through normal component documents, not stage-local algorithm copies.
 Evidence supply, stage time and physical context capacity remain separate limits.
 Cross-run reuse of validated organization parts still requires the explicit
 incremental control; working-file persistence alone grants no reuse authority.
+
+Stage allowances retain their current names and scope. Algorithms obtain prompts
+and numeric policy defaults from their registered component resources. Configure
+sampling through the evidence-selection I component and editor recovery through
+the editor component; do not embed either policy into study observations.
+[Proposal decisions](../lab/improvement/editor/README.md#submit-an-explicit-decision)
+and diagnostic manifests are outputs, not stage selectors or implicit permissions.
+There is no configuration-version field or automatic follow-on execution.

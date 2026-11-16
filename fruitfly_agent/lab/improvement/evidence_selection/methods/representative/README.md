@@ -4,7 +4,7 @@
 
 `RepresentativeSelector` reserves successful official controls, prioritizes rare
 signals, and fills task rounds within a case limit and a per-task limit. Signals
-include execution failure, official zero/negative reward, elapsed time, model-call
+include execution failure, source-declared unmet acceptance, elapsed time, model-call
 count, execution tool-start count, execution input/output token thresholds and
 missing diagnostics. Turn/composite usage and reported subtotals never count as
 execution token totals. Receipt completion alone never proves success.
@@ -15,3 +15,10 @@ This is an offline triage heuristic, not a reproduction of a published RSI
 algorithm or proof of a cause. It does not rank raw tokens across incompatible
 accounting scopes. Unknown facts and omitted executions remain explicit. No
 Provider, mutable learning state or external service is required.
+
+Source-declared outcomes determine acceptance signals. Numeric values alone do
+not identify success. `sampling_policy: balanced` covers distinct process/outcome
+strata before rare-signal filling; `rare-first` preserves rare-signal ordering.
+Unscored contrasts remain separate from known successful controls. See the
+[parent guide](../../README.md#balance-distinct-investigation-strata) for controls,
+material scope and isolated candidate checks.

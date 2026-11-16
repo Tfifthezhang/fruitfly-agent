@@ -16,7 +16,6 @@ parameters:
     update_timeout_seconds: 20.0
     memory_tokens: 2048
     update_every_messages: 32
-    switch_ratio: 0.85
     page_char_limit: 24000
     max_pages: 2
     auxiliary_max_tokens: 3072

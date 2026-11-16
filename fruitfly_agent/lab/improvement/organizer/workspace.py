@@ -2,6 +2,7 @@
 from fruitfly_agent.improvement.contracts.components import ComponentDocument, HarnessSnapshot
 from fruitfly_agent.improvement.contracts.versions import canonical_json
 from ..evidence.resources import ReferenceWorkspace
+from ..evidence.access import EvidenceAccess
 from ..evidence.investigation import selected_records, receipt_metadata, selected_materials
 from ..evidence.batch import batch_view, context_observations
 
@@ -38,6 +39,8 @@ def build_workspace(request, artifacts, *, record=None):
     for name, value in batch_view(request.tasks, request.records,
             context_observations(request.context, artifacts), artifacts).items():
         if name == 'executions.json':
+            for summary in value:
+                references['context/summaries/' + summary['run_id'] + '.json'] = artifacts.put(canonical_json(summary).encode())
             for row in value:
                 row['detailed_grant'] = row['run_id'] in {r.run_id for r in records}
                 if not row['detailed_grant']:
@@ -45,11 +48,12 @@ def build_workspace(request, artifacts, *, record=None):
                 if row.get('overview') not in references:
                     row['overview'] = None
         references['context/' + name] = artifacts.put(canonical_json(value).encode())
-    batch = {'overview': 'context/overview.json', 'executions': 'context/executions.json',
+    batch = {'statistics': 'context/statistics.json', 'overview': 'context/overview.json', 'executions': 'context/executions.json',
         'coverage': 'context/coverage.json',
         'selection': 'context/extensions/selection.json' if any(r.path == 'selection.json' for r in request.context) else None, 'tasks': tasks, 'instruction': request.instruction,
         'scope': 'Granted records for reading. Execution status and measurements are observations, not judgments.'}
     references['context/batch.json'] = artifacts.put(canonical_json(batch).encode())
     placeholder = HarnessSnapshot((ComponentDocument('organization', 'organization', 'I', 'organization-v1', ()),))
     return ReferenceWorkspace(artifacts=artifacts, references=references, baseline=placeholder,
-        files={}, writable_ids=(), record=record), batch
+        files={}, writable_ids=(), record=record,
+        access=EvidenceAccess((r.run_id for r in request.records), record=record)), batch

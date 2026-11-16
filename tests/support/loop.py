@@ -31,7 +31,9 @@ def make_tool(name: str = "count", *, terminate: bool = False, execution_mode: s
 
 
 def make_config(provider: FauxProvider, tools=None, **overrides) -> AgentLoopConfig:
+    from fruitfly_agent.lab.context_manager.measurement.budget import MeasurementService
     kwargs = dict(
+        context_meter=MeasurementService(),
         provider=provider,
         model="test-model",
         tools=tools or [],

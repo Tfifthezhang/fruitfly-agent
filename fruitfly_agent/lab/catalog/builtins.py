@@ -1,5 +1,6 @@
 """Compose explicit owner declarations; construction stays with each owner."""
 from .catalog import LabCatalog
+from fruitfly_agent.lab.context_manager.budget.registration import definition as context_budget
 from fruitfly_agent.lab.agents.subagent.registration import definition as subagent
 from fruitfly_agent.lab.agents.work_products.registration import definition as work_products
 from .defaults import declared_defaults
@@ -16,6 +17,6 @@ from fruitfly_agent.lab.improvement.registration import definition as improvemen
 
 def builtin_catalog():
     return LabCatalog(tuple(declared_defaults(d) for d in (
-        instructions(), *environments(), *tools(), *mcp(), *augmentation(),
+        instructions(), context_budget(), *environments(), *tools(), *mcp(), *augmentation(),
         *reduction(), *externalization(), improvement(), subagent(), work_products(),
     )), bootstrap=measurement)

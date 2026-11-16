@@ -63,6 +63,8 @@ stages:
       evidence_characters: 256000
       evidence_responses: 64
     attempt: reuse
+  # Select execute only after candidate-a actually contains a candidate.
+  # Inspect decision.json first; baseline retention/evidence requests have none.
   execute:
     inputs:
       harness: {candidate: candidate-a}

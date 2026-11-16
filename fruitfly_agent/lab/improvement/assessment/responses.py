@@ -3,7 +3,7 @@ import json
 
 
 def reprocess_response(artifacts, response_id, records, supplied_citations):
-    """Do not normalize malformed JSON, move fields, request models or fabricate citations."""
+    """Decode the declared no-choice sentinel; do not repair malformed fields or invent citations."""
     from .methods.model.algorithm import ModelEvaluator
     def unique(pairs):
         values = {}
@@ -12,6 +12,7 @@ def reprocess_response(artifacts, response_id, records, supplied_citations):
                 raise ValueError('duplicate evaluator result field: ' + key)
             values[key] = value
         return values
-    data = json.loads(artifacts.read(response_id).decode('utf-8'), object_pairs_hook=unique)
+    from .submission import normalize_no_choice
+    data = normalize_no_choice(json.loads(artifacts.read(response_id).decode('utf-8'), object_pairs_hook=unique))
     ModelEvaluator.validate(data, records, set(supplied_citations))
     return data

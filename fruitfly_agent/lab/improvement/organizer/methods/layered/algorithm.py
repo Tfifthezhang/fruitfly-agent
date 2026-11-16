@@ -9,8 +9,9 @@ from fruitfly_agent.improvement.contracts.tasks import Resource
 from fruitfly_agent.improvement.contracts.versions import canonical_json, content_hash
 from ...instructions import OrganizerInstructions
 from ...workspace import build_workspace
-from ...findings import validate_findings, FINDING_FIELDS
+from ...findings import validate_findings, FINDING_FIELDS, finding_sources
 from ....evidence.session import EvidenceSession
+from ...publication import publish_investigation
 
 
 class LayeredOrganizer:
@@ -34,7 +35,7 @@ class LayeredOrganizer:
             reference = self.artifacts.put(raw.encode())
             services.record('organization-response', artifact_id=reference)
             data = json.loads(raw)
-            if not isinstance(data, dict) or set(data) != {'sections', 'findings'} or not isinstance(data['sections'], list):
+            if not isinstance(data, dict) or set(data) != {'schema_version', 'sections', 'findings'} or data.get('schema_version') != 2 or not isinstance(data['sections'], list):
                 raise ValueError('organizer must submit sections and findings arrays')
             validate_findings(data['findings'])
             source_rows = []
@@ -49,11 +50,13 @@ class LayeredOrganizer:
                             or source['citation_id'] not in workspace.eligible_paths(source['path'])):
                         raise ValueError(f'sections[{index}].sources: unavailable or unread evidence: {source}')
                     source_rows.append(source)
-            for index, finding in enumerate(data['findings']):
-                for source in finding['sources']:
+            for finding in data['findings']:
+                if (set(finding['run_ids']) | set(finding['control_ids'])) - {r.run_id for r in request.records}:
+                    raise ValueError('finding scope exceeds supplied executions')
+                for source in finding_sources(finding):
                     if (set(source) != {'path', 'citation_id'} or source['path'] not in workspace.paths()
                             or source['citation_id'] not in workspace.eligible_paths(source['path'])):
-                        raise ValueError(f'findings[{index}].sources: unavailable or unread evidence: {source}')
+                        raise ValueError('finding ' + finding['issue_id'] + ' cited unavailable or unread evidence: ' + source['path'])
                     source_rows.append(source)
             accepted = data
         async def submit(ctx):
@@ -65,16 +68,26 @@ class LayeredOrganizer:
         section = {'type': 'object', 'properties': {'title': text, 'summary': text,
             'sources': {'type': 'array', 'items': source}},
             'required': ['title', 'summary', 'sources'], 'additionalProperties': False}
+        fact = {'type': 'object', 'properties': {'text': text,
+            'sources': {'type': 'array', 'items': source}},
+            'required': ['text', 'sources'], 'additionalProperties': False}
+        gap = {'type': 'object', 'properties': {'question': text,
+            'materials': {'type': 'array', 'items': text},
+            'availability': {'type': 'string', 'enum': ['not_read', 'not_granted', 'unavailable', 'unknown']}},
+            'required': ['question', 'materials', 'availability'], 'additionalProperties': False}
         finding = {'type': 'object', 'properties': {
             **{key: text for key in ('issue_id', 'signal')},
-            **{key: {'type': 'array', 'items': text, 'maxItems': 16} for key in ('facts', 'hypotheses', 'counterevidence', 'unknowns')},
-            'sources': {'type': 'array', 'items': source}},
+            'facts': {'type': 'array', 'items': fact, 'maxItems': 16},
+            'unknowns': {'type': 'array', 'items': gap, 'maxItems': 16},
+            **{key: {'type': 'array', 'items': text, 'maxItems': 16}
+                for key in ('hypotheses', 'counterevidence', 'run_ids', 'control_ids')},
+            'status': {'type': 'string', 'enum': ['ready_for_proposal', 'needs_evidence', 'not_supported']}},
             'required': list(FINDING_FIELDS), 'additionalProperties': False}
         tool = AgentTool(name='submit_organization', label='Submit readable view',
             description='Submit sourced facts, testable hypotheses, counterevidence and unknowns; no candidate edits.',
-            parameters={'type': 'object', 'properties': {'sections': {'type': 'array', 'items': section},
+            parameters={'type': 'object', 'properties': {'schema_version': {'type': 'integer', 'enum': [2]}, 'sections': {'type': 'array', 'items': section},
                     'findings': {'type': 'array', 'items': finding, 'maxItems': 16}},
-                'required': ['sections', 'findings'], 'additionalProperties': False}, execute=submit, requires_exclusive_batch=True)
+                'required': ['schema_version', 'sections', 'findings'], 'additionalProperties': False}, execute=submit, requires_exclusive_batch=True)
         mission = self.instructions.organize
         if request.instruction.strip():
             mission += '\n\nInvocation requirements:\n' + request.instruction
@@ -84,7 +97,8 @@ class LayeredOrganizer:
             initial_content=canonical_json({'batch_path': 'context/batch.json', 'task_count': len(request.tasks)}))
         if accepted is None:
             raise ValueError('organizer did not submit a view')
-        values = {'batch.json': batch, 'guide.json': accepted,
+        values = {**publish_investigation(accepted, workspace, request.records),
+            'batch.json': batch, 'guide.json': accepted,
             'parts.json': {'parts': list(workspace.retained_parts.values()),
                 'scope': 'Selected/new child findings; directory coverage is not full original reading.'},
             'sources.json': {'sources': source_rows, 'scope': 'Derived summaries do not certify downstream original reading.'}}

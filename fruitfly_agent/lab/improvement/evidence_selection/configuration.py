@@ -21,9 +21,14 @@ class SelectionSettings:
     many_tools: int = default('many_tools')
     high_tokens: int = default('high_tokens')
     material_policy: str = default('material_policy')
+    sampling_policy: str = default('sampling_policy')
 
     def __post_init__(self):
         for key, value in asdict(self).items():
+            if key == 'sampling_policy':
+                if value not in ('balanced', 'rare-first'):
+                    raise ValueError('invalid evidence sampling policy')
+                continue
             if key == 'material_policy':
                 if value not in ('focused', 'all-granted'):
                     raise ValueError('invalid evidence material policy')

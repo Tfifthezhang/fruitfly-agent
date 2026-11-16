@@ -37,3 +37,10 @@ Use [Core contracts](../../core/context/README.md) and [Catalog registration](..
 
 [Memory resources](resources/README.md) provide session-scoped public history and immutable artifacts for both reduction methods. They are infrastructure, not a selectable context stage.
 [registration.py](registration.py) supplies typed parameter declarations without a discovery registry.
+
+## Configure one working input budget
+
+[Context budget](budget/README.md) owns shared H thresholds and configuration.
+Core enforces its ceiling across layered compaction, working memory and requests
+without reduction. [Reduction](reduction/README.md) owns how evidence is retained,
+not whether a final request may exceed the shared working capacity.

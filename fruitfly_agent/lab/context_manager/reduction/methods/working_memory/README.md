@@ -11,10 +11,11 @@ alias there for an independent memory model. Inheritance follows changes to the
 executor while explicit overrides remain fixed. The resolved model identity
 participates in checkpoint policy identity.
 
-Periodic maintenance begins only at `maintenance_ratio` of the available input
-budget (default 0.5). The first eligible update starts immediately; subsequent
+Periodic maintenance begins at `maintenance_ratio` of the
+[shared working input allowance](../../../budget/README.md) (default 0.5).
+The allowance is bounded independently of the model's advertised context window. The first eligible update starts immediately; subsequent
 updates require 32 new canonical messages by default. Catch-up pages continue an
-existing frozen evidence boundary. At `switch_ratio` (default 0.85), or on overflow,
+existing frozen evidence boundary. At the shared `trigger_ratio` (default 0.75), or on overflow,
 maintenance can bypass the message interval, but never the failed-page cooldown.
 Merge previous memory with sequential new evidence pages. Prompts
 `instructions.update`, `instructions.shrink` and `instructions.readback` are
@@ -33,7 +34,7 @@ memory or policy has a distinct fingerprint. State-only decisions never claim a
 projection reduction or overflow recovery.
 Clearing requires full coverage, a fitting smaller projection and permission to
 rebase Provider continuation. The projection contains the first user task and
-the memory artifact; subsequent events append normally. User corrections are
+the memory artifact and up to three latest user inputs; subsequent events append normally. User corrections are
 inputs to memory updates and remain available in canonical history.
 
 A checkpoint records exact policy identity, immutable memory hash and source
@@ -43,7 +44,7 @@ before continuation. A changed policy rebuilds from canonical evidence rather
 than attributing old state to the candidate. Fresh trials use fresh Session and
 artifact scopes. Memory is task-local execution state, never automatically S.
 
-H candidates may tune the prompts, memory size, update frequency, switch ratio,
+H candidates may tune the prompts, memory size, update frequency, maintenance ratio,
 pages, auxiliary output/attempt limits and timeout. Outer budgets, coverage and
 integrity rules remain protected. Counting is conservative unless a supported
 exact Provider counter is selected; bounded text does not prove factual fidelity.
@@ -74,3 +75,18 @@ references follow it on fresh assembly; complete frozen candidates keep their
 selected values. Improvement edits `parameters.yaml` through the same grants and
 owner validation for prompts and numbers. Model roles, integrity checks and
 state/reset/recovery rules retain their existing protected owners.
+
+## Satisfy the final request budget
+
+This method does not own a `switch_ratio`; switching uses `H.context-budget`.
+Complete evidence coverage remains mandatory. If an update only advances its
+checkpoint, Core may perform bounded catch-up while over the working ceiling.
+Incomplete coverage, cooldown, provider failure or a non-rebasable prefix never
+authorizes dropping evidence or sending an oversized main request. Core reports
+`context_budget_exhausted` when preparation cannot produce an admissible request.
+The memory target and pinned user inputs can prevent a fit even when maintenance
+succeeded; auxiliary success alone does not establish request admission.
+
+The effective memory text limit is the smaller of `memory_tokens` and the shared
+reduction target. Pinned user input and request framing also consume capacity;
+meeting the text limit does not guarantee a fitting final request.

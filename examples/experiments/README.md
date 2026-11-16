@@ -59,3 +59,11 @@ The system file still owns H/S/I and shared model definitions. `models.roles` se
 stage aliases in that system profile. Credentials stay outside configuration/report
 files. Paths resolve from their declaring document. Generic file tasks need an
 explicit registered backend; they do not install a local task executor.
+
+
+Before selecting a published proposal for execution, inspect `decision.json` and
+`proposal.json`. A built-in retain-baseline or needs-evidence result has no new
+candidate. Choose an explicit baseline configuration to run the baseline; requested
+materials do not grant access or trigger another stage. Organization publishes a
+compact index, per-issue details and reading coverage alongside its guide. Hosted
+research Sessions are retained with delegation enabled or disabled.

@@ -103,7 +103,8 @@ class ModelEvaluator:
                     result[key] = value
                 return result
             try:
-                data = json.loads(raw, object_pairs_hook=unique)
+                from ...submission import normalize_no_choice
+                data = normalize_no_choice(json.loads(raw, object_pairs_hook=unique))
                 self.validate(data, records, supplied | workspace.eligible_ids)
             except (ValueError, TypeError, KeyError) as exc:
                 rejection_id = self.artifacts.put(canonical_json({

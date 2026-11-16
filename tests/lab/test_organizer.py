@@ -53,9 +53,10 @@ class OrganizerTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn('Invocation requirements:\nKeep the guide compact for this invocation.', view.system_prompt)
             tool_result = json.loads(view.messages[-1].text)
             source = {'path': 'context/batch.json', 'citation_id': tool_result['citation_id']}
-            guide = {'findings': [{'issue_id': 'missing-diagnostics', 'signal': 'Unknown execution diagnostics',
-                'facts': ['One retained execution'], 'hypotheses': ['Collection may be incomplete'],
-                'counterevidence': [], 'unknowns': ['No terminal reason supplied'], 'sources': [source]}], 'sections': [{'title': 'Candidate view' if 'CANDIDATE GUIDE' in view.system_prompt else 'Task view',
+            guide = {'schema_version': 2, 'findings': [{'issue_id': 'missing-diagnostics', 'signal': 'Unknown execution diagnostics',
+                'facts': [{'text': 'One retained execution', 'sources': [source]}], 'hypotheses': ['Collection may be incomplete'],
+                'counterevidence': [], 'unknowns': [{'question': 'Terminal reason?', 'materials': [], 'availability': 'unknown'}],
+                'run_ids': [record.run_id], 'control_ids': [], 'status': 'needs_evidence'}], 'sections': [{'title': 'Candidate view' if 'CANDIDATE GUIDE' in view.system_prompt else 'Task view',
                 'summary': 'One retained execution; inspect the output.',
                 'sources': [{'path': 'context/batch.json', 'citation_id': tool_result['citation_id']}]}]}
             async def events():
@@ -81,6 +82,13 @@ class OrganizerTests(unittest.IsolatedAsyncioTestCase):
                 document = json.loads(artifacts.read(guide.artifact_id))
                 titles.append(document['sections'][0]['title'])
                 self.assertEqual('missing-diagnostics', document['findings'][0]['issue_id'])
+                retained = {resource.path: json.loads(artifacts.read(resource.artifact_id)) for resource in view.resources}
+                self.assertEqual(2, retained['organization/index.json']['schema_version'])
+                self.assertEqual(1, retained['organization/coverage.json']['selected_count'])
+                self.assertIn('context/batch.json', retained['organization/coverage.json']['direct_reading']['paths'])
+                detail = retained['organization/findings/missing-diagnostics.json']
+                self.assertEqual('One retained execution', detail['facts'][0]['text'])
+                self.assertEqual('needs_evidence', detail['status'])
                 self.assertTrue(any(fields.get('role') == 'organizer' for _, fields in services.events))
         self.assertEqual(titles, ['Task view', 'Candidate view'])
         self.assertEqual(record.output, '\n'.join(c.files[0].text for c in baseline.components))

@@ -1,4 +1,5 @@
 """Complete offline attachment, media saving, queueing and recovery paths."""
+from fruitfly_agent.lab.context_manager.measurement.budget import MeasurementService
 import asyncio
 import io
 import tempfile
@@ -75,7 +76,7 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
             provider = FauxProvider()
             provider.respond_text('text works')
             with Session(path) as durable:
-                session = InteractiveSession(AgentLoopConfig(provider=provider, session=durable), vision=False)
+                session = InteractiveSession(AgentLoopConfig(provider=provider, session=durable, context_meter=MeasurementService()), vision=False)
                 with self.assertRaisesRegex(ValueError, 'vision model'):
                     await session.submit([image()])
                 self.assertEqual(durable.messages(), [])
@@ -93,7 +94,7 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
             steering = await config.get_steering_messages(None)
             seen.extend([steering] if steering else [])
             return AgentLoopResult([*messages, *steering], 'stop')
-        session = InteractiveSession(AgentLoopConfig(provider=FauxProvider()), run_loop=loop)
+        session = InteractiveSession(AgentLoopConfig(provider=FauxProvider(), context_meter=MeasurementService()), run_loop=loop)
         app = AgentApplication(_Factory([session]))
         await app.start()
         try:
@@ -114,7 +115,7 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
     async def test_terminal_image_reference_and_retired_commands(self):
         provider = FauxProvider()
         provider.respond_text('seen')
-        session = InteractiveSession(AgentLoopConfig(provider=provider), load_attachment=lambda _: image())
+        session = InteractiveSession(AgentLoopConfig(provider=provider, context_meter=MeasurementService()), load_attachment=lambda _: image())
         output = io.StringIO()
         frontend = TerminalFrontend(session, input_stream=io.StringIO(
             '@"image with spaces.png"\n/exit\n'), output_stream=output)
@@ -173,7 +174,7 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
                 provider = FauxProvider()
                 provider.respond_tool_call('write', {'resource_id': resource, 'path': 'candidate.png'})
                 provider.respond_text('done')
-                candidate = assemble_lab(AgentLoopConfig(provider=provider), catalog=builtin_catalog(),
+                candidate = assemble_lab(AgentLoopConfig(provider=provider, context_meter=MeasurementService()), catalog=builtin_catalog(),
                     selections=(MechanismSelection('local-env'),
                         MechanismSelection('write-tool', parameters={'description': instructions})),
                     context=AssemblyContext(root, session, 'offline', lambda *args: None, media_reader=media.read))
@@ -188,7 +189,7 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
     async def test_pending_attachment_draft_survives_rejection_and_clears_on_session_switch(self):
         from dataclasses import replace
         from fruitfly_agent.interactive.contracts.commands import CommandResult
-        session = InteractiveSession(AgentLoopConfig(provider=FauxProvider()), load_attachment=lambda _: image())
+        session = InteractiveSession(AgentLoopConfig(provider=FauxProvider(), context_meter=MeasurementService()), load_attachment=lambda _: image())
         output = io.StringIO()
         frontend = TerminalFrontend(session, input_stream=io.StringIO(
             'inspect @image.png\n\n/resume other\n/exit\n'), output_stream=output)
@@ -238,7 +239,7 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
             entered.set()
             await signal.wait()
             return AgentLoopResult(list(messages), 'aborted')
-        session = InteractiveSession(AgentLoopConfig(provider=FauxProvider()), run_loop=loop,
+        session = InteractiveSession(AgentLoopConfig(provider=FauxProvider(), context_meter=MeasurementService()), run_loop=loop,
             register_media=lambda *args: registered.append(args))
         app = AgentApplication(_Factory([session]))
         await app.start()
@@ -286,7 +287,7 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
                 provider = FauxProvider()
                 provider.respond_tool_call('capture', {})
                 provider.respond_text('seen')
-                config = retain_tool_media(AgentLoopConfig(provider=provider, tools=[tool]), media)
+                config = retain_tool_media(AgentLoopConfig(provider=provider, tools=[tool], context_meter=MeasurementService()), media)
                 result = await run_agent_loop(config, [UserMessage('capture')])
                 self.assertFalse(result.is_error)
                 record = next(m for m in result.messages if m.role == 'toolResult')
@@ -309,7 +310,7 @@ class MultimodalTests(unittest.IsolatedAsyncioTestCase):
                 services = NS(check=lambda: None, observe=lambda *args: None,
                     record=lambda *args, **kwargs: None, signal=asyncio.Event())
                 workspace = EvidenceWorkspace(baseline=fixture()[1], files={'input': data}, writable_ids=())
-                result = await EvidenceSession(AgentLoopConfig(provider=provider), None).session(
+                result = await EvidenceSession(AgentLoopConfig(provider=provider, context_meter=MeasurementService()), None).session(
                     'Inspect media', workspace, services)
                 self.assertEqual(result, 'checked')
                 tool = next(m for m in provider.calls[-1]['messages'] if m.role == 'toolResult')

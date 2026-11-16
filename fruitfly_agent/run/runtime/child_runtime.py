@@ -33,7 +33,9 @@ class ChildRuntimeFactory:
             mechanisms=(), prompt='assistant-default', artifact_bindings={}, artifact_contents={},
             component_settings={}, execution={}, configured=False), self.catalog)
         # Core execution limits remain host conditions, independent of component selection.
-        restricted = replace(restricted, execution=dict(self.profile.execution))
+        from fruitfly_agent.lab.catalog import resolve_execution_conditions
+        conditions = resolve_execution_conditions(self.profile, self.catalog)
+        restricted = replace(restricted, execution=conditions)
         async def prepare(identity, model_alias, excluded):
             return await self._prepare(identity, model_alias, excluded, restricted)
         return prepare

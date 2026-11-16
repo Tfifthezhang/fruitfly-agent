@@ -28,7 +28,7 @@ class ParameterDefaultTests(unittest.IsolatedAsyncioTestCase):
         self.raw = {'default_profile': 'test', 'profiles': {'test': {
             'models': {'catalog': 'models.yaml', 'roles': {'executor': 'offline'}},
             'H': {name: {'default': True} for name in
-                  ('local-env', 'read-tool', 'base_prompt', 'layered-compaction')},
+                  ('local-env', 'read-tool', 'base_prompt', 'layered-compaction', 'context-budget')},
             'S': {}, 'I': {name: {'default': True} for name in
                            ('improvement-editor', 'improvement-evaluator')}}}}
         self.write()
@@ -46,7 +46,7 @@ class ParameterDefaultTests(unittest.IsolatedAsyncioTestCase):
                 value = yaml.safe_load(data)
                 value['parameters']['instructions']['system'] = 'Updated owner instructions.'
                 return yaml.safe_dump(value).encode()
-            if package.endswith('.layered_compaction') and resource == 'defaults.yaml':
+            if package == 'fruitfly_agent.core.context' and resource == 'defaults.yaml':
                 value = yaml.safe_load(data)
                 value['parameters']['settings']['trigger_ratio'] = .8
                 return yaml.safe_dump(value).encode()
@@ -69,7 +69,7 @@ class ParameterDefaultTests(unittest.IsolatedAsyncioTestCase):
                 self.assertFalse(result.is_error)
                 reducer = runtime.components['layered-compaction-state']
                 base = provider.calls[0]['system_prompt'].rstrip()
-                return base, reducer.config.trigger_ratio
+                return base, runtime.config.context_budget.trigger_ratio
             finally:
                 for resource in reversed(owned):
                     closer = getattr(resource, 'aclose', None) or getattr(resource, 'close', None)
@@ -91,7 +91,7 @@ class ParameterDefaultTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn('Updated owner instructions.', prompt)
             self.assertEqual(ratio, .8)
             rows = configuration_inventory(profile, builtin_catalog())
-            row = next(row for row in rows if row['id'] == 'layered-compaction')
+            row = next(row for row in rows if row['id'] == 'context-budget')
             self.assertEqual(row['source_kind'], 'default')
             self.assertFalse(row['fields']['parameters.settings.trigger_ratio']['configured'])
 
@@ -173,6 +173,7 @@ class ParameterDefaultTests(unittest.IsolatedAsyncioTestCase):
         snapshot = capture_source_tree(Path(__file__).resolve().parents[2])
         paths = {entry.path for entry in snapshot.files}
         self.assertIn('fruitfly_agent/lab/base_prompt/defaults.yaml', paths)
+        self.assertIn('fruitfly_agent/core/context/defaults.yaml', paths)
         self.assertIn('fruitfly_agent/improvement/contracts/defaults.yaml', paths)
         self.assertIn('fruitfly_agent/lab/improvement/assessment/methods/model/defaults.yaml', paths)
         self.assertIn('fruitfly_agent/lab/improvement/editor/methods/workspace/defaults.yaml', paths)
@@ -188,6 +189,9 @@ from fruitfly_agent.lab.catalog.defaults import read_default
 from fruitfly_agent.lab.context_manager.reduction.methods.working_memory import config
 assert Path(config.__file__).is_relative_to(root)
 assert config.WorkingMemoryConfig().maintenance_ratio == .5
+from fruitfly_agent.core.context.budget import ContextBudget
+assert ContextBudget().max_input_tokens == 65536
+assert Path(sys.modules[ContextBudget.__module__].__file__).is_relative_to(root)
 from fruitfly_agent.improvement.contracts.plans import StageTimeouts
 from fruitfly_agent.lab.improvement.editor import AgentEditor
 from fruitfly_agent.lab.improvement.assessment import ModelEvaluator
@@ -217,6 +221,14 @@ assert composer.Composer(None).prepare('text') == 'text'
         result = subprocess.run([sys.executable, '-I', '-B', '-c', code, str(frozen)],
                                 cwd=self.root, capture_output=True, text=True, timeout=20)
         self.assertEqual(result.returncode, 0, result.stderr)
+        budget_resource = frozen / 'fruitfly_agent/core/context/defaults.yaml'
+        budget_bytes = budget_resource.read_bytes()
+        budget_resource.unlink()
+        missing_budget = subprocess.run([sys.executable, '-I', '-B', '-c', code, str(frozen)],
+                                       cwd=self.root, capture_output=True, text=True, timeout=20)
+        self.assertNotEqual(missing_budget.returncode, 0)
+        self.assertIn('defaults.yaml', missing_budget.stderr)
+        budget_resource.write_bytes(budget_bytes)
         (frozen / 'fruitfly_agent/lab/base_prompt/defaults.yaml').unlink()
         missing = subprocess.run([sys.executable, '-I', '-B', '-c', code, str(frozen)],
                                  cwd=self.root, capture_output=True, text=True, timeout=20)

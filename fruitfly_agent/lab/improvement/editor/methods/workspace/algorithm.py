@@ -73,10 +73,14 @@ class AgentEditor:
         while True:
             services.check()
             attempt += 1
+            if attempt > self.options.max_repair_attempts:
+                raise RuntimeError('editor_repair_exhausted: no valid proposal decision')
             response = ''
             try:
                 response = await self.session(mission, workspace, services, submit=seal)
-                return sealed if sealed is not None else submission(response, workspace, request, self.components)
+                candidate = sealed if sealed is not None else submission(response, workspace, request, self.components)
+                services.retain_proposal_decision(workspace.proposal_decision)
+                return candidate
             except IntegrityError:
                 raise
             except EvidenceUnavailable as exc:

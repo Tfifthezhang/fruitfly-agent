@@ -42,3 +42,30 @@ class ExecutionSummaryTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('PRIVATE_OUTPUT', text)
         self.assertNotIn('large-directory', text)
         self.assertLess(len(text), 2000)
+
+    def test_statistics_keep_unknown_denominators_and_source_declared_outcomes(self):
+        from fruitfly_agent.lab.improvement.evidence.statistics import batch_statistics
+        rows = [
+            {'status': 'completed', 'observations': [{'name': 'loss', 'value': 0,
+                'semantics': {'outcome': 'met', 'direction': 'lower'}}], 'counters': {'tool_denied': 0}},
+            {'status': 'error', 'observations': [{'name': 'score', 'value': 100,
+                'semantics': {'outcome': 'unknown'}}], 'counters': {}},
+            {'status': 'completed', 'observations': [{'name': 'accuracy', 'value': .1,
+                'semantics': {'outcome': 'unmet', 'direction': 'higher'}}], 'counters': {}}]
+        result = batch_statistics(rows, [{'name': 'environment', 'value': 'fixture'}])
+        self.assertEqual(3, result['population_count'])
+        self.assertEqual({'population_count': 3, 'known_count': 1, 'unknown_count': 2,
+            'counts': {'0': 1}}, result['counters']['tool_denied'])
+        self.assertEqual(1, result['outcomes']['unknown_count'])
+        self.assertEqual({'met': 1, 'unmet': 1}, result['outcomes']['counts'])
+        self.assertEqual('environment', result['batch_observations'][0]['name'])
+
+    def test_inspection_distinguishes_search_from_read_and_merges_unicode_ranges(self):
+        from fruitfly_agent.lab.improvement.evidence.access import EvidenceAccess
+        access = EvidenceAccess()
+        access.provided('text', 'abc', offset=0, reading_kind='search')
+        access.provided('text', 'é中文', offset=2)
+        access.provided('text', 'de', offset=4)
+        reading = access.inspection()['paths']['text']
+        self.assertEqual([(0, 3)], reading['search'])
+        self.assertEqual([(2, 6)], reading['read'])

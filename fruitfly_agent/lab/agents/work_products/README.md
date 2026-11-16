@@ -38,7 +38,9 @@ read/directory defaults and the context-pressure threshold. `improvement.py` adm
 ordinary parameter candidate path. Integrity, producer permissions, schemas and
 revision checks are protected. The Python contracts bound text to 120000
 characters and read pages to 24000. A pressure hook requests a checkpoint and
-integration before further material expansion; it does not invent task findings.
+integration before further material expansion. Pressure uses the shared working
+input budget, output reserve and measurement margin, even when the model window
+is much larger. It does not invent task findings.
 Read/list/patch schemas become visible after saved products exist, keeping an
 empty runtime request compact. The Run store owns disk persistence; Lab owns
 tool behavior. Selected restricted roles use the same installer as daily Agents.

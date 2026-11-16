@@ -90,3 +90,8 @@ the same final validator. Rejected fields can be patched without retransmitting
 the complete document. Direct Lab embeddings without a prepared host retain
 minimal execution and record `role-runtime-mode`; they do not inherit ambient
 configuration or claim an installed context policy.
+
+Direct tool calls, saved JSON submissions, final text and offline response
+reprocessing decode the declared empty-string no-choice sentinel to `null`
+before applying the same judgment validator. Missing fields, unknown choices
+and unread citations remain errors.

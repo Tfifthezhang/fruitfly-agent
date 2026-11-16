@@ -39,6 +39,7 @@ class StageServices:
         self.interrupted_records = []
         self.evidence_builder = None
         self.hypotheses = {}
+        self.proposal_decision = None
         self.supervisor = OperationSupervisor(cleanup_error=CleanupError)
 
     def own(self, resource):
@@ -90,6 +91,13 @@ class StageServices:
         if clock is not None and clock.owner is self:
             clock.check()
 
+    def retain_proposal_decision(self, decision):
+        from ..contracts.editing import ProposalDecision
+        if not isinstance(decision, ProposalDecision):
+            raise TypeError('expected a proposal decision')
+        self.proposal_decision = decision
+        self.record('proposal-decision', decision=asdict(decision))
+
     def retain_execution(self, record):
         self.interrupted_records.append(record)
         self.record('execution-interrupted', receipt=asdict(record))
@@ -130,6 +138,7 @@ class StageServices:
         self.check()
         if self.editor is None:
             raise ValueError('this generator requires an editor capability')
+        self.proposal_decision = None
         return await self.editor(stage, request, self)
 
     async def complete(self, system, prompt):
@@ -182,6 +191,10 @@ class GeneratorServices:
     """A generator may edit and record; it cannot execute, verify or activate."""
     def __init__(self, services):
         self.services = services
+
+    @property
+    def proposal_decision(self):
+        return self.services.proposal_decision
 
     def check(self):
         self.services.check()

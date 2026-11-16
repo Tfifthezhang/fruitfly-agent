@@ -314,9 +314,18 @@ class OpenAIProvider(MediaInput):
         if output is None:
             if thoughts:
                 message = replace(message, content=[ThinkingBlock(''.join(thoughts)), *message.content])
-            output = convert_to_openai([message])
+            output = convert_to_openai([message], input_fallback=False)
             if thoughts:
                 output.insert(0, {'type': 'reasoning', 'content': [{'type': 'reasoning_text', 'text': ''.join(thoughts)}]})
+        usable = bool(message.text.strip() or message.tool_calls or message.continue_turn)
+        server_work = any(item.get('type') in _SERVER_ITEMS for item in wire_value(output or []))
+        if message.stop_reason != 'length' and not usable and not server_work:
+            raise FatalError('Responses terminal response contains no usable content', details={
+                'kind': 'empty_response', 'usage': message.usage.to_dict() if message.usage else None,
+                'diagnostics': {'phase': 'assemble', 'failure_category': 'empty_response',
+                    'evidence_kind': 'runtime_rule', 'output_items': len(output or []),
+                    'text_deltas': len(text_parts), 'tool_calls': len(calls),
+                    'status': str(getattr(completed, 'status', 'unknown'))[:80]}})
         message = self._replay.attach(message, effective, tools, prefix, wire_value(output))
         yield StreamDone(result=message)
 

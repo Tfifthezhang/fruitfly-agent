@@ -113,7 +113,7 @@ def resolve_harness(profile, catalog, *, tool_providers=None):
     mechanisms = tuple({'id': item.definition.descriptor.mechanism_id, 'parameters': dict(item.parameters),
         'implementation_id': item.definition.implementation_id} for item in resolved)
     from .configuration import configuration_surfaces
-    return ResolvedHarness(profile.profile_id, mechanisms, tuple(sorted(tools)), execution_values(profile.execution),
+    return ResolvedHarness(profile.profile_id, mechanisms, tuple(sorted(tools)), resolve_execution_conditions(profile, catalog),
         tuple(components[key] for key in sorted(components)), tuple(sorted(owners.items())), tuple(sorted(controlled.items())),
         dict(profile.component_settings), catalog.extension_identities)
 
@@ -166,3 +166,25 @@ def runtime_component_entries(profile, catalog, targets):
                 'parameters': target.parameter_values(snapshot.text)})
             known.add(snapshot.target_id)
     return tuple(entries)
+
+
+def resolve_execution_conditions(profile, catalog):
+    """Project registered shared execution policies without constructing resources."""
+    from fruitfly_agent.runtime_spec.execution import flatten_execution, validate_execution
+    values = execution_values(profile.execution)
+    owners: set[str] = set()
+    for item in catalog.resolve(profile.mechanisms):
+        definition = item.definition
+        if definition.execution_projection is None:
+            continue
+        if owners & definition.execution_fields:
+            raise ValueError('multiple owners project the same execution field')
+        owners.update(definition.execution_fields)
+        supplied = validate_execution(definition.execution_projection(item.parameters))
+        candidate = execution_values({**values, **supplied})
+        before, after = flatten_execution(values), flatten_execution(candidate)
+        changed = {key for key in after if before[key] != after[key]}
+        if changed - definition.execution_fields:
+            raise ValueError('owner projected undeclared execution conditions')
+        values = candidate
+    return values

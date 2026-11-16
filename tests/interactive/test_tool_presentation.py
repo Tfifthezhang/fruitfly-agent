@@ -1,5 +1,6 @@
 """Tool-owned descriptions and actual outcomes reach every frontend offline."""
 
+from fruitfly_agent.lab.context_manager.measurement.budget import MeasurementService
 import asyncio
 from contextlib import asynccontextmanager
 from dataclasses import replace
@@ -29,6 +30,7 @@ class ToolPresentationTests(unittest.IsolatedAsyncioTestCase):
         provider.respond_tool_call(tool.name, {'path': 'README.md'} if args is None else args)
         provider.respond_text('done')
         events = []
+        config.setdefault('context_meter', MeasurementService())
         session = InteractiveSession(AgentLoopConfig(provider=provider, tools=(tool,), **config), event_sink=events.append)
         result = await session.submit('inspect')
         return session, events, result
@@ -94,7 +96,7 @@ class ToolPresentationTests(unittest.IsolatedAsyncioTestCase):
         events = []
         session = InteractiveSession(AgentLoopConfig(provider=provider,
             tools=(self.tool(), replace(self.tool(execute=slow), name='slow', label='Wait for resource')),
-            tool_execution=ToolExecutionConfig(max_parallel=2)), event_sink=events.append)
+            tool_execution=ToolExecutionConfig(max_parallel=2), context_meter=MeasurementService()), event_sink=events.append)
         task = asyncio.create_task(session.submit('run'))
         await asyncio.wait_for(entered.wait(), 1)
         session.cancel()
@@ -194,12 +196,41 @@ class ToolPresentationTests(unittest.IsolatedAsyncioTestCase):
         calls = []
         def output(handle, *, offset=0):
             calls.append((handle, offset))
-            return '\x1b[31mretained output'
+            return '\x1b[31mretained output\n  indented output'
         handler = operations_handler(lambda: SimpleNamespace(output=output))
         result = await handler(InteractiveCommand('operations', ('command-test', '3')))
         self.assertEqual(calls, [('command-test', 3)])
-        self.assertIn('retained output', result.text)
+        self.assertIn('retained output\n  indented output', result.text)
+        self.assertIsNone(result.panel)
         self.assertNotIn('\x1b', result.text)
+
+    async def test_operations_snapshot_groups_counts_and_preserves_output_preview(self):
+        from types import SimpleNamespace
+        from fruitfly_agent.interactive.contracts.operations import OperationStatus
+        from fruitfly_agent.interactive.contracts.commands import InteractiveCommand
+        from fruitfly_agent.interactive.terminal.features.operations import operations_handler
+        calls = []
+        values = (OperationStatus('full-handle', 'running', 62., 'run', 'call',
+                                  'Inspect exports', 'old\nfirst\nsecond\nlast\x1b[2J'),
+                  OperationStatus('other', 'failed', 2., 'run', 'call'))
+        def statuses():
+            calls.append('statuses')
+            return values
+        result = await operations_handler(lambda: SimpleNamespace(statuses=statuses))(
+            InteractiveCommand('operations'))
+        self.assertEqual(calls, ['statuses'])
+        self.assertEqual(dict(result.panel.sections[0].rows), {'Operations': '2'})
+        self.assertEqual(dict(result.panel.sections[1].rows), {'running': '1', 'failed': '1'})
+        task = dict(result.panel.sections[2].rows)
+        self.assertEqual(task['Handle'], 'full-handle')
+        self.assertEqual(task['Elapsed'], '1m 2s')
+        self.assertEqual([task[f'Output {i}'] for i in (1, 2, 3)], ['first', 'second', 'last\x1b[2J'])
+        self.assertNotIn('\x1b', result.text)
+        self.assertIn('No description supplied.', result.text)
+        empty = await operations_handler(lambda: SimpleNamespace(statuses=lambda: ())) (
+            InteractiveCommand('operations'))
+        self.assertEqual(dict(empty.panel.sections[0].rows), {'Operations': '0'})
+        self.assertIn('No background operations', empty.text)
 
     async def test_operations_command_lists_and_cancels_through_optional_binding(self):
         from types import SimpleNamespace
@@ -211,14 +242,16 @@ class ToolPresentationTests(unittest.IsolatedAsyncioTestCase):
                 raise ValueError('unknown handle')
             values[0] = replace(values[0], state='cancelled')
             return values[0]
-        session = InteractiveSession(AgentLoopConfig(provider=FauxProvider(), tools=()))
+        session = InteractiveSession(AgentLoopConfig(provider=FauxProvider(), tools=(), context_meter=MeasurementService()))
         bindings = replace(TerminalBindings.from_session(session), operations=lambda: SimpleNamespace(
             statuses=lambda: tuple(values), cancel=cancel))
         output = io.StringIO()
         frontend = TerminalFrontend(session, bindings=bindings, output_stream=output, input_stream=io.StringIO(),
             line_editor=ScriptedLines('/operations', '/operations cancel missing', '/operations cancel command-test', '/exit'))
         await frontend.run()
-        self.assertIn('command-test · running · 2.0s', output.getvalue())
+        self.assertIn('Task 1 · running', output.getvalue())
+        self.assertIn('command-test', output.getvalue())
+        self.assertIn('2.0s', output.getvalue())
         self.assertIn('unknown handle', output.getvalue())
         self.assertIn('command-test: cancelled', output.getvalue())
         self.assertEqual('cancelled', values[0].state)

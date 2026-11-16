@@ -72,7 +72,7 @@ class EvidenceSession:
                     services.record('tool-recovery-exhausted', feedback_opportunities=recovery.allowance)
                     raise
             hooks.add(BEFORE_REQUEST, check_recovery, required=True)
-            return replace(config, provider=bounded_provider, hooks=hooks)
+            return replace(config, provider=bounded_provider, hooks=hooks, context_meter=meter)
         role_config = prepare_config(replace(self.config, env=None, hooks=None,
             prepare_next_turn=None, before_tool_call=None, after_tool_call=None,
             on_partial=None, on_tool_result=None, should_stop_after_turn=None))

@@ -108,7 +108,11 @@ class EditReason:
         if len(self.issue_ids) != len(set(self.issue_ids)):
             raise ValueError('edit issue identities must be distinct')
         for issue in self.issue_ids:
-            identifier(issue)
+            if '/' in issue:
+                reference, local = issue.split('/', 1)
+                require_hash(reference); identifier(local)
+            else:
+                identifier(issue)
         if not self.evidence_ids or any(not isinstance(v, str) or not v for v in self.evidence_ids):
             raise ValueError('edits need attributable evidence')
 

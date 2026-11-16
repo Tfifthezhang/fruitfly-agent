@@ -63,6 +63,20 @@ class ResearchDelegationTests(unittest.IsolatedAsyncioTestCase):
                 settings=self.settings, runtime_factory=factory).session(mission, self.workspace, services)
             return response, services.used, list(services.events)
 
+    async def test_single_role_retains_session_without_constructing_subagent_dependencies(self):
+        self.settings = {'delegation': {'enabled': False}}
+        self.parent.respond_tool_call('read', {'path': 'a.txt'})
+        self.parent.respond_text('Observed a failure; its cause remains unknown.')
+        result, usage, events = await self.run_role()
+        self.assertIn('cause remains unknown', result)
+        self.assertEqual(2, usage['model'])
+        self.assertFalse(self.assembly.registry.create.called)
+        self.assertFalse(list((self.root / 'roles').glob('*.subagents')))
+        reference = next(fields['artifact_id'] for event, fields in events if event == 'research-session')
+        trace = self.artifacts.read_bytes(reference).decode()
+        self.assertIn('observed failure', trace)
+        self.assertIn('toolResult', trace)
+
     async def test_parent_delegates_and_integrates_validated_citations_without_original_read_claim(self):
         child = FauxProvider()
         child.respond_tool_call('read', {'path': 'a.txt'})
