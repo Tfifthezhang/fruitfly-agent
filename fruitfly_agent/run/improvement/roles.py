@@ -63,13 +63,22 @@ class ResearchRoles:
                 return binding()(view, signal=signal)
             def __getattr__(self, name):
                 return getattr(binding(), name)
+        from fruitfly_agent.runtime_spec import execution_kwargs
         return AgentLoopConfig(provider=DeferredProvider(),
-            model=spec.model, max_tokens=spec.max_output_tokens, context_window=spec.context_window)
+            model=spec.model, max_tokens=spec.max_output_tokens, context_window=spec.context_window, **execution_kwargs(self.profile.execution))
+
+    def provider_binding(self, alias, maximum=None, *, resources):
+        from dataclasses import replace
+        from fruitfly_agent.lab.catalog import ProviderBinding
+        spec = self.specs[alias or self.alias('executor')]
+        if maximum is not None:
+            spec = replace(spec, max_output_tokens=min(spec.max_output_tokens, maximum))
+        provider = self.registry.create(spec, self.environment)
+        resources.append(provider)
+        return ProviderBinding(provider, spec.model, alias or self.alias('executor'),
+            spec.context_window, spec.max_output_tokens, content_hash(canonical_json(asdict(spec))))
 
     def runtime_factory(self, role, directory, artifacts, settings, *, parts=None):
-        from fruitfly_agent.lab.improvement.api import EvidenceSettings
-        if not EvidenceSettings.from_dict(settings).delegation.enabled:
-            return None
         from .research_runtime import ResearchRuntimeFactory
         return ResearchRuntimeFactory(self, role, directory, artifacts, settings, parts=parts)
 

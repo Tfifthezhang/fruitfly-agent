@@ -24,6 +24,8 @@ def install(state, context, parameters):
         **{key: parameters[key] for key in ('max_concurrent', 'max_agents', 'run_timeout_seconds', 'max_model_requests', 'retirement_timeout')},
         instructions=parameters['child_instructions'],
         protocol=ProtocolSettings.from_parameters(parameters), results=ResultSettings.from_parameters(parameters)))
+    if context.work_products is not None:
+        context.work_products.on_publish = service.observe_product
     prefix = context.resources.mount('subagent', lambda path: _read(service, path))
     service.result_prefix = prefix
     return replace(state, config=replace(state.config, tools=(*state.config.tools, *create_tools(service, parameters)))).with_component(

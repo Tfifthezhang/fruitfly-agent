@@ -139,3 +139,6 @@ Algorithm configuration must follow the mandatory [ownership rules](../../AGENTS
 Defaults belong to owner resources; user overrides belong to referenced workspace
 component documents. Every new algorithm must prove its declared optimization surface
 changes isolated execution before delivery.
+
+[Work products](agents/work_products/README.md) provide durable, attributed working
+files and bounded parent/child handoffs for ordinary and research tasks.

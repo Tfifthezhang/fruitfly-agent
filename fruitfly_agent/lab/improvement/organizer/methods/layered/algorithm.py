@@ -38,7 +38,7 @@ class LayeredOrganizer:
                 raise ValueError('organizer must submit sections and findings arrays')
             validate_findings(data['findings'])
             source_rows = []
-            for section in data['sections']:
+            for index, section in enumerate(data['sections']):
                 if set(section) != {'title', 'summary', 'sources'} or not all(
                         isinstance(section[k], str) and section[k].strip() for k in ('title', 'summary')):
                     raise ValueError('each readable section needs title, summary and sources')
@@ -47,13 +47,13 @@ class LayeredOrganizer:
                 for source in section['sources']:
                     if (set(source) != {'path', 'citation_id'} or source['path'] not in workspace.paths()
                             or source['citation_id'] not in workspace.eligible_paths(source['path'])):
-                        raise ValueError('organizer cited unavailable or unread evidence')
+                        raise ValueError(f'sections[{index}].sources: unavailable or unread evidence: {source}')
                     source_rows.append(source)
-            for finding in data['findings']:
+            for index, finding in enumerate(data['findings']):
                 for source in finding['sources']:
                     if (set(source) != {'path', 'citation_id'} or source['path'] not in workspace.paths()
                             or source['citation_id'] not in workspace.eligible_paths(source['path'])):
-                        raise ValueError('finding cited unavailable or unread evidence')
+                        raise ValueError(f'findings[{index}].sources: unavailable or unread evidence: {source}')
                     source_rows.append(source)
             accepted = data
         async def submit(ctx):

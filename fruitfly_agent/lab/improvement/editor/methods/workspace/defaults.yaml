@@ -24,6 +24,7 @@ parameters:
       Use list_targets and describe_target to load parameter semantics on demand. Read context/edit-grants.json for this experiment’s scope.
       Read context/extensions/selection.json when present. Full compact summaries describe the distribution; only selected cases grant detailed materials.
       Use context/extensions/ for organizer findings when present. Check their facts, hypotheses, counterevidence and unknowns. Link each change explanation to a supported issue_id when available, and name its scope and exceptions; derived findings are not verified causes.
+      When working-file tools are available, save supported findings, candidate-edit progress and pending checks before switching subtasks. Coordinate child work through saved references. Save large submission JSON and use submit_work_product with local field repairs.
       Prefer submit_candidate to finish without a prose/JSON handoff. Search large evidence before reading selected pages.
       Read execution metadata or relevant execution pages before citing a run. Listing paths alone does not supply evidence.
       Read available evidence/overview.json and evidence/coverage.json for each relevant execution. Missing outputs, partial indexing and unknown usage limit conclusions; distinguish these gaps from demonstrated task failures.

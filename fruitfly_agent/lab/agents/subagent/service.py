@@ -62,8 +62,15 @@ class SubagentService:
         self.changed = asyncio.Event()
         self.revision = 0
         self.unconfirmed = set()
+        self.product_notices = []
         self.closed = False
         self.poisoned = False
+
+    def observe_product(self, row):
+        if self.scope_id is not None and row["producer"] in self.agents:
+            self.product_notices.append(CustomMessage("work-product",
+                "Child working file saved (derived, not final): " + json.dumps(row)))
+            self.changed.set()
 
     def _poison(self):
         self.poisoned = True
@@ -398,7 +405,7 @@ class SubagentService:
             value = callback(context) if callback else []
             return await value if inspect.isawaitable(value) else value
         def notices():
-            output = []
+            output, self.product_notices = self.product_notices, []
             for row in tuple(self.store.rows.values()):
                 if row['scope_id'] == self.scope_id and row['state'] not in ACTIVE and not row['delivered'] and row['run_id'] not in self.offered_results:
                     message = CustomMessage('subagent-result', 'Subagent execution result (derived agent output):\n' + json.dumps(bounded(row, settings=self.results)))

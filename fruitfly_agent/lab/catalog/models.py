@@ -89,8 +89,11 @@ class MechanismDefinition:
     parameter_paths: Mapping[str, str] = field(default_factory=dict)
     execution_description: Callable[[Mapping[str, Any], Path], ExecutionEnvironmentDescription] | None = None
     default_resource: tuple[str, str] | None = None
+    role_safe: bool = False
 
     def __post_init__(self) -> None:
+        if type(self.role_safe) is not bool:
+            raise ValueError("role_safe must be boolean")
         if self.default_resource is not None:
             from fruitfly_agent.runtime_spec.documents import validate_default_resource
             validate_default_resource(self.default_resource)

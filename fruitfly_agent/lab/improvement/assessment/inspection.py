@@ -11,12 +11,12 @@ class InspectionInstructions:
 
 
 class ReadOnlyInspector:
-    def __init__(self, config, artifacts, components=None, *, instructions=None, evaluator_instructions=None, evidence_settings=None):
+    def __init__(self, config, artifacts, components=None, *, instructions=None, evaluator_instructions=None, evidence_settings=None, runtime_factory=None):
         self.artifacts = artifacts
         self.instructions = instructions or InspectionInstructions()
-        self.workspace_session = EvidenceSession(config, artifacts, settings=evidence_settings)
+        self.workspace_session = EvidenceSession(config, artifacts, settings=evidence_settings, runtime_factory=runtime_factory)
         from .methods.model.algorithm import ModelEvaluator
-        self.evaluator = ModelEvaluator(config, artifacts, instructions=evaluator_instructions, settings=evidence_settings)
+        self.evaluator = ModelEvaluator(config, artifacts, instructions=evaluator_instructions, settings=evidence_settings, runtime_factory=runtime_factory)
 
     async def session(self, mission, workspace, services, *, writable=False):
         if writable:

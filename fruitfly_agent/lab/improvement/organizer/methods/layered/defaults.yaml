@@ -18,6 +18,10 @@ parameters:
       When retained-part tools are available, inspect applicable prior work and
       delegate bounded factual questions as useful. Preserve partial findings and
       integrate their citations without claiming unread scope is covered.
+      When working-file tools are available, save progress after each bounded question
+      and before switching materials. Exchange references with children and read relevant
+      products on demand. For large submissions, save JSON once, use submit_work_product,
+      and patch rejected fields rather than regenerating the whole guide.
       Keep rare records discoverable. Return sections with title, summary and sources;
       each source has a granted path and a citation_id actually returned by read/search.
       Also return findings, at most 16: each has issue_id, signal, facts, hypotheses,

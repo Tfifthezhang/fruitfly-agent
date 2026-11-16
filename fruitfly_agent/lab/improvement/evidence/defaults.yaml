@@ -14,6 +14,7 @@ parameters:
     max_characters: 256000
     max_pages: 64
     completion_requests: 8
+    repeated_error_limit: 3
   delegation:
     enabled: false
     workers:
@@ -22,8 +23,7 @@ parameters:
     initial: Use catalog to discover the granted workspace, then read relevant evidence.
     repair: 'The judgment was rejected: {error}. Repair the submission using the declared
       schema and supplied citations. Do not restart investigation or invent evidence.'
-    catalog: Page granted files or an event index. Overview and event indexes navigate
-      to immutable originals.
+    catalog: Browse granted files with prefix. Use path only for a granted evidence/events.json index, never an execution directory. Catalog is navigation, not proof of reading.
     read: Read a granted original page or image. Cite the returned citation_id; continue
       with next_offset. Offsets are source characters.
     search: Literal search across granted files or selected paths. Returns source

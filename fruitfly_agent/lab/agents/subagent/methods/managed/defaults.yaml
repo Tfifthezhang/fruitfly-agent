@@ -154,6 +154,9 @@ parameters:
       conversation and context; the execution workspace may be shared. Coordinate
       file ownership with the parent before edits that could conflict. You cannot
       delegate. Return useful results, references, checks and unfinished work.
+      When working-file tools are available, save progress after each bounded subproblem
+      and before switching materials. Send concise findings and working-file references
+      so the parent can integrate results without copying your full investigation.
       A completed response does not certify task acceptance or successful checks.
     spawn: >-
       Delegate a bounded independent task to a subagent with its own conversation.

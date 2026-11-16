@@ -3,8 +3,8 @@
 [Up: Reduction](../../README.md)
 
 `LayeredCompactionReducer` implements `ContextReducer`. The default
-`layered-compaction` selection uses deterministic mode. It requires `read-tool`
-so every abbreviated result and archive remains readable. No auxiliary Provider
+`layered-compaction` selection uses deterministic mode. It requires the `resource-reader` capability
+(the ordinary read tool or a scoped host reader) so every abbreviated result and archive remains readable. No auxiliary Provider
 is resolved in this mode.
 
 ## Follow the stages

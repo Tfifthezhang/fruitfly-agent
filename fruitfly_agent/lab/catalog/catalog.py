@@ -125,6 +125,7 @@ class LabCatalog:
     def resolve(
         self,
         selections: Sequence[MechanismSelection],
+        *, capabilities: frozenset[str] = frozenset(),
     ) -> tuple[ResolvedMechanism, ...]:
         seen: set[str] = set()
         resolved: list[ResolvedMechanism] = []
@@ -205,9 +206,10 @@ class LabCatalog:
             for capability in definition.requires_capabilities:
                 providers = [other.definition.descriptor.mechanism_id for other in resolved
                              if capability in other.definition.provides]
-                if len(providers) != 1:
+                if len(providers) + (capability in capabilities) != 1:
                     raise ValueError(f"mechanism {definition.descriptor.mechanism_id!r} requires exactly one provider of capability {capability!r}")
-                required.add(providers[0])
+                if providers:
+                    required.add(providers[0])
             dependencies[definition.descriptor.mechanism_id] = required
         ordered = []
         remaining = {item.definition.descriptor.mechanism_id: item for item in resolved}

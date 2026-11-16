@@ -3,7 +3,7 @@ from .instructions import instruction_target
 from .methods.layered.algorithm import LayeredOrganizer
 
 
-def candidate_organizer(config, artifacts, document, *, options, baseline=None, settings=None):
+def candidate_organizer(config, artifacts, document, *, options, baseline=None, settings=None, runtime_factory=None):
     """Construct a trial role; validation is not verification or activation."""
     owner = instruction_target(baseline)
     # Reuse the shared parameter adapter to decode the candidate's protected I file.
@@ -12,7 +12,7 @@ def candidate_organizer(config, artifacts, document, *, options, baseline=None, 
     adapter.validate(document)
     text = adapter.to_text(document)
     owner.validate_change(text, options)
-    return LayeredOrganizer(config, artifacts, instructions=owner.parse(text), settings=settings)
+    return LayeredOrganizer(config, artifacts, instructions=owner.parse(text), settings=settings, runtime_factory=runtime_factory)
 
 
 def install_trial(context, request, registry, services):
@@ -28,7 +28,8 @@ def install_trial(context, request, registry, services):
     document = request.candidate.component('improvement-organizer')
     organizer = services.own(candidate_organizer(context.organizer_config or context.editor_config,
         context.artifacts, document, baseline=current,
-        options=context.plan.component_options.get('improvement-organizer', {}), settings=context.evidence_settings))
+        options=context.plan.component_options.get('improvement-organizer', {}), settings=context.evidence_settings,
+        runtime_factory=context.role_runtime_factory("organizer") if context.role_runtime_factory else None))
     owner = instruction_target(organizer.instructions)
     registry.adapters['improvement-organizer'] = TextComponentAdapter(owner, 'improvement-instructions')
     async def organize(event):

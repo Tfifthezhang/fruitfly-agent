@@ -43,7 +43,7 @@ parameters:
     coverage: If the initial execution list is incomplete, page context/executions.json for
       every run. Read context/task.md for the complete task. Cover every supplied run in the
       final judgment.
-    submit: Prefer {name} to finish. In tool submissions use an empty string for no choice.
+    submit: Prefer {name} to finish. In tool submissions use an empty string for no choice. When working-file tools are available, checkpoint judgments and evidence gaps during investigation. For large judgments, save JSON once and use submit_work_product; patch only rejected fields.
       Correct validation errors within this invocation.
     catalog: Use catalog for the complete paged resource list
     submit_judgment: Submit the complete judgment. The host checks identities, structure and

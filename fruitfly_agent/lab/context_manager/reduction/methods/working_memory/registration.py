@@ -20,7 +20,7 @@ def definition():
         effects=MechanismEffects(uses_provider=True, uses_network=True, writes_files=True,
             lifecycle_hooks=('before_compaction',),
             cost_notice='Memory updates and shortening requests may incur Provider charges.')),
-        install, implementation_id='working-memory-v1', implementation_path=root + 'algorithm.py',
+        install, role_safe=True, implementation_id='working-memory-v1', implementation_path=root + 'algorithm.py',
         documentation_path=root + 'README.md', feature_path=(CONTEXT, REDUCTION), selection_group='reduction', selection_group_label='Reduction',
         validate_parameters=partial(validate, WorkingMemoryConfig),
         input_parameters=('memory_model_profile',), default_resource=(__package__, 'defaults.yaml'),

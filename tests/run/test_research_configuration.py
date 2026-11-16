@@ -21,7 +21,8 @@ class ResearchConfigurationTests(unittest.TestCase):
             path.write_text(yaml.safe_dump(raw))
             with patch('fruitfly_agent.providers.registry.ProviderRegistry.create', side_effect=AssertionError('Provider')):
                 result = defaults(SimpleNamespace(config=str(path)), root)
-            self.assertEqual(len(result['components']), 10)
+            self.assertEqual(len(result['components']), 11)
+            self.assertIn('work-products', result['components'])
             self.assertIn('subagent', result['components'])
             self.assertNotIn('file-memory', result['components'])
             self.assertNotIn('improvement-editor', result['components'])

@@ -74,7 +74,7 @@ class EvaluatorTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_search_supplies_only_returned_spans_and_keeps_tools_available(self):
         evaluator, task, records, services, provider, log = self.setup_evaluation()
-        provider.respond_tool_call('search', {'path': 'context/executions/run-0/trajectory.txt', 'query': 'decisive'})
+        provider.respond_tool_call('search', {'paths': ['context/executions/run-0/trajectory.txt'], 'query': 'decisive'})
         from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone
         def finish(view, signal=None):
             self.assertEqual({'catalog', 'read', 'search', 'submit_comparison'}, {tool.name for tool in view.tools})

@@ -56,3 +56,11 @@ allow insufficient evidence. Detailed grants come from the independent
 [evidence selector](../evidence_selection/README.md), while full compact summaries
 remain available. Neither selected scope nor a directory read establishes full
 original coverage.
+
+Prepared hosts preserve configured context mechanisms and scoped archive
+readback. When [work products](../../agents/work_products/README.md) are enabled,
+roles checkpoint progress and can submit an exact saved JSON revision through
+the same final validator. Rejected fields can be patched without retransmitting
+the complete document. Direct Lab embeddings without a prepared host retain
+minimal execution and record `role-runtime-mode`; they do not inherit ambient
+configuration or claim an installed context policy.

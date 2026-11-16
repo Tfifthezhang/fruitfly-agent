@@ -12,6 +12,7 @@ class PreparedAgentRuntime:
     start: Callable[[], Awaitable[None]]
     close: Callable[[], Awaitable[None]]
     run_loop: Callable[..., Awaitable[Any]] | None = None
+    work_products: Any = None
 
 
 class AgentRuntimeError(RuntimeError):

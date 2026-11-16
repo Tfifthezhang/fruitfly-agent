@@ -224,3 +224,9 @@ replaceable I policy over full compact batch summaries. Organize/propose expose
 only selected detailed cases and materials; structured findings separate facts,
 hypotheses, counterevidence and unknowns. Candidate reasons retain issue and
 original-execution attribution. Archive scope and reading coverage stay distinct.
+
+Restricted research roles now assemble effective owner-admitted context mechanisms
+through Catalog, including when delegation is disabled. The same reduction
+implementations and scoped archive readback serve parent and child loops.
+[Durable work products](lab/agents/work_products/README.md) provide attributed
+checkpoints for ordinary and research collaboration without granting file access.

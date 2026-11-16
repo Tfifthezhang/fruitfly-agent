@@ -1,0 +1,13 @@
+id: work-products
+role: H
+implementation: work-products
+parameters:
+  settings:
+    page_characters: 12000
+    directory_entries: 20
+    pressure_ratio: 0.8
+  instructions:
+    checkpoint: Persist a working file after completing a subproblem, before switching materials or delegating, and before context pressure. Include progress, source references, uncertainties and next steps. Use expected_revision=0 for a new name; updates require its current revision. Saving does not finish the task.
+    catalog: List durable checkpoints and child work references. Read relevant products on demand; completion and factual validity remain separate.
+    read: Read an exact saved working-file revision in character pages. Follow next_offset; derived material supplies no new original-source citation.
+    patch: Repair selected JSON fields in your saved working-file revision. Paths are arrays of object keys or array index strings. replace requires value containing JSON text; remove deletes the named field. The whole result is saved atomically with revision checking. This does not validate or submit a final result.

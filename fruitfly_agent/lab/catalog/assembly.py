@@ -57,7 +57,9 @@ class AssemblyContext:
     model_parameters: Mapping[str, Any] = field(default_factory=dict)
     component_id: str = ''
     child_runtime_factory: Any = None
+    work_products: Any = None
     artifact_store: Any = None
+    host_capabilities: frozenset[str] = frozenset()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "workspace", self.workspace.resolve())
@@ -154,7 +156,7 @@ def assemble_lab(
     resources = context.resources or context.own(ResourceRegistry(scope=str(context.session_path) if context.session_path else None))
     context = replace(context, resources=resources)
     base_config = replace(base_config, readable_resources=resources)
-    resolved = catalog.resolve(selections)
+    resolved = catalog.resolve(selections, capabilities=context.host_capabilities)
     context = replace(context, execution_owners={key: item.definition.descriptor.mechanism_id
         for item in resolved for key in item.definition.execution_fields})
     state = AssemblyState(config=base_config).with_component('readable-resources', resources)

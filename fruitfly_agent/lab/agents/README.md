@@ -33,3 +33,10 @@ so a research report can distinguish Provider failure from submission rejection.
 private Sessions, steering, bounded execution and monitoring. An explicit prepared runtime lets research roles use that scope without another
 Agent loop. The caller owns startup/retirement; AgentRunner records requests and
 results through the same observation callbacks.
+
+## Retain working files
+
+[Work products](work_products/README.md) supply durable checkpoints, attributed
+parent/child exchange and paged retrieval through the ordinary H component.
+Restricted roles assemble owner-declared `role_safe` components through the same
+Catalog installers; each invocation owns its context state.

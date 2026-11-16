@@ -82,3 +82,11 @@ These values are configurable, recorded and frozen, but protected from ordinary
 candidate grants. `ModelEvaluator(..., options=...)` consumes them; `settings=...`
 continues to mean shared evidence configuration. Submission guidance may change;
 the Python schema, run coverage and supplied-citation validator remain authoritative.
+
+Prepared hosts preserve configured context mechanisms and scoped archive
+readback. When [work products](../../agents/work_products/README.md) are enabled,
+roles checkpoint progress and can submit an exact saved JSON revision through
+the same final validator. Rejected fields can be patched without retransmitting
+the complete document. Direct Lab embeddings without a prepared host retain
+minimal execution and record `role-runtime-mode`; they do not inherit ambient
+configuration or claim an installed context policy.

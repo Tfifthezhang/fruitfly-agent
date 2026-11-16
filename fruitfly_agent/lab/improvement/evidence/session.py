@@ -38,6 +38,8 @@ class EvidenceSession:
         tools.extend(extra_tools)
         def prepare_config(config, *, delegated=False):
             meter = new_measurement_scope(config.context_meter) or MeasurementService()
+            from fruitfly_agent.lab.agents.recovery import ToolRecoveryGuard
+            recovery = ToolRecoveryGuard(self.settings.supply.repeated_error_limit)
             def bounded_provider(view, *, signal=None):
                 async def events():
                     services.check()
@@ -60,7 +62,17 @@ class EvidenceSession:
                         await inner.aclose()
                 return AssistantMessageEventStream(events())
             forward_context_capabilities(bounded_provider, config.provider)
-            return replace(config, provider=bounded_provider)
+            from fruitfly_agent.core.extensions.hooks import HookRegistry, BEFORE_REQUEST
+            from fruitfly_agent.core.errors import FatalError
+            hooks = config.hooks.clone() if config.hooks else HookRegistry(session=config.session)
+            def check_recovery(event):
+                try:
+                    recovery.check(event.messages)
+                except FatalError:
+                    services.record('tool-recovery-exhausted', feedback_opportunities=recovery.allowance)
+                    raise
+            hooks.add(BEFORE_REQUEST, check_recovery, required=True)
+            return replace(config, provider=bounded_provider, hooks=hooks)
         role_config = prepare_config(replace(self.config, env=None, hooks=None,
             prepare_next_turn=None, before_tool_call=None, after_tool_call=None,
             on_partial=None, on_tool_result=None, should_stop_after_turn=None))
@@ -68,12 +80,20 @@ class EvidenceSession:
             raise ValueError('evidence delegation requires an explicit prepared-runtime host')
         async with AsyncExitStack() as stack:
             runtime = None
+            if self.runtime_factory is None:
+                services.record('role-runtime-mode', mode='minimal', context_policy='unassembled', persistence='caller-owned')
             if self.runtime_factory is not None:
                 runtime = await stack.enter_async_context(self.runtime_factory(config=role_config,
                     workspace=workspace, services=services, tools=tuple(tools),
                     system_prompt=system+'\n'+mission, prepare_config=prepare_config))
                 role_config = runtime.config
                 tools = list(role_config.tools)
+                final_submit = validate_final or (seal if submit is not None else None)
+                if runtime.work_products is not None and final_submit is not None and any(t.name == 'save_checkpoint' for t in tools):
+                    from fruitfly_agent.lab.agents.submissions import saved_submission_tool
+                    tools.append(saved_submission_tool(runtime.work_products, final_submit))
+                    role_config = replace(role_config, tools=tuple(tools))
+                    runtime = replace(runtime, config=role_config)
             messages = [UserMessage(initial_content or self.settings.instructions.initial)]
             while True:
                 services.check()

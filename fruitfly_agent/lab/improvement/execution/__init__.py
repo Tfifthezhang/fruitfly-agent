@@ -33,6 +33,7 @@ class ExecutionContext:
     resource_factories: Any = None
     organizer_factory: Any = None
     organizer_config: Any = None
+    role_runtime_factory: Any = None
 
 
 class ExecutionRegistry:

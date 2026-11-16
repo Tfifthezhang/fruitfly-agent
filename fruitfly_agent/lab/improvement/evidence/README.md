@@ -191,3 +191,9 @@ All execution summaries remain available; detailed task and execution paths are
 limited to selected cases. Metadata links to output bodies instead of copying
 them. Selection reasons and omitted scope are separate from original-reading
 coverage.
+
+Prepared research hosts install effective role-safe context mechanisms and route
+`resource://` history references through their scoped reader. Archive reads and
+[working-file reads](../../agents/work_products/README.md) are derived material,
+not new evidence citations. Enabled working-file tools remain usable after the
+original evidence supply is exhausted, so a role can retain progress and submit.

@@ -31,7 +31,7 @@ def evidence_tools(workspace, *, settings=None, reader=None):
         path=args.get('path')
         if path:
             if not path.endswith('/evidence/events.json') and path != 'evidence/events.json':
-                raise ValueError('event catalog requires a granted event index')
+                raise ValueError('catalog.path requires a granted evidence/events.json index; browse files with catalog(prefix=...)')
             value=json.loads(workspace.read(path))
             events=value['events']
             if args.get('kind'):events=[v for v in events if v['kind']==args['kind']]
@@ -70,8 +70,8 @@ def evidence_tools(workspace, *, settings=None, reader=None):
     return (AgentTool(name='catalog',label='Browse evidence',description=settings.instructions.catalog,
         parameters={'type':'object','properties':{'prefix':{'type':'string'},'path':{'type':'string'},'kind':{'type':'string'},
             **{key: {'type': 'string'} for key in ('tool_name', 'tool_call_id', 'request_id', 'operation_id', 'phase', 'status')},
-            'order':{'type':'string','enum':['elapsed_seconds']},'cursor':{'type':'integer'},'limit':{'type':'integer'}}},execute=catalog),
+            'order':{'type':'string','enum':['elapsed_seconds']},'cursor':{'type':'integer','minimum':0},'limit':{'type':'integer','minimum':1,'maximum':settings.catalog.max_entries}},'additionalProperties':False},execute=catalog),
         AgentTool(name='read',label='Read evidence',description=settings.instructions.read,
         parameters={'type':'object','properties':{'path':{'type':'string'},'offset':{'type':'integer'},'limit':{'type':'integer'}},'required':['path']},execute=read),
         AgentTool(name='search',label='Search evidence',description=settings.instructions.search,
-        parameters={'type':'object','properties':{'query':{'type':'string'},'paths':{'type':'array','items':{'type':'string'}},'cursor':{'type':'string'},'limit':{'type':'integer'}},'required':['query']},execute=search))
+        parameters={'type':'object','properties':{'query':{'type':'string'},'paths':{'type':'array','items':{'type':'string'}},'cursor':{'type':'string'},'limit':{'type':'integer','minimum':1,'maximum':settings.search.max_matches}},'required':['query'],'additionalProperties':False},execute=search))

@@ -109,3 +109,11 @@ Entries bind resolved path, device, inode, size, modification and change times.
 Discovery refreshes changed files and probes writer locks on every call. Cache
 errors fall back to source inspection; selected recovery always validates actual
 history and required artifacts. Cache data grants no recovery authority.
+
+[work_products.py](work_products.py) owns attributed working-file stores. Each
+revision retains content and predecessor manifests through immutable artifact
+references. Publication locks its writer, checks the expected revision, flushes
+content and atomically replaces the locator. Parent views inspect the shared
+collaboration scope; child writers access their own namespace. Research role
+repairs reuse a stage-scoped `roles/<role>/shared.work/` store. Working files
+survive failure, but persistence does not authorize automatic execution or reuse.

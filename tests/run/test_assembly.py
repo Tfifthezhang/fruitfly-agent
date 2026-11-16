@@ -237,7 +237,7 @@ class RuntimeAssemblyTest(unittest.TestCase):
 
         self.assertEqual(
             [tool.name for tool in runtime.config.tools],
-            ["read", "edit", "write"],
+            ["read", "edit", "write", "patch_checkpoint", "save_checkpoint", "list_work_products", "read_work_product"],
         )
         self.assertNotIn("bash-tool", runtime.mechanism_ids)
 

@@ -51,3 +51,8 @@ attachments. Actual artifact access verifies content hashes. Case/material
 selection is an injected Lab policy; the host records its identity and selection
 receipt. Multi-batch input rejects conflicting task/run identities and deduplicates
 identical observations. See [bounded investigation](../../lab/improvement/evidence_selection/README.md).
+
+Research roles always receive a persistent prepared runtime, including when
+delegation is disabled. Effective role-safe component selections use the shared
+Catalog assembler; parent and child compression and work products retain their
+ordinary owners. Role manifests record installed parameters and excluded owners.

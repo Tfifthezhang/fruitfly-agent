@@ -9,12 +9,13 @@ from fruitfly_agent.lab.catalog import PreparedAgentRuntime, RoleProvider, Agent
 
 class ChildRuntimeFactory:
     def __init__(self, *, build, profile, config_path, catalog, environment, cwd,
-                 provider_registry, artifacts, permission_policy, model_specs, authorization, parent_path):
+                 provider_registry, artifacts, permission_policy, model_specs, authorization, parent_path, work_products=None):
         self.build, self.profile = build, profile
         self.config_path, self.catalog, self.environment = config_path, catalog, environment
         self.cwd, self.registry, self.artifacts = cwd, provider_registry, artifacts
         self.policy, self.models = permission_policy, model_specs
         self.authorization, self.parent_path = authorization, parent_path
+        self.work_products = work_products
         self.quarantined: list[Any] = []
 
     def restrict_components(self, component_ids):
@@ -57,7 +58,8 @@ class ChildRuntimeFactory:
                 environment=self.environment, session=session, cwd=self.cwd, provider_registry=self.registry,
                 resource_sink=resources, artifact_store=self.artifacts, permission_policy=replace(self.policy,
                     readonly_paths=(*self.policy.readonly_paths, self.parent_path, self.parent_path.parent / (self.parent_path.name + '.subagents'))),
-                model_specs=self.models, shared_authorization=self.authorization)
+                model_specs=self.models, shared_authorization=self.authorization,
+                work_product_store=self.work_products.writer(identity.agent_id) if self.work_products is not None else None)
             owner.components = {key: value for key, value in runtime.components.items() if value is not self.authorization}
             manifest = runtime.manifest.to_dict()
             session.append('meta', {'kind': 'child-runtime', 'identity': {

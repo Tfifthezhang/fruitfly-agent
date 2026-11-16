@@ -300,3 +300,17 @@ The standalone [evidence-selection I surface](../improvement/evidence_selection/
 uses the same settings projection, field grants, frozen snapshots and candidate
 adapter as other owned research components. It selects investigation materials;
 it does not alter task execution or observation authority.
+
+## Assemble restricted hosts
+
+`MechanismDefinition.role_safe` is protected owner metadata admitting an installer
+to restricted tool-using roles. Such hosts project effective selections without
+changing parameters or enabling explicitly disabled components.
+`AssemblyContext.host_capabilities` declares real injected capabilities. Resolution
+requires exactly one selected or host provider for each capability. A host
+`resource-reader` must implement scoped archive readback; declarations alone do
+not authorize filesystem access. The same owner installers, defaults, grants and
+state isolation apply to daily, child and research execution.
+
+The [work-products](../agents/work_products/README.md) H owner declares working-file
+tools and editable guidance. Runtime stores and integrity controls remain protected.

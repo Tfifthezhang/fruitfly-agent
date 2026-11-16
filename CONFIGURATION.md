@@ -513,3 +513,9 @@ registered owner resources; daily customizations use referenced component files.
 Import source and task paths must exist before the corresponding stage executes.
 Reading/showing configuration performs no model work; explicitly running model or
 execution stages can incur charges.
+
+The [work-products component](fruitfly_agent/lab/agents/work_products/README.md)
+uses the same H document syntax for daily and restricted Agent roles. Existing
+explicit profiles opt in with `H.work-products: {default: true}`; installed
+workspace templates enable it. Saving configuration does not rewrite existing
+workspace profiles or publish working files as retained S content.

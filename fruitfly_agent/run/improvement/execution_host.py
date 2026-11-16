@@ -38,6 +38,7 @@ class RunExecutionHost:
                  tasks=None, publish=None, editor=None, components=None, executions=None,
                  component_options=None, hooks=None, delivery_backend=None, evidence_settings=None,
                  resource_factories=None, organizer=None, evidence_selector=None):
+        self.role_runtime_factory = None
         self.evidence_selector_factory = evidence_selector
         self.resource_factories: Callable[[], dict[str, Any]] = resource_factories or (lambda: {})
         self.evidence_settings = dict(evidence_settings or {})
@@ -100,7 +101,8 @@ class RunExecutionHost:
     def completed_assessment(self, services):
         return CompletedAssessmentService(config=self.assessor_configuration() if self.assessor_configuration else self.editor_configuration(),
             artifacts=self.artifacts, services=services,
-            instructions=self.system_settings().get('evaluator', {}), evidence_settings=self.evidence_settings)
+            instructions=self.system_settings().get('evaluator', {}), evidence_settings=self.evidence_settings,
+            runtime_factory=self.role_runtime_factory('assessor') if self.role_runtime_factory else None)
 
 
     def context(self, plan=None, services=None, experience=()):
@@ -112,7 +114,7 @@ class RunExecutionHost:
             organizer_factory=self.organizer_factory,
             organizer_config=self.organizer_configuration() if self.organizer_configuration else self.editor_configuration(),
             assessor_config=self.assessor_configuration() if self.assessor_configuration else self.editor_configuration(),
-            completed_assessment_factory=self.completed_assessment,
+            completed_assessment_factory=self.completed_assessment, role_runtime_factory=self.role_runtime_factory,
             generator_definitions=self.generators.definitions(), system_settings=self.system_settings(), evidence_settings=self.evidence_settings, hooks_factory=self.hooks_factory, delivery_backend=self.delivery_backend,
             resource_factories=dict(self.resource_factories()))
 

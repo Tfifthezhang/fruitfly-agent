@@ -404,3 +404,41 @@ class ResearchDelegationTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(change=change), patch.object(self.artifacts, 'read_bytes', side_effect=read):
                 await self.run_role(parts=parts, mission='Different requirements' if change == 'requirements' else 'Investigate')
         self.assertEqual(1, len(parts.entries()))
+
+    async def test_child_inherits_compression_and_retains_checkpoint_after_parent_failure(self):
+        from dataclasses import replace
+        from fruitfly_agent.lab.catalog import load_system_config
+        from fruitfly_agent.run.storage.work_products import WorkProductStore
+        path = self.root / 'config.yaml'
+        value = yaml.safe_load(path.read_text())
+        value['profiles']['test']['H'].update({'local-env': {'default': True}, 'read-tool': {'default': True},
+            'layered-compaction': {'default': True}, 'work-products': {'default': True}})
+        path.write_text(yaml.safe_dump(value))
+        self.roles.profile = load_system_config(path, catalog=self.roles.catalog).select()
+        self.roles.specs['offline'] = replace(self.roles.specs['offline'], context_window=9000, max_output_tokens=128)
+        self.workspace.files['a.txt'] = b'ORIGINAL EVIDENCE ' * 1000
+        child = FauxProvider()
+        source = {}
+        child.respond_tool_call('read', {'path': 'a.txt'})
+        def checkpoint(view, signal=None):
+            source.update(json.loads(view.messages[-1].text))
+            return tool_response('save_checkpoint', {'name': 'investigation', 'content': 'Progress: source inspected; cause remains unknown.', 'expected_revision': 0})
+        child.script.append(checkpoint)
+        for _ in range(4):
+            child.respond_tool_call('read', {'path': 'a.txt'})
+        child.script.append(lambda view, signal=None: tool_response('submit_findings', {
+            'summary': 'The supplied source contains original evidence.',
+            'sources': [{'path': 'a.txt', 'citation_id': source['citation_id']}], 'unknowns': ['Cause unestablished.']}))
+        self.create(child)
+        self.parent_spawn(['a.txt'])
+        self.parent.script[-1] = RuntimeError('parent failed after child work')
+        with self.assertRaises(RuntimeError):
+            await self.run_role()
+        work_root = next((self.root / 'roles').glob('*.work'))
+        store = WorkProductStore(work_root, self.artifacts)
+        row = store.entries()[0]
+        self.assertIn('cause remains unknown', store.read(row['producer'], row['name'], row['revision']))
+        child_path = next((self.root / 'roles').glob('*.subagents/*/session.jsonl'))
+        with Session(child_path) as session:
+            self.assertTrue(any(e.type == 'compaction' for e in session.read_all()))
+        self.assertTrue(any('work-product' in str(c['messages']) for c in self.parent.calls))

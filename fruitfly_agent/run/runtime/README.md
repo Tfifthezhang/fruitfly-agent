@@ -147,3 +147,16 @@ ordinary InteractiveSession for both interactive and headless submissions. This
 entry wraps Core execution with the Lab-owned scope and its final cleanup; no
 algorithm-specific lifecycle state is added to Application. See
 [Subagent lifecycle](../../lab/agents/subagent/README.md#own-the-execution-scope).
+
+## Assemble restricted roles
+
+[role_runtime.py](role_runtime.py) assembles Catalog owners marked `role_safe`
+from effective profile values. The role supplies scoped tools and an actual
+`resource-reader` capability; unrelated environment and tool installers are
+excluded and recorded. Missing dependencies fail before model work. Compression
+uses the ordinary reducer and Session artifact mount. The role read adapter
+can retrieve its own archived public history without supplying new source
+citations. Auxiliary Providers, measurements and context state remain independent.
+
+`build_runtime` accepts an optional `work_product_store` for an attributed child
+writer. Ordinary runtimes create a parent store beside their Session.

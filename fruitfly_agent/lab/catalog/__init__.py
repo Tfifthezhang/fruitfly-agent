@@ -90,3 +90,8 @@ def builtin_catalog() -> LabCatalog:
 
 from .optimization import registry_optimization_table, select_default_components, optimization_grants, optimization_table, render_optimization_table
 __all__ += ['registry_optimization_table', 'select_default_components', 'optimization_grants', 'optimization_table', 'render_optimization_table']
+
+from .role_runtime import assemble_role
+from fruitfly_agent.lab.agents.resources import bind_resource_reader
+from fruitfly_agent.lab.tools.resources import ResourceRegistry
+__all__ += ['assemble_role', 'bind_resource_reader', 'ResourceRegistry']

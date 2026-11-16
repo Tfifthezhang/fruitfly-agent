@@ -25,6 +25,7 @@ class SearchSettings:
 
 @dataclass(frozen=True)
 class SupplySettings:
+    repeated_error_limit: int = field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'supply.repeated_error_limit'))
     max_characters: int = field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'supply.max_characters'))
     max_pages: int = field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'supply.max_pages'))
     completion_requests: int = field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'supply.completion_requests'))

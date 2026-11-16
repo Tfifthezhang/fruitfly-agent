@@ -65,6 +65,7 @@ class CatalogTest(unittest.TestCase):
                 'bash-tool',
                 'edit-tool',
                 'write-tool',
+                'work-products',
                 'ipython-tool',
                 'web-search-tool',
                 'web-fetch-tool',

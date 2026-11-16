@@ -69,6 +69,7 @@ def build_runtime(
     tool_providers: Mapping[str, Any] | None = None,
     model_specs: Mapping[str, ModelSpec] | None = None,
     shared_authorization: Any = None,
+    work_product_store: Any = None,
 ) -> RuntimeAssembly:
     """Build a fresh runtime; no result is applied until all installers succeed."""
 
@@ -178,17 +179,19 @@ def build_runtime(
             "unsupported runtime data artifact binding(s): "
             + ", ".join(unsupported_bindings)
         )
+    from fruitfly_agent.run.storage.work_products import WorkProductStore
+    work_products = work_product_store or WorkProductStore(session.path.with_suffix(session.path.suffix + ".work"), store)
     from .child_runtime import ChildRuntimeFactory
     child_factory = ChildRuntimeFactory(build=build_runtime, profile=profile,
         config_path=config_path, catalog=catalog, environment=environment, cwd=cwd,
         provider_registry=registry, artifacts=store, permission_policy=policy,
-        model_specs=models, authorization=approvals, parent_path=session.path)
+        model_specs=models, authorization=approvals, parent_path=session.path, work_products=work_products)
     assembled = assemble_lab(
         base,
         catalog=catalog,
         selections=profile.mechanisms,
         context=AssemblyContext(
-            workspace=cwd,
+            workspace=cwd, work_products=work_products,
             child_runtime_factory=child_factory, artifact_store=store,
             session=session,
             main_model=main.model,

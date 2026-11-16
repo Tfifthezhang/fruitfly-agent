@@ -137,6 +137,7 @@ class HarnessSelectionTest(unittest.TestCase):
                 "bash-tool",
                 "edit-tool",
                 "write-tool",
+                "work-products",
                 "skills",
                                 "file-memory",
                                                                 "layered-compaction",

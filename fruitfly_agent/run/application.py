@@ -194,6 +194,14 @@ class RunApplicationFactory:
             resource_factories=lambda: self._current_components.get('execution-resources', {}),
             **{f.name: getattr(pipeline_bindings, f.name) for f in fields(pipeline_bindings)})
         from fruitfly_agent.lab.improvement.api import ORGANIZER_CONFIG, EDITOR_CONFIG, ASSESSOR_CONFIG, EDITOR_INSTRUCTIONS, SETTINGS, SYSTEM_SETTINGS
+        def role_runtime(role):
+            from fruitfly_agent.run.improvement.roles import ResearchRoles
+            roles = ResearchRoles(self.cwd, self.selection.config_path,
+                profile=self.selection.profile.profile_id, registry=self.provider_registry, environment=self.environment)
+            roles.profile = self._active_profile or self._resolve().profile
+            return roles.runtime_factory(role, self.cwd / '.fruitfly/improvement/roles' / role,
+                self.artifact_store, self._execution_host.evidence_settings)
+        self._execution_host.role_runtime_factory = role_runtime
         self._execution_host.defaults = lambda: self._current_components.get(SETTINGS, {})
         self._execution_host.editor_configuration = lambda: self._current_components.get(EDITOR_CONFIG, self._current_runtime_config)
         self._execution_host.organizer_configuration = lambda: self._current_components.get(ORGANIZER_CONFIG, self._current_runtime_config)

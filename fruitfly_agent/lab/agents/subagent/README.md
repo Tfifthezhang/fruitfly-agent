@@ -321,3 +321,12 @@ effective limits enter the child manifest. Worker definitions remain protected
 from ordinary task candidate edits. Ordinary daily spawn retains its existing
 interface and inheritance policy; named workers belong to the research host.
 
+
+## Exchange intermediate work
+
+When [work-products](../work_products/README.md) is enabled, ordinary children
+inherit its effective configuration and write to their own producer namespace.
+Parents can inspect saved revisions while children are running or after failure.
+Publish bounded progress before switching material groups and use references
+in handoffs. Research children inherit owner-admitted context mechanisms through
+the shared Catalog assembler; immutable evidence remains restricted to grants.

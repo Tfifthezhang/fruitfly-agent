@@ -155,3 +155,14 @@ fields are strict booleans. Enabling retention requires delegation. Completed ch
 findings are stored independently of final guide publication; reuse remains
 conditional on current source and execution identities. See the
 [operational guide](../lab/improvement/DEVELOPER_GUIDE.md#reuse-completed-organization-parts).
+
+## Retain progress during model stages
+
+Organize, propose, assess and compare use the selected runtime profile for
+owner-admitted context mechanisms, even with delegation disabled. The
+[work-products H component](../lab/agents/work_products/README.md) enables durable
+checkpoints and saved JSON repair. Configure its defaults and custom instructions
+through normal component documents, not stage-local algorithm copies.
+Evidence supply, stage time and physical context capacity remain separate limits.
+Cross-run reuse of validated organization parts still requires the explicit
+incremental control; working-file persistence alone grants no reuse authority.

@@ -10,7 +10,8 @@ class AgentSelector:
     def __init__(self, inspector, services):
         self.services, self.inspector = services, inspector
         self.evaluator: ModelEvaluator = getattr(inspector, 'evaluator', None) or ModelEvaluator(
-            inspector.workspace_session.config, inspector.artifacts)
+            inspector.workspace_session.config, inspector.artifacts,
+            runtime_factory=inspector.workspace_session.runtime_factory)
 
     async def select(self, task, records):
         inputs = []
