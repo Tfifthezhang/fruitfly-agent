@@ -90,7 +90,7 @@ class ResearchDelegationTests(unittest.IsolatedAsyncioTestCase):
         self.parent_spawn(['a.txt'])
         response, usage, events = await self.run_role()
         self.assertEqual('Integrated attributed findings', response)
-        self.assertEqual({'catalog', 'search', 'read', 'submit_findings'}, set(child.calls[0]['tools']))
+        self.assertEqual({'catalog', 'search', 'read', 'save_findings', 'submit_findings'}, set(child.calls[0]['tools']))
         self.assertNotIn('UNASSIGNED', str(child.calls))
         self.assertEqual(set(), self.workspace.provided_ids)
         self.assertEqual(1, len(self.workspace.eligible_paths('a.txt')))
@@ -291,7 +291,7 @@ class ResearchDelegationTests(unittest.IsolatedAsyncioTestCase):
         await self.run_role()
         self.assertEqual('secondary-model', child.calls[0]['model'])
         self.assertIn('WORKER MARKER', child.calls[0]['system_prompt'])
-        self.assertEqual({'read', 'submit_findings'}, set(child.calls[0]['tools']))
+        self.assertEqual({'read', 'save_findings', 'submit_findings'}, set(child.calls[0]['tools']))
         self.assertEqual(3, self.workspace.access.supply_characters)
         exported = materialize_system(self.roles.profile, self.root / 'export/config.yaml',
             catalog=self.roles.catalog, model_source=model_path)
@@ -347,6 +347,36 @@ class ResearchDelegationTests(unittest.IsolatedAsyncioTestCase):
                 'sources': [{'path': 'a.txt', 'citation_id': page['citation_id']}], 'unknowns': ['Cause unknown.']})
         child.script.append(submit)
         return child
+
+    async def test_repeated_content_and_detailed_blocks_survive_retention(self):
+        from fruitfly_agent.run.storage.organization_parts import OrganizationPartStore
+        parts = OrganizationPartStore(self.root / 'parts', self.artifacts)
+        self.settings['retention'] = {'enabled': True}
+        self.workspace.files['b.txt'] = self.workspace.files['a.txt']
+        sources = []
+        child = FauxProvider()
+        child.respond_tool_call('read', {'path': 'a.txt'})
+        def read_second(view, signal=None):
+            page = json.loads(view.messages[-1].text)
+            sources.append({'path': 'a.txt', 'citation_id': page['citation_id']})
+            return tool_response('read', {'path': 'b.txt'})
+        def save_block(view, signal=None):
+            page = json.loads(view.messages[-1].text)
+            sources.append({'path': 'b.txt', 'citation_id': page['citation_id']})
+            return tool_response('save_findings', {'summary': 'Both paths contain identical observations.',
+                'sources': sources, 'unknowns': ['Cause unknown.']})
+        child.script.extend((read_second, save_block))
+        child.respond_tool_call('submit_findings', {'summary': 'Two attributed paths inspected.', 'sources': [], 'unknowns': []})
+        self.create(child)
+        self.parent_spawn(['a.txt', 'b.txt'])
+        await self.run_role(parts=parts)
+        self.assertEqual(1, len(parts.entries()))
+        part = parts.read(parts.entries()[0])
+        self.assertEqual({'a.txt', 'b.txt'}, {s['path'] for s in part.findings['sources']})
+        self.assertEqual(1, len(part.findings['blocks']))
+        block = json.loads(self.artifacts.read_bytes(part.findings['blocks'][0]))
+        self.assertEqual(2, len(block['sources']))
+        self.assertEqual(self.workspace.eligible_paths('a.txt'), self.workspace.eligible_paths('b.txt'))
 
     async def test_completed_parts_survive_parent_failure_and_reuse_with_added_material(self):
         from fruitfly_agent.run.storage.organization_parts import OrganizationPartStore

@@ -1,0 +1,6 @@
+id: improvement-editor
+role: I
+implementation: improvement-editor
+parameters:
+  settings:
+    max_repair_attempts: 5

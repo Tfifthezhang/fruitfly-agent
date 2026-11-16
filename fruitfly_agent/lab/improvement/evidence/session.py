@@ -1,5 +1,6 @@
 """Compose workspace access with a shared Agent invocation; roles own policy."""
 from dataclasses import replace
+import json
 from contextlib import AsyncExitStack
 from fruitfly_agent.core.context.budget import forward_context_capabilities
 from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone
@@ -24,6 +25,9 @@ class EvidenceSession:
             raise ValueError('workspace must provide evidence access receipts')
         workspace.record=services.record
         workspace.access.record=services.record
+        from .preflight import inspect_workspace
+        preflight = inspect_workspace(workspace, self.settings)
+        workspace.files['context/preflight.json'] = json.dumps(preflight).encode()
         submitted=None
         def seal(value):
             nonlocal submitted
@@ -69,7 +73,8 @@ class EvidenceSession:
                 try:
                     recovery.check(event.messages)
                 except FatalError:
-                    services.record('tool-recovery-exhausted', feedback_opportunities=recovery.allowance)
+                    services.record('tool-recovery-exhausted', feedback_opportunities=recovery.allowance,
+                        errors=sorted(recovery.previous or ()))
                     raise
             hooks.add(BEFORE_REQUEST, check_recovery, required=True)
             return replace(config, provider=bounded_provider, hooks=hooks, context_meter=meter)

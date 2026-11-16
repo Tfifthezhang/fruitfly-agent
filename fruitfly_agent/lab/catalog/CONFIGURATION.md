@@ -334,3 +334,11 @@ identity apply. Shared evidence error bounds and submission/source validation ar
 protected infrastructure. No additional parameter registry or model-role binding
 is introduced. See [editor](../improvement/editor/README.md) and
 [evidence selection](../improvement/evidence_selection/README.md).
+
+## Configure large retained investigations
+
+Evidence selection admits `sampling_policy: all` and up to 4096 cases/controls
+through its existing I owner and field grants. Candidate file discovery exposes
+actual `harness/` files through the same editor target directory. Research worker
+blocks and reading limits remain protected evidence services; visibility grants
+no editing authority. See the [large batch recipe](../../../examples/experiments/large-batch/README.md).

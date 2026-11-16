@@ -28,6 +28,19 @@ class OrganizationPartStoreTests(unittest.TestCase):
         self.assertEqual((reference,), reopened.entries())
         self.assertEqual(self.part, reopened.read(reference))
 
+    def test_identical_content_under_distinct_granted_paths_retains_both_sources(self):
+        record = self.part.to_dict()
+        source = record['grant']['a.txt']
+        citation = record['findings']['sources'][0]['citation_id']
+        record['grant']['b.txt'] = source
+        record['findings']['sources'].append({'path': 'b.txt', 'citation_id': citation})
+        part = OrganizationPart.from_dict(record)
+        retained = self.store.read(self.store.save(part))
+        self.assertEqual(['a.txt', 'b.txt'], [s['path'] for s in retained.findings['sources']])
+        record['grant']['b.txt'] = self.artifacts.put_bytes(b'different').artifact_id
+        with self.assertRaisesRegex(ValueError, 'unretained source span'):
+            OrganizationPart.from_dict(record)
+
     def test_corrupt_and_symlink_locators_fail_discovery(self):
         reference = self.store.save(self.part)
         locator = self.root / 'parts' / (reference[7:] + '.json')

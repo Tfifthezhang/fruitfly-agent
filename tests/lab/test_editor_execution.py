@@ -14,6 +14,120 @@ from tests.support.faux_provider import FauxProvider
 
 
 class ReliabilityTests(unittest.IsolatedAsyncioTestCase):
+    async def test_draft_check_reports_independent_component_errors_without_finishing(self):
+        import json
+        from fruitfly_agent.lab.improvement.components import ComponentRegistry, FileComponentAdapter
+        from fruitfly_agent.improvement.contracts.optimization import OptimizationSpec
+        flow, plan, baseline, _ = proposal_fixture()
+        def validate(document):
+            if document.files[0].text == 'INVALID':
+                raise ValueError('Invalid component content')
+        components = ComponentRegistry(FileComponentAdapter(document, validate,
+            optimization=OptimizationSpec(document.role, 'documents')) for document in baseline.components)
+        provider = FauxProvider()
+        for name in ('prompt', 'memory'):
+            provider.respond_tool_call('write_file', {'path': f'harness/{name}/instructions.txt', 'content': 'INVALID'})
+        provider.respond_tool_call('check_candidate', {'reasons': []})
+        def repair(view, signal=None):
+            result = json.loads(view.messages[-1].text)
+            self.assertFalse(result['valid'])
+            self.assertEqual({'prompt', 'memory'}, {e['component_id'] for e in result['errors'] if 'component_id' in e})
+            fake = FauxProvider()
+            fake.respond_tool_call('write_file', {'path': 'harness/prompt/instructions.txt', 'content': 'prompt'})
+            return fake(view, signal=signal)
+        provider.script.append(repair)
+        provider.respond_tool_call('write_file', {'path': 'harness/memory/instructions.txt', 'content': 'memory'})
+        provider.respond_tool_call('submit_candidate', {'reasons': [], 'decision': {
+            'kind': 'retain_baseline', 'explanation': 'No supported change.', 'baseline_applicability': 'Unchanged baseline.'}})
+        async with StageServices(plan) as services:
+            candidate = await AgentEditor(AgentLoopConfig(provider), MemoryArtifacts(), components).edit('propose',
+                ProposalRequest(plan, TaskMaterial('task', 'Work'), baseline, (), 'invariant', 0), services)
+        self.assertFalse(candidate.changed_ids)
+        self.assertFalse(provider.script)
+
+    async def test_runtime_failure_retains_unsubmitted_candidate_without_mutating_baseline(self):
+        import json
+        flow, plan, baseline, runner = proposal_fixture()
+        task = TaskMaterial('task', 'Work')
+        record = await runner.execute(plan, task, baseline)
+        artifacts = MemoryArtifacts()
+        provider = FauxProvider()
+        provider.respond_tool_call('read', {'path': 'context/executions.json'})
+        provider.respond_tool_call('write_file', {'path': 'harness/prompt/instructions.txt', 'content': 'Retained draft'})
+        provider.respond_tool_call('read', {'path': 'harness/prompt/instructions.txt'})
+        provider.respond_tool_call('write_file', {'path': 'harness/prompt/instructions.txt', 'content': 'Retained draft'})
+        provider.respond_fatal('Interrupted after editing')
+        editor = AgentEditor(AgentLoopConfig(provider), artifacts, flow.components)
+        async with StageServices(plan) as services:
+            with self.assertRaises(RuntimeError):
+                await editor.edit('propose', ProposalRequest(plan, task, baseline, (record,), 'invariant', 0), services)
+            reference = [fields['artifact_id'] for event, fields in services.events if event == 'editor-draft-retained'][-1]
+        draft = json.loads(artifacts.read(reference))
+        self.assertEqual(baseline.snapshot_id, draft['baseline_id'])
+        component = next(c for c in draft['harness']['components'] if c['component_id'] == 'prompt')
+        self.assertEqual('Retained draft', component['files'][0]['text'])
+        self.assertEqual(baseline, flow.components.snapshot())
+        from fruitfly_agent.improvement.contracts.tasks import Resource
+        resumed = FauxProvider()
+        resumed.respond_tool_call('restore_candidate', {'artifact_id': reference})
+        resumed.respond_tool_call('read', {'path': 'context/executions.json'})
+        resumed.respond_tool_call('submit_candidate', {'reasons': [{'component_id': 'prompt',
+            'explanation': 'Continue the retained inspection draft.', 'evidence_ids': [record.run_id],
+            'expected_effect': 'Inspection precedes completion.'}]})
+        request = ProposalRequest(plan, task, baseline, (record,), 'invariant', 0,
+            context=(Resource('draft.json', reference),))
+        from fruitfly_agent.lab.improvement.editor.recovery import restore_draft
+        from fruitfly_agent.lab.improvement.evidence import EvidenceWorkspace
+        workspace = EvidenceWorkspace.build(request, artifacts)
+        with self.assertRaisesRegex(ValueError, 'explicitly granted'):
+            restore_draft(reference, workspace, replace(request, context=()), artifacts, flow.components)
+        with self.assertRaisesRegex(ValueError, 'outside current grants'):
+            restore_draft(reference, workspace, replace(request, plan=replace(plan, component_ids=('memory',))), artifacts, flow.components)
+        self.assertEqual(baseline, workspace.collect())
+        async with StageServices(plan) as services:
+            candidate = await AgentEditor(AgentLoopConfig(resumed), artifacts, flow.components).edit('propose', request, services)
+        self.assertEqual('Retained draft', candidate.harness.component('prompt').files[0].text)
+        self.assertEqual(3, len(resumed.calls))
+        self.assertFalse(resumed.script)
+
+    def test_explicit_draft_hash_resolves_through_research_stage_context(self):
+        import tempfile
+        from pathlib import Path
+        import yaml
+        from fruitfly_agent.run.improvement.context import ResearchContext
+        reference = 'sha256:' + 'a' * 64
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'improvement.yaml'
+            path.write_text(yaml.safe_dump({'research': {'id': 'restore'}, 'stages': {'propose': {
+                'inputs': {'batches': [{'bundle': 'batch.json'}]}, 'context': [{'artifact': reference}]}},
+                'next': {'stage': 'propose'}}))
+            context = ResearchContext.resolve(path)
+            self.assertEqual([reference], context.inputs['context'])
+
+    async def test_target_discovery_exposes_real_readable_candidate_files(self):
+        import json
+        flow, plan, baseline, runner = proposal_fixture()
+        task = TaskMaterial('task', 'Work')
+        record = await runner.execute(plan, task, baseline)
+        provider = FauxProvider()
+        provider.respond_tool_call('list_targets', {})
+        provider.respond_tool_call('describe_target', {'component_id': 'prompt'})
+        provider.respond_tool_call('read', {'path': 'harness/prompt/instructions.txt'})
+        provider.respond_tool_call('read', {'path': 'context/executions.json'})
+        provider.respond_tool_call('write_file', {'path': 'harness/prompt/instructions.txt', 'content': 'candidate'})
+        provider.respond_tool_call('submit_candidate', {'reasons': [{'component_id': 'prompt',
+            'explanation': 'Observed missing procedure', 'evidence_ids': [record.run_id],
+            'expected_effect': 'Inspection precedes completion.'}]})
+        editor = AgentEditor(AgentLoopConfig(provider), MemoryArtifacts(), flow.components)
+        async with StageServices(plan) as services:
+            candidate = await editor.edit('propose', ProposalRequest(plan, task, baseline, (record,), 'invariant', 0), services)
+        messages = provider.calls[1]['messages']
+        result = next(m for m in messages if getattr(m, 'role', '') == 'toolResult')
+        target = json.loads(result.text)['targets'][0]
+        self.assertEqual(['harness/prompt/instructions.txt'], target['candidate_files'])
+        self.assertEqual(('prompt',), candidate.changed_ids)
+        self.assertEqual(baseline, flow.components.snapshot())
+
     async def test_submission_tool_finishes_without_an_extra_model_request(self):
         flow, plan, baseline, runner = proposal_fixture()
         task = TaskMaterial('task', 'Work')

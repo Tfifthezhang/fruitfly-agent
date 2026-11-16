@@ -64,8 +64,8 @@ class RepresentativeSelector:
         # Reserve controls, then cover distinct execution/outcome strata before filling.
         for row in sorted(controls, key=lambda r: (r['task_id'], r['run_id'])):
             add(row, [control_label, *signals[row['run_id']]], min(settings.controls, settings.max_cases))
-        ranked = sorted((r for r in summaries if signals[r['run_id']]), key=lambda r: (
-            min(frequencies[s] for s in signals[r['run_id']]), r['task_id'], r['run_id']))
+        ranked = sorted((r for r in summaries if signals[r['run_id']] or settings.sampling_policy == 'all'), key=lambda r: (
+            min((frequencies[s] for s in signals[r['run_id']]), default=0), r['task_id'], r['run_id']))
         if settings.sampling_policy == 'balanced':
             covered = {(r['status'], tuple(sorted(set(declared_outcomes(r)))))
                 for r in summaries if any(c['run_id'] == r['run_id'] for c in chosen)}

@@ -1,0 +1,112 @@
+# Source and task paths are placeholders. Model stages incur charges.
+research:
+  id: large-batch-research
+  title: Large retained batch research
+  output_root: ./research-output
+  branch: main
+baseline:
+  config: runtime.example.yaml
+  profile: baseline
+stages:
+  import:
+    source: eval
+    path: /path/to/completed-eval
+    attempt: reuse
+    publish_as: original-batch
+  organize:
+    incremental:
+      enabled: true
+      reuse: true
+    delegation:
+      enabled: true
+      workers:
+      - evidence-reader
+      - record-organizer
+      - cross-record-reader
+      - counterexample-reader
+    inputs:
+      batches:
+      - artifact: original-batch
+    publish_as: organized-evidence
+    instruction: Investigate recurring cross-task behavior, matched contrasts, source
+      gaps and refutable hypotheses. Use complete batch statistics, investigate groups
+      of 8 to 12 cases, and preserve exact source citations. Keep material-audit findings
+      distinct from observed Agent behavior.
+    allowance:
+      seconds: 86400
+      evidence_characters: 536870912
+      evidence_responses: 16384
+    attempt: reuse
+  assess:
+    delegation:
+      enabled: true
+      workers:
+      - evidence-reader
+      - record-organizer
+      - cross-record-reader
+      - counterexample-reader
+    inputs:
+      batches:
+      - artifact: original-batch
+      evidence:
+      - artifact: organized-evidence
+    publish_as: original-assessment
+    allowance:
+      seconds: 1200
+      evidence_characters: 256000
+      evidence_responses: 64
+    attempt: reuse
+  propose:
+    delegation:
+      enabled: true
+      workers:
+      - evidence-reader
+      - record-organizer
+      - cross-record-reader
+      - counterexample-reader
+    inputs:
+      batches:
+      - artifact: original-batch
+      evidence:
+      - artifact: organized-evidence
+    publish_as: candidate-a
+    direction: Improve the enabled mechanisms using supplied observations.
+    optimization:
+      scope: defaults
+      include: {}
+      exclude: []
+    allowance:
+      seconds: 86400
+      evidence_characters: 536870912
+      evidence_responses: 16384
+    attempt: reuse
+  execute:
+    inputs:
+      harness:
+        candidate: candidate-a
+    publish_as: candidate-a-results
+    tasks:
+      file: /path/to/tasks.yaml
+    allowance:
+      task_seconds: 3600
+    attempt: reuse
+  compare:
+    delegation:
+      enabled: true
+      workers:
+      - evidence-reader
+      - record-organizer
+      - cross-record-reader
+      - counterexample-reader
+    inputs:
+      batches:
+      - artifact: original-batch
+      - artifact: candidate-a-results
+    publish_as: candidate-a-comparison
+    allowance:
+      seconds: 1200
+      evidence_characters: 256000
+      evidence_responses: 64
+    attempt: reuse
+next:
+  stage: import

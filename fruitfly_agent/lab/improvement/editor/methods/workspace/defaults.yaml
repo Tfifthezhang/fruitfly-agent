@@ -22,6 +22,7 @@ parameters:
     component_context: 'Authorized component descriptions and current values:'
     navigation: |-
       Use list_targets and describe_target to load parameter semantics on demand. Read context/edit-grants.json for this experiment’s scope.
+      list_targets returns candidate_files under harness/<component_id>/. Read the actual candidate file, preserve its format and protected values, then write_file to that exact path. details_path describes fields; it is not editable. Never guess candidate paths.
       Read context/extensions/selection.json when present. Full compact summaries describe the distribution; only selected cases grant detailed materials.
       Read context/statistics.json for deterministic distributions and known/unknown denominators.
       Use catalog with context/extensions/ to discover organization/index.json and per-issue details.
@@ -31,6 +32,8 @@ parameters:
       Use qualified issue_ref identities from the index when multiple guides share local IDs.
       Check historical effective configuration against the current baseline; unknown history remains unknown.
       A behavior appearing in a successful case does not establish efficiency or exclude improvement.
+      When a previous draft artifact is explicitly granted in stage context, restore_candidate can restore its edits after baseline and source checks. Read the relevant current evidence before submitting.
+      Use check_candidate to validate the current draft without finishing. Use catalog(kind=executions) and per-run summaries for batch navigation.
       Prefer submit_candidate to finish without a prose/JSON handoff. Search large evidence before reading selected pages.
       Read execution metadata or relevant execution pages before citing a run. Listing paths alone does not supply evidence.
       Read available evidence/overview.json and evidence/coverage.json for each relevant execution. Missing outputs, partial indexing and unknown usage limit conclusions; distinguish these gaps from demonstrated task failures.
@@ -60,6 +63,8 @@ parameters:
       and constraints.
     submit_candidate: Validate the candidate and evidence-grounded behavior hypotheses. Ends
       this editing invocation on success.
+    check_candidate: Check the current draft and reasons without publishing or ending the invocation. Returns independent component errors and submission errors for local repair.
+    restore_candidate: Restore an unsubmitted draft artifact explicitly granted in stage context. Baseline, source identities and current owner grants must match. Read current execution evidence before submitting restored edits.
   settings:
     target_page_entries: 20
     max_target_entries: 100

@@ -8,6 +8,7 @@ See the [field guide](../../fruitfly_agent/experiments/CONFIGURATION.md) and
 
 | Recipe | Required material |
 |---|---|
+| [Large retained batch](large-batch/README.md) | Explicit retained source; expanded stage and worker budgets; model stages incur charges |
 | [Independent research](research-stage.example.yaml) | Replace historical source paths; model stages need credentials |
 | [Default optimization scope](improvement-defaults.example.yaml) | Offline preview or explicit portable batch inputs |
 | [Benchmark batch](benchmark-smoke.example.yaml) | Prepared [collection](tasks/tb4-smoke.yaml); executes only the selected complete config |

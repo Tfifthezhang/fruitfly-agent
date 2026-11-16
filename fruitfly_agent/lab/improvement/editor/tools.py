@@ -36,6 +36,8 @@ def editing_tools(workspace, *, submit=None, settings=None, instructions=None, o
         if row is None:raise ValueError('component is outside the resolved target set')
         from ..evidence.catalog import WorkspaceEvidence
         value=WorkspaceEvidence(workspace, settings=settings).read(row['details_path'],offset=ctx.args.get('offset',0),limit=ctx.args.get('limit'))
+        value['candidate_prefix'] = row['candidate_prefix']
+        value['candidate_files'] = row['candidate_files']
         return AgentToolResult(content=[TextBlock(json.dumps(value,ensure_ascii=False))])
     tools.extend((AgentTool(name='list_targets',label='Discover optimization targets',description=instructions.list_targets,
         parameters={'type':'object','properties':{'cursor':{'type':'integer'},'limit':{'type':'integer'}}},execute=targets),

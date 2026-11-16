@@ -121,3 +121,31 @@ invocations (default 3). Like directory presentation settings, it is configurabl
 but protected from candidate instruction grants. Repairs retain the draft, exact
 authorized sources and original cumulative allowance. Exhaustion is a runtime
 failure, never an implicit retain-baseline decision.
+
+## Discover and check candidate files
+
+`list_targets` returns `candidate_prefix` and `candidate_files` for every legal
+target. `describe_target` repeats these paths beside field details. Read the
+actual `harness/<component-id>/<file>` before replacing it; `details_path` is
+read-only metadata. `check_candidate` uses final validation without terminating
+the role. Only `submit_candidate` or a valid final handoff finishes the proposal.
+
+Every candidate file write/delete retains an immutable, unsubmitted draft in the
+artifact store and records `editor-draft-retained` with its baseline and exact
+source spans. Failed stage traces retain these references. This preserves edits
+for explicit recovery; loading a draft never activates it or bypasses current
+grants, component validation and execution-evidence checks.
+
+To restore a failed draft, explicitly grant its recorded artifact through
+`stages.propose.context: [{artifact: "sha256:<recorded-draft-hash>"}]`. The hash
+must exist in the selected research artifact store. Call `restore_candidate` with
+that identity. The owner verifies the baseline, current component grants, source
+identities and workspace size before replacing candidate files. It does not
+restore direct-reading receipts: read the relevant current evidence and submit
+validated reasons. Ungranted drafts and changed baselines fail before mutation.
+
+Draft checks report independent component validation errors together with a
+submission error when present. These diagnostics do not finish the invocation.
+`instructions.check_candidate` and `instructions.restore_candidate` belong to
+the existing editor I instruction surface; grants and restoration validation
+remain protected.

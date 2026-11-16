@@ -1,0 +1,111 @@
+id: subagent
+role: H
+implementation: subagent
+parameters:
+  settings:
+    max_concurrent: 4
+    max_agents: 32
+    run_timeout_seconds: 3600
+    max_model_requests: 256
+    workers:
+      evidence-reader:
+        description: Investigate a bounded evidence question.
+        model_role: subagent
+        instructions: Read assigned sources to answer the delegated question. Report
+          observations, plausible explanations, counterexamples and unknowns separately.
+        capabilities:
+          tools:
+          - catalog
+          - search
+          - read
+          resources: assigned
+          writes: deny
+          delegation: disabled
+        inheritance:
+          conversation: explicit_materials
+          state: independent
+        limits:
+          seconds: 3600
+          model_requests: 256
+          evidence_characters: 2097152
+          evidence_responses: 512
+        result:
+          contract: evidence_findings
+          max_characters: 24000
+      record-organizer:
+        description: Organize assigned records for later reading.
+        model_role: subagent
+        instructions: Organize assigned records into a compact factual summary. Preserve
+          chronology, rare events, source references and coverage gaps. Do not propose
+          candidate changes.
+        capabilities:
+          tools:
+          - catalog
+          - search
+          - read
+          resources: assigned
+          writes: deny
+          delegation: disabled
+        inheritance:
+          conversation: explicit_materials
+          state: independent
+        limits:
+          seconds: 3600
+          model_requests: 256
+          evidence_characters: 2097152
+          evidence_responses: 512
+        result:
+          contract: evidence_findings
+          max_characters: 24000
+      cross-record-reader:
+        description: Compare assigned records for recurring or conflicting observations.
+        model_role: subagent
+        instructions: Compare the assigned records. Identify recurring observations,
+          differences and counterexamples. Distinguish missing material from observed
+          absence; do not infer causation from correlation.
+        capabilities:
+          tools:
+          - catalog
+          - search
+          - read
+          resources: assigned
+          writes: deny
+          delegation: disabled
+        inheritance:
+          conversation: explicit_materials
+          state: independent
+        limits:
+          seconds: 3600
+          model_requests: 256
+          evidence_characters: 2097152
+          evidence_responses: 512
+        result:
+          contract: evidence_findings
+          max_characters: 24000
+      counterexample-reader:
+        description: Check a stated explanation against assigned evidence.
+        model_role: subagent
+        instructions: Test the delegated explanation against assigned evidence. Seek
+          disconfirming observations and alternative explanations. State supporting
+          evidence, contradictions and unresolved scope.
+        capabilities:
+          tools:
+          - catalog
+          - search
+          - read
+          resources: assigned
+          writes: deny
+          delegation: disabled
+        inheritance:
+          conversation: explicit_materials
+          state: independent
+        limits:
+          seconds: 3600
+          model_requests: 256
+          evidence_characters: 2097152
+          evidence_responses: 512
+        result:
+          contract: evidence_findings
+          max_characters: 24000
+    results:
+      summary_characters: 6000

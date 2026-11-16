@@ -69,3 +69,9 @@ class ExecutionSummaryTests(unittest.IsolatedAsyncioTestCase):
         reading = access.inspection()['paths']['text']
         self.assertEqual([(0, 3)], reading['search'])
         self.assertEqual([(2, 6)], reading['read'])
+
+    def test_supplied_single_summary_attributes_only_its_execution(self):
+        from fruitfly_agent.lab.improvement.evidence.access import EvidenceAccess
+        access = EvidenceAccess(('a', 'b'))
+        access.provided('context/summaries/a.json', '{"run_id":"a"}')
+        self.assertEqual({'a'}, access.supplied)

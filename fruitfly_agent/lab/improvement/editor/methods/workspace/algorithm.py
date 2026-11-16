@@ -39,9 +39,9 @@ class AgentEditor:
         self.options = EditorSettings.from_dict(options)
         self.workspace_session = EvidenceSession(config, artifacts, settings=settings, reader_factory=reader_factory, runtime_factory=runtime_factory)
 
-    async def session(self, mission, workspace, services, *, writable=True, submit=None):
+    async def session(self, mission, workspace, services, *, writable=True, submit=None, extra_tools=()):
         return await self.workspace_session.session(mission, workspace, services,
-            writable=writable, system=self.instructions.system, submit=submit, editing_instructions=self.instructions, editing_options=self.options)
+            writable=writable, system=self.instructions.system, submit=submit, editing_instructions=self.instructions, editing_options=self.options, extra_tools=extra_tools)
 
     async def edit(self, stage, request, services):
         return await services.operation(self._edit(stage,request,services),stage='editor')
@@ -55,7 +55,11 @@ class AgentEditor:
             details=canonical_json(value).encode()
             path='context/components/'+name+'.json'
             workspace.references[path]=self.artifacts.put(details)
-            summary.append({'component_id':name,'role':value['role'],'fields':[f['path'] for f in value['fields']], 'details_path':path})
+            component = request.baseline.component(name)
+            summary.append({'component_id':name,'role':value['role'],
+                'fields':[f['path'] for f in value['fields']], 'details_path':path,
+                'candidate_prefix': 'harness/' + name + '/',
+                'candidate_files': ['harness/' + name + '/' + file.path for file in component.files]})
         workspace.files['context/components.json']=canonical_json(summary).encode()
         services.record('component-descriptions',identity=content_hash(description_text),
             conditions_id=request.plan.conditions_id,baseline_id=request.baseline.snapshot_id,
@@ -69,6 +73,29 @@ class AgentEditor:
         def seal(value):
             nonlocal sealed
             sealed = submission(value, workspace, request, self.components)
+        from fruitfly_agent.core.tool_runtime import AgentTool
+        from fruitfly_agent.core.data_model import AgentToolResult, TextBlock
+        from ...schema import SUBMISSION
+        async def check(ctx):
+            from ...validation import draft_component_errors
+            errors = draft_component_errors(workspace, request, self.components)
+            try:
+                candidate = submission(ctx.args, workspace, request, self.components)
+            except (ValueError, TypeError, KeyError) as exc:
+                errors.append({'submission': str(exc)[:4000]})
+            if errors:
+                return AgentToolResult([TextBlock(canonical_json({'valid': False, 'errors': errors}))])
+            return AgentToolResult([TextBlock(canonical_json({'valid': True, 'changed_components': candidate.changed_ids,
+                'note': 'Draft checked; call submit_candidate to publish.'}))])
+        check_tool = AgentTool('check_candidate', 'Check draft', self.instructions.check_candidate,
+            SUBMISSION, check, requires_exclusive_batch=True)
+        from ...recovery import restore_draft
+        async def restore(ctx):
+            value = restore_draft(ctx.args['artifact_id'], workspace, request, self.artifacts, self.components)
+            return AgentToolResult([TextBlock(canonical_json(value))])
+        restore_tool = AgentTool('restore_candidate', 'Restore granted draft', self.instructions.restore_candidate,
+            {'type': 'object', 'properties': {'artifact_id': {'type': 'string'}},
+                'required': ['artifact_id'], 'additionalProperties': False}, restore, requires_exclusive_batch=True)
         attempt = 0
         while True:
             services.check()
@@ -77,7 +104,7 @@ class AgentEditor:
                 raise RuntimeError('editor_repair_exhausted: no valid proposal decision')
             response = ''
             try:
-                response = await self.session(mission, workspace, services, submit=seal)
+                response = await self.session(mission, workspace, services, submit=seal, extra_tools=(check_tool, restore_tool))
                 candidate = sealed if sealed is not None else submission(response, workspace, request, self.components)
                 services.retain_proposal_decision(workspace.proposal_decision)
                 return candidate

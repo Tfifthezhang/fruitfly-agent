@@ -28,6 +28,8 @@ class EditorInstructions:
     list_targets: str = field(default_factory=lambda: parameter_default(__package__ + '.methods.workspace', 'defaults.yaml', 'instructions.list_targets'))
     describe_target: str = field(default_factory=lambda: parameter_default(__package__ + '.methods.workspace', 'defaults.yaml', 'instructions.describe_target'))
     submit_candidate: str = field(default_factory=lambda: parameter_default(__package__ + '.methods.workspace', 'defaults.yaml', 'instructions.submit_candidate'))
+    check_candidate: str = field(default_factory=lambda: parameter_default(__package__ + '.methods.workspace', 'defaults.yaml', 'instructions.check_candidate'))
+    restore_candidate: str = field(default_factory=lambda: parameter_default(__package__ + '.methods.workspace', 'defaults.yaml', 'instructions.restore_candidate'))
 
     def __post_init__(self):
         for value in asdict(self).values():

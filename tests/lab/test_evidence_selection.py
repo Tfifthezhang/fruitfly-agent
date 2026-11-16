@@ -20,6 +20,17 @@ def row(run, task, **changes):
 
 
 class SelectionTests(unittest.IsolatedAsyncioTestCase):
+    def test_all_policy_selects_large_batches_and_preserves_case_bounds(self):
+        for count in (89, 256):
+            rows = tuple(row('run-' + str(i), 'task-' + str(i)) for i in range(count))
+            settings = SelectionSettings(max_cases=count, controls=0, sampling_policy='all')
+            selected = RepresentativeSelector(settings).select(rows)
+            self.assertEqual(count, len(selected['selected']))
+            self.assertEqual(0, selected['omitted_executions'])
+            self.assertEqual(selected, RepresentativeSelector(settings).select(tuple(reversed(rows))))
+        with self.assertRaises(ValueError):
+            SelectionSettings(max_cases=4097)
+
     def test_frozen_source_loads_policy_and_default_resources_without_checkout(self):
         import tempfile
         import subprocess

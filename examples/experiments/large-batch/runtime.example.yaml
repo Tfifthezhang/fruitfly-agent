@@ -1,0 +1,62 @@
+default_profile: baseline
+profiles:
+  baseline:
+    models:
+      catalog: ../../configuration/models.example.yaml
+      roles:
+        subagent:
+          inherit: executor
+        executor: deepseek-flash-openai
+        editor:
+          inherit: executor
+        organizer:
+          inherit: executor
+        assessor:
+          inherit: executor
+        working_memory:
+          inherit: executor
+        context_query:
+          inherit: executor
+        context_summary:
+          inherit: executor
+        memory_maintenance:
+          inherit: executor
+    H:
+      context-budget:
+        file: research-context-budget.yaml
+      subagent:
+        file: research-subagent.yaml
+      local-env:
+        default: true
+      read-tool:
+        default: true
+      bash-tool:
+        default: true
+      edit-tool:
+        default: true
+      write-tool:
+        default: true
+      work-products:
+        default: true
+      layered-compaction:
+        file: research-compaction.yaml
+      base_prompt:
+        default: true
+      skills:
+        default: true
+      file-memory:
+        default: true
+    S:
+      memory-library:
+        default: true
+      skill-library:
+        default: true
+    I:
+      improvement-evidence-selection:
+        file: research-evidence-selection.yaml
+      improvement-organizer:
+        file: research-organizer.yaml
+      improvement-editor:
+        file: research-editor.yaml
+      improvement-evaluator:
+        default: true

@@ -32,6 +32,8 @@ class EvidenceDelegation:
         self.scopes, self.grants, self.accepted = {}, {}, {}
         self.spans = {}
         self.service = None
+        self.blocks = {}
+        self.block_sizes = {}
         self.cache = OrganizationPartCache(workspace, artifacts, settings, parts,
             conditions=conditions or {}, models=models or {}, workers=self.worker_by_name, record=record) if parts is not None else None
 
@@ -123,23 +125,33 @@ class EvidenceDelegation:
         run_id = request.identity.run_id
         worker = self.worker_config(request)
         maximum = min(self.settings.read.max_characters, worker['result']['max_characters'])
+        from .findings import validate_findings_block
+        def validate(value):
+            return validate_findings_block(value, scope, maximum)
+        async def save(ctx):
+            value = validate(ctx.args)
+            size = len(canonical_json(value))
+            if self.block_sizes.get(run_id, 0) + size > self.settings.findings.max_characters:
+                raise ValueError('detailed findings cumulative character allowance exhausted')
+            reference = self.artifacts.put(canonical_json(value).encode())
+            self.blocks.setdefault(run_id, []).append((reference, value))
+            self.block_sizes[run_id] = self.block_sizes.get(run_id, 0) + size
+            self.record('delegation-findings-block', child_run_id=run_id, artifact_id=reference)
+            return AgentToolResult([TextBlock(canonical_json({'artifact_id': reference, 'characters': size,
+                'remaining_characters': self.settings.findings.max_characters - self.block_sizes[run_id]}))])
         async def submit(ctx):
-            value = ctx.args
-            if set(value) != {'summary', 'sources', 'unknowns'} or not isinstance(value['summary'], str) or not value['summary'].strip():
-                raise ValueError('findings require summary, sources and unknowns')
-            if len(value['summary']) > maximum or not isinstance(value['sources'], list):
-                raise ValueError('findings exceed the supported result size')
-            if not isinstance(value['unknowns'], list) or any(not isinstance(v, str) or len(v) > maximum for v in value['unknowns']):
-                raise ValueError('unknowns must be bounded text entries')
-            for source in value['sources']:
-                if (not isinstance(source, dict) or set(source) != {'path', 'citation_id'}
-                        or source['path'] not in scope.paths()
-                        or source['citation_id'] not in scope.provided_paths.get(source['path'], set())):
-                    raise ValueError('findings cite unassigned or unread source spans')
-            frozen = canonical_json(value)
-            if len(frozen) > maximum:
-                raise ValueError('findings exceed the supported result size')
-            self.accepted[run_id] = json.loads(frozen)
+            value = validate(ctx.args)
+            blocks = self.blocks.get(run_id, [])
+            if blocks:
+                if len(value['summary']) > self.settings.findings.summary_characters:
+                    raise ValueError(f'final summary exceeds {self.settings.findings.summary_characters} characters; retain detail with save_findings')
+                sources = {(v['path'], v['citation_id']): v for v in value['sources']}
+                for _, block in blocks:
+                    sources.update({(v['path'], v['citation_id']): v for v in block['sources']})
+                value = {**value, 'sources': list(sources.values()), 'blocks': [ref for ref, _ in blocks]}
+            if self.cache is not None:
+                self._save_part(request, value)
+            self.accepted[run_id] = value
             return AgentToolResult([TextBlock('Attributed findings retained.')], terminate=True)
         text = {'type': 'string'}
         source = {'type': 'object', 'properties': {'path': text, 'citation_id': text},
@@ -150,29 +162,53 @@ class EvidenceDelegation:
                 'sources': {'type': 'array', 'items': source}, 'unknowns': {'type': 'array', 'items': text}},
                 'required': ['summary', 'sources', 'unknowns'], 'additionalProperties': False},
             execute=submit, requires_exclusive_batch=True)
-        return (*tuple(t for t in evidence_tools(scope, settings=self.settings) if t.name in worker['capabilities']['tools']), submission)
+        block_tool = AgentTool(name='save_findings', label='Save detailed findings',
+            description=self.settings.instructions.save_findings,
+            parameters=submission.parameters, execute=save)
+        return (*tuple(t for t in evidence_tools(scope, settings=self.settings) if t.name in worker['capabilities']['tools']), block_tool, submission)
+
+    def _save_part(self, request, value):
+        if self.service is None:
+            raise ValueError('retention requires a managed child lifecycle')
+        row = self.service.detail(request.identity.agent_id, request.identity.run_id)
+        citations = {source['citation_id']: self.spans[request.identity.agent_id][source['citation_id']] for source in value['sources']}
+        self.cache.save(request, value, self.grants[request.identity.agent_id], citations,
+            reusable=not row['steered'] and not row['continuation'])
 
     def finalize(self, request, result, summary):
         value = self.accepted.get(request.identity.run_id)
         if value is None:
             raise ValueError('evidence child did not submit validated findings')
         scope = self.scopes[request.identity.agent_id]
-        payload = {'identity': asdict(request.identity), 'worker': request.worker,
+        block_paths = []
+        for index, reference in enumerate(value.get('blocks', ())):
+            path = 'context/findings/' + request.identity.run_id + '/' + str(index) + '.json'
+            if isinstance(self.workspace, ReferenceWorkspace):
+                self.workspace.references[path] = reference
+            else:
+                self.workspace.files[path] = self.artifacts.read(reference)
+            block_paths.append(path)
+        payload = {'block_paths': block_paths, 'identity': asdict(request.identity), 'worker': request.worker,
             'grant': self.grants[request.identity.agent_id], 'findings': value,
             'reading_scope': 'Child source reading; parent received derived findings, not original bytes.'}
         reference = self.artifacts.put(canonical_json(payload).encode())
+        final_path = 'context/findings/' + request.identity.run_id + '/final.json'
+        if isinstance(self.workspace, ReferenceWorkspace):
+            self.workspace.references[final_path] = reference
+        else:
+            self.workspace.files[final_path] = canonical_json(payload).encode()
         self.record('delegation-findings', agent_id=request.identity.agent_id,
             child_run_id=request.identity.run_id, artifact_id=reference, sources=value['sources'])
-        if self.cache is not None:
-            service = self.service
-            if service is None:
-                raise ValueError('retention requires a managed child lifecycle')
-            row = service.detail(request.identity.agent_id, request.identity.run_id)
-            citations = {source['citation_id']: self.spans[request.identity.agent_id][source['citation_id']] for source in value['sources']}
-            self.cache.save(request, value, self.grants[request.identity.agent_id], citations,
-                reusable=not row['steered'] and not row['continuation'])
         for source in value['sources']:
             self.workspace.delegated_paths.setdefault(source['path'], set()).add(source['citation_id'])
+            span = getattr(scope, 'source_spans', {}).get((source['path'], source['citation_id']))
+            if span is not None:
+                from .provenance import retain_span
+                retain_span(self.workspace, span['path'], span['artifact_id'], span['start'], span['end'])
         if value['sources']:
             self.workspace.access.delegated_supplied.update(scope.access.supplied)
-        return canonical_json({**payload, 'artifact_id': reference})
+        return canonical_json({'identity': payload['identity'], 'worker': request.worker,
+            'summary': value['summary'][:self.settings.findings.summary_characters],
+            'source_count': len(value['sources']), 'artifact_id': reference,
+            'findings_path': final_path, 'block_paths': block_paths,
+            'reading_scope': payload['reading_scope']})

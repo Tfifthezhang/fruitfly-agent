@@ -30,6 +30,10 @@ class ResearchContext:
             if len(value) != 1:
                 raise ValueError('input reference requires exactly one selector')
             kind, name = next(iter(value.items()))
+            if kind == 'artifact' and name.startswith('sha256:'):
+                from fruitfly_agent.improvement.contracts.versions import require_hash
+                require_hash(name)
+                return name
             if kind == 'config':
                 if not harness:
                     raise ValueError('config references are only valid for harness inputs')

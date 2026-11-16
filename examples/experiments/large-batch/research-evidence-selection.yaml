@@ -1,0 +1,10 @@
+id: improvement-evidence-selection
+role: I
+implementation: improvement-evidence-selection
+parameters:
+  settings:
+    max_cases: 256
+    controls: 16
+    max_per_task: 2
+    sampling_policy: all
+    material_policy: focused

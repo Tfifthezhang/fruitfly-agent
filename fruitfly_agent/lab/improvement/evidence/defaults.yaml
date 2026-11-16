@@ -1,5 +1,8 @@
 # Shared evidence defaults. Types and hard safety limits remain in Python.
 parameters:
+  findings:
+    max_characters: 256000
+    summary_characters: 6000
   read:
     default_characters: 12000
     max_characters: 24000
@@ -13,17 +16,18 @@ parameters:
   supply:
     max_characters: 256000
     max_pages: 64
-    completion_requests: 8
+    completion_requests: 32
     repeated_error_limit: 3
   delegation:
     enabled: false
     workers:
     - evidence-reader
   instructions:
+    save_findings: Save one validated detailed findings block before final submission. Each block uses the findings schema and result size limit. Final submit_findings retains these blocks and returns a compact summary.
     initial: Use catalog to discover the granted workspace, then read relevant evidence.
     repair: 'The judgment was rejected: {error}. Repair the submission using the declared
       schema and supplied citations. Do not restart investigation or invent evidence.'
-    catalog: Browse granted files with prefix. Use path only for a granted evidence/events.json index, never an execution directory. Catalog is navigation, not proof of reading.
+    catalog: Use kind=executions to page complete compact execution rows, optionally filtering status. Browse granted files with prefix. Use path only for a granted evidence/events.json index, never an execution directory. Catalog is navigation, not proof of reading.
     read: Read a granted original page or image. Cite the returned citation_id; continue
       with next_offset. Offsets are source characters.
     search: Literal search across granted files or selected paths. Returns source

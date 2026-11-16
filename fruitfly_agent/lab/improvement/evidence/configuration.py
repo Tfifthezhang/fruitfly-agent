@@ -59,7 +59,19 @@ class RetentionSettings:
 
 
 @dataclass(frozen=True)
+class FindingsSettings:
+    max_characters: int = field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'findings.max_characters'))
+    summary_characters: int = field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'findings.summary_characters'))
+
+    def __post_init__(self):
+        if (type(self.max_characters) is not int or self.max_characters < 24000
+                or type(self.summary_characters) is not int or not 1 <= self.summary_characters <= 24000):
+            raise ValueError('invalid findings retention limits')
+
+
+@dataclass(frozen=True)
 class SessionInstructions:
+    save_findings: str = field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'instructions.save_findings'))
     catalog_parts: str = field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'instructions.catalog_parts'))
     read_part: str = field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'instructions.read_part'))
     initial: str = field(default_factory=lambda: parameter_default(__package__, 'defaults.yaml', 'instructions.initial'))
@@ -76,6 +88,7 @@ class SessionInstructions:
 
 @dataclass(frozen=True)
 class EvidenceSettings:
+    findings: FindingsSettings = field(default_factory=FindingsSettings)
     read: ReadSettings = field(default_factory=ReadSettings)
     catalog: CatalogSettings = field(default_factory=CatalogSettings)
     search: SearchSettings = field(default_factory=SearchSettings)
@@ -85,7 +98,7 @@ class EvidenceSettings:
     retention: RetentionSettings = field(default_factory=RetentionSettings)
 
     def __post_init__(self):
-        for name, kind in (('read', ReadSettings), ('catalog', CatalogSettings), ('search', SearchSettings), ('supply', SupplySettings), ('delegation', DelegationSettings), ('instructions', SessionInstructions), ('retention', RetentionSettings)):
+        for name, kind in (('findings', FindingsSettings), ('read', ReadSettings), ('catalog', CatalogSettings), ('search', SearchSettings), ('supply', SupplySettings), ('delegation', DelegationSettings), ('instructions', SessionInstructions), ('retention', RetentionSettings)):
             value = getattr(self, name)
             if isinstance(value, dict):
                 value = kind(**mapping(value, kind.__dataclass_fields__, 'evidence.' + name))

@@ -3,7 +3,7 @@ from dataclasses import dataclass, field, asdict
 from fruitfly_agent.runtime_spec.documents import parameter_default, mapping
 
 PACKAGE = __package__ + '.methods.representative'
-LIMITS = {'max_cases': (1, 64), 'controls': (0, 16), 'max_per_task': (1, 16),
+LIMITS = {'max_cases': (1, 4096), 'controls': (0, 4096), 'max_per_task': (1, 16),
           'slow_seconds': (1, 86400), 'many_calls': (1, 10000), 'many_tools': (1, 100000), 'high_tokens': (1, 100000000)}
 
 
@@ -26,7 +26,7 @@ class SelectionSettings:
     def __post_init__(self):
         for key, value in asdict(self).items():
             if key == 'sampling_policy':
-                if value not in ('balanced', 'rare-first'):
+                if value not in ('balanced', 'rare-first', 'all'):
                     raise ValueError('invalid evidence sampling policy')
                 continue
             if key == 'material_policy':

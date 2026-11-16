@@ -174,3 +174,13 @@ the editor component; do not embed either policy into study observations.
 [Proposal decisions](../lab/improvement/editor/README.md#submit-an-explicit-decision)
 and diagnostic manifests are outputs, not stage selectors or implicit permissions.
 There is no configuration-version field or automatic follow-on execution.
+
+Large batch configurations should raise both stage allowances and named worker
+limits through their respective owners. See the [large batch recipe](../../examples/experiments/large-batch/README.md).
+Failure reports retain bounded exception causes; research traces additionally
+record repeated tool-error messages. A runtime failure is not a baseline decision.
+
+An explicit `artifact: "sha256:<hash>"` input resolves directly in the selected
+research artifact store; it is validated by its typed stage consumer. This also
+allows an unsubmitted draft to be granted through proposal `context` for explicit
+[owner-validated restoration](../lab/improvement/editor/README.md).

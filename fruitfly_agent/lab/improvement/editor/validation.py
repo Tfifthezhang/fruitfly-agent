@@ -2,6 +2,21 @@
 from fruitfly_agent.improvement.contracts.candidates import CandidateBundle
 
 
+def draft_component_errors(workspace, request, components):
+    """Check each component against the same baseline to report independent errors."""
+    from fruitfly_agent.improvement.contracts.components import HarnessSnapshot
+    errors = []
+    snapshot = workspace.collect()
+    for document in snapshot.components:
+        trial = HarnessSnapshot(tuple(document if old.component_id == document.component_id else old
+            for old in request.baseline.components))
+        try:
+            components.validate(trial)
+        except (ValueError, TypeError, KeyError) as exc:
+            errors.append({'component_id': document.component_id, 'error': str(exc)[:4000]})
+    return errors
+
+
 def validate_candidate(candidate, *, components, plan, baseline, records):
     if not isinstance(candidate, CandidateBundle) or candidate.parent != plan.parent or candidate.base != baseline:
         raise ValueError('candidate must match its frozen parent and editing baseline')

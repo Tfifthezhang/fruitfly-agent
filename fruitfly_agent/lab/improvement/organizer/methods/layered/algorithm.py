@@ -88,11 +88,36 @@ class LayeredOrganizer:
             parameters={'type': 'object', 'properties': {'schema_version': {'type': 'integer', 'enum': [2]}, 'sections': {'type': 'array', 'items': section},
                     'findings': {'type': 'array', 'items': finding, 'maxItems': 16}},
                 'required': ['schema_version', 'sections', 'findings'], 'additionalProperties': False}, execute=submit, requires_exclusive_batch=True)
+        async def check(ctx):
+            nonlocal accepted, source_rows
+            previous, previous_sources = accepted, source_rows
+            errors = []
+            try:
+                for key in ('sections', 'findings'):
+                    for index, item in enumerate(ctx.args[key]):
+                        value = {**ctx.args, 'sections': [], 'findings': [], key: [item]}
+                        try:
+                            accept(value)
+                        except (ValueError, TypeError, KeyError) as exc:
+                            errors.append({'path': f'{key}[{index}]', 'error': str(exc)[:4000]})
+                if not errors:
+                    try:
+                        accept(ctx.args)
+                    except (ValueError, TypeError, KeyError) as exc:
+                        errors.append({'path': 'submission', 'error': str(exc)[:4000]})
+            finally:
+                accepted, source_rows = previous, previous_sources
+            if errors:
+                return AgentToolResult([TextBlock(canonical_json({'valid': False, 'errors': errors}))])
+            return AgentToolResult([TextBlock('Organization draft validated; submit_organization publishes it.')])
+        check_tool = AgentTool(name='check_organization', label='Check organization draft',
+            description='Validate a draft through the final owner validator without publishing or finishing.',
+            parameters=tool.parameters, execute=check, requires_exclusive_batch=True)
         mission = self.instructions.organize
         if request.instruction.strip():
             mission += '\n\nInvocation requirements:\n' + request.instruction
         await self.session.session(mission, workspace, services, system=self.instructions.system,
-            extra_tools=(tool,), validate_final=accept,
+            extra_tools=(tool, check_tool), validate_final=accept,
             submission_result=lambda: canonical_json(accepted) if accepted is not None else None,
             initial_content=canonical_json({'batch_path': 'context/batch.json', 'task_count': len(request.tasks)}))
         if accepted is None:

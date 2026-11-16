@@ -82,8 +82,12 @@ class OrganizationPart:
                 raise ValueError('invalid part citation kind')
             if citation != expected:
                 raise ValueError('organization part citation identity mismatch')
-        if not isinstance(self.findings, dict) or set(self.findings) != {'summary', 'sources', 'unknowns'}:
+        if not isinstance(self.findings, dict) or not {'summary', 'sources', 'unknowns'} <= set(self.findings) or set(self.findings) - {'summary', 'sources', 'unknowns', 'blocks'}:
             raise ValueError('organization part requires structured findings')
+        if 'blocks' in self.findings and not isinstance(self.findings['blocks'], list):
+            raise ValueError('organization findings blocks must be an array')
+        for reference in self.findings.get('blocks', ()):
+            require_hash(reference)
         bounded(self.findings['summary'], 24000)
         if (not isinstance(self.findings['unknowns'], list)
                 or any(not isinstance(v, str) for v in self.findings['unknowns'])
@@ -92,7 +96,8 @@ class OrganizationPart:
         for source in self.findings['sources']:
             if (not isinstance(source, dict) or set(source) != {'path', 'citation_id'}
                     or source['citation_id'] not in self.citations
-                    or self.citations[source['citation_id']]['path'] != source['path']):
+                    or source['path'] not in self.grant
+                    or self.citations[source['citation_id']]['artifact_id'] != self.grant[source['path']]):
                 raise ValueError('organization part cites an unretained source span')
 
     def to_dict(self):

@@ -232,6 +232,7 @@ class SubagentService:
             result = await runtime.run(self.requests[run_id], signal=signal)
             return result
         state, error, result = 'failed', None, None
+        error_detail = None
         try:
             result = await supervisor.run(invoke, timeout=policy.timeout_seconds, signal=signal)
             state = 'failed' if result.is_error else 'cancelled' if result.stop_reason == 'aborted' else 'completed'
@@ -273,12 +274,14 @@ class SubagentService:
                     summary = self.finalize(request, result, summary)
                     if not isinstance(summary, str):
                         raise TypeError('worker finalization must return text')
-                except (ValueError, TypeError, KeyError):
+                except (ValueError, TypeError, KeyError) as exc:
+                    error_detail = {'type': type(exc).__name__, 'message': str(exc)[:4000]}
                     state, error, summary = 'failed', 'invalid_worker_result', ''
                 except BaseException:
                     self._poison()
                     raise
             payload = {'state': state, 'output': summary, 'error': error,
+                'error_detail': error_detail,
                 'usage': result.usage.to_dict() if result and runtime and runtime.usage_known else None,
                 'diagnostics': asdict(result.diagnostics) if result and result.diagnostics else None}
             try:

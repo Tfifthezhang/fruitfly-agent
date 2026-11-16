@@ -85,6 +85,7 @@ class EvidenceAccess:
         text = content if isinstance(content, str) else ''
         for run in self.run_ids:
             if (path.startswith('context/executions/' + run + '/')
+                    or path == 'context/summaries/' + run + '.json'
                     or path.startswith('context/tasks/') and '/executions/' + run + '/' in path
                     or path in {'context/executions.json', 'context/evaluations.json'} and ('"run_id":"' + run + '"') in text):
                 self.supplied.add(run)

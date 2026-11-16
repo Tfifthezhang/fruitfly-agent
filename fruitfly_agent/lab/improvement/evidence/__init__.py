@@ -123,6 +123,7 @@ class EvidenceWorkspace:
         else:
             repair = EvidenceWorkspace(**parameters)
         repair.retained_parts = dict(self.retained_parts)
+        repair.source_spans = dict(getattr(self, 'source_spans', {}))
         repair.delegated_paths = {path: set(ids) for path, ids in self.delegated_paths.items()}
         repair.provided_ids = set(self.provided_ids)
         repair.provided_paths = {path: set(ids) for path, ids in self.provided_paths.items()}
@@ -152,7 +153,7 @@ class EvidenceWorkspace:
         relative_path(path)
         parts = path.split('/')
         if len(parts) < 3 or parts[0] != 'harness' or parts[1] not in self.writable_ids:
-            raise ValueError('only declared candidate components may be edited')
+            raise ValueError('only declared candidate components may be edited; use list_targets to discover candidate_files under harness/<component_id>/, then read the existing file before writing')
 
     def write(self, path, text):
         self._write_path(path)
@@ -162,6 +163,7 @@ class EvidenceWorkspace:
         if sum(map(len, self.files.values())) - len(self.files.get(path, b'')) + len(data) > self.max_bytes:
             raise ValueError('editor workspace byte allocation exhausted')
         self.files[path] = data
+        self.retain_draft()
         self.record('editor-write', path=path, bytes=len(data))
 
     def delete(self, path):
@@ -169,7 +171,19 @@ class EvidenceWorkspace:
         if path not in self.files:
             raise ValueError('candidate file does not exist')
         del self.files[path]
+        self.retain_draft()
         self.record('editor-delete', path=path)
+
+    def retain_draft(self):
+        artifacts = getattr(self, 'artifacts', None)
+        if artifacts is None:
+            return
+        value = {'baseline_id': self.baseline.snapshot_id, 'harness': self.collect().to_dict(),
+            'writable_components': sorted(self.writable_ids),
+            'sources': list(getattr(self, 'source_spans', {}).values()),
+            'scope': 'Unsubmitted draft; current grants and original evidence must be revalidated before use.'}
+        reference = artifacts.put(canonical_json(value).encode())
+        self.record('editor-draft-retained', artifact_id=reference, baseline_id=self.baseline.snapshot_id)
 
     def collect(self):
         components = []

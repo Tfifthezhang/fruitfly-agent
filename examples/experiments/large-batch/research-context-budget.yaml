@@ -1,0 +1,8 @@
+id: context-budget
+role: H
+implementation: context-budget
+parameters:
+  settings:
+    max_input_tokens: 262144
+    trigger_ratio: 0.65
+    target_ratio: 0.45

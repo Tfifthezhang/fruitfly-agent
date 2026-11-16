@@ -211,10 +211,14 @@ class StageCliTests(unittest.IsolatedAsyncioTestCase):
             def integrate(view, signal=None):
                 notice = next(m for m in reversed(view.messages) if getattr(m, 'kind', '') == 'subagent-result')
                 row = json.loads(notice.text.split('\n', 1)[1])
-                findings = json.loads(row['summary'])['findings']
+                path = json.loads(row['summary'])['findings_path']
+                return stream(AssistantMessage([ToolCallBlock('read-findings', 'read', {'path': path})], 'toolUse'))
+            def publish(view, signal=None):
+                findings = json.loads(json.loads(view.messages[-1].text)['text'])['findings']
                 guide = {'schema_version': 2, 'findings': [], 'sections': [{'title': 'Batch scope', 'summary': findings['summary'], 'sources': findings['sources']}]}
                 return stream(AssistantMessage([TextBlock(json.dumps(guide))], 'stop'))
             parent.script.append(integrate)
+            parent.script.append(publish)
             child.respond_tool_call('read', {'path': 'context/batch.json'})
             def submit(view, signal=None):
                 page = json.loads(view.messages[-1].text)

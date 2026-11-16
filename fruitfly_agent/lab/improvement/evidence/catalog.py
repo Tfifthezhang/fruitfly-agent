@@ -65,6 +65,8 @@ class WorkspaceEvidence:
             self.supplied_pages += 1
         self.supplied_characters += len(page)
         if page or not text:
+            from .provenance import retain_span
+            retain_span(self.workspace, path, reference, start, end)
             self.workspace.access.provided(path, page, offset=start, reading_kind="read" if count_response else "search")
             self.workspace.provided_ids.add(span.citation_id)
             self.workspace.provided_paths.setdefault(path, set()).add(span.citation_id)

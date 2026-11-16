@@ -337,3 +337,8 @@ Parents can inspect saved revisions while children are running or after failure.
 Publish bounded progress before switching material groups and use references
 in handoffs. Research children inherit owner-admitted context mechanisms through
 the shared Catalog assembler; immutable evidence remains restricted to grants.
+
+Research child `save_findings` persists validated detailed blocks;
+`submit_findings` seals a compact final result. See [evidence services](../../improvement/evidence/README.md#investigate-large-batches).
+Invalid worker finalization retains its bounded exception type and message in the
+result artifact. Daily child tools and permissions remain unchanged.

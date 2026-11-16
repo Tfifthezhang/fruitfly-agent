@@ -47,7 +47,7 @@ class SelectionTarget:
              'material_policy': 'Focused evidence or every retained granted material.'}[key], value, defaults[key],
             minimum=LIMITS[key][0] if key in LIMITS else None,
             maximum=LIMITS[key][1] if key in LIMITS else None,
-            choices=() if key in LIMITS else ('balanced', 'rare-first') if key == 'sampling_policy' else ('focused', 'all-granted')) for key, value in values.items())
+            choices=() if key in LIMITS else ('balanced', 'rare-first', 'all') if key == 'sampling_policy' else ('focused', 'all-granted')) for key, value in values.items())
 
     def validate_options(self, options):
         fields = {'parameters.settings.' + k for k in asdict(self.settings)}

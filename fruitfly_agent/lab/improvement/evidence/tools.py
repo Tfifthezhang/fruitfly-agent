@@ -28,6 +28,12 @@ def evidence_tools(workspace, *, settings=None, reader=None):
         if not allow():
             return exhausted()
         args=ctx.args
+        if args.get('kind') == 'executions':
+            from .executions import execution_page
+            cursor, limit = args.get('cursor', 0), args.get('limit', settings.catalog.default_entries)
+            if type(cursor) is not int or cursor < 0 or type(limit) is not int or not 1 <= limit <= settings.catalog.max_entries:
+                raise ValueError('invalid execution catalog page')
+            return result(execution_page(workspace, cursor=cursor, limit=limit, status=args.get('status'), max_characters=settings.read.max_characters))
         path=args.get('path')
         if path:
             if not path.endswith('/evidence/events.json') and path != 'evidence/events.json':

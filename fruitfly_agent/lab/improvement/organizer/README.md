@@ -88,3 +88,15 @@ the same final validator. Rejected fields can be patched without retransmitting
 the complete document. Direct Lab embeddings without a prepared host retain
 minimal execution and record `role-runtime-mode`; they do not inherit ambient
 configuration or claim an installed context policy.
+
+## Check and hand off a large investigation
+
+`check_organization` validates a draft without publishing or ending the role.
+Use bounded case groups and separate recurring Agent behavior from collection
+quality findings. The published `provenance.json` maps returned text citations
+to immutable bytes and character intervals. Failed workers remain explicit;
+validated incremental findings survive parent failure.
+
+Organization draft checks collect independent section/finding errors before
+returning; final submission still validates the complete guide and unique issue
+identities through the same owner.

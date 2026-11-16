@@ -14,6 +14,9 @@ parameters:
       paging a large JSON. Inspect outcome unmet, execution errors, resource anomalies and
       contrasting cases when granted. Missing outcome semantics are unknown. Investigate
       bounded factual questions and preserve task requirements, chronology and rare cases.
+      Use catalog(kind=executions) and context/summaries/<run_id>.json instead of guessing offsets in large tables.
+      Divide large batches into groups of 8 to 12 cases and synthesize recurring behaviors separately from material-quality findings.
+      Children should save_findings in bounded blocks, then submit a compact final summary.
       A selected case, directory read or search match does not establish complete reading.
       Report observed facts separately from testable hypotheses, counterevidence and gaps.
       A behavior in a successful case only refutes necessity of failure, not its cost or

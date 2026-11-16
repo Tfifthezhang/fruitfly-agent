@@ -80,7 +80,7 @@ async def research():
         def __call__(self, view, *, signal=None):
             self.count += 1
             if self.child:
-                assert {t.name for t in view.tools} == {'catalog', 'search', 'read', 'submit_findings'}
+                assert {t.name for t in view.tools} == {'catalog', 'search', 'read', 'save_findings', 'submit_findings'}
                 if self.count == 1:
                     message = AssistantMessage([ToolCallBlock('read', 'read', {'path': 'evidence.txt'})], 'toolUse')
                 else:

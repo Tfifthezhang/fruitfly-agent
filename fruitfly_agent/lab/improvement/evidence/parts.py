@@ -35,6 +35,12 @@ class OrganizationPartCache:
                 raise ValueError('part source identity changed')
             # Check dependencies without claiming they were supplied to a model.
             self.artifacts.read(reference)
+        for reference in part.findings.get('blocks', ()):
+            block = json.loads(self.artifacts.read(reference))
+            if not isinstance(block, dict) or set(block) != {'summary', 'sources', 'unknowns'}:
+                raise ValueError('invalid retained findings block')
+            if any(source not in part.findings['sources'] for source in block['sources']):
+                raise ValueError('retained findings block exceeds validated sources')
         return part
 
     def save(self, request, findings, grant, citations, reusable):
@@ -88,8 +94,21 @@ class OrganizationPartCache:
                 self.workspace.files[path] = data
             page = WorkspaceEvidence(self.workspace, settings=self.settings).read(path,
                 offset=ctx.args.get('offset', 0), limit=ctx.args.get('limit', self.settings.read.default_characters))
+            block_paths = []
+            for index, block in enumerate(part.findings.get('blocks', ())):
+                block_path = 'context/organization-parts/' + reference[7:] + '/' + str(index) + '.json'
+                if isinstance(self.workspace, ReferenceWorkspace):
+                    self.workspace.references[block_path] = block
+                else:
+                    self.workspace.files[block_path] = self.artifacts.read(block)
+                block_paths.append(block_path)
+            page['block_paths'] = block_paths
             if page.get('text'):
                 for source in part.findings['sources']:
+                    span = part.citations[source['citation_id']]
+                    if span['kind'] == 'text':
+                        from .provenance import retain_span
+                        retain_span(self.workspace, source['path'], span['artifact_id'], span['start'], span['end'])
                     self.workspace.delegated_paths.setdefault(source['path'], set()).add(source['citation_id'])
                     for run in self.workspace.access.run_ids:
                         supplied_table = ''

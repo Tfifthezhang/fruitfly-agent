@@ -606,3 +606,9 @@ to requested materials. Runtime errors remain failed/interrupted invocations.
 All hosted roles retain Sessions without enabling delegation. Diagnostic manifests
 and snapshots travel with publications but are not automatically granted as
 research evidence. See [host diagnostics](../../run/improvement/README.md#retain-independent-role-diagnostics).
+
+For complete retained batches and larger worker budgets, use the
+[large batch recipe](../../../examples/experiments/large-batch/README.md).
+Use `check_candidate` or `check_organization` before final submission.
+Saved blocks and organization parts retain attribution; they do not authorize
+activation or automatic replay of failed work.

@@ -122,7 +122,7 @@ repeated pages. A search response counts once regardless of its number of matche
 source spans; every returned character and exact citation still counts. The tool facade additionally bounds catalog/read/search calls.
 Exhausted reads return `budget_exhausted`, no source citation, and a request to
 submit using existing evidence with uncovered scope declared. Invocation request
-count is bounded by max_pages plus supply.completion_requests (default eight) opportunities to finish. A request
+count is bounded by max_pages plus supply.completion_requests (default 32) opportunities to finish. A request
 measurement checks input, uncertainty margin and output reserve before Provider
 execution; estimates retain their declared quality. Context exhaustion stops with
 `evidence_context_budget_exhausted` instead of sending another oversized request.
@@ -223,3 +223,26 @@ Parallel failures in one batch count as one opportunity. Successful tool results
 reset the consecutive-error count. This bound shares the invocation's original time and
 reading allowance; it does not convert failures into accepted research decisions.
 No-read synthesis alone does not trigger this guard.
+
+## Investigate large batches
+
+Use `catalog(kind="executions", cursor=0, limit=8)` to page complete compact
+execution entries. Optional `status` filters recorded execution state. Oversized
+entries point to their pageable `context/summaries/<run-id>.json`. Navigation does
+not supply source citations. Original trajectories remain lazy during preflight.
+`context/preflight.json` records inspected entry documents, candidate files and
+effective reading controls; it does not certify all archived originals.
+
+Research children can `save_findings` using the same sourced block schema as
+`submit_findings`. Each block respects the worker result limit; the shared owner
+limits cumulative block content to 256000 characters. Final summaries with blocks
+are limited to 6000 characters. The final submission retains block references
+and their validated sources. Parents receive a compact summary and paths to
+detailed results. Incremental parts are saved before successful submission returns.
+`findings.py` validates individual blocks; delegation and part services own their
+publication and reuse.
+
+`provenance.py` retains exact text source intervals keyed by path and citation.
+Organizer publication includes `organization/provenance.json`; blob dependencies
+remain discoverable from its artifact references. Identical bytes at different
+granted paths share a content identity without losing source attribution.

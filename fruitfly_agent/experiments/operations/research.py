@@ -351,8 +351,15 @@ async def dispatch(args, workspace):
         return {**asdict(result), 'run_id': run_id, 'bundle': str(path),
             'report': str(outputs.root / prefix / 'report.json')}
     except BaseException as exc:
+        causes = []
+        current = exc.__cause__
+        seen = {id(exc)}
+        while current is not None and id(current) not in seen and len(causes) < 8:
+            seen.add(id(current))
+            causes.append({'type': type(current).__name__, 'message': str(current)[:4000]})
+            current = current.__cause__
         run.update(status='interrupted' if type(exc).__name__ in {'CancelledError', 'KeyboardInterrupt'} else 'failed',
-            error={'type': type(exc).__name__, 'message': str(exc)})
+            error={'type': type(exc).__name__, 'message': str(exc), 'causes': causes})
         safe = redact(reporting['configuration'])
         outputs.write(prefix + '/configuration/effective.json', safe)
         outputs.write(prefix + '/configuration/sources.json', safe.get('sources', []))

@@ -67,3 +67,10 @@ recorded harness, execution conditions and initial state. Otherwise
 `comparison_basis` is `not_established`. Matching identities do not imply equal
 task difficulty, identical outputs, reconstructed historical configuration or
 causal proof; task requirements and relevant differences still need inspection.
+
+## Grant a complete retained batch
+
+`sampling_policy: all` includes cases without anomaly signals, subject to
+`max_cases` and `max_per_task`. Case and control ceilings support up to 4096;
+ordinary defaults remain eight cases and one control. Full authorization does
+not mean full reading: use paged navigation and bounded investigations.
