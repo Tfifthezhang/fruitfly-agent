@@ -150,7 +150,7 @@ class EvidenceDelegation:
                     sources.update({(v['path'], v['citation_id']): v for v in block['sources']})
                 value = {**value, 'sources': list(sources.values()), 'blocks': [ref for ref, _ in blocks]}
             if self.cache is not None:
-                self._save_part(request, value)
+                self._save_part(request, value, self.cache)
             self.accepted[run_id] = value
             return AgentToolResult([TextBlock('Attributed findings retained.')], terminate=True)
         text = {'type': 'string'}
@@ -167,12 +167,12 @@ class EvidenceDelegation:
             parameters=submission.parameters, execute=save)
         return (*tuple(t for t in evidence_tools(scope, settings=self.settings) if t.name in worker['capabilities']['tools']), block_tool, submission)
 
-    def _save_part(self, request, value):
+    def _save_part(self, request, value, cache: OrganizationPartCache):
         if self.service is None:
             raise ValueError('retention requires a managed child lifecycle')
         row = self.service.detail(request.identity.agent_id, request.identity.run_id)
         citations = {source['citation_id']: self.spans[request.identity.agent_id][source['citation_id']] for source in value['sources']}
-        self.cache.save(request, value, self.grants[request.identity.agent_id], citations,
+        cache.save(request, value, self.grants[request.identity.agent_id], citations,
             reusable=not row['steered'] and not row['continuation'])
 
     def finalize(self, request, result, summary):

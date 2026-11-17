@@ -4,17 +4,27 @@ from fruitfly_agent.improvement.execution.facts import model_usage_facts
 from fruitfly_agent.lab.improvement.evidence.decoding import decode_rows
 
 
+def receipt_usage_facts(value):
+    """Adapt native Core Usage receipts to the internal reporting vocabulary."""
+    requests = value['requests']
+    if value.get('schema_version') != 1 or type(value.get('used')) is not int or value['used'] < 0 or value['used'] != len(requests) or len({r['id'] for r in requests}) != len(requests):
+        raise ValueError('invalid usage receipt')
+    fields = {'inputTokens': 'input_tokens', 'outputTokens': 'output_tokens',
+              'cacheReadTokens': 'cache_read_tokens', 'cacheCreationTokens': 'cache_creation_tokens'}
+    rows = []
+    for request in requests:
+        usage = request.get('usage')
+        converted = {target: usage[source] for source, target in fields.items() if source in usage} if isinstance(usage, dict) else None
+        rows.extend(({'kind': 'request', 'id': request['id']},
+                     {'kind': 'response', 'attempt_id': request['id'], 'usage': converted}))
+    return model_usage_facts(rows, value['used'])
+
+
 def retained_usage(directory):
     receipt = directory / 'model-usage.json'
     if receipt.is_file():
         value = json.loads(receipt.read_bytes())
-        requests = value['requests']
-        if value.get('schema_version') != 1 or type(value.get('used')) is not int or value['used'] != len(requests) or len({r['id'] for r in requests}) != len(requests):
-            raise ValueError('invalid usage receipt')
-        rows = [event for r in requests for event in (
-            {'kind': 'request', 'id': r['id']},
-            {'kind': 'response', 'attempt_id': r['id'], 'usage': r.get('usage')})]
-        facts = model_usage_facts(rows, value['used'])
+        facts = receipt_usage_facts(value)
         return {v.resource: v.used for v in facts}, 'provider-receipts'
     rows, _, gaps = decode_rows((directory / 'session.jsonl').read_text(encoding='utf-8'))
     totals, reported = {}, 0

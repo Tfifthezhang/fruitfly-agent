@@ -34,6 +34,26 @@ class ModelUsageTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len({r['id']for r in value['requests']}),3)
             self.assertTrue(all(r['status']=='completed'for r in value['requests']))
 
+    async def test_written_native_usage_is_readable_by_eval(self):
+        from fruitfly_agent.core.data_model import AssistantMessage, TextBlock, Usage
+        from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone
+        from fruitfly_eval.usage import retained_usage
+        def provider(view, signal=None):
+            async def events():
+                yield StreamDone(AssistantMessage([TextBlock('done')], stop_reason='stop',
+                    usage=Usage(input_tokens=100, output_tokens=20, cache_read_tokens=80)))
+            return AssistantMessageEventStream(events())
+        from fruitfly_agent.run.runtime.usage import ObservedProvider
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            observed = ObservedProvider(provider, ModelUsage(receipt=root / 'model-usage.json'))
+            await observed(ProviderView('', [], [], 'fixture', 128)).result()
+            values, source = retained_usage(root)
+            self.assertEqual(source, 'provider-receipts')
+            self.assertEqual(values['input_tokens'], 100)
+            self.assertEqual(values['output_tokens'], 20)
+            self.assertEqual(values['cache_read_tokens'], 80)
+
     def test_removed_cli_option_is_rejected(self):
         with self.assertRaises(SystemExit):create_parser().parse_args(['--max-model-calls','8','task'])
 

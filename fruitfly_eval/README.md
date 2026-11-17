@@ -241,3 +241,6 @@ organization result with explicit gaps; per-trial organization errors return 1.
 collection. [Improvement evidence](../fruitfly_agent/lab/improvement/evidence/README.md)
 owns organization and paged reading. A standalone evidence directory is not an
 automatic grant to an editor; the Improvement adapter registers permitted resources.
+
+See [public execution accounting](improvement/README.md#read-public-execution-accounting) for native receipt adaptation,
+reported subtotals and public Harbor termination evidence.

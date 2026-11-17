@@ -48,6 +48,11 @@ async def run():
         owner = RuntimeHandle(None, {}, components=runtime.components)
         try:
             service = runtime.components['subagent-monitor']
+            assert service.max_concurrent == 4
+            assert service.max_agents == 32
+            assert service.timeout == 3600
+            assert service.request_limit == 256
+            assert service.retirement_timeout == 30
             assert service.protocol.max_task_characters == 16000
             assert service.results.output_page_characters == 4000
             service.begin()

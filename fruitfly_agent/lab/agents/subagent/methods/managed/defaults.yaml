@@ -3,11 +3,11 @@ role: H
 implementation: subagent
 parameters:
   settings:
-    max_concurrent: 2
-    max_agents: 8
-    run_timeout_seconds: 600
-    max_model_requests: 64
-    retirement_timeout: 10
+    max_concurrent: 4
+    max_agents: 32
+    run_timeout_seconds: 3600
+    max_model_requests: 256
+    retirement_timeout: 30
     workers:
       evidence-reader:
         description: Investigate a bounded evidence question.
@@ -26,10 +26,10 @@ parameters:
           conversation: explicit_materials
           state: independent
         limits:
-          seconds: 600
-          model_requests: 64
-          evidence_characters: 256000
-          evidence_responses: 64
+          seconds: 3600
+          model_requests: 256
+          evidence_characters: 2097152
+          evidence_responses: 512
         result:
           contract: evidence_findings
           max_characters: 24000
@@ -50,10 +50,10 @@ parameters:
           conversation: explicit_materials
           state: independent
         limits:
-          seconds: 600
-          model_requests: 64
-          evidence_characters: 256000
-          evidence_responses: 64
+          seconds: 3600
+          model_requests: 256
+          evidence_characters: 2097152
+          evidence_responses: 512
         result:
           contract: evidence_findings
           max_characters: 24000
@@ -75,10 +75,10 @@ parameters:
           conversation: explicit_materials
           state: independent
         limits:
-          seconds: 600
-          model_requests: 64
-          evidence_characters: 256000
-          evidence_responses: 64
+          seconds: 3600
+          model_requests: 256
+          evidence_characters: 2097152
+          evidence_responses: 512
         result:
           contract: evidence_findings
           max_characters: 24000
@@ -100,10 +100,10 @@ parameters:
           conversation: explicit_materials
           state: independent
         limits:
-          seconds: 600
-          model_requests: 64
-          evidence_characters: 256000
-          evidence_responses: 64
+          seconds: 3600
+          model_requests: 256
+          evidence_characters: 2097152
+          evidence_responses: 512
         result:
           contract: evidence_findings
           max_characters: 24000

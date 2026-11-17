@@ -1,12 +1,13 @@
 """Page complete compact execution rows without character-offset guessing."""
 import json
+from typing import Any
 
 
 def execution_page(workspace, *, cursor, limit, status=None, max_characters=24000):
     rows = json.loads(workspace.read('context/executions.json'))
     if status is not None:
         rows = [row for row in rows if row.get('status') == status]
-    page = []
+    page: list[dict[str, Any]] = []
     size = 0
     for row in rows[cursor:cursor + limit]:
         length = len(json.dumps(row, ensure_ascii=False))

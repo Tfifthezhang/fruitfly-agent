@@ -164,3 +164,20 @@ class HarborAdapterTests(unittest.TestCase):
             next(item["value"] for item in metrics if item["name"] == "error_rate"),
             1.0,
         )
+
+
+class PublicOutcomeTests(unittest.TestCase):
+    def test_public_timeout_preserves_unknowns_and_excludes_raw_output(self):
+        for kind, message, seconds in (
+            ('AgentTimeoutError', 'Agent execution timed out after 900.0 seconds', 900.),
+            ('AgentTimeoutError', 'Interrupted', None),
+            ('NonZeroAgentExitCodeError', 'command SECRET output PRIVATE', None),
+        ):
+            with self.subTest(kind=kind, message=message):
+                from fruitfly_eval.results import public_trial_outcome
+                value = public_trial_outcome({'exception_info': {'exception_type': kind, 'exception_message': message}, 'verifier_result': {'rewards': {'reward': 1}}})
+                self.assertFalse(value['eligible'])
+                self.assertEqual(value['reward'], 1.)
+                self.assertEqual(value['error']['timeout_seconds'], seconds)
+                self.assertNotIn('SECRET', str(value))
+                self.assertNotIn('PRIVATE', str(value))

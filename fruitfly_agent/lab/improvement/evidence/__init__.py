@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, replace
 import hashlib
+from typing import Any
 from .access import EvidenceAccess
 
 from fruitfly_agent.improvement.contracts.components import ComponentFile, HarnessSnapshot
@@ -36,6 +37,8 @@ class EvidenceWorkspace:
     This is a tool capability boundary, not an OS sandbox for trusted Python.
     Large text is paginated; binary originals remain available as bytes.
     """
+    source_spans: dict[tuple[str, str], dict[str, Any]]
+
     def __init__(self, *, baseline, files, writable_ids, record=None, max_bytes=2_000_000, access=None):
         self.baseline, self.files = baseline, dict(files)
         self.writable_ids = frozenset(writable_ids)

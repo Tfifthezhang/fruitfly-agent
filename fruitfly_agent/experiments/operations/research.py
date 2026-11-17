@@ -351,7 +351,7 @@ async def dispatch(args, workspace):
         return {**asdict(result), 'run_id': run_id, 'bundle': str(path),
             'report': str(outputs.root / prefix / 'report.json')}
     except BaseException as exc:
-        causes = []
+        causes: list[dict[str, str]] = []
         current = exc.__cause__
         seen = {id(exc)}
         while current is not None and id(current) not in seen and len(causes) < 8:

@@ -34,11 +34,11 @@ Unknown aliases and incompatible model capabilities fail before child model work
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `max_concurrent` | 2 | Child executions holding active slots |
-| `max_agents` | 8 | Child conversations admitted in one parent scope |
-| `run_timeout_seconds` | 600 | Per-execution queue, construction and work deadline |
-| `max_model_requests` | 64 | Main child loop request limit per execution |
-| `retirement_timeout` | 10 | Seconds to confirm owned resource cleanup |
+| `max_concurrent` | 4 | Child executions holding active slots |
+| `max_agents` | 32 | Child conversations admitted in one parent scope |
+| `run_timeout_seconds` | 3600 | Per-execution queue, construction and work deadline |
+| `max_model_requests` | 256 | Main child loop request limit per execution |
+| `retirement_timeout` | 30 | Seconds to confirm owned resource cleanup |
 
 The owner validates strict parameters. Host permissions, model limits and inherited
 Core tool allowances still apply. Requests made by auxiliary context components
@@ -72,8 +72,8 @@ role: H
 implementation: subagent
 parameters:
   settings:
-    max_concurrent: 2
-    retirement_timeout: 10
+    max_concurrent: 4
+    retirement_timeout: 30
     protocol:
       max_task_characters: 8000
       max_context_characters: 8000
@@ -342,3 +342,18 @@ Research child `save_findings` persists validated detailed blocks;
 `submit_findings` seals a compact final result. See [evidence services](../../improvement/evidence/README.md#investigate-large-batches).
 Invalid worker finalization retains its bounded exception type and message in the
 result artifact. Daily child tools and permissions remain unchanged.
+
+## Bound ordinary and research child work
+
+Ordinary child executions use the shared `run_timeout_seconds` and
+`max_model_requests` settings. Named research workers declare their own execution
+policy under `parameters.settings.workers.<name>.limits`: defaults are 3600 seconds,
+256 model requests, 2097152 evidence characters and 512 evidence responses.
+Both paths derive their values from the registered owner default document.
+
+Larger child allowances do not extend parent stage deadlines or Provider transport
+timeouts. Repeated identical tool errors retain their existing recovery limit.
+Wait polling remains bounded to 60 seconds and never cancels work by itself.
+Existing explicit component files retain their authored values; default references
+consume the owner defaults when a new runtime is assembled. More concurrent children
+can increase Provider load and aggregate usage.

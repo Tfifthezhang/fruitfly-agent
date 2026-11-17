@@ -22,7 +22,7 @@ class TrajectoryTests(unittest.TestCase):
             root = Path(directory)
             (root / 'session.jsonl').write_text('{"incomplete":')
             (root / 'model-usage.json').write_text(json.dumps({'schema_version': 1, 'used': 1,
-                'requests': [{'id': 'a', 'usage': {'input_tokens': 8, 'output_tokens': 3}}]}))
+                'requests': [{'id': 'a', 'usage': {'inputTokens': 8, 'outputTokens': 3}}]}))
             agent = load_harbor_agent().__new__(load_harbor_agent()); agent.logs_dir = root
             context = SimpleNamespace(metadata=None)
             agent.populate_context_post_run(context)

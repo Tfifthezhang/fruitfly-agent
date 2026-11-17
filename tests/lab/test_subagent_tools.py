@@ -10,6 +10,22 @@ from fruitfly_agent.lab.catalog import builtin_catalog
 from tests.support.subagents import ChildFixture
 
 class SubagentToolTests(unittest.IsolatedAsyncioTestCase):
+    def test_research_worker_defaults_expand_actual_execution_policy(self):
+        from fruitfly_agent.lab.improvement.evidence.delegation import EvidenceDelegation
+        from fruitfly_agent.lab.agents.subagent.workers import worker_definitions
+        from types import SimpleNamespace
+        definition = builtin_catalog().get('subagent')
+        parameters = definition.descriptor.normalize_parameters({})
+        definition.validate_parameters(parameters)
+        owner = SimpleNamespace(workers=worker_definitions(parameters))
+        for name, worker in owner.workers.items():
+            with self.subTest(worker=name):
+                policy = EvidenceDelegation.execution_policy(owner, SimpleNamespace(worker=name))
+                self.assertEqual(policy.timeout_seconds, 3600)
+                self.assertEqual(policy.max_model_requests, 256)
+                self.assertEqual(worker.limits['evidence_characters'], 2097152)
+                self.assertEqual(worker.limits['evidence_responses'], 512)
+
     async def test_five_tools_and_repeated_waits_return_actual_execution(self):
         with tempfile.TemporaryDirectory() as directory:
             fixture = ChildFixture(directory)

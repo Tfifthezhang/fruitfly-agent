@@ -188,3 +188,16 @@ and source identity. It contains no verifier source or private answers.
 Sanitized retained configuration declarations are readable through
 `diagnostics/configuration/`; they do not reconstruct the historical effective
 harness or initial learning state. Generic research remains usable without Eval.
+
+## Read public execution accounting
+
+Native Provider receipts are adapted from Core Usage fields before reporting.
+Reported token subtotals remain available when interrupted requests make complete
+execution totals unknown. Cache counters are separate and are not added twice.
+
+Historical `diagnostics/outcome.json` retains public error type, a bounded summary,
+phase, timeout classification and an explicitly recorded timeout boundary with
+its source. Missing boundaries remain null; elapsed time never supplies a limit.
+Raw exception commands, output and private verifier content are excluded. Native
+termination diagnostics remain independent of Harbor outcome observations.
+Existing published batches remain immutable; reimport to obtain new projections.

@@ -9,7 +9,7 @@ from fruitfly_agent.improvement.contracts.versions import canonical_json, conten
 from fruitfly_agent.lab.improvement.evidence.indexing import organize_evidence
 from .evidence import collect, answer_evidence, trial_directories, safe_path
 from .facts import attach_benchmark_facts
-from fruitfly_eval.results import trial_outcome
+from fruitfly_eval.results import trial_outcome, public_trial_outcome
 
 
 def import_history(run, artifacts, *, task_names=(), related_records=None, evidence_paths=None):
@@ -75,9 +75,7 @@ def import_history(run, artifacts, *, task_names=(), related_records=None, evide
             answer['text'][:120000], resources, calls)
         receipt = attach_benchmark_facts(receipt, root, artifacts, interrupted=True, trial=directory)
         outcome = trial_outcome(official)
-        public_result = {'status': outcome['status'], 'eligible': outcome['eligible'],
-            'reward': outcome['reward'], 'error': {'type': outcome['error']['type']} if outcome['error'] else None,
-            'agent_elapsed_seconds': outcome['agent_elapsed_seconds'],
+        public_result = {**public_trial_outcome(official),
             'source_identity': content_hash(result.read_text()) if official else None,
             'scope': 'Public outcome projection; verifier source and private answers excluded.'}
         receipt = replace(receipt, artifacts=(*receipt.artifacts,
@@ -89,6 +87,7 @@ def import_history(run, artifacts, *, task_names=(), related_records=None, evide
             'run_id': receipt.run_id, 'name': 'official_reward',
             'official_status': outcome['status'], 'eligible': outcome['eligible'],
             'exception_type': outcome['error']['type'] if outcome['error'] else None,
+            'error': public_result['error'],
             'agent_elapsed_seconds': outcome['agent_elapsed_seconds'],
             'interpretation': 'Shared Eval result rules; raw reward is not an execution-success certificate.',
             'value': (official.get('verifier_result') or {}).get('rewards'),

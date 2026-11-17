@@ -7,7 +7,8 @@ import unittest
 
 from fruitfly_eval.improvement.evidence import collect
 from fruitfly_eval.improvement.facts import attach_benchmark_facts
-from fruitfly_agent.core.data_model import LoopDiagnostics
+from fruitfly_agent.core.data_model import LoopDiagnostics, Usage
+from fruitfly_eval.usage import receipt_usage_facts
 from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
 from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
 from fruitfly_agent.improvement.execution.facts import read_facts
@@ -42,3 +43,17 @@ class BenchmarkFactTests(unittest.TestCase):
                 self.assertEqual(facts.artifacts[0].status, 'collection_failed')
                 self.assertEqual(facts.usage[-1].used, 2)
                 self.assertTrue(all(b'PRIVATE' not in artifacts.read(r.artifact_id) for r in result.artifacts))
+
+    def test_native_usage_and_partial_receipts(self):
+        for partial in (False, True):
+            with self.subTest(partial=partial):
+                requests = [{'id': 'a', 'usage': Usage(input_tokens=100, output_tokens=20, cache_read_tokens=80).to_dict()}]
+                if partial:
+                    requests.append({'id': 'b', 'usage': None})
+                facts = {f.resource: f.used for f in receipt_usage_facts({'schema_version': 1, 'used': len(requests), 'requests': requests})}
+                self.assertEqual(facts['reported_input_tokens'], 100)
+                self.assertEqual(facts['reported_output_tokens'], 20)
+                self.assertEqual(facts['reported_model_calls'], 1)
+                self.assertEqual(facts['cache_read_tokens'], None if partial else 80)
+                self.assertEqual(facts['input_tokens'], None if partial else 100)
+

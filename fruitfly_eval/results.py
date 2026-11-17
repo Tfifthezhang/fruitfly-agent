@@ -219,3 +219,26 @@ def _mapping(value: Any, name: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
         raise ValueError(f"{name} must be an object")
     return value
+
+
+def public_trial_outcome(trial: Mapping[str, Any]) -> dict[str, Any]:
+    """Project public termination facts without copying commands or private output."""
+    import re
+    import math
+    from .harbor.diagnostics import EXCEPTION_PHASES
+    outcome = trial_outcome(trial)
+    error = outcome['error']
+    public_error = None
+    if error:
+        kind = error['type']
+        phase = EXCEPTION_PHASES.get(kind.rsplit('.', 1)[-1])
+        seconds = None
+        match = re.fullmatch(r'Agent execution timed out after ([0-9]+(?:\.[0-9]+)?) seconds', error.get('message', ''))
+        if kind == 'AgentTimeoutError' and match:
+            number = float(match[1])
+            if math.isfinite(number) and number > 0:
+                seconds = number
+        public_error = {'type': kind, 'summary': f'Agent execution timed out after {seconds:g} seconds.' if seconds is not None else 'Execution error recorded; raw command and output excluded.',
+            'phase': phase, 'timed_out': outcome['timed_out'], 'timeout_seconds': seconds,
+            'timeout_source': 'exception_info.exception_message' if seconds is not None else None}
+    return {key: outcome[key] for key in ('status', 'eligible', 'reward', 'agent_elapsed_seconds')} | {'error': public_error}

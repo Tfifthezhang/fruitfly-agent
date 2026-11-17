@@ -70,12 +70,8 @@ def attach_benchmark_facts(record, root, artifacts, *, interrupted=False, trial=
                     evidence.append(Resource('agent/0/' + name, artifacts.put(path.read_bytes()),
                         'application/json', 'diagnostic'))
                 try:
-                    from fruitfly_agent.improvement.execution.facts import model_usage_facts
-                    requests = json.loads(path.read_bytes())['requests']
-                    rows = [event for request in requests for event in (
-                        {'kind': 'request', 'id': request['id']},
-                        {'kind': 'response', 'attempt_id': request['id'], 'usage': request['usage']})]
-                    values['usage'] = (*values.get('usage', ()), *model_usage_facts(rows, record.model_calls))
+                    from fruitfly_eval.usage import receipt_usage_facts
+                    values['usage'] = (*values.get('usage', ()), *receipt_usage_facts(json.loads(path.read_bytes())))
                 except (ValueError, TypeError, KeyError):
                     if not interrupted:
                         raise
@@ -111,12 +107,8 @@ def attach_benchmark_facts(record, root, artifacts, *, interrupted=False, trial=
         receipt = next((r for r in evidence if r.path.endswith('/model-usage.json')), None)
         if receipt:
             try:
-                from fruitfly_agent.improvement.execution.facts import model_usage_facts
-                requests = json.loads(artifacts.read(receipt.artifact_id))['requests']
-                rows = [event for request in requests for event in (
-                    {'kind': 'request', 'id': request['id']},
-                    {'kind': 'response', 'attempt_id': request['id'], 'usage': request.get('usage')})]
-                values['usage'] = (*values.get('usage', ()), *model_usage_facts(rows, record.model_calls))
+                from fruitfly_eval.usage import receipt_usage_facts
+                values['usage'] = (*values.get('usage', ()), *receipt_usage_facts(json.loads(artifacts.read(receipt.artifact_id))))
             except (ValueError, KeyError, TypeError):
                 if not interrupted:
                     raise

@@ -246,3 +246,6 @@ publication and reuse.
 Organizer publication includes `organization/provenance.json`; blob dependencies
 remain discoverable from its artifact references. Identical bytes at different
 granted paths share a content identity without losing source attribution.
+
+See [public execution accounting](../../../../fruitfly_eval/improvement/README.md#read-public-execution-accounting) for native receipt adaptation,
+reported subtotals and public Harbor termination evidence.

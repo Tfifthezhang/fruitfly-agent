@@ -117,3 +117,38 @@ class ReadingMaterialsTests(unittest.TestCase):
             self.assertEqual(answer_evidence(resources, artifacts)['state'], 'absent')
             scope = json.loads(artifacts.read(next(r.artifact_id for r in resources if r.path == 'diagnostics/reading-scope.json')))
             self.assertTrue(scope['gaps'])
+
+    def test_native_receipts_and_timeout_reach_focused_organizer_workspace(self):
+        from fruitfly_agent.core.data_model import Usage
+        from fruitfly_agent.improvement.contracts.organization import OrganizationRequest
+        from fruitfly_agent.lab.improvement.organizer.workspace import build_workspace
+        from fruitfly_agent.lab.improvement.evidence_selection.methods.representative.algorithm import RepresentativeSelector
+        from fruitfly_agent.lab.improvement.evidence_selection.configuration import SelectionSettings
+        from fruitfly_agent.lab.improvement.evidence.batch import batch_view
+        from fruitfly_agent.improvement.contracts.tasks import Resource
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            trial = root / 'artifacts/harbor/job/trial'
+            agent = trial / 'agent'; agent.mkdir(parents=True)
+            (agent / 'session.jsonl').write_text(json.dumps({'message': {'role': 'user', 'content': 'Inspect'}}) + '\n')
+            (agent / 'model-usage.json').write_text(json.dumps({'schema_version': 1, 'used': 1, 'requests': [
+                {'id': 'a', 'usage': Usage(input_tokens=100, output_tokens=20).to_dict()}]}))
+            result = trial / 'result.json'
+            result.write_text(json.dumps({'task_name': 'fixture', 'exception_info': {'exception_type': 'AgentTimeoutError',
+                'exception_message': 'Agent execution timed out after 900.0 seconds'}, 'verifier_result': {'rewards': {'reward': 1}}}))
+            before = result.read_bytes()
+            artifacts = MemoryArtifacts(); batch = import_history(root, artifacts)
+            rows = batch_view(batch.tasks, batch.records, batch.observations, artifacts)['executions.json']
+            usage = {v['resource']: v['used'] for v in rows[0]['usage']}
+            self.assertEqual(usage['input_tokens'], 100)
+            self.assertEqual(rows[0]['observations'][0]['error']['timeout_seconds'], 900.)
+            selection = RepresentativeSelector(SelectionSettings()).select(rows, resources={r.run_id: r.artifacts for r in batch.records})
+            context = tuple(Resource(name, artifacts.put(json.dumps(value).encode()), 'application/json', 'diagnostic')
+                for name, value in [('observations.json', batch.observations), ('selection.json', selection)])
+            workspace, _ = build_workspace(OrganizationRequest(batch.tasks, batch.records, context=context), artifacts)
+            path = 'context/executions/' + batch.records[0].run_id + '/diagnostics/outcome.json'
+            self.assertIn(path, workspace.paths())
+            public = json.loads(workspace.read(path))
+            self.assertEqual(public['error']['timeout_seconds'], 900.)
+            self.assertFalse(public['eligible'])
+            self.assertEqual(result.read_bytes(), before)
