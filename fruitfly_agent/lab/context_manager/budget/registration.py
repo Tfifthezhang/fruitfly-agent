@@ -19,7 +19,7 @@ def definition():
         contributions=(MechanismContribution('capability', 'context'),),
         default_enabled=True, install_order=0, parameters=parameters(ContextBudget)),
         install, implementation_id='context-budget-v1', role_safe=True,
-        execution_fields=frozenset('context_budget.' + name for name in ('max_input_tokens', 'trigger_ratio', 'target_ratio')),
+        execution_fields=frozenset('context_budget.' + name for name in ('trigger_ratio', 'target_ratio')),
         execution_projection=lambda values: {'context_budget': dict(values)},
         validate_parameters=partial(validate, ContextBudget),
         default_resource=('fruitfly_agent.core.context', 'defaults.yaml'),

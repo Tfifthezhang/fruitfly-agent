@@ -36,12 +36,15 @@ class AuxiliaryText:
             output = min(max_tokens, self.output_limit or max_tokens)
             view = ProviderView(system, [UserMessage(prompt)], [], self.model or snapshot.model, output)
             tokens = estimate(system + prompt) + 32
+            window = self.context_window if self.context_window is not None else snapshot.context_window
+            reserve = output
             if self.meter is not None:
                 measured = await self.meter.measure(view, self.provider, signal=snapshot.signal)
                 tokens = measured.input_tokens
-                if not snapshot.context_budget.fits(self.context_window or snapshot.context_window, measured):
+                reserve = measured.output_reserve
+                if not snapshot.context_budget.fits(window, measured):
                     return AuxiliaryResult(reason='input_capacity')
-            if tokens is None or tokens > min(input_limit, snapshot.context_budget.max_input_tokens) or self.context_window is not None and tokens + output > self.context_window:
+            if tokens is None or tokens > input_limit or tokens > snapshot.context_budget.capacity(window, reserve):
                 return AuxiliaryResult(reason='input_capacity')
             stream = self.provider(view, signal=snapshot.signal)
             try:
@@ -93,16 +96,15 @@ class AuxiliaryText:
             max_tokens=max_tokens, estimate=estimate, input_limit=2**63-1)
         return result.text if result.outcome == 'succeeded' else None
 
-    def page_size(self, text, *, system, build_prompt, max_chars, max_tokens, estimate):
+    def page_size(self, snapshot, text, *, system, build_prompt, max_chars, max_tokens, estimate):
         """Largest complete character prefix that fits; never omit a middle range."""
         high = min(len(text), max_chars)
-        if self.context_window is None:
-            return high
+        window = self.context_window if self.context_window is not None else snapshot.context_window
         output = min(max_tokens, self.output_limit or max_tokens)
         low = 0
         while low < high:
             middle = (low + high + 1) // 2
-            if estimate(system + build_prompt(text[:middle])) + output + 32 <= self.context_window:
+            if estimate(system + build_prompt(text[:middle])) + 32 <= snapshot.context_budget.capacity(window, output):
                 low = middle
             else:
                 high = middle - 1

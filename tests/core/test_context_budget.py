@@ -1,18 +1,21 @@
-"""Shared working capacity is independent of the model's advertised window."""
+"""Request capacity follows the model window and effective output reserve."""
 import unittest
 
 from fruitfly_agent.core.context.budget import ContextBudget, InputMeasurement
 
 
 class ContextBudgetTests(unittest.TestCase):
-    def test_large_model_window_does_not_override_working_capacity(self):
-        budget = ContextBudget(65536, .75, .5)
+    def test_model_window_and_output_reserve_change_capacity(self):
+        budget = ContextBudget()
         measured = InputMeasurement(150000, 'offline', 'heuristic', 'request', 131072, 15000)
         self.assertTrue(measured.fits(1048576))
-        self.assertFalse(budget.fits(1048576, measured))
+        self.assertTrue(budget.fits(1048576, measured))
+        self.assertFalse(budget.fits(256000, measured))
+        self.assertEqual(1868928, budget.capacity(2000000, measured.output_reserve))
+        self.assertEqual(1934464, budget.capacity(2000000, 65536))
 
     def test_margin_and_model_output_reserve_are_both_enforced(self):
-        budget = ContextBudget(65536, .75, .5)
+        budget = ContextBudget()
         measured = InputMeasurement(8000, 'offline', 'heuristic', 'request', 2000, 1000)
         self.assertTrue(budget.fits(11000, measured))
         self.assertFalse(budget.fits(10999, measured))
@@ -21,13 +24,30 @@ class ContextBudgetTests(unittest.TestCase):
         self.assertFalse(budget.fits(11000, unknown))
 
     def test_invalid_configuration_is_rejected(self):
-        for values in ((True, .75, .5), (0, .75, .5), (100, .5, .75),
-                       (100, float('nan'), .5), (100, True, .5)):
+        for values in ((True, .5), (0, .5), (.5, .75),
+                       (float('nan'), .5), (.75, True)):
             with self.subTest(values=values), self.assertRaises(ValueError):
                 ContextBudget(*values)
 
 
 class BudgetAdmissionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_large_measured_request_reaches_provider(self):
+        from fruitfly_agent.core.config import AgentLoopConfig
+        from fruitfly_agent.core.data_model import UserMessage
+        from fruitfly_agent.core.loop import run_agent_loop
+        from fruitfly_agent.lab.context_manager.measurement.budget import MeasurementService
+        from tests.support.faux_provider import FauxProvider
+
+        provider = FauxProvider()
+        provider.respond_text('done')
+        result = await run_agent_loop(
+            AgentLoopConfig(provider, context_window=1000000, max_tokens=131072,
+                            context_meter=MeasurementService()),
+            [UserMessage('abcd ' * 100000)],
+        )
+        self.assertFalse(result.is_error, result.error_details)
+        self.assertEqual(1, len(provider.calls))
+
     async def test_noop_failed_and_state_only_reducers_cannot_bypass_the_ceiling(self):
         from fruitfly_agent.core.config import AgentLoopConfig
         from fruitfly_agent.core.data_model import ContextDecision, UserMessage
@@ -47,11 +67,11 @@ class BudgetAdmissionTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(mode=mode):
                 provider = FauxProvider(); provider.respond_text('must not be consumed')
                 reducer = None if mode == 'absent' else Reducer(mode)
-                config = AgentLoopConfig(provider, context_window=1048576, max_tokens=128,
-                    context_budget=ContextBudget(1024, .75, .5), context_meter=MeasurementService())
+                config = AgentLoopConfig(provider, context_window=1152, max_tokens=128,
+                    context_meter=MeasurementService())
                 result = await run_agent_loop(config, [UserMessage('evidence ' * 2000)], context_pipeline=reducer)
                 self.assertTrue(result.is_error)
-                self.assertEqual('context_budget_exhausted', result.error_details['kind'])
+                self.assertEqual('context_overflow', result.error_details['kind'])
                 self.assertEqual([], provider.calls)
                 if reducer is not None: self.assertLessEqual(reducer.calls, 2)
 
@@ -71,8 +91,8 @@ class BudgetAdmissionTests(unittest.IsolatedAsyncioTestCase):
         hooks = HookRegistry()
         hooks.add(BEFORE_COMPACTION, lambda event: replace(event, messages=[UserMessage('expanded ' * 3000)]))
         provider = FauxProvider(); provider.respond_text('must not run')
-        config = AgentLoopConfig(provider, hooks=hooks, context_window=1048576,
-            context_budget=ContextBudget(1024, .75, .5), context_meter=MeasurementService())
+        config = AgentLoopConfig(provider, hooks=hooks, context_window=1152, max_tokens=128,
+            context_meter=MeasurementService())
         result = await run_agent_loop(config, [UserMessage('original ' * 2000)], context_pipeline=Reducer())
         self.assertTrue(result.is_error)
         self.assertEqual([], provider.calls)
@@ -105,10 +125,10 @@ class BudgetAdmissionTests(unittest.IsolatedAsyncioTestCase):
             return AgentToolResult(content=[TextBlock('large evidence ' * 2000)])
         tool = replace(make_tool()[0], execute=execute)
         result = await run_agent_loop(AgentLoopConfig(provider, tools=(tool,),
-            context_window=1048576, context_budget=ContextBudget(1024, .75, .5),
+            context_window=1152, max_tokens=128,
             context_meter=MeasurementService()), [UserMessage('Inspect once.')])
         self.assertTrue(result.is_error)
-        self.assertEqual('context_budget_exhausted', result.diagnostics.termination_reason)
+        self.assertEqual('context_overflow', result.error_details['kind'])
         self.assertEqual(['once'], effects)
         self.assertEqual(1, result.tool_call_count)
         self.assertEqual(1, result.diagnostics.tool_started)

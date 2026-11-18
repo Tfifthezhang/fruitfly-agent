@@ -231,10 +231,9 @@ implementations and scoped archive readback serve parent and child loops.
 [Durable work products](lab/agents/work_products/README.md) provide attributed
 checkpoints for ordinary and research collaboration without granting file access.
 
-Working input capacity is independent of model capacity. Core enforces the
+Working input capacity follows each model window and request output reserve. Core enforces the
 [shared context budget](lab/context_manager/budget/README.md) after every request
-preparation, for all reduction methods and runs without a reducer. Long histories
-can trigger archiving well before the model window fills. Empty Responses
+preparation, for all reduction methods and runs without a reducer. Long histories can trigger archiving at the configured fraction of input capacity. Empty Responses
 completion is a Provider failure rather than a successful final answer.
 
 Research roles persist Sessions independently of delegation. Deterministic batch

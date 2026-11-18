@@ -30,8 +30,8 @@ class SharedBudgetExecutionTests(unittest.IsolatedAsyncioTestCase):
         target.validate_change(json.dumps(values), grant)
         candidate = apply_profile_binding(baseline, 'configuration', 'component.context-budget', target.export_text(json.dumps(values)))
         forbidden = json.loads(before.text)
-        forbidden['settings']['max_input_tokens'] *= 2
-        with self.assertRaisesRegex(ValueError, 'fixed'):
+        forbidden['settings']['max_input_tokens'] = 65536
+        with self.assertRaises(ValueError):
             target.validate_change(json.dumps(forbidden), grant)
         counts, identities = [], []
         with tempfile.TemporaryDirectory() as directory:
@@ -42,7 +42,7 @@ class SharedBudgetExecutionTests(unittest.IsolatedAsyncioTestCase):
                 restored = load_system_config(path).select()
                 provider = FauxProvider(); provider.respond_text('done')
                 resources = []
-                runtime = assemble_lab(AgentLoopConfig(provider, context_window=1048576, max_tokens=128),
+                runtime = assemble_lab(AgentLoopConfig(provider, context_window=75000, max_tokens=128),
                     catalog=catalog, selections=restored.mechanisms,
                     context=AssemblyContext(root, None, 'offline', lambda *args: None, resource_sink=resources))
                 try:

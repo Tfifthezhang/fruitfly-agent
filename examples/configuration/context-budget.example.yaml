@@ -1,0 +1,10 @@
+# Copy to .fruitfly/components/context-budget.yaml to customize reduction.
+id: context-budget
+role: H
+implementation: context-budget
+parameters:
+  settings:
+    # Begin reduction at this fraction of the role's available input capacity.
+    trigger_ratio: 0.75
+    # Aim for this fraction after reduction, including measurement margin.
+    target_ratio: 0.50

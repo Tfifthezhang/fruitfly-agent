@@ -4,14 +4,13 @@
 
 ## Calculate working input capacity
 
-`budget.ContextBudget` defines a Provider-neutral working input bound and validates
-ordered trigger/target ratios. Capacity is the smaller of the working bound and
-the model window minus the measured output reserve. Input occupancy includes the
+`budget.ContextBudget` validates ordered trigger/target ratios. Input capacity is the
+model window minus the effective output reserve. Input occupancy includes the
 measurement's uncertainty margin; unknown input counts cannot pass admission.
 Core passes this contract in every `ContextSnapshot` and enforces it before a
 Provider call, independently of the selected reducer. Direct callers must supply
 a `ContextMeter`. Unknown measurement fails closed. Physical overflow retains its
-existing recovery path; working-budget failures report `context_budget_exhausted`.
+existing recovery path; unknown measurement or no remaining input capacity report `context_budget_exhausted`.
 See [shared H configuration](../../lab/context_manager/budget/README.md).
 Offline coverage: `tests.core.test_context_budget`.
 

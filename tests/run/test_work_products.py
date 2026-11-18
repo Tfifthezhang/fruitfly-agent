@@ -63,9 +63,9 @@ class WorkProductTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([{'body': body}], accepted)
         self.assertIn('extra', json.loads(self.store.read('parent', 'draft', 1)))
 
-    async def test_checkpoint_pressure_uses_working_budget_with_a_large_model_window(self):
+    async def test_checkpoint_pressure_uses_model_input_capacity(self):
         from fruitfly_agent.core.config import AgentLoopConfig
-        from fruitfly_agent.core.context.budget import ContextBudget, InputMeasurement
+        from fruitfly_agent.core.context.budget import InputMeasurement
         from fruitfly_agent.core.data_model import UserMessage
         from fruitfly_agent.core.loop import run_agent_loop
         from fruitfly_agent.lab.catalog import assemble_lab, AssemblyContext
@@ -78,8 +78,8 @@ class WorkProductTests(unittest.IsolatedAsyncioTestCase):
         provider = FauxProvider()
         provider.respond_text('Checkpoint requested before further investigation.')
         with Session(self.root / 'pressure.jsonl') as session:
-            runtime = assemble_lab(AgentLoopConfig(provider, context_window=1000000, max_tokens=128,
-                context_budget=ContextBudget(max_input_tokens=4096), context_meter=Meter()),
+            runtime = assemble_lab(AgentLoopConfig(provider, context_window=4224, max_tokens=128,
+                context_meter=Meter()),
                 catalog=builtin_catalog(), selections=(MechanismSelection('work-products'),),
                 context=AssemblyContext(self.root, session, 'offline', lambda *args: None,
                     work_products=self.store))

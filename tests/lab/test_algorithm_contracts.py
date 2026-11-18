@@ -58,7 +58,7 @@ def _compactors(provider, *, timeout=60):
     return (
         WorkingMemoryReducer(WorkingMemoryConfig(
             memory_tokens=32, auxiliary_attempts=1, auxiliary_timeout_seconds=timeout, update_every_messages=1,
-        ), provider),
+        ), provider, memory_context_window=8192),
     )
 
 

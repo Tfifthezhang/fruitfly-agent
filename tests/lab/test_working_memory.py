@@ -28,7 +28,7 @@ def snapshot(messages=None, **changes):
 
 def reducer(provider, history=None, **changes):
     return WorkingMemoryReducer(WorkingMemoryConfig(memory_tokens=64, auxiliary_max_tokens=128,
-        update_every_messages=1, maintenance_ratio=0., **changes), provider, history=history)
+        update_every_messages=1, maintenance_ratio=0., **changes), provider, history=history, memory_context_window=8192)
 
 
 class WorkingMemoryTests(unittest.IsolatedAsyncioTestCase):

@@ -10,6 +10,7 @@ import asyncio
 import logging
 import json
 from copy import deepcopy
+from dataclasses import asdict
 from .context.validation import valid_tool_links, can_rebase_context
 from .data_model.runtime import ProviderView
 from typing import Any
@@ -329,6 +330,10 @@ def _overflow_details(
         "messages": len(ctx.messages),
         "overflow_attempts": ctx.overflow_attempt,
     }
+    if ctx.measurement is not None:
+        details["measurement"] = asdict(ctx.measurement)
+        details["effective_input_capacity"] = ctx.context_budget.capacity(
+            ctx.context_window, ctx.measurement.output_reserve)
     if recovery is not None:
         details["recovery"] = recovery
     return details

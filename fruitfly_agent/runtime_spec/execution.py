@@ -32,7 +32,9 @@ def validate_execution(value):
         result['tool_execution'] = tools
     if 'context_budget' in result:
         budget = result['context_budget']
-        if not isinstance(budget, Mapping) or set(budget) - {'max_input_tokens', 'trigger_ratio', 'target_ratio'}:
+        if isinstance(budget, Mapping) and 'max_input_tokens' in budget:
+            raise ValueError('remove execution.context_budget.max_input_tokens; capacity follows the model window')
+        if not isinstance(budget, Mapping) or set(budget) - {'trigger_ratio', 'target_ratio'}:
             raise ValueError('execution.context_budget contains unsupported fields')
         result['context_budget'] = asdict(ContextBudget(**budget))
     return result

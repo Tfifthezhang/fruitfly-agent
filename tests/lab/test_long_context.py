@@ -50,7 +50,7 @@ class LongContextTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(decision.messages)
         self.assertTrue(provider.calls)
 
-    async def test_large_model_window_still_archives_a_150k_working_history(self):
+    async def test_model_capacity_controls_archiving_of_a_150k_history(self):
         from fruitfly_agent.core.data_model import AssistantMessage
         from fruitfly_agent.lab.context_manager.reduction import LayeredCompactionReducer, LayeredCompactionConfig
         from tests.support.compaction import mounted_history
@@ -66,7 +66,7 @@ class LongContextTests(unittest.IsolatedAsyncioTestCase):
                 UserMessage('Keep correction ' + str(i))))
         messages.append(current)
         meter = MeasurementService()
-        result = await run_agent_loop(AgentLoopConfig(provider, context_window=1048576,
+        result = await run_agent_loop(AgentLoopConfig(provider, context_window=300000,
             max_tokens=131072, context_meter=meter), messages, context_pipeline=reducer)
         self.assertFalse(result.is_error, result.error_details)
         self.assertEqual(len(messages) + 1, len(result.canonical_messages))
@@ -77,4 +77,4 @@ class LongContextTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(history.values)
         from fruitfly_agent.core.data_model import ProviderView
         measurement = await meter.measure(ProviderView('', sent, [], '', 131072), provider)
-        self.assertLessEqual(measurement.input_tokens + measurement.margin, 65536)
+        self.assertLessEqual(measurement.input_tokens + measurement.margin, (300000 - 131072) * .5)

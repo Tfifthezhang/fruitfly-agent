@@ -36,7 +36,7 @@ async def maintain(snapshot, checkpoint, sources, config, auxiliary, estimate, p
             break
         evidence = ''.join(sources[current.covered:target])[current.offset:]
         build = lambda page: update_prompt(config.update_instructions, current.memory, page, config.memory_tokens)
-        size = auxiliary.page_size(evidence, system='Maintain bounded task memory.', build_prompt=build,
+        size = auxiliary.page_size(snapshot, evidence, system='Maintain bounded task memory.', build_prompt=build,
             max_chars=config.page_char_limit, max_tokens=config.auxiliary_max_tokens, estimate=estimate)
         fingerprint = digest({'policy': policy, 'memory': current.memory, 'page': evidence[:size]})
         if not retry_ready(current.attempt, fingerprint, time.time()):

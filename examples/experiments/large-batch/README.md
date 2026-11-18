@@ -12,7 +12,9 @@ charges. Copy this directory and adjust catalog and source paths before use.
 | `runtime.example.yaml` | Model bindings and component references |
 | `research-subagent.yaml` | Four concurrent workers, 32 conversations, 3600 seconds and 256 requests per worker |
 | `research-evidence-selection.yaml` | All-policy detail grants, up to 256 cases |
-| `research-context-budget.yaml` | 262144 input tokens, reduction at 0.65 toward 0.45; model capacity still applies |
+| `research-context-budget.yaml` | Reduction at 65% of model input capacity, with a target of 45% |
+| `research-compaction.yaml` | Layered compaction settings for the research runtime |
+| `research-organizer.yaml` | Organizer settings for the research runtime |
 | `research-editor.yaml` | Five bounded draft repair attempts |
 | `improvement.example.yaml` | Explicit independent stages and named inputs |
 

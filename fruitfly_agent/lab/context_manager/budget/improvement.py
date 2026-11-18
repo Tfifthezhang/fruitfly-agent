@@ -1,4 +1,4 @@
-"""Only reduction thresholds are candidate editable; the host ceiling is protected."""
+"""Only reduction thresholds are candidate editable; the model binding owns capacity."""
 from fruitfly_agent.lab.catalog.adapters.parameters import editable_parameters
 
 

@@ -317,10 +317,9 @@ tools and editable guidance. Runtime stores and integrity controls remain protec
 
 ## Declare shared context conditions
 
-`H.context-budget` configures the common working input ceiling and reduction
-thresholds through ordinary component documents. Its owner declares controlled
+`H.context-budget` configures reduction thresholds relative to model input capacity through ordinary component documents. Its owner declares controlled
 `context_budget.*` execution fields and uses the common parameter adapter.
-Only trigger/target ratios are candidate editable; the ceiling is protected.
+Only trigger/target ratios are candidate editable. The model binding owns capacity.
 See [budget ownership and defaults](../context_manager/budget/README.md).
 Reduction implementations cannot bypass final Core admission. Ordinary saves
 preserve references; candidate/export documents freeze effective values.

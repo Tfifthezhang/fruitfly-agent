@@ -19,7 +19,7 @@ def snapshot(messages=None, **overrides):
 
 
 def reducer(provider, **changes):
-    return WorkingMemoryReducer(WorkingMemoryConfig(memory_tokens=64, auxiliary_attempts=1, auxiliary_max_tokens=128, **changes), provider)
+    return WorkingMemoryReducer(WorkingMemoryConfig(memory_tokens=64, auxiliary_attempts=1, auxiliary_max_tokens=128, **changes), provider, memory_context_window=8192)
 
 
 class ReductionSafetyTests(unittest.IsolatedAsyncioTestCase):
@@ -74,7 +74,7 @@ class ReductionSafetyTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_default_threshold_avoids_auxiliary_work_far_below_capacity(self):
         provider = FauxProvider()
-        method = WorkingMemoryReducer(WorkingMemoryConfig(), provider)
+        method = WorkingMemoryReducer(WorkingMemoryConfig(), provider, memory_context_window=8192)
         messages = [UserMessage('short evidence ' + str(i)) for i in range(100)]
         self.assertIsNone(await method.check_budget(snapshot(messages, context_window=100000)))
         self.assertEqual([], provider.calls)

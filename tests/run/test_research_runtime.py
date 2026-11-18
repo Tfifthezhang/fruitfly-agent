@@ -37,7 +37,7 @@ class ResearchRuntimeTests(unittest.IsolatedAsyncioTestCase):
             'H': {'local-env': {'default': True}, 'read-tool': {'default': True},
                 'context-budget': {'inline': {'id': 'context-budget', 'role': 'H',
                     'implementation': 'context-budget', 'parameters': {'settings': {
-                        'max_input_tokens': 7000, 'trigger_ratio': .6, 'target_ratio': .4}}}},
+                        'trigger_ratio': .6, 'target_ratio': .4}}}},
                 'layered-compaction': {'default': True}, 'work-products': {'default': True}}, 'S': {}, 'I': {}}}}))
         roles = ResearchRoles(root, path, registry=assembly.registry, environment={})
         self.addAsyncCleanup(roles.aclose)
@@ -78,7 +78,7 @@ class ResearchRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     self.assertTrue(any(e.type == 'compaction' for e in entries))
                     manifest = next(e.payload['manifest'] for e in entries if e.payload.get('kind') == 'research-runtime')
                     self.assertEqual({'context-budget', 'layered-compaction', 'work-products'}, {r['id'] for r in manifest['components']})
-                    self.assertEqual(7000, manifest['context_budget']['max_input_tokens'])
+                    self.assertEqual({'trigger_ratio': .6, 'target_ratio': .4}, manifest['context_budget'])
                     self.assertEqual(.6, manifest['context_budget']['trigger_ratio'])
                 retained = next(fields['artifact_id'] for event, fields in services.events if event == 'research-session')
                 self.assertEqual(session_path.read_bytes(), artifacts.read_bytes(retained))

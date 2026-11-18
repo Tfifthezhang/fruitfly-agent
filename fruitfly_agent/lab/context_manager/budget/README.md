@@ -15,7 +15,6 @@ selected reduction method.
 
 | Setting | Default | Ownership |
 |---|---|---|
-| `parameters.settings.max_input_tokens` | 65536 | User/host configuration; protected from candidates |
 | `parameters.settings.trigger_ratio` | 0.75 | H policy, editable only with explicit grants |
 | `parameters.settings.target_ratio` | 0.5 | H policy, editable only with explicit grants |
 
@@ -23,23 +22,23 @@ selected reduction method.
 `ContextBudget` owns type and cross-field validation. `registration.py` declares
 the Catalog parameters and controlled execution fields. `improvement.py` grants
 only the two ratios through the existing parameter adapter. Candidate runs use
-isolated Session/resources and the ordinary assembler; ratios cannot increase
-the protected ceiling or bypass Core admission.
+isolated Session/resources and the ordinary assembler. Model bindings own the window.
+Remove `max_input_tokens` from component files and regenerate frozen execution
+material containing that field.
 
 ## Calculate admission
 
-Working capacity is `min(max_input_tokens, model_window - output_reserve)`.
-Input occupancy includes system instructions, visible tools, messages and the
-measurement margin. Methods receive the remaining input allowance after margin;
-the trigger and target ratios use that allowance. The default trigger is about
-48K tokens, independent of a model's 1M capacity. Estimates remain heuristic
-unless the Provider supplies exact counting.
+Input capacity is the current role's model window minus the effective output
+reserve for the request. System instructions, visible tools, messages and the
+measurement margin count toward input occupancy. Reduction triggers at 75% by
+default and aims for 50% of this capacity, including the margin. For a
+1,000,000-token window with 131,072 reserved for output, capacity is 868,928.
 
-After transformations, reduction and hooks, Core measures the final request.
-Unknown measurement or excess working occupancy stops before a Provider call
-with `context_budget_exhausted`. Physical model overflow retains bounded overflow
-recovery. Direct Core callers must inject a `ContextMeter`; ordinary assembly
-and Lab role runners install shared measurement automatically.
+Core measures the final request after transformations and hooks. Unknown
+measurement or an output reserve that leaves no input capacity stops before the
+Provider call. Measured overflow uses the bounded recovery path. Direct Core
+callers must inject a `ContextMeter`; ordinary assembly and Lab role runners
+install shared measurement automatically.
 
 State-only maintenance can catch up while above the ceiling for at most
 `max_context_recovery_attempts` preparation passes. Repeated state, no proposal,
@@ -47,7 +46,7 @@ failed commit or cancellation stops catch-up. Existing auxiliary time, page and
 request limits still apply. State progress never claims request reduction.
 No main request is sent until it fits. Large pinned inputs, tool groups or
 signed replay can prevent reduction; this is an explicit failure, not permission
-to truncate evidence or exceed the working ceiling.
+to truncate evidence or exceed model input capacity.
 
 ## Preserve execution identity
 
@@ -55,7 +54,7 @@ Effective conditions enter execution receipts and RuntimeManifest identities.
 Current configuration applies on recovery; original Session records and their
 historical digests are unchanged. Frozen component documents retain complete
 values and include the declared default resource. Restricted children inherit
-the parent conditions even when their selected algorithm subset omits this owner.
+the parent reduction ratios even when their selected algorithm subset omits this owner.
 Reduction summaries and memory updates also validate the shared ceiling against
 their own model and output reserve.
 

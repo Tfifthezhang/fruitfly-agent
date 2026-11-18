@@ -524,6 +524,6 @@ workspace profiles or publish working files as retained S content.
 
 Use the shared `H.context-budget` component independently of the selected
 compression method. [Context budget](fruitfly_agent/lab/context_manager/budget/README.md)
-owns its settings and defaults; [component syntax](fruitfly_agent/runtime_spec/COMPONENTS.md)
-owns authoring. Keep actual model capacity in the model catalog. An omitted
+owns its reduction thresholds; [component syntax](fruitfly_agent/runtime_spec/COMPONENTS.md)
+owns authoring. The model window and effective output reserve determine input capacity. An omitted
 budget component retains Core enforcement with registered defaults.

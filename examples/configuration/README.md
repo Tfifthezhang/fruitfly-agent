@@ -26,9 +26,26 @@ container starts during initialization.
 | [ssh.example.yaml](ssh.example.yaml) | `.fruitfly/config.yaml` | Minimal remote profile; addresses are placeholders, credentials stay in the secret file |
 | [mcp.example.yaml](mcp.example.yaml) | `.fruitfly/mcp.yaml` | Optional local stdio servers, explicit selected tools and limits; edit placeholders before enabling `mcp-tools` |
 | [default-config.example.yaml](default-config.example.yaml) | `.fruitfly/default-config.yaml` | Single baseline file selecting model roles and registered H/S/I defaults |
+| [context-budget.example.yaml](context-budget.example.yaml) | `.fruitfly/components/context-budget.yaml` | Optional custom reduction thresholds relative to each model’s available input capacity |
 | [eval-host.example.yaml](eval-host.example.yaml) | `.fruitfly/eval-host.yaml` | Machine-local Linux runtime mounts and dependency/cache settings; configure path variables before use |
 
 Copy the single default configuration only when its destination is absent.
+From the repository root, copy these files for a fresh workspace:
+
+```bash
+mkdir -p .fruitfly
+cp -n examples/configuration/models.example.yaml .fruitfly/models.yaml
+cp -n examples/configuration/default-config.example.yaml .fruitfly/default-config.yaml
+cp -n .fruitfly/default-config.yaml .fruitfly/config.yaml
+cp -n examples/configuration/.env.example .fruitfly/secrets.env
+```
+
+The daily and baseline files can share the same model catalog. Set the key
+variable named by the selected entry in `.fruitfly/secrets.env` or the process
+environment. Adjust `models.roles.executor` in each profile to select its alias.
+Paths under `models.catalog` and component `file` references are relative to
+the system configuration file.
+
 Registered defaults resolve through installed owner resources. Reuse `.fruitfly/models.yaml`, or create it from the model
 template if missing. Select aliases separately in daily and baseline
 `models.roles`. **/config → Restore default configuration** stages the
@@ -38,11 +55,20 @@ unless explicitly overridden, using its aliases from the shared model catalog.
 It passes `--unrestricted` inside task containers; no permission configuration
 belongs in either Agent file.
 
+With the project installed in `.venv`, validate both profiles offline before
+starting a session. Inspection resolves model aliases and component references
+without constructing Providers.
+
+```bash
+.venv/bin/python -m fruitfly_agent.run.configuration.inspection --config .fruitfly/config.yaml
+.venv/bin/python -m fruitfly_agent.run.configuration.inspection --config .fruitfly/default-config.yaml
+```
+
 The default system selects H context directories, S `memory-library` and
 `skill-library`, and I editor/evaluator instructions through registered defaults.
 Four packaged coding Skills are available on demand; memory starts empty.
 Initialization does not write learned state or make model calls. Enable H
-H `file-memory` automatic maintenance for
+`file-memory` automatic maintenance for
 threshold-based cross-session updates, then review pending batches with `/memory`.
 The lazy `models.roles.memory_maintenance` reference inherits executor by default.
 See [memory behavior](../../fruitfly_agent/lab/context_manager/augmentation/memory/methods/file_memory/README.md)
@@ -143,6 +169,24 @@ complete groups with original-message references through `read`.
 the same Reduction slot. Shared request measurement is automatic and has no
 component selection or optimization grant.
 
+The default `H.context-budget: {default: true}` loads the installed reduction
+ratios. The current role's `context_window` in the model catalog, minus the
+effective output reserve for the request, determines the available input capacity.
+For a 1,000,000-token window and a 32,768-token reserve, input capacity is 967,232
+tokens, including the measurement margin.
+
+To set your own ratios, copy [context-budget.example.yaml](context-budget.example.yaml)
+to `.fruitfly/components/context-budget.yaml` and replace the existing
+`context-budget` reference under the desired profile's `H` section:
+
+```yaml
+context-budget:
+  file: components/context-budget.yaml
+```
+
+The example contains all budget settings. See [the budget guide](../../fruitfly_agent/lab/context_manager/budget/README.md)
+for ratio constraints and how to update older component files.
+
 To enable hybrid summaries, set `parameters.settings.mode: hybrid` in the selected
 layered-compaction component. `profiles.<profile>.models.roles.context_summary`
 defaults to `{inherit: executor}`; replace it with a catalog alias for an independent
@@ -178,7 +222,7 @@ Maintenance starts at 50% of the
 available input budget, then normally waits 32 new messages; each update has a
 20-second total auxiliary budget and two-page limit. It remains optional.
 IPython uses `models.roles.context_query`, which also defaults to
-`{inherit: executor}`. All six auxiliary role positions are present in the default
+`{inherit: executor}`. All auxiliary role positions are present in the default
 configuration. Replace a reference with a catalog alias only when an independent
 model is needed. Auxiliary calls may use the network and incur model charges. See
 [role admission](../../fruitfly_agent/lab/catalog/README.md#declare-auxiliary-model-dependencies).
@@ -188,9 +232,9 @@ They apply during benchmark execution and do not run when loading this example.
 
 ## Enable subagents
 
-The default configuration example includes the complete `subagent` group disabled
-and its model role set to executor inheritance. Enable the group in Tools through
-`/config`, or change that component's `enabled` to true. Select a different existing
+The default configuration example enables the `subagent` component through its
+registered default and inherits the executor model. Manage the component through
+`/config`. Select a different existing
 model alias through `models.roles.subagent`. Running delegated tasks can incur
 model and tool effects; configuring or inspecting them does not. See
 [Subagent configuration](../../fruitfly_agent/lab/agents/subagent/README.md#enable-delegation-and-choose-a-model).

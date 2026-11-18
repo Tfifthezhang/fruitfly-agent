@@ -246,7 +246,7 @@ async def _run(
                 return await _finish(config, ctx, hooks, "aborted", turn_count, tool_call_count)
 
             assistant: AssistantMessage | TaggedFailure
-            preflight = ctx.measurement is not None and not ctx.measurement.fits(ctx.context_window)
+            preflight = ctx.measurement is not None and not ctx.context_budget.fits(ctx.context_window, ctx.measurement)
             if preflight:
                 assistant = TaggedFailure(OverflowError('request exceeds the measured context budget',
                     details={'preflight': True, 'measurement': asdict(ctx.measurement)}))
@@ -466,8 +466,8 @@ async def _prepare_request(
     if ctx.measurement is not None:
         estimate, source = ctx.measurement.input_tokens, ctx.measurement.source
         _append_session_record(ctx, 'input_measurement', {**asdict(ctx.measurement),
-            'working_input_limit': ctx.context_budget.max_input_tokens,
-            'effective_input_capacity': ctx.context_budget.capacity(ctx.context_window, ctx.measurement),
+            'context_window': ctx.context_window,
+            'effective_input_capacity': ctx.context_budget.capacity(ctx.context_window, ctx.measurement.output_reserve),
             'reduction_trigger_ratio': ctx.context_budget.trigger_ratio,
             'reduction_target_ratio': ctx.context_budget.target_ratio,
             'fits_working_budget': ctx.context_budget.fits(ctx.context_window, ctx.measurement)})
@@ -483,9 +483,9 @@ async def _prepare_request(
         check_writer()
     measured = ctx.measurement
     if (measured is None or measured.input_tokens is None
-            or measured.fits(ctx.context_window) and not ctx.context_budget.fits(ctx.context_window, measured)):
-        raise FatalError('request exceeds working context budget or input measurement is unavailable',
-            details={'kind': 'context_budget_exhausted', 'max_input_tokens': ctx.context_budget.max_input_tokens,
+            or ctx.context_budget.capacity(ctx.context_window, measured.output_reserve) == 0):
+        raise FatalError('input measurement unavailable or output reserve leaves no model input capacity',
+            details={'kind': 'context_budget_exhausted',
                      'measurement': asdict(measured) if measured is not None else None,
                      'context_window': ctx.context_window})
     return request_ctx

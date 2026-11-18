@@ -58,9 +58,11 @@ class WorkingMemoryReducer:
         allowance = snapshot.context_budget.input_allowance(snapshot.context_window, measured, snapshot.max_tokens)
         if snapshot.signal is not None and snapshot.signal.is_set():
             raise asyncio.CancelledError
+        margin = measured.margin if measured is not None else 0
+        capacity = allowance + margin
         if allowance <= 0:
             return None
-        occupancy = max(self.estimate(snapshot), measured.input_tokens or 0 if measured else 0) / allowance
+        occupancy = (max(self.estimate(snapshot), measured.input_tokens or 0 if measured else 0) + margin) / capacity
         switch = force or occupancy >= snapshot.context_budget.trigger_ratio
         catching_up = checkpoint.covered < checkpoint.target_count
         if not switch and (occupancy < self.config.maintenance_ratio or
@@ -69,7 +71,7 @@ class WorkingMemoryReducer:
             return None
         sources = self._sources(items)
         effective_config = replace(self.config, memory_tokens=max(1, min(self.config.memory_tokens,
-            int(allowance * snapshot.context_budget.target_ratio))))
+            int(capacity * snapshot.context_budget.target_ratio - margin))))
         checkpoint, updated = await maintain(snapshot, checkpoint, sources, effective_config,
             self.auxiliary, self.meter.text_tokens, self.policy)
         if not updated:

@@ -190,7 +190,7 @@ from fruitfly_agent.lab.context_manager.reduction.methods.working_memory import 
 assert Path(config.__file__).is_relative_to(root)
 assert config.WorkingMemoryConfig().maintenance_ratio == .5
 from fruitfly_agent.core.context.budget import ContextBudget
-assert ContextBudget().max_input_tokens == 65536
+assert ContextBudget().capacity(1000000, 131072) == 868928
 assert Path(sys.modules[ContextBudget.__module__].__file__).is_relative_to(root)
 from fruitfly_agent.improvement.contracts.plans import StageTimeouts
 from fruitfly_agent.lab.improvement.editor import AgentEditor

@@ -19,8 +19,7 @@ is resolved in this mode.
 [Shared context budget](../../../budget/README.md) supplies capacity and thresholds.
 The complete request includes system instructions and tool definitions; output
 reserve and measurement uncertainty reduce available input capacity. This method
-has no independent trigger/target fields. A large model window does not postpone
-archiving until hundreds of thousands of tokens.
+has no independent trigger/target fields. Larger model windows raise the threshold for archiving.
 The tail target is soft: the minimum complete groups and pinned user input can
 exceed it. `tail_tokens` applies after archiving triggers; it is not a request cap.
 A request that still cannot fit fails through Core final admission;

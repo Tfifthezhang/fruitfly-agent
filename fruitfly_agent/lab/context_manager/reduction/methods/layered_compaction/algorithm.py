@@ -55,6 +55,8 @@ class LayeredCompactionReducer:
             return None
         measured = snapshot.measurement
         allowance = snapshot.context_budget.input_allowance(snapshot.context_window, measured, snapshot.max_tokens)
+        margin = measured.margin if measured is not None else 0
+        capacity = allowance + margin
         if allowance <= 0:
             return None
         raw_before = self.estimate(snapshot)
@@ -62,8 +64,8 @@ class LayeredCompactionReducer:
         scale = max(1., before / max(1, raw_before))
         def size(messages):
             return self.estimate(replace(snapshot, messages=tuple(messages))) * scale
-        target = allowance * snapshot.context_budget.target_ratio
-        triggered = force or before >= allowance * snapshot.context_budget.trigger_ratio
+        target = max(0, capacity * snapshot.context_budget.target_ratio - margin)
+        triggered = force or before + margin >= capacity * snapshot.context_budget.trigger_ratio
         projected = shrink_results(snapshot.messages, items, self.history.resource_prefix, self.config)
         # A single oversized new result must also be externalized when the request cannot fit.
         if size(projected) > allowance:

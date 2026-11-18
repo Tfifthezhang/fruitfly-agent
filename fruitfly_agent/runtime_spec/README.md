@@ -56,6 +56,5 @@ frozen imports require those resources and never fall back to the checkout.
 
 The shared H `context-budget` component projects working conditions into the
 internal execution receipt without adding a top-level YAML grammar.
-[Budget ownership](../lab/context_manager/budget/README.md) declares its protected
-ceiling and editable thresholds. Recorded `execution.context_budget` values are
+[Budget ownership](../lab/context_manager/budget/README.md) declares its editable thresholds and model-derived capacity. Recorded `execution.context_budget` values are
 strictly validated and participate in runtime identity.
