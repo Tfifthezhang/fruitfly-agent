@@ -2,6 +2,7 @@
 from collections import Counter
 from dataclasses import asdict
 from ...configuration import SelectionSettings
+from ..focused import trajectory_material
 from ....evidence.statistics import declared_outcomes
 from fruitfly_agent.improvement.contracts.versions import canonical_json, content_hash
 
@@ -98,7 +99,9 @@ class RepresentativeSelector:
                     'final-answer.json', 'task.json', 'model-usage.json', 'process.json', 'trajectory-status.json',
                     'overview.json', 'coverage.json', 'sources.json', 'events.json', 'history.json', 'outcome.json'}
                 case['material_paths'] = [r.path for r in granted if settings.material_policy == 'all-granted'
-                    or r.path.startswith('diagnostics/configuration/') or r.kind in {'trajectory', 'deliverable'} or r.path.rsplit('/', 1)[-1] in focused_names]
+                    or trajectory_material(r) or (settings.material_policy == 'focused' and
+                    (r.path.startswith('diagnostics/configuration/') or r.kind == 'deliverable'
+                     or r.path.rsplit('/', 1)[-1] in focused_names))]
                 case['omitted_materials'] = len(granted) - len(case['material_paths'])
         return {'selector_id': self.identity, 'implementation_id': self.implementation_id,
                 'settings': asdict(settings), 'selected': chosen,

@@ -28,6 +28,13 @@ class OrganizationPartStoreTests(unittest.TestCase):
         self.assertEqual((reference,), reopened.entries())
         self.assertEqual(self.part, reopened.read(reference))
 
+    def test_partial_locators_survive_reopening_without_final_submission(self):
+        reference = self.store.save(self.part, partial=True)
+        reopened = OrganizationPartStore(self.root / 'parts', self.artifacts)
+        self.assertEqual((), reopened.entries())
+        self.assertEqual((reference,), reopened.entries(partial=True))
+        self.assertEqual(self.part, reopened.read(reference))
+
     def test_identical_content_under_distinct_granted_paths_retains_both_sources(self):
         record = self.part.to_dict()
         source = record['grant']['a.txt']

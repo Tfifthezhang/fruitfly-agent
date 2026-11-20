@@ -1,0 +1,8 @@
+id: improvement-comparison
+role: I
+implementation: improvement-comparison
+parameters:
+  settings:
+    method: model
+    minimum_gain: null
+    maximum_regression_rate: null

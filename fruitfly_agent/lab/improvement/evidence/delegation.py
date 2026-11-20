@@ -33,6 +33,7 @@ class EvidenceDelegation:
         self.spans = {}
         self.service = None
         self.blocks = {}
+        self.partial_parts = {}
         self.block_sizes = {}
         self.cache = OrganizationPartCache(workspace, artifacts, settings, parts,
             conditions=conditions or {}, models=models or {}, workers=self.worker_by_name, record=record) if parts is not None else None
@@ -122,6 +123,7 @@ class EvidenceDelegation:
 
     def child_tools(self, request):
         scope = self.scopes[request.identity.agent_id]
+        agent_id = request.identity.agent_id
         run_id = request.identity.run_id
         worker = self.worker_config(request)
         maximum = min(self.settings.read.max_characters, worker['result']['max_characters'])
@@ -134,10 +136,37 @@ class EvidenceDelegation:
             if self.block_sizes.get(run_id, 0) + size > self.settings.findings.max_characters:
                 raise ValueError('detailed findings cumulative character allowance exhausted')
             reference = self.artifacts.put(canonical_json(value).encode())
-            self.blocks.setdefault(run_id, []).append((reference, value))
+            blocks = self.blocks.setdefault(run_id, [])
+            path = f'context/findings/{run_id}/partial-{len(blocks)}.json'
+            partial = self.artifacts.put(canonical_json({
+                'status': 'partial', 'identity': asdict(request.identity),
+                'question': request.task, 'worker': request.worker, 'grant': self.grants[agent_id],
+                'source_spans': [{**self.spans[agent_id][item['citation_id']], 'path': item['path']}
+                                 for item in value['sources']],
+                'artifact_id': reference, 'findings': value,
+            }).encode())
+            if isinstance(self.workspace, ReferenceWorkspace):
+                self.workspace.references[path] = partial
+            else:
+                self.workspace.files[path] = self.artifacts.read(partial)
+            blocks.append((reference, value))
+            parts = self.partial_parts.setdefault(run_id, [])
+            parts.append({'path': path, 'artifact_id': partial})
+            index_path = f'context/findings/{run_id}/partial-index.json'
+            index = self.artifacts.put(canonical_json({'status': 'partial', 'identity': asdict(request.identity),
+                                                        'blocks': parts}).encode())
+            if isinstance(self.workspace, ReferenceWorkspace):
+                self.workspace.references[index_path] = index
+            else:
+                self.workspace.files[index_path] = self.artifacts.read(index)
+            if self.service is not None:
+                self.service.observe_partial(request.identity, reference=index, path=index_path, count=len(parts))
+            if self.cache is not None:
+                self._save_part(request, value, self.cache, partial=True)
             self.block_sizes[run_id] = self.block_sizes.get(run_id, 0) + size
-            self.record('delegation-findings-block', child_run_id=run_id, artifact_id=reference)
-            return AgentToolResult([TextBlock(canonical_json({'artifact_id': reference, 'characters': size,
+            self.record('delegation-findings-block', child_run_id=run_id, artifact_id=reference,
+                        partial_artifact_id=partial, path=path, index_artifact_id=index)
+            return AgentToolResult([TextBlock(canonical_json({'artifact_id': reference, 'characters': size, 'partial_path': path,
                 'remaining_characters': self.settings.findings.max_characters - self.block_sizes[run_id]}))])
         async def submit(ctx):
             value = validate(ctx.args)
@@ -167,13 +196,13 @@ class EvidenceDelegation:
             parameters=submission.parameters, execute=save)
         return (*tuple(t for t in evidence_tools(scope, settings=self.settings) if t.name in worker['capabilities']['tools']), block_tool, submission)
 
-    def _save_part(self, request, value, cache: OrganizationPartCache):
+    def _save_part(self, request, value, cache: OrganizationPartCache, *, partial=False):
         if self.service is None:
             raise ValueError('retention requires a managed child lifecycle')
         row = self.service.detail(request.identity.agent_id, request.identity.run_id)
         citations = {source['citation_id']: self.spans[request.identity.agent_id][source['citation_id']] for source in value['sources']}
         cache.save(request, value, self.grants[request.identity.agent_id], citations,
-            reusable=not row['steered'] and not row['continuation'])
+            reusable=not row['steered'] and not row['continuation'], partial=partial)
 
     def finalize(self, request, result, summary):
         value = self.accepted.get(request.identity.run_id)

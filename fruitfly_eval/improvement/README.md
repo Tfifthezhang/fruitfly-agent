@@ -118,7 +118,9 @@ package is installed by declaring a collection name.
 The bridge extracts task instructions and a single reading trajectory from the
 native Session, falling back to converted ATIF when native evidence is absent.
 Each step contains visible text/tool calls/results with 2000-character excerpts,
-original lengths, truncation markers and original source spans. Provider replay
+original lengths, truncation markers and original source spans. Long permitted
+text and serialized tool arguments also have a full body resource. The preview
+records its relative path and content hash for scoped readback. Provider replay
 state, thinking blocks and duplicate event streams are excluded from default input.
 Usage receipts, process status, final answer and execution facts remain separate.
 Failed trials without a Session remain discoverable through explicit gaps and

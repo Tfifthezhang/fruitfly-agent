@@ -50,3 +50,9 @@ were informed by the user-supplied `learning harness/compact` directory and
 No upstream source files or SDK adapters are included. This implements readable
 canonical archives, optional bounded summaries and editable H policy; it does not
 reproduce upstream model-quality claims. See [implemented behavior](fruitfly_agent/lab/context_manager/reduction/methods/layered_compaction/README.md).
+
+## GEPA (optional dependency)
+
+The `gepa` extra installs GEPA 0.1.4, distributed under the MIT License.
+FruitFlyAgent uses the package's instruction renderer and output extractor.
+[Upstream release](https://pypi.org/project/gepa/0.1.4/) · [Source and license](https://github.com/gepa-ai/gepa)

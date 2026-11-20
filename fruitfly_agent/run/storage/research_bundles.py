@@ -60,9 +60,10 @@ class ResearchOutputs:
             if source_root != self.root:
                 for reference in bundle.dependencies:
                     self.artifacts.put_bytes(source.read_bytes(reference))
-            producers.append({'bundle': bundle.identity, 'producer': bundle.producer,
+            producers.append({'bundle': bundle.identity, 'kind': bundle.kind, 'producer': bundle.producer,
                 'configuration_id': bundle.configuration_id})
-            selected = tuple(r for r in bundle.outputs if not r.path.startswith('diagnostics/'))
+            selected = tuple(r for r in bundle.outputs
+                             if not r.path.startswith(('diagnostics/', 'organization/units/')))
             if bundle.kind != 'organize':
                 selected = tuple(resource for resource in bundle.outputs if resource.path == bundle.primary_path)
                 if len(selected) != 1:
@@ -132,3 +133,32 @@ class ResearchOutputs:
             except (ValueError, UnicodeDecodeError): continue
             self.write(prefix + '/' + resource.path, content)
         return bundle, path
+
+
+def role_usage(artifacts, diagnostic_id):
+    """Derive model activity from the existing receipts, including failed calls."""
+    from collections import Counter
+
+    trace = json.loads(artifacts.read_bytes(diagnostic_id))
+    requests, responses = {}, {}
+    for reference in trace['events']:
+        event = json.loads(artifacts.read_bytes(reference['artifact_id']))
+        name = event['event']
+        if name == 'request':
+            requests[event['id']] = event.get('role', 'unknown')
+        elif name == 'response':
+            responses[event['attempt_id']] = event
+    by_role = Counter(requests.values())
+    totals = Counter()
+    measured = 0
+    completed = 0
+    for key in requests:
+        response = responses.get(key, {})
+        completed += response.get('status') == 'completed'
+        usage = response.get('usage')
+        if isinstance(usage, dict):
+            measured += 1
+            totals.update({name: value for name, value in usage.items() if type(value) is int and value >= 0})
+    return {'observed_model_requests': len(requests), 'observed_by_role': dict(by_role),
+            'responses_completed': completed, 'responses_with_usage': measured,
+            'reported_token_subtotals': dict(totals), 'billed_cost': None}

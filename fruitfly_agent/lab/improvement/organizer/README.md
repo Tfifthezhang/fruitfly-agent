@@ -22,7 +22,7 @@ visible. A source citation is not a certificate that a downstream editor read it
 
 System `models.roles.organizer` selects the model or inherits executor. The
 `improvement-organizer` I component exposes `instructions.system` and
-`instructions.organize`. Schemas, grants, source bookkeeping and execution remain
+`instructions.organize` and `instructions.extract`. Schemas, grants, source bookkeeping and execution remain
 protected. `candidate_organizer` validates an I document and applies its instructions
 to real role execution. Fixed-I studies that select this component install the candidate into the inner
 reading role before editing. An isolated trial is not proof for persistent adoption;
@@ -100,3 +100,23 @@ validated incremental findings survive parent failure.
 Organization draft checks collect independent section/finding errors before
 returning; final submission still validates the complete guide and unique issue
 identities through the same owner.
+
+## Inspect task-local organization
+
+A grouped batch schedules task-local units from granted event indexes. Each
+unit lists its events and the preceding event for continuity. Extraction reads
+the task instruction, event metadata and authorized event bodies or exact
+source intervals. The unit exposes event-specific paths for source reads.
+An interval shared across units remains available to group synthesis and is
+marked unavailable to the local unit. Extraction returns short event-attributed
+observations. The synthesis Agent can consult the unit index and retrieve
+granted source spans. Deferred, missing and unavailable units remain visible.
+The backend-neutral reflection packet records task and execution identities,
+exact references, source-declared observations and the synthesized findings.
+
+Set `parameters.settings.extraction_model_requests` to bound all local extraction
+requests for one grouped invocation, including retries and follow-up reads.
+A value of zero defers model extraction while preserving the unit queue.
+Extraction leaves the shared completion reserve available for synthesis.
+The packet reports consumed extraction requests, unit reads, and direct unit
+citations in synthesis. Citation coverage records links in the guide.

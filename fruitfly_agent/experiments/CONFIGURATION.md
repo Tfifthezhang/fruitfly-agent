@@ -14,6 +14,8 @@ owner admission belongs to [Catalog](../lab/catalog/CONFIGURATION.md).
 | `baseline.config`, optional `profile` | Complete system configuration with H/S/I references and `models.roles` |
 | `stages.<stage>.inputs`, `context` | Explicit named materials and supplementary context |
 | `stages.<stage>.allowance` | Independent time and evidence supply allowance |
+| `stages.group.position`, `members` | Select one group position and provide authored task-ID lists for fixed grouping |
+| `stages.compare.measured_policy` | Path to the frozen task-attempt policy JSON for measured comparison |
 | `stages.propose.optimization` | Owner-validated default/explicit field grants |
 | `stages.<stage>.publish_as`, `attempt` | Immutable output alias and reuse/retry decision |
 | `next.stage` | Execute exactly one configured stage |

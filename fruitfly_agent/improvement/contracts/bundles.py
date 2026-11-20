@@ -14,7 +14,7 @@ class ResearchBundle:
     dependencies: tuple[str, ...] = ()
 
     def __post_init__(self):
-        if self.kind not in {'eval', 'import', 'organize', 'assess', 'propose', 'execute', 'compare'}:
+        if self.kind not in {'eval', 'import', 'group', 'organize', 'assess', 'propose', 'execute', 'compare'}:
             raise ValueError('unknown research bundle kind')
         for field in ('outputs', 'inputs', 'dependencies'):
             object.__setattr__(self, field, tuple(getattr(self, field)))

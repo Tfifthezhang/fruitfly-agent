@@ -46,10 +46,10 @@ class ResearchRoles:
             raise ValueError('unknown research model alias: ' + alias)
         return alias
 
-    def configuration(self, role, *, resources=None):
+    def configuration(self, role, *, resources=None, tools=True):
         alias = self.alias(role)
         spec = self.specs[alias]
-        spec.require(streaming=True, tools=True)
+        spec.require(streaming=True, tools=tools)
         provider = None
         def binding():
             nonlocal provider

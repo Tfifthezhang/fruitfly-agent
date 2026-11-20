@@ -72,6 +72,13 @@ class SubagentService:
                 "Child working file saved (derived, not final): " + json.dumps(row)))
             self.changed.set()
 
+    def observe_partial(self, identity, *, reference, path, count):
+        """Persist the current index projection while preserving execution state."""
+        row = self._row(identity.agent_id, identity.run_id)
+        if row['scope_id'] != identity.scope_id or row['state'] not in ACTIVE:
+            raise SubagentError('invalid_partial_owner')
+        self._save({**row, 'partial_result': {'artifact_id': reference, 'path': path, 'count': count}})
+
     def _poison(self):
         self.poisoned = True
         for signal in self.signals.values():

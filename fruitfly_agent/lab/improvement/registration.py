@@ -34,7 +34,7 @@ def definition():
         model_role_parameters={'organizer': ModelRoleRequirement('organizer_profile', 'Organize experiment records for reading.', fallback_role='executor', lazy=True), 'editor': ModelRoleRequirement('editor_profile', 'Generate candidates.', fallback_role='executor', lazy=True),
             'assessor': ModelRoleRequirement('assessor_profile', 'Assess candidate evidence.', fallback_role='executor', lazy=True)},
         component_validator=validate_component_options,
-        artifact_slots=frozenset({'improvement-editor', 'improvement-evaluator', 'improvement-organizer', 'improvement-evidence-selection'}), prepare_targets=_prepare_targets,
+        artifact_slots=frozenset({'improvement-editor', 'improvement-evaluator', 'improvement-organizer', 'improvement-evidence-selection', 'improvement-grouping', 'improvement-comparison'}), prepare_targets=_prepare_targets,
         implementation_path='fruitfly_agent/lab/improvement/registration.py',
         documentation_path='fruitfly_agent/lab/improvement/README.md')
 

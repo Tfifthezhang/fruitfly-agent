@@ -195,10 +195,34 @@ assert result['selected'][0]['run_id'] == 'frozen'
         surface = configuration_surfaces(catalog)[document.id][1]
         self.assertEqual('I', surface.role)
         self.assertEqual(dict(document.parameters), surface.normalize(dict(document.parameters)))
-        self.assertEqual({'settings': asdict(SelectionSettings())}, surface.restore({}, json.dumps(document.parameters)))
-        surface.edit_options(['parameters.settings.max_cases'], {'parameters.settings.max_cases': {'maximum': 12}})
+        from fruitfly_agent.lab.improvement.evidence_selection.configuration import MaterialSettings
+        self.assertEqual({'settings': asdict(MaterialSettings())}, surface.restore({}, json.dumps(document.parameters)))
+        surface.edit_options(['parameters.settings.optional_categories'], {})
+        with self.assertRaisesRegex(ValueError, 'belongs to grouping'):
+            surface.normalize({'settings': {'sampling_policy': 'all'}})
         with self.assertRaises(ValueError):
             surface.normalize({'settings': {'max_cases': True}})
+
+    def test_current_category_candidate_changes_grants_without_dropping_executions(self):
+        from fruitfly_agent.improvement.contracts.versions import content_hash
+        from fruitfly_agent.lab.improvement.evidence_selection.configuration import MaterialSettings
+        from fruitfly_agent.lab.improvement.evidence_selection.improvement import MaterialTarget, candidate_material_selector
+        from tests.support.configuration import with_component_parameters
+
+        settings = MaterialSettings('trajectory-only')
+        target = MaterialTarget(settings)
+        baseline = TextComponentAdapter(target, target.component_kind).snapshot()
+        edited = with_component_parameters(baseline, {'settings': {
+            'material_policy': 'trajectory-only', 'optional_categories': ['termination']}})
+        options = {'editable_fields': ['parameters.settings.optional_categories']}
+        selector = candidate_material_selector(edited, options=options, baseline=settings)
+        receipt = Resource('diagnostics/termination.json', content_hash('termination'), kind='diagnostic')
+        result = selector.select((row('one', 'task'), row('two', 'task')), resources={
+            'one': (receipt,), 'two': (),
+        })
+        self.assertEqual(['one', 'two'], [item['run_id'] for item in result['selected']])
+        self.assertEqual(['termination'], result['selected'][0]['material_reasons'][receipt.path])
+        self.assertEqual((), settings.optional_categories)
 
     def test_sampling_candidate_balances_outcomes_without_guessing_numeric_scores(self):
         rows = tuple(row('error-' + str(i), 'a-' + str(i), status='error', model_calls=99) for i in range(2))

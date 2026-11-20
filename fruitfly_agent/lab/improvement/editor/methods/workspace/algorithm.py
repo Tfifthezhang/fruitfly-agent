@@ -17,13 +17,15 @@ from fruitfly_agent.improvement.contracts.versions import canonical_json, conten
 
 def model_completion(config):
     """One tool-free request for non-Agent generators; the caller owns accounting."""
-    async def complete(system, prompt, *, signal):
+    async def complete(system, prompt, *, signal, on_response=None):
         stream = config.provider(ProviderView(system, [UserMessage(content=prompt)], [],
             config.model, config.max_tokens), signal=signal)
         try:
             result = await stream.result()
         finally:
             await stream.aclose()
+        if on_response is not None:
+            on_response(result)
         if result.stop_reason != 'stop' or result.tool_calls:
             raise ValueError('generator model completion did not finish')
         return result.text

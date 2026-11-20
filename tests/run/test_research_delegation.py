@@ -377,6 +377,23 @@ class ResearchDelegationTests(unittest.IsolatedAsyncioTestCase):
         block = json.loads(self.artifacts.read_bytes(part.findings['blocks'][0]))
         self.assertEqual(2, len(block['sources']))
         self.assertEqual(self.workspace.eligible_paths('a.txt'), self.workspace.eligible_paths('b.txt'))
+        execution, = self.workspace.investigation_children
+        partial = execution['partial_result']
+        self.assertEqual(partial['count'], 1)
+        index = json.loads(self.workspace.read(partial['path']))
+        self.assertEqual(index['status'], 'partial')
+        self.assertEqual(index['identity']['run_id'], execution['run_id'])
+        reference, = parts.entries(partial=True)
+        reopened = OrganizationPartStore(self.root / 'parts', self.artifacts)
+        self.workspace = EvidenceWorkspace(baseline=self.workspace.baseline,
+            files={'a.txt': b'observed failure', 'b.txt': b'observed failure'}, writable_ids=())
+        self.parent = FauxProvider()
+        self.parent.respond_tool_call('read_part', {'part_id': reference})
+        self.parent.respond_text('Partial finding recovered.')
+        await self.run_role(parts=reopened)
+        result = json.loads(self.parent.calls[-1]['messages'][-1].text)
+        self.assertEqual('partial', result['status'])
+        self.assertFalse(self.workspace.eligible_paths('a.txt'))
 
     async def test_completed_parts_survive_parent_failure_and_reuse_with_added_material(self):
         from fruitfly_agent.run.storage.organization_parts import OrganizationPartStore

@@ -51,6 +51,9 @@ class WorkspaceEvidence:
                     "note": "Reading budget exhausted. Submit using supplied evidence and declare uncovered scope."}
         limit = min(limit, remaining)
         self.workspace.access.grant(self.workspace.paths())
+        if path not in self.workspace.paths():
+            self.workspace.access.denied(path)
+            raise ValueError('read path is outside the evidence grant')
         try:
             data = self.workspace.read(path)
             text = decode_text_file(data)

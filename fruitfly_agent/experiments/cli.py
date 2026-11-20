@@ -38,7 +38,7 @@ def parser():
         actions = group.add_subparsers(dest='command', required=True)
         names = ['check', 'report', 'list'] if operation == 'improvement' else ['check', 'run', 'report', 'stop', 'list']
         if operation == 'improvement':
-            names += ['show', 'step', 'defaults', 'import', 'organize', 'assess', 'propose', 'execute', 'compare', 'inspect', 'resume', 'fork']
+            names += ['show', 'step', 'defaults', 'import', 'group', 'organize', 'assess', 'propose', 'execute', 'compare', 'inspect', 'resume', 'fork']
         if operation == 'eval':
             names += ['prepare', 'catalog']
         if operation == 'rsi':
@@ -46,7 +46,7 @@ def parser():
         for name in names:
             action = actions.add_parser(name)
             _options(action, suppress=True)
-            if operation == 'improvement' and name in {'import', 'organize', 'assess', 'propose', 'execute', 'compare', 'inspect', 'resume', 'fork'}:
+            if operation == 'improvement' and name in {'import', 'group', 'organize', 'assess', 'propose', 'execute', 'compare', 'inspect', 'resume', 'fork'}:
                 action.add_argument('--study')
                 action.add_argument('--output-root', help='portable study output directory')
                 action.add_argument('--apply-to-current', action='store_true', help='derive a candidate on current configuration when executing')
@@ -59,8 +59,12 @@ def parser():
                     action.add_argument('--related-records', help='associated report export directory')
                 elif name == 'fork':
                     action.add_argument('target')
-                elif name in {'organize', 'assess', 'propose', 'execute', 'compare'}:
+                elif name in {'group', 'organize', 'assess', 'propose', 'execute', 'compare'}:
                     action.add_argument('inputs', nargs='*', help='explicit input artifact IDs or bundle paths')
+                if name == 'group':
+                    action.add_argument('--position', type=int, default=0)
+                if name == 'compare':
+                    action.add_argument('--measured-policy', help='frozen task-attempt manifest JSON for measured comparison')
             elif name in {'report', 'stop', 'resume'}:
                 action.add_argument('run_id')
             if name == 'prepare':
@@ -88,7 +92,7 @@ def dispatch(args):
         return 0
     if args.operation == 'improvement' and args.config is None:
         args.config = str(workspace / '.fruitfly/improvement.yaml')
-    if ((args.operation == 'improvement' and args.command in {'show', 'step', 'check', 'import', 'organize', 'assess', 'propose', 'execute', 'compare', 'inspect', 'resume', 'list', 'report'})
+    if ((args.operation == 'improvement' and args.command in {'show', 'step', 'check', 'import', 'group', 'organize', 'assess', 'propose', 'execute', 'compare', 'inspect', 'resume', 'list', 'report'})
             or (args.operation == 'eval' and args.command == 'run')):
         from fruitfly_agent.runtime_spec.documents import DocumentReader
         target = Path(args.config).expanduser() if args.config else workspace / '.fruitfly/experiment.yaml'
@@ -108,7 +112,7 @@ def dispatch(args):
         from .operations.research import defaults
         print_json(defaults(args, workspace))
         return 0
-    if args.operation == 'improvement' and args.command in {'import', 'organize', 'assess', 'propose', 'execute', 'compare', 'inspect', 'resume', 'fork'}:
+    if args.operation == 'improvement' and args.command in {'import', 'group', 'organize', 'assess', 'propose', 'execute', 'compare', 'inspect', 'resume', 'fork'}:
         from .operations.research import dispatch as research
         print_json(asyncio.run(research(args, workspace)))
         return 0

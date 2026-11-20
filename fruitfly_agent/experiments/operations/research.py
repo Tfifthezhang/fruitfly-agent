@@ -36,7 +36,7 @@ def resolve_inputs(outputs, args):
                     raise ValueError('execute requires one explicitly selected harness')
                 requested['harness'] = str(path)
                 args.harness_bundle = str(path)
-            elif bundle.kind in {'import', 'eval', 'execute', 'assess'}:
+            elif bundle.kind in {'import', 'eval', 'execute', 'assess', 'group'}:
                 requested['batches'].append(str(path))
             else:
                 requested[{'organize': 'evidence', 'compare': 'assessments'}.get(bundle.kind, 'context')].append(str(path))
@@ -53,7 +53,7 @@ def resolve_inputs(outputs, args):
         resources: list[Resource] = []
         for index, value in enumerate(values):
             entries, origins = outputs.inputs((value,), args.command)
-            producers.extend(origins)
+            producers.extend({**origin, 'slot': name} for origin in origins)
             resources.extend(replace(entry, path=name + '/' + str(index) + '/' + entry.path) for entry in entries)
         slots[name] = resources[0] if name == 'harness' and resources else None if name == 'harness' else tuple(resources)
     named = StageInputs(**slots)
@@ -218,25 +218,71 @@ async def _dispatch(args, workspace, outputs, reporting):
     inputs, producers, named = resolve_inputs(outputs, args)
     reporting.update(inputs=inputs, producers=producers)
     _capture_configuration(outputs, reporting)
-    role_name = {'organize': 'organizer', 'propose': 'editor', 'assess': 'assessor', 'compare': 'assessor'}[args.command]
-    from fruitfly_agent.lab.improvement.evidence_selection import RepresentativeSelector, SelectionSettings
+    if args.command == 'group':
+        try:
+            settings = roles.profile.component_settings['grouping']['settings']
+            return await service.perform_named('group', named, parameters={
+                'grouping': settings, 'position': getattr(args, 'position', 0),
+                'members': getattr(args, 'members', None),
+            }, fresh=args.fresh, retry_unresolved=args.retry_unresolved)
+        finally:
+            await roles.aclose()
+    if args.command == 'compare':
+        from fruitfly_agent.lab.improvement.assessment.registration import method_and_role, apply_thresholds
+        method, comparison_role = method_and_role(roles.profile.component_settings)
+        manifest_path = getattr(args, 'measured_policy', None)
+        if method == 'measured':
+            try:
+                if not manifest_path:
+                    raise ValueError('measured comparison requires a measured policy JSON manifest')
+                path = Path(manifest_path).expanduser()
+                if not path.is_absolute():
+                    path = workspace / path
+                policy = json.loads(path.read_text())
+                if not isinstance(policy, dict):
+                    raise ValueError('measured policy manifest must be an object')
+                policy = apply_thresholds(roles.profile.component_settings['comparison'], policy)
+                reporting['configuration']['parameters']['measured_policy'] = policy
+                _capture_configuration(outputs, reporting)
+                return await service.perform_named('compare', named, parameters={'measured_policy': policy},
+                    fresh=args.fresh, retry_unresolved=args.retry_unresolved)
+            finally:
+                await roles.aclose()
+        if manifest_path:
+            raise ValueError('measured policy requires the measured comparison method')
+    role_name = {'organize': 'organizer', 'propose': 'editor', 'assess': 'assessor', 'compare': comparison_role if args.command == 'compare' else None}[args.command]
+    from fruitfly_agent.lab.improvement.evidence_selection.configuration import MaterialSettings
+    from fruitfly_agent.lab.improvement.evidence_selection.methods.focused import FocusedGroupSelector
     selector_factory = roles.extensions.bindings().evidence_selector
+    group_bundles = [producer for producer in producers if producer['kind'] == 'group']
+    material_settings = MaterialSettings.from_parameters(roles.profile.component_settings.get('evidence_selection', {}))
     service.evidence_selector = (selector_factory(roles.profile.component_settings) if selector_factory else
-        RepresentativeSelector(SelectionSettings.from_parameters(
-            roles.profile.component_settings.get('evidence_selection', {}))))
+        FocusedGroupSelector(material_settings.material_policy, material_settings.optional_categories,
+                             bounded=bool(group_bundles)))
+    if args.command in {'organize', 'propose'} and group_bundles:
+        if len(group_bundles) != 1 or len(named.batches) != 1:
+            raise ValueError('a grouped research invocation accepts exactly one feedback batch')
+        if group_bundles[0]['slot'] != 'batches':
+            raise ValueError('group bundles must be supplied as the feedback batch')
     from fruitfly_agent.run.storage.organization_parts import OrganizationPartStore
     from fruitfly_agent.lab.improvement.api import EvidenceSettings
     part_store = OrganizationPartStore(outputs.root / 'organization-parts' / getattr(args, 'branch', 'main'), outputs.artifacts) if EvidenceSettings.from_dict(config.evidence_settings).retention.enabled else None
-    runtime_factory = roles.runtime_factory(role_name, outputs.root / 'runs' / reporting['run_id'] / 'roles' / role_name,
+    editor_options = roles.profile.component_settings.get('editor', {}).get('settings', {})
+    tool_free = args.command == 'propose' and editor_options.get('method') == 'gepa-reflection'
+    runtime_factory = None if tool_free else roles.runtime_factory(role_name,
+        outputs.root / 'runs' / reporting['run_id'] / 'roles' / role_name,
         outputs.artifacts, config.evidence_settings, parts=part_store)
     try:
         if args.command == 'organize':
             from fruitfly_agent.lab.improvement.organizer import LayeredOrganizer, OrganizerInstructions
-            instructions = roles.profile.component_settings.get('organizer', {}).get('instructions', {})
+            organizer_config = roles.profile.component_settings.get('organizer', {})
+            instructions = organizer_config.get('instructions', {})
             service.organizer = LayeredOrganizer(roles.configuration('organizer'), artifacts,
-                instructions=OrganizerInstructions(**instructions), settings=config.evidence_settings, runtime_factory=runtime_factory)
+                instructions=OrganizerInstructions(**instructions), settings=config.evidence_settings,
+                runtime_factory=runtime_factory, options=organizer_config.get('settings'))
             service.role_identity['organize'] = {'model': roles.identity('organizer'), 'instructions': instructions,
-                'evidence': config.evidence_settings, 'delegation': runtime_factory.identity if runtime_factory else None}
+                'settings': organizer_config.get('settings'), 'evidence': config.evidence_settings,
+                'delegation': runtime_factory.identity if runtime_factory else None}
         elif args.command in {'assess', 'compare'}:
             from fruitfly_agent.lab.improvement.assessment.completed import CompletedAssessmentService
             role_config = roles.configuration('assessor')
@@ -249,7 +295,7 @@ async def _dispatch(args, workspace, outputs, reporting):
             from fruitfly_agent.lab.catalog import optimization_grants, optimization_table
             from fruitfly_agent.lab.catalog.research import configuration_targets
             from fruitfly_agent.lab.improvement.components import component_registry
-            from fruitfly_agent.lab.improvement.editor import AgentEditor
+            from fruitfly_agent.lab.improvement.editor.factory import create_editor
             from fruitfly_agent.lab.improvement.editor.generators import GeneratorRegistry, AgentGenerator
             from fruitfly_agent.lab.improvement.editor.proposal import ProposalStage
             from fruitfly_agent.run.runtime.assembly import resolve_base_prompt
@@ -274,7 +320,7 @@ async def _dispatch(args, workspace, outputs, reporting):
                 if reference in roles.profile.artifact_contents:
                     return roles.profile.artifact_contents[reference]
                 return artifacts.read(reference).decode()
-            role_config = roles.configuration('editor')
+            role_config = roles.configuration('editor', tools=False) if tool_free else roles.configuration('editor')
             from dataclasses import replace
             targets = configuration_targets(roles.profile, roles.catalog, options,
                 config=replace(role_config, system_prompt=text), artifact_reader=read_artifact, workspace=workspace)
@@ -283,13 +329,19 @@ async def _dispatch(args, workspace, outputs, reporting):
             service.plan = replace(service.plan, component_ids=tuple(options), component_options=options,
                 generator_id=full.improvement.generator)
             from fruitfly_agent.lab.improvement.editor.instructions import EditorInstructions
-            editor = AgentEditor(role_config, artifacts, components,
+            from functools import partial
+            from fruitfly_agent.run.improvement.research_runtime import completion_session
+            session_factory = partial(completion_session, outputs.root / 'runs' / reporting['run_id'] /
+                                      'roles' / 'editor', outputs.artifacts) if tool_free else None
+            editor = create_editor(role_config, artifacts, components,
                 instructions=EditorInstructions(**roles.profile.component_settings.get('editor', {}).get('instructions', {})), settings=config.evidence_settings, runtime_factory=runtime_factory,
-                options=roles.profile.component_settings.get('editor', {}).get('settings'))
+                options=editor_options, completion_session=session_factory)
             generators = roles.extensions.bindings().generators
             service.proposal = ProposalStage(generators=generators, components=components)
             service.services_factory = lambda plan: StageServices(plan, edit=editor.edit)
-            service.role_identity['propose'] = {'model': roles.identity('editor'), 'instructions': asdict(editor.instructions), 'settings': asdict(editor.options),
+            service.role_identity['propose'] = {'model': roles.identity('editor'),
+                'editor': editor.identity if tool_free else {'method': editor.implementation_id, 'instructions': asdict(editor.instructions)},
+                'settings': editor_options,
                 'grants': options, 'direction': service.plan.direction,
                 'generator': service.plan.generator_id, 'extensions': roles.extensions.identities,
                 'delegation': runtime_factory.identity if runtime_factory else None}
@@ -309,7 +361,7 @@ async def _dispatch(args, workspace, outputs, reporting):
 
 async def dispatch(args, workspace):
     """Every independent invocation has an immutable report and portable outputs."""
-    from fruitfly_agent.run.storage.research_bundles import ResearchOutputs
+    from fruitfly_agent.run.storage.research_bundles import ResearchOutputs, role_usage
     from fruitfly_agent.run.improvement.configuration.snapshot import differences, redact
     from datetime import datetime, timezone
     outputs = ResearchOutputs(workspace, args.study, getattr(args, 'output_root', None))
@@ -369,7 +421,10 @@ async def dispatch(args, workspace):
     finally:
         if reporting.get('service') is not None and reporting['service'].last_diagnostics is not None:
             run['diagnostics'] = asdict(reporting['service'].last_diagnostics)
-        run['finished_at'] = datetime.now(timezone.utc).isoformat()
+            run['usage'] = role_usage(outputs.artifacts, run['diagnostics']['artifact_id'])
+        finished = datetime.now(timezone.utc)
+        run['finished_at'] = finished.isoformat()
+        run['wall_seconds'] = (finished - datetime.fromisoformat(run['started_at'])).total_seconds()
         outputs.write(prefix + '/run.json', run)
         outputs.write(prefix + '/report.json', run)
         (outputs.root / prefix / 'report.md').write_text('# Research run ' + run_id + '\n\n```json\n' +

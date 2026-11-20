@@ -115,6 +115,13 @@ Output selection is not independent verification. Tests with fake Providers prov
 covered control flow, not real model gains. Task packages are explicitly authored;
 ordinary chat does not collect training material. See [task preparation](fruitfly_agent/lab/improvement/tasks/README.md).
 
+For grouped studies, [compose a feedback batch](fruitfly_agent/lab/improvement/grouping/README.md)
+before organization and proposal. The workspace editor is the default.
+[GEPA reflective proposal](fruitfly_agent/lab/improvement/editor/methods/gepa_reflection/README.md)
+is available as an optional editor method.
+The [research design](RESEARCH_PIPELINE_DESIGN.md) records the experiment
+protocol and the design behind these stages.
+
 ## What you can do
 
 | Task | Start here |

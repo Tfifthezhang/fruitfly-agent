@@ -19,6 +19,5 @@ Provider, mutable learning state or external service is required.
 Source-declared outcomes determine acceptance signals. Numeric values alone do
 not identify success. `sampling_policy: balanced` covers distinct process/outcome
 strata before rare-signal filling; `rare-first` preserves rare-signal ordering.
-Unscored contrasts remain separate from known successful controls. See the
-[parent guide](../../README.md#balance-distinct-investigation-strata) for controls,
-material scope and isolated candidate checks.
+Unscored contrasts remain separate from known successful controls. Current
+component settings are documented in the [material selection guide](../../README.md).

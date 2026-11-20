@@ -149,3 +149,6 @@ submission error when present. These diagnostics do not finish the invocation.
 `instructions.check_candidate` and `instructions.restore_candidate` belong to
 the existing editor I instruction surface; grants and restoration validation
 remain protected.
+
+[GEPA reflective proposal](methods/gepa_reflection/README.md) is an optional
+research editor for a frozen Organizer packet and one scalar system instruction.

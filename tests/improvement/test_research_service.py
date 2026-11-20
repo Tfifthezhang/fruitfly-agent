@@ -17,6 +17,41 @@ from tests.support.stages import proposal_fixture, Runner
 
 
 class ResearchServiceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_measured_compare_reuses_frozen_inputs_without_a_model_role(self):
+        from dataclasses import replace
+        from fruitfly_agent.improvement.contracts.stages import StageInputs
+        from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
+        from fruitfly_agent.improvement.contracts.versions import content_hash
+
+        _, plan, baseline, runner = proposal_fixture()
+        task = TaskMaterial('task', 'Compare the retained executions')
+        before = await runner.execute(plan, task, baseline)
+        after = replace(before, run_id='candidate-run', harness_id=content_hash('candidate'))
+        scorer = content_hash('fixture scorer')
+        policy = content_hash('fixture outcome policy')
+
+        def recorded(receipt, value, outcome):
+            return ResearchBatch((task,), (receipt,), (
+                {'run_id': receipt.run_id, 'attempt': 0, 'name': 'reward', 'value': value,
+                 'scorer_id': scorer, 'outcome_policy_id': policy, 'eligible': True,
+                 'semantics': {'scope': 'execution', 'outcome': outcome}},)).to_dict()
+
+        with tempfile.TemporaryDirectory() as directory:
+            service = ResearchService(directory, 'study', MemoryArtifacts())
+            service.revise({'comparison': 'measured'})
+            batches = (service.put('before.json', recorded(before, 0, 'unmet')),
+                       service.put('after.json', recorded(after, 1, 'met')))
+            manifest = {'metric': 'reward', 'scorer_id': scorer, 'outcome_policy_id': policy,
+                        'direction': 'max', 'minimum_gain': 0, 'maximum_regression_rate': 0,
+                        'pairs': [{'task_id': task.task_id, 'attempt': 0,
+                                   'before': before.run_id, 'after': after.run_id}]}
+            named = StageInputs(batches=batches)
+            result = await service.perform_named('compare', named, parameters={'measured_policy': manifest})
+            self.assertEqual(service.read(result.outputs[0])['conclusion'], 'better')
+            repeated = await service.perform_named('compare', named, parameters={'measured_policy': manifest})
+            self.assertEqual(repeated, result)
+            self.assertEqual(len(runner.calls), 1)
+
     async def test_named_batch_proposal_reads_multiple_failed_unscored_batches_without_execution(self):
         from dataclasses import replace
         from fruitfly_agent.improvement.contracts.stages import StageInputs
@@ -102,7 +137,10 @@ class ResearchServiceTests(unittest.IsolatedAsyncioTestCase):
             agent = trial / 'agent'; agent.mkdir(parents=True)
             messages = [{'type': 'message', 'message': {'role': 'user', 'content': 'Do the task'}},
                 {'type': 'message', 'message': {'role': 'assistant', 'stopReason': 'stop',
-                    'content': [{'type': 'text', 'text': 'Delivered'}]}}]
+                    'content': [{'type': 'text', 'text': 'Delivered'},
+                                {'type': 'thinking', 'thinking': 'EXTENSION SENTINEL'},
+                                {'type': 'image', 'data': 'EXTENSION SENTINEL'}]}},
+                {'type': 'compaction', 'summary': 'EXTENSION SENTINEL'}]
             (agent / 'session.jsonl').write_text(''.join(json.dumps(r) + '\n' for r in messages))
             (trial / 'result.json').write_text(json.dumps({'task_name': 'fixture',
                 'exception_info': {'exception_type': 'AgentTimeoutError'}, 'verifier_result': {'rewards': {'reward': 1}}}))
@@ -113,6 +151,11 @@ class ResearchServiceTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(batch.records[0].status, 'error')
             self.assertEqual(batch.observations[0]['value'], {'reward': 1})
             self.assertTrue(all(b'PRIVATE SENTINEL' not in v for v in artifacts.values.values()))
+            scope = next(r for r in batch.records[0].artifacts if r.path == 'diagnostics/reading-scope.json')
+            extensions = json.loads(artifacts.read(scope.artifact_id))['extensions']
+            self.assertEqual({'thinking': 1, 'image': 1, 'compaction': 1},
+                             {key: value['observed_count'] for key, value in extensions.items()})
+            self.assertTrue(all(b'EXTENSION SENTINEL' not in v for v in artifacts.values.values()))
 
     async def test_cli_inspection_requires_neither_configuration_nor_provider(self):
         with tempfile.TemporaryDirectory() as directory:

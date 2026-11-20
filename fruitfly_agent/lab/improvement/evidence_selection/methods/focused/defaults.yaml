@@ -1,0 +1,7 @@
+id: improvement-evidence-selection
+role: I
+implementation: improvement-evidence-selection
+parameters:
+  settings:
+    material_policy: focused
+    optional_categories: []

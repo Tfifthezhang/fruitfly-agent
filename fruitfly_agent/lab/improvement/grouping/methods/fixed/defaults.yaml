@@ -1,0 +1,8 @@
+id: improvement-grouping
+role: I
+implementation: improvement-grouping
+parameters:
+  settings:
+    method: fixed
+    batch_size: 1
+    seed: 0

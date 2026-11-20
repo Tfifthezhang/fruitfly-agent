@@ -20,7 +20,7 @@ fruitfly-agent-lab improvement check --config experiment.yaml
 fruitfly-agent-lab improvement step --config experiment.yaml
 ```
 
-Set `next.stage` to `import`, `organize`, `assess`, `propose`, `execute`, `compare`
+Set `next.stage` to `import`, `group`, `organize`, `assess`, `propose`, `execute`, `compare`
 or `eval`. Named inputs resolve explicit branch references; neither scores nor
 a global latest output chooses the next operation. A stage never reruns a missing
 prerequisite. Editing this file changes the next invocation without changing
@@ -93,3 +93,25 @@ For retained Eval results, import produces compact evidence without model calls.
 Select assess or propose next; model organize is optional. Task selection and
 explicit hash-checked original supplements are described in
 [stage settings](CONFIGURATION.md#configure-stage-settings).
+
+
+### Compose one feedback batch
+
+Supply one imported or executed batch to `stages.group.inputs.batches`. The
+[grouping component](../lab/improvement/grouping/README.md) selects a position
+from the frozen pool. Give the group a `publish_as` alias and supply that alias
+in the Organizer or Proposer batch slot. Each invocation performs one stage.
+
+### Compare planned attempts offline
+
+Reference an `improvement-comparison` component with
+`parameters.settings.method: measured` in the baseline system configuration.
+Pass two batches in before/after order and set `stages.compare.measured_policy`
+to a JSON manifest path relative to the research configuration. For legacy
+CLI invocations, supply `--measured-policy`. See the
+[manifest and measurement requirements](../lab/improvement/assessment/README.md#compare-explicitly-paired-measurements).
+
+The run report includes elapsed wall time. When role receipts are available,
+it reports observed calls, completed responses and reported token subtotals.
+Totals cover the receipts collected for that invocation. Billed cost remains
+unknown.

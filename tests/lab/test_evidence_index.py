@@ -11,6 +11,35 @@ from tests.support.stages import proposal_fixture,Runner
 
 
 class EvidenceIndexTests(unittest.IsolatedAsyncioTestCase):
+    async def test_saved_worker_block_is_readable_before_final_submission(self):
+        from types import SimpleNamespace
+        from fruitfly_agent.lab.agents.subagent.contracts import ChildRequest, ExecutionIdentity
+        from fruitfly_agent.lab.improvement.evidence.configuration import EvidenceSettings
+        from fruitfly_agent.lab.improvement.evidence.delegation import EvidenceDelegation
+
+        _, _, baseline, _ = proposal_fixture()
+        artifacts = MemoryArtifacts()
+        workspace = EvidenceWorkspace(baseline=baseline, files={'artifact.txt': b'error details'}, writable_ids=())
+        delegation = EvidenceDelegation(workspace, artifacts, EvidenceSettings.from_dict({
+            'delegation': {'enabled': True, 'workers': ['evidence-reader']},
+        }), tools=('read',), record=lambda *args, **fields: None)
+        identity = ExecutionIdentity('scope', 'reader', 'worker-run')
+        request = ChildRequest(identity, 'Find the error', worker='evidence-reader', materials=('artifact.txt',))
+        delegation.admit(request)
+        tools = {tool.name: tool for tool in delegation.child_tools(request)}
+        reading = await tools['read'].execute(SimpleNamespace(args={'path': 'artifact.txt'}))
+        citation = json.loads(reading.content[0].text)['citation_id']
+        await tools['save_findings'].execute(SimpleNamespace(args={
+            'summary': 'Error observed', 'unknowns': [],
+            'sources': [{'path': 'artifact.txt', 'citation_id': citation}],
+        }))
+        with self.assertRaisesRegex(ValueError, 'did not submit'):
+            delegation.finalize(request, None, '')
+        partial = json.loads(workspace.read('context/findings/worker-run/partial-0.json'))
+        self.assertEqual(partial['status'], 'partial')
+        self.assertEqual(partial['question'], 'Find the error')
+        self.assertEqual(partial['source_spans'][0]['path'], 'artifact.txt')
+
     async def test_streaming_deltas_share_navigation_ranges_without_losing_original_text(self):
         _, plan, baseline, _ = proposal_fixture()
         artifacts = MemoryArtifacts(); task = TaskMaterial('task', 'Inspect stream')
@@ -159,3 +188,25 @@ class EvidenceIndexTests(unittest.IsolatedAsyncioTestCase):
             await EvidenceSession(AgentLoopConfig(provider, context_window=100, max_tokens=100), None).session(
                 'Inspect evidence', workspace, services)
         self.assertEqual(provider.calls, [])
+
+    async def test_event_read_expands_only_a_granted_body(self):
+        from types import SimpleNamespace
+        from fruitfly_agent.lab.improvement.evidence.tools import evidence_tools
+
+        _, _, baseline, _ = proposal_fixture()
+        artifacts = MemoryArtifacts()
+        body = ('界' * 2000 + 'tail-only failure').encode()
+        event = {'event_id': 'fixture-event', 'body_path': 'body.txt',
+                 'body_artifact_id': artifacts.put(body)}
+        workspace = EvidenceWorkspace(baseline=baseline, files={
+            EVENTS_PATH: json.dumps({'events': [event]}).encode(),
+            'body.txt': body,
+        }, writable_ids=())
+        read = next(tool for tool in evidence_tools(workspace) if tool.name == 'read')
+        request = SimpleNamespace(args={'path': EVENTS_PATH, 'event_id': event['event_id'],
+                                        'offset': 2000})
+        response = await read.execute(request)
+        self.assertEqual(json.loads(response.content[0].text)['text'], 'tail-only failure')
+        request.args['event_id'] = 'outside-group'
+        with self.assertRaisesRegex(ValueError, 'outside the selected index'):
+            await read.execute(request)

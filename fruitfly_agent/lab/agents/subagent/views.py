@@ -10,7 +10,8 @@ def bounded(value, *, settings=None):
         value = {**value, 'executions': rows}
         if len(json.dumps(value)) > settings.max_preview_characters:
             value = {**value, 'previews_omitted': True, 'executions': [
-                {k: row[k] for k in ('agent_id', 'run_id', 'state', 'cleanup', 'result_reference', 'result_resource', 'error') if k in row}
+                {k: row[k] for k in ('agent_id', 'run_id', 'state', 'cleanup', 'result_reference',
+                                     'result_resource', 'partial_result', 'error') if k in row}
                 for row in rows]}
         return value
     if 'task' in value:

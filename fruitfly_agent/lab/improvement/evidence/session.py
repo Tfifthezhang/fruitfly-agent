@@ -20,7 +20,7 @@ class EvidenceSession:
         self.reader_factory = reader_factory
         self.runtime_factory = runtime_factory
 
-    async def session(self, mission, workspace, services, *, writable=False, system='', submit=None, initial_content=None, extra_tools=(), validate_final=None, submission_result=None, editing_instructions=None, editing_options=None):
+    async def session(self, mission, workspace, services, *, writable=False, system='', submit=None, initial_content=None, extra_tools=(), validate_final=None, submission_result=None, editing_instructions=None, editing_options=None, model_request_ceiling=None):
         if not hasattr(workspace,'access'):
             raise ValueError('workspace must provide evidence access receipts')
         workspace.record=services.record
@@ -47,16 +47,21 @@ class EvidenceSession:
             def bounded_provider(view, *, signal=None):
                 async def events():
                     services.check()
-                    workspace.access.budget['model_requests'] += 1
-                    if workspace.access.budget['model_requests'] > self.settings.supply.max_pages + self.settings.supply.completion_requests:
+                    ceiling = self.settings.supply.max_pages + self.settings.supply.completion_requests
+                    if model_request_ceiling is not None:
+                        ceiling = min(ceiling, model_request_ceiling)
+                    if workspace.access.budget['model_requests'] >= ceiling:
                         raise RuntimeError('evidence_request_budget_exhausted: shared role request budget exhausted')
-                    if delegated:
-                        services.observe('model')
                     measurement = await meter.measure(view, config.provider, signal=signal)
                     if not measurement.fits(config.context_window):
                         services.record('evidence-context-budget-exhausted', input_tokens=measurement.input_tokens,
                             output_reserve=measurement.output_reserve, quality=measurement.quality)
                         raise RuntimeError('evidence_context_budget_exhausted: input and output reserve exceed context window')
+                    if workspace.access.budget['model_requests'] >= ceiling:
+                        raise RuntimeError('evidence_request_budget_exhausted: shared role request budget exhausted')
+                    workspace.access.budget['model_requests'] += 1
+                    if delegated:
+                        services.observe('model')
                     inner = config.provider(view, signal=signal)
                     try:
                         async for event in inner:

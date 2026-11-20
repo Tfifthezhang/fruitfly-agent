@@ -11,13 +11,20 @@ from ...instructions import OrganizerInstructions
 from ...workspace import build_workspace
 from ...findings import validate_findings, FINDING_FIELDS, finding_sources
 from ....evidence.session import EvidenceSession
+from ....evidence.packets import reflection_packet
+from .scheduling import schedule
+from .extraction import extract
 from ...publication import publish_investigation
 
 
 class LayeredOrganizer:
     implementation_id = 'layered-organizer-v1'
 
-    def __init__(self, config, artifacts, *, instructions=None, settings=None, runtime_factory=None):
+    def __init__(self, config, artifacts, *, instructions=None, settings=None, runtime_factory=None, options=None):
+        from ...registration import normalize
+        options = normalize({'settings': options or {}})['settings']
+        self.events_per_unit = options['events_per_unit']
+        self.extraction_model_requests = options['extraction_model_requests']
         self.artifacts = artifacts
         self.instructions = instructions or OrganizerInstructions()
         self.session = EvidenceSession(config, artifacts, settings=settings, runtime_factory=runtime_factory)
@@ -27,6 +34,48 @@ class LayeredOrganizer:
 
     async def _organize(self, request, services):
         workspace, batch = build_workspace(request, self.artifacts, record=services.record)
+        packet = reflection_packet(request, workspace, batch, {'findings': []})
+        organized_queue = {}
+        selection = next((resource for resource in request.context if resource.path == 'selection.json'), None)
+        plan = json.loads(self.artifacts.read(selection.artifact_id)) if selection else {}
+        if plan.get('implementation_id') == 'focused-group-material-v1' and plan.get('bounded', True):
+            units = schedule(packet, workspace, self.events_per_unit)
+            queue_receipt = self.artifacts.put(canonical_json({'units': units}).encode())
+            services.record('organization-unit-queue', artifact_id=queue_receipt, count=len(units))
+            paths = {}
+            task_inputs = {card['task_id']: card['input'] for card in packet['cards']}
+            extraction_ceiling = min(self.extraction_model_requests, self.session.settings.supply.max_pages)
+            for unit in units:
+                if unit['state'] == 'pending':
+                    if workspace.access.budget['model_requests'] >= extraction_ceiling:
+                        unit = {**unit, 'state': 'deferred_budget'}
+                    else:
+                        services.check()
+                        try:
+                            observations = await extract(self.session, self.instructions.extract, self.instructions.system,
+                                                         unit, workspace, task_inputs[unit['task_id']], services,
+                                                         model_request_ceiling=extraction_ceiling)
+                            unit = {**unit, 'state': 'processed', 'observations': observations}
+                        except (ValueError, RuntimeError) as exc:
+                            state = ('deferred_budget' if 'evidence_request_budget_exhausted' in str(exc)
+                                     else 'unavailable')
+                            unit = {**unit, 'state': state, 'detail': str(exc)[:500]}
+                path = 'units/' + unit['unit_id'][7:] + '.json'
+                paths[path] = unit
+                reference = self.artifacts.put(canonical_json(unit).encode())
+                workspace.references['context/' + path] = reference
+                services.record('organization-unit-retained', artifact_id=reference,
+                                task_id=unit['task_id'], state=unit['state'])
+            index = {'units': [{'path': 'context/' + path, 'task_id': unit['task_id'],
+                               'artifact_id': workspace.references['context/' + path],
+                               'state': unit['state']} for path, unit in paths.items()]}
+            workspace.references['context/units.json'] = self.artifacts.put(canonical_json(index).encode())
+            organized_queue = {'units.json': index, **paths}
+            packet['coverage']['extraction_model_requests'] = workspace.access.budget['model_requests']
+            packet['coverage']['extraction_model_request_limit'] = extraction_ceiling
+            packet['coverage']['unit_states'] = {
+                state: sum(unit['state'] == state for unit in paths.values())
+                for state in sorted({unit['state'] for unit in paths.values()})}
         accepted = None
         source_rows: list[dict[str, Any]] = []
         def accept(value):
@@ -114,6 +163,9 @@ class LayeredOrganizer:
             description='Validate a draft through the final owner validator without publishing or finishing.',
             parameters=tool.parameters, execute=check, requires_exclusive_batch=True)
         mission = self.instructions.organize
+        if organized_queue:
+            mission += ('\nUse context/units.json to find task-local extraction results and deferred units. '
+                        'Read original spans before establishing detailed facts and report coverage gaps.')
         if request.instruction.strip():
             mission += '\n\nInvocation requirements:\n' + request.instruction
         await self.session.session(mission, workspace, services, system=self.instructions.system,
@@ -122,8 +174,15 @@ class LayeredOrganizer:
             initial_content=canonical_json({'batch_path': 'context/batch.json', 'task_count': len(request.tasks)}))
         if accepted is None:
             raise ValueError('organizer did not submit a view')
-        values = {**publish_investigation(accepted, workspace, request.records),
+        if organized_queue:
+            read_units = {path for path in workspace.access.inspection()['paths'] if path.startswith('context/units/')}
+            cited_units = {source['path'] for source in source_rows if source['path'].startswith('context/units/')}
+            packet['coverage']['unit_records_read_in_synthesis'] = len(read_units)
+            packet['coverage']['unit_records_cited_in_synthesis'] = len(cited_units)
+            packet['coverage']['unit_records_without_direct_citation'] = len(organized_queue['units.json']['units']) - len(cited_units)
+        values = {**organized_queue, **publish_investigation(accepted, workspace, request.records),
             'batch.json': batch, 'guide.json': accepted,
+            'reflection-packet.json': {**packet, 'group_findings': accepted['findings']},
             'parts.json': {'parts': list(workspace.retained_parts.values()),
                 'scope': 'Selected/new child findings; directory coverage is not full original reading.'},
             'sources.json': {'sources': source_rows, 'scope': 'Derived summaries do not certify downstream original reading.'}}

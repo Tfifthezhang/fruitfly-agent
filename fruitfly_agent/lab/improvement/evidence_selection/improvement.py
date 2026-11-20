@@ -3,7 +3,7 @@ from dataclasses import asdict
 import json
 from fruitfly_agent.improvement.contracts.optimization import OptimizationSpec, OptimizationField, TargetSnapshot, TargetBinding
 from fruitfly_agent.improvement.contracts.versions import canonical_json
-from .configuration import SelectionSettings, LIMITS
+from .configuration import SelectionSettings, LIMITS, MATERIAL_POLICIES
 from .methods.representative.algorithm import RepresentativeSelector
 
 
@@ -37,17 +37,18 @@ class SelectionTarget:
 
     def describe_fields(self, text=None):
         values = asdict(self.settings if text is None else self.parse(text))
-        defaults = asdict(SelectionSettings())
-        return tuple(OptimizationField('parameters.settings.' + key, 'integer' if key in LIMITS else 'string',
-            {'max_cases': 'Maximum detailed execution cases.', 'controls': 'Reserved successful controls.',
+        defaults = asdict(type(self.settings)())
+        return tuple(OptimizationField('parameters.settings.' + key, 'integer' if key in LIMITS else 'string_list' if key == 'optional_categories' else 'string',
+            {'optional_categories': 'Additional resource categories admitted over the base material policy.',
+             'max_cases': 'Maximum detailed execution cases.', 'controls': 'Reserved successful controls.',
              'max_per_task': 'Maximum detailed cases for one task.', 'slow_seconds': 'Elapsed-time investigation threshold.',
              'many_calls': 'Model-call investigation threshold.', 'many_tools': 'Execution tool-start investigation threshold.',
              'high_tokens': 'Per-resource execution token investigation threshold.',
              'sampling_policy': 'Cover execution/outcome strata or prioritize rare signals.',
-             'material_policy': 'Focused evidence or every retained granted material.'}[key], value, defaults[key],
+             'material_policy': 'Trajectory evidence, focused evidence, or every retained granted material.'}[key], value, defaults[key],
             minimum=LIMITS[key][0] if key in LIMITS else None,
             maximum=LIMITS[key][1] if key in LIMITS else None,
-            choices=() if key in LIMITS else ('balanced', 'rare-first', 'all') if key == 'sampling_policy' else ('focused', 'all-granted')) for key, value in values.items())
+            choices=() if key in LIMITS else ('balanced', 'rare-first', 'all') if key == 'sampling_policy' else MATERIAL_POLICIES if key == 'material_policy' else ()) for key, value in values.items())
 
     def validate_options(self, options):
         fields = {'parameters.settings.' + k for k in asdict(self.settings)}
@@ -94,3 +95,32 @@ def candidate_selector(document, *, options, baseline=None):
     text = adapter.to_text(document)
     target.validate_change(text, options)
     return RepresentativeSelector(target.parse(text))
+
+
+class MaterialTarget(SelectionTarget):
+    """Catalog target for material plans over immutable execution membership."""
+
+    def __init__(self, settings=None):
+        from .configuration import MaterialSettings
+        super().__init__(settings or MaterialSettings())
+
+    def parse(self, text):
+        from .configuration import MaterialSettings
+        values = json.loads(text)
+        if (not isinstance(values, dict) or set(values) != {'settings'}
+                or not isinstance(values['settings'], dict)
+                or set(values['settings']) != set(asdict(self.settings))):
+            raise ValueError('candidate must preserve complete material settings')
+        return MaterialSettings.from_parameters(values)
+
+
+def candidate_material_selector(document, *, options, baseline=None):
+    from ..components.text import TextComponentAdapter
+    from .methods.focused import FocusedGroupSelector
+    target = MaterialTarget(baseline)
+    adapter = TextComponentAdapter(target, target.component_kind)
+    adapter.validate(document)
+    text = adapter.to_text(document)
+    target.validate_change(text, options)
+    settings = target.parse(text)
+    return FocusedGroupSelector(settings.material_policy, settings.optional_categories)

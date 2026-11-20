@@ -35,14 +35,21 @@ async def dispatch(args, workspace):
             catalog = extensions.catalog(builtin_catalog()) if extensions.registrations else builtin_catalog()
             profile = load_system_config(system_path, catalog=catalog).select(config.runtime.get('profile'))
             from fruitfly_agent.lab.improvement.api import EvidenceSettings, EvidenceDelegation
-            if EvidenceSettings.from_dict(config.evidence_settings).delegation.enabled:
+            definition = context.preview()['definition']
+            if context.stage == 'compare':
+                from fruitfly_agent.lab.improvement.assessment.registration import method_and_role
+                method, role = method_and_role(profile.component_settings)
+                definition.update(method=method, model_role=role)
+                if role is None:
+                    definition['effects'] = 'Offline material processing'
+            if definition['model_role'] and EvidenceSettings.from_dict(config.evidence_settings).delegation.enabled:
                 EvidenceDelegation.configuration(profile, catalog, EvidenceSettings.from_dict(config.evidence_settings).delegation.workers)
             if context.stage == 'propose':
                 from .research import defaults
                 scope = defaults(SimpleNamespace(config=str(path)), workspace)
             else:
                 scope = {}
-            result = {**context.preview(), 'configuration': config.snapshot(), 'optimization': scope,
+            result = {**context.preview(), 'definition': definition, 'configuration': config.snapshot(), 'optimization': scope,
                 'configuration_table': configuration_inventory(profile, catalog),
                 'effective_roles': {**profile.resolved_model_roles(profile.model_profile), **config.models},
                 'connectivity': 'not checked'}
@@ -77,6 +84,8 @@ async def dispatch(args, workspace):
         related_records=str(context.document.resolve(settings['related_records'])) if settings.get('related_records') else None,
         instruction=settings.get('instruction', ''), task_names=settings.get('task_names', []),
         evidence_paths=settings.get('evidence_paths', {}), named_inputs=inputs,
+        position=settings.get('position', 0), members=settings.get('members'),
+        measured_policy=str(context.document.resolve(settings['measured_policy'])) if 'measured_policy' in settings else None,
         harness_bundle=inputs.get('harness_bundle'))
     from .research import dispatch as perform
     result = await perform(invocation, workspace)
