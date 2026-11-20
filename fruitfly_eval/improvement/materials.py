@@ -73,6 +73,16 @@ def collect_materials(root, artifacts, *, interrupted=False, trial=None, origins
         instruction = ''
         answer: dict[str, Any] = {'state': 'absent', 'text': '', 'source': None}
         gaps, projected = [], []
+        extensions = dict.fromkeys(('thinking', 'compaction', 'image'), 0)
+        locator = None
+        def body_reference(value, field):
+            if len(value) <= 2000:
+                return {}
+            path = f'{prefix}interaction-bodies/{len(projected)}/{field}.txt'
+            identity = artifacts.put(value.encode('utf-8'))
+            resources.append(Resource(path, identity, 'text/plain', 'diagnostic'))
+            return {'body_path': path, 'body_artifact_id': identity}
+
         if source.is_file() and safe_path(source, root):
             locator = locate(source, prefix + source.name, 'trajectory')
             data = source.read_bytes()
@@ -85,6 +95,8 @@ def collect_materials(root, artifacts, *, interrupted=False, trial=None, origins
                 gaps.append({'reason': 'invalid UTF-8; projection contains replacement characters'})
             for row in rows:
                 raw = row.value
+                if raw.get('type') == 'compaction':
+                    extensions['compaction'] += 1
                 message = raw.get('message')
                 if not isinstance(message, dict):
                     if source_format != 'atif':
@@ -97,6 +109,10 @@ def collect_materials(root, artifacts, *, interrupted=False, trial=None, origins
                 origin = {'path': locator['path'], 'artifact_id': locator['artifact_id'],
                           'start': row.start, 'end': row.end}
                 content = message.get('content', [])
+                if isinstance(content, list):
+                    for block in content:
+                        if isinstance(block, dict) and block.get('type') in ('thinking', 'image'):
+                            extensions[block['type']] += 1
                 text = content if isinstance(content, str) else ''.join(
                     b.get('text', '') for b in content if isinstance(b, dict) and b.get('type') == 'text')
                 if role == 'user' and not instruction:
@@ -108,12 +124,14 @@ def collect_materials(root, artifacts, *, interrupted=False, trial=None, origins
                 if role == 'assistant':
                     answer = {'state': 'final' if text and message.get('stopReason') == 'stop' and not calls and not gaps else 'partial',
                               'text': text, 'source': origin}
-                blocks: list[dict[str, Any]] = [{'type': 'text', 'text': text[:2000]}] if text else []
-                for call in calls:
+                blocks: list[dict[str, Any]] = [{'type': 'text', 'text': text[:2000],
+                    **body_reference(text, 'text')}] if text else []
+                for index_in_message, call in enumerate(calls):
                     arguments = canonical_json(call.get('input'))
                     blocks.append({'type': 'toolCall', 'id': call.get('id'), 'name': call.get('name'),
                                    'input': arguments[:2000], 'input_characters': len(arguments),
-                                   'input_truncated': len(arguments) > 2000})
+                                   'input_truncated': len(arguments) > 2000,
+                                   **body_reference(arguments, f'arguments-{index_in_message}')})
                 clean = {k: message[k] for k in ('role', 'toolCallId', 'toolName', 'isError', 'stopReason') if k in message}
                 clean['content'] = blocks
                 projected.append({'type': 'message', 'timestamp': raw.get('timestamp'), 'message': clean,
@@ -125,7 +143,8 @@ def collect_materials(root, artifacts, *, interrupted=False, trial=None, origins
                         projected.append({'type': 'message', 'source': origin, 'text_characters': len(output),
                             'text_truncated': len(output) > 2000, 'message': {'role': 'toolResult',
                             'toolCallId': result.get('source_call_id'), 'isError': result.get('extra', {}).get('is_error'),
-                            'content': [{'type': 'text', 'text': output[:2000]}]}})
+                            'content': [{'type': 'text', 'text': output[:2000],
+                                         **body_reference(output, 'text')}]}})
             resources.append(Resource(prefix + 'reading-trajectory.jsonl', artifacts.put(
                 ('\n'.join(canonical_json(v) for v in projected)).encode()), 'application/jsonl', 'trajectory'))
         else:
@@ -171,7 +190,13 @@ def collect_materials(root, artifacts, *, interrupted=False, trial=None, origins
         for name, value in (('task', {'instruction': instruction, 'instruction_available': bool(instruction)}),
                             ('answer-material', answer), ('reading-scope', {'gaps': gaps,
                              'scope': 'Compact projection; original bytes are external unless explicitly supplemented.',
-                             'archive_root': str(root), 'sources': locators})):
+                             'archive_root': str(root), 'sources': locators,
+                             'extensions': {kind: {'observed_count': count,
+                                 'status': ('observed_in_source' if count else
+                                            'not_observed' if locator is not None and not gaps else 'unknown'),
+                                 'source_artifact_id': locator['artifact_id'] if locator is not None else None,
+                                 'default_projection': 'excluded'}
+                                 for kind, count in extensions.items()}})):
             resources.append(Resource('diagnostics/' + name + '.json', artifacts.put(canonical_json(value).encode()),
                                       'application/json', 'diagnostic'))
     if requested.keys() - matched:

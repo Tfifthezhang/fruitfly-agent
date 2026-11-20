@@ -24,6 +24,7 @@ class StageInputs:
 
     def validate_for(self, stage):
         requirements = {
+            'group': ('batches',),
             'organize': ('batches',),
             'assess': ('batches',),
             'propose': ('harness', 'batches'),

@@ -18,7 +18,7 @@ def normalize_experiment(raw, target, *, material_only=False, stage=None):
     catalog = extensions.catalog(builtin_catalog()) if extensions is not None else builtin_catalog()
     profile = None if material_only else load_system_config(path, catalog=catalog).select(baseline.get('profile'))
     reader = DocumentReader()
-    if raw.get('tasks') is None and stage in {'organize', 'assess', 'compare', 'propose'}:
+    if raw.get('tasks') is None and stage in {'group', 'organize', 'assess', 'compare', 'propose'}:
         task, task_path = {}, target
     else:
         task, task_path = reader.reference(raw.get('tasks'), target)

@@ -34,7 +34,9 @@ def evaluator_parameters(parameters):
 def configuration_surfaces():
     from .organizer.registration import surface
     from .evidence_selection.registration import surface as selection_surface
-    return (surface(), selection_surface(),
+    from .assessment.registration import surface as comparison_surface
+    from .grouping.registration import surface as grouping_surface
+    return (surface(), selection_surface(), comparison_surface(), grouping_surface(),
         ConfigurationSurface('improvement-editor', 'I', 'settings', 'editor', editor_parameters,
                              edit_options=editor_edit_options, restore=restore_editor, default_resource=('fruitfly_agent.lab.improvement.editor.methods.workspace', 'defaults.yaml'),
                              standalone=True, optimization=EditorInstructionTarget.optimization,
@@ -88,9 +90,13 @@ def validate_component_options(name, options, inventory):
         'improvement-evaluator': lambda: EvaluatorInstructionTarget(EvaluatorInstructions(**inventory.settings.get('evaluator', {}).get('instructions', {})))}
     from .organizer.instructions import instruction_target
     targets['improvement-organizer'] = lambda: instruction_target()
-    from .evidence_selection.improvement import SelectionTarget
-    from .evidence_selection.configuration import SelectionSettings
-    targets['improvement-evidence-selection'] = lambda: SelectionTarget(SelectionSettings.from_parameters(inventory.settings.get('evidence_selection', {})))
+    from .evidence_selection.improvement import MaterialTarget
+    from .evidence_selection.configuration import MaterialSettings
+    targets['improvement-evidence-selection'] = lambda: MaterialTarget(MaterialSettings.from_parameters(inventory.settings.get('evidence_selection', {})))
+    from .grouping.improvement import GroupingTarget
+    targets['improvement-grouping'] = lambda: GroupingTarget(inventory.settings.get('grouping', {}))
+    from .assessment.improvement import ComparisonTarget
+    targets['improvement-comparison'] = lambda: ComparisonTarget(inventory.settings.get('comparison', {}))
     if name not in targets:
         raise ValueError('unknown improvement component options: ' + name)
     targets[name]().validate_options(options)

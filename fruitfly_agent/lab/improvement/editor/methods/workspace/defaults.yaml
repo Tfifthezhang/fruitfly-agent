@@ -66,6 +66,7 @@ parameters:
     check_candidate: Check the current draft and reasons without publishing or ending the invocation. Returns independent component errors and submission errors for local repair.
     restore_candidate: Restore an unsubmitted draft artifact explicitly granted in stage context. Baseline, source identities and current owner grants must match. Read current execution evidence before submitting restored edits.
   settings:
+    method: workspace
     target_page_entries: 20
     max_target_entries: 100
     max_repair_attempts: 3

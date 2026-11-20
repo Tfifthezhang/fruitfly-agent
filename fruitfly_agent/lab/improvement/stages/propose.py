@@ -19,7 +19,22 @@ async def propose(ports, spec, inputs):
     baseline = HarnessSnapshot.from_dict(ports.read(inputs.harness))
     context = list(readable_context(ports, inputs))
     context.append(ports.put('observations.json', batch.observations, 'input'))
-    if getattr(ports, 'select_evidence', None):
+    inherited = [resource for resource in inputs.evidence
+                 if resource.path.rsplit('/', 1)[-1] == 'selection.json']
+    if len(inherited) > 1:
+        raise ValueError('propose accepts one organized material plan')
+    if inherited:
+        plan = ports.read(inherited[0])
+        if plan.get('implementation_id') == 'focused-group-material-v1':
+            expected = {(record.run_id, record.task_id) for record in batch.records}
+            selected = [(row['run_id'], row['task_id']) for row in plan['selected']]
+            if set(selected) != expected or len(selected) != len(expected):
+                raise ValueError('organized material scope differs from the proposal batch')
+            context = [resource for resource in context if resource != inherited[0]]
+            context.append(ports.put('selection.json', plan, 'input'))
+        else:
+            inherited = []
+    if not inherited and getattr(ports, 'select_evidence', None):
         context.extend(ports.select_evidence(batch))
     request = proposal_request(batch, ports.plan, baseline, context=tuple(context))
     ports.proposal.components.configure(ports.plan.component_options)

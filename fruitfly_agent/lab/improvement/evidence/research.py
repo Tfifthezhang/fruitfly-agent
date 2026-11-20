@@ -1,4 +1,6 @@
 """Readable retained-batch evidence without fabricated evaluation structures."""
+import json
+
 from .resources import ReferenceWorkspace
 from .access import EvidenceAccess
 from .investigation import selected_records, receipt_metadata, selected_materials
@@ -14,9 +16,12 @@ def build_workspace(request, artifacts, *, record=None):
         'options': request.plan.component_options})
     records = selected_records(request, artifacts)
     task_ids = {r.task_id for r in records}
+    selection = next((r for r in request.context if r.path == 'selection.json'), None)
+    material_plan = (selection is not None and json.loads(artifacts.read(selection.artifact_id)).get(
+        'implementation_id') == 'focused-group-material-v1')
     tasks = []
     for task in request.tasks:
-        if task.task_id not in task_ids:
+        if not material_plan and task.task_id not in task_ids:
             continue
         prefix = 'context/tasks/' + task.task_id
         put(prefix + '/metadata.json', {'task_id': task.task_id, 'material_id': task.material_id,

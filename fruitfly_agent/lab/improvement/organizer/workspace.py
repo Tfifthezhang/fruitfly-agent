@@ -1,4 +1,6 @@
 """Batch readability uses immutable references outside writable candidate storage."""
+import json
+
 from fruitfly_agent.improvement.contracts.components import ComponentDocument, HarnessSnapshot
 from fruitfly_agent.improvement.contracts.versions import canonical_json
 from ..evidence.resources import ReferenceWorkspace
@@ -13,8 +15,11 @@ def build_workspace(request, artifacts, *, record=None):
         references['context/extensions/' + resource.path] = resource.artifact_id
     records = selected_records(request, artifacts)
     task_ids = {r.task_id for r in records}
+    selection = next((resource for resource in request.context if resource.path == 'selection.json'), None)
+    grouped = selection and json.loads(artifacts.read(selection.artifact_id)).get(
+        'implementation_id') == 'focused-group-material-v1'
     for task in request.tasks:
-        if task.task_id not in task_ids:
+        if not grouped and task.task_id not in task_ids:
             continue
         path = 'context/tasks/' + task.task_id + '/task.md'
         references[path] = artifacts.put(task.instruction.encode())

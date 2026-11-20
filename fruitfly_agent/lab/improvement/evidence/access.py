@@ -57,6 +57,9 @@ class EvidenceAccess:
         return min(maximum - self.supply_responses,
             self.limits.get('responses', maximum) - self.local_responses)
 
+    def denied(self, path):
+        self._record(AccessReceipt(path, 'not_granted'))
+
     def failed(self, path):
         self.paths[path] = 'unavailable'
         self._record(AccessReceipt(path, 'unavailable'))

@@ -1,5 +1,6 @@
 """A single editable document drives separate imports and detached proposals."""
 import json
+from contextlib import asynccontextmanager
 from pathlib import Path
 import tempfile
 import unittest
@@ -14,7 +15,181 @@ from tests.support.experiments import workspace
 from tests.support.model_evaluation import RoleProvider
 
 
+@asynccontextmanager
+async def _fixture_runtime(self, *, config, **kwargs):
+    from fruitfly_agent.lab.catalog import PreparedAgentRuntime
+
+    yield PreparedAgentRuntime(config, None, {}, None, None)
+
+
 class StageCliTests(unittest.IsolatedAsyncioTestCase):
+    async def test_measured_compare_uses_catalog_method_without_constructing_provider(self):
+        from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
+        from fruitfly_agent.improvement.contracts.research import ResearchBatch
+        from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
+        from fruitfly_agent.improvement.contracts.versions import content_hash
+        from tests.support.configuration import profile_document
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            path = workspace(root)
+            baseline = yaml.safe_load(path.read_text())['baseline']
+            profile = profile_document(executor='executor', mechanisms=[{
+                'id': 'improvement-comparison', 'parameters': {'settings': {'method': 'measured'}},
+            }])
+            path.with_name(baseline['config']).write_text(yaml.safe_dump({
+                'default_profile': 'baseline', 'profiles': {'baseline': profile},
+            }))
+            task = TaskMaterial('test-task', 'Inspect output')
+            scorer, policy, state = (content_hash(value) for value in ('scorer', 'policy', 'state'))
+            for index, side in enumerate(('before', 'after')):
+                record = ExecutionRecord(side, task.task_id, task.material_id, content_hash(side),
+                                         state, state, 'completed')
+                observation = {'run_id': side, 'attempt': 0, 'name': 'reward', 'value': index,
+                               'eligible': True, 'scorer_id': scorer, 'outcome_policy_id': policy,
+                               'semantics': {'scope': 'execution', 'outcome': 'met' if index else 'unmet'}}
+                batch = ResearchBatch((task,), (record,), (observation,))
+                (root / (side + '.json')).write_text(json.dumps(batch.to_dict()))
+            manifest = {'metric': 'reward', 'scorer_id': scorer, 'outcome_policy_id': policy,
+                        'direction': 'max', 'minimum_gain': 0, 'maximum_regression_rate': 0,
+                        'pairs': [{'task_id': task.task_id, 'attempt': 0, 'before': 'before', 'after': 'after'}]}
+            (root / 'policy.json').write_text(json.dumps(manifest))
+            authored = {'research': {'id': 'comparison-study', 'output_root': '../study'},
+                        'baseline': baseline, 'next': {'stage': 'import'}, 'stages': {}}
+            args = parser().parse_args(['improvement', 'step', '--config', str(path)])
+            with patch('fruitfly_agent.providers.registry.ProviderRegistry.create',
+                       side_effect=AssertionError('Provider constructed')):
+                for side in ('before', 'after'):
+                    authored['stages']['import'] = {'source': 'batch', 'path': '../' + side + '.json', 'publish_as': side}
+                    path.write_text(yaml.safe_dump(authored))
+                    await dispatch(args, root)
+                authored['next']['stage'] = 'compare'
+                authored['stages']['compare'] = {'measured_policy': '../policy.json',
+                    'inputs': {'batches': [{'artifact': 'before'}, {'artifact': 'after'}]}}
+                path.write_text(yaml.safe_dump(authored))
+                result = await dispatch(args, root)
+            report = json.loads((Path(result['bundle']).parent / 'comparison.json').read_text())
+            self.assertEqual(report['conclusion'], 'better')
+            self.assertEqual(report['usage']['comparison_model_calls'], 0)
+
+    async def test_gepa_method_uses_organized_group_and_shared_candidate_export(self):
+        from fruitfly_agent.improvement.contracts.execution import ExecutionRecord
+        from fruitfly_agent.improvement.contracts.research import ResearchBatch
+        from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
+        from fruitfly_agent.improvement.contracts.versions import content_hash
+        from fruitfly_agent.lab.improvement.editor.methods.gepa_reflection import compat
+        from tests.support.reflection import FixtureSignature
+        from tests.support.configuration import profile_document
+        from tests.support.faux_provider import FauxProvider
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            path = workspace(root)
+            baseline = yaml.safe_load(path.read_text())['baseline']
+            runtime = path.with_name(baseline['config'])
+            profile = profile_document(executor='executor', mechanisms=[{
+                'id': 'improvement-editor', 'parameters': {'settings': {'method': 'gepa-reflection'}},
+            }])
+            runtime.write_text(yaml.safe_dump({'default_profile': 'baseline', 'profiles': {'baseline': profile}}))
+            task = TaskMaterial('task', 'Produce a deliverable')
+            identity = content_hash('conditions')
+            record = ExecutionRecord('run-fixture', task.task_id, task.material_id, identity, identity,
+                                     identity, 'completed', output='A deliverable was reported.')
+            (root / 'import.json').write_text(json.dumps(ResearchBatch((task,), (record,)).to_dict()))
+            spec = {'research': {'id': 'gepa-study', 'output_root': '../study'}, 'baseline': baseline,
+                    'next': {'stage': 'import'}, 'stages': {
+                        'import': {'source': 'batch', 'path': '../import.json', 'publish_as': 'pool'},
+                        'group': {'members': [['task']], 'inputs': {'batches': [{'artifact': 'pool'}]},
+                                  'publish_as': 'grouped'},
+                        'organize': {'inputs': {'batches': [{'artifact': 'grouped'}]}, 'publish_as': 'organized'},
+                        'propose': {'inputs': {'batches': [{'artifact': 'grouped'}],
+                                              'evidence': [{'artifact': 'organized'}]},
+                                    'optimization': {'scope': 'explicit', 'include': {'base_prompt': {
+                                        'fields': ['parameters.instructions.system']}}},
+                                    'direction': 'Require verification of the actual deliverable'},
+                    }}
+            organizer = FauxProvider()
+            organizer.respond_text(json.dumps({'schema_version': 2, 'sections': [], 'findings': []}))
+            editor = FauxProvider()
+            editor.respond_text('Verify that the requested deliverable exists and is usable.')
+            editor.respond_text(json.dumps({'reasons': [{'component_id': 'base_prompt',
+                'explanation': 'The output reports completion without an observable check.',
+                'expected_effect': 'Require a check on the actual deliverable.',
+                'evidence_ids': [record.run_id]}], 'decision': {'kind': 'candidate',
+                'explanation': 'A shared verification instruction', 'baseline_applicability': 'Exact edit parent supplied'}}))
+
+            def role_config(roles, role, *, tools=True):
+                if role == 'organizer':
+                    self.assertTrue(tools)
+                    return AgentLoopConfig(organizer)
+                self.assertEqual(role, 'editor')
+                self.assertFalse(tools)
+                return AgentLoopConfig(editor)
+
+            args = parser().parse_args(['improvement', 'step', '--config', str(path)])
+            with patch('fruitfly_agent.run.improvement.roles.ResearchRoles.configuration', role_config), \
+                 patch('fruitfly_agent.run.improvement.research_runtime.ResearchRuntimeFactory.__call__',
+                       new=_fixture_runtime), patch.object(compat, 'signature', return_value=FixtureSignature):
+                for stage in ('import', 'group', 'organize', 'propose'):
+                    spec['next']['stage'] = stage
+                    path.write_text(yaml.safe_dump(spec))
+                    result = await dispatch(args, root)
+            candidate_file = Path(result['bundle']).parent / 'proposal.json'
+            proposal = json.loads(candidate_file.read_text())
+            self.assertEqual(len(proposal['candidates']), 1)
+            self.assertEqual(len(editor.calls), 2)
+            self.assertEqual(len(list(candidate_file.parent.glob('*/candidate/config.yaml'))), 1)
+            usage = json.loads(Path(result['report']).read_text())['usage']
+            self.assertEqual(usage['observed_model_requests'], 2)
+            self.assertEqual(usage['observed_by_role'], {'editor': 2})
+            self.assertIsNone(usage['billed_cost'])
+            from fruitfly_agent.core.session import Session
+            from fruitfly_agent.run.storage.artifacts import DataArtifactStore
+            report = Path(result['report'])
+            transcript, = (report.parent / 'roles' / 'editor').glob('*.jsonl')
+            store = DataArtifactStore(root / 'study/artifacts')
+            trace = json.loads(store.read_bytes(json.loads(report.read_text())['diagnostics']['artifact_id']))
+            events = [json.loads(store.read_bytes(item['artifact_id'])) for item in trace['events']]
+            event, = (item for item in events if item['event'] == 'research-session')
+            self.assertEqual(store.read_bytes(event['artifact_id']), transcript.read_bytes())
+            messages = [entry.payload['message']['role'] for entry in Session.inspect(transcript).read_all()
+                        if entry.type == 'message']
+            self.assertEqual(messages, ['user', 'assistant', 'user', 'assistant'])
+
+    async def test_group_publishes_one_narrow_batch_without_constructing_provider(self):
+        from fruitfly_agent.improvement.contracts.research import ResearchBatch
+        from fruitfly_agent.improvement.contracts.tasks import TaskMaterial
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            path = workspace(root)
+            baseline = yaml.safe_load(path.read_text())['baseline']
+            batch = ResearchBatch((TaskMaterial('first', 'First instruction'),
+                                   TaskMaterial('second', 'Second instruction')), ())
+            (root / 'pool.json').write_text(json.dumps(batch.to_dict()))
+            authored = {'research': {'id': 'group-study', 'output_root': '../study'},
+                        'baseline': baseline, 'next': {'stage': 'import'},
+                        'stages': {'import': {'source': 'batch', 'path': '../pool.json', 'publish_as': 'pool'},
+                                   'group': {'position': 0, 'members': [['second']],
+                                             'inputs': {'batches': [{'artifact': 'pool'}]}}}}
+            args = parser().parse_args(['improvement', 'step', '--config', str(path)])
+            with patch('fruitfly_agent.providers.registry.ProviderRegistry.create',
+                       side_effect=AssertionError('Provider constructed')):
+                path.write_text(yaml.safe_dump(authored))
+                await dispatch(args, root)
+                authored['next']['stage'] = 'group'
+                path.write_text(yaml.safe_dump(authored))
+                result = await dispatch(args, root)
+            published = Path(result['bundle']).parent
+            narrow = ResearchBatch.from_dict(json.loads((published / 'batch.json').read_text()))
+            self.assertEqual([task.task_id for task in narrow.tasks], ['second'])
+            decision = json.loads((published / 'grouping.json').read_text())
+            self.assertEqual(decision['settings']['method'], 'fixed')
+            from fruitfly_agent.run.storage.research_bundles import ResearchOutputs
+            downstream = ResearchOutputs(root, 'group-study', root / 'study')
+            resources, _ = downstream.inputs((result['bundle'],), 'organize')
+            self.assertEqual([resource.path for resource in resources], ['batch.json'])
+
     async def test_document_import_and_two_proposals_inherit_selected_candidate(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve(); path = workspace(root)

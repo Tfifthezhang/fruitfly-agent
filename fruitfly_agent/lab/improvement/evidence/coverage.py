@@ -10,6 +10,10 @@ def build_coverage(record, sources, artifacts, facts):
                'complete' if indexed else 'unknown')
     indexing = ('partial' if gaps else 'complete' if indexed else 'unknown')
     capture = next((r for r in record.artifacts if r.path.endswith('capture-manifest.json')), None)
+    scope = next((r for r in record.artifacts if r.path == 'diagnostics/reading-scope.json'), None)
+    material = json.loads(artifacts.read(scope.artifact_id)) if scope else {}
+    external_ids = {entry['artifact_id'] for entry in material.get('sources', ())
+                    if entry.get('status') == 'external'}
     collection, outputs = 'unknown', 'unknown'
     if capture:
         try:
@@ -17,24 +21,26 @@ def build_coverage(record, sources, artifacts, facts):
             if not isinstance(manifest, dict) or not isinstance(manifest.get('files'), list):
                 raise ValueError('invalid capture manifest')
             collection = 'complete' if manifest.get('status') == 'complete' else 'partial'
+            outputs = collection
             available = {r.artifact_id for r in record.artifacts}
             for entry in manifest.get('files', []):
                 if entry.get('status') == 'collected' and 'sha256:' + entry.get('sha256', '') not in available:
-                    collection = 'partial'
-                    gaps.append({'source_path': entry.get('path'), 'reason': 'captured bytes unavailable or invalid'})
-            outputs = collection
+                    outputs = 'partial'
+                    reason = ('captured bytes remain external'
+                              if 'sha256:' + entry.get('sha256', '') in external_ids
+                              else 'capture receipt has no verified body in research materials')
+                    gaps.append({'source_path': entry.get('path'), 'reason': reason})
         except (ValueError, KeyError, OSError, TypeError, AttributeError):
             collection = 'partial'
             gaps.append({'source_path': capture.path, 'reason': 'invalid capture manifest'})
     else:
         gaps.append({'source_path': 'deliverables', 'reason': 'capture scope/receipt unavailable'})
-    scope = next((r for r in record.artifacts if r.path == 'diagnostics/reading-scope.json'), None)
+    import_coverage = 'unknown'
     if scope:
-        material = json.loads(artifacts.read(scope.artifact_id))
         gaps.extend(material.get('gaps', []))
         external = [v for v in material.get('sources', []) if v['status'] != 'retained']
+        import_coverage = 'partial' if external else 'complete'
         if external:
-            collection = 'partial'
             gaps.append({'source_path': scope.path, 'reason': 'originals remain external; see source catalog'})
         if material.get('gaps'):
             parsing = 'partial'
@@ -55,9 +61,10 @@ def build_coverage(record, sources, artifacts, facts):
         if totals:
             usage = 'complete' if all(v is not None for v in totals) else 'partial'
     dimensions = {'collection': collection, 'parsing': parsing, 'indexing': indexing,
-                  'outputs': outputs, 'usage': usage,
+                  'outputs': outputs, 'import': import_coverage, 'usage': usage,
                   'identity': 'partial' if any(s['status'] == 'unavailable' for s in sources) else 'complete'}
     return {'run_id': record.run_id, 'scope': 'registered resources and declared capture roots',
             'dimensions': dimensions, 'gaps': gaps, 'final_answer_state': answer_state,
-            'evidence_complete': all(v in {'complete', 'not_applicable'} for v in dimensions.values()),
+            'evidence_complete': all(v in {'complete', 'not_applicable'} for k, v in dimensions.items()
+                                 if k != 'import' or scope is not None),
             'execution_diagnostics_complete': facts.complete if facts else False}

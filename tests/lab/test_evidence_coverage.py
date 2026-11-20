@@ -36,3 +36,6 @@ class EvidenceCoverageTests(unittest.IsolatedAsyncioTestCase):
                 value = json.loads(artifacts.read(next(r.artifact_id for r in record.artifacts if r.path == COVERAGE_PATH)))
                 self.assertTrue(value['execution_diagnostics_complete'])
                 self.assertEqual(value['evidence_complete'], defect == 'none')
+                if defect == 'missing-file':
+                    self.assertEqual(value['dimensions']['collection'], 'complete')
+                    self.assertEqual(value['dimensions']['outputs'], 'partial')

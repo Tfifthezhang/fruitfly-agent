@@ -43,13 +43,13 @@ class OrganizationPartCache:
                 raise ValueError('retained findings block exceeds validated sources')
         return part
 
-    def save(self, request, findings, grant, citations, reusable):
+    def save(self, request, findings, grant, citations, reusable, *, partial=False):
         config = self.workers(request.worker)
         part = OrganizationPart(request.task, request.context, request.worker,
             self.conditions_for(request.worker, config), dict(grant), findings, citations,
             {'scope_id': request.identity.scope_id, 'agent_id': request.identity.agent_id, 'run_id': request.identity.run_id}, reusable)
-        reference = self.store.save(part)
-        self.workspace.retained_parts[reference] = {'artifact_id': reference, 'disposition': 'new',
+        reference = self.store.save(part, partial=partial)
+        self.workspace.retained_parts[reference] = {'artifact_id': reference, 'disposition': 'partial' if partial else 'new',
             'producer': part.producer, 'reusable': part.reusable}
         self.record('organization-part-saved', artifact_id=reference, producer=part.producer, reusable=part.reusable)
         return reference
@@ -64,7 +64,9 @@ class OrganizationPartCache:
                 raise ValueError('invalid retained-part directory page')
             rows, unavailable = [], 0
             if self.settings.retention.reuse:
-                for reference in self.store.entries():
+                references = [(reference, 'submitted') for reference in self.store.entries()]
+                references.extend((reference, 'partial') for reference in self.store.entries(partial=True))
+                for reference, state in references:
                     try:
                         part = self.validate(self.store.read(reference))
                     except (ValueError, KeyError, OSError, TypeError) as exc:
@@ -72,7 +74,7 @@ class OrganizationPartCache:
                         unavailable += 1
                         continue
                     rows.append({'part_id': reference, 'question': part.question[:self.settings.retention.preview_characters],
-                        'worker': part.worker, 'source_count': len(part.findings['sources']),
+                        'status': state, 'worker': part.worker, 'source_count': len(part.findings['sources']),
                         'unknown_count': len(part.findings['unknowns'])})
             return result({'parts': rows[cursor:cursor+limit], 'total': len(rows), 'unavailable_count': unavailable,
                 'next_cursor': cursor+limit if cursor+limit < len(rows) else None,
@@ -81,7 +83,8 @@ class OrganizationPartCache:
             if not self.settings.retention.reuse:
                 raise ValueError('retained part reuse is disabled')
             reference = ctx.args['part_id']; require_hash(reference)
-            if reference not in self.store.entries():
+            partial = reference in self.store.entries(partial=True)
+            if not partial and reference not in self.store.entries():
                 raise ValueError('unknown retained part')
             part = self.validate(self.store.read(reference))
             path = 'context/organization-parts/' + reference[7:] + '.json'
@@ -103,8 +106,9 @@ class OrganizationPartCache:
                     self.workspace.files[block_path] = self.artifacts.read(block)
                 block_paths.append(block_path)
             page['block_paths'] = block_paths
+            page['status'] = 'partial' if partial else 'submitted'
             if page.get('text'):
-                for source in part.findings['sources']:
+                for source in (() if partial else part.findings['sources']):
                     span = part.citations[source['citation_id']]
                     if span['kind'] == 'text':
                         from .provenance import retain_span

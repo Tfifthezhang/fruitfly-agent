@@ -58,8 +58,10 @@ class ResearchService:
         rows = batch_view(batch.tasks, batch.records, batch.observations, self.artifacts)['executions.json']
         selection = self.evidence_selector.select(tuple(rows),
             resources={r.run_id: r.artifacts for r in batch.records})
-        if {item['run_id'] for item in selection['selected']} - {row['run_id'] for row in rows}:
-            raise ValueError('evidence selector exceeded execution grant')
+        expected = {(row['run_id'], row['task_id']) for row in rows}
+        selected = [(item['run_id'], item['task_id']) for item in selection['selected']]
+        if len(selected) != len(expected) or set(selected) != expected:
+            raise ValueError('material selection must preserve every task and execution in the batch')
         return (self.put('selection.json', selection, 'input'),)
 
     def put(self, path, value, kind='diagnostic'):

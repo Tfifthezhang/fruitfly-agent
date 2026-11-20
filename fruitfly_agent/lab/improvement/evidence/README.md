@@ -21,7 +21,7 @@ A successful tool status does not establish success of every command it contains
 |---|---|
 | `catalog` | Page granted paths or filter/sort an event directory |
 | `search` | Literal search over one or more granted sources, with continuation |
-| `read` | Original text pages or supported images |
+| `read` | Original text pages or supported images. Supply an event index path and `event_id` to read the linked body or source range. |
 
 Results carry the returned resource identity and character intervals. Projections
 separately retain original source locators; reading a projection does not prove
@@ -239,6 +239,10 @@ limits cumulative block content to 256000 characters. Final summaries with block
 are limited to 6000 characters. The final submission retains block references
 and their validated sources. Parents receive a compact summary and paths to
 detailed results. Incremental parts are saved before successful submission returns.
+Each validated block also updates a partial index. The child status includes
+its artifact ID, path and block count. The parent can read the index while the
+child runs and after cancellation. Execution state is recorded independently
+of partial evidence availability.
 `findings.py` validates individual blocks; delegation and part services own their
 publication and reuse.
 
@@ -249,3 +253,13 @@ granted paths share a content identity without losing source attribution.
 
 See [public execution accounting](../../../../fruitfly_eval/improvement/README.md#read-public-execution-accounting) for native receipt adaptation,
 reported subtotals and public Harbor termination evidence.
+
+Imported reading scopes report the presence of native thinking, compaction
+and image extensions separately from the ordinary trajectory projection.
+The scope supplies counts and source identities. Reading extension bodies
+requires an explicit original-material grant.
+
+When retained-part storage is enabled, validated partial blocks are discoverable
+after reopening the store. Reading one revalidates its material identities and
+worker conditions against the current grant. Partial reads do not establish
+direct original-source citations.

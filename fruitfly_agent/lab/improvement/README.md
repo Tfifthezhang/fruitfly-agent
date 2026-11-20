@@ -82,3 +82,6 @@ intent independently of workflow stopping. See [organizer](organizer/README.md),
 [editor decisions](editor/README.md#submit-an-explicit-decision) and
 [deterministic statistics](evidence/README.md#inspect-distributions-and-reading-scope).
 No additional stage runs automatically.
+
+[Group one frozen feedback batch](grouping/README.md) before organizing evidence
+for a shared candidate.

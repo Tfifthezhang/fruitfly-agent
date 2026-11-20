@@ -5,13 +5,17 @@ from fruitfly_agent.runtime_spec.documents import mapping, parameter_default
 
 @dataclass(frozen=True)
 class EditorSettings:
+    method: str = field(default_factory=lambda: parameter_default(
+        __package__ + '.methods.workspace', 'defaults.yaml', 'settings.method'))
     target_page_entries: int = field(default_factory=lambda: parameter_default(__package__ + '.methods.workspace', 'defaults.yaml', 'settings.target_page_entries'))
     max_target_entries: int = field(default_factory=lambda: parameter_default(__package__ + '.methods.workspace', 'defaults.yaml', 'settings.max_target_entries'))
 
     max_repair_attempts: int = field(default_factory=lambda: parameter_default(__package__ + '.methods.workspace', 'defaults.yaml', 'settings.max_repair_attempts'))
 
     def __post_init__(self):
-        if any(type(v) is not int or not 1 <= v <= 24000 for v in asdict(self).values()):
+        if self.method not in ('workspace', 'gepa-reflection'):
+            raise ValueError('unknown improvement editor method')
+        if any(type(v) is not int or not 1 <= v <= 24000 for k, v in asdict(self).items() if k != 'method'):
             raise ValueError('role presentation settings require bounded positive integers')
         if not self.target_page_entries <= self.max_target_entries <= 100:
             raise ValueError('target pages require default <= maximum <= 100')

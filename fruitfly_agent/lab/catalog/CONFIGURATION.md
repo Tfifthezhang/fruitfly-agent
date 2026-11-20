@@ -327,8 +327,8 @@ preserve references; candidate/export documents freeze effective values.
 Research role recovery settings use the existing owner surfaces.
 `improvement-editor.parameters.settings.max_repair_attempts` is configurable and
 frozen but protected from instruction candidate grants. The evidence-selection I
-surface also declares `parameters.settings.sampling_policy` with owner choices
-`balanced` and `rare-first`; ordinary grants, isolated trials and source/resource
+surface declares `material_policy` and `optional_categories` under
+`parameters.settings`. Ordinary grants, isolated trials and source/resource
 identity apply. Shared evidence error bounds and submission/source validation are
 protected infrastructure. No additional parameter registry or model-role binding
 is introduced. See [editor](../improvement/editor/README.md) and
@@ -336,8 +336,15 @@ is introduced. See [editor](../improvement/editor/README.md) and
 
 ## Configure large retained investigations
 
-Evidence selection admits `sampling_policy: all` and up to 4096 cases/controls
-through its existing I owner and field grants. Candidate file discovery exposes
+Evidence selection admits additional material categories through its I owner
+and field grants. Grouping owns task and execution composition. Candidate file discovery exposes
 actual `harness/` files through the same editor target directory. Research worker
 blocks and reading limits remain protected evidence services; visibility grants
 no editing authority. See the [large batch recipe](../../../examples/experiments/large-batch/README.md).
+
+
+Standalone Improvement settings include `improvement-grouping` for frozen-pool
+composition and `improvement-comparison` for method selection. Their default
+component resources own the method names and defaults. See
+[Grouping](../improvement/grouping/README.md) and
+[Comparison](../improvement/assessment/README.md#compare-explicitly-paired-measurements).

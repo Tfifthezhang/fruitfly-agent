@@ -70,6 +70,10 @@ class ReadingMaterialsTests(unittest.TestCase):
             trajectory = next(r for r in record.artifacts if r.kind == 'trajectory')
             rows = [json.loads(v) for v in artifacts.read(trajectory.artifact_id).decode().splitlines()]
             self.assertTrue(rows[2]['text_truncated'])
+            body = rows[2]['message']['content'][0]
+            resource = next(r for r in record.artifacts if r.path == body['body_path'])
+            self.assertEqual(resource.artifact_id, body['body_artifact_id'])
+            self.assertEqual(artifacts.read(resource.artifact_id), b'x' * 10000)
             self.assertEqual(json.loads(original[rows[2]['source']['start']:rows[2]['source']['end']])['message']['role'], 'toolResult')
             path = 'artifacts/harbor/job/trial/artifacts/0.txt'
             identity = 'sha256:' + hashlib.sha256(b'deliverable').hexdigest()

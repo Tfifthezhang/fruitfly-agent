@@ -7,6 +7,7 @@ from .assess import assess
 from .propose import propose
 from .execute import execute
 from .compare import compare
+from .group import group
 from fruitfly_agent.improvement.contracts.stages import StageInputs
 
 
@@ -29,6 +30,7 @@ def stage_definitions():
                 allowance_fields=('task_seconds',), effects='Task backends and model requests'),
             StageDefinition('import', 'Freeze retained permitted records',
                 frozenset({'source', 'path', 'related_records', 'task_names', 'evidence_paths'})),
+            StageDefinition('group', 'Select one feedback batch', frozenset({'position', 'members'}), ('batches',)),
             StageDefinition('organize', 'Build an attributable reading guide', frozenset({'instruction', 'delegation', 'incremental'}),
                 ('batches',), ('seconds', 'evidence_characters', 'evidence_responses'), 'organizer', 'Model requests'),
             StageDefinition('assess', 'Assess retained execution evidence', frozenset({'delegation'}),
@@ -37,7 +39,7 @@ def stage_definitions():
                 ('batches',), ('seconds', 'evidence_characters', 'evidence_responses'), 'editor', 'Model requests and candidate files'),
             StageDefinition('execute', 'Execute an explicitly selected harness', frozenset({'tasks', 'attempts', 'concurrency'}),
                 ('harness',), ('task_seconds',), effects='Task backends and model requests'),
-            StageDefinition('compare', 'Compare explicitly selected result batches', frozenset({'delegation'}),
+            StageDefinition('compare', 'Compare explicitly selected result batches', frozenset({'delegation', 'measured_policy'}),
                 ('batches',), ('seconds', 'evidence_characters', 'evidence_responses'), 'assessor', 'Model requests'),
         )}
 
@@ -60,7 +62,7 @@ class StageContext:
 def builtin_stage_handlers(context):
     return {(name, 'research-' + name + '-v1'): partial(invoke_named, handler, context)
         for name, handler in (('organize', organize), ('assess', assess),
-            ('propose', propose), ('execute', execute), ('compare', compare))}
+            ('propose', propose), ('execute', execute), ('compare', compare), ('group', group))}
 
 
 async def invoke_named(handler, context, spec):

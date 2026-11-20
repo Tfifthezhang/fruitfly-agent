@@ -79,9 +79,29 @@ class ResearchDocument:
         for name in ('attempts', 'concurrency'):
             if name in result and (type(result[name]) is not int or result[name] < 1):
                 raise ValueError(name + ' must be a positive integer')
-        for name in ('instruction', 'direction', 'path', 'related_records'):
+        for name in ('instruction', 'direction', 'path', 'related_records', 'measured_policy'):
             if name in result and (not isinstance(result[name], str) or not result[name].strip()):
                 raise ValueError(name + ' must be nonempty text')
+        if stage == 'group':
+            position = result.get('position', 0)
+            if type(position) is not int or position < 0:
+                raise ValueError('group position must be a nonnegative integer')
+            if 'members' in result:
+                groups = result['members']
+                if (not isinstance(groups, list) or not groups
+                        or any(not isinstance(group, list) or not group for group in groups)):
+                    raise ValueError('group members must be a list of nonempty lists')
+                for group in groups:
+                    for member in group:
+                        if isinstance(member, str):
+                            identifier(member)
+                        else:
+                            value = mapping(member, {'task_id', 'run_ids'}, 'fixed group member')
+                            identifier(value.get('task_id'))
+                            if not isinstance(value.get('run_ids'), list):
+                                raise ValueError('fixed group run_ids must be a list')
+                            for run_id in value['run_ids']:
+                                identifier(run_id)
         if 'tasks' in result:
             tasks = mapping(result['tasks'], {'file', 'inline'}, 'stage tasks')
             if len(tasks) != 1 or ('file' in tasks and (not isinstance(tasks['file'], str) or not tasks['file'].strip())) or ('inline' in tasks and not isinstance(tasks['inline'], dict)):

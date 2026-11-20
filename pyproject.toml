@@ -29,6 +29,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+gepa = ["gepa==0.1.4"]
 mcp = [
     "mcp==2.3.0",
     "jsonschema>=4.23,<5",
@@ -73,9 +74,12 @@ include = ["fruitfly_agent*", "fruitfly_eval*"]
 "fruitfly_agent.lab.context_manager.reduction.methods.layered_compaction" = ["defaults.yaml"]
 "fruitfly_agent.lab.context_manager.reduction.methods.working_memory" = ["defaults.yaml"]
 "fruitfly_agent.lab.environment.methods.remote" = ["defaults.yaml"]
-"fruitfly_agent.lab.improvement.assessment.methods.model" = ["defaults.yaml"]
+"fruitfly_agent.lab.improvement.assessment.methods.model" = ["defaults.yaml", "comparison-defaults.yaml"]
+"fruitfly_agent.lab.improvement.grouping.methods.fixed" = ["defaults.yaml"]
 "fruitfly_agent.lab.improvement.editor.methods.workspace" = ["defaults.yaml"]
+"fruitfly_agent.lab.improvement.editor.methods.gepa_reflection" = ["defaults.yaml"]
 "fruitfly_agent.lab.improvement.evidence_selection.methods.representative" = ["defaults.yaml"]
+"fruitfly_agent.lab.improvement.evidence_selection.methods.focused" = ["defaults.yaml"]
 "fruitfly_agent.lab.improvement.evidence" = ["defaults.yaml"]
 "fruitfly_agent.lab.improvement.organizer.methods.layered" = ["defaults.yaml"]
 "fruitfly_agent.lab.mcp" = ["defaults.yaml"]

@@ -23,10 +23,13 @@ class OrganizationPartStore:
         if any(p.is_symlink() for p in (self.directory, *self.directory.parents)):
             raise ValueError('organization part store cannot traverse symlinks')
 
-    def entries(self):
+    def entries(self, *, partial=False):
         self._safe()
+        directory = self.directory / 'partial' if partial else self.directory
+        if directory.is_symlink():
+            raise ValueError('organization part directory must not be a symlink')
         entries = []
-        for path in sorted(self.directory.glob('*.json')):
+        for path in sorted(directory.glob('*.json')):
             reference = 'sha256:' + path.stem
             require_hash(reference)
             if path.is_symlink() or json.loads(path.read_text()) != {'artifact_id': reference}:
@@ -38,15 +41,18 @@ class OrganizationPartStore:
         require_hash(reference)
         return OrganizationPart.from_dict(json.loads(self.artifacts.read_bytes(reference)))
 
-    def save(self, part):
+    def save(self, part, *, partial=False):
         if not isinstance(part, OrganizationPart):
             raise TypeError('organization part store requires a validated part')
         reference = self.artifacts.put_bytes(canonical_json(part.to_dict()).encode()).artifact_id
         self._safe()
-        self.directory.mkdir(parents=True, exist_ok=True)
-        target = self.directory / (reference[7:] + '.json')
+        directory = self.directory / 'partial' if partial else self.directory
+        if directory.is_symlink():
+            raise ValueError('organization part directory must not be a symlink')
+        directory.mkdir(parents=True, exist_ok=True)
+        target = directory / (reference[7:] + '.json')
         data = canonical_json({'artifact_id': reference})
-        descriptor, name = tempfile.mkstemp(prefix='.part-', dir=self.directory)
+        descriptor, name = tempfile.mkstemp(prefix='.part-', dir=directory)
         temporary = Path(name)
         try:
             with os.fdopen(descriptor, 'w') as stream:

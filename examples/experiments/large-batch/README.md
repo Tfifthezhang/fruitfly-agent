@@ -11,7 +11,7 @@ charges. Copy this directory and adjust catalog and source paths before use.
 |---|---|
 | `runtime.example.yaml` | Model bindings and component references |
 | `research-subagent.yaml` | Four concurrent workers, 32 conversations, 3600 seconds and 256 requests per worker |
-| `research-evidence-selection.yaml` | All-policy detail grants, up to 256 cases |
+| `research-evidence-selection.yaml` | Trajectory materials with explicit termination diagnostics |
 | `research-context-budget.yaml` | Reduction at 65% of model input capacity, with a target of 45% |
 | `research-compaction.yaml` | Layered compaction settings for the research runtime |
 | `research-organizer.yaml` | Organizer settings for the research runtime |
@@ -56,3 +56,51 @@ Offline validation uses fake Providers and does not establish model quality:
 ```bash
 .venv/bin/python -m unittest tests.workflows.test_large_batch_research tests.run.test_research_delegation tests.run.test_organization_parts tests.lab.test_editor_execution tests.lab.test_evidence_selection
 ```
+
+## Run an independent grouping comparison
+
+Add a referenced I component with ID and implementation `improvement-grouping`
+to a copy of the runtime profile. The following is a component file.
+
+```yaml
+id: improvement-grouping
+role: I
+implementation: improvement-grouping
+parameters:
+  settings:
+    method: random
+    batch_size: 12
+    seed: 19
+```
+
+After publishing a frozen batch under the alias `pool`, add the following stage
+to the research document. Set `next.stage: group` and invoke
+`fruitfly-agent-lab improvement step --config .fruitfly/improvement.yaml`.
+Replace the alias if the imported pool was published under a different name.
+
+```yaml
+group:
+  position: 0
+  inputs:
+    batches:
+      - artifact: pool
+  publish_as: random-group-0
+```
+
+Grouping runs offline. Choose another explicit position and output alias for
+another group. Copy the research document or select another branch when setting
+up another experimental condition. Preserve the pool, parent Harness, editor,
+and allowances across the conditions being compared.
+
+Select the group alias as the sole batch input for `organize`, then invoke that
+stage independently. Supply its bundle as evidence and the same group bundle as
+the batch for `propose`. Organizer and Proposer call their configured models.
+The group receipt and feature table stay with the research outputs. The model
+receives the selected batch, its material plan, and the granted organized view.
+
+For a source-external test, invoke `execute` separately with the baseline and
+the selected candidate against the same declared task and attempt population.
+Execution can invoke models and task backends. Compare the frozen results
+offline with the measured comparison component and a paired manifest.
+The authoritative measurement source must provide attempt, scorer and outcome
+policy identities. [Configure measured comparison](../../../fruitfly_agent/lab/improvement/assessment/README.md#compare-explicitly-paired-measurements)

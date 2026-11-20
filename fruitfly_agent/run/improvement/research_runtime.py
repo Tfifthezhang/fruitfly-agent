@@ -12,6 +12,22 @@ from fruitfly_agent.improvement.contracts.versions import canonical_json, conten
 from fruitfly_agent.run.storage.research_bundles import ArtifactPort
 
 
+@asynccontextmanager
+async def completion_session(directory, artifacts, services):
+    """Own a durable transcript for an explicitly tool-free research role."""
+    token = uuid4().hex
+    path = directory / (token + '.jsonl')
+    session = Session(path)
+    try:
+        session.append('meta', {'kind': 'research-runtime', 'mode': 'tool-free',
+                                'session_id': token}, sync=True)
+        yield session
+    finally:
+        session.close()
+        reference = artifacts.put_bytes(path.read_bytes()).artifact_id
+        services.record('research-session', session_id=token, artifact_id=reference)
+
+
 class ResearchRuntimeFactory:
     def __init__(self, roles, role, directory, artifacts, settings, *, parts=None):
         self.roles, self.role, self.directory = roles, role, directory
@@ -79,7 +95,7 @@ class ResearchRuntimeFactory:
                     await service.close()
             finally:
                 workspace.investigation_children = [{key: row.get(key) for key in
-                    ('agent_id', 'run_id', 'state', 'error', 'cleanup')}
+                    ('agent_id', 'run_id', 'state', 'error', 'cleanup', 'partial_result')}
                     for row in service.snapshot()['executions']] if service is not None else []
                 try:
                     await self._close(parent_owned)

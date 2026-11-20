@@ -1,76 +1,28 @@
-# Select Investigation Evidence
+# Select evidence materials
 
 [Up: Improvement](../README.md)
 
-The evidence selector is an I policy. It chooses bounded detailed cases from all
-compact execution summaries. It cannot edit candidates, execute tasks, assign
-task quality or activate a component. Hosts inject the public
-`EvidenceSelector` contract; selection is independent of organizer/editor models.
+The evidence selector makes a material plan for every execution in a frozen
+batch. The batch determines the tasks and attempts. Use [Grouping](../grouping/README.md)
+to compose another batch.
 
-| Entry | Responsibility |
+The `improvement-evidence-selection` I component exposes these fields under
+`parameters.settings`.
+
+| Field | Behavior |
 |---|---|
-| `configuration.py`, `registration.py` | Strict settings, installed defaults and Catalog surface |
-| `improvement.py` | Field grants and isolated candidate selector construction |
-| [Representative method](methods/representative/README.md) | Default deterministic selection |
+| `material_policy` | `trajectory-only` selects trajectories, body references and indexes. `focused` adds standard execution diagnostics and deliverables. `all-granted` includes every authorized retained resource. |
+| `optional_categories` | Add `outputs`, `termination`, `usage` or `capture` independently. Each added path records its admitting category. |
 
-`improvement-evidence-selection` belongs in system I components. Ordinary saves
-retain default/file references. Frozen candidates include complete settings and
-the packaged default resource. Editable paths are `parameters.settings.max_cases`,
-`controls`, `max_per_task`, `slow_seconds`, `many_calls`, `many_tools` and `high_tokens` under the same prefix. `parameters.settings.material_policy` chooses `focused`
-or `all-granted`. Focused grants retain trajectories, deliverables and relevant
-execution facts/diagnostics; capture directories remain archived. The full policy
-only grants already retained resources, never unsupplied external originals.
-Identity, role, schema, evidence grants and receipt identities are protected.
-Numeric grants may narrow owner bounds. Selection is stateless; each call starts
-from the supplied summaries. Changes require an independent research comparison
-before persistent activation; normal task comparison cannot verify this I policy.
+Task requirements and compact execution receipts remain available as stage
+context. A material plan records authorization and does not attest to reading
+or availability. Propose can reuse the Organizer plan for the same batch.
+Former case count, anomaly threshold and sampling settings are rejected by the
+current component. Historical selection receipts retain their original meaning.
 
-`candidate_selector` validates an authorized detached document and constructs the
-actual trial policy. Different settings change selected cases and identity while
-retaining source documents. There is no automatic nested trial or adoption.
-Offline checks: `tests.lab.test_evidence_selection`.
+Developer extensions register a selector through `register_evidence_selector`.
+The host validates exact task and execution membership on its output.
+Offline checks use `tests.lab.test_evidence_selection` and
+`tests.lab.test_research_grouping`.
 
-Organize/propose retain all summaries and give detail tools only selected task and
-execution paths. Selection reasons, distribution counts and omitted scope remain
-readable. Full archived materials are preserved; a later investigation must
-explicitly select additional cases. A selection receipt is not an original read.
-
-Embedding hosts set `StageBindings.evidence_selector`; developer extensions bind
-the same port through `register_evidence_selector(factory)`. The factory receives
-Catalog component settings and returns a fresh policy. Its `select` consumes
-summary rows plus immutable resource manifests and returns selected run IDs and
-optional exact `material_paths`. Out-of-grant material paths fail before access.
-
-## Balance distinct investigation strata
-
-`parameters.settings.sampling_policy` selects `balanced` (default) or `rare-first`.
-Balanced sampling reserves available controls, covers distinct execution/outcome
-strata and then fills remaining slots by rare signals. The same overall and
-per-task limits apply. The owner exposes this field through its ordinary I grant;
-`candidate_selector` applies it to actual isolated selection and identity.
-
-Outcome signals use source-declared semantics, never numeric reward conventions.
-`outcome_unmet` means explicit unmet acceptance. A `successful_control` requires
-explicit met acceptance. When investigations exist but no known successful control
-exists, an otherwise unremarkable unscored completed case can be a
-`contrasting_control`; success remains unknown. Historical observations without
-semantics remain readable and do not acquire a success label.
-
-Focused materials include retained overview, coverage, source/event directories,
-historical configuration declarations and public outcome projections in addition
-to trajectories and execution diagnostics. Unretained bytes and protected verifier
-inputs stay excluded. Event navigation identifies ungranted sources explicitly.
-Selection receipts include signal meanings and omitted scope.
-
-Selected cases expose `control_run_ids` only when a selected control shares the
-recorded harness, execution conditions and initial state. Otherwise
-`comparison_basis` is `not_established`. Matching identities do not imply equal
-task difficulty, identical outputs, reconstructed historical configuration or
-causal proof; task requirements and relevant differences still need inspection.
-
-## Grant a complete retained batch
-
-`sampling_policy: all` includes cases without anomaly signals, subject to
-`max_cases` and `max_per_task`. Case and control ceilings support up to 4096;
-ordinary defaults remain eight cases and one control. Full authorization does
-not mean full reading: use paged navigation and bounded investigations.
+[Historical representative algorithm](methods/representative/README.md)

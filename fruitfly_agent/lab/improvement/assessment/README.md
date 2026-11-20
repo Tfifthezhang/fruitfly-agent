@@ -35,9 +35,27 @@ also apply. Search and read pages within those explicit controls. Missing eviden
 | [Model method](methods/model/README.md), `instructions.py` | Shared model judgment, editable instructions and complete owner defaults |
 | `completed.py` | Completed feedback persistence and comparisons |
 | `selection.py`, `measured.py`, `promotion.py` | Evidence selection and explicit objective-analysis helpers |
+| `methods/measured/` | Deterministic comparison of declared task-attempt pairs |
 | `verification.py`, [Scorers](scorers/README.md) | Independent checks and declared objective sources |
 
 Offline checks: `tests.lab.test_evaluator`, `tests.lab.test_improvement_configuration`.
+
+## Compare explicitly paired measurements
+
+The research service accepts a `measured_policy` parameter for the `compare`
+stage. Provide exactly two batch resources in before/after order. The policy
+specifies the metric, scorer and outcome-policy identities, comparison direction,
+minimum gain, maximum regression rate, and every planned task-attempt pair.
+A missing run may be represented by a null receipt ID. Observations must
+identify their scorer, outcome policy and attempt, and declare eligibility.
+The report preserves raw values and distinguishes unavailable values from zero.
+Choose `parameters.settings.method: measured` on an
+`improvement-comparison` component to use the same path from the experiment
+CLI. The default method is `model`. Measured execution requires no assessor.
+Historical imports without attributed attempts, scorer identity and outcome
+policy produce insufficient comparison coverage.
+
+Offline check: `tests.lab.test_measured_comparison`.
 
 ## Maintain I parameter defaults
 

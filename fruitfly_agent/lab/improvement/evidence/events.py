@@ -4,6 +4,12 @@ from typing import Any
 from fruitfly_agent.improvement.contracts.versions import canonical_json, content_hash
 
 
+def body_locator(block):
+    if not block or not block.get('body_path'):
+        return {}
+    return {key: block[key] for key in ('body_path', 'body_artifact_id')}
+
+
 def extract_events(resource, rows, source_format):
     events: list[dict[str, Any]] = []
     for row in rows:
@@ -51,12 +57,15 @@ def extract_events(resource, rows, source_format):
             kind = 'model_request'
             base.update(request_id=raw.get('request_id') or raw.get('id'),
                         request_receipt_id=raw.get('id'), phase=raw.get('model_role'))
-        emit(kind, '')
         blocks = message.get('content', [])
+        body = next((block for block in blocks if isinstance(block, dict)
+                     and block.get('type') == 'text' and block.get('body_path')), None) if isinstance(blocks, list) else None
+        emit(kind, '', **body_locator(body))
         if isinstance(blocks, list):
             for i, block in enumerate(blocks):
                 if isinstance(block, dict) and block.get('type') == 'toolCall':
-                    emit('toolCall', f'/message/content/{i}', tool_call_id=block.get('id'), tool_name=block.get('name'))
+                    emit('toolCall', f'/message/content/{i}', tool_call_id=block.get('id'), tool_name=block.get('name'),
+                         **body_locator(block))
         if source_format == 'atif':
             for i, call in enumerate(raw.get('tool_calls', [])):
                 emit('toolCall', f'/tool_calls/{i}', tool_call_id=call.get('tool_call_id'), tool_name=call.get('function_name'))
