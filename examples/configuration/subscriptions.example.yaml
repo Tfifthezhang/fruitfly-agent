@@ -1,0 +1,6 @@
+# Selected subscription models only. The interactive picker fills this catalog.
+# Add models.subscriptions: subscriptions.yaml to each profile that uses it.
+# Keep API models in models.yaml and key values in private secrets.env or account storage.
+# Directory refresh never rewrites selected limits. Inspect and save changes explicitly.
+models: {}
+connections: {}

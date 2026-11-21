@@ -175,7 +175,12 @@ class WebSetupTests(unittest.TestCase):
             (('@deepseek', '', '@Cancel'), 'fixture-cancelled-key\n'),
         ):
             with self.subTest(lines=lines, secrets=bool(secrets)):
-                self.assertFalse(self.wizard('web-search-tool', *lines, secrets=secrets))
+                if lines == ('@deepseek', '') and secrets == '':
+                    from fruitfly_agent.interactive.terminal.io.controls import InputEnded
+                    with self.assertRaises(InputEnded):
+                        self.wizard('web-search-tool', *lines, secrets=secrets)
+                else:
+                    self.assertFalse(self.wizard('web-search-tool', *lines, secrets=secrets))
                 self.assertEqual(before, self.configuration.profile())
                 self.assertFalse(self.service.credentials.available('DEEPSEEK_SEARCH_API_KEY'))
                 self.assertFalse((self.root / '.fruitfly/secrets.env').exists())

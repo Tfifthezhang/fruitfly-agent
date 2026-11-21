@@ -24,7 +24,7 @@ from .model_catalog import order_model_catalog
 class RunModelSetup:
     def __init__(self, *, config_path: Path, current_profile, stage_profile,
                  workspace: Path, environment: dict[str, str], credentials: CredentialDraft | None = None,
-                 registry: ProviderRegistry | None = None) -> None:
+                 registry: ProviderRegistry | None = None, connection_service=None) -> None:
         self.config_path = config_path
         self.current_profile = current_profile
         self.stage_profile = stage_profile
@@ -33,6 +33,23 @@ class RunModelSetup:
         self.entries: dict[Path, dict[str, dict]] = {}
         self.credentials = credentials or CredentialDraft(self.workspace, environment)
         self.registry = registry or default_registry()
+        from fruitfly_agent.providers.connections.service import ConnectionService
+        from .connections import ModelConnectionDraft, RunModelConnections
+        draft = ModelConnectionDraft(
+            config_path=self.config_path, workspace=self.workspace, environment=self.environment,
+            entries=self.entries, current_profile=self.current_profile, stage_profile=self.stage_profile,
+            models=self.models, capture=self.capture, validate=self.registry.validate,
+            select_store=self.select_credential_store,
+        )
+        self.connections = RunModelConnections(
+            draft, connection_service or ConnectionService(store=self.registry.credential_store))
+        self._sources: dict[Path, bytes | None] = {}
+
+    def select_credential_store(self, store) -> None:
+        self.registry.credential_store = store
+
+    def capture(self, path: Path) -> None:
+        self._sources.setdefault(path, path.read_bytes() if path.is_file() else None)
 
     def _fields(self) -> tuple[ConfigurationParameter, ...]:
         fields = (
@@ -48,7 +65,7 @@ class RunModelSetup:
             getattr(defaults, name), choices=(True,) if required else (False, True))
             for name, description, required in CAPABILITY_OPTIONS)
         return fields + (ConfigurationParameter('parameters', 'parameters',
-            'Edit the complete API options as one JSON object. Reasoning effort defaults to medium; '
+            'Edit optional API options as one JSON object. Blank uses service defaults; '
             'use {} for server defaults. Confirm parameter support with your model service.', 'json', ''),)
 
     def options(self) -> tuple[ModelSetupOption, ...]:
@@ -56,7 +73,9 @@ class RunModelSetup:
             (self.field(item.id, 'protocol', {}),
              ConfigurationParameter('sdk', 'sdk', 'Automatically selected client library', 'constant', '')) + self._fields(),
             group=item.label) for item in SERVICES
-            if setup_selection(item.id, {}, self.registry.registered_pairs())[1])
+            if setup_selection(item.id, {}, self.registry.registered_pairs())[1]) + tuple(
+                ModelSetupOption(item.id, item.label, 'Use an existing subscription plan', (), 'Subscription', 'subscription')
+                for item in self.connections.options())
 
     def field(self, option_id, name, values) -> ConfigurationParameter:
         protocol, choices = setup_selection(option_id, values, self.registry.registered_pairs())
@@ -85,9 +104,17 @@ class RunModelSetup:
         return setup_defaults(option_id, values)
 
     def models(self, profile) -> dict[str, ModelSpec]:
-        path = model_catalog_path(profile, self.config_path)
-        result = load_model_specs(path) if path.is_file() else {}
-        result.update({name: ModelSpec.from_dict(name, raw) for name, raw in self.entries.get(path, {}).items()})
+        sources = profile.model_sources(self.config_path)
+        existing = tuple(path for path in sources if path.is_file() or
+                         (path not in self.entries and path not in self._sources and path != sources[0]))
+        result = load_model_specs(*existing) if existing else {}
+        pending = {name: raw for path in sources for name, raw in self.entries.get(path, {}).items()}
+        for name, raw in pending.items():
+            if 'connection' in raw:
+                from fruitfly_agent.providers.connections.contracts import ConnectionProfile
+                connection = ConnectionProfile.from_dict(self.connections.definitions(*sources)[raw['connection']])
+                raw = self.connections.service.registry.resolve(connection, {k: v for k, v in raw.items() if k != 'connection'})
+            result[name] = ModelSpec.from_dict(name, raw)
         return result
 
     def stage(self, option_id, values, secret) -> ConfigurationActionResult:
@@ -102,21 +129,35 @@ class RunModelSetup:
         self._check_secret(entry["api_key_env"], secret)
         # Validate insertion before staging any changes, preserving existing text.
         _append_models(path.read_text(encoding="utf-8") if path.is_file() else "", {name: entry})
+        self.capture(path)
         self.entries.setdefault(path, {})[name] = entry
         if secret:
             self.credentials.values[entry["api_key_env"]] = secret
         self.stage_profile(replace(profile, model_profile=name))
         return ConfigurationActionResult("Model and credential staged; save before applying settings", changed=True)
 
+    def authentication_kind(self, model_profile: str) -> str:
+        spec = self.models(self.current_profile())[model_profile]
+        return 'account' if spec.access else 'api_key'
+
     def credential_status(self, model_profile: str) -> str:
         profile = self.current_profile()
         spec = self.models(profile)[model_profile]
+        if spec.access and 'credential' in spec.access:
+            from fruitfly_agent.providers.registry import credential_available
+            return ('Account connected' if credential_available(spec, {**self.environment, **self.credentials.values})
+                    else 'Authorization required')
+        if spec.access:
+            return 'Account connected' if self.connections.service.ready(spec.access['integration'], spec.access['account']) else 'Authorization required'
         key = spec.provider.api_key_env
         return "API key set" if self.credentials.values.get(key) or self.environment.get(key) else "API key missing"
 
     def stage_credential(self, model_profile, secret) -> ConfigurationActionResult:
         profile = self.current_profile()
-        key = self.models(profile)[model_profile].provider.api_key_env
+        spec = self.models(profile)[model_profile]
+        if spec.access:
+            raise ValueError('Use Connections to authorize this account')
+        key = spec.provider.api_key_env
         self._check_secret(key, secret)
         if secret:
             self.credentials.values[key] = secret
@@ -131,18 +172,41 @@ class RunModelSetup:
 
     @property
     def changed(self) -> bool:
-        return bool(self.entries or self.credentials.values)
+        return bool(self.entries or self.credentials.values or self.connections.pending)
 
     def reset(self) -> None:
         self.entries.clear()
+        self.connections.service.clear_variable_connections()
+        self.connections.pending.clear()
+        self.connections.updates.clear()
+        self._sources.clear()
         self.credentials.values.clear()
 
     def payloads(self) -> dict[Path, str]:
         """Prepare file contents without publishing models or credentials."""
         payloads = {}
+        for path, original in self._sources.items():
+            current = path.read_bytes() if path.is_file() else None
+            if current != original:
+                raise ValueError("Model catalog changed; discard and reload before saving")
         for path, entries in self.entries.items():
-            text = path.read_text(encoding="utf-8") if path.is_file() else ""
-            payloads[path] = _append_models(text, entries)
+            current = path.read_bytes() if path.is_file() else None
+            text = current.decode('utf-8') if current is not None else ''
+            additions = {name: entry for name, entry in entries.items() if name not in self.connections.updates.get(path, {})}
+            payloads[path] = self.connections.payload(path, _append_models(text, additions) if additions else text)
+        from .model_files import separate_models
+        primary = model_catalog_path(self.current_profile(), self.config_path)
+        sources = self.current_profile().model_sources(self.config_path)
+        companion = sources[1] if len(sources) > 1 else None
+        if companion is not None and companion in payloads and primary not in payloads and not primary.exists():
+            payloads[primary] = 'models: {}\n'
+        if companion is not None and (primary.is_file() or primary in payloads):
+            text = payloads.get(primary, primary.read_text() if primary.is_file() else '')
+            api, moved = separate_models(text)
+            if moved is not None:
+                if companion.exists() or companion in payloads:
+                    raise ValueError('Move connected entries to subscriptions.yaml before adding more; both catalogs already contain subscriptions')
+                payloads[primary], payloads[companion] = api, moved
         payloads.update(self.credentials.payloads())
         return payloads
 
@@ -176,6 +240,15 @@ def _append_models(text: str, entries: dict) -> str:
     if not isinstance(root, yaml.MappingNode):
         raise ValueError("Model catalog must be a YAML mapping")
     node = next((value for key, value in root.value if key.value == "models"), None)
+    if isinstance(node, yaml.MappingNode) and node.flow_style and not node.value:
+        if not entries:
+            return text
+        # Keep the empty mapping's inline comment on the models header.
+        end = text.find("\n", node.end_mark.index)
+        if end == -1:
+            end = len(text)
+        insertion = textwrap.indent(yaml.safe_dump(entries, sort_keys=False, allow_unicode=True), "  ")
+        return text[:node.start_mark.index].rstrip(" ") + text[node.end_mark.index:end] + "\n" + insertion + text[end + 1:]
     if not isinstance(node, yaml.MappingNode) or node.flow_style:
         raise ValueError("Model wizard requires a block-style models mapping; edit this catalog manually")
     existing = {key.value for key, value in node.value}

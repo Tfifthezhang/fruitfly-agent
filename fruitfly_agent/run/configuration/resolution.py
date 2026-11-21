@@ -127,7 +127,7 @@ def resolve_profile_models(
     model_specs: Mapping[str, ModelSpec] | None = None,
 ) -> tuple[dict[str, ModelSpec], str, ModelSpec]:
     models = (dict(model_specs) if model_specs is not None
-              else load_model_specs(model_catalog_path(profile, config_path)))
+              else load_model_specs(*profile.model_sources(config_path)))
     selected = profile.model_profile
     if selected is None:
         if len(models) != 1:

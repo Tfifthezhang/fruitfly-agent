@@ -147,6 +147,8 @@ def _environment_lines(status: InteractiveStatus, width: int | None = None) -> l
         if environment.server:
             rows.append(("server", environment.server))
         rows.append(("exec cwd", environment.working_directory))
+    if status.model_connection:
+        rows.append(('plan', status.model_connection + ' · ' + status.model_account))
     lines = [f"  {label}: {safe_terminal_text(value)}" for label, value in rows]
     return lines if width is None else [part for line in lines for part in wrap_cells(line, width)]
 

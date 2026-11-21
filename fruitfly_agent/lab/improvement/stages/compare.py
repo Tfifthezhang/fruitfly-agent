@@ -15,5 +15,5 @@ async def compare(ports, spec, inputs):
         result = await compare_model(ports, batches, context=readable_context(ports, inputs),
                                      input_ids=input_ids, policy=spec.parameters.get('role_identity', {}))
     else:
-        result = compare_measured(*batches, policy, input_ids)
+        result = compare_measured(batches[0], batches[1], policy, input_ids)
     return ActivityResult((ports.put('comparison.json', result),))

@@ -1,5 +1,6 @@
 """Materialize owner-declared text bindings without changing the source profile."""
 from pathlib import Path
+from fruitfly_agent.providers.registry import model_catalog_companions
 from fruitfly_agent.lab.catalog import load_system_config, bind_component_changes, materialize_system
 
 
@@ -25,13 +26,16 @@ class RuntimeConfigBuilder:
         if not self.original_catalog.is_absolute():
             self.original_catalog = (self.source.parent / self.original_catalog).resolve()
         self.model_bytes = self.original_catalog.read_bytes()
+        self.model_sources = self.baseline.model_sources(self.source)
+        self.model_companions = model_catalog_companions(*self.model_sources)
 
     def check(self):
         for source in self.baseline.source_files:
             source.check()
         if self.source.read_bytes() != self.source_bytes:
             raise ValueError('source runtime configuration changed during improvement')
-        if self.original_catalog.read_bytes() != self.model_bytes:
+        if (self.original_catalog.read_bytes() != self.model_bytes or
+                model_catalog_companions(*self.model_sources) != self.model_companions):
             raise ValueError('source model catalog changed during improvement')
 
     def build(self, snapshot, *, destination):
@@ -48,4 +52,4 @@ class RuntimeConfigBuilder:
             if reference in profile.artifact_contents:
                 return profile.artifact_contents[reference]
             return (self.workspace / '.fruitfly/artifacts' / reference[7:]).read_text(encoding='utf-8')
-        return materialize_system(profile, destination, artifact_reader=read, model_source=self.original_catalog)
+        return materialize_system(profile, destination, artifact_reader=read, model_source=self.original_catalog, model_companions=self.model_companions)

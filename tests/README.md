@@ -26,6 +26,9 @@ The development runner rejects integration/support and non-test modules. It does
 
 ## Static types
 
+Development-only [optional dependency stubs](../typings/README.md) describe the
+pinned GEPA renderer/extractor surface without requiring its runtime extra.
+
 Install the optional development dependencies with `pip install -e '.[dev]'` (network download), then run `.venv/bin/python -m mypy` offline. Development dependencies include pinned mypy and PyYAML stubs. The module list and per-module rules in `pyproject.toml` define the gate.
 
 The same gate works with or without the optional `benchmarks` extra. When Harbor

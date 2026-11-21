@@ -10,6 +10,7 @@ import shutil
 import textwrap
 from typing import Any, Protocol, TextIO
 
+from fruitfly_agent.interactive.terminal.io.controls import InputEnded, InputInterrupted
 from fruitfly_agent.interactive.terminal.io.input import LineEditor
 from fruitfly_agent.interactive.terminal.io.text import (
     colors_enabled, is_tty, supports_ansi, input_styles, safe_terminal_text, truncate_cells, cell_width,
@@ -93,9 +94,9 @@ class RawTerminalMenuInput:
             except BlockingIOError:
                 return MenuEvent(MenuAction.IGNORE)
             if not first or first == b"\x04":
-                return MenuEvent(MenuAction.QUIT)
+                raise InputEnded
             if first == b"\x03":
-                raise KeyboardInterrupt
+                raise InputInterrupted
             sequence = first
             if first == b"\x1b":
                 while len(sequence) < 8 and select.select(
@@ -146,7 +147,7 @@ class LineMenuInput:
     def read_event(self) -> MenuEvent:
         value = self.line_editor.read_line()
         if value is None:
-            return MenuEvent(MenuAction.QUIT)
+            raise InputEnded
         text = value.strip().casefold()
         if not text:
             return MenuEvent(MenuAction.ACTIVATE)

@@ -143,6 +143,12 @@ def build_runtime(
         elif binding_key == 'main':
             resolved_model_specs[binding_key]['model_role'] = 'executor'
         provider = registry.create(spec, environment)
+        bind_session = getattr(provider, 'bind_session', None)
+        if bind_session is not None and session is not None:
+            bind_session(hashlib.sha256(str(session.path.resolve()).encode()).hexdigest())
+        identity = getattr(provider, 'connection_identity', None)
+        if identity is not None:
+            resolved_model_specs[binding_key]['connection'] = identity
         transport_parameters = getattr(provider, "transport_parameters", None)
         if isinstance(transport_parameters, dict):
             resolved_model_specs[binding_key]["transport"] = dict(transport_parameters)

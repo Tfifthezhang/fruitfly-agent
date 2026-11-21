@@ -2,7 +2,7 @@
 
 [Up: Examples](../README.md)
 
-Use the interactive model wizard for first setup, or copy the single model catalog below for DeepSeek Flash examples using two API protocols.
+Use the interactive model wizard for first setup, or copy the API model catalog below for DeepSeek Flash examples using two API protocols.
 
 For H/S/I authoring, follow [Component documents](../../fruitfly_agent/runtime_spec/COMPONENTS.md).
 For your own implementation, follow [Catalog registration](../../fruitfly_agent/lab/catalog/CONFIGURATION.md).
@@ -11,7 +11,7 @@ is the navigation root; this page owns template setup rather than another schema
 
 For independent experiments, `fruitfly-agent-lab init` creates the default
 system/model files from installed templates, without an experiment executor. It creates
-the shared `models.yaml` only when absent, preserves daily files and existing
+the shared `models.yaml` and empty `subscriptions.yaml` only when absent, preserves daily files and existing
 regular model catalogs/secrets, and rejects other conflicting configuration files.
 Use `--source task-set --benchmark terminal-bench-4` for benchmark request/host
 and experiment templates. See [system setup](../experiments/README.md#initialize-and-prepare)
@@ -21,6 +21,7 @@ container starts during initialization.
 | Template | Workspace destination | Contents |
 |---|---|---|
 | [models.example.yaml](models.example.yaml) | `.fruitfly/models.yaml` | Both DeepSeek Flash protocol profiles in one file |
+| [subscriptions.example.yaml](subscriptions.example.yaml) | `.fruitfly/subscriptions.yaml` | Empty selected-subscription catalog; the interactive picker supplies model metadata |
 | [additional-models.example.yaml](additional-models.example.yaml) | Merge into `.fruitfly/models.yaml` | Explicit Qwen3.8-Flash examples in three protocols; keep existing aliases and roles |
 | [.env.example](.env.example) | `.fruitfly/secrets.env` | Empty model/search keys and optional SSH account/password variables |
 | [ssh.example.yaml](ssh.example.yaml) | `.fruitfly/config.yaml` | Minimal remote profile; addresses are placeholders, credentials stay in the secret file |
@@ -87,7 +88,7 @@ transfer, Linux runtime installation and machine/request file generation in orde
 | `deepseek-flash-openai` | `openai` | `responses` | `deepseek-flash` | `https://api.deepseek.com` |
 | `deepseek-flash-anthropic` | `anthropic` | `messages` | `deepseek-flash` | `https://api.deepseek.com/anthropic` |
 
-Both profiles access DeepSeek, with a DeepSeek key. `sdk` selects the client library and `protocol` selects the API format; neither selects OpenAI or Anthropic's own models. In the wizard choose **DeepSeek**, then Responses, Messages or Chat Completions; SDK follows automatically. The parameters editor defaults effort to `medium`; these authored templates explicitly select `high`. DeepSeek documents these endpoints in [model details](https://api-docs.deepseek.com/quick_start/pricing/), [Responses](https://api-docs.deepseek.com/api/create-response/), and [Messages compatibility](https://api-docs.deepseek.com/guides/anthropic_api/).
+Both profiles access DeepSeek, with a DeepSeek key. `sdk` selects the client library and `protocol` selects the API format; neither selects OpenAI or Anthropic's own models. In the wizard choose **DeepSeek**, then Responses, Messages or Chat Completions; SDK follows automatically. The parameters editor uses service defaults; these authored templates explicitly select `high`. DeepSeek documents these endpoints in [model details](https://api-docs.deepseek.com/quick_start/pricing/), [Responses](https://api-docs.deepseek.com/api/create-response/), and [Messages compatibility](https://api-docs.deepseek.com/guides/anthropic_api/).
 
 Create `.fruitfly/` and copy templates only if the destinations are absent. Set `DEEPSEEK_API_KEY` in the secret file or process environment. Select one profile in the terminal, or set `FRUITFLY_MODEL_PROFILE` before first one-shot startup. Keep both profiles in the same catalog or remove the one you do not need.
 
@@ -113,8 +114,8 @@ Copying, parsing, and offline construction do not make requests. Live tasks cont
 Choose Qwen, then the protocol before entering model fields. SDK is automatic;
 model ID, limits and optional capabilities are explicit user declarations. The
 protocol page warns that some models may not support the selected protocol. New
-wizard entries offer medium reasoning effort in an editable parameters JSON field.
-Blank accepts the displayed mapping; `{}` selects server defaults explicitly.
+wizard entries start with `{}` in the editable parameters JSON field.
+Blank keeps service defaults; explicit values override them.
 
 For explicit authored examples, merge selected entries from
 [additional-models.example.yaml](additional-models.example.yaml) into the existing
@@ -238,3 +239,23 @@ registered default and inherits the executor model. Manage the component through
 model alias through `models.roles.subagent`. Running delegated tasks can incur
 model and tool effects; configuring or inspecting them does not. See
 [Subagent configuration](../../fruitfly_agent/lab/agents/subagent/README.md#enable-delegation-and-choose-a-model).
+
+
+For OpenCode Go or ChatGPT plan access, use the interactive subscription picker.
+The [connection guide](../../fruitfly_agent/providers/connections/README.md#store-references-and-freeze-execution)
+shows placeholder YAML and explains why local account authorization is required.
+Browser authorization and model-directory refresh require network access;
+inference consumes plan allowance and may incur service-configured charges.
+
+
+## Share subscription aliases between profiles
+
+The picker saves selected subscription entries in `subscriptions.yaml`. Add
+`subscriptions: subscriptions.yaml` beside `models.catalog` in every daily or
+default profile that should use those aliases. Both catalogs share one alias
+namespace; select aliases through the same `models.roles` positions. The empty
+subscription template makes no network requests and contains no account tokens.
+See [account authorization](../../fruitfly_agent/providers/auth/README.md#authorize-a-headless-host)
+for headless login and selected-account SSH deployment. External Eval containers
+still require the host relay integration described in the Eval guide; copying an
+account to the server alone does not enable container inference.

@@ -93,6 +93,11 @@ def classify_provider_error(
     token-estimate fallback instead of being assumed to be overflow.
     """
 
+    from .connections.errors import connection_error
+    declared = connection_error(getattr(exc, 'body', None))
+    if declared is not None:
+        declared.details['status_code'] = _status_code(exc, status_code)
+        return declared
     resolved_status = _status_code(exc, status_code)
     text = _classification_text(exc)
     non_overflow = any(pattern.search(text) for pattern in _NON_OVERFLOW_PATTERNS)

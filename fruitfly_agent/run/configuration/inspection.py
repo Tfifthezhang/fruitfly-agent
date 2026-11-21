@@ -12,9 +12,7 @@ def inspect_configuration(path, *, profile_id=None, catalog=None):
     catalog = catalog or builtin_catalog()
     path = Path(path).resolve()
     profile = load_system_config(path, catalog=catalog).select(profile_id)
-    models_path = Path(profile.model_catalog)
-    models_path = models_path if models_path.is_absolute() else path.parent / models_path
-    models = load_model_specs(models_path)
+    models = load_model_specs(*profile.model_sources(path))
     executor = profile.model_profile
     if executor is None:
         if len(models) != 1:

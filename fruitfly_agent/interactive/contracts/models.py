@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 
 @dataclass(frozen=True)
@@ -107,6 +107,11 @@ class InteractiveStatus:
     improvement_available: bool = False
     execution_environment: InteractiveExecutionEnvironment | None = None
     tool_services: tuple[ToolServiceStatus, ...] = ()
+    model_connection: str = ''
+    model_account: str = ''
+    output_reserve: int | None = None
+    output_limit_enforced: bool | None = None
+    service_usage: dict[str, Any] | None = None
 
 
 __all__ = ["ConversationBlock", "ConversationMessage", "InteractiveMechanism", "InteractiveExecutionEnvironment", "InteractiveStatus", "ResumableSession", "ToolServiceStatus"]

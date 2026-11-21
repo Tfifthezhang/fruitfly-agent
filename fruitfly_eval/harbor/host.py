@@ -87,6 +87,7 @@ class HostConfig:
     offline: bool = False
     task_patches: tuple[Mapping[str, Any], ...] = ()
     evidence: Mapping[str, Any] = field(default_factory=capture_policy)
+    model_relay: Mapping[str, Any] = field(default_factory=dict)
 
     @classmethod
     def read(cls, workspace: Path, explicit: str | Path | None = None) -> HostConfig:
@@ -98,10 +99,19 @@ class HostConfig:
         except yaml.YAMLError:
             raise ValueError("invalid Eval host YAML") from None
         data = fields(loaded,
-                      {"cache", "agent", "environment", "dependencies", "task_directory", "task_patches", "evidence"}, "Eval host")
+                      {"cache", "agent", "environment", "dependencies", "task_directory", "task_patches", "evidence", "model_relay"}, "Eval host")
         if 'evidence' in data and not isinstance(data['evidence'], dict):
             raise ValueError('evidence must be a mapping')
         base = path.parent
+        relay = fields(data.get('model_relay', {}),
+            {'network_url', 'listen_host', 'certificate', 'private_key', 'ca'}, 'model relay')
+        if relay:
+            if set(relay) != {'network_url', 'listen_host', 'certificate', 'private_key', 'ca'}:
+                raise ValueError('Network model relay requires address, certificate, private key and CA')
+            address = urlsplit(text(relay['network_url'], 'model relay URL'))
+            if address.scheme != 'https' or not address.hostname or address.username or address.password or address.query or address.fragment or address.path not in ('', '/'):
+                raise ValueError('Model relay network URL requires credential-free HTTPS')
+            relay = {**relay, **{key: str(path_at(relay[key], base)) for key in ('certificate', 'private_key', 'ca')}}
         agent = fields(data.get("agent", {}), {"python", "mounts", "library_paths"}, "agent runtime")
         python = container_path(agent.get("python"), "agent.python")
         if not PurePosixPath(python).is_absolute():
@@ -175,7 +185,7 @@ class HostConfig:
                    environment(phases.get("verifier", {})), assets, recipes,
                    path_at(data["task_directory"], base) if data.get("task_directory") else None,
                    uv,
-                   deps.get("offline", False), patches, capture_policy(data.get('evidence')))
+            deps.get("offline", False), patches, capture_policy(data.get('evidence')), relay)
 
     def runtime_env(self) -> dict[str, str]:
         values = {"PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "/installed-agent/fruitfly/source"}
@@ -185,6 +195,7 @@ class HostConfig:
 
     def identity(self) -> dict[str, Any]:
         return {"python": self.python, "mounts": [m.to_dict() for m in self.mounts],
+                **({'model_relay': dict(self.model_relay)} if self.model_relay else {}),
                 "library_paths": list(self.library_paths), "setup": dict(self.setup_env),
                 "agent": dict(self.agent_env), "verifier": dict(self.verifier_env),
                 "uv": self.uv, "offline": self.offline, "task_patches": list(self.task_patches),

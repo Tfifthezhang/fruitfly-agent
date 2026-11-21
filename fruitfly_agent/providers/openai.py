@@ -7,6 +7,8 @@ from dataclasses import asdict, replace
 import json
 from typing import Any, AsyncIterator
 
+import httpx
+
 from fruitfly_agent.core.data_model import (
     AssistantMessage,
     AgentMessage,
@@ -66,9 +68,10 @@ class OpenAIProvider(MediaInput):
         cleanup_timeout: float = 5.0,
         retry_jitter: float = 0.2,
         store: bool = False,
-        parallel_tool_calls: bool = True,
+        parallel_tool_calls: bool | None = True,
         service: str = 'generic',
         vision: bool | None = None,
+        http_client: httpx.AsyncClient | None = None,
         **request_options: Any,
     ) -> None:
         import openai  # SDK stays inside the adapter.
@@ -76,6 +79,9 @@ class OpenAIProvider(MediaInput):
         request_options = validate_request_options(self.protocol, request_options)
         self._service = service_definition(service, self.protocol)
         self._service.validate(self.protocol, model, request_options)
+        self.request_policy: Any = None
+        self.connection_session = ''
+        self.service_usage: dict[str, Any] = {}
         self.service = service
         self.vision = vision
         self._replay = ReplayBinding(self.protocol, service, base_url, api_key,
@@ -85,8 +91,10 @@ class OpenAIProvider(MediaInput):
                                        stall_timeout, total_timeout, cleanup_timeout, retry_jitter)
         self.transport_parameters = {**asdict(self._policy), "retry_max": retry_max,
                                      "retry_base_delay": retry_base_delay, "transport_version": "bounded-v1"}
+        client_options: dict[str, Any] = {"http_client": http_client} if http_client is not None else {}
         self._client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url or self._service.base_url, max_retries=0,
-                                           timeout=openai.Timeout(timeout, connect=connect_timeout))
+                                           timeout=openai.Timeout(timeout, connect=connect_timeout),
+                                           **client_options)
         self.model = model
         self.max_output_tokens = max_output_tokens
         self.retry_max = retry_max
@@ -94,6 +102,24 @@ class OpenAIProvider(MediaInput):
         self.store = store
         self.parallel_tool_calls = parallel_tool_calls
         self.request_options = request_options
+
+    def configure_connection(self, identity: str, policy: Any, session_id: str) -> None:
+        """Install provider-owned request policy and stable authorization binding."""
+        import hashlib
+        validator = getattr(policy, 'validate', None)
+        if validator is not None:
+            validator(self.request_options)
+        self.request_policy = policy
+        self.connection_session = session_id
+        self._replay.identity = hashlib.sha256(json.dumps([identity, self.service,
+            self.protocol, str(self._client.base_url)], separators=(',', ':')).encode()).hexdigest()
+
+    def set_access_token(self, token: str) -> None:
+        """Use a request-local credential snapshot without changing replay identity."""
+        self._client.api_key = token
+
+    def bind_session(self, session_id: str) -> None:
+        self.connection_session = session_id
 
     async def close(self) -> None:
         """Close the owned SDK client within the cleanup allowance."""
@@ -129,7 +155,7 @@ class OpenAIProvider(MediaInput):
             "instructions": view.system_prompt,
             "max_output_tokens": min(self.max_output_tokens, view.max_tokens) if view.max_tokens > 0 else self.max_output_tokens,
             "store": self.store,
-            "parallel_tool_calls": self.parallel_tool_calls,
+            **({'parallel_tool_calls': self.parallel_tool_calls} if self.parallel_tool_calls is not None else {}),
             **self.request_options,
         }
         tools = [
@@ -146,7 +172,7 @@ class OpenAIProvider(MediaInput):
         if tools:
             request["tools"] = tools
         if not self._service.parallel_control:
-            request.pop('parallel_tool_calls')
+            request.pop('parallel_tool_calls', None)
         if not self._service.responses_store:
             request.pop('store')
         effective = replace(view, model=view.model or self.model)
@@ -154,6 +180,8 @@ class OpenAIProvider(MediaInput):
         prefix = convert_to_openai(project_images(view.messages, self.vision), replay=self._replay.reader(effective, tools))
         request['input'] = prefix
 
+        if self.request_policy is not None:
+            request = self.request_policy.prepare(request, self.connection_session)
         return request, effective, tools, prefix
 
     @property
@@ -289,7 +317,8 @@ class OpenAIProvider(MediaInput):
                     completed = getattr(event, "response", None)
                 elif event_type in ("response.failed", "error"):
                     detail = getattr(event, "error", None) or getattr(event, "response", None)
-                    raise FatalError(f"OpenAI response failed: {detail}")
+                    from .connections.errors import response_error
+                    raise response_error(detail)
         except TaggedError as exc:
             deadline.note_error(exc)
             raise
@@ -310,6 +339,9 @@ class OpenAIProvider(MediaInput):
         output = getattr(completed, 'output', None)
         if output is None and done_items:
             output = [done_items[key] for key in sorted(done_items)]
+        if self.request_policy is not None and hasattr(self.request_policy, 'receipt'):
+            self.service_usage.clear()
+            self.service_usage.update(self.request_policy.receipt(getattr(completed, 'usage', None)))
         message = self._assemble(completed, text_parts, calls, output=output)
         if output is None:
             if thoughts:

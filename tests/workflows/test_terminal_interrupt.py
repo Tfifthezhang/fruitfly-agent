@@ -188,3 +188,47 @@ class TerminalAuthorizationWorkflowTests(unittest.TestCase):
                 output = process.finish()
                 self.assertIn('EFFECT-COUNT=0', output)
                 self.assertIn('TERMINAL-RESTORED=True', output)
+
+MODAL_CODE = CODE.replace('        seen = []', '''        from fruitfly_agent.interactive.contracts.commands import CommandResult
+        from fruitfly_agent.interactive.terminal.io.input import read_field_line
+        from fruitfly_agent.interactive.terminal.io.secret import read_secret
+        def modal(command):
+            with frontend.menu_scope():
+                if command.arguments:
+                    read_secret(sys.stdin, sys.stdout, prompt='HIDDEN-READY: ')
+                else:
+                    read_field_line(frontend.line_editor, 'FIELD-READY')
+            return CommandResult()
+        frontend.commands.register('fixturemodal', modal)
+        seen = []''')
+
+@unittest.skipUnless(os.name == 'posix', 'requires POSIX terminal controls')
+class TerminalModalInterruptTests(unittest.TestCase):
+    def test_fields_and_hidden_input_cancel_and_restore_chat(self):
+        for hidden, key in ((False, b'\x1b'), (False, b'\x03'), (True, b'\x1b'), (True, b'\x03'), (False, None), (True, None)):
+            with self.subTest(hidden=hidden, key=key), TerminalProcess(MODAL_CODE) as process:
+                process.read_until('❯ ')
+                process.send(b'/fixturemodal' + (b' hidden' if hidden else b'') + b'\r')
+                process.read_until('HIDDEN-READY' if hidden else 'FIELD-READY')
+                if key is None:
+                    process.signal()
+                else:
+                    process.send(key)
+                process.read_until('Interaction cancelled')
+                process.send(b'/status\r')
+                process.read_until('state: idle')
+                process.send(b'/exit\r')
+                output = process.finish()
+                self.assertIn('TERMINAL-RESTORED=True', output)
+                self.assertNotIn('PROVIDER-WAITING', output)
+                self.assertNotIn('input cleared.', output)
+
+    def test_modal_eof_exits_without_selecting_or_saving(self):
+        with TerminalProcess(MODAL_CODE) as process:
+            process.read_until('❯ ')
+            process.send(b'/fixturemodal\r')
+            process.read_until('FIELD-READY')
+            process.send(b'\x04')
+            output = process.finish()
+            self.assertIn('Input ended; staged changes were not saved', output)
+            self.assertIn('TERMINAL-RESTORED=True', output)

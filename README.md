@@ -47,8 +47,10 @@ python3 -m venv .venv
 ```
 
 The CLI opens an offline startup panel. Choose **Configure** to select a model
-and environment; **model → Add model…** collects service settings and a hidden
-API key. Review, stage, then choose **Save and return**. Choose **Start session**
+and environment; **model → Add model…** first selects API or Subscription access.
+API setup collects service settings and a hidden key; subscription setup connects
+an account and opens its model directory. Authorization and directory refresh can
+use the network before any inference request. Review, stage, then choose **Save and return**. Choose **Start session**
 when ready. Connection failures return to the panel so settings remain accessible.
 Use `/config` during chat or `fruitfly-agent --configure` to open the same editor. Setup validates locally;
 submitted tasks contact the service and may incur charges. Local shell tools run
@@ -119,8 +121,8 @@ For grouped studies, [compose a feedback batch](fruitfly_agent/lab/improvement/g
 before organization and proposal. The workspace editor is the default.
 [GEPA reflective proposal](fruitfly_agent/lab/improvement/editor/methods/gepa_reflection/README.md)
 is available as an optional editor method.
-The [research design](RESEARCH_PIPELINE_DESIGN.md) records the experiment
-protocol and the design behind these stages.
+The [research design](RESEARCH_PIPELINE_DESIGN.md) explains the experiment
+protocol and design rationale; use the stage guides for current capabilities and commands.
 
 ## What you can do
 

@@ -55,7 +55,7 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.workspace.setup.changed)
 
     def test_reasoning_declaration_does_not_change_protocol_parameter_defaults(self):
-        for option in self.workspace.setup.options():
+        for option in (o for o in self.workspace.setup.options() if o.kind == 'api'):
             for reasoning in ('true', 'false'):
                 with self.subTest(service=option.option_id, reasoning=reasoning):
                     values = {**self.workspace.values, 'capabilities.reasoning': reasoning}
@@ -73,5 +73,5 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
         defaults['parameters']['extra_body'] = {'future_feature': True}
         defaults['transport']['retry_max'] = 99
         again = self.workspace.setup.defaults('qwen', {})
-        self.assertEqual(again['parameters'], {'reasoning_effort': 'medium'})
+        self.assertEqual(again['parameters'], {})
         self.assertEqual(again['transport']['retry_max'], 3)

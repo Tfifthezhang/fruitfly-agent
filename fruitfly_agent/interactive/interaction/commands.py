@@ -118,6 +118,7 @@ def _status(
     return CommandResult(
         text=(
             f"model: {status.model}\n"
+            f"{_connection_status(status)}"
             f"{prompt_line}"
             f"{_environment_status(status)}"
             f"session: {status.session_path}\n"
@@ -128,6 +129,18 @@ def _status(
             f"{_context_status(status)}"
         )
     )
+
+
+def _connection_status(status: InteractiveStatus) -> str:
+    if not status.model_connection:
+        return ''
+    usage = status.service_usage or {}
+    enforcement = 'server enforced' if status.output_limit_enforced else 'conservative reservation; server output limit unavailable'
+    return (f'connection: {status.model_connection} · {status.model_account}\n'
+            f'output reserve: {status.output_reserve} ({enforcement})\n'
+            f'plan allowance remaining: unknown\n'
+            f'last request allowance: {usage.get("allowance_usd", "unknown")}\n'
+            f'last billing source: {usage.get("billing_source", "unknown")}\n')
 
 
 def _environment_rows(status: InteractiveStatus) -> tuple[tuple[str, str], ...]:

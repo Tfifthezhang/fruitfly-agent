@@ -15,13 +15,14 @@ system config selects its own `models.roles` aliases. Keep actual keys in
 | `openai` | `chat-completions` | assistant `tool_calls` / `tool` | Attributed image observation after the complete tool-result batch |
 
 `sdk` identifies the client library; `protocol` identifies the wire format. Both
-remain required catalog fields. The registry dispatches on this pair and rejects
+are required for inline API entries; connected model references resolve them from
+the integration. The registry dispatches on this pair and rejects
 unregistered pairs before constructing a client. The wizard derives SDK from the
 selected protocol; multiple adapters require an explicit default registration.
 
 [services.yaml](services.yaml) is the single built-in service/protocol table used
-by both setup and runtime endpoint resolution. It contains four named services
-and the existing custom entry:
+by both setup and runtime endpoint resolution. API setup exposes four named
+services and the existing custom entry. Account connections also use this table:
 
 | Service | Responses | Messages | Chat Completions |
 |---|---|---|---|
@@ -30,6 +31,8 @@ and the existing custom entry:
 | DeepSeek | Supported | Supported | Supported |
 | Qwen | Supported | Supported | Supported |
 | Custom (`generic`) | Registered adapters | Registered adapters | Registered adapters |
+| OpenCode Go connection | Not offered | Not offered | Supported |
+| ChatGPT plan connection | Supported | Not offered | Not offered |
 
 The table declares each service's label, default protocol, credential variable
 name and protocol mappings. Each protocol mapping supplies an API base URL and
@@ -48,10 +51,10 @@ The wizard selects service, then protocol, then model fields. Enter model ID and
 token limits explicitly; it does not infer model capabilities or force thinking.
 Capabilities are support declarations and do not change parameter choices.
 After capabilities, the parameters editor offers a complete editable JSON object
-with medium reasoning effort: Responses uses `reasoning.effort`, Messages uses
-`output_config.effort`, and Chat uses `reasoning_effort`. These are protocol defaults,
-not model policies. Unsupported custom protocols default to `{}`. Enter `{}` to use
-server defaults explicitly; blank accepts the displayed mapping. Invalid JSON or
+initialized to `{}` for a new API model, leaving optional request behavior to the
+service. Explicit reasoning controls use `reasoning.effort` for Responses,
+`output_config.effort` for Messages, or `reasoning_effort` for Chat where supported.
+Blank accepts the displayed mapping; an explicit `{}` clears optional overrides. Invalid JSON or
 protocol options retry before credential input. Model/service compatibility remains
 the caller's responsibility. Existing explicitly authored options are preserved.
 
@@ -114,8 +117,9 @@ share the output allowance with answer tokens. `capabilities` contains strict
 booleans describing declared support; it does not enable a request feature.
 Run requires tools/streaming where used. Remote support remains unverified offline.
 
-The catalog accepts `models` and optional JSON-mapping `metadata` for local notes.
-Model fields are the ones shown above. Unknown fields, duplicate YAML keys,
+The catalog accepts `models`, optional `connections`, and optional JSON-mapping
+`metadata` for local notes. Inline API model fields are the ones shown above;
+[account connections](connections/README.md) own connected-model fields. Unknown fields, duplicate YAML keys,
 non-string keys, nonfinite numbers and configuration version markers fail.
 `parameters` contains only API request options; `transport` contains only client
 waiting/retry options. There is one format and no fallback parser.
@@ -282,3 +286,29 @@ implemented; its presence does not establish support.
 Use the [public templates](../../examples/configuration/README.md) and
 [offline tests](../../tests/providers/README.md). Real integration is explicit,
 uses the network and may incur charges; see [Integration](../../tests/integration/README.md).
+
+## Connect an account instead of an API key
+
+[Connections](connections/README.md) defines subscription setup, model discovery,
+strict reference syntax and resolved snapshots. OpenCode Go uses a subscription
+key; ChatGPT uses official browser consent. Both reuse existing protocol streams.
+They have distinct counting and request capabilities from API-key routes. A token
+refresh is not a model/account switch. Unsupported subscription request options
+fail explicitly; they are not silently stripped from authored parameters.
+
+
+## Preserve Chat reasoning extensions
+
+Chat streaming accepts `reasoning_content`, `reasoning`, and known
+`reasoning_details` entries. The first nonempty reasoning representation supplies
+one display stream; parallel representations are retained for protocol replay.
+Encrypted content stays out of display. OpenRouter-style `reasoning.*` entries
+retain their original order and fields. Kimi-style `summary` entries merge by
+stream index; bare `summary` and `encrypted` entries replay without that index.
+Unknown detail types fail with `response_schema`, without logging their content.
+
+The codec follows the documented [reasoning details shape](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens)
+and the dialect distinction in the [OpenCode Chat protocol](https://github.com/anomalyco/opencode/blob/dev/packages/ai/src/protocols/openai-chat.ts).
+These references do not establish every Go model's remote compatibility.
+The existing Session Provider state preserves native replay values separately
+from display blocks. Existing continuation identity checks still apply.

@@ -14,6 +14,33 @@ FruitFlyHarborAgent = load_harbor_agent()
 
 
 class HarborAdapterTests(unittest.TestCase):
+    def test_subscription_access_is_removed_before_trial_returns(self) -> None:
+        from contextlib import asynccontextmanager
+        agent = FruitFlyHarborAgent.__new__(FruitFlyHarborAgent)
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        installed_agent_inputs(agent, root)
+        agent.model_relay_directory = str(root / 'relay')
+        agent.model_relay_settings = {}
+        agent.model_catalog_path = root / 'models.yaml'
+        agent.profile = 'default'
+        agent.render_instruction = lambda instruction: instruction
+        agent.exec_as_agent = AsyncMock()
+        environment = SimpleNamespace(upload_file=AsyncMock())
+        retired = []
+        @asynccontextmanager
+        async def access(*args):
+            try:
+                yield {'models': {'fixture': {'grant': 'private-fixture-grant'}}}
+            finally:
+                retired.append(True)
+        with patch('fruitfly_eval.harbor.model_access.task_access', access):
+            asyncio.run(agent.run('task', environment, SimpleNamespace(metadata=None)))
+        self.assertEqual(retired, [True])
+        commands = [call.kwargs['command'] for call in agent.exec_as_agent.call_args_list]
+        self.assertIn('rm -f /installed-agent/fruitfly/runtime/model-access.json', commands[-1])
+        self.assertNotIn('private-fixture-grant', str(agent.exec_as_agent.call_args_list))
+        self.assertNotIn('FRUITFLY_MODEL_ACCESS_FILE', agent.runtime_environment)
+
     def test_setup_logging_keeps_output_and_nonzero_exit(self) -> None:
         import subprocess
         agent = FruitFlyHarborAgent.__new__(FruitFlyHarborAgent)

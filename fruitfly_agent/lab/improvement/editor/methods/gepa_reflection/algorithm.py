@@ -1,6 +1,7 @@
 """One reflective text proposal and one metadata completion on its fixed draft."""
 import json
 from dataclasses import asdict
+from typing import Any
 from uuid import uuid4
 
 import yaml
@@ -57,6 +58,7 @@ class GEPAReflectionEditor:
         revised = compat.parse(self.adapter, response)
         draft = self.artifacts.put(revised.encode())
         services.record('gepa-draft', artifact_id=draft, packet_id=packet.artifact_id)
+        metadata: dict[str, Any]
         if revised == before:
             metadata = {'reasons': [], 'decision': {'kind': 'retain_baseline',
                 'explanation': 'The proposed instruction matches the authorized baseline.',

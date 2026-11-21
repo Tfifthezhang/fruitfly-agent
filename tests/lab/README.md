@@ -18,7 +18,7 @@ Verify algorithms and components through Core contracts and Catalog assembly.
 | `test_reduction_safety.py / test_working_memory.py` | Valid memory updates, tool associations, overflow, external references, and commits |
 | `test_task_packs.py / test_pack_format.py / test_coding_tasks.py` | Task material, catalog discovery and dangling-link rejection, policy, and restricted scoring |
 | `test_rlm.py` | Local IPython and artifact behavior |
-| `test_improvement_pipeline.py / test_improver.py` | Stage contracts, result retention, stopping, hierarchical budgets and frozen editor fields |
+| `test_improvement_pipeline.py / test_improver.py` | Stage contracts, result retention, independent phase timing and protected editor fields |
 | `test_improvement_mechanisms.py` | Synchronous faults, invalid results, hook isolation, missing evidence, evidence-index wiring and bounded long sequences |
 | `test_improvement_delivery.py` | Declared outputs, missing sidecars, clean-directory validation and unsupported backend admission |
 | `test_task_sets.py / test_task_set_search.py` | Frozen task identity, deterministic coverage, common full-set selection and incomplete candidates |
@@ -41,9 +41,9 @@ versioned file changes with no real model requests.
 
 [RSI runtime tests](../rsi/README.md) own generation and restart accounting.
 
-`test_improvement_configuration.py` verifies configured I search rounds in real
-fake-Provider episodes, exact returned evidence pages, independent assessor
-guidance and immutable local allowances. These are wiring tests, not quality gains.
+`test_improvement_configuration.py` verifies exact returned evidence pages,
+owner-validated I fields and protected role settings. It does not establish an
+automatic nested I search or comparison backend. These are wiring tests, not quality gains.
 
 
 [Improvement runtime tests](../improvement/README.md) own loop fault injection;

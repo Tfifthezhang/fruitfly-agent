@@ -348,3 +348,11 @@ composition and `improvement-comparison` for method selection. Their default
 component resources own the method names and defaults. See
 [Grouping](../improvement/grouping/README.md) and
 [Comparison](../improvement/assessment/README.md#compare-explicitly-paired-measurements).
+
+
+Model account connections are Provider infrastructure, not selectable Lab
+algorithms. Account references, endpoint/authentication policies and model-directory
+caches create no editable Improvement fields or additional parameter registry.
+Role bindings still use `models.roles`; enabled algorithms consume their resolved
+Provider through the existing assembly. See
+[connection ownership](../../providers/connections/README.md).

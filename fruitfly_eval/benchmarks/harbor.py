@@ -8,6 +8,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tempfile
 from typing import Any, Mapping
 
 
@@ -185,90 +186,96 @@ class HarborBenchmarkAdapter:
         job_root.mkdir(parents=True, exist_ok=True)
         write_json(job_root / "preparation.json", preparation)
         write_json(job_root / "readiness.json", readiness)
-        paths = WorkspacePaths(Path(request.runtime.working_directory))
-        environment = {**load_env(paths.secret_file()), **os.environ}
-        config_path, model_catalog, secret_names = prepare_runtime(runtime=runtime, output_dir=job_root, environment=environment)
-        selected_profile = request.runtime.profile
-        receipt = job_root / "runtime.json"
-        if receipt.is_file():
-            selected_profile = json.loads(receipt.read_text(encoding="utf-8"))["profile"]
-        if not selected_profile:
-            raise ValueError("prepared runtime has no selected profile")
-        job_name = self.descriptor.benchmark_id
-        command = self._command(executable=preflight.command[0], dataset=self.descriptor.dataset,
-            variant=variant, execution=execution, jobs_dir=job_root, job_name=job_name,
-            config_path=config_path, model_catalog=model_catalog,
-            profile=selected_profile, secret_names=secret_names, host=host, preparation=preparation)
-        budget = execution_budget(preparation['tasks'], request.execution.attempts,
-            request.execution.concurrency, request.execution.timeout_seconds)
-        budget['evidence_capture'] = {
-            'max_bytes_per_pass': host.evidence['max_total_bytes'],
-            'max_final_bytes_all_attempts': host.evidence['max_total_bytes'] * len(preparation['tasks']) * request.execution.attempts,
-            'max_entries_per_pass': host.evidence['max_entries'],
-            'baseline_seconds': host.evidence['baseline_seconds'],
-            'capture_seconds': host.evidence['capture_seconds'],
-            'note': 'Additional per-phase job wall time; transfer/index storage and multi-step phases are additional. Bounds are not runtime predictions.'}
-        write_json(job_root / 'execution-budget.json', budget)
-        if progress is not None:
-            progress({'type': 'execution_budget', **budget})
-        if progress is not None:
-            progress({"type": "job_started", "job_id": job_name, "artifacts_path": str(job_root)})
-        runner_error = None
-        try:
-            code, detail = run_harbor_job(command, environment=environment,
-                timeout=request.execution.timeout_seconds, job_root=job_root, progress=progress, job_id=job_name,
-                docker=self._docker_command or "docker")
-            if code:
-                runner_error = f"Harbor exited with {code}: {detail[-2000:]}"
-        except (RuntimeError, KeyboardInterrupt) as exc:
-            runner_error = str(exc) or "evaluation interrupted"
-        job_result_path = job_root / job_name / "result.json"
-        errors = {"runner": runner_error} if runner_error else {}
-        if not job_result_path.parent.is_dir():
-            candidates = tuple(job_root.glob("*/result.json"))
-            if len(candidates) == 1:
-                job_result_path = candidates[0]
-            else:
-                errors['results'] = 'Harbor did not create a unique job result; inspect harbor.log'
-        trials: list[dict[str, Any]] = []
-        metrics: list[dict[str, Any]] = []
-        if 'results' not in errors:
+        with tempfile.TemporaryDirectory(prefix='ffrelay-') as access_directory:
+            paths = WorkspacePaths(Path(request.runtime.working_directory))
+            environment = {**load_env(paths.secret_file()), **os.environ}
+            config_path, model_catalog, secret_names = prepare_runtime(runtime=runtime, output_dir=job_root, environment=environment,
+                model_relay=True)
+            selected_profile = request.runtime.profile
+            relay_required = False
+            receipt = job_root / "runtime.json"
+            if receipt.is_file():
+                runtime_receipt = json.loads(receipt.read_text(encoding="utf-8"))
+                selected_profile = runtime_receipt['profile']
+                relay_required = bool(runtime_receipt.get('connected_models'))
+            if not selected_profile:
+                raise ValueError("prepared runtime has no selected profile")
+            job_name = self.descriptor.benchmark_id
+            command = self._command(executable=preflight.command[0], dataset=self.descriptor.dataset,
+                variant=variant, execution=execution, jobs_dir=job_root, job_name=job_name,
+                config_path=config_path, model_catalog=model_catalog,
+                profile=selected_profile, secret_names=secret_names, host=host, preparation=preparation,
+                relay_directory=Path(access_directory), relay_required=relay_required)
+            budget = execution_budget(preparation['tasks'], request.execution.attempts,
+                request.execution.concurrency, request.execution.timeout_seconds)
+            budget['evidence_capture'] = {
+                'max_bytes_per_pass': host.evidence['max_total_bytes'],
+                'max_final_bytes_all_attempts': host.evidence['max_total_bytes'] * len(preparation['tasks']) * request.execution.attempts,
+                'max_entries_per_pass': host.evidence['max_entries'],
+                'baseline_seconds': host.evidence['baseline_seconds'],
+                'capture_seconds': host.evidence['capture_seconds'],
+                'note': 'Additional per-phase job wall time; transfer/index storage and multi-step phases are additional. Bounds are not runtime predictions.'}
+            write_json(job_root / 'execution-budget.json', budget)
+            if progress is not None:
+                progress({'type': 'execution_budget', **budget})
+            if progress is not None:
+                progress({"type": "job_started", "job_id": job_name, "artifacts_path": str(job_root)})
+            runner_error = None
             try:
-                data = load_harbor_job_result(job_result_path, allow_partial=True)
-                trials, metrics = parse_harbor_job_result(data, job_id=job_name)
-            except (OSError, ValueError) as exc:
-                errors['results'] = str(exc)
-        try:
-            validate_coverage(preparation["tasks"], trials, request.execution.attempts)
-        except ValueError as exc:
-            errors["coverage"] = str(exc)
-            metrics = []  # Partial samples cannot establish a full selection score.
-        coverage = coverage_report(preparation['tasks'], trials, request.execution.attempts)
-        resume_requests = []
-        for missing in sorted(set(coverage['missing_results'].values())):
-            names = [task['name'] for task in preparation['tasks'] if coverage['missing_results'].get(task['id']) == missing]
-            draft = request.to_dict()
-            draft['benchmark']['task_names'] = names
-            draft['execution']['attempts'] = missing
-            resume_requests.append({'request': draft, 'requires_configuration_review': True})
-        write_json(job_root / 'resume-requests.json', {'requests': resume_requests,
-            'note': 'Review runtime source/model identities before executing. Drafts do not resume or combine scores automatically.'})
-        payload: dict[str, Any] = {"schema_version": RESULT_SCHEMA_VERSION, "status": "failed" if errors else "completed", "metrics": metrics,
-            "errors": errors, "trials": trials, "coverage": coverage, "budget": budget,
-            "artifacts": [{"kind": "execution_budget", "path": str(job_root / "execution-budget.json")},
-                          {"kind": "resume_requests", "path": str(job_root / "resume-requests.json")},
-                          {"kind": "harbor_job", "path": str(job_result_path.parent)},
-                          {"kind": "harbor_log", "path": str(job_root / "harbor.log")},
-                          {"kind": "runtime_config", "path": str(config_path)},
-                          {"kind": "model_catalog", "path": str(model_catalog)},
-                          {"kind": "preparation", "path": str(job_root / "preparation.json")},
-                          {"kind": "readiness", "path": str(job_root / "readiness.json")}]}
-        if receipt.is_file():
-            payload["artifacts"].append({"kind": "runtime_snapshot", "path": str(receipt)})
-            payload["runtime_snapshot"] = json.loads(receipt.read_text(encoding="utf-8"))
-        result_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        if progress is not None:
-            progress({"type": "job_finished", "job_id": job_name, "completed": len(trials)})
+                code, detail = run_harbor_job(command, environment=environment,
+                    timeout=request.execution.timeout_seconds, job_root=job_root, progress=progress, job_id=job_name,
+                    docker=self._docker_command or "docker")
+                if code:
+                    runner_error = f"Harbor exited with {code}: {detail[-2000:]}"
+            except (RuntimeError, KeyboardInterrupt) as exc:
+                runner_error = str(exc) or "evaluation interrupted"
+            job_result_path = job_root / job_name / "result.json"
+            errors = {"runner": runner_error} if runner_error else {}
+            if not job_result_path.parent.is_dir():
+                candidates = tuple(job_root.glob("*/result.json"))
+                if len(candidates) == 1:
+                    job_result_path = candidates[0]
+                else:
+                    errors['results'] = 'Harbor did not create a unique job result; inspect harbor.log'
+            trials: list[dict[str, Any]] = []
+            metrics: list[dict[str, Any]] = []
+            if 'results' not in errors:
+                try:
+                    data = load_harbor_job_result(job_result_path, allow_partial=True)
+                    trials, metrics = parse_harbor_job_result(data, job_id=job_name)
+                except (OSError, ValueError) as exc:
+                    errors['results'] = str(exc)
+            try:
+                validate_coverage(preparation["tasks"], trials, request.execution.attempts)
+            except ValueError as exc:
+                errors["coverage"] = str(exc)
+                metrics = []  # Partial samples cannot establish a full selection score.
+            coverage = coverage_report(preparation['tasks'], trials, request.execution.attempts)
+            resume_requests = []
+            for missing in sorted(set(coverage['missing_results'].values())):
+                names = [task['name'] for task in preparation['tasks'] if coverage['missing_results'].get(task['id']) == missing]
+                draft = request.to_dict()
+                draft['benchmark']['task_names'] = names
+                draft['execution']['attempts'] = missing
+                resume_requests.append({'request': draft, 'requires_configuration_review': True})
+            write_json(job_root / 'resume-requests.json', {'requests': resume_requests,
+                'note': 'Review runtime source/model identities before executing. Drafts do not resume or combine scores automatically.'})
+            payload: dict[str, Any] = {"schema_version": RESULT_SCHEMA_VERSION, "status": "failed" if errors else "completed", "metrics": metrics,
+                "errors": errors, "trials": trials, "coverage": coverage, "budget": budget,
+                "artifacts": [{"kind": "execution_budget", "path": str(job_root / "execution-budget.json")},
+                              {"kind": "resume_requests", "path": str(job_root / "resume-requests.json")},
+                              {"kind": "harbor_job", "path": str(job_result_path.parent)},
+                              {"kind": "harbor_log", "path": str(job_root / "harbor.log")},
+                              {"kind": "runtime_config", "path": str(config_path)},
+                              {"kind": "model_catalog", "path": str(model_catalog)},
+                              {"kind": "preparation", "path": str(job_root / "preparation.json")},
+                              {"kind": "readiness", "path": str(job_root / "readiness.json")}]}
+            if receipt.is_file():
+                payload["artifacts"].append({"kind": "runtime_snapshot", "path": str(receipt)})
+                payload["runtime_snapshot"] = json.loads(receipt.read_text(encoding="utf-8"))
+            result_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            if progress is not None:
+                progress({"type": "job_finished", "job_id": job_name, "completed": len(trials)})
 
     def _command(
         self,
@@ -285,13 +292,15 @@ class HarborBenchmarkAdapter:
         secret_names: tuple[str, ...],
         host: HostConfig,
         preparation: dict[str, Any],
+        relay_directory: Path | None = None,
+        relay_required: bool = False,
     ) -> list[str]:
         selected = next((item for item in self.descriptor.variants if item.variant_id == variant), None)
         if selected is None:
             raise ValueError(f"unknown execution profile {variant!r}")
         if not preparation["tasks"]:
             raise ValueError("prepared task selection is empty")
-        payload = {
+        payload: dict[str, Any] = {
             "job_name": job_name, "jobs_dir": str(jobs_dir),
             "n_attempts": int(execution.get("attempts", 1)),
             "n_concurrent_trials": int(execution.get("concurrency", 1)),
@@ -305,6 +314,18 @@ class HarborBenchmarkAdapter:
                 "secret_names": ",".join(secret_names),
             }}],
         }
+        if relay_required:
+            from fruitfly_eval.harbor.model_access import TARGET
+            if relay_directory is None:
+                raise ValueError('Subscription execution requires an owned relay directory')
+            payload['agents'][0]['kwargs']['model_relay_directory'] = str(relay_directory)
+            payload['agents'][0]['kwargs']['model_relay_settings'] = dict(host.model_relay)
+            if not host.model_relay:
+                import platform
+                if platform.system() != 'Linux':
+                    raise ValueError('Subscription models on Docker Desktop require model_relay TLS settings')
+                payload['environment']['mounts'].append({'type': 'bind', 'source': str(relay_directory),
+                    'target': TARGET, 'read_only': True})
         config = jobs_dir / "harbor-job.json"
         write_json(config, payload)
         return [executable, "run", "--config", str(config), "--yes",

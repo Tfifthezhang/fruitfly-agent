@@ -11,6 +11,7 @@ from typing import TextIO
 from fruitfly_agent.interactive.contracts.startup import StartupAction, StartupSnapshot
 from fruitfly_agent.interactive.terminal.io.input import create_line_editor
 from fruitfly_agent.interactive.terminal.io.live import InputInterrupted
+from fruitfly_agent.interactive.terminal.io.controls import InputEnded
 from fruitfly_agent.interactive.terminal.io.menu import (
     LineMenuInput, MenuAction, MenuInput, MenuRow, TerminalMenuRenderer,
     create_menu_input, navigate_menu,
@@ -53,7 +54,7 @@ class TerminalStartupFrontend:
                     'Enter an option number; blank selects highlighted; q exits')
             try:
                 event = self.menu_input.read_event()
-            except (KeyboardInterrupt, InputInterrupted):
+            except (KeyboardInterrupt, InputInterrupted, InputEnded):
                 return 'exit'
             selected, handled = navigate_menu(event, selected, 3)
             if handled:
@@ -93,7 +94,7 @@ class TerminalStartupFrontend:
                             event = await asyncio.to_thread(poll, .1)
                         if event.action in {MenuAction.BACK, MenuAction.QUIT}:
                             cancel_start()
-                    except (KeyboardInterrupt, InputInterrupted):
+                    except (KeyboardInterrupt, InputInterrupted, InputEnded):
                         cancel_start()
             try:
                 await task

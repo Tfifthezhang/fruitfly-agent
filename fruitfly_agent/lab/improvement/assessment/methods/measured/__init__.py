@@ -1,5 +1,6 @@
 """Deterministic comparison of explicitly paired research receipts."""
 from math import fsum, isfinite
+from typing import Any
 
 from fruitfly_agent.improvement.contracts.versions import canonical_json, content_hash, require_hash
 
@@ -45,17 +46,17 @@ def compare_measured(before, after, manifest, input_ids):
         observations = {}
         for item in batch.observations:
             if isinstance(item, dict) and item.get('name') == metric:
-                key = item.get('run_id')
-                if key in observations:
-                    raise ValueError('duplicate objective observation for ' + str(key))
-                observations[key] = item
+                run_id = item.get('run_id')
+                if run_id in observations:
+                    raise ValueError('duplicate objective observation for ' + str(run_id))
+                observations[run_id] = item
         sides[side] = records, observations
 
-    rows = []
+    rows: list[dict[str, Any]] = []
     sign = 1 if direction == 'max' else -1
     for pair in sorted(pairs, key=lambda p: (p['task_id'], p['attempt'])):
         row = dict(pair)
-        records = []
+        pair_records = []
         for side, (runs, observations) in sides.items():
             receipt = runs.get(pair[side])
             observation = observations.get(pair[side], {}) if receipt else {}
@@ -80,14 +81,14 @@ def compare_measured(before, after, manifest, input_ids):
                          'material_id': receipt.material_id if receipt else None,
                          'initial_state_id': receipt.initial_state_id if receipt else None,
                          'conditions_id': receipt.conditions_id if receipt else None}
-            records.append(receipt)
-        base, candidate = records
+            pair_records.append(receipt)
+        base, candidate = pair_records
         comparable = (base is not None and candidate is not None and
                       (base.material_id, base.initial_state_id, base.conditions_id) ==
                       (candidate.material_id, candidate.initial_state_id, candidate.conditions_id))
         row['comparable'] = comparable
-        values = row['before']['value'], row['after']['value']
-        row['gain'] = sign * (values[1] - values[0]) if comparable and None not in values else None
+        pair_values = row['before']['value'], row['after']['value']
+        row['gain'] = sign * (pair_values[1] - pair_values[0]) if comparable and None not in pair_values else None
         rows.append(row)
 
     gains = [r['gain'] for r in rows if r['gain'] is not None]
@@ -97,7 +98,7 @@ def compare_measured(before, after, manifest, input_ids):
     denominator = retained + regressions
     regression_rate = regressions / denominator if denominator else None
     average = fsum(gains) / len(gains) if gains else None
-    if (issues or len(gains) != len(rows)
+    if (average is None or issues or len(gains) != len(rows)
             or any(r[side]['outcome'] == 'unknown' for r in rows for side in sides)):
         conclusion = 'insufficient'
     elif (regression_rate is not None and regression_rate > maximum_regression) or average < 0:

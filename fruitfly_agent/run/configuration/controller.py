@@ -115,7 +115,22 @@ class RunConfigurationController:
         return self._is_changed()
 
     def _models(self, profile: HarnessProfile):
-        return self.model_setup.models(profile) if self.model_setup is not None else load_model_specs(model_catalog_path(profile, self._path))
+        return self.model_setup.models(profile) if self.model_setup is not None else load_model_specs(*profile.model_sources(self._path))
+
+    def _model_credential_available(self, spec: ModelSpec) -> bool:
+        if spec.access and 'credential' in spec.access:
+            from fruitfly_agent.providers.registry import credential_available
+            if self.model_setup is not None:
+                return credential_available(spec, {**self.model_setup.environment, **self.model_setup.credentials.values})
+            name = spec.access['credential']['env']
+            value = self._secret_resolver(name) if self._secret_resolver is not None else None
+            return credential_available(spec, {name: value} if value else {})
+        if spec.access:
+            if self.model_setup is not None:
+                return self.model_setup.connections.service.ready(spec.access['integration'], spec.access['account'])
+            from fruitfly_agent.providers.registry import credential_available
+            return credential_available(spec, {})
+        return self._secret_resolver is None or bool(self._secret_resolver(spec.provider.api_key_env))
 
     def snapshot(self) -> ConfigurationSnapshot:
         from fruitfly_agent.run.storage.prompts import resolve_base_prompt
@@ -147,11 +162,11 @@ class RunConfigurationController:
             ready = False
         if self._secret_resolver is not None and selected_model in models:
             name = models[selected_model].provider.api_key_env
-            if not self._secret_resolver(name):
+            if not self._model_credential_available(models[selected_model]):
                 warnings.append(f"missing model credential: {name}")
                 ready = False
         if self.model_setup is not None and selected_model is not None and selected_model in models:
-            if self.model_setup.credential_status(selected_model) == 'API key missing':
+            if self.model_setup.credential_status(selected_model) in {'API key missing', 'Authorization required'}:
                 warnings.append('missing model credential: ' + models[selected_model].provider.api_key_env)
                 ready = False
         if self.read_only:
@@ -162,7 +177,7 @@ class RunConfigurationController:
                     if name not in models:
                         warnings.append(f"unknown auxiliary model profile {name!r}")
                         ready = False
-                    elif self._secret_resolver is not None and not self._secret_resolver(models[name].provider.api_key_env):
+                    elif self._secret_resolver is not None and not self._model_credential_available(models[name]):
                         credential_missing.append(models[name].provider.api_key_env)
                 if credential_missing:
                     warnings.append("missing credentials: " + ", ".join(credential_missing))
@@ -291,7 +306,7 @@ class RunConfigurationController:
             raise ValueError("model catalog path must not be empty")
         profile = self._draft.select(self._selected)
         candidate = replace(profile, model_catalog=value, model_profile=None)
-        models = load_model_specs(model_catalog_path(candidate, self._path))
+        models = load_model_specs(*candidate.model_sources(self._path))
         selected = next(iter(models)) if len(models) == 1 else None
         self._replace_profile(replace(candidate, model_profile=selected))
         suffix = f" and selected {selected!r}" if selected is not None else ""
@@ -520,7 +535,7 @@ class RunConfigurationController:
         payloads = {**payloads, **{path: data.decode('utf-8') for path, data in components.items()}}
         profile = candidate.select()
         models = deepcopy(self._models(profile))
-        files = FileTransaction.capture((*payloads, self._path, model_catalog_path(profile, self._path),
+        files = FileTransaction.capture((*payloads, self._path, *profile.model_sources(self._path),
             *(Path(source.path) for source in profile.source_files if not source.path.startswith('package:'))))
         draft = deepcopy(self._draft)
         selected = self._selected

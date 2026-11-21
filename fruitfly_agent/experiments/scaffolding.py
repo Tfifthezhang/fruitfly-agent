@@ -52,12 +52,13 @@ def initialize_workspace(workspace: Path, *, source: str | None = None,
     if directory.is_symlink() or (directory.exists() and not directory.is_dir()):
         raise ValueError('.fruitfly must be a real workspace directory')
     preserved = []
-    models = directory / 'models.yaml'
-    if models.is_symlink() or (models.exists() and not models.is_file()):
-        raise ValueError('models.yaml must be a regular file')
-    if models.exists():
-        payloads.pop('models.yaml')
-        preserved.append(str(models))
+    for name in ('models.yaml', 'subscriptions.yaml'):
+        models = directory / name
+        if models.is_symlink() or (models.exists() and not models.is_file()):
+            raise ValueError(name + ' must be a regular file')
+        if models.exists():
+            payloads.pop(name)
+            preserved.append(str(models))
     conflicts = [name for name in payloads if (directory / name).exists() or (directory / name).is_symlink()]
     if conflicts:
         raise ValueError('init will not overwrite existing configuration: ' + ', '.join(conflicts))

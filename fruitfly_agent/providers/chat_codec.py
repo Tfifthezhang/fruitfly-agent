@@ -3,10 +3,87 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
-from typing import Any, Callable
+from typing import Any, Callable, NoReturn
 
 from fruitfly_agent.core.data_model import (AgentMessage, AssistantMessage, UserMessage,
     ToolResultMessage, CustomMessage, TextBlock, ImageBlock)
+from fruitfly_agent.core.errors import FatalError
+
+
+class ChatReasoning:
+    """Retain native reasoning separately from its single display projection."""
+
+    def __init__(self) -> None:
+        self.strings: dict[str, list[str]] = {}
+        self.details: list[dict[str, Any]] = []
+        self.display_field: str | None = None
+
+    def consume(self, delta: dict[str, Any]) -> str:
+        visible: dict[str, str] = {}
+        for name in ('reasoning_content', 'reasoning'):
+            value = delta.get(name)
+            if value is None:
+                continue
+            if not isinstance(value, str):
+                self.invalid(name)
+            if value:
+                self.strings.setdefault(name, []).append(value)
+                visible[name] = value
+        details = delta.get('reasoning_details')
+        if details is not None:
+            if not isinstance(details, list):
+                self.invalid('reasoning_details')
+            parts = []
+            for detail in details:
+                if not isinstance(detail, dict):
+                    self.invalid('reasoning_details')
+                kind = detail.get('type')
+                if not isinstance(kind, str):
+                    self.invalid('reasoning_details.type')
+                field = {'reasoning.text': 'text', 'reasoning.summary': 'summary',
+                         'reasoning.encrypted': 'data', 'summary': 'summary',
+                         'encrypted': 'encrypted'}.get(kind)
+                if field is None:
+                    self.invalid('reasoning_details.type')
+                value = detail.get(field, '')
+                if not isinstance(value, str):
+                    self.invalid('reasoning_details.content')
+                if 'index' in detail and (type(detail['index']) is not int or detail['index'] < 0):
+                    self.invalid('reasoning_details.index')
+                if kind in ('summary', 'encrypted') and 'index' in detail:
+                    previous = next((item for item in self.details
+                        if item.get('type') == kind and item.get('index') == detail['index']), None)
+                    if previous is not None:
+                        if kind == 'summary':
+                            previous[field] += value
+                        elif previous[field] != value:
+                            self.invalid('reasoning_details.encrypted')
+                    else:
+                        self.details.append(dict(detail))
+                else:
+                    self.details.append(dict(detail))
+                if field in ('text', 'summary'):
+                    parts.append(value)
+            if any(parts):
+                visible['reasoning_details'] = ''.join(parts)
+        if self.display_field is None:
+            self.display_field = next(iter(visible), None)
+        return visible.get(self.display_field or '', '')
+
+    def replay(self) -> dict[str, Any]:
+        result: dict[str, Any] = {name: ''.join(parts) for name, parts in self.strings.items()}
+        if self.details:
+            result['reasoning_details'] = [
+                {key: value for key, value in item.items()
+                 if key != 'index' or item['type'] not in ('summary', 'encrypted')}
+                for item in self.details]
+        return result
+
+    @staticmethod
+    def invalid(field: str) -> NoReturn:
+        raise FatalError('Unsupported Chat reasoning structure: ' + field,
+            details={'diagnostics': {'failure_category': 'response_schema',
+                                    'evidence_kind': 'runtime_rule', 'field': field}})
 
 
 def chat_input_messages(messages: list[AgentMessage]) -> list[AgentMessage]:

@@ -2,7 +2,6 @@
 
 import re
 import json
-from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 from urllib.parse import urlsplit
 
@@ -39,7 +38,7 @@ SERVICES = tuple(SetupService(
     definition.label, definition.default_protocol, definition.id,
     'Choose a protocol, then enter the model ID and documented limits. Confirm endpoint and account access.',
     custom=definition.id == 'generic', initial={'api_key_env': definition.api_key_env},
-) for definition in builtin_services())
+) for definition in builtin_services() if definition.api_key_env or definition.id == 'generic')
 
 
 def setup_service(option_id: str) -> SetupService:
@@ -67,13 +66,8 @@ def setup_initial(option_id: str, protocol: str) -> dict:
 
 
 def default_parameters(protocol: str) -> dict:
-    """Editable protocol defaults, independent of vendor, model and capability flags."""
-    defaults: dict[str, dict] = {
-        'responses': {'reasoning': {'effort': 'medium'}},
-        'messages': {'output_config': {'effort': 'medium'}},
-        'chat-completions': {'reasoning_effort': 'medium'},
-    }
-    return deepcopy(defaults.get(protocol, {}))
+    """Leave optional protocol parameters to the service unless explicitly selected."""
+    return {}
 
 
 def setup_defaults(option_id: str, values) -> dict:

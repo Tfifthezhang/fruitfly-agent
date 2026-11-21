@@ -79,7 +79,7 @@ def order_model_catalog(text: str) -> str:
         end = end_line(max(entry.value[-1][0].end_mark.index, _content_end(entry.value[-1][1])))
         chunks = {key.value: text[start:stop] for (key, _), start, stop in
                   zip(entry.value, starts, [*starts[1:], end])}
-        pieces = [chunks[name] for name in MODEL_FIELD_ORDER if name in chunks]
+        pieces = [chunks[name] for name in ordered if name in chunks]
         newline = '\r\n' if '\r\n' in text else '\n'
         replacement = ''.join(part + (newline if index < len(pieces) - 1 and not part.endswith('\n') else '')
                               for index, part in enumerate(pieces))

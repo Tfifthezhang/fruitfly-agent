@@ -72,7 +72,8 @@ def collect_materials(root, artifacts, *, interrupted=False, trial=None, origins
         source = native if native.is_file() and safe_path(native, root) else agent / 'trajectory.json'
         instruction = ''
         answer: dict[str, Any] = {'state': 'absent', 'text': '', 'source': None}
-        gaps, projected = [], []
+        gaps: list[dict[str, Any]] = []
+        projected: list[dict[str, Any]] = []
         extensions = dict.fromkeys(('thinking', 'compaction', 'image'), 0)
         locator = None
         def body_reference(value, field):

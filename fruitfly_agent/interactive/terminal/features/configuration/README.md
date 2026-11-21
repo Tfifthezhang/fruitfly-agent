@@ -35,15 +35,18 @@ controllers expose review only. No permission settings page is supplied.
 The host ConfigurationController owns choices and persistence. ModelSetupService owns validation and credential staging. Forms use explicitly supplied selection, rendering, reader, and staging operations; they do not access a menu owner's private methods. Credential values bypass readline/history and are absent from views and review text.
 
 After capabilities, model setup edits host-supplied `parameters` as a complete
-JSON object. Blank accepts the displayed medium effort default; `{}` requests
-server defaults. Invalid values retry before reading credentials. Back returns to
+JSON object. New API entries start with `{}`. Blank accepts the displayed
+mapping; an explicit `{}` clears optional overrides and requests service defaults. Invalid values retry before reading credentials. Back returns to
 protocol selection; cancellation stages nothing. Model review displays the exact
 edited parameters and transport defaults. ANSI review has Next/Previous pages so
 long mappings remain readable; numbered output prints the complete review.
 Confirmation stages the defaults through the host. Service metadata stays in Providers.
 
-Model setup selects a host-supplied service option, then always opens a protocol
-menu before model fields. Back returns to services; `back` from text fields returns
+Model setup first selects API or Subscription access. API setup selects a
+host-supplied service and opens a protocol menu before model fields. Subscription
+setup uses account authorization and the cached directory, with possible network
+authorization and refresh operations. Account writes are independent of draft
+saving; discarding the model draft does not sign out the account. Back returns to services; `back` from text fields returns
 to protocols. Per-service/protocol drafts retain edits, while new protocol choices
 refresh addresses and defaults. SDK is a host-resolved constant, never a question,
 and appears in review. Quit or field cancellation leaves no staged model.
@@ -137,3 +140,37 @@ list. The selected original value remains separate from its display label;
 Enter; line menus use numbered options. Host validation and staging remain the
 same. Model and mechanism flows depend on shared forms and I/O; neither imports
 the other's helpers.
+
+## Connect subscriptions and browse model directories
+
+`model_connections.py` renders injected account, storage, browser authorization,
+reauthorization and sign-out operations. `model_picker.py` searches and pages local
+model metadata, supports favorites/recent models and stages only the selection.
+Add model opens a separate access menu before listing API or subscription services.
+Backing out of account authorization returns through credential storage to the
+account menu. The subscription picker groups model rows, search, directory refresh,
+pagination, and navigation. Focused model details include capabilities and
+published rates when available. The same
+configuration menu exposes Connections and Advanced model settings. No terminal
+service list, HTTP client or credential file reader is introduced. Auth callbacks
+use a single terminal input owner; manual callback URLs use hidden input.
+Account authorization is independent of the draft. Model changes still require
+save/apply, and cancellation retains the active model. See
+[connection semantics](../../../../providers/connections/README.md).
+
+Wide interactive terminals show the model list beside the focused model's
+details. Page capacity follows terminal height. Resize keeps the focused model
+when it is still present and switches to a single column when space is limited.
+Page Up and Page Down scroll the detail column. Search, refresh, pagination,
+and Back remain in separate groups. The numbered interface uses fixed-size
+pages. Back from model review keeps the entered alias for editing.
+
+The picker uses the same page capacity when entering a page and rendering live
+updates, so short terminals can traverse every model without repeating a page.
+
+For a static subscription key, the account picker can select an existing
+workspace secret variable by name. When a model directory declares supported
+request values, **Advanced settings** shows those choices. **Service default**
+leaves the option unset.
+
+Model and account forms cancel on Esc or Ctrl+C without staging unfinished values. Previously staged configuration remains available. Quit on the save/apply confirmation retains the draft; only selecting Discard changes resets it. Command-level cancellation returns to chat; EOF ends input without saving or applying the draft. Authorization cancellation closes the pending attempt without reporting an authorization failure or signing out an existing account.

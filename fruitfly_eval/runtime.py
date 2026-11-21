@@ -18,6 +18,7 @@ def prepare_runtime(
     runtime: Mapping[str, Any],
     output_dir: Path,
     environment: Mapping[str, str] | None = None,
+    model_relay: bool = False,
 ) -> tuple[Path, Path, tuple[str, ...]]:
     workspace = Path(runtime.get("working_directory") or ".").resolve()
     original_config = (workspace / (runtime.get("config_path") or ".fruitfly/default-config.yaml")).resolve()
@@ -41,7 +42,7 @@ def prepare_runtime(
            for item in resolved):
         raise ValueError("evaluation requires execution inside the task container; remote environments are unsupported")
     try:
-        source_models = load_model_specs(source_catalog)
+        source_models = load_model_specs(*selected.model_sources(original_config))
     except (KeyError, TypeError, AttributeError) as exc:
         raise ValueError("invalid model catalog; verify provider, model and token limits") from exc
     selected_model = selected.model_profile
@@ -50,6 +51,14 @@ def prepare_runtime(
             raise ValueError("select one model profile for evaluation")
         selected_model = next(iter(source_models))
     required_models = {selected_model, *catalog.required_model_profiles(selections)}
+    from fruitfly_agent.lab.catalog.model_roles import role_alias
+    roles = selected.resolved_model_roles(selected_model)
+    for item in resolved:
+        for role, requirement in item.definition.model_role_parameters.items():
+            if not requirement.lazy:
+                alias = role_alias(role, requirement, item.parameters, roles)
+                if alias is not None:
+                    required_models.add(alias)
     declared_models = required_models | set(selected.resolved_model_roles(selected_model).values())
     if declared_models - source_models.keys():
         raise ValueError("unknown model profiles: " + ", ".join(sorted(declared_models - source_models.keys())))
@@ -57,8 +66,11 @@ def prepare_runtime(
     secret_names = set(catalog.required_credentials(selections))
     for name in sorted(declared_models):
         spec = source_models[name]
+        if spec.access and not model_relay:
+            raise ValueError('Subscription connections require a host credential proxy and cannot be exported to task containers; use an API model')
         if name in required_models:
             spec.require(tools=any(c.family == "tools" for item in resolved for c in item.definition.descriptor.contributions), streaming=True)
+        if name in required_models and not spec.access:
             secret_names.add(spec.provider.api_key_env)
         staged_models[name] = spec.to_dict()
     if any(not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) for name in secret_names):
@@ -77,7 +89,7 @@ def prepare_runtime(
             raise ValueError("runtime artifact content differs from its reference")
         return body.decode("utf-8")
     from fruitfly_agent.runtime_spec import MechanismSelection
-    projected = component_profile(replace(selected, model_catalog=remote_catalog,
+    projected = component_profile(replace(selected, model_catalog=remote_catalog, subscription_catalog=None,
         model_profile=selected_model, mechanisms=tuple(MechanismSelection(item.mechanism_id,
             item.enabled, normalized.get(item.mechanism_id, dict(item.parameters))) for item in selections)),
         catalog, artifact_reader=read_artifact)
@@ -114,6 +126,7 @@ def prepare_runtime(
         "configuration_sources": [{"path": source.path, "sha256": source.digest}
                                   for source in selected.source_files],
         "execution_policy": "unrestricted", "isolation": "harbor_task_container",
+        "connected_models": [name for name in sorted(required_models) if source_models[name].access],
         "files": {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (config_path, model_path)}}
     (output_dir / "runtime.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
     return config_path, model_path, tuple(sorted(secret_names))

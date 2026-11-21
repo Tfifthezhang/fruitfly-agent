@@ -20,6 +20,9 @@ classifiers = [
 ]
 dependencies = [
     "httpx>=0.27",
+    "h11>=0.16",
+    "PyJWT[crypto]>=2.10",
+    "keyring>=25",
     "anthropic>=1.12.0",
     "ipython>=8.18",
     "markdown-it-py>=3.0",
@@ -92,6 +95,7 @@ include = ["fruitfly_agent*", "fruitfly_eval*"]
 "fruitfly_agent.lab.tools.methods.web_fetch" = ["defaults.yaml"]
 
 [tool.mypy]
+mypy_path = "$MYPY_CONFIG_FILE_DIR/typings"
 python_version = "3.11"
 follow_imports = "silent"
 check_untyped_defs = true

@@ -277,6 +277,7 @@ class ScaffoldingTests(unittest.TestCase):
         expected = {
             'default-config.yaml': 'examples/configuration/default-config.example.yaml',
             'models.yaml': 'examples/configuration/models.example.yaml',
+            'subscriptions.yaml': 'examples/configuration/subscriptions.example.yaml',
         }
         for name, path in expected.items():
             self.assertEqual(templates[name], (project / path).read_text())
@@ -285,3 +286,15 @@ class ScaffoldingTests(unittest.TestCase):
         self.assertEqual(benchmark['eval-host.yaml'], (project / 'examples/configuration/eval-host.example.yaml').read_text())
         self.assertEqual(json.loads(benchmark['eval-request.json']),
             json.loads((project / 'examples/experiments/tb4-smoke-request.example.json').read_text()))
+
+    def test_existing_subscription_catalog_is_preserved_and_empty_template_loads_offline(self):
+        from fruitfly_agent.providers.registry import load_model_specs
+        directory = self.root / '.fruitfly'
+        directory.mkdir()
+        subscriptions = directory / 'subscriptions.yaml'
+        subscriptions.write_text('# Preserve authored subscriptions\nmodels: {}\nconnections: {}\n')
+        before = subscriptions.read_bytes()
+        result = initialize_workspace(self.root)
+        self.assertIn(str(subscriptions), result['preserved'])
+        self.assertEqual(subscriptions.read_bytes(), before)
+        self.assertEqual(load_model_specs(subscriptions), {})

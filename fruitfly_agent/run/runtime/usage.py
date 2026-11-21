@@ -31,8 +31,10 @@ class ModelUsage:
         self.write()
         return identity
 
-    def finish(self, identity, *, status, usage=None, elapsed_seconds=None, failure=None):
+    def finish(self, identity, *, status, usage=None, elapsed_seconds=None, failure=None, service_usage=None):
         self.requests[identity].update(status=status,usage=usage,elapsed_seconds=elapsed_seconds)
+        if service_usage:
+            self.requests[identity]['service_usage'] = dict(service_usage)
         if failure is not None:
             self.requests[identity]['failure'] = failure
         self.write()
@@ -53,6 +55,9 @@ class ObservedProvider:
     def __init__(self, provider, usage):
         self.provider,self.usage=provider,usage
         self.transport_parameters=getattr(provider,'transport_parameters',None)
+        self.connection_identity = getattr(provider, 'connection_identity', None)
+        if hasattr(provider, 'bind_session'):
+            self.bind_session = provider.bind_session
         forward_context_capabilities(self,provider)
 
     def __call__(self,view,*,signal=None):
@@ -63,7 +68,7 @@ class ObservedProvider:
                 inner=self.provider(view,signal=signal)
                 async for event in inner:yield event
                 message=await inner.result()
-                self.usage.finish(identity,status='failed' if message.stop_reason == 'error' else 'completed',usage=message.usage.to_dict() if message.usage else None,elapsed_seconds=time.monotonic()-started)
+                self.usage.finish(identity,status='failed' if message.stop_reason == 'error' else 'completed',usage=message.usage.to_dict() if message.usage else None,elapsed_seconds=time.monotonic()-started, service_usage=getattr(self.provider, 'service_usage', None))
                 yield StreamDone(message)
             except (asyncio.CancelledError, GeneratorExit):
                 self.usage.finish(identity,status='interrupted',elapsed_seconds=time.monotonic()-started)
@@ -79,13 +84,14 @@ class ObservedProvider:
         return AssistantMessageEventStream(events())
 
     async def aclose(self):
-        close=getattr(self.provider,'aclose',None)
+        close=getattr(self.provider,'aclose',None) or getattr(self.provider,'close',None)
         if close is not None:await close()
 
 
 class ObservedProviderRegistry(ProviderRegistry):
     def __init__(self,registry,usage):
-        super().__init__()
+        super().__init__(credential_store=registry.credential_store,
+                         binding_directory=registry.binding_directory)
         self.registry,self.usage=registry,usage
 
     def register(self,sdk,protocol,factory,*,default=False):
@@ -94,4 +100,8 @@ class ObservedProviderRegistry(ProviderRegistry):
     def registered_pairs(self):return self.registry.registered_pairs()
     def sdk_for(self,protocol):return self.registry.sdk_for(protocol)
     def validate(self,spec):self.registry.validate(spec)
-    def create(self,spec,env=None):return ObservedProvider(self.registry.create(spec,env),self.usage)
+    def create(self,spec,env=None):
+        if self.credential_store is not None:
+            self.registry.credential_store = self.credential_store
+        self.registry.binding_directory = self.binding_directory
+        return ObservedProvider(self.registry.create(spec,env),self.usage)

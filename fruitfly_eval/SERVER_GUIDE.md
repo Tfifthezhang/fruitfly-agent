@@ -99,10 +99,17 @@ scp .fruitfly/secrets.env \
 | File | Required content |
 |---|---|
 | `.fruitfly/default-config.yaml` | Selected evaluation harness profile using local task execution |
-| `.fruitfly/models.yaml` | Model/protocol/endpoint settings and credential variable names |
+| `.fruitfly/models.yaml` | API model/protocol/endpoint settings and credential variable names |
+| `.fruitfly/subscriptions.yaml` | Selected subscription models and non-secret connection references, when declared by the profile |
 | `.fruitfly/secrets.env` | Actual model and enabled-tool credential values |
 | `.fruitfly/eval-host.yaml` | Server-specific paths, mounts and dependency preparation |
 | `.fruitfly/eval-smoke.json`, `.fruitfly/eval-selected.json` | Dataset selection and execution budgets |
+
+For subscription execution, also transfer the catalog referenced by
+`models.subscriptions` (normally `.fruitfly/subscriptions.yaml`). Preserve model
+entries and adjust only the server credential binding. Follow
+[server subscription setup](#prepare-subscription-authorization-on-a-shared-server) before
+running the baseline. A copied account ID alone does not authorize this server.
 
 Transfer `.fruitfly/config.yaml` only for optional daily interaction; daily and
 Eval configs can select different aliases from the same `.fruitfly/models.yaml`.
@@ -354,13 +361,15 @@ HostConfig.read(workspace)
 environment = {**load_env(WorkspacePaths(workspace).secret_file()), **os.environ}
 with tempfile.TemporaryDirectory(prefix='fruitfly-config-check-') as directory:
     _, _, names = prepare_runtime(runtime=asdict(request.runtime),
-        output_dir=Path(directory), environment=environment)
-    print('Configuration valid; credential variables:', ', '.join(names))
+        output_dir=Path(directory), environment=environment, model_relay=True)
+    print('Export configuration valid; API/tool credential variables:', ', '.join(names))
 PY
 ```
 
 This validates request fields, profile/model references, required credential names
-and immutable bindings. It does not contact the model. Eval rejects SSH execution
+and immutable bindings. `model_relay=True` admits connected model specifications
+for inspection; this probe does not resolve account credentials, create grants,
+start a listener or establish container reachability. It does not contact the model. Eval rejects SSH execution
 profiles: Agent tools must operate in the selected task environment.
 
 Before container preparation, developers using a source checkout can run:
@@ -545,3 +554,37 @@ The export includes permitted evidence, not private verifier inputs, complete
 runtime/task caches or Docker images. `material-inventory.json` identifies external
 material availability. Preserve exact prepared caches separately when full execution
 reproduction is required. Missing historical container files remain missing.
+
+## Prepare subscription authorization on a shared server
+
+Run Eval on the Linux evaluation server using a separate Unix account and private
+credential directories. The server needs its own authorization; a local Mac
+keyring is not available there automatically. Choose one credential route:
+
+| Route | Server preparation |
+|---|---|
+| Go environment key | Privately define `OPENCODE_GO_KEY` in `.fruitfly/secrets.env`, restrict the file to mode 0600, and reference it through `credential.env` in the selected connection. See [Go configuration](../fruitfly_agent/providers/connections/methods/opencode_go/README.md#use-a-workspace-secret-variable). |
+| Account registration | Select protected-file storage on the server, then use [selected-account SSH deployment](../fruitfly_agent/providers/auth/README.md#deploy-one-existing-account-through-ssh) from the authorized computer. The remote Python environment and verified SSH access must already exist. |
+
+Deployment transfers only the selected registration, not model catalogs or system
+configuration. Transfer the selected subscription catalog as a separate non-secret
+file. Declare `models.subscriptions: subscriptions.yaml` in the chosen baseline
+profile and set `models.roles.executor` to its exact selected alias. Preserve
+existing model metadata, H/S/I and other role bindings. Daily `.fruitfly/config.yaml`
+selection does not update Eval's `.fruitfly/default-config.yaml`.
+
+Harbor creates per-task model relay grants. Account credentials remain on the
+controller host; temporary grants are retired after Agent execution. Native Linux
+with Docker on that same server uses a private Unix socket. Running Eval on your
+computer against another machine's Docker Engine requires verified TLS
+reachability and usable runtime bind paths; TLS alone does not establish remote
+Docker compatibility. See [transport and lifecycle limits](harbor/README.md#connect-subscription-models).
+
+Use the existing configuration validation, preparation, check and smoke sequence
+above. Configuration export does not verify subscription credentials or relay
+reachability. Re-run preparation after changing source or mounted runtime; an old
+frozen Agent does not acquire new Provider support from the current checkout.
+A real smoke consumes model allowance and can incur charges. For restricted Go
+DeepSeek models, the key's workspace must allow Global in service Privacy settings;
+a new request is needed to confirm access. Never copy account storage, subscription
+keys or renewable tokens into task images.

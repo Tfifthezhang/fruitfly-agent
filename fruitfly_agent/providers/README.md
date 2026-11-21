@@ -4,13 +4,17 @@
 
 Adapt model APIs to Core's Provider protocol. Run resolves model specifications and constructs adapters; Core remains independent of vendor SDKs.
 
+[Connection directory caching](connections/README.md) provides account-scoped
+model discovery, OpenCode Go and official ChatGPT plan connections.
+[Authentication](auth/README.md) owns renewable credentials separately from models.
+
 | API | Purpose |
 |---|---|
 | `AnthropicProvider` | Anthropic Messages |
 | `OpenAIProvider` | OpenAI Responses |
 | `ChatCompletionsProvider` | OpenAI-compatible Chat Completions |
 | `ModelSpec`, `ProviderSpec`, `ModelCapabilities` | Exact model/API identity, limits, parameters, and capabilities |
-| `ProviderRegistry`, `default_registry` | Construction using environment keys named by `api_key_env` |
+| `ProviderRegistry`, `default_registry` | Construction using environment keys or explicit account connections |
 | `ProviderRegistry.registered_pairs()` | Read-only registered SDK/protocol choices for setup; no factory invocation |
 | `ProviderRegistry.sdk_for(protocol)` | Automatic setup SDK; unique registration or explicit default adapter |
 | `load_env` | Prepare the secret environment |
@@ -54,7 +58,8 @@ Harness call budgets do not count individual adapter retry attempts or guarantee
 | [error_classification.py](error_classification.py) | Shared error categories |
 | [transport.py](transport.py) | Validated deadlines, signal-aware waits, retry hints/jitter, and cleanup |
 
-Implement Core's Provider protocol, register the adapter, and test messages, streaming, errors, limits, cancellation, and cleanup offline. Providers do not read Session, Lab, or Eval state. API keys come from the prepared environment; no Provider-specific `FRUITFLY_*` variables.
+Implement Core's Provider protocol, register the adapter, and test messages, streaming, errors, limits, cancellation, and cleanup offline. Providers do not read Session, Lab, or Eval state. API keys come from the prepared environment; subscription credentials use the
+explicit account service. No Provider-specific `FRUITFLY_*` variables.
 
 The offline type gate checks this complete package and requires annotated codec definitions. Anthropic request fields use a typed SDK wire shape inside the adapter; codecs remain SDK-independent and own message serialization. SDK type descriptions do not validate remote service compatibility.
 
@@ -73,9 +78,8 @@ The packaged service table and registered adapters supply choices; the registry
 resolves SDK automatically. Setup and adapters share the table's addresses and
 client controls. Model ID, limits and optional capabilities are entered explicitly.
 The protocol page warns that some models may not support the selected protocol.
-The parameters editor offers medium reasoning effort in protocol-native fields
-and accepts a complete JSON object or `{}` for server defaults. Custom protocols
-use empty defaults. Capability declarations do not change these choices. Built-ins do not validate or
+The parameters editor starts with `{}` for service defaults and accepts a
+complete JSON object for explicit overrides. Capability declarations do not change these choices. Built-ins do not validate or
 rewrite model-specific options, including options a remote service may ignore.
 See [additional examples](../../examples/configuration/additional-models.example.yaml).
 
@@ -142,3 +146,5 @@ classified as context overflow. Available usage and bounded structural diagnosti
 remain in failure details. Output serialization never synthesizes user input.
 An exact historical empty-response `Continue.` fallback is excluded from replay
 after hash validation; canonical Session records remain unchanged.
+
+The [model relay](gateway/README.md) validates stream requests against a host-issued grant.

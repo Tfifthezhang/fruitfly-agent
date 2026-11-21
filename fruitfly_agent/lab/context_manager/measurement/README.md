@@ -69,3 +69,13 @@ Core uses the same occupancy, including margin, for
 [shared reduction thresholds](../budget/README.md). Direct Core callers
 must provide a meter; ordinary Lab assembly and independent role runners supply
 one. Missing/unknown measurement cannot authorize a main request.
+
+## Measure account connections
+
+Connection capabilities, rather than the service hostname, determine whether
+exact counting is supported. Account routes currently use marked heuristic
+measurement; strict counting rejects them. A provider that cannot enforce a
+requested output limit reserves its confirmed model maximum, including for
+auxiliary roles. Token refresh does not reset account identity or reduce this
+reservation. Model-directory refresh changes no active budgets. See
+[subscription request policies](../../../providers/connections/README.md#preserve-harness-behavior).

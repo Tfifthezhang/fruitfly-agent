@@ -1,9 +1,20 @@
 """Extract deterministic task descriptions, outcome classes and action signatures."""
 import re
+from typing import TypedDict
+
+
+class _Features(TypedDict):
+    terms: list[str]
+    outcomes: set[str]
+    actions: set[str]
+    complete_indexes: int
+    attempts: int
+    action_count: int
+    unavailable_indexes: int
 
 
 def frozen_features(pool, read):
-    features = {task.task_id: {'terms': sorted(set(re.findall(r'\w+', task.instruction.casefold()))),
+    features: dict[str, _Features] = {task.task_id: {'terms': sorted(set(re.findall(r'\w+', task.instruction.casefold()))),
                                'outcomes': set(), 'actions': set(), 'complete_indexes': 0,
                                'attempts': 0, 'action_count': 0, 'unavailable_indexes': 0}
                 for task in pool.tasks}

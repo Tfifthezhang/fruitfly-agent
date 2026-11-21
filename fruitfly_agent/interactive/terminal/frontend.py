@@ -1,6 +1,7 @@
 """Input loop for the built-in line-oriented terminal adapter."""
 
 from __future__ import annotations
+from fruitfly_agent.interactive.terminal.io.controls import InputEnded
 
 import asyncio
 import sys
@@ -211,7 +212,17 @@ class TerminalFrontend:
                     self.renderer.finish_line()
                 continue
             self._composer.release_command(submitted)
-            result = await self.commands.execute(command)
+            try:
+                result = await self.commands.execute(command)
+            except (InputInterrupted, KeyboardInterrupt):
+                self.renderer.write_system("Interaction cancelled.\n")
+                continue
+            except InputEnded:
+                self.renderer.write_system("Input ended; staged changes were not saved.\n")
+                wait = self.bindings.wait
+                if wait is not None:
+                    await wait()
+                return 0
             if result is None:
                 result = self.command_router.execute(command, self.session)
             self.renderer.write_command_result(result)
@@ -344,10 +355,24 @@ class TerminalFrontend:
     def menu_scope(self):
         """Lend terminal input/display to one menu and restore it on every exit."""
         self._suspend_inline_terminal(preserve_output=True)
+        previous_signal = None
+        previous_wakeup = None
+        if threading.current_thread() is threading.main_thread() and self.input.isatty():
+            previous_signal = signal.getsignal(signal.SIGINT)
+            # Do not replay a modal SIGINT through asyncio after the menu closes.
+            previous_wakeup = signal.set_wakeup_fd(-1)
+            def interrupt_menu(signum, frame):
+                raise InputInterrupted
+            signal.signal(signal.SIGINT, interrupt_menu)
         try:
             with transient_screen(self.input, self.output):
                 yield
         finally:
+            if previous_signal is not None:
+                signal.signal(signal.SIGINT, previous_signal)
+            if previous_wakeup is not None:
+                signal.set_wakeup_fd(previous_wakeup)
+            self._reader_interrupt.clear()
             self._activate_inline_terminal()
 
     async def show_history(self, *, older: bool = False) -> None:

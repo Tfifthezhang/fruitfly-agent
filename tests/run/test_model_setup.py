@@ -26,7 +26,7 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
         self.workspace = ModelSetupWorkspace(self.enterContext(tempfile.TemporaryDirectory()))
 
     async def test_first_run_wizard_saves_then_assembles_without_restarting_process(self):
-        frontend = self.workspace.frontend("1", "", "local", "offline-model", "", "8192", "1024", "", "", "", "2", "1")
+        frontend = self.workspace.frontend("1", "1", "", "local", "offline-model", "", "8192", "1024", "", "", "", "2", "1")
         result = frontend.run()
         self.assertTrue(result.start)
         self.assertTrue(result.saved)
@@ -37,7 +37,7 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Press Enter to use: my-model", self.workspace.output.getvalue())
         self.assertIn("This is not the model ID", self.workspace.output.getvalue())
         self.assertIn('Request and transport defaults (confirm to save)', self.workspace.output.getvalue())
-        self.assertIn('"effort": "medium"', self.workspace.output.getvalue())
+        self.assertNotIn('"effort": "medium"', self.workspace.output.getvalue())
         self.assertIn('"first_progress_timeout": 180.0', self.workspace.output.getvalue())
         spec = load_model_specs(self.workspace.root / ".fruitfly/models.yaml")["local"]
         self.assertEqual(spec.parameters, default_parameters(spec.provider.protocol))
@@ -63,7 +63,7 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
     def test_field_screen_replaces_service_menu_and_labels_the_input_frame(self):
         output = io.StringIO()
         screens = []
-        lines = iter(("1", "", "/cancel", "3"))
+        lines = iter(("1", "1", "", "/cancel", "3"))
         def reader(_prompt):
             output.write(_prompt)
             screens.append(output.getvalue().rsplit("\x1b[2J\x1b[H", 1)[-1])
@@ -72,7 +72,7 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
             output_stream=output, line_editor=ReadlineLineEditor(output, reader=reader))
         frontend.renderer.ansi = True
         self.assertFalse(frontend.run().start)
-        field_screen = screens[2]
+        field_screen = screens[3]
         self.assertIn("Step 1 of 9", field_screen)
         self.assertIn("Service: OpenAI", field_screen)
         self.assertIn("models.<name>> ", field_screen)
@@ -83,7 +83,7 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.workspace.setup.changed)
 
     def test_capabilities_checkboxes_persist_booleans_and_yaml_field_names(self):
-        frontend = self.workspace.frontend("1", "", "local", "offline-model", "", "8192", "1024", "",
+        frontend = self.workspace.frontend("1", "1", "", "local", "offline-model", "", "8192", "1024", "",
                                  "1", "5", "2", "3", "4", "2", "6", "", "2", "1")
         self.assertTrue(frontend.run().saved)
         spec = load_model_specs(self.workspace.root / ".fruitfly/models.yaml")["local"]
@@ -111,15 +111,15 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(values["capabilities.streaming"], "true")
         self.assertEqual(values["capabilities.reasoning"], "true")
         self.assertFalse(self.workspace.setup.changed)
-        frontend = self.workspace.frontend("1", "", "local", "offline-model", "", "8192", "1024", "", "3", "back", "3")
+        frontend = self.workspace.frontend("1", "1", "", "local", "offline-model", "", "8192", "1024", "", "3", "back", "3")
         self.assertFalse(frontend.run().start)
         self.assertFalse(self.workspace.setup.changed)
         self.assertFalse((self.workspace.root / ".fruitfly/models.yaml").exists())
 
     def test_cancel_and_exit_write_nothing(self):
-        for lines in (("back", "3"), ("1", "", "/cancel", "3"),
-                      ("1", "", "local", "offline-model", "", "8192", "1024", "", "", "", "1", "3"),
-                      ("1", "", "local", "offline-model", "", "8192", "1024", "", "", "", "2", "3")):
+        for lines in (("back", "3"), ("1", "1", "", "/cancel", "3"),
+                      ("1", "1", "", "local", "offline-model", "", "8192", "1024", "", "", "", "1", "3"),
+                      ("1", "1", "", "local", "offline-model", "", "8192", "1024", "", "", "", "2", "3")):
             with self.subTest(lines=lines):
                 self.assertFalse(self.workspace.frontend(*lines).run().start)
                 self.assertFalse(self.workspace.setup.changed)
@@ -131,7 +131,7 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
         self.workspace.controller.save()
         catalog = (self.workspace.root / ".fruitfly/models.yaml").read_bytes()
         environment = (self.workspace.root / ".fruitfly/secrets.env").read_bytes()
-        frontend = self.workspace.frontend("1", "2", "1", "", "second", "another-model", "", "8192", "1024", "", "", "", "2", "back", "3")
+        frontend = self.workspace.frontend("1", "2", "1", "1", "", "second", "another-model", "", "8192", "1024", "", "", "", "2", "back", "3")
         self.assertFalse(frontend.run_for_active_session().start)
         self.assertEqual(self.workspace.controller.snapshot().model_profile, "local")
         self.assertFalse(self.workspace.controller.snapshot().changed)
@@ -185,7 +185,7 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
         descriptor = self.workspace.setup.field('custom', 'protocol', {'protocol': 'demo-api'})
         self.assertEqual(descriptor.choices, ('responses', 'messages', 'chat-completions', 'demo-api'))
         self.assertEqual(descriptor.value, 'demo-api')
-        frontend = self.workspace.frontend('5', '4', 'local', 'offline-model', 'https://fixture.invalid/v1',
+        frontend = self.workspace.frontend('1', '5', '4', 'local', 'offline-model', 'https://fixture.invalid/v1',
                                  '8192', '1024', '', '', '', '2', '1')
         self.assertTrue(frontend.run().saved)
         spec = load_model_specs(self.workspace.root / '.fruitfly/models.yaml')['local']
@@ -195,7 +195,7 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
         construct.assert_not_called()
 
     def test_named_service_asks_for_model_and_limits_without_model_defaults(self):
-        frontend = self.workspace.frontend('4', '', 'local', 'my-qwen-model', '', '8192', '1024', '', '', '', '2', '1')
+        frontend = self.workspace.frontend('1', '4', '', 'local', 'my-qwen-model', '', '8192', '1024', '', '', '', '2', '1')
         self.assertTrue(frontend.run().saved)
         spec = load_model_specs(self.workspace.root / '.fruitfly/models.yaml')['local']
         self.assertEqual(spec.model, 'my-qwen-model')
@@ -209,7 +209,7 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('offline-placeholder', self.workspace.output.getvalue())
 
     def test_custom_service_selects_protocol_on_a_separate_screen(self):
-        frontend = self.workspace.frontend('5', '3', 'local', 'offline-model', 'https://fixture.invalid/v1',
+        frontend = self.workspace.frontend('1', '5', '3', 'local', 'offline-model', 'https://fixture.invalid/v1',
                                  '8192', '1024', '', '', '', '2', '1')
         self.assertTrue(frontend.run().saved)
         spec = load_model_specs(self.workspace.root / '.fruitfly/models.yaml')['local']
@@ -218,7 +218,7 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(spec.provider.base_url, 'https://fixture.invalid/v1')
         rendered = self.workspace.output.getvalue()
         root_screen, protocol_screen = rendered.split('Add model · Custom service… · Choose API protocol', 1)
-        self.assertRegex(root_screen, r'5\.\s+Custom service…')
+        self.assertRegex(root_screen, r'5\.\s+API · Custom service…')
         self.assertNotRegex(root_screen, r'1\.\s+Responses API')
         self.assertNotRegex(root_screen, r'2\.\s+Messages API')
         self.assertNotRegex(root_screen, r'3\.\s+Chat Completions API')
@@ -226,7 +226,7 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('offline-placeholder', rendered)
 
     def test_back_from_custom_protocol_returns_to_services_without_staging(self):
-        frontend = self.workspace.frontend('5', 'back', '1', '', '/cancel', '3')
+        frontend = self.workspace.frontend('1', '5', 'back', '1', '', '/cancel', '3')
         self.assertFalse(frontend.run().start)
         rendered = self.workspace.output.getvalue()
         self.assertEqual(rendered.count('Add model · Choose a service'), 2)
@@ -236,7 +236,7 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse((self.workspace.root / '.fruitfly/models.yaml').exists())
 
     def test_quit_custom_protocol_and_preset_field_cancel_write_nothing(self):
-        for lines in (('5', 'q', '3'), ('3', '', '/cancel', '3'), ('4', '', '/cancel', '3')):
+        for lines in (('1', '5', 'q', '3'), ('1', '3', '', '/cancel', '3'), ('1', '4', '', '/cancel', '3')):
             with self.subTest(lines=lines):
                 self.assertFalse(self.workspace.frontend(*lines).run().start)
                 self.assertFalse(self.workspace.setup.changed)
@@ -248,7 +248,8 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
             'deepseek': ('responses', 'messages', 'chat-completions'),
             'qwen': ('responses', 'messages', 'chat-completions'),
             'custom': ('responses', 'messages', 'chat-completions')}
-        self.assertEqual(len(self.workspace.setup.options()), 5)
+        self.assertEqual(len([o for o in self.workspace.setup.options() if o.kind == 'api']), 5)
+        self.assertEqual([o.option_id for o in self.workspace.setup.options() if o.kind == 'subscription'], ['opencode-go', 'chatgpt'])
         with patch('openai.AsyncOpenAI') as openai, patch('anthropic.AsyncAnthropic') as anthropic:
             for index, (name, protocols) in enumerate(expected.items(), 1):
                 field = self.workspace.setup.field(name, 'protocol', {})
@@ -258,7 +259,7 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
                         alias = name + '-' + protocol
                         values = {'protocol': protocol}
                         model = self.workspace.setup.field(name, 'model', values).value or 'fixture-model'
-                        frontend = self.workspace.frontend(str(index), str(field.choices.index(protocol) + 1),
+                        frontend = self.workspace.frontend('1', str(index), str(field.choices.index(protocol) + 1),
                             alias, model, 'https://fixture.invalid/v1' if name == 'custom' else '',
                             '100000', '4096', '', '', '', '2')
                         run_model_setup(frontend._model_form(), self.workspace.setup)
@@ -278,7 +279,7 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
         anthropic.assert_not_called()
 
     def test_back_to_protocol_recalculates_endpoint_parameters_and_keeps_edited_alias(self):
-        frontend = self.workspace.frontend('4', '3', 'local', 'my-model', '', 'back', '2', '', '', '', '8192', '1024', '', '', '', '2', '1')
+        frontend = self.workspace.frontend('1', '4', '3', 'local', 'my-model', '', 'back', '2', '', '', '', '8192', '1024', '', '', '', '2', '1')
         self.assertTrue(frontend.run().saved)
         spec = load_model_specs(self.workspace.root / '.fruitfly/models.yaml')['local']
         self.assertEqual(spec.provider.protocol, 'messages')
@@ -293,7 +294,7 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
         construct = Mock()
         registry.register('first', 'fixture-api', construct)
         registry.register('second', 'fixture-api', construct)
-        frontend = self.workspace.frontend('5', '4', 'q')
+        frontend = self.workspace.frontend('1', '5', '4', 'q', 'q')
         self.assertFalse(frontend.run().start)
         self.assertIn('explicit default adapter', self.workspace.output.getvalue())
         self.assertFalse(self.workspace.setup.changed)
@@ -301,7 +302,7 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
 
     def test_parameters_editor_retries_invalid_input_and_saves_the_reviewed_mapping(self):
         parameters = '{"reasoning":{"effort":"high"},"temperature":0.3,"extra_body":{"future_feature":true}}'
-        frontend = self.workspace.frontend('1', '', 'local', 'offline-model', '', '8192', '1024', '', '',
+        frontend = self.workspace.frontend('1', '1', '', 'local', 'offline-model', '', '8192', '1024', '', '',
             '{broken', '[]', '{"model":"override"}', parameters, '2', '1')
         self.assertTrue(frontend.run().saved)
         import json
@@ -314,12 +315,12 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('offline-placeholder', rendered)
 
     def test_parameters_can_explicitly_use_server_defaults(self):
-        frontend = self.workspace.frontend('1', '', 'local', 'offline-model', '', '8192', '1024', '', '', '{}', '2', '1')
+        frontend = self.workspace.frontend('1', '1', '', 'local', 'offline-model', '', '8192', '1024', '', '', '{}', '2', '1')
         self.assertTrue(frontend.run().saved)
         self.assertEqual(load_model_specs(self.workspace.root / '.fruitfly/models.yaml')['local'].parameters, {})
 
     def test_parameters_cancellation_writes_nothing_and_does_not_read_the_key(self):
-        frontend = self.workspace.frontend('1', '', 'local', 'offline-model', '', '8192', '1024', '', '', '/cancel', '3')
+        frontend = self.workspace.frontend('1', '1', '', 'local', 'offline-model', '', '8192', '1024', '', '', '/cancel', '3')
         self.assertFalse(frontend.run().start)
         self.assertFalse(self.workspace.setup.changed)
         self.assertEqual(frontend.input.tell(), 0)

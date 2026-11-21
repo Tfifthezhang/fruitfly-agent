@@ -8,6 +8,7 @@ import textwrap
 
 from fruitfly_agent.interactive.terminal.io.input import LineEditor
 
+from fruitfly_agent.interactive.terminal.io.controls import cancellable_form
 from .forms import FormIO, CANCELLED, select_field
 from fruitfly_agent.interactive.terminal.io.secret import read_secret
 from fruitfly_agent.interactive.contracts.model_setup import ModelSetupOption, ModelSetupService
@@ -16,39 +17,52 @@ from fruitfly_agent.interactive.terminal.io.input import read_field_line
 from fruitfly_agent.interactive.terminal.io.menu import MenuAction, MenuRow, MenuHelp, navigate_menu
 
 
+@cancellable_form
 def run_model_setup(form: FormIO, service: ModelSetupService) -> None:
     drafts = {}
     while True:
-        option = _choose_service(form, service.options())
-        if option is None:
+        _, kind = form.choose_value(title='Add model · Choose access',
+            subtitle='Choose how this model is billed and connected.',
+            values=('api', 'subscription'), current='subscription',
+            labels={'api': 'API', 'subscription': 'Subscription'})
+        if kind is CANCELLED:
             return
-        previous = {}
         while True:
-            field = service.field(option.option_id, 'protocol', previous)
-            quit_requested, protocol = form.choose_value(
-                title=f'Add model · {option.label} · Choose API protocol',
-                subtitle=field.description + '\nBack returns to service selection.',
-                values=field.choices, current=field.value)
-            if quit_requested:
-                return
-            if protocol is CANCELLED:
+            option = _choose_service(form, tuple(o for o in service.options()
+                if o.kind == ('subscription' if kind == 'subscription' else 'api')))
+            if option is None:
                 break
-            key = (option.option_id, protocol)
-            values = drafts.setdefault(key, {'protocol': str(protocol)})
-            if previous and previous.get('protocol') != protocol:
-                for name in ('profile', 'model', 'context_window', 'max_output_tokens', 'api_key_env'):
-                    old = service.field(option.option_id, name, previous)
-                    if name not in values and name in previous and previous[name] != str(old.value or ''):
-                        values[name] = previous[name]
-            try:
-                values['sdk'] = str(service.field(option.option_id, 'sdk', values).value)
-            except ValueError as exc:
-                form.apply(lambda: ConfigurationActionResult(f'Configuration error: {exc}'))
-                return
-            status = _fill_model(form, service, option, values)
-            if status != 'back':
-                return
-            previous = values
+            if option.kind == 'subscription':
+                from .model_connections import run_subscription_setup
+                if run_subscription_setup(form, service.connections, option.option_id):
+                    return
+                continue
+            previous = {}
+            while True:
+                field = service.field(option.option_id, 'protocol', previous)
+                quit_requested, protocol = form.choose_value(title=f'Add model · {option.label} · Choose API protocol',
+                    subtitle=field.description + '\nBack returns to service selection.',
+                    values=field.choices, current=field.value)
+                if quit_requested:
+                    return
+                if protocol is CANCELLED:
+                    break
+                key = (option.option_id, protocol)
+                values = drafts.setdefault(key, {'protocol': str(protocol)})
+                if previous and previous.get('protocol') != protocol:
+                    for name in ('profile', 'model', 'context_window', 'max_output_tokens', 'api_key_env'):
+                        old = service.field(option.option_id, name, previous)
+                        if name not in values and name in previous and previous[name] != str(old.value or ''):
+                            values[name] = previous[name]
+                try:
+                    values['sdk'] = str(service.field(option.option_id, 'sdk', values).value)
+                except ValueError as exc:
+                    form.apply(lambda: ConfigurationActionResult(f'Configuration error: {exc}'))
+                    break
+                status = _fill_model(form, service, option, values)
+                if status in ('done', 'cancel'):
+                    return
+                previous = values
 
 
 def _fill_model(form: FormIO, service: ModelSetupService, option: ModelSetupOption, values: dict) -> str:
@@ -128,9 +142,9 @@ def _edit_json(form, service, option, values, field, step, total):
 
 def _choose_service(form: FormIO, options: tuple[ModelSetupOption, ...]) -> ModelSetupOption | None:
     quit_requested, chosen = form.choose_value(title='Add model · Choose a service',
-        subtitle='Select the service your API key belongs to, then choose its API protocol.',
+        subtitle='API access uses your own API billing. Subscription connections use an existing plan.',
         values=tuple(item.option_id for item in options), current=None,
-        labels={item.option_id: item.label for item in options},
+        labels={item.option_id: ('Subscription · ' if item.kind == 'subscription' else 'API · ') + item.label for item in options},
         details={item.option_id: item.description for item in options})
     if quit_requested or chosen is CANCELLED:
         return None
@@ -159,7 +173,12 @@ def _review(form: FormIO, text: str):
         page = (page + (1 if action == "Next page" else -1)) % len(pages)
 
 
+@cancellable_form
 def configure_credential(form: FormIO, service: ModelSetupService, model_profile: str) -> None:
+    if service.authentication_kind(model_profile) == 'account':
+        from .model_connections import manage_connections
+        manage_connections(form, service.connections)
+        return
     _render_field(form, model_profile, 1, 1, "API key",
                   "Enter the key for this model. Input is hidden and excluded from history.", "",
                   title="Set API key", context="Model")

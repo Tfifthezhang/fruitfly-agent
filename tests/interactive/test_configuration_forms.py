@@ -33,3 +33,12 @@ class ConfigurationChoiceTests(unittest.TestCase):
                     title='Typed choices', subtitle='', values=(False, None, ''), current=None)
                 self.assertFalse(quit_requested)
                 self.assertIs(value, expected)
+
+    def test_eof_is_not_a_quit_choice_or_default_selection(self):
+        from fruitfly_agent.interactive.terminal.io.controls import InputEnded
+        from fruitfly_agent.interactive.terminal.io.input import read_field_line
+        with self.assertRaises(InputEnded):
+            choose_value(LineMenuInput(ScriptedLines(None)), TerminalMenuRenderer(io.StringIO()),
+                title='Review', subtitle='', values=('Discard', 'Apply'), current='Apply')
+        with self.assertRaises(InputEnded):
+            read_field_line(ScriptedLines(None), 'Model label')
