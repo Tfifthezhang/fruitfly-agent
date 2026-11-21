@@ -36,8 +36,8 @@ These checks make no model requests. See [Task packs](../../../fruitfly_agent/la
 |---|---|
 | 1 | Register an execution backend through `StageBindings.runner` in an embedding; the CLI supplies no local executor. |
 | 2 | Prepare the Agent/model files and credentials, and select this pack in the workflow request. |
-| 3 | For persistent verification, set `scope="persistent"` and suitable independent phase times on the request. |
-| 4 | Preview, then invoke the Application workflow explicitly; model calls may incur charges. |
+| 3 | Bind proposal, execution and comparison as separate operations through the [stage guide](../../../fruitfly_agent/lab/improvement/DEVELOPER_GUIDE.md). Set independent phase times. |
+| 4 | Execute only the explicitly requested stage through the research host; the Interactive Application exposes no preview/confirm/submit search operation. Model calls may incur charges. |
 | 5 | Inspect candidate evidence; use the explicit RSI host for independently verified adoption. |
 
 The active target supplies the baseline; selecting the pack does not load `baseline.txt`. The embedding owns progress and cancellation. Latest candidates do not guarantee better results. The run retains its separate configuration and evidence for review.

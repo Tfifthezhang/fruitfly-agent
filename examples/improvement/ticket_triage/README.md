@@ -42,9 +42,9 @@ cp -R examples/improvement/ticket_triage .fruitfly/improvement/task-packs/ticket
 | Step | Action |
 |---|---|
 | 1 | Prepare the independent default Agent/model files and credentials. |
-| 2 | Select `source: files` and the pack in the task document referenced by experiment `tasks`. |
-| 3 | For persistent verification, set `scope: persistent` in the referenced comparison document and choose suitable independent phase times. |
-| 4 | Run `fruitfly-agent-lab improvement check`, then explicitly `improvement step`; model calls may incur charges. |
+| 2 | Register a compatible execution backend through `StageBindings.runner`; the CLI does not supply a local task-package executor. |
+| 3 | Supply the pack through that backend and bind explicit proposal, execution and comparison stages with independent phase times. |
+| 4 | Follow the [stage guide](../../../fruitfly_agent/lab/improvement/DEVELOPER_GUIDE.md); check the configured stage before invoking it. Model calls may incur charges. |
 | 5 | Inspect the linked candidate and evidence. Candidate execution does not authorize production adoption. |
 
 Search and live answers may incur model charges. Classification instructions can change general Agent behavior; inspect their scope before adoption.

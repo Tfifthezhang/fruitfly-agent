@@ -30,3 +30,16 @@ class ConfigurationConfirmationTests(unittest.TestCase):
                 result = choose_value(LineMenuInput(SimpleNamespace(read_line=lambda: line)), renderer,
                     title='Confirm', subtitle='', values=(True, False), current=False)
                 self.assertFalse(result[0]); self.assertIs(result[1], expected)
+
+    def test_quit_confirmation_retains_draft_and_never_applies(self):
+        from unittest.mock import Mock, patch
+        from fruitfly_agent.interactive.terminal.features.configuration.menu import TerminalConfigurationFrontend
+        from tests.support.terminal import ScriptedLines
+        configuration = SimpleNamespace(read_only=False,
+            snapshot=lambda: SimpleNamespace(changed=True), reset=Mock())
+        frontend = TerminalConfigurationFrontend(configuration, input_stream=io.StringIO(),
+            output_stream=io.StringIO(), line_editor=ScriptedLines('q'))
+        with patch.object(frontend, '_configure_loop', return_value=False):
+            result = frontend.run_for_active_session()
+        self.assertFalse(result.start)
+        configuration.reset.assert_not_called()

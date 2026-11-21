@@ -10,7 +10,7 @@ from fruitfly_agent.core.data_model import AgentMessage, AssistantMessage, Provi
 from fruitfly_agent.core.errors import FatalError, TaggedError
 from fruitfly_agent.core.model_stream import StreamEvent, StreamDone, TextDelta, ThinkingDelta, ToolCallStart, ToolCallDelta
 from .openai import OpenAIProvider, classify_error
-from .chat_codec import convert_to_chat, chat_input_messages
+from .chat_codec import convert_to_chat, chat_input_messages, ChatReasoning
 from .media import project_images
 from .replay import wire_value
 from .transport import AttemptDeadline, close_transport, retry_details
@@ -37,8 +37,10 @@ class ChatCompletionsProvider(OpenAIProvider):
             request['stream_options'] = {'include_usage': True}
         if tools:
             request['tools'] = tools
-            if self._service.parallel_control:
+            if self._service.parallel_control and self.parallel_tool_calls is not None:
                 request['parallel_tool_calls'] = self.parallel_tool_calls
+        if self.request_policy is not None:
+            request = self.request_policy.prepare(request, self.connection_session)
         return request, effective, tools, prefix
 
     async def _stream_once(self, view: ProviderView, signal: asyncio.Event | None,
@@ -46,6 +48,7 @@ class ChatCompletionsProvider(OpenAIProvider):
         request, effective, tools, prefix = self._prepare_payload(view)
         text: list[str] = []
         thinking: list[str] = []
+        reasoning = ChatReasoning()
         refusal: list[str] = []
         calls: dict[int, dict[str, Any]] = {}
         finish: str | None = None
@@ -69,11 +72,13 @@ class ChatCompletionsProvider(OpenAIProvider):
                     finish = getattr(choice, 'finish_reason', None) or finish
                     delta = choice.delta
                     unknown = {key for key, value in wire_value(delta).items() if value
-                        and key not in {'role', 'content', 'reasoning_content', 'refusal', 'tool_calls'}}
+                        and key not in {'role', 'content', 'reasoning_content', 'reasoning', 'reasoning_details', 'refusal', 'tool_calls'}}
                     if unknown:
-                        raise FatalError('Unsupported Chat Completions delta fields: ' + ', '.join(sorted(unknown)))
+                        raise FatalError('Unsupported Chat Completions delta fields: ' + ', '.join(sorted(unknown)),
+                            details={'diagnostics': {'failure_category': 'response_schema',
+                                'evidence_kind': 'runtime_rule', 'fields': sorted(unknown)}})
                     for name, target, event_type in (('content', text, TextDelta),
-                            ('reasoning_content', thinking, ThinkingDelta), ('refusal', refusal, TextDelta)):
+                            ('refusal', refusal, TextDelta)):
                         part = getattr(delta, name, None)
                         if part:
                             if not isinstance(part, str):
@@ -81,6 +86,11 @@ class ChatCompletionsProvider(OpenAIProvider):
                             target.append(part)
                             deadline.progress()
                             yield event_type(part)
+                    thought = reasoning.consume(wire_value(delta))
+                    if thought:
+                        thinking.append(thought)
+                        deadline.progress()
+                        yield ThinkingDelta(thought)
                     for part in getattr(delta, 'tool_calls', []) or []:
                         index = int(part.index)
                         if index not in calls:
@@ -130,6 +140,9 @@ class ChatCompletionsProvider(OpenAIProvider):
             except (ValueError, TypeError):
                 arguments = {}
             blocks.append(ToolCallBlock(call['id'], call['function']['name'], arguments if isinstance(arguments, dict) else {}))
+        if self.request_policy is not None and hasattr(self.request_policy, 'receipt'):
+            self.service_usage.clear()
+            self.service_usage.update(self.request_policy.receipt(usage))
         details = getattr(usage, 'completion_tokens_details', None)
         receipt = None if usage is None else Usage(
             input_tokens=int(getattr(usage, 'prompt_tokens', 0) or 0),
@@ -139,8 +152,7 @@ class ChatCompletionsProvider(OpenAIProvider):
         message = AssistantMessage(content=blocks, usage=receipt,
             stop_reason='length' if finish == 'length' else 'toolUse' if calls else 'stop')
         item: dict[str, Any] = {'role': 'assistant', 'content': ''.join(text) or None}
-        if thinking:
-            item['reasoning_content'] = ''.join(thinking)
+        item.update(reasoning.replay())
         if refusal:
             item['refusal'] = ''.join(refusal)
         if calls:

@@ -59,7 +59,7 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
     def test_concurrent_duplicate_and_secret_symlink_are_rejected(self):
         self.workspace.stage()
         _write_catalog(self.workspace.root / ".fruitfly/models.yaml", {"local": "other-model"})
-        with self.assertRaisesRegex(ValueError, "already exists"):
+        with self.assertRaisesRegex(ValueError, "catalog changed"):
             self.workspace.controller.save()
         self.assertEqual(load_model_specs(self.workspace.root / ".fruitfly/models.yaml")["local"].model, "other-model")
         (self.workspace.root / ".fruitfly/models.yaml").unlink()

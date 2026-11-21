@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 import sys
 import time
+import select
 from typing import TextIO
 
 from fruitfly_agent.interactive.contracts.models import ResumableSession
@@ -81,9 +82,16 @@ class TerminalResumeFrontend:
                 rendered = state
             poll = getattr(self.menu_input, 'poll_event', None)
             if loading and poll is None:
-                time.sleep(.05)
-                continue
-            event = poll(.1) if loading else self.menu_input.read_event()
+                try:
+                    ready = select.select([self.input], [], [], .05)[0]
+                except (OSError, ValueError, TypeError):
+                    time.sleep(.05)
+                    continue
+                if not ready:
+                    continue
+                event = self.menu_input.read_event()
+            else:
+                event = poll(.1) if loading else self.menu_input.read_event()
             if event.index is not None and 0 <= event.index < len(rows):
                 selected = event.index
             elif event.action == MenuAction.UP:

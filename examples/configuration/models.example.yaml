@@ -66,3 +66,7 @@ models:
       retry_jitter: 0.2
       retry_max: 3
       retry_base_delay: 1.0
+
+# Account-backed subscription syntax and placeholder IDs:
+# fruitfly_agent/providers/connections/README.md
+# Use the interactive picker to save selected model limits and a local account reference.

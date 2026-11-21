@@ -31,3 +31,12 @@ evidence:
   baseline_seconds: 30
   capture_seconds: 60
   include_tool_outputs: true
+
+# Optional network model relay for Docker Desktop or a remote Docker host.
+# Replace certificate paths and hostname; containers must reach ephemeral ports.
+# model_relay:
+#   network_url: https://eval-host.example
+#   listen_host: 0.0.0.0
+#   certificate: relay-server.pem
+#   private_key: relay-server-key.pem
+#   ca: relay-ca.pem

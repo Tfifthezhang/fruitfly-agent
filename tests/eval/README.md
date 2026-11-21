@@ -50,3 +50,6 @@ Task-batch checks include zero-result reports and review-required resume drafts.
 
 `test_execution_facts.py` covers native Usage conversion and partial accounting.
 `test_harbor_results.py` covers public timeout projection without exposing raw command output.
+
+`test_model_access.py` owns private access descriptors, model binding, task grant
+retirement and absence of upstream credentials in container material.

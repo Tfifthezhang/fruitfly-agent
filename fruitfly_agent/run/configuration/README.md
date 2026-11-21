@@ -93,7 +93,7 @@ The injected Provider registry intersects registered protocols with service rule
 through `field()`. Setup selects service, then protocol, then model fields; SDK is
 resolved automatically and shown read-only. `field()` refreshes addresses and
 credential variable defaults. Only harness-required capabilities are fixed.
-The parameters JSON field offers protocol-native medium effort and validates edits
+The parameters JSON field defaults to service behavior and validates explicit edits
 before credentials; `{}` explicitly selects server defaults. Stage validates
 the pair before any write. Registering another protocol updates custom choices
 without a terminal change or a model request. Multiple SDKs require an explicit
@@ -188,3 +188,20 @@ a new process. Ordinary saving does not rewrite the active runtime. Skill
 catalogs and their readable text resources share one runtime snapshot.
 Initialization creates `default-config.yaml` and models, without a components tree.
 Custom file references remain supported when independent maintenance is useful.
+
+## Select account-backed models
+
+[connections.py](connections.py) projects Provider-owned connection definitions,
+stages selected model/connection references and retains guarded source bytes.
+`RunModelSetup.connections` exposes the shared account and model-picker service.
+Account authorization is stored independently; discarding model drafts does not
+revoke it. Subscription selections are saved beside the API catalog in
+`subscriptions.yaml` and referenced by `models.subscriptions`. Role selection
+uses the combined aliases. Saves preserve API entries and unrelated catalog content and check both sources for changes.
+Reviewed updates replace only selected model value nodes. Runtime preparation
+consumes fully resolved non-secret model values through the same assembly path.
+See [Connections](../../providers/connections/README.md) for syntax and effects.
+
+Connection staging receives a `ModelConnectionDraft` with explicit queries,
+validation and staging capabilities. It does not retain the model setup service.
+The setup owner publishes credential-store selection to its Provider registry.

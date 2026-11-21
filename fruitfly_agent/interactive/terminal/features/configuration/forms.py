@@ -1,5 +1,6 @@
 """Shared configuration form operations; independent of model and mechanism flows."""
 from dataclasses import dataclass
+from fruitfly_agent.interactive.terminal.io.controls import InputInterrupted
 from typing import Any, Callable, Mapping, TextIO
 from fruitfly_agent.interactive.terminal.io.input import LineEditor
 from fruitfly_agent.interactive.terminal.io.menu import MenuInput, TerminalMenuRenderer, MenuRow, MenuHelp, MenuAction, navigate_menu
@@ -40,7 +41,10 @@ def choose_value(menu_input: MenuInput, renderer: TerminalMenuRenderer, *, title
             instructions=('↑↓ move · Enter select · Esc / q cancel' if not renderer.numbered
                 else 'Enter a number to select; blank keeps the highlighted choice. back / q cancels.'))
         notice = ''
-        event = menu_input.read_event()
+        try:
+            event = menu_input.read_event()
+        except (InputInterrupted, KeyboardInterrupt):
+            return False, CANCELLED
         selected, handled = navigate_menu(event, selected, len(rows))
         if handled:
             continue

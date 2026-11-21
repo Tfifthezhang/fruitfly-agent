@@ -88,10 +88,20 @@ import fruitfly_agent.providers as providers
 from fruitfly_agent.providers.services import builtin_services
 from fruitfly_agent.experiments.scaffolding import workspace_templates
 assert Path(providers.__file__).is_relative_to(root)
+import fruitfly_agent.providers.gateway.access as access_module
+import fruitfly_eval.harbor.model_access as model_access_module
+assert Path(access_module.__file__).is_relative_to(root)
+assert Path(model_access_module.__file__).is_relative_to(root)
+from fruitfly_agent.providers.chat_codec import ChatReasoning
+reasoning = ChatReasoning()
+assert reasoning.consume({'reasoning': 'Plan'}) == 'Plan'
+assert reasoning.replay() == {'reasoning': 'Plan'}
 assert {item.id for item in builtin_services()} >= {'openai', 'anthropic', 'deepseek', 'qwen'}
 templates = workspace_templates()
 assert 'default-config.yaml' in templates
-assert set(templates) == {'default-config.yaml', 'models.yaml'}
+assert set(templates) == {'default-config.yaml', 'models.yaml', 'subscriptions.yaml'}
+import yaml
+assert yaml.safe_load(templates['subscriptions.yaml']) == {'models': {}, 'connections': {}}
 assert (root / 'fruitfly_agent/lab/context_manager/reduction/methods/layered_compaction/defaults.yaml').is_file()
 assert 'layered-compaction:' in templates['default-config.yaml']
 from fruitfly_agent.lab.context_manager.reduction import LayeredCompactionConfig

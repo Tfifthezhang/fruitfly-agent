@@ -36,3 +36,5 @@ Restoration renders the newest 40 canonical messages. `/history older` appends
 preceding pages in chronological order; `/history` refreshes the current snapshot
 and newest page. Paging changes presentation only, preserves the active model
 context, and never replays tools or requests. A resumed session resets the page.
+
+Ctrl+C cancels session selection and returns to chat. EOF ends terminal input without selecting a session. A selection cancellation does not request restoration; cancellation after restoration starts follows the host lifecycle.

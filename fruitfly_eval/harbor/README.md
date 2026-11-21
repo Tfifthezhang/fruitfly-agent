@@ -355,3 +355,47 @@ from an empty directory or reconstruct an output from a command claiming to crea
 The container implementation and real image compatibility require a Linux/Docker
 smoke trial. Offline coverage is in `tests.eval.test_evidence_capture` and frozen
 resource tests. Historical/offline organization is described in [Eval](../README.md#organize-retained-evidence).
+
+
+## Connect subscription models
+
+Harbor resolves subscription credentials in its host process and creates an
+inference listener for each Agent execution. The container receives an owner-only
+temporary descriptor at `/installed-agent/fruitfly/runtime/model-access.json`.
+The normal FruitFlyAgent CLI consumes it through `FRUITFLY_MODEL_ACCESS_FILE`.
+Main and auxiliary connected models share the ordinary registry assembly path.
+API models retain their existing environment-key path.
+
+Native Linux uses an Agent-only bind of private Unix sockets at
+`/opt/fruitfly-model-relay`. Host and container ownership must permit the Agent
+user to access those private paths. Docker Desktop and remote Docker hosts need
+explicit verified TLS reachability:
+
+```yaml
+# Placeholder host names and private local file paths; replace before preparation.
+model_relay:
+  network_url: https://eval-host.example
+  listen_host: 0.0.0.0
+  certificate: relay-server.pem
+  private_key: relay-server-key.pem
+  ca: relay-ca.pem
+```
+
+Each trial binds an ephemeral port on the listener address; containers must be
+able to reach those ports. The advertised hostname must match the certificate.
+Only the CA is uploaded. TLS private keys and subscription credentials stay on
+the host. Machine settings enter preparation identity; prepare again after edits.
+Task network restrictions remain effective and can prevent relay access.
+
+Grants bind model, endpoint and inference route, expire after 24 hours and are
+revoked when Agent execution exits. Long tasks exceeding that period need a new
+execution. Listener retirement closes active streams. Temporary access material
+is removed before verification; a cleanup failure remains a task failure.
+Separate verifiers receive no relay mount. A shared Agent/verifier environment
+provides no process-level secret isolation while the Agent is active.
+Host failure or SIGKILL cannot guarantee filesystem cleanup; the dead listener
+cannot serve additional inference. No upstream credential enters that material.
+
+Offline checks cover descriptor identity and grant retirement. Actual container
+user mapping, network reachability, OAuth renewal, model availability and official
+verifier completion require explicitly authorized integration runs.

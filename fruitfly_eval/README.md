@@ -54,6 +54,7 @@ or model credentials. Harbor owns artifact transfer and scoring.
 
 ## Run an evaluation
 
+
 Unless `runtime.config_path` is supplied, Eval selects the workspace's
 `.fruitfly/default-config.yaml` and its default profile. The runtime object and
 profile may be omitted; `working_directory` defaults to the process workspace.
@@ -62,8 +63,9 @@ remain supported. Missing/invalid defaults fail without daily fallback. Prepare
 the independent [default files](../CONFIGURATION.md#restore-default-configuration)
 before execution.
 
-Create a request using the [evaluation guide](DEVELOPER_GUIDE.md), and configure
-the [machine runtime and dependencies](harbor/README.md), then run:
+Create a request using the [evaluation guide](DEVELOPER_GUIDE.md), configure
+the [machine runtime and dependencies](harbor/README.md), and, for subscription
+models, complete [server authorization](SERVER_GUIDE.md#prepare-subscription-authorization-on-a-shared-server) and baseline catalog selection. Then run:
 
 ```bash
 # Preparation can download/build/start containers; no model requests.
@@ -109,8 +111,9 @@ inside an attempt is discarded with its environment; Eval does not carry learnin
 between tasks or optimize the Agent.
 
 Secrets come from the workspace `.fruitfly/secrets.env`
-and process environment; process values win. Model keys and enabled mechanisms'
-Catalog-declared credentials reach the Agent through environment variables.
+and process environment; process values win. API model keys and enabled mechanisms' Catalog-declared credentials reach the
+Agent through environment variables. Subscription credentials stay on the host;
+task containers receive temporary model relay grants instead.
 Values are absent from request JSON and runner arguments. See
 [Configuration](../CONFIGURATION.md#files-and-precedence).
 
@@ -244,3 +247,7 @@ automatic grant to an editor; the Improvement adapter registers permitted resour
 
 See [public execution accounting](improvement/README.md#read-public-execution-accounting) for native receipt adaptation,
 reported subtotals and public Harbor termination evidence.
+
+
+Subscription models use per-trial host relay grants. Account credentials and
+refresh tokens stay on the host. See [subscription execution](harbor/README.md#connect-subscription-models).

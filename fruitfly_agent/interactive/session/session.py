@@ -105,7 +105,13 @@ class InteractiveSession:
 
     @property
     def status(self) -> InteractiveStatus:
+        connection = getattr(self._config.provider, 'connection_status', {})
         return InteractiveStatus(
+            model_connection=connection.get('integration', ''),
+            model_account=connection.get('account_label', ''),
+            output_reserve=connection.get('output_reserve'),
+            output_limit_enforced=connection.get('output_enforced'),
+            service_usage=dict(getattr(self._config.provider, 'service_usage', {})) or None,
             model=self._config.model,
             working_directory=self._working_directory,
             session_path=self._session_path,

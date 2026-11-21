@@ -42,7 +42,7 @@ class TerminalInputPtyRegressionTest(unittest.TestCase):
 
     def test_suspended_form_restores_display_history_and_echo_on_every_exit(self):
         for keys, result in ((b'value\r', "'value'"), (b'q 1\r', "'q 1'"),
-                             (b'\x04', 'None'), (b'\x03', "'cancelled'"), (b'\x1b', "'cancelled'")):
+                             (b'\x04', "'ended'"), (b'\x03', "'cancelled'"), (b'\x1b', "'cancelled'")):
             with self.subTest(keys=keys):
                 code = (
                     "import sys, termios\n"
@@ -52,6 +52,8 @@ class TerminalInputPtyRegressionTest(unittest.TestCase):
                     "editor._history=['chat entry']\n"
                     "try:\n"
                     "    value=read_field_line(editor,'Variable')\n"
+                    "except EOFError:\n"
+                    "    value='ended'\n"
                     "except InputInterrupted:\n"
                     "    value='cancelled'\n"
                     "print('RESTORED='+str(editor.display is display and not display.active and editor._history==['chat entry']),flush=True)\n"

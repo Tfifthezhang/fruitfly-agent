@@ -1,106 +1,70 @@
-# Joint Task-Set Search
+# Execute frozen task collections
 
 [Up: Improvement](../README.md)
 
-Search one shared candidate across frozen task collections. Sources, execution,
-sampling, objective aggregation and editing remain separate. No benchmark,
-container or host implementation is imported here. A one-task collection uses the
-same queue and search engine; concurrency one also supports a serial multi-task run.
+Freeze task collections and execute an explicitly selected harness through a
+bounded leaf scheduler. Source discovery, material identity, execution and
+assessment remain separate. This module installs no automatic search, periodic
+promotion, Organizer invocation or production adoption loop.
 
-## Run a task set
+## Prepare and execute a collection
 
-Use `task.source: task-set` in the [experiment configuration](../../../experiments/README.md).
-The [annotated template](../../../../examples/experiments/multi-task.example.yaml)
-combines prepared Eval collections. Other sources require explicit registration. Paths and IDs are
-placeholders. `improvement check` reads material and validates declarations without
-constructing Providers. `improvement step` starts models and may incur charges.
-For Eval collections, explicitly run `eval prepare` first; it can download/build
-and start preparation containers. Custom sources need no Eval installation.
+The [experiment examples](../../../../examples/experiments/README.md) show prepared
+Eval collections. Other sources need explicit registration. Preparation may
+use downloads and containers; execution can consume model allowance and incur
+charges. The ordinary task backend remains responsible for environment isolation.
+
+Use the [independent stage guide](../DEVELOPER_GUIDE.md) to select baseline or
+candidate configuration, execute it, then explicitly select retained batches for
+organization, proposal or comparison. Each invocation runs one stage. An Organizer
+is optional, and no missing stage is run automatically.
 
 | Entry | Responsibility |
 |---|---|
-| [registry.py](registry.py) | Versioned `TaskSetSourceDefinition` factories |
-| [sampling.py](sampling.py) | All, fixed and deterministic collection-stratified cycles |
-| [configuration.py](configuration.py) | Independent typed sampling, parallel, joint and promotion settings |
-| [execution.py](execution.py) | Public execution definition and frozen preview |
-| [Contracts](../../../improvement/contracts/README.md) | Task entries, snapshots, batch receipts and editing requests |
-| [Execution](../execution/README.md#schedule-task-batches) | One bounded queue and independent leaf phases |
-| [Assessment](../assessment/README.md) | Declared utilities, promotion and supported process comparison |
-| [Independent stages](../DEVELOPER_GUIDE.md) | One shared round engine |
+| [registry.py](registry.py) | `TaskSetSourceDefinition` and source factories |
+| [configuration.py](configuration.py) | Typed sampling, execution, aggregation and promotion setting records |
+| [sampling.py](sampling.py) | Explicit all/fixed/stratified-cycle sampling helper |
+| [execution.py](execution.py) | Frozen preview and registered batch execution |
+| [Execution runtime](../../../improvement/execution/README.md) | Bounded scheduling and leaf facts |
+| [Assessment](../assessment/README.md) | Explicit model or attributed measurement comparison |
 
-## Freeze tasks and conditions
+The registered `execute_batch` path executes the frozen development entries with
+configured attempts and concurrency. The existence of sampling and promotion
+settings does not schedule sampling rounds or periodic selection. Hosts using
+those helpers must invoke and record the intended policy themselves.
 
-`TaskSetSnapshot` binds task namespaces, canonical origins, source/material
-identities, partitions, objective ranges, and task objectives.
-Duplicate origins and cross-partition groups fail. Existing source partitions are
-preserved. Editing receives only development entries, never private acceptance,
-selection/confirmation inputs or verifier files. No automatic conversation mining
-or synthetic summary is performed.
+## Freeze tasks and preserve scope
 
-Collections declare objectives to attribute optional measurement observations.
-Absent or failed measurements do not gate candidate generation or comparison.
-A custom material format supplies a source, execution backend and scorer through
-the public ports; no local collection executor is installed by default. Task-set CLI search uses the fixed flow, task scope, no retained
-experience, and one candidate per round. Other component kinds and I experiments
-need compatible declared runners; collection registration does not bypass their
-capability checks.
+`TaskSetSnapshot` binds namespaces, canonical origins, material identities,
+partitions and declared objectives. Duplicate origins and cross-partition groups
+fail. Public task material stays separate from private verification data.
+A registered source supplies current-source checks and leaf construction through
+`CollectionBinding`. Source changes after preview reject execution.
 
-## Compare batches and promote
+Each leaf uses ordinary `ExecutionPorts` and fresh services with independent
+phase clocks. Own resources before fallible construction; borrowed ports remain
+caller-owned. Interrupted batches retain completed receipts and incomplete
+coverage. Missing measurements stay unknown and do not establish task failure.
 
-Each round evaluates the retained development incumbent and its challenger on the same
-task keys, attempts and conditions. The independent assessor compares the supplied
-records across dimensions. Numeric score magnitude, equality and availability do
-not choose seeds or gate comparison. Unsupported judgments retain the incumbent.
-
-Formal selection runs every `promotion.every_rounds` and at search completion,
-using the complete common selection set. For each collection, explicit selection
-entries are used when present; otherwise all its development entries are used.
-Thus a pack's private validation cannot accidentally exclude another benchmark.
-The previous formal harness survives unavailable or unsupported judgments. Reports
-distinguish official evaluation, collection utilities and coverage.
-`selected` is development assurance, not independent verification or adoption.
-
-Final comparison uses fresh evaluator invocations. Missing scores do not advance failure counters or trigger score-based stopping. Repeating a harness on another sampled batch does not itself stop search. Leaf process metrics do not implicitly become task-set stop conditions.
-
-Confirmation material stays private and unused by this development search.
-Task-set persistent scope/RSI are rejected until an independent adoption policy is
-registered. Search all known tasks only establishes performance on that development
-set; unseen-task quality needs independent evidence.
+Task-set execution currently admits task scope and supported H/S component
+capabilities. Persistent scope requires a separately implemented verification and
+adoption policy; no automatic nested I comparison backend is installed here.
+Executing all development tasks does not prove unseen-task quality.
 
 ## Extend a source
 
 Register `TaskSetSourceDefinition(source_id, implementation_id, freeze)` in
-`TaskSetSourceRegistry`. `freeze(specification, context)` returns a
-`CollectionBinding`: immutable public entries, current-source query, capabilities,
-roles and a private `build(leaf_context)` callback. Preparation has no model side
-effects. The callback returns ordinary `ExecutionPorts`; the runner keeps the
-established `TaskRunner.execute(plan, task, harness)` signature.
+`TaskSetSourceRegistry`. Freezing supplies immutable entries, source identity,
+capabilities and a private `build(leaf_context)` callback. The callback constructs
+ordinary execution ports; it does not change Core's Agent loop.
+The experiment composition root supplies the optional Eval source.
 
-Each leaf receives fresh services and independent execution/evaluator times. Own resources before fallible construction; borrowed ports remain caller-owned. Missing usage stays unknown. Composite runners report their actual leaf observations and delegate timing to leaf phases.
-
-The experiment composition root registers the optional `eval` source. Embeddings
-can provide an explicit registry for other sources. Adding another backend or task family does not add branches to Core,
-Run, the scheduler or joint comparison. Models, host permissions and benchmark
-grading retain their original owners.
-
-## Inspect records
-
-Hosted jobs save material under `materials/task-set.json`, declared `batches/`,
-individual `executions/`, `evaluations/` and `comparisons/`, alongside the existing
-plan, result and journal. Immutable evidence remains in `.fruitfly/artifacts/`;
-complete Eval logs remain in `.fruitfly/eval/<id>/`. References connect the records.
-Interrupted batches retain completed receipts and explicitly incomplete coverage.
-No unknown paid work is automatically replayed.
+The host publishes portable stage bundles and execution receipts. See
+[research storage](../../../run/storage/README.md) for actual output ownership
+and [Eval](../../../../fruitfly_eval/README.md) for complete benchmark logs.
 
 ```bash
-.venv/bin/python -m unittest tests.lab.test_task_sets tests.improvement.test_scheduler tests.lab.test_joint_assessment tests.lab.test_task_sets tests.experiments.test_multi_task
+.venv/bin/python -m unittest tests.lab.test_task_sets tests.improvement.test_scheduler tests.lab.test_joint_assessment tests.experiments.test_multi_task
 ```
 
-Fake rewards validate orchestration, coverage, isolation and accounting only.
-Real container compatibility and quality gains require an authorized experiment.
-
-Before each shared proposal, the independent [Organizer](../organizer/README.md)
-creates a readable batch guide with attributable source references. The editor
-owns optimization signals. A failed organization retains raw evidence for editing.
-The independent [Independent stages](../DEVELOPER_GUIDE.md)
-can also consume imported batches and reuse individual stage outputs.
+Offline fixtures establish identities, scheduling and isolation, not model gains.

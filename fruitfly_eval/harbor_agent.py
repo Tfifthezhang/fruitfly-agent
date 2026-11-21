@@ -41,6 +41,8 @@ class FruitFlyHarborAgent(BaseInstalledAgent):  # type: ignore[misc]
         capabilities = AgentCapabilities(atif=True)
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        self.model_relay_directory = kwargs.pop('model_relay_directory', None)
+        self.model_relay_settings = kwargs.pop('model_relay_settings', {})
         self.config_path = Path(_required(kwargs.pop("config_path", None), "config_path"))
         self.model_catalog_path = Path(
             _required(kwargs.pop("model_catalog_path", None), "model_catalog_path")
@@ -123,6 +125,34 @@ class FruitFlyHarborAgent(BaseInstalledAgent):  # type: ignore[misc]
 
     @with_prompt_template
     async def run(
+        self, instruction: str, environment: BaseEnvironment, context: AgentContext,
+    ) -> None:
+        if not getattr(self, 'model_relay_directory', None):
+            await self._run_task(instruction, environment, context)
+            return
+        from fruitfly_eval.harbor.model_access import task_access
+        async with task_access(self.model_catalog_path, Path(self.model_relay_directory),
+                               self.model_relay_settings) as access:
+            target = '/installed-agent/fruitfly/runtime/model-access.json'
+            with tempfile.TemporaryDirectory(prefix='fruitfly-model-access-') as directory:
+                source = Path(directory) / 'access.json'
+                source.write_text(json.dumps(access), encoding='utf-8')
+                source.chmod(0o600)
+                await environment.upload_file(source, target)
+            if self.model_relay_settings:
+                await environment.upload_file(Path(self.model_relay_settings['ca']),
+                    '/installed-agent/fruitfly/runtime/relay-ca.pem')
+            await self.exec_as_agent(environment, command='chmod 600 ' + target,
+                env=self.runtime_environment, timeout_sec=10)
+            self.runtime_environment = {**self.runtime_environment, 'FRUITFLY_MODEL_ACCESS_FILE': target}
+            try:
+                await self._run_task(instruction, environment, context)
+            finally:
+                self.runtime_environment.pop('FRUITFLY_MODEL_ACCESS_FILE', None)
+                await self.exec_as_agent(environment, command='rm -f ' + target,
+                    env=self.runtime_environment, timeout_sec=10)
+
+    async def _run_task(
         self,
         instruction: str,
         environment: BaseEnvironment,

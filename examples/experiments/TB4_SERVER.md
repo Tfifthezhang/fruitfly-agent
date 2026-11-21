@@ -82,7 +82,13 @@ Change `models.roles.executor/editor/assessor` in `default-config.yaml` to selec
 different case-sensitive aliases from `models.yaml`. The
 template's remote model compatibility is not established by offline checks.
 
-Set `DEEPSEEK_API_KEY` privately. Keep `FRUITFLY_EVAL_PYTHON_ROOT` and
+For the API template, set `DEEPSEEK_API_KEY` privately. To use OpenCode Go or
+another supported subscription, follow the [server subscription procedure](../../fruitfly_eval/SERVER_GUIDE.md#prepare-subscription-authorization-on-a-shared-server):
+provide the server credential, retain selected subscription model entries, declare
+`models.subscriptions` and select its executor alias in the baseline. Daily model
+selection does not change this baseline.
+
+Keep `FRUITFLY_EVAL_PYTHON_ROOT` and
 `FRUITFLY_EVAL_VENV` exported in each controller shell, including tmux, or replace
 their placeholders in `eval-host.yaml` with the validated absolute server paths.
 Runtime directories must be readable/traversable by the task user. Keep caches

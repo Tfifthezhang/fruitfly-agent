@@ -23,7 +23,7 @@ class ResearchRoles:
             self.catalog = extensions.catalog(self.catalog)
         self.profile = load_system_config(self.config_path, catalog=self.catalog).select(profile)
         self.model_path = model_catalog_path(self.profile, self.config_path)
-        self.specs = load_model_specs(self.model_path)
+        self.specs = load_model_specs(*self.profile.model_sources(self.config_path))
         self.registry = registry or default_registry()
         self.environment = {**load_env(WorkspacePaths(self.workspace).secret_file()),
             **(dict(os.environ) if environment is None else environment)}

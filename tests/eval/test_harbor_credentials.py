@@ -134,3 +134,30 @@ class HarborAdapterTests(unittest.TestCase):
             _, _, names = prepare_runtime(runtime={"config_path": str(root / "config.yaml"), "profile": "default"},
                                          output_dir=root / "runtime")
         self.assertEqual(("MODEL_KEY", "RESOURCE_KEY"), names)
+
+
+class SubscriptionIsolationTests(unittest.TestCase):
+    def test_account_connections_are_rejected_before_container_materialization(self):
+        from fruitfly_agent.run import RunApplicationFactory
+        from tests.support.connections import connection_service, account_record, seed_directory
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            service = connection_service(root / 'user')
+            service.credentials().modify('account-a', lambda _: account_record(integration='opencode-go'))
+            seed_directory(service)
+            factory = RunApplicationFactory(cwd=root, environment={}, allow_incomplete=True, connection_service=service)
+            factory.configuration.model_setup.connections.stage('opencode-go', 'account-a', 'model-0', 'daily')
+            factory.configuration.save()
+            output = root / 'container'
+            output.mkdir()
+            with self.assertRaisesRegex(ValueError, 'credential proxy'):
+                prepare_runtime(runtime={'working_directory': str(root), 'config_path': '.fruitfly/config.yaml'},
+                    output_dir=output, environment={})
+            self.assertEqual(list(output.iterdir()), [])
+            _, model_path, names = prepare_runtime(
+                runtime={'working_directory': str(root), 'config_path': '.fruitfly/config.yaml'},
+                output_dir=output, environment={}, model_relay=True)
+            staged = yaml.safe_load(model_path.read_text())['models']['daily']
+            self.assertEqual(staged['access'], {'integration': 'opencode-go', 'account': 'account-a'})
+            self.assertEqual(names, ())
+            self.assertNotIn('offline-token-a', ''.join(path.read_text() for path in output.iterdir() if path.is_file()))

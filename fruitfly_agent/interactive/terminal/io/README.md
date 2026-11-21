@@ -113,3 +113,5 @@ ranges, text updates, paste and explicit clipboard actions. I/O interprets no
 image formats or paths. Fields and authorization choices bypass the adapter.
 The existing reader owns Ctrl+V and bracketed paste; no second stdin reader runs.
 See [Composer](../features/composer/README.md) for image draft policy.
+
+Field and menu readers raise `InputEnded` on EOF rather than treating it as a selection or an explicit Quit. Ordinary line readers retain `None` for EOF. `InputInterrupted` represents local cancellation. Hidden TTY input accepts Esc and Ctrl+C without echo or history and restores terminal attributes on every exit. Local form cancellation does not consume EOF.

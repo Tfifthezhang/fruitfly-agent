@@ -80,6 +80,6 @@ def forward_context_capabilities(target: Any, source: Any) -> None:
     """A transparent Provider wrapper must preserve counting and replay capabilities."""
     for name in ('count_input', 'input_count_supported', 'can_rebase_context', 'context_usage_tokens',
                  'effective_output_limit', 'input_count_identity', 'input_measurement_scope',
-                 'input_estimation_messages', 'validate_input', 'vision'):
+                 'input_estimation_messages', 'validate_input', 'vision', 'connection_status', 'service_usage'):
         if hasattr(source, name):
             setattr(target, name, getattr(source, name))

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 import yaml
 
+from fruitfly_agent.providers.registry import model_catalog_companions
 from fruitfly_agent.lab.catalog import select_default_components, optimization_grants, optimization_table, builtin_catalog, MechanismSelection, materialize_system, configuration_resources
 from fruitfly_agent.lab.improvement.api import StageBindings
 from fruitfly_agent.lab.improvement.execution import builtin_executions
@@ -43,6 +44,7 @@ class PreparedExperiment:
     catalog: Any = None
     extensions: Any = None
     optimization_scope: tuple = ()
+    companion_bytes: tuple[tuple[str, bytes], ...] = ()
 
     def summary(self):
         snapshot = self.config.snapshot()
@@ -57,9 +59,10 @@ class PreparedExperiment:
         snapshot['harness'] = self.harness
         snapshot['optimization_table'] = list(self.optimization_scope) or optimization_table(self.profile, self.catalog,
             self.config.improvement.components, self.config.improvement.component_options)
-        snapshot['model_specifications'] = {name: asdict(spec) for name, spec in load_model_specs(self.model_path).items()}
+        snapshot['model_specifications'] = {name: asdict(spec) for name, spec in load_model_specs(*self.profile.model_sources(self.config_path)).items()}
         snapshot['runtime_hashes'] = {'config': hashlib.sha256(self.config_bytes).hexdigest(),
-            'models': hashlib.sha256(self.model_bytes).hexdigest()}
+            'models': hashlib.sha256(self.model_bytes).hexdigest(),
+            **{name: hashlib.sha256(body).hexdigest() for name, body in self.companion_bytes}}
         snapshot['configuration_sources'] = [{'path': source.path, 'sha256': source.digest}
             for source in (*self.profile.source_files, *self.config.source_files)]
         snapshot['configuration_resources'] = [{'path': entry.path, 'content_hash': entry.digest}
@@ -112,7 +115,8 @@ class PreparedExperiment:
                 return self.profile.artifact_contents[reference]
             return (self.config.workspace / '.fruitfly/artifacts' / reference[7:]).read_text(encoding='utf-8')
         return materialize_system(self.profile, root / 'config.yaml', artifact_reader=read,
-            model_source=self.model_path, resources=self.resources, catalog=self.catalog)
+            model_source=self.model_path, model_companions=dict(self.companion_bytes),
+            resources=self.resources, catalog=self.catalog)
 
     def verify_sources(self):
         if self.extensions is not None:
@@ -121,6 +125,8 @@ class PreparedExperiment:
             source.check()
         if self.config_path.read_bytes() != self.config_bytes or self.model_path.read_bytes() != self.model_bytes:
             raise ValueError('runtime configuration or model catalog changed after checking')
+        if model_catalog_companions(*self.profile.model_sources(self.config_path)) != dict(self.companion_bytes):
+            raise ValueError('subscription catalog changed after checking')
         if configuration_resources(self.profile, self.catalog, self.config.workspace) != self.resources:
             raise ValueError('registered configuration resources changed after checking')
         if resolve_source(self.config, default_source='eval' if self.operation == 'eval' else 'files').source_identity != self.source.source_identity:
@@ -162,7 +168,7 @@ def prepare_experiment(config, operation, *, require_prepared=True, environment=
     harness = load_system_config(config_path, catalog=catalog)
     profile = harness.select(profile_id)
     model_path = model_catalog_path(profile, config_path)
-    specs = load_model_specs(model_path)
+    specs = load_model_specs(*profile.model_sources(config_path))
     executor = config.models.get('executor', profile.model_profile)
     if executor is None:
         if len(specs) != 1:
@@ -184,7 +190,8 @@ def prepare_experiment(config, operation, *, require_prepared=True, environment=
         if name not in specs:
             raise ValueError('unknown model catalog profile: ' + str(name))
         specs[name].require(streaming=True)
-        if require_credentials and not process_env.get(specs[name].provider.api_key_env):
+        from fruitfly_agent.providers.registry import credential_available
+        if require_credentials and not credential_available(specs[name], process_env):
             raise ValueError('missing model credential variable: ' + specs[name].provider.api_key_env)
     catalog.resolve(profile.mechanisms)
     from fruitfly_agent.lab.catalog import resolve_harness
@@ -257,7 +264,8 @@ def prepare_experiment(config, operation, *, require_prepared=True, environment=
         config_path.read_bytes(), model_path.read_bytes(), roles, process_env, request, policy_id, inventory,
         configuration_resources(profile, catalog, config.workspace), catalog, extensions,
         tuple(optimization_table(profile, catalog, options.components, options.component_options,
-            roles=allowed_roles, capabilities=capabilities)))
+            roles=allowed_roles, capabilities=capabilities)),
+        tuple(model_catalog_companions(*profile.model_sources(config_path)).items()))
 
 
 def application_factory(prepared, runtime_path, *, provider_registry=None):

@@ -1,5 +1,6 @@
 """Convert the frozen reflection packet into GEPA examples within its batch."""
 import json
+from typing import Any
 
 from fruitfly_agent.improvement.contracts.versions import canonical_json, content_hash
 
@@ -24,7 +25,8 @@ def dataset(request, artifacts):
     cards = {card['task_id']: card for card in packet['cards']}
     if len(cards) != len(packet['cards']) or set(cards) != set(tasks):
         raise ValueError('reflection packet cards differ from the proposal batch')
-    examples, supplied = [], {}
+    examples: list[dict[str, Any]] = []
+    supplied = {}
     findings = packet['group_findings']
     for task_id, task in tasks.items():
         card = cards[task_id]

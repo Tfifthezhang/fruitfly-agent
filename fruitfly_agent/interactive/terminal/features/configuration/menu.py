@@ -79,6 +79,8 @@ class TerminalConfigurationFrontend:
         repaired = self.configuration.snapshot()
         if not snapshot.ready and repaired.ready and repaired.changed:
             decision = self._confirm_application(startup=True)
+            if decision == 'cancel':
+                return ConfigurationLaunchResult(start=False)
             if decision == 'discard':
                 self.configuration.reset()
                 return ConfigurationLaunchResult(start=False)
@@ -105,6 +107,11 @@ class TerminalConfigurationFrontend:
             if snapshot.model_profile not in snapshot.model_profiles:
                 return False
         if setup is not None and snapshot.model_profile is not None:
+            if setup.credential_status(snapshot.model_profile) == 'Authorization required':
+                from .model_connections import manage_connections
+                manage_connections(self._model_form(), setup.connections)
+                if setup.credential_status(snapshot.model_profile) == 'Authorization required':
+                    return False
             if setup.credential_status(snapshot.model_profile) == 'API key missing':
                 configure_credential(self._model_form(), setup, snapshot.model_profile)
                 if setup.credential_status(snapshot.model_profile) == 'API key missing':
@@ -131,6 +138,8 @@ class TerminalConfigurationFrontend:
                 continue
             if snapshot.changed:
                 decision = self._confirm_application(startup=True)
+                if decision == 'cancel':
+                    return ConfigurationLaunchResult(start=False)
                 if decision == 'continue':
                     continue
                 if decision == 'discard':
@@ -165,6 +174,8 @@ class TerminalConfigurationFrontend:
                 if not snapshot.changed:
                     return ConfigurationLaunchResult(start=False)
                 decision = self._confirm_application(startup=startup, return_to_panel=startup)
+                if decision == "cancel":
+                    return ConfigurationLaunchResult(start=False)
                 if decision == "continue":
                     continue
                 if decision == "discard":
@@ -298,7 +309,7 @@ class TerminalConfigurationFrontend:
             if event.action == MenuAction.BACK:
                 return "continue"
             if event.action == MenuAction.QUIT:
-                return "discard"
+                return "cancel"
             if event.action != MenuAction.ACTIVATE:
                 continue
             return ("apply", "continue", "discard")[selected]
@@ -312,14 +323,23 @@ class TerminalConfigurationFrontend:
     def _choose_model(self, snapshot: ConfigurationSnapshot) -> bool:
         setup = getattr(self.configuration, "model_setup", None)
         if setup is not None:
-            values = snapshot.model_profiles + ("Add model…", "Set API key…")
+            values = snapshot.model_profiles + ("Add model…", "Set API key…", "Connections…", "Advanced model settings…")
             labels = {name: f"{name} · {setup.credential_status(name)}" for name in snapshot.model_profiles}
+            if snapshot.model_profile in snapshot.model_profiles and setup.authentication_kind(snapshot.model_profile) == 'account':
+                labels['Set API key…'] = 'Manage account…' 
             quit_requested, value = self._choose_value(
                 title="model.profile", subtitle="Choose a model or add one. Review and save before applying changes.",
                 values=values, current=snapshot.model_profile, labels=labels,
             )
             if value == "Add model…":
                 run_model_setup(self._model_form(), setup)
+            elif value == "Advanced model settings…":
+                from .model_connections import advanced_model_settings
+                if snapshot.model_profile is not None:
+                    advanced_model_settings(self._model_form(), setup.connections, snapshot.model_profile)
+            elif value == "Connections…":
+                from .model_connections import manage_connections
+                manage_connections(self._model_form(), setup.connections)
             elif value == "Set API key…":
                 if snapshot.model_profile is None:
                     self.notice = "Select a model before setting its API key."

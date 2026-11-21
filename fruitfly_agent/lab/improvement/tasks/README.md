@@ -21,7 +21,7 @@ my-task-pack/
 | `pack.json` | Declare and validate the pack | Frozen metadata |
 | `cases.json`: `train` | First input supplies diagnosis; all cases check regressions after generation | First input; answers/checks stay private unless an explicit feedback policy exposes them |
 | `cases.json`: `validation` | Fixed baseline/candidate comparison after generation | No inputs or answers in editor workspaces |
-| `holdout.json` | Manual testing or one automatic confirmation after generation stops | No content access through the editor |
+| `holdout.json` | Manual testing or an explicitly supplied independent verification policy | No content access through the editor |
 
 `default_direction` is optional package metadata; the current panel uses its explicit
 **Improvement guidance** field and does not automatically load that metadata.
@@ -154,10 +154,10 @@ cp -R examples/improvement/python_functions .fruitfly/improvement/task-packs/pyt
 | Step | Action |
 |---|---|
 | 1 | Prepare the default Agent configuration, model catalog and secret environment. |
-| 2 | Reference a task document with `source: files` and `pack` set to the installed package ID. |
-| 3 | Use experiment `edit` grants for registered component fields; default feedback uses the pack measurement. |
-| 4 | Set `scope: persistent` in the referenced comparison document, and configure suitable independent phase times. |
-| 5 | Run `fruitfly-agent-lab improvement check`, then explicitly `improvement step`; model requests may incur charges. |
+| 2 | Register a compatible task execution backend through the public stage ports; installing a pack does not install a CLI executor. |
+| 3 | Declare owner-validated component grants through the [research configuration](../../../experiments/CONFIGURATION.md). |
+| 4 | Bind proposal, execution, comparison and any independent verification explicitly; configure independent phase times. |
+| 5 | Follow the [stage guide](../DEVELOPER_GUIDE.md). Check before explicitly executing one configured stage; model requests may incur charges. |
 | 6 | Inspect the result and evidence; Candidate execution does not authorize production adoption. |
 
 Selecting a pack changes one job, not the YAML or runtime manifest. Experiment requests select instruction text and explicit input paths. Search only changes target text, not Python task outputs. See [Improvement](../README.md) for timing, results, and retention.
@@ -191,7 +191,7 @@ explicit host API above. Ordinary chat does not create task packs or inferred an
 
 Persistent [Improvement](../README.md) requires nonempty independent holdout. Verification privately freezes its cases and compares baseline/candidate after editing. Scorer answers and holdout instructions never enter generation. Task-local selection requires no scoring policy.
 
-Host services exclude holdout contents from generation and material review; this is not a filesystem sandbox for arbitrary Python plugins. Confirmation is once per automatic job, not a guarantee of independence across repeated jobs. No automatic adoption is performed.
+Host services exclude holdout contents from generation and material review; this is not a filesystem sandbox for arbitrary Python plugins. An injected verification policy controls confirmation; repeated use of the same holdout does not establish independence across invocations. No automatic adoption is performed.
 
 | Example | Purpose |
 |---|---|

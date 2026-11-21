@@ -16,8 +16,8 @@ class ServiceTableTests(TestCase):
 
     def test_packaged_table_drives_setup_without_a_separate_vendor_list(self):
         table = self.table()
-        self.assertEqual(set(table['services']), {'openai', 'anthropic', 'deepseek', 'qwen', 'generic'})
-        self.assertEqual([item.service for item in SERVICES], list(table['services']))
+        self.assertEqual(set(table['services']), {'openai', 'anthropic', 'deepseek', 'qwen', 'generic', 'opencode-go', 'chatgpt'})
+        self.assertEqual([item.service for item in SERVICES], [name for name, row in table['services'].items() if row['api_key_env'] or name == 'generic'])
         for choice in SERVICES:
             row = table['services'][choice.service]
             self.assertEqual(choice.label, row['label'])

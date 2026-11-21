@@ -62,13 +62,13 @@ uses native terminal scrollback, including after menus and exit.
 | RuntimeHandle field / contract | Responsibility |
 |---|---|
 | `session`: [RuntimeSession](contracts/runtime.py) | Public conversation, observation, cancellation, and submission operations; InteractiveSession is the default implementation. |
-| `improvement`: [ImprovementService](contracts/improvement.py) | Preview, confirmed search, and cancellation. Optional ImprovementActivityService supplies progress observations; ImprovementHistoryService exposes submitted experiment results. |
+| `improvement`: [ImprovementService](contracts/improvement.py) | Workflow configuration, cancellation and retained activity/history views; research execution uses the independent stage host. Optional ImprovementActivityService supplies progress observations; ImprovementHistoryService exposes submitted experiment results. |
 | `candidates`: [CandidateService](contracts/candidates.py) | List, inspect, acknowledge, and review candidates. Does not require a search service. |
 | `candidate_activation`: [CandidateActivationService](contracts/candidates.py) | Prepare an isolated handle. Application owns startup and switching. |
 | `task_packs`: [TaskPackService](contracts/task_packs.py) | Read task materials and save corrections. Does not require improvement or candidate services. |
 | `authorization`: [AuthorizationService](interaction/authorization.py) | Serialize permission requests and retain grants for this runtime only. |
 
-Configuration and model setup come from the injected RuntimeFactory/controller. Confirmed generic improvement uses Application jobs. Run binds concrete implementations; Interactive imports neither Run, Lab, Providers, nor Eval.
+Configuration and model setup come from the injected RuntimeFactory/controller. The current Improvement service does not expose a preview/confirm/submit search operation. Use the independent research stage host for execution. Run binds concrete implementations; Interactive imports neither Run, Lab, Providers, nor Eval.
 
 Each runtime capability is optional and independently injected. Use explicit `candidates=` and `task_packs=` fields even when one object implements several contracts. Missing query capabilities return empty candidate lists or unavailable material status; operations requiring a missing service raise an explicit error. Protocol and view definitions belong to `contracts/`. The package-level `fruitfly_agent.interactive` API exports the usual Application, concrete RuntimeHandle, Session, views, and terminal entries. Internal consumers import their owning modules directly.
 

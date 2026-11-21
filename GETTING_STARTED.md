@@ -8,7 +8,7 @@ Install FruitFlyAgent and complete your first terminal session.
 |---|---|
 | Python | 3.11+ |
 | Platform | macOS or Linux; native Windows is unsupported and WSL2 is unverified |
-| Model access | An API key for real requests; the offline example needs no key |
+| Model access | API credentials or a supported subscription account; the offline example needs neither |
 | Docker | Only needed for optional [Eval](fruitfly_eval/README.md) |
 
 ## Install
@@ -46,17 +46,17 @@ Editable installation keeps source changes visible without reinstalling. To inst
 
 | Step | Action |
 |---|---|
-| 1 | From the startup panel, choose **Configure → model → Add model…**, then choose OpenAI Responses, Anthropic Messages, or a custom service using one of those protocols. |
+| 1 | From the startup panel, choose **Configure → model → Add model…**, choose **API** or **Subscription**. API access selects a service and protocol; subscription access connects an account and selects a cached model. Steps 2–5 below describe API setup. See [subscription setup](CONFIGURATION.md#connect-a-subscription-plan) for the account flow. |
 | 2 | Enter a menu label, model ID, and the token limits documented by your service. Official services may leave the API address blank; custom services require it. |
 | 3 | Leave the existing-key-variable field blank to create a variable for this model, then enter the API key with hidden input. To reuse a key, enter its environment variable name and leave the key input blank. |
 | 4 | On **capabilities**, toggle verified optional support; keep required rows checked and choose Continue. |
-| 5 | Review the non-secret settings and choose **Stage model**, then **Save and return** to save. Select **Start session** from the panel when ready. Cancellation writes no model or credential files. |
+| 5 | Review the non-secret settings and choose **Stage model**, then **Save and return** to save. Select **Start session** from the panel when ready. Cancelling API setup discards its staged model and key. Subscription account authorization is stored independently and remains connected when a model draft is discarded. |
 
-For additional models, use **/config → model → Add model…**, or run `fruitfly-agent --configure`. **Set API key…** supplies a missing key for the selected model. The wizard performs offline checks only; it does not test credentials, model access, or remote API compatibility. Enter `/cancel` at a field to return. Starting a session does not send a model request until you submit a task.
+For additional models, use **/config → model → Add model…**, or run `fruitfly-agent --configure`. **Set API key…** supplies a missing key for the selected model. API forms validate locally without testing inference. Subscription authorization and model-directory refresh can contact the service; neither proves successful inference. Enter `/cancel` at a field to return. Starting a session does not send a model request until you submit a task.
 
-The [model template](examples/configuration/models.example.yaml) provides `deepseek-flash-openai` (Responses API) and `deepseek-flash-anthropic` (Messages API) in one file. Both use `deepseek-flash` and a `DEEPSEEK_API_KEY`; the Provider name selects the protocol. See the [example setup and limits](examples/configuration/README.md). A Chat Completions-only endpoint cannot use the Responses adapter. Keep only profiles you need; rename them if desired. Use separate `api_key_env` names if profiles need different keys.
+The [model template](examples/configuration/models.example.yaml) provides `deepseek-flash-openai` (Responses API) and `deepseek-flash-anthropic` (Messages API) in one file. Both use `deepseek-flash` and a `DEEPSEEK_API_KEY`; `sdk` selects the client library and `protocol` selects the API format. See the [example setup and limits](examples/configuration/README.md). A Chat Completions-only endpoint cannot use the Responses adapter. Keep only profiles you need; rename them if desired. Use separate `api_key_env` names if profiles need different keys.
 
-The wizard writes model specifications to `.fruitfly/models.yaml`, key values to the workspace `.fruitfly/secrets.env`, and selection to `.fruitfly/config.yaml`. These local files are excluded from distributions. Existing models, catalog comments, and unrelated environment entries are retained. Manual configuration with the public templates remains available for advanced model parameters and capabilities; see [Configuration](CONFIGURATION.md).
+API setup writes model specifications to `.fruitfly/models.yaml` and staged keys to `.fruitfly/secrets.env`. Subscription setup writes selected models and credential references to `.fruitfly/subscriptions.yaml`; account secrets use the selected user-level keyring or private-file backend. Both save selection in `.fruitfly/config.yaml`. A Go `credential.env` reference instead reads its named variable from the workspace secret environment. These local files are excluded from distributions. Existing models, catalog comments, and unrelated environment entries are retained. Manual configuration with the public templates remains available for advanced model parameters and capabilities; see [Configuration](CONFIGURATION.md).
 
 Leave `FRUITFLY_MODEL_PROFILE` unset or blank to choose interactively. A sole model is selected automatically. Use `--cwd /path/to/workspace` to read that workspace's configuration and `.fruitfly/secrets.env`; process environment variables take precedence.
 
@@ -119,7 +119,9 @@ executable experiment. In an existing workspace, generate its files:
 ```
 
 Review `.fruitfly/models.yaml`, choose its aliases in `default-config.yaml`, and
-put keys privately in `secrets.env` or the process environment. Configure the host
+put API keys privately in `secrets.env` or the process environment. Subscription
+models require their declared catalog and server-side authorization; follow the
+[server subscription recipe](fruitfly_eval/SERVER_GUIDE.md#prepare-subscription-authorization-on-a-shared-server). Configure the host
 runtime as described in the walkthrough. Initialization starts no models,
 downloads or containers. Existing regular model catalogs and secrets are preserved;
 other generated destinations must not exist.

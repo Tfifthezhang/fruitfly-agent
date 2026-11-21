@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import sys
+from typing import Any
 
 from fruitfly_agent.core.errors import SessionCorruptError
 from fruitfly_agent.interactive import AgentApplication, TerminalConfigurationFrontend, TerminalFrontend, TerminalRenderer
@@ -15,6 +16,7 @@ from fruitfly_agent.interactive.terminal import transient_screen
 from fruitfly_agent.interactive.terminal.features.startup import TerminalStartupFrontend
 from fruitfly_agent.interactive.contracts.runtime import RuntimeCleanupError
 from fruitfly_agent.interactive.terminal.io.live import InputInterrupted
+from fruitfly_agent.interactive.terminal.io.controls import InputEnded
 from fruitfly_agent.run.startup import describe_startup
 from fruitfly_agent.providers.config import load_env
 from fruitfly_agent.providers.workspace import WorkspacePaths
@@ -49,7 +51,14 @@ async def run_cli(args: argparse.Namespace) -> int:
         if 'FRUITFLY_MAX_MODEL_CALLS' in environment:
             raise ValueError('FRUITFLY_MAX_MODEL_CALLS is unsupported; use stage times')
         usage_path=environment.get('FRUITFLY_MODEL_USAGE_PATH')
-        registry=ObservedProviderRegistry(default_registry(),ModelUsage(receipt=usage_path)) if usage_path else None
+        access_path = environment.get('FRUITFLY_MODEL_ACCESS_FILE')
+        registry: Any
+        if access_path:
+            from fruitfly_agent.providers.gateway.access import access_registry
+            base_registry = access_registry(Path(access_path))
+            registry = ObservedProviderRegistry(base_registry, ModelUsage(receipt=usage_path)) if usage_path else base_registry
+        else:
+            registry = ObservedProviderRegistry(default_registry(), ModelUsage(receipt=usage_path)) if usage_path else None
         from fruitfly_agent.runtime_spec import load_harness_config
         config_source = Path(args.config) if args.config else cwd / '.fruitfly/config.yaml'
         if not config_source.is_absolute():
@@ -173,6 +182,8 @@ async def _start_interactive(args: argparse.Namespace, factory: RunApplicationFa
                     if result.saved:
                         factory.reload_configuration()
                         notice = 'Configuration saved. Select Start session when ready.'
+                except InputEnded:
+                    return None
                 except (KeyboardInterrupt, InputInterrupted):
                     factory.configuration.reset()
                     notice = 'Configuration edits discarded.'

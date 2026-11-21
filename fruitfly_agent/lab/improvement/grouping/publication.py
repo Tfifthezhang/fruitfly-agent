@@ -20,10 +20,11 @@ def compose(pool, source, settings, position, members, *, features=None):
         selected = related(tasks, features, method=method, position=position,
                            size=settings['batch_size'], seed=settings['seed'])
     grants = selected if method == 'fixed' else dict.fromkeys(selected)
-    runs_by_task = {task: [] for task in grants}
+    runs_by_task: dict[str, list[str]] = {task: [] for task in grants}
     records = []
     for record in pool.records:
-        if record.task_id in grants and (grants[record.task_id] is None or record.run_id in grants[record.task_id]):
+        granted_runs = grants.get(record.task_id)
+        if record.task_id in grants and (granted_runs is None or record.run_id in granted_runs):
             runs_by_task[record.task_id].append(record.run_id)
             records.append(record)
     for task, granted in grants.items():

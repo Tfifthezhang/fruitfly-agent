@@ -166,3 +166,21 @@ recorded in effective execution identity. New and resumed runtimes apply the
 current budget before their next request. Restricted child runtimes retain parent
 execution conditions even when their component subset omits the budget owner.
 Historical manifests are validated against their original contents.
+
+## Bind account connections
+
+Assembly uses the same model resolver for API and account-backed models. Stable
+non-secret account bindings enter runtime model identity; access-token rotation
+does not change exact continuation. Session-derived request attribution is bound
+through an optional public adapter capability. `usage.py` retains declared
+service billing/allowance receipts separately from native token usage. Unknown
+allowance remains unknown. See [Connections](../../providers/connections/README.md).
+
+
+## Consume host model access
+
+The CLI accepts `FRUITFLY_MODEL_ACCESS_FILE` as an explicit host-injected private
+access descriptor. Providers validates its frozen models, account identities
+and transports before assembly. Usage observation wraps the resulting registry
+for main and auxiliary requests. The default CLI requires no descriptor.
+See [model relay](../../providers/gateway/README.md). No Eval import is required.

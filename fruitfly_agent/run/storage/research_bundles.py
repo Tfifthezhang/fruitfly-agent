@@ -149,7 +149,7 @@ def role_usage(artifacts, diagnostic_id):
         elif name == 'response':
             responses[event['attempt_id']] = event
     by_role = Counter(requests.values())
-    totals = Counter()
+    totals: Counter[str] = Counter()
     measured = 0
     completed = 0
     for key in requests:

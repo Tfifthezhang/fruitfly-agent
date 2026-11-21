@@ -35,7 +35,7 @@ Unknown fields and obsolete flat profile fields are rejected.
 | Source | Default location | Contents |
 |---|---|---|
 | Model template | [models.example.yaml](examples/configuration/models.example.yaml) | DeepSeek Flash profiles for Responses and Messages APIs in one file; configure a key before use |
-| Shared model catalog | `.fruitfly/models.yaml` in the working directory | Daily and experiment model definitions: SDK, API protocol, model ID, endpoint, capabilities, limits, and key variable name |
+| Shared model catalog | `.fruitfly/models.yaml` in the working directory | Daily and experiment model definitions: SDK, API protocol, model ID, endpoint, capabilities, limits, key variable name or subscription account reference |
 | Secrets | `.fruitfly/secrets.env` or process environment | API keys and SSH account/password values |
 | Harness configuration | `.fruitfly/config.yaml` | Profiles, model roles and selected H/S/I component documents |
 | Component defaults | Owner YAML resources in `fruitfly_agent/lab/` | One registered default document per parameterized component, including its H/S/I role |
@@ -153,7 +153,7 @@ MCP server are not implemented.
 
 ## Configure a model
 
-Run the interactive CLI and choose **Configure → model → Add model…**. In chat use **/config → model → Add model…**; `--configure` opens the shared editor first. Choose a service, choose its protocol, then enter the model ID, documented token limits and hidden API key. The SDK is automatic and appears read-only in review. Custom services need a base URL. Review and stage the settings; **Save and return** saves them offline and returns to the startup panel, while **Save and apply to this conversation** commits them after candidate startup succeeds.
+Run the interactive CLI and choose **Configure → model → Add model…**. In chat use **/config → model → Add model…**; `--configure` opens the shared editor first. For API access, choose a service and protocol, then enter the model ID, documented token limits and hidden API key. For an existing plan, choose a Subscription entry, connect the account and select from its cached model directory. The SDK is automatic and appears read-only in review. Custom services need a base URL. Review and stage the settings; **Save and return** saves them offline and returns to the startup panel, while **Save and apply to this conversation** commits them after candidate startup succeeds.
 
 | Service | Protocol choices |
 |---|---|
@@ -163,13 +163,13 @@ Run the interactive CLI and choose **Configure → model → Add model…**. In 
 | Qwen | Responses, Messages or Chat Completions |
 | Custom service… | Registered protocols; supply the gateway/server's address and key |
 
-Every service opens a protocol selection before its form. Choices come from
+Every API service opens a protocol selection before its form; subscription integrations supply their registered protocol and directory picker. Choices come from
 Provider service rules intersected with registered adapters. The protocol determines
 request, streaming, and tool-call formats. Choose what your service actually
 supports; the model name alone does not establish compatibility. See
 [protocol configuration](fruitfly_agent/providers/PROVIDER_GUIDE.md#choose-the-protocol-and-service).
 
-After protocol selection, each field has its own screen with the selected service and step count. `models.<name>` is the catalog entry name shown in menus; `model` is the service model ID. Press Enter to accept a displayed default. After capabilities, edit the complete `parameters` JSON object or accept medium reasoning effort. Enter `{}` for server defaults. Invalid parameter input retries before reading the hidden API key. `back` returns to protocol selection; Back there returns to services. Per-protocol drafts retain edits. The final review displays the exact parameters and transport defaults that will be saved. No connection test runs during setup.
+After protocol selection, each field has its own screen with the selected service and step count. `models.<name>` is the catalog entry name shown in menus; `model` is the service model ID. Press Enter to accept a displayed default. After capabilities, edit the complete `parameters` JSON object or accept service defaults. Enter `{}` to omit optional request parameters. Invalid parameter input retries before reading the hidden API key. `back` returns to protocol selection; Back there returns to services. Per-protocol drafts retain edits. The final review displays the exact parameters and transport defaults that will be saved. API form validation makes no inference request. Subscription authorization and directory refresh may use the network; they do not establish inference compatibility.
 
 An interactive first run without saved harness configuration or a workspace catalog starts a draft targeting the selected workspace's `.fruitfly/models.yaml`.
 
@@ -178,7 +178,7 @@ An interactive first run without saved harness configuration or a workspace cata
 | Supported services | Four named services and the existing custom entry, declared in the [service table](fruitfly_agent/providers/services.yaml); the protocol page warns that some models may not support the selected protocol. |
 | Limits | Enter model ID and documented limits explicitly. Positive integers; output smaller than context. No model-specific defaults or network discovery. |
 | Capabilities | Checkbox page: only `tools` and `streaming` are required. Other flags default false and describe declared support; they do not generate or change API options. |
-| Request defaults | Editable JSON object: Responses `reasoning.effort`, Messages `output_config.effort`, Chat `reasoning_effort`, all default `medium`. `{}` explicitly uses server defaults. Custom protocols default to `{}`. No vendor/model-specific policy. |
+| Request defaults | Editable JSON object. Optional request parameters default to `{}`, leaving their values to the service. Explicit overrides are validated for the selected protocol. |
 | Transport defaults | All choices display and save the same bounded waiting/retry defaults used by adapters; no manual input. |
 | Credentials | Hidden input bypasses readline history. Blank input reuses the named environment variable. Blank variable name generates `FRUITFLY_MODEL_<LABEL>_API_KEY`, replacing label punctuation with underscores. |
 | Existing key | The Model menu shows only set/missing status. **Set API key…** supplies a missing key; an already-set different value is rejected. |
@@ -527,3 +527,36 @@ compression method. [Context budget](fruitfly_agent/lab/context_manager/budget/R
 owns its reduction thresholds; [component syntax](fruitfly_agent/runtime_spec/COMPONENTS.md)
 owns authoring. The model window and effective output reserve determine input capacity. An omitted
 budget component retains Core enforcement with registered defaults.
+
+## Connect a subscription plan
+
+Use `/config` → model → Add model → Subscription, then choose OpenCode Go or ChatGPT.
+Connect an account, search its cached directory, select a model and save/apply.
+The wizard saves subscription models to `subscriptions.yaml` beside the API
+catalog and records its path in `models.subscriptions`. Declared catalogs
+contribute aliases to the same model roles. Connections manages accounts
+independently of model drafts. Startup uses saved model definitions. The picker
+reads its local cache and refreshes stale directories in the background.
+See [Connections](fruitfly_agent/providers/connections/README.md) for the current
+`connections` grammar, explicit credential backend, output budgets and limits.
+Existing API configuration remains supported. Account tokens never enter project
+YAML, Session manifests, frozen exports or task-container preparation.
+
+For an OpenCode Go subscription, a connection may reference a key variable in
+`.fruitfly/secrets.env` through `credential.env`. See the [Go connection
+guide](fruitfly_agent/providers/connections/methods/opencode_go/README.md#use-a-workspace-secret-variable)
+for the configuration example.
+
+For a server without a browser, use the explicit
+[headless account commands](fruitfly_agent/providers/auth/README.md#authorize-a-headless-host).
+The same guide describes deploying one selected registration through SSH without
+copying host identity or unrelated accounts. An empty
+[subscription catalog template](examples/configuration/subscriptions.example.yaml)
+is installed by workspace initialization; profiles opt in through
+`models.subscriptions`.
+
+
+Harbor subscription execution uses temporary host-issued access grants rather
+than copying account credentials. Machine-local transport settings belong to
+[Harbor configuration](fruitfly_eval/harbor/README.md#connect-subscription-models).
+Temporary descriptors are not model configuration and must not be saved or exported.

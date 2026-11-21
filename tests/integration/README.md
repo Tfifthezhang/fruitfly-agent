@@ -20,3 +20,9 @@ Smoke outcomes report `sdk` and `protocol` separately, using the selected model
 specification. Reading help or parsing a catalog does not run these paid scenarios.
 
 See [Configuration](../../CONFIGURATION.md) and [Providers](../../fruitfly_agent/providers/README.md). Do not run this as an automatic documentation check.
+# Local model relay transport
+
+Run `.venv/bin/python -m unittest tests.integration.model_relay_socket` to
+exercise the private Unix socket with a fake upstream. This check requires
+permission to bind a local socket. It uses no external model or credential.
+

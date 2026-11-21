@@ -53,3 +53,17 @@ services:
       messages:
         prefix_bound: true
       chat-completions: {}
+  opencode-go:
+    label: OpenCode Go
+    default_protocol: chat-completions
+    api_key_env: ''
+    protocols:
+      chat-completions:
+        base_url: https://opencode.ai/inference/go/v1
+  chatgpt:
+    label: ChatGPT
+    default_protocol: responses
+    api_key_env: ''
+    protocols:
+      responses:
+        base_url: https://api.openai.com/v1

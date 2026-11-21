@@ -212,7 +212,7 @@ class ReadlineLineEditor:
         self.output.flush()
 
 
-def read_field_line(editor: LineEditor, label: str) -> str | None:
+def _read_field_line(editor: LineEditor, label: str) -> str | None:
     """Label built-in form readers without changing the injected reader contract."""
     if isinstance(editor, IsolatedLineEditor):
         return editor.read_field_line(label)
@@ -317,3 +317,12 @@ __all__ = [
     "StreamLineEditor",
     "create_line_editor",
 ]
+
+
+def read_field_line(editor: LineEditor, label: str) -> str:
+    """Read a field, propagating EOF separately from cancellation and blanks."""
+    from .controls import InputEnded
+    value = _read_field_line(editor, label)
+    if value is None:
+        raise InputEnded
+    return value

@@ -28,7 +28,7 @@ from fruitfly_agent.providers.registry import load_model_specs
 def check_model_setup(root: Path) -> None:
     """Exercise the shipped model wizard against a temporary workspace."""
     factory = RunApplicationFactory(cwd=root, environment={}, allow_incomplete=True)
-    lines = iter(("1", "", "wheel-check", "offline-model", "", "8192", "1024", "", "", "", "2", "1"))
+    lines = iter(("1", "1", "", "wheel-check", "offline-model", "", "8192", "1024", "", "", "", "2", "1"))
     output = io.StringIO()
     frontend = TerminalConfigurationFrontend(
         factory.configuration, input_stream=io.StringIO("offline-placeholder\n"),

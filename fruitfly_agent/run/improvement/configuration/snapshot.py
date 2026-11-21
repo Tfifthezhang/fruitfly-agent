@@ -3,6 +3,7 @@ from dataclasses import asdict
 import json
 import re
 import yaml
+from fruitfly_agent.providers.registry import model_catalog_companions
 from fruitfly_agent.improvement.contracts.configuration import configuration_differences
 
 
@@ -56,7 +57,7 @@ def export_candidates(outputs, directory, result, reporting):
         for name, selected in (('baseline', profile), ('candidate', bind_component_changes(profile,
                 components.export(candidate.harness), catalog=catalog))):
             materialize_system(selected, root / name / 'config.yaml', catalog=catalog,
-                artifact_reader=reporting['artifact_reader'], model_source=reporting['model_source'], resources=resources)
+                artifact_reader=reporting['artifact_reader'], model_source=reporting['model_source'], model_companions=model_catalog_companions(*selected.model_sources(reporting['system_source'])), resources=resources)
         (root / 'changes.json').write_text(json.dumps({'changed_ids': candidate.changed_ids,
             'base': candidate.base.to_dict(), 'harness': candidate.harness.to_dict()}, ensure_ascii=False, indent=2))
         (root / 'rationale.json').write_text(json.dumps(value['reasons'], ensure_ascii=False, indent=2))

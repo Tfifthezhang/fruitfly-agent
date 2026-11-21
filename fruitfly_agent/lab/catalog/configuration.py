@@ -441,7 +441,7 @@ def configuration_resources(profile, catalog, workspace):
 
 
 def materialize_system(profile, destination, *, catalog=None, artifact_reader=None, model_source=None,
-                       resources=()):
+                       resources=(), model_companions=None):
     """Write an isolated complete system bundle; never change source documents."""
     if catalog is None:
         from .builtins import builtin_catalog
@@ -465,7 +465,18 @@ def materialize_system(profile, destination, *, catalog=None, artifact_reader=No
         if not model_path.exists():
             with model_path.open('xb') as stream:
                 stream.write(data)
-        projected = replace(projected, model_catalog='models.yaml')
+        for name, body in (model_companions or {}).items():
+            if Path(name).name != name or name in {'', '.', '..', 'models.yaml', destination.name, 'snapshot.json'}:
+                raise ValueError('invalid frozen model resource name')
+            target = destination.parent / name
+            if target.exists():
+                if target.read_bytes() != body:
+                    raise ValueError('candidate model resource conflicts with frozen source')
+            else:
+                with target.open('xb') as stream:
+                    stream.write(body)
+        projected = replace(projected, model_catalog='models.yaml',
+                            subscription_catalog=next(iter(model_companions or {}), None))
     data = {'default_profile': profile.profile_id,
             'profiles': {profile.profile_id: projected.to_dict(references=False)}}
     with destination.open('x', encoding='utf-8') as stream:
@@ -494,6 +505,9 @@ def materialize_system(profile, destination, *, catalog=None, artifact_reader=No
     if resources:
         snapshot['working_directory'] = 'resources'
     if model_source is not None:
+        if model_companions:
+            snapshot['model_resources'] = {name: hashlib.sha256(body).hexdigest()
+                                           for name, body in sorted(model_companions.items())}
         snapshot['model_catalog_sha256'] = hashlib.sha256((destination.parent / 'models.yaml').read_bytes()).hexdigest()
     with (destination.parent / 'snapshot.json').open('x', encoding='utf-8') as stream:
         json.dump(snapshot, stream, indent=2, ensure_ascii=False)

@@ -306,3 +306,5 @@ starts work or refreshes automatically.
 `/operations HANDLE [OFFSET]` reads at most 12000 characters of retained output
 without consuming model polling state. Offsets refer to the current bounded
 output snapshot, which can change while running. Cancellation remains explicit.
+
+Menu interaction owns Ctrl+C while input is lent: it cancels the interaction and returns to chat without counting toward the chat double-interrupt exit. Esc cancels a field or returns from a menu. Input EOF ends interaction without saving or applying staged changes; unsaved in-memory drafts do not survive process exit. Explicit account authorization remains independent of configuration drafts.

@@ -42,6 +42,7 @@ class HarnessProfile:
     configured: bool = field(default=False, compare=False, repr=False)
     component_settings: Mapping[str, Any] = field(default_factory=dict)
     extensions: tuple[str, ...] = ()
+    subscription_catalog: str | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.extensions, str) or any(not isinstance(v, str) or not v.strip() for v in self.extensions):
@@ -53,6 +54,10 @@ class HarnessProfile:
             raise ValueError("harness profile id must be a stable identifier")
         if not isinstance(self.model_catalog, str) or not self.model_catalog.strip():
             raise ValueError("model catalog must be a non-empty path")
+        if self.subscription_catalog is not None and (
+            not isinstance(self.subscription_catalog, str) or not self.subscription_catalog.strip()
+        ):
+            raise ValueError('subscription catalog must be a non-empty path')
         if self.model_profile is not None and (
             not isinstance(self.model_profile, str) or not self.model_profile.strip()
         ):
@@ -69,6 +74,14 @@ class HarnessProfile:
         object.__setattr__(self, 'artifact_contents', dict(self.artifact_contents))
         if not isinstance(self.prompt, str) or not self.prompt.strip():
             raise ValueError("harness profile prompt must be a non-empty reference")
+
+    def model_sources(self, config_path: str | Path) -> tuple[Path, ...]:
+        paths = (self.model_catalog,) if self.subscription_catalog is None else (
+            self.model_catalog, self.subscription_catalog)
+        resolved = tuple((Path(config_path).parent / path).resolve() for path in paths)
+        if len(set(resolved)) != len(resolved):
+            raise ValueError('primary and subscription catalogs must use different files')
+        return resolved
 
     def resolved_model_roles(self, executor: str) -> dict[str, str]:
         """Resolve inherited bindings against the current executor without pinning them."""
@@ -94,6 +107,7 @@ class HarnessProfile:
         result = {
             "model": {
                 "catalog": self.model_catalog,
+                **({"subscriptions": self.subscription_catalog} if self.subscription_catalog else {}),
                 "profile": self.model_profile,
             },
             "mechanisms": [item.to_dict() for item in self.mechanisms],
@@ -117,6 +131,7 @@ class HarnessProfile:
         ordered = ({'executor': roles['executor']} if 'executor' in roles else {})
         ordered.update({role: binding for role, binding in roles.items() if role != 'executor'})
         return {'models': {'catalog': self.model_catalog,
+                           **({'subscriptions': self.subscription_catalog} if self.subscription_catalog else {}),
                            'roles': {role: dict(binding) if isinstance(binding, Mapping) else binding
                                      for role, binding in ordered.items()}},
                 **groups, **({'extensions': list(self.extensions)} if self.extensions else {})}
@@ -193,7 +208,7 @@ def _component_profile(profile_id, raw, target, reader):
     if not isinstance(sources, list) or any(not isinstance(v, str) or not v for v in sources):
         raise ValueError('extensions must be a list of source strings')
     sources = tuple(v if v.startswith('entrypoint:') else str((target.parent / v).expanduser().resolve()) for v in sources)
-    models = mapping(raw.get('models'), {'catalog', 'roles'}, 'system models')
+    models = mapping(raw.get('models'), {'catalog', 'subscriptions', 'roles'}, 'system models')
     roles = models.get('roles', {})
     if not isinstance(roles, dict):
         raise ValueError('model roles must be a mapping')
@@ -217,7 +232,7 @@ def _component_profile(profile_id, raw, target, reader):
                 raise ValueError('component ID/role differs from its configuration position: ' + str(name))
             documents.append(document)
     return HarnessProfile(profile_id, model_catalog=models.get('catalog', 'models.yaml'),
-                          model_profile=roles.get('executor'), model_roles=roles,
+                          subscription_catalog=models.get('subscriptions'), model_profile=roles.get('executor'), model_roles=roles,
                           component_documents=tuple(documents), extensions=sources)
 
 

@@ -19,7 +19,7 @@ and cost notice. Discovery starts no models or task execution.
 | [File memory learning](../../context_manager/augmentation/memory/methods/file_memory/README.md) | H learning trials over isolated S updates |
 | [tasks.py](tasks.py) | Task material, optional task-package scoring and holdout; requires an injected runner |
 | [Experiment contracts](../../../improvement/contracts/experiments.py) | Requests, prepared material and stage ports |
-| [Independent stages](../DEVELOPER_GUIDE.md) | Fixed-depth I comparison with an explicit episode/task backend |
+| [Independent stages](../DEVELOPER_GUIDE.md) | Explicit I proposals; comparison requires a compatible injected backend |
 
 `agent-task` is a material adapter, not an Agent executor. Supply
 `StageBindings.runner(plan, components, artifacts, services)` when constructing

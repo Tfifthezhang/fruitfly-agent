@@ -2,7 +2,7 @@
 
 [Project](README.md) · [Runtime architecture](fruitfly_agent/README.md) · [Improvement](fruitfly_agent/lab/improvement/README.md)
 
-**Status:** requested design, 2026-11-19. Except for the explicitly reported external-package probe, the changes below are proposals, not implemented capabilities. This standalone design does not change runtime defaults or authorize model/task execution. FruitFlyAgent remains version `0.1`.
+**Scope:** research protocol and design rationale, not an operational capability reference. Grouping, GEPA reflective proposals and measured comparison have implementations described in the [current stage guide](fruitfly_agent/lab/improvement/DEVELOPER_GUIDE.md). Experimental choices and expected research outcomes below are not runtime guarantees. Use the owning module guides for available settings and limits. This document authorizes no execution; FruitFlyAgent remains version `0.1`.
 
 ## 1. Define the objective and current scope
 

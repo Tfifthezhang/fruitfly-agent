@@ -43,7 +43,7 @@ def resolve_inputs(outputs, args):
     from dataclasses import replace
     from fruitfly_agent.improvement.contracts.stages import StageInputs
     slots: dict[str, Any] = {}
-    producers = []
+    producers: list[dict[str, Any]] = []
     for name in ('harness', 'batches', 'evidence', 'assessments', 'context'):
         values = requested.get(name, [])
         if name == 'harness':

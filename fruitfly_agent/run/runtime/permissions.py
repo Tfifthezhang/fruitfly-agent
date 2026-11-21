@@ -6,5 +6,6 @@ def execution_environment(environment):
     return PermissionPolicy.prepare_environment(environment)
 
 def default_permission_policy(workspace, config_path):
+    from fruitfly_agent.providers.auth.stores import auth_directory
     root = Path(workspace).resolve()
-    return PermissionPolicy(root, sensitive_paths=(root / '.env', root / '.fruitfly' / 'secrets.env'))
+    return PermissionPolicy(root, sensitive_paths=(root / '.env', root / '.fruitfly' / 'secrets.env', auth_directory()))

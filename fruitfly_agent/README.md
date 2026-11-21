@@ -241,3 +241,11 @@ statistics preserve unknown denominators and source-declared outcome meaning;
 organization publishes scoped findings and gaps. Proposals retain explicit
 candidate/baseline/evidence decisions without changing activation authority.
 See [independent research](lab/improvement/DEVELOPER_GUIDE.md#consume-investigation-results-and-proposal-decisions).
+
+
+Model [connections](providers/connections/README.md) support OpenCode Go subscription
+keys and official ChatGPT browser authorization without vendor branches in Core.
+Account authentication, cached discovery and protocol policies belong to Providers;
+Run owns project drafts and assembly; Interactive consumes neutral account views.
+Directory refresh never rewrites the active model or context budget. External Eval
+containers consume per-trial host relay grants; see [Harbor access](../fruitfly_eval/harbor/README.md#connect-subscription-models).

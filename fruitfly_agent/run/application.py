@@ -65,8 +65,11 @@ class RunApplicationFactory:
         tool_service_startup_approval: ToolServiceStartupApproval | None = None,
         extensions=None,
         retained_state_enabled: bool = True,
+        connection_service=None,
     ) -> None:
         self.cwd = cwd.resolve()
+        from fruitfly_agent.providers.connections.service import ConnectionService
+        self.connection_service = connection_service or ConnectionService(store=getattr(provider_registry, 'credential_store', None))
         self.retained_state_enabled = retained_state_enabled
         self._base_catalog = catalog or builtin_catalog()
         self._base_improvement_bindings = improvement_bindings
@@ -152,7 +155,7 @@ class RunApplicationFactory:
         self._configuration.model_setup = RunModelSetup(
             config_path=self._configuration.config_path, current_profile=self._configuration.profile,
             stage_profile=self._configuration.stage_profile, workspace=self.cwd, environment=self.environment,
-            registry=self.provider_registry,
+            registry=self.provider_registry, connection_service=self.connection_service,
         )
         self._configuration.mechanism_setup = RunMechanismSetup(
             catalog=self.catalog, current_profile=self._configuration.profile,
@@ -262,7 +265,7 @@ class RunApplicationFactory:
             data_artifact_bindings=self.data_artifact_bindings, task_pack_sources=self.task_pack_sources,
             permission_policy=self.permission_policy, improvement_bindings=self._base_improvement_bindings,
             tool_service_startup_approval=self.tool_service_startup_approval, extensions=extensions,
-            retained_state_enabled=self.retained_state_enabled)
+            retained_state_enabled=self.retained_state_enabled, connection_service=self.connection_service)
         replacement._preparer.sessions = self._preparer.sessions
         return replacement
 
@@ -459,6 +462,8 @@ class RunApplicationFactory:
         from fruitfly_agent.run.configuration.resolution import model_catalog_path
         profile = deepcopy(self._active_profile or self.selection.profile)
         model_path = model_catalog_path(profile, self.selection.config_path)
+        from fruitfly_agent.providers.registry import model_catalog_companions
+        companions = model_catalog_companions(*profile.model_sources(self.selection.config_path))
         frozen_models = directory / 'baseline-models.yaml'
         frozen_state = self._versions.snapshots.read(self.system_version().state)
         with frozen_models.open('xb') as stream:
@@ -466,7 +471,7 @@ class RunApplicationFactory:
         def materialize(candidate, registry, destination):
             bound = bind_component_changes(profile, registry.export(candidate.harness, changed_only=False), catalog=self.catalog)
             path = materialize_system(bound, destination / 'config.yaml', catalog=self.catalog,
-                artifact_reader=self.artifact_store.read_text, model_source=frozen_models,
+                artifact_reader=self.artifact_store.read_text, model_source=frozen_models, model_companions=companions,
                 resources=frozen_state.files)
             (destination / 'changes.json').write_text(json.dumps({
                 'parent': asdict(candidate.parent), 'candidate_id': candidate.candidate_id,

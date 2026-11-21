@@ -3,6 +3,7 @@ import argparse
 from pathlib import Path
 import shutil
 
+from fruitfly_agent.providers.registry import model_catalog_companions
 from fruitfly_agent.lab.catalog import load_system_config, materialize_system, configuration_resources, builtin_catalog
 from .inspection import inspect_configuration
 
@@ -28,7 +29,7 @@ def export_configuration(source, destination, *, profile_id=None, workspace=None
         destination.mkdir(parents=True)
         try:
             materialize_system(profile, destination / 'config.yaml', artifact_reader=read,
-                model_source=catalog_path, resources=resources)
+                model_source=catalog_path, model_companions=model_catalog_companions(*profile.model_sources(source)), resources=resources)
             inspect_configuration(destination / 'config.yaml')
         except BaseException:
             # The destination was exclusively created by this operation.

@@ -24,3 +24,14 @@ No real API calls. Use the explicit Integration entry for network smoke.
 
 `test_continuation.EmptyResponseTests` owns empty terminal response rejection,
 available usage retention, no automatic retry and safe historical fallback replay.
+
+`test_auth.py`, `test_connections.py`, `test_subscription_requests.py` and
+`test_catalog_cache.py` cover account storage/rotation, catalog caching, strict
+connection references, request policies and token/allowance separation offline.
+
+`test_auth_transfer.py` verifies selected-registration SSH transfer, explicit
+replacement, private publication, bounded invalid payload rejection and secret-free
+command arguments and errors. SSH and authorization-service calls are substituted.
+
+Chat reasoning extension regressions in `test_subscription_requests.py` cover
+alternate reasoning fields, dialect-specific detail replay and tool follow-up.
