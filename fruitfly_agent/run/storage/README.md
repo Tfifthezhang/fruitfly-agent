@@ -125,3 +125,14 @@ from stored resources. Cross-study copying retains diagnostics, while ordinary
 organization input projection excludes `diagnostics/` outputs from model grants.
 Failed runs reference retained diagnostics through their reports; no successful
 bundle is fabricated for a failed activity.
+
+Research role usage retains parent receipts separately from child Session
+terminal receipts. Child sessions are deduplicated by artifact identity. Combined
+reported token subtotals include available terminal child usage; unfinished
+sessions have unknown final usage. Provider attempts and parent request counts
+retain separate accounting scopes.
+A research report materializes its diagnostic trace for failed as well as
+completed invocations. The trace still references immutable event and Session
+artifacts. Transfer the output root's `artifacts/` directory with run reports and
+retained-part pointers for an independently readable archive. Bundle publication
+validates required retained event/Session dependencies before publishing.

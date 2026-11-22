@@ -75,3 +75,43 @@ class ExecutionSummaryTests(unittest.IsolatedAsyncioTestCase):
         access = EvidenceAccess(('a', 'b'))
         access.provided('context/summaries/a.json', '{"run_id":"a"}')
         self.assertEqual({'a'}, access.supplied)
+
+    def test_execution_navigation_excludes_large_observations_but_links_full_summary(self):
+        from types import SimpleNamespace
+        from fruitfly_agent.lab.improvement.evidence.executions import execution_page
+        rows = [{'run_id': 'one', 'task_id': 'task', 'status': 'error',
+                 'model_calls': None, 'observations': [{'body': 'x' * 50000}]}]
+        workspace = SimpleNamespace(read=lambda _: json.dumps(rows))
+        result = execution_page(workspace, cursor=0, limit=8, compact=True)
+        self.assertEqual(result['executions'][0]['model_calls'], None)
+        self.assertEqual(result['executions'][0]['summary_path'], 'context/summaries/one.json')
+        self.assertNotIn('observations', result['executions'][0])
+        self.assertIsNone(result['next_cursor'])
+
+    def test_execution_lookup_returns_one_complete_observation_record(self):
+        from types import SimpleNamespace
+        from fruitfly_agent.lab.improvement.evidence.executions import execution_page
+        rows = [{'run_id': 'one', 'observations': [{'reward': None}]},
+                {'run_id': 'two', 'observations': [{'reward': 1}]}]
+        page = execution_page(SimpleNamespace(read=lambda _: json.dumps(rows)),
+                              cursor=0, limit=8, run_id='one')
+        self.assertEqual(page['total'], 1)
+        self.assertEqual(page['executions'][0]['observations'], [{'reward': None}])
+
+    def test_child_usage_uses_attributed_sessions_once(self):
+        from fruitfly_agent.run.storage.research_bundles import role_usage
+        class Store:
+            def read_bytes(self, key):
+                return payloads[key]
+        child = json.dumps({'kind': 'runRecord', 'event': 'end', 'data': {
+            'provider_attempt_count': 3, 'usage': {'inputTokens': 50}}}).encode()
+        followup = json.dumps({'kind': 'runRecord', 'event': 'end', 'run_id': 'followup',
+                               'data': {'provider_attempt_count': 2, 'usage': {'inputTokens': 20}}}).encode()
+        child += b'\n' + followup
+        payloads = {'child': child,
+                    'event': json.dumps({'event': 'research-child-session', 'artifact_id': 'child'}).encode(),
+                    'trace': json.dumps({'events': [{'artifact_id': 'event'}, {'artifact_id': 'event'}]}).encode()}
+        usage = role_usage(Store(), 'trace')
+        self.assertEqual(usage['children']['sessions'], 1)
+        self.assertEqual(usage['children']['provider_attempts_observed'], 5)
+        self.assertEqual(usage['combined_reported_token_subtotals']['inputTokens'], 70)

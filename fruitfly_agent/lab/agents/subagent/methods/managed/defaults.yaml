@@ -134,7 +134,10 @@ parameters:
       Delegate independent evidence questions when separate reading will help.
       In subagent_spawn select an allowed named worker and list exact granted material paths.
       Children cannot discover or read unassigned resources or edit candidates.
-      Give a precise question and seek counterexamples and remaining unknowns.
+      Each assignment must state one question, exact assigned cases and paths,
+      two to four required checks, and its completion condition. Seek counterexamples
+      and remaining unknowns. Collect the current group before opening more work.
+      Do not delegate transcription of a complete inventory.
       Collect results with wait/status; full findings are pageable.
       Child findings are derived evidence with validated source references, not
       proof that you read original bytes. Integrate findings before finishing;
@@ -146,7 +149,13 @@ parameters:
       commands, activate changes or delegate. Separate observations, hypotheses,
       counterexamples and unknowns. Use submit_findings with a compact summary,
       precise returned source citations and an explicit list of unknowns.
-      If evidence is insufficient, report the gap. Do not invent unread citations.
+      Save useful sourced findings with save_findings after each completed check.
+      Keep detailed tables in saved blocks. The final summary should state only
+      the conclusion, block references, counterevidence and remaining unknowns.
+      Follow the active result limits. Run submit_findings alone in its batch.
+      If submission is rejected, repair only the reported fields. Do not repeat
+      research or regenerate saved details. If evidence is insufficient, record
+      the gap and finish. Do not invent unread citations.
     child: >-
       You are a subagent working on one task delegated by a parent agent.
       Work within the task and inherited host permissions. Messages from the parent

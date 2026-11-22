@@ -263,3 +263,13 @@ When retained-part storage is enabled, validated partial blocks are discoverable
 after reopening the store. Reading one revalidates its material identities and
 worker conditions against the current grant. Partial reads do not establish
 direct original-source citations.
+
+Use `catalog(kind="executions", compact=true, limit=8)` for a short navigation
+page. It preserves run/task identity, execution state, elapsed time, model calls,
+counters and diagnostic completeness, and links the full citable summary.
+Omitting `compact` preserves complete execution rows. Full summaries remain
+available with their original provenance.
+Use `catalog(kind="executions", run_id="<exact-run-id>")` to locate a complete
+execution record and its observations without paging the observations extension.
+Read its summary path for citations. Organizer `context/material-scope.json`
+provides compact authorization counts and the full selection receipt reference.

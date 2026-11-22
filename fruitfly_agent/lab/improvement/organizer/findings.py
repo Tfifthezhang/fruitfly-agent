@@ -10,8 +10,10 @@ def finding_sources(finding):
 
 
 def validate_findings(findings):
-    if not isinstance(findings, list) or len(findings) > 16:
-        raise ValueError('organization findings must be a bounded array')
+    if not isinstance(findings, list):
+        raise ValueError('organization findings must be an array')
+    if len(findings) > 16:
+        raise ValueError(f'findings: received {len(findings)} entries; maximum 16. Merge overlapping issues and recheck the saved draft.')
     seen = set()
     for index, finding in enumerate(findings):
         prefix = f'findings[{index}]'

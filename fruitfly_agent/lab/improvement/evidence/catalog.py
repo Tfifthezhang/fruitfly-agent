@@ -53,7 +53,7 @@ class WorkspaceEvidence:
         self.workspace.access.grant(self.workspace.paths())
         if path not in self.workspace.paths():
             self.workspace.access.denied(path)
-            raise ValueError('read path is outside the evidence grant')
+            raise ValueError(f'read path is outside the evidence grant: {path}. Discover exact paths with catalog(prefix=...).')
         try:
             data = self.workspace.read(path)
             text = decode_text_file(data)

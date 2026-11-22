@@ -104,3 +104,9 @@ Execution can invoke models and task backends. Compare the frozen results
 offline with the measured comparison component and a paired manifest.
 The authoritative measurement source must provide attempt, scorer and outcome
 policy identities. [Configure measured comparison](../../../fruitfly_agent/lab/improvement/assessment/README.md#compare-explicitly-paired-measurements)
+
+The Organizer example uses two concurrent workers, at most six child executions
+and 32 model requests per child. Its 30-minute invocation and shared 512000-character,
+128-response reading allowance are starting controls for Flash models. Review
+actual completion and evidence quality before enlarging them. Other stages keep
+their own allowances. Reuse validates retained material and worker conditions.

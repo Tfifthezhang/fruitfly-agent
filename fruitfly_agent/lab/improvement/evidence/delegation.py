@@ -167,13 +167,15 @@ class EvidenceDelegation:
             self.record('delegation-findings-block', child_run_id=run_id, artifact_id=reference,
                         partial_artifact_id=partial, path=path, index_artifact_id=index)
             return AgentToolResult([TextBlock(canonical_json({'artifact_id': reference, 'characters': size, 'partial_path': path,
-                'remaining_characters': self.settings.findings.max_characters - self.block_sizes[run_id]}))])
+                'remaining_characters': self.settings.findings.max_characters - self.block_sizes[run_id],
+                'final_summary_max_characters': self.settings.findings.summary_characters,
+                'next': 'Save additional detailed blocks if needed, then submit a short conclusion referencing saved work.'}))])
         async def submit(ctx):
             value = validate(ctx.args)
             blocks = self.blocks.get(run_id, [])
             if blocks:
                 if len(value['summary']) > self.settings.findings.summary_characters:
-                    raise ValueError(f'final summary exceeds {self.settings.findings.summary_characters} characters; retain detail with save_findings')
+                    raise ValueError(f'final summary exceeds {self.settings.findings.summary_characters} characters; received {len(value["summary"])}. Retain existing saved blocks and shorten only summary; do not repeat the detailed findings.')
                 sources = {(v['path'], v['citation_id']): v for v in value['sources']}
                 for _, block in blocks:
                     sources.update({(v['path'], v['citation_id']): v for v in block['sources']})

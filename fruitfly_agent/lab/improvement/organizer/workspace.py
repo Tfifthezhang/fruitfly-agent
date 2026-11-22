@@ -53,7 +53,13 @@ def build_workspace(request, artifacts, *, record=None):
                 if row.get('overview') not in references:
                     row['overview'] = None
         references['context/' + name] = artifacts.put(canonical_json(value).encode())
-    batch = {'statistics': 'context/statistics.json', 'overview': 'context/overview.json', 'executions': 'context/executions.json',
+    material_scope = {'execution_count': len(request.records),
+        'detailed_execution_count': len(records),
+        'granted_resource_count': len(references),
+        'selection_path': 'context/extensions/selection.json' if selection else None,
+        'instructions': 'Browse exact granted paths with catalog(prefix=...). The selection receipt is authorization metadata, not required full reading.'}
+    references['context/material-scope.json'] = artifacts.put(canonical_json(material_scope).encode())
+    batch = {'material_scope': 'context/material-scope.json', 'statistics': 'context/statistics.json', 'overview': 'context/overview.json', 'executions': 'context/executions.json',
         'coverage': 'context/coverage.json',
         'selection': 'context/extensions/selection.json' if any(r.path == 'selection.json' for r in request.context) else None, 'tasks': tasks, 'instruction': request.instruction,
         'scope': 'Granted records for reading. Execution status and measurements are observations, not judgments.'}

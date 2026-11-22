@@ -456,7 +456,12 @@ class SubagentService:
                 get_follow_up_messages=follow), messages, signal=signal, context_pipeline=context_pipeline)
             outstanding = any(r['scope_id'] == self.scope_id and (r['state'] in ACTIVE or not r['delivered']) for r in self.store.rows.values())
             if outstanding and result.stop_reason != 'aborted':
-                result = replace(result, is_error=True, error_details={'kind': 'subagent_results_uncollected'})
+                details = dict(result.error_details or {})
+                if result.is_error:
+                    details['subagent_results_uncollected'] = True
+                else:
+                    details['kind'] = 'subagent_results_uncollected'
+                result = replace(result, is_error=True, error_details=details)
             return result
         finally:
             await self.end()

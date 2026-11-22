@@ -141,13 +141,33 @@ def role_usage(artifacts, diagnostic_id):
 
     trace = json.loads(artifacts.read_bytes(diagnostic_id))
     requests, responses = {}, {}
+    child_sessions = set()
+    child_totals: Counter[str] = Counter()
+    child_attempts = 0
+    child_terminal = 0
     for reference in trace['events']:
         event = json.loads(artifacts.read_bytes(reference['artifact_id']))
         name = event['event']
+        if name == 'research-child-session':
+            child_sessions.add(event['artifact_id'])
         if name == 'request':
             requests[event['id']] = event.get('role', 'unknown')
         elif name == 'response':
             responses[event['attempt_id']] = event
+    for child_reference in child_sessions:
+        terminals = {}
+        for line in artifacts.read_bytes(child_reference).splitlines():
+            try:
+                row = json.loads(line)
+            except (ValueError, UnicodeDecodeError):
+                continue
+            if isinstance(row, dict) and row.get('kind') == 'runRecord' and row.get('event') == 'end':
+                terminals[row.get('run_id', 'unknown')] = row.get('data', {})
+        child_terminal += bool(terminals)
+        for terminal in terminals.values():
+            child_attempts += terminal.get('provider_attempt_count', 0)
+            child_totals.update({key: value for key, value in terminal.get('usage', {}).items()
+                                 if type(value) is int and value >= 0})
     by_role = Counter(requests.values())
     totals: Counter[str] = Counter()
     measured = 0
@@ -161,4 +181,8 @@ def role_usage(artifacts, diagnostic_id):
             totals.update({name: value for name, value in usage.items() if type(value) is int and value >= 0})
     return {'observed_model_requests': len(requests), 'observed_by_role': dict(by_role),
             'responses_completed': completed, 'responses_with_usage': measured,
-            'reported_token_subtotals': dict(totals), 'billed_cost': None}
+            'reported_token_subtotals': dict(totals), 'billed_cost': None,
+            'children': {'sessions': len(child_sessions), 'terminal_sessions': child_terminal,
+                         'provider_attempts_observed': child_attempts,
+                         'reported_token_subtotals': dict(child_totals)},
+            'combined_reported_token_subtotals': dict(totals + child_totals)}

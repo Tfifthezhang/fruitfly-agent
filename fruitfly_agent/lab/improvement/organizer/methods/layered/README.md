@@ -28,3 +28,9 @@ scope, contrasting cases, investigation status and structured evidence gaps.
 Publication derives an index and per-issue detail files without extra model calls.
 Direct/search ranges and child outcomes remain separate coverage dimensions.
 See [the organizer contract](../../README.md#keep-partial-work).
+
+The reading instructions start with deterministic overview/statistics, define up
+to three questions, and investigate small case groups before drafting. Workers
+retain detailed blocks and return short conclusions. After the first round,
+additional investigation should resolve a contradiction that changes a finding.
+Draft checks report the finding count and actionable repair instructions.

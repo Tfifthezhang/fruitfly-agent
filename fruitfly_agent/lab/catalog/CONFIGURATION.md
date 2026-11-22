@@ -356,3 +356,11 @@ caches create no editable Improvement fields or additional parameter registry.
 Role bindings still use `models.roles`; enabled algorithms consume their resolved
 Provider through the existing assembly. See
 [connection ownership](../../providers/connections/README.md).
+
+Organizer reading and repair instructions remain owner resources in
+`organizer/methods/layered/defaults.yaml`. Evidence tool guidance is declared in
+`evidence/defaults.yaml`; runtime limits remain typed Evidence settings. Compact
+execution navigation is a tool option and does not change component selection.
+The evidence catalog also accepts `compact: boolean` and `run_id: string` for
+execution navigation. Full-row behavior remains the default. These arguments
+filter existing authorized records and grant no additional source access.

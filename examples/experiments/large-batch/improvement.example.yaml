@@ -28,14 +28,15 @@ stages:
       batches:
       - artifact: original-batch
     publish_as: organized-evidence
-    instruction: Investigate recurring cross-task behavior, matched contrasts, source
-      gaps and refutable hypotheses. Use complete batch statistics, investigate groups
-      of 8 to 12 cases, and preserve exact source citations. Keep material-audit findings
-      distinct from observed Agent behavior.
+    instruction: Investigate up to three cross-task questions. Start with two or three
+      relevant cases and available counterexamples per question. Use deterministic
+      statistics, save sourced findings, then validate and submit a concise guide.
+      Record unresolved questions as needs_evidence. Expand only to resolve a
+      contradiction that changes a finding.
     allowance:
-      seconds: 86400
-      evidence_characters: 536870912
-      evidence_responses: 16384
+      seconds: 1800
+      evidence_characters: 512000
+      evidence_responses: 128
     attempt: reuse
   assess:
     delegation:

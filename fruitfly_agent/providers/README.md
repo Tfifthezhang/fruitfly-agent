@@ -148,3 +148,7 @@ An exact historical empty-response `Continue.` fallback is excluded from replay
 after hash validation; canonical Session records remain unchanged.
 
 The [model relay](gateway/README.md) validates stream requests against a host-issued grant.
+
+A structurally identified connection timeout without an HTTP response is
+retryable within the configured transport allowance. Partial content delivery
+still prevents automatic retry. Explicit HTTP failures retain their status policy.

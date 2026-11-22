@@ -120,3 +120,9 @@ A value of zero defers model extraction while preserving the unit queue.
 Extraction leaves the shared completion reserve available for synthesis.
 The packet reports consumed extraction requests, unit reads, and direct unit
 citations in synthesis. Citation coverage records links in the guide.
+
+Flash-oriented reading starts with `context/overview.json`, statistics and the
+compact material scope. Use execution navigation with `compact=true`; use an
+exact `run_id` for a complete observation row. Read the linked summary for a
+citation. The model instructions converge after the first bounded investigation
+round and preserve unresolved questions as `needs_evidence`.

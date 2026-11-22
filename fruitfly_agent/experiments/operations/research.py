@@ -422,6 +422,8 @@ async def dispatch(args, workspace):
         if reporting.get('service') is not None and reporting['service'].last_diagnostics is not None:
             run['diagnostics'] = asdict(reporting['service'].last_diagnostics)
             run['usage'] = role_usage(outputs.artifacts, run['diagnostics']['artifact_id'])
+            outputs.write(prefix + '/diagnostics/trace.json',
+                json.loads(outputs.artifacts.read_bytes(run['diagnostics']['artifact_id'])))
         finished = datetime.now(timezone.utc)
         run['finished_at'] = finished.isoformat()
         run['wall_seconds'] = (finished - datetime.fromisoformat(run['started_at'])).total_seconds()

@@ -3,13 +3,19 @@ import json
 from typing import Any
 
 
-def execution_page(workspace, *, cursor, limit, status=None, max_characters=24000):
+def execution_page(workspace, *, cursor, limit, status=None, max_characters=24000, compact=False, run_id=None):
     rows = json.loads(workspace.read('context/executions.json'))
     if status is not None:
         rows = [row for row in rows if row.get('status') == status]
+    if run_id is not None:
+        rows = [row for row in rows if row.get('run_id') == run_id]
     page: list[dict[str, Any]] = []
     size = 0
-    for row in rows[cursor:cursor + limit]:
+    for original in rows[cursor:cursor + limit]:
+        row = {key: original.get(key) for key in (
+            'run_id', 'task_id', 'status', 'termination_reason', 'elapsed_seconds',
+            'model_calls', 'counters', 'diagnostics_complete')} if compact else dict(original)
+        row['summary_path'] = 'context/summaries/' + original['run_id'] + '.json'
         length = len(json.dumps(row, ensure_ascii=False))
         if page and size + length > max_characters:
             break

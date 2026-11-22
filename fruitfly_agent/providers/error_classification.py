@@ -120,7 +120,7 @@ def classify_provider_error(
         return OverflowError(str(exc), details=details)
     if not non_overflow and resolved_status == 413:
         return OverflowError(str(exc), details=details)
-    if resolved_status in _RETRYABLE_STATUS_CODES or any(
+    if (resolved_status is None and code == 'connect_timeout') or resolved_status in _RETRYABLE_STATUS_CODES or any(
         pattern.search(text) for pattern in _RETRYABLE_PATTERNS
     ):
         return RetryableError(str(exc), details=details)

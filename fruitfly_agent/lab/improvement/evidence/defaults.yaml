@@ -32,9 +32,9 @@ parameters:
       with next_offset. Offsets are source characters.
     search: Literal search across granted files or selected paths. Returns source
       spans, citation IDs, failures and a continuation cursor.
-    submit_findings: Submit final compact findings, exact supplied citations and remaining
+    submit_findings: Submit a short final conclusion, references to saved detailed blocks, exact supplied citations and remaining
       unknowns. Success terminates this child invocation. Do not use this tool for probes
-      or progress updates.
+      or progress updates. Run this tool alone in its batch. If rejected, repair only the reported fields.
     catalog_parts: Browse still-applicable retained child findings without supplying original evidence.
     read_part: Read a retained part with original producer and source references. Continue with next_offset; this is derived historical evidence.
   retention:

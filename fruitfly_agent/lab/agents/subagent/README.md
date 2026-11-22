@@ -357,3 +357,7 @@ Wait polling remains bounded to 60 seconds and never cancels work by itself.
 Existing explicit component files retain their authored values; default references
 consume the owner defaults when a new runtime is assembled. More concurrent children
 can increase Provider load and aggregate usage.
+
+When the parent fails with outstanding child results, its original error remains
+primary. The result additionally records `subagent_results_uncollected: true`.
+A successful parent that leaves results uncollected retains the dedicated error.

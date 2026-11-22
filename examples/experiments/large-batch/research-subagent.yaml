@@ -3,10 +3,10 @@ role: H
 implementation: subagent
 parameters:
   settings:
-    max_concurrent: 4
-    max_agents: 32
+    max_concurrent: 2
+    max_agents: 6
     run_timeout_seconds: 3600
-    max_model_requests: 256
+    max_model_requests: 32
     workers:
       evidence-reader:
         description: Investigate a bounded evidence question.
@@ -26,7 +26,7 @@ parameters:
           state: independent
         limits:
           seconds: 3600
-          model_requests: 256
+          model_requests: 32
           evidence_characters: 2097152
           evidence_responses: 512
         result:
@@ -51,7 +51,7 @@ parameters:
           state: independent
         limits:
           seconds: 3600
-          model_requests: 256
+          model_requests: 32
           evidence_characters: 2097152
           evidence_responses: 512
         result:
@@ -76,7 +76,7 @@ parameters:
           state: independent
         limits:
           seconds: 3600
-          model_requests: 256
+          model_requests: 32
           evidence_characters: 2097152
           evidence_responses: 512
         result:
@@ -101,7 +101,7 @@ parameters:
           state: independent
         limits:
           seconds: 3600
-          model_requests: 256
+          model_requests: 32
           evidence_characters: 2097152
           evidence_responses: 512
         result:

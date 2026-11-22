@@ -33,7 +33,7 @@ def evidence_tools(workspace, *, settings=None, reader=None):
             cursor, limit = args.get('cursor', 0), args.get('limit', settings.catalog.default_entries)
             if type(cursor) is not int or cursor < 0 or type(limit) is not int or not 1 <= limit <= settings.catalog.max_entries:
                 raise ValueError('invalid execution catalog page')
-            return result(execution_page(workspace, cursor=cursor, limit=limit, status=args.get('status'), max_characters=settings.read.max_characters))
+            return result(execution_page(workspace, cursor=cursor, limit=limit, status=args.get('status'), max_characters=settings.read.max_characters, compact=args.get('compact', False), run_id=args.get('run_id')))
         path=args.get('path')
         if path:
             if not path.endswith('/evidence/events.json') and path != 'evidence/events.json':
@@ -115,7 +115,7 @@ def evidence_tools(workspace, *, settings=None, reader=None):
             return exhausted()
         return result(reader.search(ctx.args['query'],paths=tuple(ctx.args.get('paths',())),cursor=ctx.args.get('cursor',''),limit=ctx.args.get('limit',settings.search.default_matches)))
     return (AgentTool(name='catalog',label='Browse evidence',description=settings.instructions.catalog,
-        parameters={'type':'object','properties':{'prefix':{'type':'string'},'path':{'type':'string'},'kind':{'type':'string'},
+        parameters={'type':'object','properties':{'run_id':{'type':'string'},'compact':{'type':'boolean'},'prefix':{'type':'string'},'path':{'type':'string'},'kind':{'type':'string'},
             **{key: {'type': 'string'} for key in ('tool_name', 'tool_call_id', 'request_id', 'operation_id', 'phase', 'status')},
             'order':{'type':'string','enum':['elapsed_seconds']},'cursor':{'type':'integer','minimum':0},'limit':{'type':'integer','minimum':1,'maximum':settings.catalog.max_entries}},'additionalProperties':False},execute=catalog),
         AgentTool(name='read',label='Read evidence',description=settings.instructions.read,

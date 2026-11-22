@@ -64,6 +64,14 @@ class ProviderTests(unittest.TestCase):
         unknown = classify_provider_error(Exception('an unfamiliar failure'))
         self.assertEqual('unknown', unknown.details['failure']['code'])
 
+    def test_connect_timeout_is_retryable_without_response_status(self):
+        from fruitfly_agent.providers.error_classification import classify_provider_error
+        cause = type('ConnectTimeout', (Exception,), {})('fixture')
+        error = type('APITimeoutError', (Exception,), {})('Request timed out.')
+        error.__cause__ = cause
+        self.assertIsInstance(classify_provider_error(error), RetryableError)
+        self.assertIsInstance(classify_provider_error(error, status_code=401), FatalError)
+
     def test_public_model_template_loads_without_live_credentials(self) -> None:
         specs = load_model_specs(Path(__file__).resolve().parents[2] / "examples/configuration/models.example.yaml")
         self.assertEqual({"deepseek-flash-openai", "deepseek-flash-anthropic"}, set(specs))

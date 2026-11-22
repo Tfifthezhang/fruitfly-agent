@@ -288,3 +288,18 @@ class SubagentServiceTests(unittest.IsolatedAsyncioTestCase):
         result = await self.finish(self.service.spawn('Inspect'))
         self.assertEqual(('failed', 'tool_terminated'), (result['state'], result['error']))
         self.assertEqual('confirmed', result['cleanup'])
+
+    async def test_uncollected_children_preserve_parent_provider_error(self):
+        from unittest.mock import patch
+        from fruitfly_agent.core.config import AgentLoopConfig
+        from fruitfly_agent.core.data_model import AgentLoopResult
+        await self.service.end()
+        async def fail(*args, **kwargs):
+            row = self.service.spawn('inspect')
+            await self.finish(row)
+            return AgentLoopResult(messages=[], stop_reason='error', is_error=True,
+                               error_details={'kind': 'FatalError', 'error': 'connection timeout'})
+        with patch('fruitfly_agent.lab.agents.subagent.service.run_agent_loop', fail):
+            result = await self.service.run_loop(AgentLoopConfig(FauxProvider()), [UserMessage('root')])
+        self.assertEqual(result.error_details['kind'], 'FatalError')
+        self.assertTrue(result.error_details['subagent_results_uncollected'])
