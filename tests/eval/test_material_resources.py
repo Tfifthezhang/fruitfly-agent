@@ -92,6 +92,9 @@ import fruitfly_agent.providers.gateway.access as access_module
 import fruitfly_eval.harbor.model_access as model_access_module
 assert Path(access_module.__file__).is_relative_to(root)
 assert Path(model_access_module.__file__).is_relative_to(root)
+import fruitfly_eval.harbor.access_files as access_files
+assert Path(access_files.__file__).is_relative_to(root)
+access_files._operate('identity', '0' * 32)
 from fruitfly_agent.providers.chat_codec import ChatReasoning
 reasoning = ChatReasoning()
 assert reasoning.consume({'reasoning': 'Plan'}) == 'Plan'

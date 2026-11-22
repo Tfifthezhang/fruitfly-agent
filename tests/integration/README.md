@@ -26,3 +26,12 @@ Run `.venv/bin/python -m unittest tests.integration.model_relay_socket` to
 exercise the private Unix socket with a fake upstream. This check requires
 permission to bind a local socket. It uses no external model or credential.
 
+
+## Docker model access
+
+On a native Linux rootless Docker host, set `FRUITFLY_ACCESS_TEST_IMAGE` to an
+existing local Linux image with Python 3.12+ and FruitFlyAgent runtime
+dependencies. Run `.venv/bin/python -m unittest tests.integration.eval_model_access`.
+The check requires host OpenSSL. It mounts the checkout read-only and checks
+default and explicit Agent identities through a fixture Unix socket and a
+container-local TLS listener. The containers have no external network access.

@@ -24,7 +24,12 @@ class HarborAdapterTests(unittest.TestCase):
         agent.model_catalog_path = root / 'models.yaml'
         agent.profile = 'default'
         agent.render_instruction = lambda instruction: instruction
-        agent.exec_as_agent = AsyncMock()
+        operations = []
+        async def execute(_environment, *, command, env, **kwargs):
+            operations.append((command, dict(env)))
+            return SimpleNamespace(stdout='[1000, 1000]')
+        agent.exec_as_agent = AsyncMock(side_effect=execute)
+        agent.exec_as_root = AsyncMock(side_effect=execute)
         environment = SimpleNamespace(upload_file=AsyncMock())
         retired = []
         @asynccontextmanager
@@ -33,12 +38,15 @@ class HarborAdapterTests(unittest.TestCase):
                 yield {'models': {'fixture': {'grant': 'private-fixture-grant'}}}
             finally:
                 retired.append(True)
+                self.assertNotIn(" remove ", operations[-1][0])
         with patch('fruitfly_eval.harbor.model_access.task_access', access):
             asyncio.run(agent.run('task', environment, SimpleNamespace(metadata=None)))
         self.assertEqual(retired, [True])
-        commands = [call.kwargs['command'] for call in agent.exec_as_agent.call_args_list]
-        self.assertIn('rm -f /installed-agent/fruitfly/runtime/model-access.json', commands[-1])
-        self.assertNotIn('private-fixture-grant', str(agent.exec_as_agent.call_args_list))
+        self.assertIn('access_files remove ', operations[-1][0])
+        run_env = next(env for command, env in operations if 'harbor.supervisor' in command)
+        self.assertRegex(run_env['FRUITFLY_MODEL_ACCESS_FILE'],
+                         r'/model-access/[0-9a-f]{32}/model-access.json$')
+        self.assertNotIn('private-fixture-grant', str(operations))
         self.assertNotIn('FRUITFLY_MODEL_ACCESS_FILE', agent.runtime_environment)
 
     def test_setup_logging_keeps_output_and_nonzero_exit(self) -> None:

@@ -77,7 +77,7 @@ async def task_access(models: Path, directory: Path, settings: dict[str, Any]) -
                             'integration': auth.integration, 'account': auth.account,
                             'identity': auth.identity, 'label': auth.label},
                             'socket': TARGET + '/' + root.name + '/model.sock', 'grant': grant,
-                            'network_url': network_url, 'ca': '/installed-agent/fruitfly/runtime/relay-ca.pem' if network_url else None}
+                            'network_url': network_url, 'ca': None}
                     yield {'models': entries}
             finally:
                 for grant in grants:

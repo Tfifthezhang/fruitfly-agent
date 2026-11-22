@@ -581,7 +581,11 @@ reachability and usable runtime bind paths; TLS alone does not establish remote
 Docker compatibility. See [transport and lifecycle limits](harbor/README.md#connect-subscription-models).
 
 Use the existing configuration validation, preparation, check and smoke sequence
-above. Configuration export does not verify subscription credentials or relay
+above. If the Agent cannot reach the Unix socket, check whether its container
+UID/GID maps to the relay owner on the host. Use the existing TLS settings when
+the host and container identities cannot share the private socket. The
+[local Docker delivery check](../tests/integration/README.md#docker-model-access)
+uses a fixture listener. Configuration export does not verify subscription credentials or relay
 reachability. Re-run preparation after changing source or mounted runtime; an old
 frozen Agent does not acquire new Provider support from the current checkout.
 A real smoke consumes model allowance and can incur charges. For restricted Go

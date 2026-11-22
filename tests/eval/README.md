@@ -53,3 +53,6 @@ Task-batch checks include zero-result reports and review-required resume drafts.
 
 `test_model_access.py` owns private access descriptors, model binding, task grant
 retirement and absence of upstream credentials in container material.
+
+`test_access_files.py` covers container identity, private publication, failed
+uploads, cancellation and scoped file retirement.

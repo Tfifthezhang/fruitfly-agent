@@ -361,7 +361,13 @@ resource tests. Historical/offline organization is described in [Eval](../README
 
 Harbor resolves subscription credentials in its host process and creates an
 inference listener for each Agent execution. The container receives an owner-only
-temporary descriptor at `/installed-agent/fruitfly/runtime/model-access.json`.
+temporary descriptor at
+`/installed-agent/fruitfly/runtime/model-access/<execution-id>/model-access.json`.
+[File delivery](access_files.py) queries the Agent's actual container UID/GID,
+stages files in a private directory, and grants the Agent ownership of the
+directory (0700) and files (0600). Before launching the CLI, the Agent identity
+validates the descriptor and connects to the relay. The probe completes a TLS
+handshake in network mode and sends no inference request.
 The normal FruitFlyAgent CLI consumes it through `FRUITFLY_MODEL_ACCESS_FILE`.
 Main and auxiliary connected models share the ordinary registry assembly path.
 API models retain their existing environment-key path.
@@ -389,8 +395,10 @@ Task network restrictions remain effective and can prevent relay access.
 
 Grants bind model, endpoint and inference route, expire after 24 hours and are
 revoked when Agent execution exits. Long tasks exceeding that period need a new
-execution. Listener retirement closes active streams. Temporary access material
-is removed before verification; a cleanup failure remains a task failure.
+execution. Listener retirement closes active streams. After execution or a delivery error,
+Eval retires the listener and revokes grants before removing the execution's
+access files and optional CA. If removal cannot be confirmed, Eval attempts to
+stop the task environment and reports an infrastructure failure.
 Separate verifiers receive no relay mount. A shared Agent/verifier environment
 provides no process-level secret isolation while the Agent is active.
 Host failure or SIGKILL cannot guarantee filesystem cleanup; the dead listener

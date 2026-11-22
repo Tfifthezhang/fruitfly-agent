@@ -130,33 +130,32 @@ class FruitFlyHarborAgent(BaseInstalledAgent):  # type: ignore[misc]
         if not getattr(self, 'model_relay_directory', None):
             await self._run_task(instruction, environment, context)
             return
+        from fruitfly_eval.harbor.access_files import ContainerModelAccess
         from fruitfly_eval.harbor.model_access import task_access
-        async with task_access(self.model_catalog_path, Path(self.model_relay_directory),
-                               self.model_relay_settings) as access:
-            target = '/installed-agent/fruitfly/runtime/model-access.json'
-            with tempfile.TemporaryDirectory(prefix='fruitfly-model-access-') as directory:
-                source = Path(directory) / 'access.json'
-                source.write_text(json.dumps(access), encoding='utf-8')
-                source.chmod(0o600)
-                await environment.upload_file(source, target)
-            if self.model_relay_settings:
-                await environment.upload_file(Path(self.model_relay_settings['ca']),
-                    '/installed-agent/fruitfly/runtime/relay-ca.pem')
-            await self.exec_as_agent(environment, command='chmod 600 ' + target,
-                env=self.runtime_environment, timeout_sec=10)
-            self.runtime_environment = {**self.runtime_environment, 'FRUITFLY_MODEL_ACCESS_FILE': target}
-            try:
-                await self._run_task(instruction, environment, context)
-            finally:
-                self.runtime_environment.pop('FRUITFLY_MODEL_ACCESS_FILE', None)
-                await self.exec_as_agent(environment, command='rm -f ' + target,
-                    env=self.runtime_environment, timeout_sec=10)
+
+        async with ContainerModelAccess(self, environment) as files:
+            async with task_access(self.model_catalog_path, Path(self.model_relay_directory),
+                                   self.model_relay_settings) as access:
+                if access is None:
+                    await self._run_task(instruction, environment, context)
+                    return
+                ca = self.model_relay_settings.get('ca')
+                try:
+                    await files.publish(access, ca_source=Path(ca) if ca else None)
+                except Exception as exc:
+                    # Harbor may continue to verification after an Agent exit or
+                    # timeout. A failed delivery is an infrastructure error.
+                    raise RuntimeError('Could not deliver task model access') from exc
+                await self._run_task(instruction, environment, context,
+                                     model_access_file=str(files.descriptor_path))
 
     async def _run_task(
         self,
         instruction: str,
         environment: BaseEnvironment,
         context: AgentContext,
+        *,
+        model_access_file: str | None = None,
     ) -> None:
         token = uuid.uuid4().hex
         command = shlex.join(
@@ -190,6 +189,8 @@ class FruitFlyHarborAgent(BaseInstalledAgent):  # type: ignore[misc]
         # expired Harbor await must not leave an Agent making requests behind.
         env = {**self.runtime_environment, **self.preparation["runtime"]["host"].get("agent", {}),
                "FRUITFLY_EVENT_STREAM_PATH": "/logs/agent/live-events.jsonl"}
+        if model_access_file is not None:
+            env['FRUITFLY_MODEL_ACCESS_FILE'] = model_access_file
         env['FRUITFLY_MODEL_USAGE_PATH'] = '/logs/agent/model-usage.json'
         try:
             await self.exec_as_agent(environment, command=command, env=env)
