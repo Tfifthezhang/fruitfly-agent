@@ -121,8 +121,8 @@ For grouped studies, [compose a feedback batch](fruitfly_agent/lab/improvement/g
 before organization and proposal. The workspace editor is the default.
 [GEPA reflective proposal](fruitfly_agent/lab/improvement/editor/methods/gepa_reflection/README.md)
 is available as an optional editor method.
-The [research design](RESEARCH_PIPELINE_DESIGN.md) explains the experiment
-protocol and design rationale; use the stage guides for current capabilities and commands.
+The [research stage guide](fruitfly_agent/lab/improvement/DEVELOPER_GUIDE.md)
+describes the implemented experiment protocol and commands.
 
 ## What you can do
 

@@ -44,10 +44,10 @@ class ConfigurationPathsTest(unittest.IsolatedAsyncioTestCase):
         (self.root / '.env').write_text('OLD_ONLY=unused-fixture\n')
         self.assertIsNone(self.paths.model_catalog())
         self.assertEqual(load_env(self.paths.secret_file()), {})
-        factory = RunApplicationFactory(cwd=self.root, environment={}, allow_incomplete=True)
+        factory = RunApplicationFactory(cwd=self.root, user_root=(self.root) / '.fruitfly-user', environment={}, allow_incomplete=True)
         self.assertIsNone(factory.selection.profile.model_profile)
         _write_catalog(self.paths.models, {'current': 'current-model'})
-        factory = RunApplicationFactory(cwd=self.root, environment={})
+        factory = RunApplicationFactory(cwd=self.root, user_root=(self.root) / '.fruitfly-user', environment={})
         self.assertEqual(factory.selection.profile.model_profile, 'current')
 
     def test_explicit_custom_catalog_is_supported_without_implicit_discovery(self):
@@ -56,7 +56,7 @@ class ConfigurationPathsTest(unittest.IsolatedAsyncioTestCase):
         save_harness_config(self.root / '.fruitfly/config.yaml', HarnessConfig('work', {
             'work': HarnessProfile('work', '../custom-models.yaml', 'explicit')}))
         _write_catalog(self.paths.models, {'default': 'default-model'})
-        factory = RunApplicationFactory(cwd=self.root, environment={})
+        factory = RunApplicationFactory(cwd=self.root, user_root=(self.root) / '.fruitfly-user', environment={})
         self.assertEqual(factory.selection.profile.model_profile, 'explicit')
         self.assertEqual(factory.selection.profile.model_catalog, '../custom-models.yaml')
 
@@ -64,7 +64,7 @@ class ConfigurationPathsTest(unittest.IsolatedAsyncioTestCase):
         _write_catalog(self.paths.models, {'offline': 'offline-model'})
         root_secret = self.root / '.env'
         root_secret.write_text('UNRELATED=leave-this-file\n')
-        factory = RunApplicationFactory(cwd=self.root, environment={})
+        factory = RunApplicationFactory(cwd=self.root, user_root=(self.root) / '.fruitfly-user', environment={})
         factory.configuration.model_setup.stage('openai', dict(profile='added', model='offline',
             context_window='8192', max_output_tokens='1024', base_url='', api_key_env=''), 'offline-placeholder')
         factory.configuration.save()

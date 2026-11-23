@@ -54,9 +54,9 @@ turn; closing its owning runtime still retires that work.
 ## Schedule optional idle work
 
 A handle can supply an independent maintenance service. Application records input
-completion, schedules work only with no queued input, and cancels and retires it
-before foreground work or runtime replacement. Maintenance holds the submission
-lock; it cannot activate a new state. `retained_action` prepares a replacement
+completion and starts maintenance when idle with no queued input. Maintenance
+already underway can finish alongside a new submission. Runtime replacement
+retires maintenance before closing its resources. Maintenance cannot activate a new state. `retained_action` prepares a replacement
 before a commit, then uses the ordinary checked activation boundary. Inspection
 uses frozen active documents. Hosts without maintenance retain existing behavior.
 

@@ -18,7 +18,7 @@ def validate_memories(entries):
                 or entry['id'] in identities):
             raise ValueError('invalid or duplicate memory identity')
         identities.add(entry['id'])
-        if not isinstance(entry['kind'], str) or entry['kind'] not in KINDS or entry['scope'] != 'project' or not isinstance(entry['status'], str) or entry['status'] not in {'active', 'withdrawn'}:
+        if not isinstance(entry['kind'], str) or entry['kind'] not in KINDS or entry['scope'] not in ('project', 'user') or not isinstance(entry['status'], str) or entry['status'] not in {'active', 'withdrawn'}:
             raise ValueError('invalid memory kind, scope or status')
         for field in ('subject', 'description', 'body', 'applicability', 'observed_at'):
             value = entry[field]
@@ -92,7 +92,7 @@ def apply_changes(entries, changes, *, evidence, observed_at):
             source = known[citations[0]]
             if any(known[c].session_id != source.session_id for c in citations):
                 raise ValueError('one memory update must cite one session')
-            entry = {**value, 'id': key, 'scope': 'project', 'status': 'active',
+            entry = {**value, 'id': key, 'scope': current[key]['scope'] if operation == 'update' else 'user', 'status': 'active',
                 'provenance': {'session_id': source.session_id,
                     'message_ids': [known[c].message_id for c in citations], 'basis': 'inferred'},
                 'observed_at': observed_at}

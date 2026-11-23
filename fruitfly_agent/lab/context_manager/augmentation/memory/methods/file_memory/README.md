@@ -2,18 +2,19 @@
 
 [Up: Memory](../../README.md)
 
-Use attributed workspace notes across sessions. H `file-memory` controls when to
+Use attributed user notes across sessions and workspaces. H `file-memory` controls when to
 read, extract and consolidate them. S `memory-library` contains the adopted notes.
 Normal maintenance changes S through the host; it uses no Improvement editor or
 evaluator. I contains only those improvement strategies themselves.
 
 ## Enable and read
 
-Memory and automatic maintenance are enabled by default. The configuration menu
+Memory and automatic upkeep are enabled by default. The configuration menu
 shows Memory with File memory as its implementation. It exposes automatic
-maintenance and the two thresholds. Advanced instructions and budgets use the
+automatic upkeep and the two thresholds. Advanced instructions and budgets use the
 ordinary H component document. Disabling Memory removes its reading and upkeep;
-disabling only maintenance preserves reading. Neither action deletes saved notes.
+disabling Memory removes reading and manual upkeep. Disabling automatic upkeep
+preserves reading and `/memory run`. Neither action deletes saved notes.
 
 Each request receives descriptions and resource locations. Bodies are read only
 when the model calls `read`. The bounded directory includes an `INDEX.md` resource
@@ -28,9 +29,14 @@ through file tools. Assembly and directory loading make no model requests.
 | Extraction | 8000 | New original user-input characters since the processed cursor |
 | Consolidation | 50 | Completed user turns since the last consolidation |
 
-Counters and evidence identities accumulate across sessions in the same retained
-scope. Assistant output and tool results are not extraction evidence. Scheduling
-occurs while idle; pending proposals suppress duplicate work. A lazy
+Counters and evidence identities accumulate in the shared memory store at
+`.fruitfly/memory/state.json`. Run hosts can inject `user_root` to share one memory store across workspaces.
+The default stores memory in the current workspace. Assistant output and tool
+results are not extraction evidence. Scheduling
+occurs while idle; `/memory run` manually requests the same owner-validated
+pipeline below thresholds. Both paths use the same batch journal, validation,
+atomic publication and visible model activity. Pending proposals suppress
+duplicate work. A lazy
 `models.roles.memory_maintenance` binding inherits executor unless explicitly
 assigned another catalog alias. Empty consolidation and unchanged content already consolidated with the same
 instructions make no model request.
@@ -38,13 +44,43 @@ Invocation input/output and timeout bounds are declared in [defaults.yaml](defau
 Failed or cancelled work does not advance successful cursors. Explicit retry
 remains available; no periodic model polling is used.
 
-Generated batches remain pending. `/memory` lists notes, counters and pending
-updates. `/memory read ID`, `/memory commit UPDATE`, `/memory reject UPDATE` and
-`/memory retry OPERATION` use the host's retained-state capability. Commit prepares
+Validated maintenance results and successful cursors publish atomically. A library committed by another session is
+refreshed through checked runtime preparation before the next foreground task.
+Refresh preserves the current conversation path and uses the ordinary assembler.
+Preparation failures let the task continue with the previous runtime and expose a
+refresh error through `/memory`. The saved library remains published. `/memory`
+shows the location, automatic trigger status and next command; `/memory details`
+lists notes, counters and pending updates. `/memory run`, `/memory read ID`,
+`/memory commit UPDATE`, `/memory reject UPDATE` and `/memory retry OPERATION`
+use the host's retained-state capability. Commit prepares
 and starts a replacement runtime before activation. Failed preparation leaves the
 active runtime, canonical history and pending status intact. Sources are never
-rewritten. One-shot tasks disable the workspace maintenance service and use frozen
+rewritten. One-shot tasks disable user and workspace maintenance services and use frozen
 initial content from their selected configuration.
+
+## Recover maintenance
+
+The host journals immutable evidence, the base library revision, algorithm input
+identity, observation time and each model response. Completed batches are reused
+when a later batch is interrupted. A call recorded as started without a durable
+response requires `/memory retry OPERATION`, which permits another potentially
+paid call. New input cannot authorize that replay. Invalid responses retain the
+input cursor; explicit retry regenerates the failed batch while keeping earlier
+responses. Recovery requires the captured algorithm configuration. Restore that
+configuration before resuming an interrupted batch. `/memory discard OPERATION`
+releases a known failed batch while retaining its responses and unprocessed
+evidence. Use it after a base revision conflict before generating against the new
+revision. Unknown calls still require retry authorization.
+
+Use `/memory import WORKSPACE` once for legacy project checkpoints. Import verifies
+source artifacts, merges identities, keeps project applicability and unknown
+operations, and publishes one checkpoint. Repeating an unchanged import is safe.
+Resolve conflicting identities or pending batches explicitly. Source checkpoints
+remain available. Import does not call a model; retry is a separate action.
+
+New notes use `user` scope and retain applicability for project-specific facts.
+Historical `project` notes retain their scope. Store publication and the revision
+loaded by each session are displayed separately. Bodies stay on-demand.
 
 ## Structure retained entries
 
@@ -71,7 +107,7 @@ trial clones the same initial memory, applies validated updates locally and
 executes downstream validation/holdout tasks. Production retained state is never
 written by the trial. Ordinary task runners cannot claim to evaluate learning
 instructions without this capability. Independent verification is required for
-persistent improvement publication; normal reviewed memory upkeep is a different
+persistent improvement publication; normal owner-validated memory upkeep is a different
 operation. The generic experiment source can select `execution: memory-learning`.
 
 ## Files and checks

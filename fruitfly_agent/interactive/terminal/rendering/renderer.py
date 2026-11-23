@@ -15,6 +15,7 @@ from fruitfly_agent.interactive.contracts.events import (
     AssistantTextDelta,
     AssistantMessageStarted,
     ManagedOperationChanged,
+    AuxiliaryModelActivity,
     AssistantThinkingDelta,
     CompactionStarted,
     InteractiveEvent,
@@ -258,6 +259,31 @@ class TerminalRenderer:
                 self._newline()
                 color = _RED if event.state in {'failed', 'cleanup_unconfirmed'} else _YELLOW if event.state == 'cancelled' else _GREEN_BOLD
                 self._write(f"[background {safe_terminal_text(event.handle)} · {safe_terminal_text(event.state)} · {event.elapsed_seconds:.1f}s]\n", color)
+            return
+        if isinstance(event, AuxiliaryModelActivity):
+            if event.phase == 'batch_started':
+                self._newline()
+                self.write_system(f"[memory · batch {event.batch}/{event.total} · model running]\n")
+            elif event.phase == 'batch_response':
+                self._newline()
+                self.write_system(f"[memory · batch {event.batch}/{event.total} · model response]\n")
+                if event.text:
+                    self.write_system(safe_terminal_text(event.text) + ('' if event.text.endswith('\n') else '\n'))
+            elif event.phase == 'model_text':
+                self._write(safe_terminal_text(event.text))
+                self._line_open = self._line_open or bool(event.text)
+            elif event.phase == 'model_started':
+                self._newline()
+                self.write_system('[auxiliary model · ' + safe_terminal_text(event.model_role or event.subject) + ' · running]\n')
+            elif event.phase == 'model_status':
+                self._newline()
+                self.write_system('[auxiliary model · ' + safe_terminal_text(event.text) + ']\n')
+            elif event.phase == 'model_finished':
+                self._newline()
+                self.write_system('[auxiliary model finished]\n')
+            elif event.phase == 'model_failed':
+                self._newline()
+                self.write_system('[auxiliary model failed · ' + safe_terminal_text(event.text) + ']\n')
             return
         if isinstance(event, ToolStarted):
             self._flush_markdown()

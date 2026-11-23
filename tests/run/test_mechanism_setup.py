@@ -17,7 +17,7 @@ class MechanismSetupTests(unittest.TestCase):
     def setUp(self):
         self.root = Path(self.enterContext(tempfile.TemporaryDirectory())).resolve()
         _write_catalog(self.root / '.fruitfly/models.yaml', {'offline': 'offline-model'})
-        self.factory = RunApplicationFactory(cwd=self.root, environment={'TEST_API_KEY': 'fixture-model-key'})
+        self.factory = RunApplicationFactory(cwd=self.root, user_root=(self.root) / '.fruitfly-user', environment={'TEST_API_KEY': 'fixture-model-key'})
         self.configuration = self.factory.configuration
         self.service = self.configuration.mechanism_setup
         self.output = io.StringIO()
@@ -147,7 +147,7 @@ class MechanismSetupTests(unittest.TestCase):
         self.configuration.set_mechanism('local-env', enabled=True)
         self.configuration.save()
         # Recreate the host with only persisted credentials, as CLI startup does.
-        self.factory = RunApplicationFactory(cwd=self.root,
+        self.factory = RunApplicationFactory(cwd=self.root, user_root=(self.root) / '.fruitfly-user',
             environment={**load_env(secret_path), 'TEST_API_KEY': 'fixture-model-key'})
         self.configuration = self.factory.configuration
         self.service = self.configuration.mechanism_setup

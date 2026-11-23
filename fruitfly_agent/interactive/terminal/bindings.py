@@ -42,6 +42,7 @@ class TerminalBindings:
     retained_state: Callable | None = None
     retained_document: Callable | None = None
     retained_action: Callable | None = None
+    retained_run: Callable | None = None
 
     discover_progress: Callable | None = None
     subagents: Callable | None = None
@@ -72,5 +73,6 @@ class TerminalBindings:
             retained_state=getattr(session, 'retained_state', None),
             retained_document=getattr(session, 'retained_document', None),
             retained_action=getattr(session, 'retained_action', None),
+            retained_run=getattr(session, 'run_retained', None),
         )
 

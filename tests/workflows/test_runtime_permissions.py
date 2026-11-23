@@ -21,7 +21,7 @@ class RuntimePermissionWorkflowTests(unittest.IsolatedAsyncioTestCase):
             provider = FauxProvider()
             registry = Mock()
             registry.create.return_value = provider
-            factory = RunApplicationFactory(cwd=workspace,
+            factory = RunApplicationFactory(cwd=workspace, user_root=(workspace) / '.fruitfly-user',
                 environment={'TEST_API_KEY': 'offline-placeholder'}, provider_registry=registry)
             factory.configuration.set_mechanism('working-memory-reduction', enabled=False)
             factory.configuration.save()

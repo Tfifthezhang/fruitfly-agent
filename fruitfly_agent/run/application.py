@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Mapping
 
-from fruitfly_agent.improvement.contracts.optimization import TextProjection
+from fruitfly_agent.improvement.contracts.optimization import TextProjection, RetainedDocuments
 from fruitfly_agent.core.config import AgentLoopConfig
 from fruitfly_agent.interactive import ResumableSession
 from fruitfly_agent.interactive.application import RuntimeHandle
@@ -66,14 +66,17 @@ class RunApplicationFactory:
         extensions=None,
         retained_state_enabled: bool = True,
         connection_service=None,
+        user_root: Path | None = None,
     ) -> None:
         self.cwd = cwd.resolve()
+        self.user_root = (Path(user_root) if user_root is not None else self.cwd / '.fruitfly').expanduser().resolve()
         from fruitfly_agent.providers.connections.service import ConnectionService
         self.connection_service = connection_service or ConnectionService(store=getattr(provider_registry, 'credential_store', None))
         self.retained_state_enabled = retained_state_enabled
         self._base_catalog = catalog or builtin_catalog()
         self._base_improvement_bindings = improvement_bindings
-        self.permission_policy = permission_policy
+        from .runtime.permissions import default_permission_policy
+        self.permission_policy = permission_policy or default_permission_policy(self.cwd, config_path, user_root=self.user_root)
         if extensions is None:
             from .extensions import configured_extensions
             extension_config = Path(config_path).expanduser() if config_path is not None else self.cwd / '.fruitfly/config.yaml'
@@ -123,7 +126,17 @@ class RunApplicationFactory:
 
         from hashlib import sha256
         retained_scope = sha256((str(self.selection.config_path) + ':' + self.selection.profile.profile_id).encode()).hexdigest()[:24]
-        self.retained_store = RetainedStateStore(self.cwd / '.fruitfly/retained' / retained_scope, self.artifact_store)
+        retained_directory = '.fruitfly/retained/' + retained_scope
+        workspace_store = RetainedStateStore(
+            self.cwd / retained_directory, self.artifact_store, snapshot_directory=retained_directory,
+        )
+        from .storage.retained_scopes import RetainedScopes
+        from fruitfly_agent.lab.catalog import configuration_surfaces
+        self.retained_store = RetainedScopes(workspace_store,
+            RetainedStateStore(self.user_root / 'memory', DataArtifactStore(self.user_root / 'artifacts'),
+                snapshot_directory='.fruitfly/retained/user'),
+            {name for name, (_, surface) in configuration_surfaces(self.catalog).items()
+                if surface.storage_scope == 'user'})
         self._preparer = RuntimePreparer(
             workspace=self.cwd, catalog=self.catalog, environment=self.environment,
             artifacts=self.artifact_store, provider_registry=self.provider_registry,
@@ -265,7 +278,8 @@ class RunApplicationFactory:
             data_artifact_bindings=self.data_artifact_bindings, task_pack_sources=self.task_pack_sources,
             permission_policy=self.permission_policy, improvement_bindings=self._base_improvement_bindings,
             tool_service_startup_approval=self.tool_service_startup_approval, extensions=extensions,
-            retained_state_enabled=self.retained_state_enabled, connection_service=self.connection_service)
+            retained_state_enabled=self.retained_state_enabled, connection_service=self.connection_service,
+            user_root=self.user_root)
         replacement._preparer.sessions = self._preparer.sessions
         return replacement
 
@@ -359,6 +373,28 @@ class RunApplicationFactory:
             profile_override=profile_override,
         )
 
+    async def prepare_retained_refresh(self, *, session_path: Path) -> RuntimeHandle | None:
+        """Prepare newly persisted documents while preserving this conversation."""
+        if not self.retained_state_enabled:
+            return None
+        libraries = self.retained_store.read()['libraries']
+        changed = any(
+            isinstance(self._current_targets.get(key), RetainedDocuments)
+            and getattr(self._current_targets[key], 'retained_documents')
+            != self.retained_store.artifacts.read_text(reference)
+            for key, reference in libraries.items()
+        )
+        if not changed:
+            return None
+        profile = retained_profile(
+            self._active_profile or self.selection.profile,
+            self.retained_store,
+            catalog=self.catalog,
+        )
+        return await self.open(
+            resume=True, session_path=session_path, profile_override=profile,
+        )
+
     async def prepare_retained_update(self, identity: str, *, session_path: Path) -> RuntimeHandle:
         from fruitfly_agent.lab.catalog import bind_component_changes
         from fruitfly_agent.improvement.contracts.components import ComponentBinding
@@ -371,7 +407,7 @@ class RunApplicationFactory:
         from fruitfly_agent.improvement.contracts.optimization import RetainedDocuments
         if not isinstance(target, RetainedDocuments):
             raise ValueError('retained update has no enabled document owner')
-        text = self.artifact_store.read_text(row['artifact'])
+        text = self.retained_store.artifacts.read_text(row['artifact'])
         target.validate_documents(json.loads(text))
         profile = bind_component_changes(self._active_profile or self.selection.profile,
             (ComponentBinding(row['key'], 'configuration', 'component.' + row['key'],
@@ -404,7 +440,7 @@ class RunApplicationFactory:
         return handle
 
     async def _prepare_profile(self, profile):
-        expected = self.retained_store.read()['libraries']
+        expected = self.retained_store.read()['libraries'] if self.retained_state_enabled else {}
         handle = await self.open(resume=False, session_path=self.new_session_path(), profile_override=profile)
         if self.retained_state_enabled:
             from fruitfly_agent.improvement.contracts.optimization import RetainedDocuments

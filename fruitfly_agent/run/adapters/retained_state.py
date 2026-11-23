@@ -13,3 +13,13 @@ class RetainedStateAdapter:
 
     def review(self, identity, action):
         return self.service.review(identity, action)
+
+    async def run(self, kind, operation_id=None):
+        if not self.service.workers:
+            raise ValueError('manual memory maintenance is unavailable')
+        result = await self.service.run(manual=True, operation_id=operation_id)
+        if self.service.error:
+            raise RuntimeError(self.service.error)
+        if result is None:
+            return 'no-work'
+        return str(result)

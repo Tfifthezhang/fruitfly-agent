@@ -25,7 +25,7 @@ class ConfigurationApplicationTest(unittest.IsolatedAsyncioTestCase):
         provider = FauxProvider()
         registry = Mock()
         registry.create.return_value = provider
-        factory = RunApplicationFactory(cwd=root, environment={'FRUITFLY_MODEL_PROFILE': 'a'}, provider_registry=registry)
+        factory = RunApplicationFactory(cwd=root, user_root=(root) / '.fruitfly-user', environment={'FRUITFLY_MODEL_PROFILE': 'a'}, provider_registry=registry)
         factory.configuration.save()
         app = AgentApplication(factory)
         await app.start()
@@ -197,7 +197,7 @@ class ConfigurationApplicationTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(app.status.session_path, path)
         self.assertEqual(app.status.message_count, 0)
         await app.close()
-        other = AgentApplication(RunApplicationFactory(cwd=Path(path).parents[2], environment={}, provider_registry=Mock()))
+        other = AgentApplication(RunApplicationFactory(cwd=Path(path).parents[2], user_root=(Path(path).parents[2]) / '.fruitfly-user', environment={}, provider_registry=Mock()))
         with self.assertRaisesRegex(ValueError, 'nothing to resume'):
             await other.start(resume=True, session_path=Path(path))
 

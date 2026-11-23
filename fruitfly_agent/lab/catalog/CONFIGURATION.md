@@ -154,6 +154,16 @@ Register owned resources immediately with `context.own`; clean up failed
 construction, startup and cancellation. Declarations do not provide OS isolation,
 arbitrary source deployment or automatic rollback.
 
+Retained collection declarations expose protected `storage_scope` as `workspace`
+or `user`. Run resolves physical stores from that declaration. The File memory
+owner declares user storage; Skill libraries retain workspace storage. This
+metadata grants no candidate editing authority. Worker requests, results and the
+injected durable call boundary use [maintenance contracts](maintenance.py).
+Normal upkeep validates and atomically publishes through the owner host policy;
+Improvement candidates retain their independent verification and activation rules.
+Frozen trials include complete declared content and maintenance resources and
+receive no personal-directory fallback.
+
 ## Verify the registration
 
 Cover ordinary configuration, disabled behavior, invalid fields, dependency

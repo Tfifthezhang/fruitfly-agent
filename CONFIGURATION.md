@@ -463,10 +463,14 @@ sessions. `models.roles.memory_maintenance` inherits executor and constructs its
 client only when generation starts. Advanced H instructions and bounds are in the
 same File memory component. Retained note text is the attached S surface.
 
-Review pending batches with `/memory`, then commit or reject explicitly. Normal
+Memory is shared through `.fruitfly/memory/`. Validated maintenance publishes
+content and progress atomically; each session refreshes before a later task.
+`/memory` shows revisions and failures. Legacy pending batches still support
+explicit commit or reject. `/memory import WORKSPACE` imports old project evidence;
+`/memory retry OPERATION` authorizes retry of an unknown call. Normal
 maintenance is H operating on S and needs no I editor/evaluator. The `memory-learning`
 execution compares H candidates with trial-local learning and private downstream
-evaluation. One-shot tasks disable workspace retained-state services and consume
+evaluation. One-shot tasks disable user and workspace retained-state services and consume
 only frozen initial content. Skills are also enabled by default; `/skills` lists
 installed names and descriptions and `/skills read ID` displays the procedure.
 

@@ -87,7 +87,7 @@ def factory_builder(registry):
     def build(prepared, path):
         generators = GeneratorRegistry()
         generators.register(Rule.generator_id, Rule)
-        return RunApplicationFactory(cwd=prepared.config.workspace, environment=prepared.environment,
+        return RunApplicationFactory(cwd=prepared.config.workspace, user_root=(prepared.config.workspace) / '.fruitfly-user', environment=prepared.environment,
             config_path=str(path), profile_id=prepared.profile.profile_id, provider_registry=registry,
             improvement_bindings=StageBindings(generators=generators))
     return build

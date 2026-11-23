@@ -8,7 +8,8 @@ from typing import Any, Callable, Mapping
 from uuid import uuid4
 
 from fruitfly_agent.core.context.budget import forward_context_capabilities
-from fruitfly_agent.core.model_stream import AssistantMessageEventStream, StreamDone
+from fruitfly_agent.core.model_stream import (AssistantMessageEventStream, StreamDone, TextDelta,
+    ThinkingDelta, StreamActivity)
 from fruitfly_agent.core.observation import FailureInfo, bind_observation, current_observation, start_operation
 
 
@@ -72,8 +73,13 @@ class RoleProvider:
             model_role=self.role, request_id=uuid4().hex)
         async def events():
             stream = None
+            saw_text = False
+            activity = context.model_activity
             with bind_observation(context):
                 observed = start_operation('model.auxiliary', origin='provider')
+            if activity is not None:
+                await activity(phase='model_started', component_id=self.component_id,
+                    model_role=self.role, request_id=context.request_id, batch=0, total=0, text='')
             request_context = replace(context, parent_operation_id=observed.event.operation_id)
             try:
                 with bind_observation(request_context):
@@ -84,6 +90,17 @@ class RoleProvider:
                             event = await anext(stream)
                     except StopAsyncIteration:
                         break
+                    if activity is not None:
+                        if isinstance(event, TextDelta):
+                            saw_text = saw_text or bool(event.text)
+                            await activity(phase='model_text', component_id=self.component_id,
+                                model_role=self.role, request_id=context.request_id, batch=0, total=0, text=event.text)
+                        elif isinstance(event, ThinkingDelta):
+                            await activity(phase='model_thinking', component_id=self.component_id,
+                                model_role=self.role, request_id=context.request_id, batch=0, total=0, text='')
+                        elif isinstance(event, StreamActivity):
+                            await activity(phase='model_status', component_id=self.component_id,
+                                model_role=self.role, request_id=context.request_id, batch=0, total=0, text=event.phase)
                     yield event
                 with bind_observation(request_context):
                     final = await stream.result()
@@ -91,6 +108,12 @@ class RoleProvider:
                     await stream.aclose()
                 stream = None
                 observed.finish()
+                if activity is not None:
+                    if not saw_text and final.text:
+                        await activity(phase='model_text', component_id=self.component_id,
+                            model_role=self.role, request_id=context.request_id, batch=0, total=0, text=final.text)
+                    await activity(phase='model_finished', component_id=self.component_id,
+                        model_role=self.role, request_id=context.request_id, batch=0, total=0, text='')
                 yield StreamDone(final)
             except (asyncio.CancelledError, GeneratorExit):
                 observed.state = 'cancelled'
@@ -100,6 +123,9 @@ class RoleProvider:
                 recorded = details.get('failure') if isinstance(details, dict) else None
                 observed.fail(FailureInfo.from_dict(recorded) if isinstance(recorded, dict) else
                     FailureInfo('provider', 'model.auxiliary', evidence_kind='exception_type', exception_type=type(exc).__name__))
+                if activity is not None:
+                    await activity(phase='model_failed', component_id=self.component_id,
+                        model_role=self.role, request_id=context.request_id, batch=0, total=0, text=type(exc).__name__)
                 raise
             finally:
                 observed.finish()

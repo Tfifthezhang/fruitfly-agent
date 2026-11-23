@@ -8,10 +8,11 @@ from tests.support.retained import memory
 
 
 class MemoryModelsTests(unittest.TestCase):
-    def test_all_kinds_and_project_scope_have_one_strict_shape(self):
+    def test_all_kinds_and_supported_scopes_have_one_strict_shape(self):
         for kind in ('profile', 'preference', 'feedback', 'project', 'reference'):
-            value = memory(); value['kind'] = kind
-            self.assertEqual([value], validate_memories([value]))
+            for scope in ('project', 'user'):
+                value = {**memory(), 'kind': kind, 'scope': scope}
+                self.assertEqual([value], validate_memories([value]))
         for field, value in (('scope', 'global'), ('kind', 'unknown'), ('body', ''), ('extra', True)):
             with self.subTest(field=field), self.assertRaises(ValueError):
                 validate_memories([{**memory(), field: value}])
@@ -36,6 +37,7 @@ class MemoryModelsTests(unittest.TestCase):
             if k in {'kind', 'subject', 'description', 'body', 'applicability', 'supersedes'}},
             'evidence_ids': [evidence.identity]}
         result = apply_changes([], [change], evidence=(evidence,), observed_at='now')
+        self.assertEqual('user', result[0]['scope'])
         self.assertEqual(['session:2'], result[0]['provenance']['message_ids'])
         change['evidence_ids'] = ['fabricated']
         with self.assertRaises(ValueError):

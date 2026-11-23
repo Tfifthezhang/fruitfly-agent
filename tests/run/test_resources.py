@@ -34,7 +34,7 @@ class FactoryResourceTests(unittest.IsolatedAsyncioTestCase):
                 'models:\n  offline:\n    sdk: anthropic\n    protocol: messages\n    model: offline\n    api_key_env: TEST_KEY\n    context_window: 4096\n',
                 encoding="utf-8",
             )
-            factory = RunApplicationFactory(cwd=root, environment={})
+            factory = RunApplicationFactory(cwd=root, user_root=(root) / '.fruitfly-user', environment={})
             with patch(
                 "fruitfly_agent.run.application.build_runtime",
                 side_effect=fail,

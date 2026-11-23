@@ -61,6 +61,8 @@ class AgentApplication:
         self._pending: deque[tuple[UserContent, OperationScope]] = deque()
         self._worker: asyncio.Task[None] | None = None
         self._maintenance_task: asyncio.Task[None] | None = None
+        self._maintenance_requested = False
+        self._retained_refresh_error = ''
         self._event_sink: EventSink | None = None
         self._authorization_enabled = False
         self._authorization_handler = None
@@ -233,7 +235,17 @@ class AgentApplication:
 
     async def submit(self, prompt: UserContent) -> AgentLoopResult:
         prompt = self.validate_input(prompt)
-        await self._stop_maintenance()
+        refresh = getattr(self._factory, 'prepare_retained_refresh', None)
+        if (refresh is not None and self._state == ApplicationState.IDLE
+                and (self._maintenance_task is None or self._maintenance_task.done())):
+            expected = str(self.runtime_manifest['digest'])
+            try:
+                candidate = await refresh(session_path=Path(self.status.session_path))
+                if candidate is not None:
+                    await self.activate_runtime(candidate, expected_manifest_digest=expected)
+                self._retained_refresh_error = ''
+            except Exception as exc:
+                self._retained_refresh_error = type(exc).__name__ + ': ' + str(exc)
         context = self._observation_context()
         with bind_observation(context):
             with operation('application.queue_lock', origin='application'):
@@ -267,24 +279,43 @@ class AgentApplication:
         service = getattr(self._handle, 'maintenance', None)
         if service is None or self._pending or self._state != ApplicationState.IDLE:
             return
+        self._maintenance_requested = True
+        if self._maintenance_task is not None and not self._maintenance_task.done():
+            return
+
         async def run() -> None:
-            async with self._submission_lock:
-                if self._state == ApplicationState.IDLE and not self._pending:
-                    await service.run()
+            while self._maintenance_requested:
+                self._maintenance_requested = False
+                if self._state != ApplicationState.IDLE or self._pending:
+                    return
+                await service.run()
+
         self._maintenance_task = asyncio.create_task(run())
 
     async def _stop_maintenance(self) -> None:
+        self._maintenance_requested = False
         task = self._maintenance_task
         if task is None:
             return
-        task.cancel()
-        async with asyncio.timeout(self._shutdown_timeout):
+        try:
+            async with asyncio.timeout(self._shutdown_timeout / 2):
+                await asyncio.shield(task)
+        except TimeoutError:
+            task.cancel()
+        except asyncio.CancelledError:
+            if not task.cancelled():
+                raise
+        except Exception as exc:
+            self._last_error = exc
+        async with asyncio.timeout(self._shutdown_timeout / 2):
             await asyncio.gather(task, return_exceptions=True)
         self._maintenance_task = None
 
     def retained_state(self, kind: str) -> dict[str, Any]:
         service = getattr(self._require_handle(), 'retained_state', None)
-        return service.describe(kind) if service is not None else {'entries': [], 'pending': []}
+        state = service.describe(kind) if service is not None else {'entries': [], 'pending': []}
+        state['refresh_error'] = self._retained_refresh_error
+        return state
 
     def retained_document(self, kind: str, identity: str) -> str:
         service = getattr(self._require_handle(), 'retained_state', None)
@@ -292,7 +323,31 @@ class AgentApplication:
             raise ValueError('retained state is unavailable')
         return service.read_document(kind, identity)
 
+    async def run_retained(self, kind: str = 'memory', operation_id: str | None = None) -> str:
+        """Run owner-validated retained maintenance on explicit user request."""
+        if self._state != ApplicationState.IDLE or self._pending:
+            raise RuntimeError('finish active work before running memory maintenance')
+        if self._maintenance_is_running():
+            raise RuntimeError('memory maintenance is already running')
+        await self._stop_maintenance()
+        if self._state != ApplicationState.IDLE or self._pending:
+            raise RuntimeError('finish active work before running memory maintenance')
+        service = getattr(self._require_handle(), 'retained_state', None)
+        if service is None:
+            raise ValueError('retained state is unavailable')
+        with bind_observation(self._observation_context()):
+            return await service.run(kind, operation_id)
+
+    def _maintenance_is_running(self) -> bool:
+        task = self._maintenance_task
+        service = getattr(self._handle, 'maintenance', None) if self._handle is not None else None
+        return ((task is not None and not task.done()) or getattr(service, 'task', None) is not None)
+
     async def retained_action(self, identity: str, action: str) -> str:
+        if self._maintenance_is_running():
+            raise RuntimeError('memory maintenance is already running; wait for its batch to finish')
+        if self._state != ApplicationState.IDLE or self._pending:
+            raise RuntimeError('finish active work before reviewing retained state')
         await self._stop_maintenance()
         if self._state != ApplicationState.IDLE or self._pending:
             raise RuntimeError('finish active work before reviewing retained state')
@@ -311,9 +366,11 @@ class AgentApplication:
             if self._state != ApplicationState.IDLE or self._pending:
                 raise RuntimeError('finish active work before reviewing retained state')
             result = service.review(identity, action)
-            if action == 'retry':
-                self._schedule_maintenance()
-            return result
+        if action == 'retry':
+            with bind_observation(self._observation_context()):
+                result = await service.run('memory', identity)
+            return 'retry authorized; maintenance ' + result
+        return result
 
     def _clear_pending(self) -> None:
         while self._pending:

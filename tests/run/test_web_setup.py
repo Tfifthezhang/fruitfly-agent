@@ -22,7 +22,7 @@ class WebSetupTests(unittest.TestCase):
         self.provider = FauxProvider()
         registry = Mock()
         registry.create.return_value = self.provider
-        self.factory = RunApplicationFactory(cwd=self.root, environment={'TEST_API_KEY': 'fixture-model-key'}, provider_registry=registry)
+        self.factory = RunApplicationFactory(cwd=self.root, user_root=(self.root) / '.fruitfly-user', environment={'TEST_API_KEY': 'fixture-model-key'}, provider_registry=registry)
         self.configuration = self.factory.configuration
         self.service = self.configuration.mechanism_setup
         self.output = io.StringIO()
@@ -59,7 +59,7 @@ class WebSetupTests(unittest.TestCase):
         replaced = {d.descriptor.mechanism_id for d in replacements}
         catalog = LabCatalog(tuple(d for d in builtin.definitions() if d.descriptor.mechanism_id not in replaced) +
             replacements, bootstrap=builtin.bootstrap)
-        factory = RunApplicationFactory(cwd=self.root, environment={'TEST_API_KEY': 'fixture-model-key'}, catalog=catalog)
+        factory = RunApplicationFactory(cwd=self.root, user_root=(self.root) / '.fruitfly-user', environment={'TEST_API_KEY': 'fixture-model-key'}, catalog=catalog)
         frontend = TerminalConfigurationFrontend(factory.configuration, input_stream=io.StringIO('fixture-key\n'),
             output_stream=self.output, line_editor=MenuScriptedLines(self.output, '@fixture', '', '@Stage settings'))
         self.assertTrue(run_mechanism_setup(frontend._model_form(), factory.configuration.mechanism_setup, 'web-search-tool'))

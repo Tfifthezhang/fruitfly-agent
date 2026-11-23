@@ -32,7 +32,7 @@ class SshRunTests(unittest.IsolatedAsyncioTestCase):
                         'TEST_API_KEY': 'fixture-model-secret'}
 
     def factory(self):
-        factory = RunApplicationFactory(cwd=self.root, environment=self.secrets, provider_registry=self.registry)
+        factory = RunApplicationFactory(cwd=self.root, user_root=(self.root) / '.fruitfly-user', environment=self.secrets, provider_registry=self.registry)
         factory.configuration.set_mechanism('working-memory-reduction', enabled=False)
         factory.configuration.set_mechanism('remote-env', enabled=True)
         factory.configuration.set_parameter('remote-env', 'host', 'server.example')

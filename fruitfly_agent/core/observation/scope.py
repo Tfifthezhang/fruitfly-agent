@@ -7,7 +7,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass, replace
 import logging
 import time
-from typing import Iterator
+from typing import Any, Awaitable, Callable, Iterator
 from uuid import uuid4
 
 from .models import FailureInfo, ObservationSink, OperationEvent
@@ -27,6 +27,7 @@ class ObservationContext:
     request_id: str = ''
     tool_call_id: str = ''
     tool_name: str = ''
+    model_activity: Callable[..., Awaitable[None] | None] | None = None
 
 
 _current: ContextVar[ObservationContext] = ContextVar('fruitfly_observation', default=ObservationContext())

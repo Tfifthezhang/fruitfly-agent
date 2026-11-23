@@ -27,7 +27,7 @@ class StartupRecoveryTests(unittest.IsolatedAsyncioTestCase):
         self.environment = {'TEST_API_KEY': 'fixture-model-secret',
             'FRUITFLY_SSH_USERNAME': 'fixture-private-account',
             'FRUITFLY_SSH_PASSWORD': 'fixture-private-password'}
-        self.factory = RunApplicationFactory(cwd=self.root, environment=self.environment,
+        self.factory = RunApplicationFactory(cwd=self.root, user_root=(self.root) / '.fruitfly-user', environment=self.environment,
             provider_registry=self.registry, allow_incomplete=True)
         controller = self.factory.configuration
         controller.set_mechanism('working-memory-reduction', enabled=False)

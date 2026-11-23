@@ -145,7 +145,7 @@ class SubscriptionIsolationTests(unittest.TestCase):
             service = connection_service(root / 'user')
             service.credentials().modify('account-a', lambda _: account_record(integration='opencode-go'))
             seed_directory(service)
-            factory = RunApplicationFactory(cwd=root, environment={}, allow_incomplete=True, connection_service=service)
+            factory = RunApplicationFactory(cwd=root, user_root=(root) / '.fruitfly-user', environment={}, allow_incomplete=True, connection_service=service)
             factory.configuration.model_setup.connections.stage('opencode-go', 'account-a', 'model-0', 'daily')
             factory.configuration.save()
             output = root / 'container'

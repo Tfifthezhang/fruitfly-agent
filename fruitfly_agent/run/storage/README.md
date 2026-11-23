@@ -59,11 +59,17 @@ contain the resources required by their own imports, without checkout fallback.
 
 ## Commit retained state
 
-[retained_state.py](retained_state.py) stores one locked atomic checkpoint per
-workspace/configuration/profile scope under `.fruitfly/retained/<scope>/state.json`.
+[retained_state.py](retained_state.py) stores locked atomic checkpoints.
+[retained_scopes.py](retained_scopes.py) routes owner-declared `user` collections to
+`.fruitfly/memory/state.json`; workspace collections retain
+`.fruitfly/retained/<scope>/state.json`. Immutable user evidence and call responses
+live under the injected personal root's `artifacts/`. Source migration is an explicit
+validated import and preserves historical unknown operations.
 Immutable document and source-evidence bytes reuse ArtifactStore. Checkpoints retain
 source identity, extraction progress, completed-turn progress, pending updates and
-operation outcomes. Evidence character counts, artifact hashes, operation states
+operation outcomes. Maintenance journals capture bounded inputs and per-call
+responses before validation. Auto-publication changes content and cursors together
+under the checkpoint lock. Conflicts preserve generated responses for inspection. Evidence character counts, artifact hashes, operation states
 and progress bounds are validated. Repeated observations are idempotent. Unknown requests are not
 replayed, even after new input; an explicit retry authorization preserves the
 unknown operation record. Rejected batches do not rewind completed extraction. Active and pending
@@ -136,3 +142,9 @@ completed invocations. The trace still references immutable event and Session
 artifacts. Transfer the output root's `artifacts/` directory with run reports and
 retained-part pointers for an independently readable archive. Bundle publication
 validates required retained event/Session dependencies before publishing.
+
+Retained publication adopts a validated pending batch under the checkpoint lock.
+The stored library survives process restart independently of the active runtime.
+Duplicate publication fails explicitly. Maintenance uses a separate nonblocking
+file lease so checkpoint reads and evidence appends remain available. Retry
+requires that lease and cannot replace an operation still running in another host.

@@ -17,6 +17,10 @@ Core records request preparation, context stages, model requests and tool work.
 Providers and Lab add their own phases through the same public seam. Concrete
 classification stays with the source owner. `FatalError`, `RetryableError` and
 `OverflowError` retain control-flow authority; a diagnostic label grants none.
+`ObservationContext.model_activity` is an optional task-local, live callback for
+auxiliary model stream events. It carries role/component attribution to an
+interactive observer and is not persisted as conversation content or execution
+evidence. A missing callback has no effect on model execution.
 
 `AgentLoopConfig.on_observation` is an optional synchronous passive sink. Ordinary
 sink failures are isolated. The standard loop also persists events through the

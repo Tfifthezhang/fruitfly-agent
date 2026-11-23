@@ -92,7 +92,7 @@ class StartupVersionsTests(unittest.IsolatedAsyncioTestCase):
     async def setup_app(self, root):
         _write_models(root)
         provider = FauxProvider(); registry = Mock(); registry.create.return_value=provider
-        factory = RunApplicationFactory(cwd=root, environment={'FRUITFLY_MODEL_PROFILE':'local'}, provider_registry=registry)
+        factory = RunApplicationFactory(cwd=root, user_root=(root) / '.fruitfly-user', environment={'FRUITFLY_MODEL_PROFILE':'local'}, provider_registry=registry)
         factory.configuration.save(); factory.reload_configuration()
         app=AgentApplication(factory); await app.start()
         return app, factory, provider

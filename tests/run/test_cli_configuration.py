@@ -127,7 +127,7 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             _write_catalog(root / '.fruitfly/models.yaml', {'only': 'model-a'})
-            factory = RunApplicationFactory(cwd=root, environment={'TEST_API_KEY': 'offline-fixture'}, allow_incomplete=True)
+            factory = RunApplicationFactory(cwd=root, user_root=(root) / '.fruitfly-user', environment={'TEST_API_KEY': 'offline-fixture'}, allow_incomplete=True)
             output = io.StringIO()
             with patch.object(cli, 'RunApplicationFactory', return_value=factory), patch.object(
                     factory.configuration, 'save', side_effect=OSError('fixture write failed')), patch.object(

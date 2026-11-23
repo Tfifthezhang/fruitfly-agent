@@ -33,7 +33,7 @@ class ContractBoundaryTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             _write_models(root)
-            factory = RunApplicationFactory(cwd=root, environment={}, catalog=catalog)
+            factory = RunApplicationFactory(cwd=root, user_root=(root) / '.fruitfly-user', environment={}, catalog=catalog)
             factory.configuration.set_mechanism('other-env', enabled=True)
             factory.configuration.set_mechanism('read-tool', enabled=True)
             items = {i.mechanism_id: i for i in factory.configuration.snapshot().mechanisms}
@@ -64,7 +64,7 @@ class ContractBoundaryTests(unittest.IsolatedAsyncioTestCase):
             _write_models(root)
             registry = Mock()
             registry.create.side_effect = lambda *_: FauxProvider()
-            factory = RunApplicationFactory(cwd=root, environment={}, catalog=builtin_catalog().extended((definition,)), provider_registry=registry)
+            factory = RunApplicationFactory(cwd=root, user_root=(root) / '.fruitfly-user', environment={}, catalog=builtin_catalog().extended((definition,)), provider_registry=registry)
             with self.assertRaisesRegex(RuntimeError, 'failed after allocation'):
                 await factory.open(resume=False, session_path=None)
         self.assertEqual(closed, ['resource'])
@@ -111,7 +111,7 @@ class ContractBoundaryTests(unittest.IsolatedAsyncioTestCase):
                 _write_models(root)
                 registry = Mock()
                 registry.create.side_effect = lambda *_: FauxProvider()
-                factory = RunApplicationFactory(cwd=root, environment={}, catalog=catalog, provider_registry=registry)
+                factory = RunApplicationFactory(cwd=root, user_root=(root) / '.fruitfly-user', environment={}, catalog=catalog, provider_registry=registry)
                 with self.assertRaisesRegex((ValueError, RuntimeError, TypeError), 'undeclared context stages|later installation failed|bootstrap must return AssemblyState'):
                     await factory.open(resume=False, session_path=None)
                 self.assertEqual(closed, [source])
@@ -154,7 +154,7 @@ class ContractBoundaryTests(unittest.IsolatedAsyncioTestCase):
             reference = store.put_text('frozen extra guidance').artifact_id
             registry = Mock()
             registry.create.side_effect = lambda *_: FauxProvider()
-            factory = RunApplicationFactory(cwd=root, environment={}, catalog=builtin_catalog().extended((definition,)), provider_registry=registry, data_artifact_bindings={'extra.guidance': reference})
+            factory = RunApplicationFactory(cwd=root, user_root=(root) / '.fruitfly-user', environment={}, catalog=builtin_catalog().extended((definition,)), provider_registry=registry, data_artifact_bindings={'extra.guidance': reference})
             handle = await factory.open(resume=False, session_path=None)
             await handle.start()
             self.assertEqual(handle.manifest['data_artifacts'][0]['id'], reference)

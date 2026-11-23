@@ -36,7 +36,10 @@ class ModelRoleTests(unittest.IsolatedAsyncioTestCase):
             component_id='memory', model_roles={'executor': 'large'},
             model_parameters={'memory': 'small'},
             model_requirements={'working_memory': ModelRoleRequirement('memory', 'Maintain memory.')})
-        with bind_observation(ObservationContext(sink=events.append, run_id='run', model_role='executor')):
+        async def model_activity(**event):
+            events.append(event)
+        with bind_observation(ObservationContext(sink=events.append, run_id='run', model_role='executor',
+                model_activity=model_activity)):
             binding = context.provider_for_role('working_memory', 128)
             self.assertEqual('executor', current_observation().model_role)
             answer = await binding.provider(ProviderView('', [], [], binding.model, 128)).result()
@@ -47,7 +50,9 @@ class ModelRoleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual('working_memory', seen[0].model_role)
         self.assertEqual('memory', seen[0].component_id)
         self.assertTrue(seen[0].request_id)
-        self.assertEqual('succeeded', events[-1].state)
+        self.assertEqual('succeeded', next(event for event in events if hasattr(event, 'state') and event.state == 'succeeded').state)
+        activity = [event['phase'] for event in events if isinstance(event, dict)]
+        self.assertEqual(['model_started', 'model_text', 'model_finished'], activity)
         with self.assertRaisesRegex(ValueError, 'undeclared'):
             context.provider_for_role('another')
 

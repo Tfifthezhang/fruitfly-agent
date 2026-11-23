@@ -116,7 +116,12 @@ failures are isolated from the primary startup/cleanup outcome.
 ## Host retained-state maintenance
 
 [maintenance.py](maintenance.py) consumes registered workers and public retained
-owners. Application supplies idle execution and cancellation. Preparation accepts
+owners. Automatic idle scheduling and explicit `/memory run` share worker selection,
+durable batches, validation and publication. Application supplies execution and
+cancellation. The store leases
+maintenance independently of its checkpoint lock. Another runtime can read
+the checkpoint and append evidence while a worker runs. Explicit retry requires
+the maintenance lease, so it cannot supersede a live call. Preparation accepts
 injected state projection and frontend adapters; leaf runtime services do not
 import improvement-host or adapter implementations. A prepared replacement starts
 no maintenance requests. One-shot tasks disable mutable workspace state services;

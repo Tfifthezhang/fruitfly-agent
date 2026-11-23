@@ -239,13 +239,22 @@ Registered default parameter documents remain in Lab. [Configuration](configurat
 
 The default interactive profile exposes [memory](../lab/context_manager/augmentation/memory/methods/file_memory/README.md)
 and [Skill libraries](../lab/context_manager/augmentation/skills/README.md) through
-`/memory` and `/skills`. Memory maintenance is explicitly enabled and scheduled at
-idle boundaries; foreground work cancels and retires it before proceeding. Human
+`/memory` and `/skills`. Memory maintenance is automatically scheduled at idle
+boundaries when enabled. `/memory run` offers the same owner-validated operation
+below thresholds; `/memory run OPERATION` resumes one authorized batch by identity.
+`/memory retry OPERATION` authorizes and immediately resumes an uncertain batch, with
+model activity delivered through the normal interactive stream. Unresolved batches
+block automatic upkeep. New foreground submissions can run alongside maintenance. Memory
+uses the current workspace root `.fruitfly` by default; `RunApplicationFactory(user_root=...)` injects
+a shared root for multiple workspaces, embedded hosts and tests. All workspaces
+using that root share memory independently of configuration/profile identity. Other retained collections keep
+their owner-declared workspace scope. Validated maintenance publishes content and
+progress atomically, then sessions refresh before a later task. Human
 batch adoption prepares a new runtime against the same Session and commits only
 on successful activation. Independently verified S candidates use ordinary
 Improvement publication and exact resource checks.
 
-`RunApplicationFactory(retained_state_enabled=False)` disables mutable workspace
+`RunApplicationFactory(retained_state_enabled=False)` disables mutable user and workspace
 retained-state overlays and maintenance services. The one-shot CLI selects this
 host mode. Frozen component documents still load through ordinary assembly, so
 isolated tasks consume their declared initial S without learning from other tasks.

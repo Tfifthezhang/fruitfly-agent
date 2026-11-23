@@ -59,12 +59,20 @@ class EventDispatcher:
     async def emit(self, event: FrontendEvent) -> None:
         if not self.active:
             return
+        await self._deliver(event, self._run_id)
+
+    async def emit_auxiliary(self, event: FrontendEvent) -> None:
+        """Deliver independent model activity when no chat run is active."""
+        request_id = getattr(event, 'request_id', '')
+        await self._deliver(event, 'operation-' + (request_id or uuid.uuid4().hex))
+
+    async def _deliver(self, event: FrontendEvent, run_id: str) -> None:
         self._sequence += 1
         if isinstance(event, (AssistantMessageStarted, RunFinished)):
             event = dataclasses.replace(event, elapsed_seconds=max(0.0, time.monotonic() - self._started_at))
         emitted = dataclasses.replace(
             event,
-            run_id=self._run_id,
+            run_id=run_id,
             sequence=self._sequence,
         )
         if not isinstance(emitted, AuthorizationRequested):

@@ -35,6 +35,7 @@ Improvement registers editor/evaluator surfaces through an internal owner, with 
 | [builtins.py](builtins.py) | Explicit built-in definitions and installers |
 | [SSH registration](../environment/methods/remote/README.md) | Optional remote execution, credentials and namespace permissions |
 | [assembly.py](assembly.py) | Assembly context, state, and installer execution |
+| [maintenance.py](maintenance.py) | Typed maintenance requests, results, durable model-call boundary and worker contract |
 | [tool_providers.py](tool_providers.py) | Async external-tool preparation, status and separate authorization contracts |
 
 ## Assembly contract

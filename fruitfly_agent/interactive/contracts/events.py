@@ -160,8 +160,23 @@ class ManagedOperationChanged(FrontendEvent):
     tool_call_id: str = ''
 
 
+@dataclass(frozen=True, kw_only=True)
+class AuxiliaryModelActivity(FrontendEvent):
+    """Visible output from a model call started by an interactive operation."""
+    event_type: ClassVar[str] = 'auxiliary_model_activity'
+    phase: str
+    subject: str = ''
+    component_id: str = ''
+    model_role: str = ''
+    request_id: str = ''
+    batch: int = 0
+    total: int = 0
+    text: str = ''
+
+
 InteractiveEvent = (
     ManagedOperationChanged
+    | AuxiliaryModelActivity
     |
     AuthorizationRequested
     | AuthorizationResolved
@@ -182,6 +197,7 @@ _EVENT_TYPES = {
     event.event_type: event
     for event in (
         ManagedOperationChanged,
+        AuxiliaryModelActivity,
         AuthorizationRequested,
         AuthorizationResolved,
         RunStarted,
@@ -224,6 +240,7 @@ __all__ = [
     "ToolOutput",
     "ToolFinished",
     "ManagedOperationChanged",
+    "AuxiliaryModelActivity",
     "CompactionStarted",
     "RunFinished",
     "InteractiveEvent",

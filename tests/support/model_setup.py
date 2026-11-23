@@ -8,7 +8,7 @@ from tests.support.terminal import ScriptedLines
 class ModelSetupWorkspace:
     def __init__(self, root):
         self.root = Path(root).resolve()
-        self.factory = RunApplicationFactory(cwd=self.root, environment={}, allow_incomplete=True)
+        self.factory = RunApplicationFactory(cwd=self.root, user_root=(self.root) / '.fruitfly-user', environment={}, allow_incomplete=True)
         self.controller = self.factory.configuration
         self.setup = self.controller.model_setup
         (self.root / ".fruitfly").mkdir(exist_ok=True)

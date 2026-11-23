@@ -37,8 +37,11 @@ class ConfigurationSurface:
     kind: str = 'instructions'
     schema: str = 'text-v1'
     artifact_slot: str | None = None
+    storage_scope: str = 'workspace'
 
     def __post_init__(self):
+        if self.storage_scope not in {'workspace', 'user'}:
+            raise ValueError('unsupported retained storage scope')
         if self.default_resource is not None:
             from fruitfly_agent.runtime_spec.documents import validate_default_resource
             validate_default_resource(self.default_resource)

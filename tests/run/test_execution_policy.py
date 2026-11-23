@@ -57,7 +57,7 @@ class ExecutionPolicyTests(unittest.IsolatedAsyncioTestCase):
                 environment = {"FIXTURE_MODEL_KEY": "offline-fixture", "PATH": str(binary) + ":/usr/bin:/bin"}
                 policy = PermissionPolicy.unrestricted(root) if unrestricted else None
                 with patch.dict(os.environ, {"PATH": environment["PATH"]}):
-                    factory = RunApplicationFactory(cwd=root, environment=environment, config_path="config.yaml",
+                    factory = RunApplicationFactory(cwd=root, user_root=(root) / '.fruitfly-user', environment=environment, config_path="config.yaml",
                         provider_registry=registry, permission_policy=policy)
                     handle = await factory.open(resume=False, session_path=None)
                     try:

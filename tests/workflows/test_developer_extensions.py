@@ -81,7 +81,7 @@ class DeveloperExtensionTests(unittest.IsolatedAsyncioTestCase):
                     'def register(api):\n    api.register_command('+repr(name)+', lambda command: CommandResult(text='+repr(name)+'))\n')
             source.write_text(body('alpha'))
             providers = Mock(); providers.create.side_effect = lambda *args: EchoGuidance()
-            factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=providers,
+            factory = RunApplicationFactory(cwd=root, user_root=(root) / '.fruitfly-user', environment={}, provider_registry=providers,
                 extensions=load_extensions((str(source),), workspace=root))
             factory.configuration.save(); factory.reload_configuration()
             app = AgentApplication(factory)
@@ -116,7 +116,7 @@ class DeveloperExtensionTests(unittest.IsolatedAsyncioTestCase):
             extensions = load_extensions((str(path),), workspace=root)
             provider = EchoGuidance()
             providers = Mock(); providers.create.return_value = provider
-            factory = RunApplicationFactory(cwd=root, environment={}, extensions=extensions, provider_registry=providers)
+            factory = RunApplicationFactory(cwd=root, user_root=(root) / '.fruitfly-user', environment={}, extensions=extensions, provider_registry=providers)
             factory.configuration.save(); factory.reload_configuration()
             app = AgentApplication(factory)
             await app.start()

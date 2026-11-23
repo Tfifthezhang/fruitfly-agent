@@ -22,7 +22,7 @@ class SubagentWorkflowTests(unittest.IsolatedAsyncioTestCase):
             def create(*args):
                 p = FauxProvider(); providers.append(p); return p
             registry.create.side_effect = create
-            factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=registry, retained_state_enabled=False)
+            factory = RunApplicationFactory(cwd=root, user_root=(root) / '.fruitfly-user', environment={}, provider_registry=registry, retained_state_enabled=False)
             factory.configuration.set_mechanism('subagent', enabled=True)
             self.assertTrue(factory.configuration.save().saved)
             factory.reload_configuration()
@@ -69,7 +69,7 @@ class SubagentWorkflowTests(unittest.IsolatedAsyncioTestCase):
             def create(*args):
                 provider = FauxProvider(); providers.append(provider); return provider
             registry.create.side_effect = create
-            factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=registry, retained_state_enabled=False)
+            factory = RunApplicationFactory(cwd=root, user_root=(root) / '.fruitfly-user', environment={}, provider_registry=registry, retained_state_enabled=False)
             factory.configuration.set_mechanism('subagent', enabled=True)
             self.assertTrue(factory.configuration.save().saved)
             factory.reload_configuration()

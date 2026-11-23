@@ -52,7 +52,9 @@ outside. See [Lab design rules](lab/README.md#design-for-improvement).
 
 Retained Skill and cross-session memory libraries belong to S. Descriptions and
 bodies share the ordinary candidate assembly path; bodies load on demand.
-Application owns threshold-maintenance scheduling and explicit batch adoption.
+Application owns threshold-maintenance scheduling, safe refresh and explicit batch adoption.
+Owner-validated memory upkeep publishes atomically to user-scoped storage, shared
+across workspaces. Other retained collections follow their Catalog storage scope.
 I instruction targets can be proposed explicitly through [independent stages](lab/improvement/DEVELOPER_GUIDE.md); no automatic nested I comparison backend is installed.
 
 Task materials and executions need no score. Persistent publication requires an injected verification policy; current-task selection retains its weaker assurance. The experience library is a separate attributed S update after explicit pending-lesson review.

@@ -76,7 +76,7 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
             registry.create.side_effect = create_provider
 
             initial_factory = RunApplicationFactory(
-                cwd=root,
+                cwd=root, user_root=(root) / '.fruitfly-user',
                 environment={},
                 provider_registry=registry,
                 data_artifact_bindings={
@@ -104,7 +104,7 @@ class CliRunTest(unittest.IsolatedAsyncioTestCase):
 
             # Current bindings govern continuation; historical guidance is not required.
             resumed_factory = RunApplicationFactory(
-                cwd=root,
+                cwd=root, user_root=(root) / '.fruitfly-user',
                 environment={},
                 provider_registry=registry,
             )

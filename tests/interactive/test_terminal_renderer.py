@@ -23,6 +23,20 @@ class _ActivityTtyStringIO(TtyStringIO):
 
 
 class TerminalRendererTests(unittest.IsolatedAsyncioTestCase):
+    async def test_auxiliary_memory_model_stream_is_visible_with_batch_context(self):
+        from fruitfly_agent.interactive.contracts.events import AuxiliaryModelActivity, event_from_dict
+        events = (
+            AuxiliaryModelActivity(run_id='run-1', phase='batch_started', batch=1, total=2),
+            AuxiliaryModelActivity(run_id='run-1', phase='model_text', text='{"operation":'),
+            AuxiliaryModelActivity(run_id='run-1', phase='model_text', text=' "extract"}'),
+            AuxiliaryModelActivity(run_id='run-1', phase='batch_response', batch=1, total=2),
+        )
+        output = await self.render_events(*events)
+        self.assertIn('memory · batch 1/2 · model running', output)
+        self.assertIn('{"operation":', output)
+        self.assertIn('{"operation": "extract"}', output)
+        self.assertEqual(events[0], event_from_dict(events[0].to_dict()))
+
     async def test_elapsed_response_marker_and_compact_finish_keep_exact_events(self):
         from fruitfly_agent.interactive.contracts.events import AssistantMessageStarted, event_from_dict
         event = replace(run_finished(), input_tokens=18400, output_tokens=2100, elapsed_seconds=222.)

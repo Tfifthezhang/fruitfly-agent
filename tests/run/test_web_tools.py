@@ -32,7 +32,7 @@ class WebAssemblyTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             _write_catalog(root / ".fruitfly/models.yaml", {"offline": "offline-model"})
-            factory = RunApplicationFactory(cwd=root, environment={})
+            factory = RunApplicationFactory(cwd=root, user_root=(root) / '.fruitfly-user', environment={})
             configuration = factory.configuration
             configuration.set_mechanism("web-search-tool", enabled=True)
             configuration.set_parameter("web-search-tool", "backend", "deepseek")
@@ -185,7 +185,7 @@ class WebAssemblyTests(unittest.IsolatedAsyncioTestCase):
                 client = WebClient(config, transport=httpx.MockTransport(respond), check_url=public_destination)
                 clients.append(client)
                 return client
-            factory = RunApplicationFactory(cwd=root, environment={"BRAVE_SEARCH_API_KEY": "offline-search-token"},
+            factory = RunApplicationFactory(cwd=root, user_root=(root) / '.fruitfly-user', environment={"BRAVE_SEARCH_API_KEY": "offline-search-token"},
                                              provider_registry=registry)
             factory.configuration.set_mechanism("working-memory-reduction", enabled=False)
             for name in ("web-search-tool", "web-fetch-tool"):
@@ -234,7 +234,7 @@ class WebAssemblyTests(unittest.IsolatedAsyncioTestCase):
                         client.start = fail_start
                     clients.append(client)
                     return client
-                factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=registry)
+                factory = RunApplicationFactory(cwd=root, user_root=(root) / '.fruitfly-user', environment={}, provider_registry=registry)
                 factory.configuration.set_mechanism("web-fetch-tool", enabled=True)
                 factory.configuration.save()
                 factory.reload_configuration()

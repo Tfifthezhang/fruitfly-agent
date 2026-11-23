@@ -42,7 +42,7 @@ class ResumeHistoryTest(unittest.IsolatedAsyncioTestCase):
             path.write_text("".join(json.dumps(record) + "\n" for record in records))
             before = path.read_bytes()
             _write_catalog(root / ".fruitfly/models.yaml", {"renamed-model": "new-model"})
-            factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=registry,
+            factory = RunApplicationFactory(cwd=root, user_root=(root) / '.fruitfly-user', environment={}, provider_registry=registry,
                 permission_policy=PermissionPolicy(root, read_roots=(root, root.parent)))
             prompt = factory.artifact_store.put_text("Current prompt for continuation")
             factory.configuration.stage_profile(replace(factory.configuration.profile(), profile_id="renamed",
@@ -93,7 +93,7 @@ class ResumeHistoryTest(unittest.IsolatedAsyncioTestCase):
             with Session(path) as saved:
                 from fruitfly_agent.core.data_model import UserMessage
                 saved.append("compaction", {"messages": [UserMessage(content="old projected summary").to_dict()]})
-            factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=registry)
+            factory = RunApplicationFactory(cwd=root, user_root=(root) / '.fruitfly-user', environment={}, provider_registry=registry)
             factory.configuration.set_mechanism("layered-compaction", enabled=False)
             factory.configuration.save()
             factory.reload_configuration()
@@ -140,7 +140,7 @@ class ResumeHistoryTest(unittest.IsolatedAsyncioTestCase):
                 optimization_coverage=OptimizationCoverage('protected', 'Resource startup fixture; no research algorithm is installed.'),
              feature_path=(FeatureNode('fixture', 'Fixture'),))
             catalog = builtin_catalog().extended((definition,))
-            factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=registry, catalog=catalog)
+            factory = RunApplicationFactory(cwd=root, user_root=(root) / '.fruitfly-user', environment={}, provider_registry=registry, catalog=catalog)
             app = AgentApplication(factory)
             await app.start()
             current = app.status.session_path
@@ -158,7 +158,7 @@ class ResumeHistoryTest(unittest.IsolatedAsyncioTestCase):
             await app.close()
 
     async def _seed(self, root, registry):
-        app = AgentApplication(RunApplicationFactory(cwd=root, environment={}, provider_registry=registry))
+        app = AgentApplication(RunApplicationFactory(cwd=root, user_root=(root) / '.fruitfly-user', environment={}, provider_registry=registry))
         await app.start()
         path = Path(app.status.session_path)
         await app.submit("old question")
@@ -176,7 +176,7 @@ class ResumeHistoryTest(unittest.IsolatedAsyncioTestCase):
                 registry.create.return_value = provider
                 path = await self._seed(root, registry)
                 before = path.read_bytes()
-                app = AgentApplication(RunApplicationFactory(cwd=root, environment={}, provider_registry=registry))
+                app = AgentApplication(RunApplicationFactory(cwd=root, user_root=(root) / '.fruitfly-user', environment={}, provider_registry=registry))
                 await app.start()
                 output = io.StringIO()
                 lines = ScriptedLines("/resume", "1", "/status", "/exit") if picker else ScriptedLines(f"/resume {path}", "/status", "/exit")
@@ -248,7 +248,7 @@ class ResumeHistoryTest(unittest.IsolatedAsyncioTestCase):
                 registry = Mock()
                 registry.create.return_value = provider
                 path = await self._seed(root, registry)
-                factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=registry)
+                factory = RunApplicationFactory(cwd=root, user_root=(root) / '.fruitfly-user', environment={}, provider_registry=registry)
                 app = AgentApplication(factory)
                 await app.start()
                 current = app.status.session_path

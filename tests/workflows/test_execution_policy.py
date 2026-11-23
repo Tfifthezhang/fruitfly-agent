@@ -47,7 +47,7 @@ class ExecutionPolicyTests(unittest.IsolatedAsyncioTestCase):
             _write_models(root)
             providers = Mock()
             providers.create.return_value = FauxProvider()
-            factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=providers,
+            factory = RunApplicationFactory(cwd=root, user_root=(root) / '.fruitfly-user', environment={}, provider_registry=providers,
                 improvement_bindings=StageBindings(runner=runner))
             app = AgentApplication(factory)
             await app.start()
@@ -91,7 +91,7 @@ class ExecutionPolicyTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory); _write_models(root)
             providers = Mock(); providers.create.return_value = FauxProvider()
-            factory = RunApplicationFactory(cwd=root, environment={}, provider_registry=providers)
+            factory = RunApplicationFactory(cwd=root, user_root=(root) / '.fruitfly-user', environment={}, provider_registry=providers)
             app = AgentApplication(factory); await app.start()
             try:
                 self.assertNotIn('execution-policy', {c.component_id for c in app.workflow_configuration().components})

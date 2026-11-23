@@ -71,7 +71,7 @@ class MemorySkillWorkflowTests(unittest.IsolatedAsyncioTestCase):
 
     def test_candidate_cannot_rewrite_skill_origin_or_memory_provenance(self):
         runtime = self.assemble(memories=[memory()])
-        for key, field, value in (('skill-library', 'origin', {}), ('memory-library', 'scope', 'global')):
+        for key, field, value in (('skill-library', 'origin', {}), ('memory-library', 'scope', 'user')):
             target = runtime.components['text-target:' + key]
             changed = deepcopy(target.entries); changed[0][field] = value
             payload = json.loads(target.snapshot().text); payload['content']['documents'] = canonical_json(changed)

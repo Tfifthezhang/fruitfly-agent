@@ -20,7 +20,7 @@ class ModelConnectionTests(unittest.IsolatedAsyncioTestCase):
         seed_directory(self.service, count=20)
         self.registry = default_registry()
         self.registry.credential_store = self.service.credentials()
-        self.factory = RunApplicationFactory(cwd=self.root, environment={}, allow_incomplete=True,
+        self.factory = RunApplicationFactory(cwd=self.root, user_root=(self.root) / '.fruitfly-user', environment={}, allow_incomplete=True,
             connection_service=self.service, provider_registry=self.registry)
         self.setup = self.factory.configuration.model_setup
         self.connections = self.setup.connections
@@ -90,7 +90,7 @@ class ModelConnectionTests(unittest.IsolatedAsyncioTestCase):
         secret_file = directory / 'secrets.env'
         secret_file.write_text('OPENCODE_GO_KEY=offline-go-token\n')
         secret_file.chmod(0o600)
-        factory = RunApplicationFactory(cwd=self.root, environment=load_env(secret_file), allow_incomplete=True)
+        factory = RunApplicationFactory(cwd=self.root, user_root=(self.root) / '.fruitfly-user', environment=load_env(secret_file), allow_incomplete=True)
         self.assertTrue(factory.configuration.snapshot().ready)
         self.assertNotIn('offline-go-token', catalog.read_text())
 

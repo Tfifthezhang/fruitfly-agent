@@ -130,9 +130,14 @@ history, cancellation and staging behavior. The host owns secret-file writes.
 ## Inspect retained content
 
 `/skills` lists installed visible Skill names and descriptions. `/skills read ID`
-shows one retained procedure. `/memory` lists notes, counters and pending upkeep;
-its read/commit/reject/retry actions consume the host's retained-state capability.
-No model request is made by listing or reading these records. Models use ordinary
+shows one retained procedure. `/memory` shows the store location, automatic upkeep
+and trigger state, plus the next action. `/memory details` lists notes, counters
+and pending batches. `/memory run` requests upkeep below thresholds; `/memory run
+OPERATION` resumes that authorized paused batch. `/memory retry OPERATION` authorizes and immediately resumes
+that exact batch, with model activity shown in the interactive stream. Unresolved
+batches block automatic upkeep. Memory read, review and maintenance commands consume
+host-retained capabilities. No model request is made by listing or reading these
+records. Models use ordinary
 read resources for on-demand bodies during a task.
 
 Improvement and RSI use the independent experiment CLI or embedding services.
@@ -271,9 +276,10 @@ Assistant intent and progress wording belongs to the configured base prompt.
 
 ## Inspect memory and Skills
 
-Use `/memory` or `/skills` to list active documents and pending batches. `read ID`
-displays a document; `commit UPDATE` or `reject UPDATE` reviews a batch while idle.
-The [retained-state feature](features/retained_state/README.md) uses injected public
+Use `/memory` or `/skills` to inspect active documents and pending batches. Memory
+adds `/memory details` and `/memory run`; the latter uses the same threshold
+maintenance worker and durable batch lifecycle. `read ID` displays a document;
+`commit UPDATE` or `reject UPDATE` reviews a batch while idle. The [retained-state feature](features/retained_state/README.md) uses injected public
 operations and starts no search or model request during inspection.
 
 ## Inspect subagents

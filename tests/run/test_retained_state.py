@@ -14,6 +14,32 @@ class RetainedStateTests(unittest.TestCase):
         self.artifacts = DataArtifactStore(self.root / '.fruitfly/artifacts')
         self.store = RetainedStateStore(self.root / '.fruitfly/retained/project', self.artifacts)
 
+    def test_runtime_retry_and_legacy_end_use_scoped_storage(self):
+        from types import SimpleNamespace
+        from fruitfly_agent.run.storage.retained_scopes import RetainedScopes
+        from fruitfly_agent.run.runtime.maintenance import RetainedRuntimeService
+        scopes = RetainedScopes(self.store, self.store, {'memory-library'})
+        service = RetainedRuntimeService(session=None, session_id='test', store=scopes,
+            components={'maintenance-workers': (SimpleNamespace(library_id='memory-library'),)})
+        identity = self.store.begin('extract', 'legacy')
+        self.store.finish(identity, status='unknown')
+        self.assertEqual('retry-authorized', service.review(identity, 'retry'))
+        self.assertEqual('retry-authorized', service.review(identity, 'retry'))
+        self.assertEqual('ended', service.review(identity, 'discard'))
+        self.assertEqual('discarded', self.store.read()['operations'][identity]['status'])
+
+    def test_skills_status_excludes_memory_counters_and_errors(self):
+        from types import SimpleNamespace
+        from fruitfly_agent.run.runtime.maintenance import RetainedRuntimeService
+        from fruitfly_agent.interactive.terminal.features.retained_state.views import render_state
+        service = RetainedRuntimeService(session=None, session_id='test', components={}, store=self.store)
+        service.collections['skill'] = SimpleNamespace(library_id='skills', view_entries=lambda: [])
+        service.error = 'memory maintenance failed'
+        state = service.describe('skill')
+        self.assertNotIn('user_chars', state)
+        self.assertEqual('', state['error'])
+        self.assertEqual('No retained documents.\n', render_state(state, kind='skill'))
+
     def test_read_only_discovery_creates_nothing(self):
         self.assertEqual({}, self.store.read()['libraries'])
         self.assertFalse(self.store.root.exists())
@@ -54,8 +80,42 @@ class RetainedStateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'unknown outcome'):
             restored.begin('extract', 'different-request-after-new-input')
         self.assertEqual('retry-authorized', restored.allow_retry(first))
+        self.assertEqual('retry-authorized', restored.allow_retry(first))
         next_operation = restored.begin('extract', 'same-request')
         restored.finish(next_operation, status='failed')
+
+    def test_active_maintenance_excludes_other_workers_and_retry(self):
+        peer = RetainedStateStore(self.store.root, self.artifacts)
+        with self.store.maintenance_lease() as acquired:
+            self.assertTrue(acquired)
+            operation = self.store.begin('extract', 'active')
+            with peer.maintenance_lease() as peer_acquired:
+                self.assertFalse(peer_acquired)
+            with self.assertRaisesRegex(ValueError, 'still running'):
+                peer.allow_retry(operation)
+            self.assertEqual('running', peer.read()['operations'][operation]['status'])
+        self.assertEqual('retry-authorized', peer.allow_retry(operation))
+
+    def test_legacy_batch_without_journal_can_be_ended_without_losing_evidence(self):
+        operation = self.store.begin('extract', 'legacy')
+        self.store.finish(operation, status='unknown')
+        self.store.allow_retry(operation)
+        before = self.store.read()
+        self.assertEqual('ended', self.store.end_legacy_operation(operation))
+        after = self.store.read()
+        self.assertEqual(before['evidence'], after['evidence'])
+        self.assertEqual('discarded', after['operations'][operation]['status'])
+        self.assertEqual('legacy-no-journal', after['operations'][operation]['end_reason'])
+        self.assertEqual('retry-authorized', before['operations'][operation]['status'])
+
+    def test_publication_is_durable_and_rejects_duplicate_adoption(self):
+        operation = self.store.begin('extract', 'publication')
+        self.store.finish(operation, status='completed', key='memory-library', text='[]')
+        self.store.publish(operation)
+        restored = RetainedStateStore(self.store.root, self.artifacts)
+        self.assertEqual('[]', restored.library('memory-library'))
+        with self.assertRaisesRegex(ValueError, 'not pending'):
+            restored.publish(operation)
 
     def test_duplicate_source_observation_counts_once(self):
         row = {'identity': 'a:1', 'session_id': 'a', 'message_id': '1',

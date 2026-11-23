@@ -159,10 +159,10 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
         fallback = self.workspace.root / "shared-models.yaml"
         _write_catalog(fallback, {"shared": "shared-model"})
         with patch("fruitfly_agent.run.configuration.resolution.default_model_catalog_path", return_value=fallback):
-            factory = RunApplicationFactory(cwd=self.workspace.root, environment={}, allow_incomplete=True)
+            factory = RunApplicationFactory(cwd=self.workspace.root, user_root=(self.workspace.root) / '.fruitfly-user', environment={}, allow_incomplete=True)
             self.assertEqual(factory.configuration.snapshot().model_profiles, ())
             self.assertEqual(factory.configuration.snapshot().model_catalog, "models.yaml")
-            one_shot = RunApplicationFactory(cwd=self.workspace.root, environment={})
+            one_shot = RunApplicationFactory(cwd=self.workspace.root, user_root=(self.workspace.root) / '.fruitfly-user', environment={})
             self.assertEqual(one_shot.selection.profile.model_profile, "shared")
 
     def test_chat_service_addition_uses_the_shared_catalog_contract(self):
@@ -175,7 +175,7 @@ class ModelSetupTest(unittest.IsolatedAsyncioTestCase):
 
     def test_sdk_and_protocol_choices_follow_the_injected_registry_without_constructing_clients(self):
         registry = default_registry()
-        self.workspace.factory = RunApplicationFactory(cwd=self.workspace.root, environment={}, allow_incomplete=True,
+        self.workspace.factory = RunApplicationFactory(cwd=self.workspace.root, user_root=(self.workspace.root) / '.fruitfly-user', environment={}, allow_incomplete=True,
                                             provider_registry=registry)
         self.workspace.controller = self.workspace.factory.configuration
         self.workspace.setup = self.workspace.controller.model_setup

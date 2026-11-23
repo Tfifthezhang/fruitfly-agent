@@ -130,7 +130,7 @@ class DocumentsTarget(ParameterTarget):
         return [entry for entry in self.list_entries() if self.visible(entry)]
 
 
-def collection_surface(identity, *, normalize, default_resource, factory):
+def collection_surface(identity, *, normalize, default_resource, factory, storage_scope='workspace'):
     """One declaration generates configuration, grants, inventory and runtime target."""
     from fruitfly_agent.lab.catalog.configuration import ConfigurationSurface
     from fruitfly_agent.improvement.contracts.optimization import OptimizationSpec
@@ -141,4 +141,4 @@ def collection_surface(identity, *, normalize, default_resource, factory):
     return ConfigurationSurface(identity, 'S', 'settings', identity, normalize,
         edit_options=options, default_resource=default_resource,
         optimization=OptimizationSpec('S', 'parameters', required_capabilities=frozenset({'configuration-materialization'})),
-        target_factory=factory, kind='retained-collection', schema='mechanism-parameters-v1')
+        target_factory=factory, kind='retained-collection', schema='mechanism-parameters-v1', storage_scope=storage_scope)

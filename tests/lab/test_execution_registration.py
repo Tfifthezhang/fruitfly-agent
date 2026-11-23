@@ -33,7 +33,7 @@ class ExecutionRegistrationTests(unittest.IsolatedAsyncioTestCase):
             provider = FauxProvider()
             providers = Mock()
             providers.create.return_value = provider
-            app = AgentApplication(RunApplicationFactory(cwd=root, environment={}, provider_registry=providers))
+            app = AgentApplication(RunApplicationFactory(cwd=root, user_root=(root) / '.fruitfly-user', environment={}, provider_registry=providers))
             await app.start()
             try:
                 self.assertFalse(hasattr(app, 'start_improvement'))

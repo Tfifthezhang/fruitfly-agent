@@ -157,6 +157,7 @@ class RuntimePreparer:
                     register_media=runtime.components['media-resources'].put,
                     vision=runtime.manifest.models['main']['capabilities']['vision'],
                 )
+                context = replace(context, model_activity=interaction.emit_model_activity)
                 operations = runtime.components.get('managed-operations')
                 operation_service = self.adapt_operations(operations, interaction.emit_frontend_event) if operations is not None and self.adapt_operations is not None else None
                 approvals = runtime.components["authorization"]
@@ -169,8 +170,13 @@ class RuntimePreparer:
 
                 retained = None
                 if self.retained_store is not None:
+                    async def emit_maintenance_activity(*, phase, subject, batch, total, text):
+                        from fruitfly_agent.interactive.contracts.events import AuxiliaryModelActivity
+                        await interaction.emit_frontend_event(AuxiliaryModelActivity(run_id='', phase=phase,
+                            subject=subject, batch=batch, total=total, text=text))
                     retained = RetainedRuntimeService(session=session, session_id=str(path.resolve()),
-                        components=runtime.components, store=self.retained_store, enabled=False)
+                        components=runtime.components, store=self.retained_store, enabled=False,
+                        conditions_id=runtime.manifest.to_dict()['digest'], emit_activity=emit_maintenance_activity)
                     runtime = replace(runtime, components={**runtime.components, 'retained-state-service': retained})
                     resources.append(retained)
                 if self.retained_store is not None:

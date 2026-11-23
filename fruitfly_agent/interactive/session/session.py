@@ -126,7 +126,17 @@ class InteractiveSession:
         )
 
     async def emit_frontend_event(self, event) -> None:
-        await self._dispatcher.emit(event)
+        from fruitfly_agent.interactive.contracts.events import AuxiliaryModelActivity
+        if isinstance(event, AuxiliaryModelActivity):
+            await self._dispatcher.emit_auxiliary(event)
+        else:
+            await self._dispatcher.emit(event)
+
+    async def emit_model_activity(self, *, phase, component_id='', model_role='', request_id='', batch=0, total=0, text=''):
+        from fruitfly_agent.interactive.contracts.events import AuxiliaryModelActivity
+        await self._dispatcher.emit_auxiliary(AuxiliaryModelActivity(run_id='', phase=phase,
+            subject=component_id, component_id=component_id, model_role=model_role,
+            request_id=request_id, batch=batch, total=total, text=text))
 
     def set_event_sink(self, sink: EventSink | None) -> None:
         self._dispatcher.set_sink(sink)

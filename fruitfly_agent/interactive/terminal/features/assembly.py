@@ -16,9 +16,11 @@ def bind_commands(registry, *, bindings, configuration, status, cancel,
     if bindings.retained_state is not None:
         for name, kind in (('memory', 'memory'), ('skills', 'skill')):
             registry.register(name, retained_handler(kind=kind, describe=bindings.retained_state,
-                read=bindings.retained_document, review=bindings.retained_action),
+                read=bindings.retained_document, review=bindings.retained_action,
+                run=bindings.retained_run),
                 summary='inspect retained documents and review pending updates',
-                usage='/' + name + ' [read ID|commit UPDATE|reject UPDATE' + ('|retry OPERATION' if kind == 'memory' else '') + ']')
+                usage='/' + name + (' [run|details|read ID|retry OPERATION|import WORKSPACE|discard OPERATION]' if kind == 'memory'
+                    else ' [read ID|commit UPDATE|reject UPDATE]'))
     if bindings.subagents is not None:
         registry.register('subagent', subagent_handler(bindings.subagents),
             summary='inspect subagent executions', usage='/subagent [AGENT_ID [RUN_ID]]')

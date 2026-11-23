@@ -34,7 +34,7 @@ class DefaultConfigurationTests(unittest.TestCase):
         self.environment = {"SHARED_MODEL_KEY": "offline-fixture"}
 
     def factory(self, **kwargs):
-        return RunApplicationFactory(cwd=self.root, environment=self.environment, **kwargs)
+        return RunApplicationFactory(cwd=self.root, user_root=(self.root) / '.fruitfly-user', environment=self.environment, **kwargs)
 
     def frontend(self, controller, *lines):
         output = io.StringIO()

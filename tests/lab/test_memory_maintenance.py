@@ -35,6 +35,14 @@ class MemoryMaintenanceTests(unittest.IsolatedAsyncioTestCase):
         state['processed'] = 50
         self.assertIsNone(worker.request(state, '[]'))
 
+    def test_manual_request_bypasses_thresholds_only_when_there_is_work(self):
+        worker = self.worker(FauxProvider())
+        state = checkpoint(chars=2)
+        self.assertIsNone(worker.request(state, '[]'))
+        self.assertEqual('extract', worker.request(state, '[]', manual=True)['operation'])
+        state['processed'] = 1
+        self.assertIsNone(worker.request(state, '[]', manual=True))
+
     async def test_empty_library_consolidation_uses_no_model(self):
         provider = FauxProvider(); worker = self.worker(provider, consolidate_after_user_turns=1)
         state = checkpoint()
@@ -78,7 +86,7 @@ class MemoryMaintenanceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual('extract prompt', provider.calls[0]['system_prompt'])
         self.assertEqual([], provider.calls[0]['tools'])
 
-    async def test_oversized_single_message_is_fully_paged_before_processing_advances(self):
+    async def test_oversized_single_message_is_fully_batched_before_processing_advances(self):
         provider = FauxProvider()
         for _ in range(4):
             provider.respond_text('[]')
@@ -87,11 +95,11 @@ class MemoryMaintenanceTests(unittest.IsolatedAsyncioTestCase):
         text, processed, _ = await worker.generate(worker.request(state, '[]'), state, lambda row: 'long input')
         self.assertIsNone(text)
         self.assertEqual(1, processed)
-        pages = [json.loads(call['messages'][0].content)['evidence'][0] for call in provider.calls]
-        self.assertEqual('long input', ''.join(page['text'] for page in pages))
-        self.assertEqual(1, len({page['id'] for page in pages}))
+        batches = [json.loads(call['messages'][0].content)['evidence'][0] for call in provider.calls]
+        self.assertEqual('long input', ''.join(batch['text'] for batch in batches))
+        self.assertEqual(1, len({batch['id'] for batch in batches}))
 
-    async def test_late_page_failure_leaves_checkpoint_untouched(self):
+    async def test_late_batch_failure_leaves_checkpoint_untouched(self):
         provider = FauxProvider(); provider.respond_text('[]'); provider.respond_text('[{}]')
         worker = self.worker(provider, extract_after_user_chars=1, max_input_chars=3)
         state = checkpoint()
@@ -108,7 +116,7 @@ class MemoryMaintenanceTests(unittest.IsolatedAsyncioTestCase):
         state = checkpoint()
         self.assertEqual('consolidate', worker.request(state, json.dumps([memory()]))['operation'])
 
-    async def test_consolidation_visits_notes_after_the_first_page(self):
+    async def test_consolidation_visits_notes_after_the_first_batch(self):
         provider = FauxProvider(); provider.respond_text('[]'); provider.respond_text('[]')
         worker = self.worker(provider, extract_after_user_chars=99999, consolidate_after_user_turns=1,
             max_input_chars=700)

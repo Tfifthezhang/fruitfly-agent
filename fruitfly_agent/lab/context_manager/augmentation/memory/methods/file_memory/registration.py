@@ -26,7 +26,7 @@ def state_surface():
         return DocumentsTarget(state_surface(), parameters['content'], label='Retained memories', kind='memory',
             validate_documents=validate_memories, mutable=MUTABLE)
     return collection_surface('memory-library', normalize=normalize,
-        default_resource=(__package__, 'state.yaml'), factory=factory)
+        default_resource=(__package__, 'state.yaml'), factory=factory, storage_scope='user')
 
 
 def definition():
@@ -59,7 +59,7 @@ def definition():
         configuration_surfaces=(state_surface(),),
         input_parameters=('maintenance_enabled', 'extract_after_user_chars', 'consolidate_after_user_turns'),
         model_role_parameters={'memory_maintenance': ModelRoleRequirement('model_profile',
-            'Extract and consolidate retained notes.', lazy=True, required_when=lambda p: p['maintenance_enabled'])},
+            'Extract and consolidate retained notes when automatic or manually requested.', lazy=True)},
         implementation_path='fruitfly_agent/lab/context_manager/augmentation/memory/methods/file_memory/algorithm.py',
         documentation_path='fruitfly_agent/lab/context_manager/augmentation/memory/methods/file_memory/README.md')
     return editable_parameters(value, {p.name for p in params} - {'root', 'model_profile'},
@@ -70,10 +70,11 @@ def install(state, context, values):
     state = install_reading(state, context, values)
     def worker_for(parameters):
         role_context = replace(context, model_parameters=parameters)
-        return ThresholdMaintenance(MaintenanceConfig(**{k: parameters[k] for k in MaintenanceConfig.__dataclass_fields__}),
+        worker = ThresholdMaintenance(MaintenanceConfig(**{k: parameters[k] for k in MaintenanceConfig.__dataclass_fields__}),
             parameters['extraction'], parameters['consolidation'], lambda: role_context.provider_for_role('memory_maintenance'))
+        worker.auto_enabled = parameters['maintenance_enabled']
+        return worker
     state = state.with_execution_resource('memory-learning', worker_for)
-    if values['maintenance_enabled']:
-        worker = worker_for(values)
-        state = state.with_component('maintenance-workers', (*state.components.get('maintenance-workers', ()), worker))
+    worker = worker_for(values)
+    state = state.with_component('maintenance-workers', (*state.components.get('maintenance-workers', ()), worker))
     return state
