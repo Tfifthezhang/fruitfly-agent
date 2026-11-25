@@ -159,3 +159,10 @@ Comparison does not activate candidates or run another stage automatically.
 Current registered scope is Code. Other WorkBuddy subsets and independent LLM
 judge requirements are not implied by Code support. Offline fake rewards test
 contracts, not benchmark quality or real server compatibility.
+
+Task selection uses the exact local directory ID, for example
+`api_contract-hard-openapi_params`. Preparation retains the official
+`task.name`, for example `workbuddy/api_contract-hard-openapi_params`, separately
+for engine results and attribution. The short name must match the directory ID.
+Do not remove the organization prefix from official task files. Run preparation
+again after updating the adapter.

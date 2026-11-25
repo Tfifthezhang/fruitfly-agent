@@ -23,6 +23,14 @@ class WorkBuddyTaskTests(unittest.TestCase):
             self.assertEqual(excluded[0]['id'], 'second')
             self.assertEqual(excluded[0]['requirements'], ['GPU required'])
 
+    def test_official_name_must_match_directory_without_rewriting_material(self):
+        with tempfile.TemporaryDirectory() as directory:
+            dataset, descriptor = self.fixture(Path(directory))
+            path = dataset / 'tasks/first/task.toml'
+            path.write_text(path.read_text().replace('workbuddy/first', 'workbuddy/second'))
+            with self.assertRaisesRegex(ValueError, 'must match'):
+                inventory(dataset, descriptor, 'full', inspect_resources=resources)
+
     def fixture(self, root):
         dataset = root / 'wb-code'
         dataset.mkdir()
@@ -33,7 +41,7 @@ class WorkBuddyTaskTests(unittest.TestCase):
         for name in ('first', 'second'):
             task = dataset / 'tasks' / name
             task.mkdir(parents=True)
-            (task / 'task.toml').write_text('[environment]\ndocker_image="fixture/code:v1"\n')
+            (task / 'task.toml').write_text('[task]\nname="workbuddy/' + name + '"\n[environment]\ndocker_image="fixture/code:v1"\n')
             (task / 'instruction.md').write_text('Implement ' + name)
         descriptor = harbor_descriptor(benchmark_id='fixture', label='Fixture', description='Fixture',
             version='1', dataset='fixture/code', smoke_task='first')
@@ -46,6 +54,7 @@ class WorkBuddyTaskTests(unittest.TestCase):
             original = {p.relative_to(dataset): p.read_bytes() for p in dataset.rglob('*') if p.is_file()}
             receipt = freeze_dataset(dataset, root / 'cache', descriptor, 'smoke', inspect_resources=resources)
             self.assertEqual([r['id'] for r in receipt['tasks']], ['first'])
+            self.assertEqual(receipt['tasks'][0]['name'], 'workbuddy/first')
             self.assertTrue((Path(receipt['root']) / 'shared/verifier/plugin.py').is_file())
             self.assertTrue((Path(receipt['root']) / 'dataset.toml').is_file())
             check_dataset(receipt, descriptor, 'smoke', inspect_resources=resources)

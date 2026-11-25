@@ -36,21 +36,24 @@ def inventory(root: Path, descriptor: BenchmarkDescriptor, variant: str, *,
     rows = []
     for path in sorted((root / 'tasks').glob('*/task.toml')):
         config = tomllib.loads(path.read_text())
-        name = config.get('task', {}).get('name') or path.parent.name
-        if not isinstance(name, str) or not name or '/' in name or '\\' in name or name in {'.', '..'}:
-            raise ValueError('WorkBuddy task names must be exact nonempty local names')
-        if selection.task_names and name not in selection.task_names:
+        identity = path.parent.name
+        name = config.get('task', {}).get('name') or identity
+        if (not isinstance(name, str) or not name or '\\' in name
+                or any(part in {'', '.', '..'} for part in name.split('/'))
+                or len(name.split('/')) > 2 or name.rsplit('/', 1)[-1] != identity):
+            raise ValueError('WorkBuddy official task name must match its local task ID')
+        if selection.task_names and identity not in selection.task_names:
             if excluded is not None:
-                excluded.append({'id': name, 'reason': 'outside declared smoke selection'})
+                excluded.append({'id': identity, 'reason': 'outside declared smoke selection'})
             continue
         instruction = path.parent / 'instruction.md'
         if not instruction.is_file():
             raise ValueError('selected task has no instruction.md: ' + name)
-        row = {'id': name, 'name': name, 'path': str(path.parent.resolve()), 'configuration': config}
+        row = {'id': identity, 'name': name, 'path': str(path.parent.resolve()), 'configuration': config}
         requirements = inspect_resources(row)
         if variant == 'no_gpu' and requirements['gpu_requirements']:
             if excluded is not None:
-                excluded.append({'id': name, 'reason': 'effective GPU or unresolved resource requirements',
+                excluded.append({'id': identity, 'reason': 'effective GPU or unresolved resource requirements',
                                  'requirements': requirements['gpu_requirements']})
             continue
         rows.append({**row, 'sha256': tree_identity(path.parent), 'requirements': requirements})

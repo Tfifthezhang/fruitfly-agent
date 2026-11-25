@@ -29,7 +29,7 @@ def fixture(root: Path):
         task = dataset / 'tasks' / name
         (task / 'tests').mkdir(parents=True)
         (task / 'tests/test.sh').write_text('# fixture rule')
-        (task / 'task.toml').write_text('[environment]\ndocker_image="fixture/code:v1"\n')
+        (task / 'task.toml').write_text('[task]\nname="workbuddy/' + name + '"\n[environment]\ndocker_image="fixture/code:v1"\n')
         (task / 'instruction.md').write_text('Implement ' + name)
     runtime = root / 'runtime'; runtime.mkdir()
     (runtime / 'fixture').write_text('mounted Python fixture')

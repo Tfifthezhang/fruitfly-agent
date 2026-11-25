@@ -124,3 +124,10 @@ References: [official WorkBuddy Bench](https://github.com/Tencent/workbuddy-benc
 [installed-Agent interface](https://github.com/Tencent/workbuddy-bench/blob/main/configs/harnesses/HARNESS_AUTHORING.md).
 This implementation preserves official dataset/plugin behavior and supplies a
 native FruitFlyAgent bridge; it does not replace the official judges.
+
+Task selection uses the exact local directory ID, for example
+`api_contract-hard-openapi_params`. Preparation retains the official
+`task.name`, for example `workbuddy/api_contract-hard-openapi_params`, separately
+for engine results and attribution. The short name must match the directory ID.
+Do not remove the organization prefix from official task files. Run preparation
+again after updating the adapter.

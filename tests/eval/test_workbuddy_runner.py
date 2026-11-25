@@ -54,7 +54,7 @@ class WorkBuddyRunnerTests(unittest.TestCase):
             dataset = host.task_directory
             tasks = []
             for path in sorted((dataset / 'tasks').iterdir()):
-                tasks.append({'id': path.name, 'name': path.name, 'path': str(path),
+                tasks.append({'id': path.name, 'name': 'workbuddy/' + path.name, 'path': str(path),
                     'sha256': tree_identity(path), 'configuration': {'environment': {'docker_image': 'fixture/code:v1'}}})
             receipt = {'id': 'prepared-fixture', 'dataset': 'wb-bench-code-v1.0', 'tasks': tasks,
                 'runner': runner_identity(root / 'workbuddy'), 'engine': {'sha256': 'fixture-engine'},
