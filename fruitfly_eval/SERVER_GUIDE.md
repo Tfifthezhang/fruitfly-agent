@@ -4,7 +4,10 @@
 
 Prepare one reusable controller environment and one reusable Agent runtime, then
 select a Harbor dataset and validate its task environments. This procedure is
-shared by every registered benchmark. Dataset identities and smoke tasks belong
+shared by the standard Harbor datasets. Backends with a separately pinned
+controller use their [owner recipes](../examples/experiments/README.md) for
+controller setup. This guide covers the mounted Linux runtime and subscription
+authorization shared by native bridges. Dataset identities and smoke tasks belong
 to [benchmark declarations](benchmarks/TASKS.md), not machine configuration.
 
 Run commands on the Linux evaluation server unless marked **Local computer**.

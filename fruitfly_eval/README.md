@@ -35,8 +35,8 @@ docker compose version
 
 | Item | Support |
 |---|---|
-| Datasets | Terminal-Bench 2.1, Terminal-Bench 4.0.0, SWE-bench Verified; see [task selections](benchmarks/TASKS.md) |
-| Backend | Docker through Harbor `0.23.0` |
+| Datasets | Terminal-Bench 2.1, Terminal-Bench 4.0.0, SWE-bench Verified, WorkBuddy Code v1.0; see [task selections](benchmarks/TASKS.md) |
+| Backend | Docker through Harbor `0.23.0`; WorkBuddy uses its isolated `0.18.0` controller |
 | Selection | `smoke`, tasks without GPU requirements (`no_gpu`), or all tasks (`full`) |
 | Formats | Requests and host files have one format without version markers; results/reports and preparation receipts retain their record versions |
 | Output | `.fruitfly/eval/<evaluation-id>/` |
@@ -162,6 +162,8 @@ and omits aggregate benchmark metrics.
 | Module | Responsibility |
 |---|---|
 | [Benchmarks](benchmarks/README.md) | Dataset declarations and shared Harbor adapter |
+| [Backend capabilities](backends/README.md), [native bridges](bridges/README.md) | Independent preparation/control and complete native Agent launch |
+| [WorkBuddy](workbuddy/README.md) | Official Code material, isolated controller and attributed outcomes |
 | [Harbor preparation](harbor/README.md) | Machine paths, frozen tasks/runtime, verifier assets/caches and lifecycle |
 | [catalog.py](catalog.py), [contracts.py](contracts.py) | Discovery and single-configuration requests |
 | [execution.py](execution.py), [storage.py](storage.py), [report.py](report.py) | Evaluation lifecycle, artifacts and reports |
@@ -251,3 +253,17 @@ reported subtotals and public Harbor termination evidence.
 
 Subscription models use per-trial host relay grants. Account credentials and
 refresh tokens stay on the host. See [subscription execution](harbor/README.md#connect-subscription-models).
+
+[Backend capabilities](backends/README.md) separate preparation and explicit host
+configuration from dataset declarations. Eval entry points consume those ports
+without selecting a backend by concrete class or model identity.
+
+The [WorkBuddy adapter](workbuddy/README.md) registers `workbuddy-code`, preserves
+dataset-local resources and supports exact task selection and native Improvement
+measurements. Use its [separate controller recipe](../examples/experiments/workbuddy/README.md);
+do not install the standard benchmarks extra in that controller environment.
+Other WorkBuddy subsets and independent model judges are unsupported.
+
+[Native host bridges](bridges/README.md) launch the complete frozen Agent
+configuration through a shared CLI argument contract, retaining model connection
+policy in Providers.

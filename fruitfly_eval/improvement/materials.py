@@ -68,6 +68,9 @@ def collect_materials(root, artifacts, *, interrupted=False, trial=None, origins
                 if origins is not None:
                     origins[logical] = path
         prefix = f'agent/{index}/'
+        from .measurement_context import read as read_context, FILENAME, RESOURCE_PATH
+        if read_context(directory, root) is not None:
+            retain(directory / FILENAME, RESOURCE_PATH)
         native = agent / 'session.jsonl'
         source = native if native.is_file() and safe_path(native, root) else agent / 'trajectory.json'
         instruction = ''

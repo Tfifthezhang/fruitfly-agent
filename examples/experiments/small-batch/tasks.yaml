@@ -1,0 +1,8 @@
+# Copy beside your prepared task collection; replace both exact names.
+source: task-set
+collections:
+  - id: benchmark
+    source: eval
+    request: ../eval-request.json
+    host: ../eval-host.yaml
+    task_names: [REPLACE_WITH_EXACT_PREPARED_TASK_1, REPLACE_WITH_EXACT_PREPARED_TASK_2]

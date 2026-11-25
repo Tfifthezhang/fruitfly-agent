@@ -78,7 +78,10 @@ def prepare_collections(config, *, tasks_only=False, progress=None):
         if row.get('source') == 'eval':
             benchmark = resolve_benchmark(replace(config, task={key: value for key, value in row.items()
                 if key in {'source', 'request', 'host'}}))
-            result[row['id']] = prepare_evaluation(benchmark.request,
+            request = benchmark.request
+            if row.get('task_names'):
+                request = replace(request, benchmark=replace(request.benchmark, task_names=tuple(row['task_names'])))
+            result[row['id']] = prepare_evaluation(request,
                 host_config_path=benchmark.stage_host(), tasks_only=tasks_only, progress=progress)
     if not result:
         raise ValueError('task set contains no Eval collections to prepare')

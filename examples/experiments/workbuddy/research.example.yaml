@@ -1,0 +1,59 @@
+# Independent stages; only next.stage is executed. Paths resolve from this file.
+# Model roles and algorithm instructions belong to the referenced system profile.
+# Input files and named outputs must exist before their stage is selected.
+research:
+  id: benchmark-research
+  title: Fixed benchmark and independent Improvement stages
+  output_root: research-output
+  branch: main
+baseline:
+  config: default-config.yaml
+  profile: baseline
+stages:
+  execute:
+    tasks:
+      file: tasks/benchmark.yaml
+    concurrency: 1
+    attempts: 1
+    inputs:
+      harness:
+        config: default-config.yaml
+    attempt: reuse
+    publish_as: baseline-results
+    allowance:
+      task_seconds: 3600
+  organize:
+    incremental:
+      enabled: true
+      reuse: true
+    delegation:
+      enabled: true
+      workers: [evidence-reader, record-organizer, cross-record-reader, counterexample-reader]
+    allowance:
+      seconds: 1200
+    attempt: reuse
+  assess:
+    delegation:
+      enabled: true
+      workers: [evidence-reader, record-organizer, cross-record-reader, counterexample-reader]
+    allowance:
+      seconds: 1200
+    attempt: reuse
+  propose:
+    delegation:
+      enabled: true
+      workers: [evidence-reader, record-organizer, cross-record-reader, counterexample-reader]
+    optimization:
+      scope: defaults
+      include: {}
+      exclude: []
+    allowance:
+      seconds: 1200
+    attempt: reuse
+  compare:
+    # Default measured comparison is offline and uses no model workers.
+    allowance:
+      seconds: 1200
+    attempt: reuse
+next:
+  stage: execute

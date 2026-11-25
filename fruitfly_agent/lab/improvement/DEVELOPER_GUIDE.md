@@ -236,7 +236,11 @@ just archived result records.
 
 Configure `stages.compare.inputs.batches` with the two result aliases, give it a
 new output alias, and set `next.stage: compare`. Run `show`, `check`, then `step`.
-Comparison may make model requests. Review official outcomes, reliability, cost
+The default measured comparison makes no model requests. Native execute batches
+flow directly into it. Explicit model comparison can incur charges. Use the
+[small-batch recipe](../../../examples/experiments/small-batch/README.md) for exact
+task selection, alternate executor models and full-baseline subset comparisons.
+Review official outcomes, reliability, cost
 coverage and hypothesis checks separately. Comparison neither activates the
 candidate nor automatically selects another stage.
 

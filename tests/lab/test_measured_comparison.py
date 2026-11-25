@@ -14,7 +14,7 @@ from fruitfly_agent.lab.improvement.stages.compare import compare
 
 
 class MeasuredComparisonTest(IsolatedAsyncioTestCase):
-    async def test_default_mode_retains_model_judgments_and_unavailable_tasks(self):
+    async def test_explicit_model_mode_retains_judgments_and_unavailable_tasks(self):
         tasks = (TaskMaterial('available', 'Instruction'), TaskMaterial('missing', 'Instruction'))
         resources = tuple(Resource(name, content_hash(name)) for name in ('before', 'after'))
         result = {}
@@ -35,7 +35,8 @@ class MeasuredComparisonTest(IsolatedAsyncioTestCase):
         ports = SimpleNamespace(read_batch=lambda _: ResearchBatch(tasks, ()), put=put,
                                 create_services=services,
                                 assessor=lambda _: SimpleNamespace(evaluator=SimpleNamespace(evaluate=evaluate)))
-        await compare(ports, ActivitySpec('compare', 'research-compare-v1'), StageInputs(batches=resources))
+        await compare(ports, ActivitySpec('compare', 'research-compare-v1',
+            parameters={'comparison_method': 'model'}), StageInputs(batches=resources))
         self.assertEqual(result['method'], 'model')
         self.assertEqual(result['coverage'], {'tasks': 2, 'judged': 1})
         self.assertEqual(result['judgments'][1]['status'], 'unavailable')

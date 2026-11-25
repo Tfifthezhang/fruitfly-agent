@@ -21,13 +21,14 @@ def workspace_templates(*, source: str | None = None, benchmark: str | None = No
     result = dict(system_templates())
     if source == 'task-set':
         result['experiment.yaml'] = _template('task-set.yaml')
-        result['tasks/tb4-smoke.yaml'] = _template('tasks/tb4-smoke.yaml')
+        result['tasks/benchmark.yaml'] = _template('tasks/benchmark.yaml')
         if not benchmark:
             raise ValueError('--source task-set requires --benchmark with a registered catalog ID')
         # Eval remains optional. Descriptor lookup does not invoke preflight or Harbor.
         from fruitfly_eval.catalog import builtin_catalog
         from fruitfly_eval.contracts import EvaluationRequest
-        descriptor = builtin_catalog().get(benchmark).descriptor
+        adapter = builtin_catalog().get(benchmark)
+        descriptor = adapter.descriptor
         if variant not in {item.variant_id for item in descriptor.variants}:
             raise ValueError('benchmark does not declare variant: ' + variant)
         request = EvaluationRequest.from_dict({
@@ -38,6 +39,16 @@ def workspace_templates(*, source: str | None = None, benchmark: str | None = No
         })
         result['eval-request.json'] = json.dumps(request.to_dict(), indent=2) + '\n'
         result['eval-host.yaml'] = _template('eval-host.yaml')
+        from fruitfly_eval.backends import WorkspaceInputs
+        if isinstance(adapter, WorkspaceInputs):
+            from fruitfly_agent.improvement.contracts.validation import relative_path
+            for name, content in adapter.initial_files().items():
+                relative_path(name)
+                if name in {'default-config.yaml', 'models.yaml', 'subscriptions.yaml', 'secrets.env'}:
+                    raise ValueError('backend inputs cannot replace system/model/secret configuration')
+                if not isinstance(content, str):
+                    raise ValueError('backend input files must contain text')
+                result[name] = content
     return result
 
 

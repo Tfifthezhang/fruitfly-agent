@@ -15,7 +15,8 @@ owner admission belongs to [Catalog](../lab/catalog/CONFIGURATION.md).
 | `stages.<stage>.inputs`, `context` | Explicit named materials and supplementary context |
 | `stages.<stage>.allowance` | Independent time and evidence supply allowance |
 | `stages.group.position`, `members` | Select one group position and provide authored task-ID lists for fixed grouping |
-| `stages.compare.measured_policy` | Path to the frozen task-attempt policy JSON for measured comparison |
+| `stages.compare.measured_policy` | Optional explicit task-attempt policy JSON; native batches need none |
+| `stages.compare.task_scope` | Explicit batch reference equal to one of the two comparison inputs; its planned pairs must occur in both |
 | `stages.propose.optimization` | Owner-validated default/explicit field grants |
 | `stages.<stage>.publish_as`, `attempt` | Immutable output alias and reuse/retry decision |
 | `next.stage` | Execute exactly one configured stage |
@@ -74,7 +75,7 @@ retained even if projection/alias publication needs attention.
 | `assess` | Input batches | Same reading allowance |
 | `propose` | `direction`, `optimization` | Same reading allowance |
 | `execute` | `tasks`, task-set `attempts`, `concurrency` | `task_seconds` |
-| `compare` | At least two batches | Same reading allowance |
+| `compare` | Exactly two batches for measured comparison; optional `task_scope`, `measured_policy` | Offline by default; explicit model method uses reading allowance |
 
 Organize, assess, propose and compare additionally accept `delegation` with
 `enabled` (boolean) and `workers` (distinct names declared by the selected Subagent component). Omitted

@@ -1,0 +1,47 @@
+# Machine-local paths; set these variables in the host process environment.
+# The Python installation and venv must be Linux-compatible and complete.
+# Match the host paths inside the container to preserve absolute Python links.
+cache: eval-cache
+agent:
+  python: ${FRUITFLY_EVAL_VENV}/bin/python
+  mounts:
+    - source: ${FRUITFLY_EVAL_PYTHON_ROOT}
+    - source: ${FRUITFLY_EVAL_VENV}
+  library_paths: []
+environment:
+  setup: {}
+  agent: {}
+  verifier: {}
+dependencies:
+  assets: []
+  prepare: []
+  offline: false
+# Optional: an exported Harbor task directory instead of registry resolution.
+# task_directory: /absolute/path/to/tasks
+# Optional: exact, reviewed setup replacements in private frozen task copies.
+task_patches: []
+# Protected evidence collection; additional whole-job time and disk usage.
+evidence:
+  roots: ['.']
+  extra_paths: []
+  exclude: ['.fruitfly', '.git', '.env', 'secrets.env', '__pycache__', '.ssh']
+  max_file_bytes: 268435456
+  max_total_bytes: 1073741824
+  max_entries: 10000
+  baseline_seconds: 30
+  capture_seconds: 60
+  include_tool_outputs: true
+
+# Optional network model relay for Docker Desktop or a remote Docker host.
+# Replace certificate paths and hostname; containers must reach ephemeral ports.
+# model_relay:
+#   network_url: https://eval-host.example
+#   listen_host: 0.0.0.0
+#   certificate: relay-server.pem
+#   private_key: relay-server-key.pem
+#   ca: relay-ca.pem
+
+# Complete dataset root, containing dataset.toml, tasks/ and shared/.
+task_directory: ${WORKBUDDY_DATASET_ROOT}
+backend:
+  file: workbuddy-runner.yaml

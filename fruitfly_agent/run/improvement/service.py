@@ -34,7 +34,7 @@ class ResearchService:
     def build_controller(self):
         from fruitfly_agent.lab.improvement.api import StageContext, builtin_stage_handlers
         context = StageContext(self.plan, self.proposal, self.organizer, self.assessor, self.executor,
-            self.put, self.read, self.read_batch, self.input_batch, self.create_services, self.select_evidence)
+            self.put, self.read, self.read_batch, self.input_batch, self.create_services, self.select_evidence, self.put_text)
         implementations = {('import', 'research-import-v1'): self._import,
             **builtin_stage_handlers(context)}
         for name, implementation in self.external_stages.items():
@@ -70,6 +70,9 @@ class ResearchService:
     def read(self, resource):
         return json.loads(self.artifacts.read(resource.artifact_id))
 
+    def put_text(self, path, text, media_type):
+        return Resource(path, self.artifacts.put(text.encode('utf-8')), media_type, 'diagnostic')
+
     def read_batch(self, resource):
         # Validate the immutable manifest now. Original bytes are hash-checked
         # by the artifact reader when a selected investigation requests them.
@@ -93,6 +96,12 @@ class ResearchService:
                 if identity not in observation_ids:
                     observations.append(observation)
                     observation_ids.add(identity)
+        if sum(o.get('kind') == 'batch_manifest' for o in observations if isinstance(o, dict)) > 1:
+            # Investigation may combine repeated runs from several independent
+            # plans. Preserve each plan as source evidence, not a fabricated
+            # single execution with ambiguous attempt numbers.
+            observations = [{**o, 'kind': 'source_batch_manifest'} if isinstance(o, dict)
+                and o.get('kind') == 'batch_manifest' else o for o in observations]
         return ResearchBatch(tuple(tasks.values()), tuple(records.values()), tuple(observations))
 
     async def perform_named(self, kind, inputs, *, parameters=None, fresh=False, retry_unresolved=False):

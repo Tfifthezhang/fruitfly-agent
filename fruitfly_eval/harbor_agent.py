@@ -20,18 +20,21 @@ from fruitfly_eval.trajectory import session_trajectory
 
 
 try:  # Harbor is an optional eval dependency.
-    from harbor.agents.capabilities import AgentCapabilities
     from harbor.agents.installed.base import BaseInstalledAgent, with_prompt_template
     from harbor.environments.base import BaseEnvironment
     from harbor.models.agent.context import AgentContext
 except ImportError:  # pragma: no cover - exercised by catalog preflight instead
-    AgentCapabilities = None  # type: ignore[assignment,misc]
     BaseInstalledAgent = object  # type: ignore[assignment,misc]
     BaseEnvironment = Any  # type: ignore[assignment,misc]
     AgentContext = Any  # type: ignore[assignment,misc]
 
     def with_prompt_template(function):  # type: ignore[no-untyped-def]
         return function
+
+try:
+    from harbor.agents.capabilities import AgentCapabilities
+except ImportError:
+    AgentCapabilities = None  # type: ignore[assignment,misc]
 
 
 class FruitFlyHarborAgent(BaseInstalledAgent):  # type: ignore[misc]
@@ -55,6 +58,10 @@ class FruitFlyHarborAgent(BaseInstalledAgent):  # type: ignore[misc]
                 inherited[name] = os.environ[name]
         kwargs["extra_env"] = inherited
         super().__init__(*args, **kwargs)
+        if self.model_relay_directory and not self.model_relay_settings:
+            from fruitfly_eval.bridges.model_access import trial_relay_directory
+            self.model_relay_directory = str(trial_relay_directory(
+                Path(self.model_relay_directory), self.logs_dir.parent))
 
     @staticmethod
     def name() -> str:
@@ -157,26 +164,13 @@ class FruitFlyHarborAgent(BaseInstalledAgent):  # type: ignore[misc]
         *,
         model_access_file: str | None = None,
     ) -> None:
+        from fruitfly_eval.bridges.native import NativeInvocation
         token = uuid.uuid4().hex
         command = shlex.join(
             [
                 self.runtime_python,
                 "-P", "-m", "fruitfly_eval.harbor.supervisor", "--record", "/logs/agent/process.json", "--token", token, "--",
-                self.runtime_python,
-                "-P",
-                "-m",
-                "fruitfly_agent",
-                "--unrestricted",
-                "--cwd",
-                ".",
-                "--config",
-                "/installed-agent/fruitfly/runtime/config.yaml",
-                "--profile",
-                self.profile,
-                "--session",
-                "/logs/agent/session.jsonl",
-                "--",
-                instruction,
+                *NativeInvocation(self.runtime_python, self.profile, instruction).argv(),
             ]
         )
         command = (

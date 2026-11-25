@@ -564,3 +564,14 @@ Harbor subscription execution uses temporary host-issued access grants rather
 than copying account credentials. Machine-local transport settings belong to
 [Harbor configuration](fruitfly_eval/harbor/README.md#connect-subscription-models).
 Temporary descriptors are not model configuration and must not be saved or exported.
+
+Independent research `compare` defaults to deterministic measured reporting. The
+comparison I component owns method selection and frozen bootstrap defaults;
+`settings.method: model` explicitly selects the model evaluator. Native execute
+measurements flow directly into comparison. See [comparison configuration](fruitfly_agent/experiments/CONFIGURATION.md)
+and [selected-task validation](examples/experiments/small-batch/README.md).
+
+Eval machine configuration can reference an owner-specific backend document with
+`backend.file`. Backend settings stay outside model catalogs and research stage
+parameters. See [backend ownership](fruitfly_eval/backends/README.md) and
+[host settings](fruitfly_eval/harbor/README.md).

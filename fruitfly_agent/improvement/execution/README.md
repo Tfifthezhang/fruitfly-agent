@@ -7,6 +7,7 @@
 | `scheduler.py` | Bounded worker queue shared by single-task and batch trials |
 | `handles.py` | Owned cancellable tasks and truthful completion-only adaptation |
 | `events.py`, `control.py` | Immutable attributed events and scoped control |
+| `observations.py` | Project backend measurements into attributed research observations without inventing acceptance |
 | `facts.py` | Validate/store terminal diagnostics without inferring unknown results |
 | `batches.py` | Execute frozen batches through injected runners and aggregation |
 | `segments.py` | Segment identity and state evidence |

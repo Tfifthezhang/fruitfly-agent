@@ -23,7 +23,7 @@ match the declared activity grant before invoking a handler.
 | `assess.py` | Assess supplied execution evidence |
 | `propose.py` | Propose through the selected editor with explicit grants |
 | `execute.py` | Invoke an injected executor and publish a research batch |
-| `compare.py` | Compare supplied batches using model judgment or a measured policy |
+| `compare.py` | Compare supplied batches deterministically by default; model judgment is explicit |
 | `context.py` | Project explicitly supplied readable stage context |
 | `extensions.py` | Bind extension hooks through the existing runtime contracts |
 | `control.py` | Declare execution controls independently of stage scheduling |
@@ -31,7 +31,8 @@ match the declared activity grant before invoking a handler.
 Import and fixed Eval are declared in the shared vocabulary but implemented by
 the outer host/source adapters. They are not extra handlers in this package.
 Execution rejects a missing executor. Measured comparison requires exactly two
-batches and a policy; it does not construct an assessor. Model comparison uses
+batches with attributed plans and measurements, or an explicit pair policy; it
+does not construct an assessor. Model comparison uses
 the supplied assessor capability. Comparison does not activate a candidate.
 
 ## Supply evidence and continue

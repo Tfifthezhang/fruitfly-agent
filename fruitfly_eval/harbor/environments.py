@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import shlex
 import subprocess
-from typing import Any
+from typing import Any, Awaitable, Callable
 import uuid
 
 from .dependencies import DEPENDENCY_TARGET, dependency_environment, dependency_mounts
@@ -28,9 +28,10 @@ def environment_key(task: dict[str, Any]) -> str:
                              for name in ("environment", "tests", "steps")}})
 
 
-def environment_config(host: HostConfig, runtime: dict[str, Any]) -> dict[str, Any]:
+def environment_config(host: HostConfig, runtime: dict[str, Any], *,
+                       environment_import: str = PREPARED_ENVIRONMENT_IMPORT) -> dict[str, Any]:
     """Keep Agent mounts role-specific; factory kwargs reach both roles."""
-    return {"type": "docker", "import_path": PREPARED_ENVIRONMENT_IMPORT,
+    return {"type": "docker", "import_path": environment_import,
             "mounts": runtime_mounts(runtime),
             "kwargs": {"dependency_mounts": dependency_mounts(host)},
             "env": {**dependency_environment(host), **host.setup_env}}
@@ -79,9 +80,11 @@ def dependency_probe(host: HostConfig) -> str:
 
 
 def probe_environment(task: dict[str, Any], runtime: dict[str, Any], docker: str,
-                      directory: Path, *, host: HostConfig) -> dict[str, Any]:
+                      directory: Path, *, host: HostConfig,
+                      environment_import: str = PREPARED_ENVIRONMENT_IMPORT,
+                      before_probe: Callable[[Any, dict[str, Any]], Awaitable[None]] | None = None) -> dict[str, Any]:
     probes = []
-    settings = environment_config(host, runtime)
+    settings = environment_config(host, runtime, environment_import=environment_import)
     for index, definition in enumerate(environment_definitions(task)):
         config = definition["configuration"]
         if config.get("os", "linux") != "linux":
@@ -98,10 +101,11 @@ def probe_environment(task: dict[str, Any], runtime: dict[str, Any], docker: str
         # Keep the network-free prebuilt Agent probe. Separate verifiers use
         # Harbor so their own resources and build contexts are exercised.
         if (definition["role"] == "agent" and config.get("docker_image")
-                and not (context / "docker-compose.yaml").exists()):
+                and not (context / "docker-compose.yaml").exists() and before_probe is None):
             result = _probe_image(definition, runtime, docker, target, settings, command, env)
         else:
-            result = asyncio.run(_probe_harbor(definition, docker, target, settings, command, env))
+            result = asyncio.run(_probe_harbor(definition, docker, target, settings, command, env,
+                                              before_probe=before_probe))
         probes.append({**definition, **result})
     images = {(image["reference"], image["id"]): image for probe in probes for image in probe["images"]}
     return {"environment_key": environment_key(task), "images": list(images.values()),
@@ -130,7 +134,8 @@ def _probe_image(definition: dict[str, Any], runtime: dict[str, Any], docker: st
 
 
 async def _probe_harbor(definition: dict[str, Any], docker: str, directory: Path,
-                        settings: dict[str, Any], command: str, env: dict[str, str]) -> dict[str, Any]:
+                        settings: dict[str, Any], command: str, env: dict[str, str], *,
+                        before_probe: Callable[[Any, dict[str, Any]], Awaitable[None]] | None = None) -> dict[str, Any]:
     from harbor.environments.factory import EnvironmentFactory  # type: ignore[import-not-found, unused-ignore]
     from harbor.models.task.config import EnvironmentConfig as TaskEnvironmentConfig  # type: ignore[import-not-found, unused-ignore]
     from harbor.models.trial.config import EnvironmentConfig  # type: ignore[import-not-found, unused-ignore]
@@ -150,6 +155,8 @@ async def _probe_harbor(definition: dict[str, Any], docker: str, directory: Path
     )
     try:
         await asyncio.wait_for(environment.start(force_build=False), timeout=config.build_timeout_sec)
+        if before_probe is not None:
+            await asyncio.wait_for(before_probe(environment, definition), timeout=60)
         result = await environment.exec(command=command, env=env, timeout_sec=60, user=definition["user"])
         (directory / "probe.log").write_text((result.stdout or "") + (result.stderr or ""), encoding="utf-8")
         if result.return_code:

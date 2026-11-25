@@ -104,12 +104,13 @@ in the Organizer or Proposer batch slot. Each invocation performs one stage.
 
 ### Compare planned attempts offline
 
-Reference an `improvement-comparison` component with
-`parameters.settings.method: measured` in the baseline system configuration.
-Pass two batches in before/after order and set `stages.compare.measured_policy`
-to a JSON manifest path relative to the research configuration. For legacy
-CLI invocations, supply `--measured-policy`. See the
-[manifest and measurement requirements](../lab/improvement/assessment/README.md#compare-explicitly-paired-measurements).
+Pass two native execute or newly imported Eval batches in before/after order.
+The default is deterministic measured comparison with no model call or manual
+measurement conversion. Different plans require an explicit `task_scope`.
+See the [small-batch recipe](../../examples/experiments/small-batch/README.md) and
+[metrics and provenance](../lab/improvement/assessment/methods/measured/README.md).
+`stages.compare.measured_policy` (or advanced `--measured-policy`) remains an
+explicit pair-policy path. Choose `settings.method: model` explicitly for model judgment.
 
 The run report includes elapsed wall time. When role receipts are available,
 it reports observed calls, completed responses and reported token subtotals.

@@ -92,6 +92,12 @@ import fruitfly_agent.providers.gateway.access as access_module
 import fruitfly_eval.harbor.model_access as model_access_module
 assert Path(access_module.__file__).is_relative_to(root)
 assert Path(model_access_module.__file__).is_relative_to(root)
+from fruitfly_eval.benchmarks.workbuddy import WorkBuddyCodeAdapter
+from fruitfly_eval.workbuddy.configuration import RunnerSettings
+assert Path(sys.modules[RunnerSettings.__module__].__file__).is_relative_to(root)
+inputs = WorkBuddyCodeAdapter().initial_files()
+assert 'workbuddy-runner.yaml' in inputs
+assert 'backend:' in inputs['eval-host.yaml']
 import fruitfly_eval.harbor.access_files as access_files
 assert Path(access_files.__file__).is_relative_to(root)
 access_files._operate('identity', '0' * 32)

@@ -88,6 +88,7 @@ class HostConfig:
     task_patches: tuple[Mapping[str, Any], ...] = ()
     evidence: Mapping[str, Any] = field(default_factory=capture_policy)
     model_relay: Mapping[str, Any] = field(default_factory=dict)
+    backend_file: Path | None = None
 
     @classmethod
     def read(cls, workspace: Path, explicit: str | Path | None = None) -> HostConfig:
@@ -99,10 +100,16 @@ class HostConfig:
         except yaml.YAMLError:
             raise ValueError("invalid Eval host YAML") from None
         data = fields(loaded,
-                      {"cache", "agent", "environment", "dependencies", "task_directory", "task_patches", "evidence", "model_relay"}, "Eval host")
+                      {"cache", "agent", "environment", "dependencies", "task_directory", "task_patches", "evidence", "model_relay", "backend"}, "Eval host")
         if 'evidence' in data and not isinstance(data['evidence'], dict):
             raise ValueError('evidence must be a mapping')
         base = path.parent
+        backend_file = None
+        if 'backend' in data:
+            backend = fields(data['backend'], {'file'}, 'backend reference')
+            if set(backend) != {'file'}:
+                raise ValueError('backend reference requires exactly file')
+            backend_file = path_at(backend['file'], base)
         relay = fields(data.get('model_relay', {}),
             {'network_url', 'listen_host', 'certificate', 'private_key', 'ca'}, 'model relay')
         if relay:
@@ -185,7 +192,29 @@ class HostConfig:
                    environment(phases.get("verifier", {})), assets, recipes,
                    path_at(data["task_directory"], base) if data.get("task_directory") else None,
                    uv,
-            deps.get("offline", False), patches, capture_policy(data.get('evidence')), relay)
+            deps.get("offline", False), patches, capture_policy(data.get('evidence')), relay, backend_file)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize effective owner settings without dropping transport or evidence."""
+        result: dict[str, Any] = {
+            'cache': str(self.cache),
+            'agent': {'python': self.python,
+                'mounts': [{'source': str(m.source), 'target': m.target} for m in self.mounts],
+                'library_paths': list(self.library_paths)},
+            'environment': {'setup': dict(self.setup_env), 'agent': dict(self.agent_env),
+                            'verifier': dict(self.verifier_env)},
+            'dependencies': {'assets': list(self.assets), 'prepare': list(self.preparation),
+                             'offline': self.offline},
+            'task_patches': list(self.task_patches), 'evidence': dict(self.evidence)}
+        if self.task_directory is not None:
+            result['task_directory'] = str(self.task_directory)
+        if self.uv:
+            result['dependencies']['uv'] = self.uv
+        if self.model_relay:
+            result['model_relay'] = dict(self.model_relay)
+        if self.backend_file is not None:
+            result['backend'] = {'file': str(self.backend_file)}
+        return result
 
     def runtime_env(self) -> dict[str, str]:
         values = {"PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "/installed-agent/fruitfly/source"}
@@ -195,6 +224,7 @@ class HostConfig:
 
     def identity(self) -> dict[str, Any]:
         return {"python": self.python, "mounts": [m.to_dict() for m in self.mounts],
+                **({'backend_file': str(self.backend_file)} if self.backend_file is not None else {}),
                 **({'model_relay': dict(self.model_relay)} if self.model_relay else {}),
                 "library_paths": list(self.library_paths), "setup": dict(self.setup_env),
                 "agent": dict(self.agent_env), "verifier": dict(self.verifier_env),

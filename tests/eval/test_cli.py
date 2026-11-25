@@ -57,7 +57,7 @@ class EvalCliTests(unittest.TestCase):
 
     def test_stop_is_not_successful_until_cleanup_is_confirmed(self):
         for state, code in (("finished", 0), ("stop_requested", 1), ("cleanup_failed", 1)):
-            with self.subTest(state=state), patch("fruitfly_eval.harbor.lifecycle.request_stop", return_value={"state": state}), redirect_stdout(StringIO()):
+            with self.subTest(state=state), patch("fruitfly_eval.service.stop_evaluation", return_value={"state": state}), redirect_stdout(StringIO()):
                 self.assertEqual(main(["stop", "owned-job"]), code)
 
     def test_task_inventory_does_not_resolve_agent_installation_material(self):

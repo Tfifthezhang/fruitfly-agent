@@ -129,6 +129,14 @@ class ResearchOutputs:
         import os
         self.write(prefix + '/location.json', {'root': os.path.relpath(self.root, path.parent)})
         for resource in result.outputs:
+            if resource.media_type in {'text/markdown', 'text/csv'}:
+                from fruitfly_agent.run.configuration.persistence import write_bytes
+                from fruitfly_agent.improvement.contracts.validation import relative_path
+                relative_path(resource.path)
+                destination = self.root / prefix / resource.path
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                write_bytes(destination, self.artifacts.read_bytes(resource.artifact_id))
+                continue
             try: content = json.loads(self.artifacts.read_bytes(resource.artifact_id))
             except (ValueError, UnicodeDecodeError): continue
             self.write(prefix + '/' + resource.path, content)

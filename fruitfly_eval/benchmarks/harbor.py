@@ -9,7 +9,11 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from typing import Any, Mapping
+from typing import Any, Mapping, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from fruitfly_eval.backends import PreparationBackend
+    from fruitfly_eval.backends.control import ExecutionControl
 
 
 from fruitfly_agent.providers.config import load_env
@@ -82,6 +86,16 @@ class HarborBenchmarkAdapter:
     """Run official benchmark tasks with FruitFlyAgent as a Harbor installed agent."""
 
     descriptor: BenchmarkDescriptor
+
+    @property
+    def preparation(self) -> PreparationBackend:
+        from fruitfly_eval.backends.harbor import HarborPreparation
+        return HarborPreparation()
+
+    @property
+    def control(self) -> ExecutionControl:
+        from fruitfly_eval.backends.control import HarborControl
+        return HarborControl()
 
     def __init__(
         self,
@@ -314,18 +328,9 @@ class HarborBenchmarkAdapter:
                 "secret_names": ",".join(secret_names),
             }}],
         }
-        if relay_required:
-            from fruitfly_eval.harbor.model_access import TARGET
-            if relay_directory is None:
-                raise ValueError('Subscription execution requires an owned relay directory')
-            payload['agents'][0]['kwargs']['model_relay_directory'] = str(relay_directory)
-            payload['agents'][0]['kwargs']['model_relay_settings'] = dict(host.model_relay)
-            if not host.model_relay:
-                import platform
-                if platform.system() != 'Linux':
-                    raise ValueError('Subscription models on Docker Desktop require model_relay TLS settings')
-                payload['environment']['mounts'].append({'type': 'bind', 'source': str(relay_directory),
-                    'target': TARGET, 'read_only': True})
+        from fruitfly_eval.bridges.model_access import configure_model_access
+        configure_model_access(payload['environment'], payload['agents'][0], required=relay_required,
+            directory=relay_directory, settings=dict(host.model_relay))
         config = jobs_dir / "harbor-job.json"
         write_json(config, payload)
         return [executable, "run", "--config", str(config), "--yes",

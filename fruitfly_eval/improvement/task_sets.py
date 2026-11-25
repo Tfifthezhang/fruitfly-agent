@@ -11,8 +11,7 @@ from fruitfly_agent.improvement.contracts.versions import content_hash
 from fruitfly_agent.improvement.contracts.versions import canonical_json
 from fruitfly_eval.contracts import EvaluationRequest
 from fruitfly_eval.catalog import builtin_catalog
-from fruitfly_eval.harbor.host import HostConfig
-from fruitfly_eval.harbor.preparation import load_preparation
+from fruitfly_eval.backends import preparation_backend
 from fruitfly_eval.task_selection import select_prepared_tasks
 from .registration import BenchmarkMaterial
 from .building import RuntimeConfigBuilder, validate_prepared_runtime
@@ -45,7 +44,8 @@ def freeze(spec, context, *, executor=None):
         raise ValueError('benchmark and task-set runtime profiles differ')
     adapter = builtin_catalog().get(request.benchmark.benchmark_id)
     descriptor = adapter.descriptor
-    host = HostConfig.read(Path(context.workspace), host_path)
+    backend = preparation_backend(adapter)
+    host = backend.read_host(Path(context.workspace), host_path)
     names = spec.get('task_names', [])
     if not isinstance(names, list) or any(not isinstance(v, str) for v in names):
         raise ValueError('collection task_names must be a list of exact prepared names')
@@ -58,7 +58,7 @@ def freeze(spec, context, *, executor=None):
     objective = ScoreSpec(OfficialMeasurements.policy_id, **objective_data)
 
     def current():
-        prepared = load_preparation(host, descriptor, request.benchmark.variant)
+        prepared = backend.load(host, descriptor, request.benchmark.variant)
         validate_prepared_runtime(prepared)
         selected = select_prepared_tasks(prepared, request.benchmark.task_names)
         selected = select_prepared_tasks(selected, tuple(names))

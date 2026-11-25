@@ -30,7 +30,7 @@ See [Getting Started](../GETTING_STARTED.md#check-the-agent-offline) and the
 |---|---|
 | Host | macOS/Linux; native Windows unsupported, WSL2 unverified |
 | Python | Harbor requires 3.12+; Agent requires 3.11+ |
-| Harbor | `0.23.0`, pinned by the benchmarks extra |
+| Harbor | Standard adapters: `0.23.0`, pinned by the benchmarks extra; WorkBuddy: isolated official `0.18.0` environment |
 | Docker | Reachable Engine and Compose v2 |
 | Model | Saved model catalog/profile and secret environment |
 
@@ -41,7 +41,12 @@ docker compose version
 .venv/bin/python -m fruitfly_eval catalog --json
 ```
 
-Catalog preflight locates Harbor/Docker and checks Engine/Compose within five
+WorkBuddy has a [separate controller and dataset recipe](../examples/experiments/workbuddy/README.md);
+do not combine its older engine with the standard benchmarks extra. Shared
+preparation, host configuration, initialization and control use optional
+[backend capabilities](backends/README.md), composed by the existing Catalog.
+
+Standard Harbor Catalog preflight locates Harbor/Docker and checks Engine/Compose within five
 seconds. Executable discovery does not prove Harbor imports or diagnose glibc.
 Detailed [Harbor preparation](harbor/README.md) freezes tasks, records controller
 packages, probes the mounted Linux runtime and records image identities.
@@ -245,3 +250,9 @@ trajectory, task/final-answer material and a hash catalog. It excludes duplicate
 streams, Provider internals and thinking content. Original Session bytes stay
 authoritative. Explicit supplements validate catalog scope and content identity;
 private verifier paths never enter the permitted catalog.
+
+Adapters needing prepare/check expose a `PreparationBackend` through `preparation`.
+Explicit machine-file support uses `HostConfigured`. See the
+[backend contract](backends/README.md) and the independent fake-backend regression.
+Unsupported capabilities fail before execution; do not add benchmark-name branches
+to the CLI or infer model connection policies from dataset identity.

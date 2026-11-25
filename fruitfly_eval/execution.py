@@ -21,11 +21,11 @@ def execute_request(
     # Validate constructed requests as well as JSON requests before external effects.
     request = EvaluationRequest.from_dict(request.to_dict())
     adapter = (catalog or builtin_catalog()).get(request.benchmark.benchmark_id)
-    if host_config_path is not None:
-        from .benchmarks.harbor import HarborBenchmarkAdapter
-        if not isinstance(adapter, HarborBenchmarkAdapter):
-            raise ValueError("--host-config is supported only by Harbor adapters")
-        adapter.configure_host(host_config_path)
+    from .backends import HostConfigured
+    if isinstance(adapter, HostConfigured):
+        adapter.configure_host(host_config_path or str(Path(request.runtime.working_directory).resolve() / '.fruitfly/eval-host.yaml'))
+    elif host_config_path is not None:
+        raise ValueError("benchmark does not support --host-config")
     descriptor = adapter.descriptor
     variant = request.benchmark.variant
     if variant not in {item.variant_id for item in descriptor.variants}:

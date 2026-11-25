@@ -2,7 +2,9 @@
 
 [Up: Improvement](../README.md)
 
-One read-only model Agent assesses completed executions and compares existing
+Deterministic measurement comparison is the default research compare method.
+See [measured comparison](methods/measured/README.md) for metrics, scope and exports.
+One read-only model Agent assesses completed executions and explicitly compares existing
 results. It uses the shared [Agent runner](../../agents/README.md) and
 [evidence access](../evidence/README.md). It cannot edit candidates or activate them.
 
@@ -51,7 +53,9 @@ identify their scorer, outcome policy and attempt, and declare eligibility.
 The report preserves raw values and distinguishes unavailable values from zero.
 Choose `parameters.settings.method: measured` on an
 `improvement-comparison` component to use the same path from the experiment
-CLI. The default method is `model`. Measured execution requires no assessor.
+CLI. The default method is `measured`. Native execution batches need no hand-authored
+pair manifest. The explicit policy API remains available for declared custom
+measurements. Measured execution requires no assessor.
 Historical imports without attributed attempts, scorer identity and outcome
 policy produce insufficient comparison coverage.
 
@@ -92,8 +96,8 @@ it does not rewrite malformed output or request a model.
 
 Default search selection always invokes the configured selector for multiple
 completed results. Measurement absence, equality or magnitude does not bypass
-that judgment. Numeric ranking helpers remain explicit analysis utilities, outside
-the default research and search stage control.
+that judgment. Numeric search ranking helpers remain explicit analysis utilities; the independent
+research compare stage defaults to the measured report described above.
 
 `parameters.settings` controls output/task previews and initial input allocation.
 These values are configurable, recorded and frozen, but protected from ordinary

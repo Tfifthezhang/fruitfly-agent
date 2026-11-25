@@ -64,6 +64,7 @@ include = ["fruitfly_agent*", "fruitfly_eval*"]
 "fruitfly_agent.lab.agents.subagent.methods.managed" = ["defaults.yaml"]
 "fruitfly_agent.providers" = ["services.yaml"]
 "fruitfly_agent.experiments" = ["templates/*.yaml", "templates/tasks/*.yaml"]
+"fruitfly_eval.workbuddy" = ["templates/*.yaml"]
 "fruitfly_agent.run.configuration" = ["templates/*.yaml"]
 
 "fruitfly_agent.lab.base_prompt" = ["defaults.yaml"]
@@ -77,7 +78,8 @@ include = ["fruitfly_agent*", "fruitfly_eval*"]
 "fruitfly_agent.lab.context_manager.reduction.methods.layered_compaction" = ["defaults.yaml"]
 "fruitfly_agent.lab.context_manager.reduction.methods.working_memory" = ["defaults.yaml"]
 "fruitfly_agent.lab.environment.methods.remote" = ["defaults.yaml"]
-"fruitfly_agent.lab.improvement.assessment.methods.model" = ["defaults.yaml", "comparison-defaults.yaml"]
+"fruitfly_agent.lab.improvement.assessment.methods.model" = ["defaults.yaml"]
+"fruitfly_agent.lab.improvement.assessment.methods.measured" = ["defaults.yaml"]
 "fruitfly_agent.lab.improvement.grouping.methods.fixed" = ["defaults.yaml"]
 "fruitfly_agent.lab.improvement.editor.methods.workspace" = ["defaults.yaml"]
 "fruitfly_agent.lab.improvement.editor.methods.gepa_reflection" = ["defaults.yaml"]
@@ -185,6 +187,9 @@ files = [
     "fruitfly_agent/run/storage",
     "fruitfly_agent/run/adapters",
     "fruitfly_eval/benchmarks",
+    "fruitfly_eval/backends",
+    "fruitfly_eval/bridges",
+    "fruitfly_eval/workbuddy",
     "fruitfly_eval/harbor",
     "fruitfly_eval/improvement",
     "fruitfly_eval/api.py",

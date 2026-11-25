@@ -12,6 +12,7 @@ native; Harbor owns task environments and verification.
 | [terminal_bench.py](terminal_bench.py) | Terminal-Bench 2.1 dataset and smoke task |
 | [terminal_bench_4.py](terminal_bench_4.py) | Terminal-Bench 4.0.0 pinned dataset and CPU smoke task |
 | [swe_bench.py](swe_bench.py) | SWE-bench Verified dataset and smoke task |
+| [workbuddy.py](workbuddy.py) | WorkBuddy Code declaration and independently composed backend |
 | [TASKS.md](TASKS.md) | Official task format and selection |
 
 ## Add a Harbor dataset

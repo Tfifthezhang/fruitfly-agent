@@ -64,8 +64,8 @@ class EvalCollectionTests(unittest.IsolatedAsyncioTestCase):
                 return {'status': 'completed', 'evaluation_id': path.name, 'errors': {},
                     'metrics': [{'name': 'official_reward', 'value': 0}]}, path
             try:
-                with patch('fruitfly_eval.improvement.task_sets.HostConfig.read', return_value=SimpleNamespace(agent_env={'FRUITFLY_MAX_MODEL_CALLS': '2'})), \
-                        patch('fruitfly_eval.improvement.task_sets.load_preparation', return_value=prepared):
+                with patch('fruitfly_eval.harbor.host.HostConfig.read', return_value=SimpleNamespace(agent_env={'FRUITFLY_MAX_MODEL_CALLS': '2'})), \
+                        patch('fruitfly_eval.harbor.preparation.load_preparation', return_value=prepared):
                     binding = freeze({'id': 'bench', 'source': 'eval', 'request': str(request), 'host': str(host)},
                         context, executor=executor)
                     snapshot = TaskSetSnapshot(binding.entries)

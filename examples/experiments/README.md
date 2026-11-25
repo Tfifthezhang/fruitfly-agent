@@ -8,6 +8,7 @@ See the [field guide](../../fruitfly_agent/experiments/CONFIGURATION.md) and
 
 | Recipe | Required material |
 |---|---|
+| [Selected-task validation](small-batch/README.md) | Exact prepared names, repeated baseline/candidate execution and offline comparison |
 | [Large retained batch](large-batch/README.md) | Explicit retained source; expanded stage and worker budgets; model stages incur charges |
 | [Independent research](research-stage.example.yaml) | Replace historical source paths; model stages need credentials |
 | [Default optimization scope](improvement-defaults.example.yaml) | Offline preview or explicit portable batch inputs |
@@ -15,6 +16,7 @@ See the [field guide](../../fruitfly_agent/experiments/CONFIGURATION.md) and
 | [Explicit prompt grant](benchmark.example.yaml) | Fixed projection with a prepared collection |
 | [Multiple collections](multi-task.example.yaml) | Prepared [request/host references](tasks/multi.yaml) |
 | [TB4 request](tb4-smoke-request.example.json) | [Linux setup](TB4_SERVER.md) |
+| [WorkBuddy Code](workbuddy/README.md) | Isolated official controller, complete dataset, API/Go configuration and selected-task comparison |
 
 ## Initialize and prepare
 

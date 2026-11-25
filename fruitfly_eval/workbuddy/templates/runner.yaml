@@ -1,0 +1,5 @@
+# Separate controller environment with the official WorkBuddy dependencies.
+# Replace paths and the checksum before prepare/check/run.
+checkout: /REPLACE_WITH_ABSOLUTE_WORKBUDDY_CHECKOUT
+python: /REPLACE_WITH_ABSOLUTE_WORKBUDDY_VENV/bin/python
+source_sha256: "0000000000000000000000000000000000000000000000000000000000000000"

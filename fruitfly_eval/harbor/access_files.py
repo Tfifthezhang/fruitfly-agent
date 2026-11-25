@@ -58,6 +58,10 @@ class ContainerModelAccess:
         self.started = True
         await self._finish(self._exec('create', root=True))
         material = deepcopy(descriptor)
+        if ca_source is None:
+            sockets = {entry['socket'] for entry in material['models'].values()}
+            for endpoint in sockets:
+                await self._finish(self._exec('grant-socket', str(self.identity[1]), endpoint, root=True))
         with tempfile.TemporaryDirectory(prefix='fruitfly-model-access-') as directory:
             source = Path(directory) / 'access.json'
             if ca_source is not None:
@@ -168,6 +172,9 @@ def _operate(operation: str, execution_id: str, *args: str) -> None:
             raise ValueError('Model access execution identity changed')
         _probe(directory / 'model-access.json')
         return
+    if operation == 'grant-socket':
+        _grant_socket(*args)
+        return
 
     for parent in reversed(ROOT.parents):
         _trusted_directory(parent)
@@ -208,6 +215,27 @@ def _operate(operation: str, execution_id: str, *args: str) -> None:
             pass
     else:
         raise ValueError('Unknown model access operation')
+
+
+def _grant_socket(group: str, endpoint: str) -> None:
+    """Allow the mapped Agent group to connect, preserving host ownership."""
+    from fruitfly_eval.harbor.model_access import TARGET
+    gid = int(group)
+    path = Path(endpoint)
+    root = Path(TARGET)
+    if (gid < 0 or path.parent.parent != root or path.name != 'model.sock'
+            or re.fullmatch(r'trial-[A-Za-z0-9_-]+', path.parent.name) is None):
+        raise ValueError('Invalid private relay socket')
+    for directory in (root, path.parent):
+        info = directory.lstat()
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
+            raise ValueError('Unsafe private relay directory')
+    info = path.lstat()
+    if not stat.S_ISSOCK(info.st_mode) or info.st_uid != os.getuid():
+        raise ValueError('Unsafe private relay socket')
+    for target, mode in ((root, 0o710), (path.parent, 0o710), (path, 0o660)):
+        os.chown(target, -1, gid, follow_symlinks=False)
+        os.chmod(target, mode, follow_symlinks=False)
 
 
 if __name__ == '__main__':

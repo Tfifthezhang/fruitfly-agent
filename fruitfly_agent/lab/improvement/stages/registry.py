@@ -39,7 +39,7 @@ def stage_definitions():
                 ('batches',), ('seconds', 'evidence_characters', 'evidence_responses'), 'editor', 'Model requests and candidate files'),
             StageDefinition('execute', 'Execute an explicitly selected harness', frozenset({'tasks', 'attempts', 'concurrency'}),
                 ('harness',), ('task_seconds',), effects='Task backends and model requests'),
-            StageDefinition('compare', 'Compare explicitly selected result batches', frozenset({'delegation', 'measured_policy'}),
+            StageDefinition('compare', 'Compare explicitly selected result batches', frozenset({'delegation', 'measured_policy', 'task_scope'}),
                 ('batches',), ('seconds', 'evidence_characters', 'evidence_responses'), 'assessor', 'Model requests'),
         )}
 
@@ -57,6 +57,7 @@ class StageContext:
     input_batch: Callable
     create_services: Callable
     select_evidence: Callable | None = None
+    put_text: Callable | None = None
 
 
 def builtin_stage_handlers(context):

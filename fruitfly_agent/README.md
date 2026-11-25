@@ -251,3 +251,8 @@ Account authentication, cached discovery and protocol policies belong to Provide
 Run owns project drafts and assembly; Interactive consumes neutral account views.
 Directory refresh never rewrites the active model or context budget. External Eval
 containers consume per-trial host relay grants; see [Harbor access](../fruitfly_eval/harbor/README.md#connect-subscription-models).
+
+External benchmark integration uses optional [Eval backend capabilities](../fruitfly_eval/backends/README.md)
+and [native bridges](../fruitfly_eval/bridges/README.md). WorkBuddy has an isolated
+controller; benchmark and model selection do not change Core or application
+lifecycle contracts. See its [owner guide](../fruitfly_eval/workbuddy/README.md).

@@ -58,6 +58,8 @@ class ComparisonTarget:
         selected = options.get('editable_fields', [_PREFIX + key for key in POLICY_FIELDS])
         if before['method'] != 'measured' or after['method'] != before['method']:
             raise ValueError('threshold candidates require the unchanged measured method')
+        if any(before[k] != after[k] for k in ('bootstrap_resamples', 'bootstrap_seed')):
+            raise ValueError('candidate changed protected statistical settings')
         if any(before[key] != after[key] and _PREFIX + key not in selected for key in POLICY_FIELDS):
             raise ValueError('candidate changed a protected comparison threshold')
 

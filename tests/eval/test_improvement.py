@@ -32,6 +32,39 @@ from tests.support.stages import version
 
 
 class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
+    async def test_native_official_measurement_is_consumed_without_rewriting_batch(self):
+        from fruitfly_agent.improvement.execution.observations import execution_observation
+        from fruitfly_agent.improvement.contracts.observations import MeasurementObservation
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            context, request, host, receipt = self.fixture(root)
+            async def executor(*args, **kwargs):
+                output = root / 'result'
+                trial = output / 'artifacts/harbor/job/trial'
+                (trial / 'agent').mkdir(parents=True)
+                (trial / 'result.json').write_text(json.dumps({'task_name': 'external/task',
+                    'verifier_result': {'rewards': {'reward': 1}}}))
+                (trial / 'agent/session.jsonl').write_text(json.dumps({'message': {
+                    'role': 'assistant', 'content': 'Delivered', 'stopReason': 'stop'}}) + '\n')
+                return {'status': 'completed', 'evaluation_id': 'fixture', 'errors': [],
+                        'metrics': [{'name': 'official_reward', 'value': 1}]}, output
+            definition, host_patch, receipt_patch = self.freeze(context, request, host, receipt, executor)
+            try:
+                with host_patch, receipt_patch:
+                    prepared = definition.prepare(context, ExecutionRequest('', (), ('base_prompt',), 'benchmark-task', 'task'))
+                    ports = definition.build(context, prepared)
+                    record = await ports.runner.execute(context.plan, prepared.task, context.components.snapshot())
+                    measured = await ports.measurements.measure(prepared.task, record)
+                    observation = MeasurementObservation.from_dict(execution_observation(record, measured, 2,
+                        lambda r: json.loads(context.artifacts.read(r.artifact_id))))
+                self.assertEqual(observation.attempt, 2)
+                self.assertEqual(observation.semantics.outcome, 'met', observation.to_dict())
+                self.assertEqual(observation.raw_value, {'reward': 1})
+                self.assertTrue(observation.eligible)
+                self.assertIsNone(observation.scorer_id, 'missing verifier identity cannot be invented')
+            finally:
+                await context.services.close()
+
     def fixture(self, root):
         artifacts = MemoryArtifacts()
         components = ComponentRegistry((TextComponentAdapter(BasePromptTarget('baseline'), 'system-prompt'),))
@@ -57,8 +90,8 @@ class BenchmarkImprovementTests(unittest.IsolatedAsyncioTestCase):
     def freeze(self, context, request, host, receipt, executor):
         definition = benchmark_execution(request, host,  executor=executor)
         host_model = SimpleNamespace(agent_env={'FRUITFLY_MAX_MODEL_CALLS': '2'})
-        return definition, patch('fruitfly_eval.improvement.registration.HostConfig.read', return_value=host_model), patch(
-            'fruitfly_eval.improvement.registration.load_preparation', return_value=receipt)
+        return definition, patch('fruitfly_eval.harbor.host.HostConfig.read', return_value=host_model), patch(
+            'fruitfly_eval.harbor.preparation.load_preparation', return_value=receipt)
 
 
     async def test_preview_is_offline_and_changed_model_material_invalidates_source(self):

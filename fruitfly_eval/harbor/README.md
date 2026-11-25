@@ -16,6 +16,7 @@ URLs and keep key values in the existing secret environment.
 
 | Field | Meaning |
 |---|---|
+| `backend.file` | Optional owner-specific backend document; resolved from this file and interpreted by the selected backend; built-in Harbor rejects it |
 | `cache` | Host directory for frozen material, probes and package caches |
 | `agent.python` | Absolute Python executable path inside the container |
 | `agent.mounts` | Required read-only `source`/optional `target` binds; target defaults to source |
@@ -373,8 +374,12 @@ Main and auxiliary connected models share the ordinary registry assembly path.
 API models retain their existing environment-key path.
 
 Native Linux uses an Agent-only bind of private Unix sockets at
-`/opt/fruitfly-model-relay`. Host and container ownership must permit the Agent
-user to access those private paths. Docker Desktop and remote Docker hosts need
+`/opt/fruitfly-model-relay`. The bind contains only the current trial's
+communication directory. Root setup grants the actual Agent group traversal
+(0710) and socket connection (0660), preserving host-owner identity and cleanup
+rights. Agent group members cannot create or remove directory entries. No
+credential store is mounted. Rootless mappings and bind permission changes still
+require an authorized integration check. Docker Desktop and remote Docker hosts need
 explicit verified TLS reachability:
 
 ```yaml
@@ -407,3 +412,8 @@ cannot serve additional inference. No upstream credential enters that material.
 Offline checks cover descriptor identity and grant retirement. Actual container
 user mapping, network reachability, OAuth renewal, model availability and official
 verifier completion require explicitly authorized integration runs.
+
+`HostConfig.to_dict()` serializes effective machine settings, including model relay
+and evidence controls. Derived experiment hosts use this owner interface;
+relative paths become absolute before publication so relocation does not change
+the selected resources. Offline regression: `tests.eval.test_host_serialization`.

@@ -101,7 +101,8 @@ receives the selected batch, its material plan, and the granted organized view.
 For a source-external test, invoke `execute` separately with the baseline and
 the selected candidate against the same declared task and attempt population.
 Execution can invoke models and task backends. Compare the frozen results
-offline with the measured comparison component and a paired manifest.
+offline with the default measured comparison component. Native execute outputs
+need no manual conversion or paired manifest.
 The authoritative measurement source must provide attempt, scorer and outcome
 policy identities. [Configure measured comparison](../../../fruitfly_agent/lab/improvement/assessment/README.md#compare-explicitly-paired-measurements)
 

@@ -1,0 +1,5 @@
+{
+  "runtime": {"working_directory": "/REPLACE_WITH_WORKSPACE"},
+  "benchmark": {"id": "workbuddy-code", "variant": "smoke"},
+  "execution": {"attempts": 1, "concurrency": 1, "timeout_seconds": 3600}
+}

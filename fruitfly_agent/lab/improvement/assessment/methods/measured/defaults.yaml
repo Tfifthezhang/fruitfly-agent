@@ -3,6 +3,8 @@ role: I
 implementation: improvement-comparison
 parameters:
   settings:
-    method: model
+    method: measured
     minimum_gain: null
     maximum_regression_rate: null
+    bootstrap_resamples: 2000
+    bootstrap_seed: 42

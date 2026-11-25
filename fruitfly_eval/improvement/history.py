@@ -13,6 +13,8 @@ from fruitfly_eval.results import trial_outcome, public_trial_outcome
 
 
 def import_history(run, artifacts, *, task_names=(), related_records=None, evidence_paths=None):
+    from fruitfly_agent.improvement.contracts.observations import BatchManifest, PlannedAttempt
+    from .observations import official_observation
     root = Path(run).resolve(strict=True)
     # Experiment exports place the completed Eval directory under run/.
     nested = root / 'run'
@@ -38,7 +40,50 @@ def import_history(run, artifacts, *, task_names=(), related_records=None, evide
                 configurations.append({'path': str(path), 'artifact_id': reference})
     tasks: dict[str, TaskMaterial] = {}
     wanted, records, observations = set(task_names), [], []
+    planned: list[PlannedAttempt] = []
+    attempts: dict[str, int] = {}
+    attributed = True
+    seen_attempts = set()
+    origins = {}
+    # A retained report can supply canonical benchmark names, without exposing
+    # verifier answers. Missing metadata remains a distinct retained namespace.
+    report_path = root / 'report.json'
+    report = json.loads(report_path.read_text()) if report_path.is_file() and safe_path(report_path, root) else {}
+    dataset = report.get('benchmark', {}).get('dataset')
+    canonical_names = {}
+    for path in sorted((root / 'trials').glob('*.json')):
+        if safe_path(path, root):
+            row = json.loads(path.read_text())
+            canonical_names[row.get('trial_id')] = row.get('task_id')
+    # Preserve unstarted attempts when the archive retains its selected
+    # preparation and request. Neither task instructions nor verifier files
+    # are recovered from the live checkout.
+    preparation_path = root / 'artifacts/harbor/preparation.json'
+    request_path = root / 'request.json'
+    declared_tasks = {}
+    declared_attempts = None
+    if all(p.is_file() and safe_path(p, root) for p in (preparation_path, request_path)):
+        preparation = json.loads(preparation_path.read_text())
+        request = json.loads(request_path.read_text())
+        count = request.get('execution', {}).get('attempts')
+        if type(count) is not int or count < 1:
+            raise ValueError('retained execution attempts must be positive')
+        declared_attempts = count
+        for row in preparation['tasks']:
+            name = row['name']
+            if wanted and name not in wanted:
+                continue
+            if name in declared_tasks:
+                raise ValueError('duplicate retained prepared task name')
+            declared_tasks[name] = row['id']
+            key = 'archive-' + content_hash(name)[7:31]
+            tasks[key] = TaskMaterial(key, 'Task instruction unavailable in retained evidence.',
+                origin=name, environment_id='retained-eval-evidence')
+            origins[key] = dataset + ':' + row['id'] if dataset else 'retained:' + content_hash(name)
+            planned.extend(PlannedAttempt(key, a) for a in range(count))
     for directory in trial_directories(root):
+        from .measurement_context import read as read_context
+        context = read_context(directory, root)
         result = directory / 'result.json'
         official = json.loads(result.read_bytes()) if result.is_file() and safe_path(result, root) else {}
         name = official.get('task_name', directory.name)
@@ -52,9 +97,27 @@ def import_history(run, artifacts, *, task_names=(), related_records=None, evide
         key = 'archive-' + content_hash(name)[7:31]
         task = TaskMaterial(key, instruction or 'Task instruction unavailable in retained evidence.',
             origin=name, environment_id='retained-eval-evidence')
-        if key in tasks and tasks[key] != task:
+        if key in attempts and tasks[key] != task:
             raise ValueError('historical task instructions differ across attempts: ' + name)
         tasks[key] = task
+        position = attempts.get(key, 0)
+        attempt = context['attempt'] if context is not None else position
+        attributed = attributed and context is not None
+        attempts[key] = position + 1
+        if (key, attempt) in seen_attempts:
+            raise ValueError('duplicate retained task attempt identity')
+        seen_attempts.add((key, attempt))
+        if declared_attempts is None:
+            planned.append(PlannedAttempt(key, attempt))
+        elif name not in declared_tasks or attempt >= declared_attempts:
+            raise ValueError('retained trial is outside its declared execution plan')
+        canonical_name = canonical_names.get(official.get('id'))
+        if key not in origins:
+            origins[key] = dataset + ':' + canonical_name if dataset and canonical_name else 'retained:' + content_hash(name)
+        if context is not None:
+            if dataset and name in declared_tasks and context['origin_id'] != dataset + ':' + declared_tasks[name]:
+                raise ValueError('measurement origin differs from its selected preparation')
+            origins[key] = context['origin_id']
         identity = content_hash(canonical_json({'trial': official.get('id', directory.name),
             'resources': [asdict(r) for r in resources]}))
         answer = answer_evidence(resources, artifacts)
@@ -82,17 +145,8 @@ def import_history(run, artifacts, *, task_names=(), related_records=None, evide
             Resource('diagnostics/outcome.json', artifacts.put(canonical_json(public_result).encode()),
                 'application/json', 'diagnostic')))
         records.append(organize_evidence(task, receipt, artifacts))
-        observations.append({'semantics': {'scope': 'execution', 'direction': 'higher',
-            'outcome': {'passed': 'met', 'failed': 'unmet'}.get(outcome['status'], 'unknown')},
-            'run_id': receipt.run_id, 'name': 'official_reward',
-            'official_status': outcome['status'], 'eligible': outcome['eligible'],
-            'exception_type': outcome['error']['type'] if outcome['error'] else None,
-            'error': public_result['error'],
-            'agent_elapsed_seconds': outcome['agent_elapsed_seconds'],
-            'interpretation': 'Shared Eval result rules; raw reward is not an execution-success certificate.',
-            'value': (official.get('verifier_result') or {}).get('rewards'),
-            'source': str(result), 'source_identity': content_hash(result.read_bytes().decode())
-                if result.is_file() and safe_path(result, root) else None})
+        observations.append(official_observation(receipt, official,
+            source_identity=public_result['source_identity'], attempt=attempt, context=context))
     if evidence_paths:
         retained = {r.path.removeprefix('originals/') for record in records for r in record.artifacts if r.path.startswith('originals/')}
         if set(evidence_paths) - retained:
@@ -101,4 +155,11 @@ def import_history(run, artifacts, *, task_names=(), related_records=None, evide
         raise ValueError('requested historical task records are unavailable')
     observations.append({'name': 'historical_configuration', 'sources': configurations,
         'scope': 'Retained declarations and receipts; unknown state is not inferred.'})
+    declared = declared_attempts is not None and attributed
+    observations.append(BatchManifest(tuple(planned), origins=tuple(origins.items()),
+        selection_reason=('Retained selected preparation and controller-attributed original attempts.' if declared else
+            'Retained selected preparation and requested attempt count; observed attempts use archive order.'
+            if declared_attempts is not None else
+            'Retained trials; attempt numbering is archive order, not a reconstructed original plan.'),
+        scope_kind='declared' if declared else 'retained-planned' if declared_attempts is not None else 'retained-observed').to_dict())
     return ResearchBatch(tuple(tasks.values()), tuple(records), tuple(observations))

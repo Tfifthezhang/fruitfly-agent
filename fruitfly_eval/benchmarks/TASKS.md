@@ -10,15 +10,16 @@ check resulting state and write rewards.
 
 ## Choose a registered dataset
 
-These are declarations only; preparation and execution use the same public Harbor
-integration for every entry. See the [server guide](../SERVER_GUIDE.md) for the
-shared setup procedure.
+These are declarations only. Standard Harbor entries use the [server guide](../SERVER_GUIDE.md).
+WorkBuddy uses its [isolated official controller](../workbuddy/README.md), complete
+dataset layout and native bridge through the same preparation/execution ports.
 
 | ID | Dataset | Exact smoke task |
 |---|---|---|
 | `terminal-bench` | `terminal-bench/terminal-bench-2-1` | `terminal-bench/fix-git` |
 | `terminal-bench-4` | `terminal-bench/terminal-bench@4.0.0` | `terminal-bench/interleaved-vigenere` |
 | `swe-bench` | `swe-bench/swe-bench-verified` | `swe-bench/psf__requests-1142` |
+| `workbuddy-code` | `wb-bench-code-v1.0` | `api_contract-hard-openapi_params` |
 
 ## Choose one of three selections
 
@@ -46,7 +47,10 @@ A single smoke validates its execution path, not a representative dataset score.
 Task images do not replace host-side instructions, configuration and verifier
 material. Resolve tasks through Harbor's public dataset API or export a flat local
 collection. `task_directory` accepts one task or immediate `<task>/task.toml` children.
-Nested downloaded revision caches must be exported first. `@version` pins a dataset
+WorkBuddy instead requires the complete dataset root with `dataset.toml`, `tasks/`
+and shared verifier resources. It snapshots these together before selecting exact
+task names.
+Nested downloaded revision caches for standard Harbor datasets must be exported first. `@version` pins a dataset
 revision; unversioned declarations resolve during preparation.
 
 Preparation preserves content hashes, explicit setup diffs and actual image

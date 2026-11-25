@@ -80,6 +80,21 @@ class EvalTaskRunner:
             if completed and reward is not None:
                 self.measurements.values[run_id] = reward
             record = attach_benchmark_facts(record, root, context.artifacts)
+            from .observations import official_observation
+            from .evidence import trial_directories, safe_path
+            from fruitfly_agent.improvement.contracts.versions import content_hash, canonical_json
+            from fruitfly_agent.improvement.execution.observations import MEASUREMENT_PATH
+            trials = trial_directories(root)
+            if len(trials) == 1:
+                outcome_path = trials[0] / 'result.json'
+                if outcome_path.is_file() and safe_path(outcome_path, Path(root).resolve()):
+                    official = json.loads(outcome_path.read_bytes())
+                    from .measurement_context import read as read_context
+                    observation = official_observation(record, official,
+                        source_identity=content_hash(outcome_path.read_text()), native=True,
+                        context=read_context(trials[0], Path(root)))
+                    record = replace(record, artifacts=(*record.artifacts, Resource(MEASUREMENT_PATH,
+                        context.artifacts.put(canonical_json(observation).encode()), 'application/json', 'diagnostic')))
             self.observe_requests(record)
             context.services.record('benchmark-execution', run_id=run_id, evaluation_id=report['evaluation_id'],
                 report=str(Path(root) / 'report.json'), model_calls=calls)

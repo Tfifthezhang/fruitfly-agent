@@ -47,7 +47,7 @@ class BenchmarkCatalogTests(unittest.TestCase):
         self.assertNotIn("modes", payload)
         self.assertEqual(
             [item["id"] for item in payload["benchmarks"]],
-            ["swe-bench", "terminal-bench", "terminal-bench-4"],
+            ["swe-bench", "terminal-bench", "terminal-bench-4", "workbuddy-code"],
         )
         for item in payload["benchmarks"]:
             self.assertEqual([v["id"] for v in item["variants"]], ["smoke", "no_gpu", "full"])

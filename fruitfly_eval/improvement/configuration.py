@@ -6,7 +6,8 @@ from typing import Any
 import yaml
 
 from fruitfly_eval.api import EvaluationRequest
-from fruitfly_eval.harbor.host import HostConfig
+from fruitfly_eval.catalog import builtin_catalog
+from fruitfly_eval.backends import preparation_backend
 from fruitfly_agent.runtime_spec import runtime_reference
 
 
@@ -14,7 +15,7 @@ from fruitfly_agent.runtime_spec import runtime_reference
 class BenchmarkSettings:
     request: EvaluationRequest
     source_request: Path
-    host: HostConfig
+    host: Any
     generated_host: Path
     host_bytes: bytes
     runtime_differences: tuple = ()
@@ -56,20 +57,9 @@ def resolve_benchmark(config):
     request = replace(request, runtime=replace(request.runtime, working_directory=str(workspace),
         config_path=str(baseline), profile=profile))
     host_path = config.resolve(task['host']) if 'host' in task else None
-    host = HostConfig.read(workspace, host_path)
-    payload: dict[str, Any] = {'cache': str(host.cache),
-        'agent': {'python': host.python,
-            'mounts': [{'source': str(m.source), 'target': m.target} for m in host.mounts],
-            'library_paths': list(host.library_paths)},
-        'environment': {'setup': dict(host.setup_env),
-            'agent': dict(host.agent_env),
-            'verifier': dict(host.verifier_env)},
-        'dependencies': {'assets': list(host.assets), 'prepare': list(host.preparation), 'offline': host.offline},
-        'task_patches': list(host.task_patches)}
-    if host.task_directory:
-        payload['task_directory'] = str(host.task_directory)
-    if host.uv:
-        payload['dependencies']['uv'] = host.uv
+    adapter = builtin_catalog().get(request.benchmark.benchmark_id)
+    host = preparation_backend(adapter).read_host(workspace, host_path)
+    payload = host.to_dict()
     data = yaml.safe_dump(payload, sort_keys=False).encode()
     identity = hashlib.sha256(data).hexdigest()
     generated = workspace / '.fruitfly/experiments/prepared' / identity / 'host.yaml'

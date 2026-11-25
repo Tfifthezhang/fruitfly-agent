@@ -75,9 +75,7 @@ stages:
       task_seconds: 3600
     attempt: reuse
   compare:
-    delegation:
-      enabled: true
-      workers: [evidence-reader, record-organizer, cross-record-reader, counterexample-reader]
+    # Default measured comparison is offline and uses no model workers.
     inputs:
       batches: [{artifact: original-batch}, {artifact: candidate-a-results}]
     publish_as: candidate-a-comparison

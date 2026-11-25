@@ -1,0 +1,8 @@
+# Replace names with exact IDs; use a matching full-variant leaf request.
+source: task-set
+collections:
+  - id: benchmark
+    source: eval
+    request: ../eval-request.json
+    host: ../eval-host.yaml
+    task_names: [REPLACE_WITH_EXACT_TASK_1, REPLACE_WITH_EXACT_TASK_2]

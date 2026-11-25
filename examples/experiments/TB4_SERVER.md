@@ -66,7 +66,7 @@ not overwrite defaults, reuse old candidate results or start Docker/model work.
 | `models.yaml` | Shared daily/experiment model ID, protocol, endpoint, capabilities, token limits and key variable name |
 | `default-config.yaml` | Executor profile, enabled mechanisms and tool-call limit, initially 512 per turn |
 | H/S/I groups in `default-config.yaml` | Registered defaults or explicit component documents; no copied components tree |
-| `tasks/tb4-smoke.yaml` | Task material and fixed comparison rules |
+| `tasks/benchmark.yaml` | Task material and fixed comparison rules |
 | `experiment.yaml` | Baseline/task references, editable fields, fixed search/assessment settings and independent phase times |
 | `secrets.env` | Fill the empty model key privately, or use the process environment; never commit it |
 | `eval-request.json` | TB4 `smoke`, one attempt, concurrency 1 and whole-job timeout |

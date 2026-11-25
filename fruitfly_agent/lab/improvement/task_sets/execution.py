@@ -51,13 +51,30 @@ def execution_definition(freeze, settings, *, expected, capabilities, roles=froz
             from ..assessment.joint import assess_batch
             ctx = replace(context, plan=plan, services=services)
             evaluator = BatchEvaluator(ctx, prepared.task, prepared.private, settings, aggregate=assess_batch)
+            from fruitfly_agent.improvement.contracts.observations import BatchManifest, PlannedAttempt
+            from fruitfly_agent.improvement.execution.observations import execution_observation
+            import json
+            # Membership is already explicitly frozen by the collection source.
             entries = prepared.task.partition('development')
             batch = EvaluationBatch(prepared.task.snapshot_id, tuple(e.key for e in entries), attempts=settings.execution.attempts)
-            result = await evaluator.evaluate(plan, harness, batch, fresh=True)
-            return ResearchBatch(tuple(e.task for e in entries),
-                tuple(t.record for t in result.trials if t.record is not None),
-                tuple({'task_key': t.task_key, 'attempt': t.attempt, 'error': t.error,
-                    'measurement': asdict(t.measurement) if t.measurement else None} for t in result.trials))
+            manifest = BatchManifest(tuple(PlannedAttempt(e.task.task_id, a) for e in entries
+                for a in range(batch.attempts)), origins=tuple((e.task.task_id, e.origin_id) for e in entries))
+            services.record('research-execution-plan', manifest=manifest.to_dict())
+            def publication(result):
+                objectives = {e.key: e.objective.policy_id for e in entries}
+                return ResearchBatch(tuple(e.task for e in entries),
+                    tuple(t.record for t in result.trials if t.record is not None),
+                    (manifest.to_dict(), *(execution_observation(t.record, t.measurement, t.attempt,
+                        lambda r: json.loads(context.artifacts.read(r.artifact_id)),
+                        policy_id=objectives[t.task_key])
+                        for t in result.trials if t.record is not None)))
+            try:
+                result = await evaluator.evaluate(plan, harness, batch, fresh=True)
+            except BaseException:
+                if evaluator.evaluations:
+                    services.record('research-partial-batch', batch=publication(evaluator.evaluations[-1]).to_dict())
+                raise
+            return publication(result)
         return ExecutionPorts(None, retain_experience=False,
             execute_batch=execute_batch)
 

@@ -9,8 +9,7 @@ from fruitfly_agent.improvement.contracts.versions import content_hash
 from fruitfly_agent.improvement.contracts.versions import canonical_json
 from fruitfly_eval.catalog import builtin_catalog
 from fruitfly_eval.contracts import EvaluationRequest
-from fruitfly_eval.harbor.host import HostConfig
-from fruitfly_eval.harbor.preparation import load_preparation
+from fruitfly_eval.backends import preparation_backend
 from .assessment import OfficialMeasurements
 from .runner import EvalTaskRunner
 from .building import RuntimeConfigBuilder, validate_prepared_runtime
@@ -38,9 +37,11 @@ def benchmark_execution(request_path, host_path, *, execution_id='benchmark-task
             raise ValueError('benchmark and improvement workspaces must match')
         if request.execution.attempts != 1 or request.execution.concurrency != 1:
             raise ValueError('register one benchmark task and one attempt per execution')
-        descriptor = builtin_catalog().get(request.benchmark.benchmark_id).descriptor
-        host = HostConfig.read(Path(context.workspace), host_path)
-        receipt = load_preparation(host, descriptor, request.benchmark.variant)
+        adapter = builtin_catalog().get(request.benchmark.benchmark_id)
+        descriptor = adapter.descriptor
+        backend = preparation_backend(adapter)
+        host = backend.read_host(Path(context.workspace), host_path)
+        receipt = backend.load(host, descriptor, request.benchmark.variant)
         if len(receipt['tasks']) != 1:
             raise ValueError('benchmark execution definition currently requires one prepared task')
         # A frozen runtime must support current configuration and facts. It

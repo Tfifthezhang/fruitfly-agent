@@ -13,6 +13,7 @@ selection decisions and attributed experience. Stage protocols are exported thro
 | `HarnessSnapshot` / `ComponentDocument` | Distinct stable IDs, declared kind, axis and schema |
 | `CandidateBundle` | Frozen parent, complete component set and per-edit evidence |
 | `ExecutionRecord` | Task, material, harness, initial state and conditions identities |
+| [Research observations](observations.py) | Planned task-attempt denominators and attributed measurements; unknown acceptance remains unknown |
 | [`EvidenceSelector`](investigation.py) | Research case/material selection over summaries; no execution or activation authority |
 | `SelectionDecision` | Existing run ID; output selection differs from verification |
 | `JobServices` / `JobResource` | Observed usage, cancellation, operations and optional asynchronous cleanup |

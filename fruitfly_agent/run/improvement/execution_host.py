@@ -256,9 +256,14 @@ class RunExecutionHost:
             record = await runner.execute(plan, prepared.task, harness)
             record = services.prepare_evidence(prepared.task, record, research_artifacts)
             observations: tuple[dict, ...] = ()
+            measurement = None
             if ports.measurements is not None:
                 measurement = await ports.measurements.measure(prepared.task, record)
-                observations = (asdict(measurement),) if measurement else ()
+            from fruitfly_agent.improvement.execution.observations import execution_observation
+            from fruitfly_agent.improvement.contracts.observations import BatchManifest, PlannedAttempt
+            observations = (execution_observation(record, measurement, 0,
+                lambda r: json.loads(research_artifacts.read(r.artifact_id))),
+                BatchManifest((PlannedAttempt(prepared.task.task_id, 0),)).to_dict())
             return ResearchBatch((prepared.task,), (record,), observations)
         return ResearchService(self.workspace, research_id, research_artifacts, plan=plan, harness=baseline,
             executor=execute, services_factory=make_services,

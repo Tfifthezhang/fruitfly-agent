@@ -12,7 +12,7 @@ baseline:
 stages:
   execute:
     tasks:
-      file: tasks/tb4-smoke.yaml
+      file: tasks/benchmark.yaml
     concurrency: 1
     attempts: 1
     inputs:
@@ -51,9 +51,7 @@ stages:
       seconds: 1200
     attempt: reuse
   compare:
-    delegation:
-      enabled: true
-      workers: [evidence-reader, record-organizer, cross-record-reader, counterexample-reader]
+    # Default measured comparison is offline and uses no model workers.
     allowance:
       seconds: 1200
     attempt: reuse

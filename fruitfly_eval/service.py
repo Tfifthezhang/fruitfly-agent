@@ -9,37 +9,37 @@ from .contracts import EvaluationRequest
 
 def prepare_evaluation(request, *, host_config_path=None, tasks_only=False, progress=None, catalog=None):
     from .installation import resolve_installation
-    from .harbor.preparation import prepare
+    from .backends import preparation_backend
     adapter, host = _preparation_context(request, host_config_path, catalog)
     package = None if tasks_only else resolve_installation(
         os.environ.get('FRUITFLY_EVAL_PACKAGE'), checkout=Path(__file__).resolve().parent.parent)
-    return prepare(request, adapter.descriptor, host, package=package, tasks_only=tasks_only, progress=progress)
+    return preparation_backend(adapter).prepare(request, adapter.descriptor, host,
+        package=package, tasks_only=tasks_only, progress=progress)
 
 
 def check_evaluation(request, *, host_config_path=None, catalog=None):
-    from .harbor.preparation import inspect, load_preparation
+    from .backends import preparation_backend
     adapter, host = _preparation_context(request, host_config_path, catalog)
+    backend = preparation_backend(adapter)
     if request.benchmark.task_names:
         from .task_selection import select_prepared_tasks
         try:
-            receipt = load_preparation(host, adapter.descriptor, request.benchmark.variant)
+            receipt = backend.load(host, adapter.descriptor, request.benchmark.variant)
             selected = select_prepared_tasks(receipt, request.benchmark.task_names)
         except (OSError, ValueError, KeyError) as exc:
             return {'available': False, 'checks': [{'id': 'task_selection', 'status': 'failed', 'detail': str(exc)}]}
-        result = inspect(request, adapter.descriptor, host, receipt=receipt)
+        result = backend.inspect(request, adapter.descriptor, host, receipt=receipt)
         return {**result, 'task_count': len(selected['tasks']), 'task_names': list(request.benchmark.task_names)}
-    return inspect(request, adapter.descriptor, host)
+    return backend.inspect(request, adapter.descriptor, host)
 
 
 def _preparation_context(request, host_config_path, catalog):
-    from .benchmarks.harbor import HarborBenchmarkAdapter
-    from .harbor.host import HostConfig
+    from .backends import preparation_backend
     adapter = (catalog or builtin_catalog()).get(request.benchmark.benchmark_id)
-    if not isinstance(adapter, HarborBenchmarkAdapter):
-        raise ValueError('preparation commands require a Harbor adapter')
     if request.benchmark.variant not in {v.variant_id for v in adapter.descriptor.variants}:
         raise ValueError('unknown benchmark variant')
-    return adapter, HostConfig.read(Path(request.runtime.working_directory).resolve(), host_config_path)
+    return adapter, preparation_backend(adapter).read_host(
+        Path(request.runtime.working_directory).resolve(), host_config_path)
 
 
 def evaluation_directory(output_root, evaluation_id):
@@ -53,9 +53,15 @@ def evaluation_directory(output_root, evaluation_id):
     return path
 
 
-def stop_evaluation(evaluation_id, *, output_root):
-    from .harbor.lifecycle import request_stop
-    return request_stop(evaluation_directory(output_root, evaluation_id))
+def stop_evaluation(evaluation_id, *, output_root, catalog=None):
+    from .backends.control import ExecutionControl
+    root = evaluation_directory(output_root, evaluation_id)
+    request = EvaluationRequest.read(root / 'request.json')
+    adapter = (catalog or builtin_catalog()).get(request.benchmark.benchmark_id)
+    control = getattr(adapter, 'control', None)
+    if not isinstance(control, ExecutionControl):
+        raise ValueError('benchmark does not provide scoped execution control')
+    return control.stop(root)
 
 
 def read_report(evaluation_id, *, output_root, as_json=True):

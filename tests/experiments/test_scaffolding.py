@@ -99,7 +99,7 @@ class ScaffoldingTests(unittest.TestCase):
                 'FRUITFLY_EVAL_PYTHON_ROOT': '/opt/fixture-python',
                 'FRUITFLY_EVAL_VENV': '/opt/fixture-agent'}, clear=True), \
              patch('fruitfly_agent.providers.registry.ProviderRegistry.create', side_effect=AssertionError('model')), \
-             patch('fruitfly_eval.improvement.task_sets.load_preparation', return_value=prepared), \
+             patch('fruitfly_eval.harbor.preparation.load_preparation', return_value=prepared), \
              redirect_stdout(output):
             resolve_benchmark(replace(config, task={k: v for k, v in collection.items() if k != 'id'})).stage_host()
             self.assertNotEqual(Path.cwd().resolve(), self.root)

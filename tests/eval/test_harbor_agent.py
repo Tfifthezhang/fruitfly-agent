@@ -35,7 +35,8 @@ class HarborAdapterTests(unittest.TestCase):
         @asynccontextmanager
         async def access(*args):
             try:
-                yield {'models': {'fixture': {'grant': 'private-fixture-grant'}}}
+                yield {'models': {'fixture': {'grant': 'private-fixture-grant',
+                    'socket': '/opt/fruitfly-model-relay/trial-fixture/model.sock'}}}
             finally:
                 retired.append(True)
                 self.assertNotIn(" remove ", operations[-1][0])

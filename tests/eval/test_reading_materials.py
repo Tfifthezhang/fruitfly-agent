@@ -99,10 +99,11 @@ class ReadingMaterialsTests(unittest.TestCase):
             artifacts = MemoryArtifacts()
             batch = import_history(root, artifacts)
             observation = next(o for o in batch.observations if o['name'] == 'official_reward')
-            self.assertEqual(observation['value'], {'reward': 1.0})
+            self.assertEqual(observation['raw_value'], {'reward': 1.0})
+            self.assertEqual(observation['value'], 1.0)
             self.assertEqual(observation['official_status'], 'error')
             self.assertFalse(observation['eligible'])
-            self.assertIsNone(observation['agent_elapsed_seconds'])
+            self.assertIsNone(observation['elapsed_seconds'])
             record = batch.records[0]
             resource = next(r for r in record.artifacts if r.path == 'diagnostics/termination.json')
             self.assertEqual(json.loads(artifacts.read(resource.artifact_id))['source'], 'missing_terminal_diagnostics')

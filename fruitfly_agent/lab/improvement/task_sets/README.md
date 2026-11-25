@@ -28,6 +28,11 @@ is optional, and no missing stage is run automatically.
 | [Execution runtime](../../../improvement/execution/README.md) | Bounded scheduling and leaf facts |
 | [Assessment](../assessment/README.md) | Explicit model or attributed measurement comparison |
 
+Choose exact prepared `task_names` in the Eval collection before freezing to run
+a small batch. See the [small-batch recipe](../../../../examples/experiments/small-batch/README.md).
+Each native batch retains its planned attempts and attributed observations for
+[direct measured comparison](../assessment/methods/measured/README.md).
+
 The registered `execute_batch` path executes the frozen development entries with
 configured attempts and concurrency. The existence of sampling and promotion
 settings does not schedule sampling rounds or periodic selection. Hosts using

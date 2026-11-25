@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+import stat
 from pathlib import Path
 import tempfile
 from types import SimpleNamespace
@@ -14,6 +15,28 @@ from fruitfly_eval.harbor import access_files
 
 
 class AccessFileTests(unittest.IsolatedAsyncioTestCase):
+    def test_socket_permissions_preserve_owner_and_restrict_to_agent_group(self):
+        endpoint = '/opt/fruitfly-model-relay/trial-fixture/model.sock'
+        def info(path):
+            return SimpleNamespace(st_uid=os.getuid(), st_mode=(stat.S_IFSOCK if path.name == 'model.sock' else stat.S_IFDIR))
+        with patch.object(Path, 'lstat', info), patch.object(os, 'chown') as chown, patch.object(os, 'chmod') as chmod:
+            access_files._grant_socket('1001', endpoint)
+            self.assertEqual([c.args[1] for c in chown.call_args_list], [-1, -1, -1])
+            self.assertEqual([c.args[2] for c in chown.call_args_list], [1001] * 3)
+            self.assertEqual([c.args[1] for c in chmod.call_args_list], [0o710, 0o710, 0o660])
+            for invalid in ('/etc/model.sock', '/opt/fruitfly-model-relay/../trial-x/model.sock',
+                            '/opt/fruitfly-model-relay/trial-x/not-a-socket'):
+                with self.assertRaises(ValueError):
+                    access_files._grant_socket('1001', invalid)
+
+    async def test_unix_publish_grants_socket_before_agent_probe(self):
+        descriptor = {'models': {'fixture': {'socket': '/opt/fruitfly-model-relay/trial-x/model.sock'}}}
+        async with access_files.ContainerModelAccess(self.agent, self.env) as files:
+            await files.publish(descriptor, ca_source=None)
+        calls = [c.kwargs['command'] for c in self.agent.exec_as_root.await_args_list]
+        self.assertIn('grant-socket', calls[1])
+        self.assertIn('1001', calls[1])
+
     def setUp(self):
         self.root = Path(self.enterContext(tempfile.TemporaryDirectory()))
         self.agent = SimpleNamespace(runtime_python='/python', runtime_environment={},

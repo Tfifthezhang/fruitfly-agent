@@ -5,8 +5,7 @@ from typing import Any
 
 from .contracts import EvaluationRequest
 from .catalog import builtin_catalog
-from .harbor.host import HostConfig
-from .harbor.preparation import load_preparation
+from .backends import preparation_backend
 
 
 def select_prepared_tasks(preparation: dict[str, Any], names: tuple[str, ...]) -> dict[str, Any]:
@@ -27,8 +26,10 @@ def select_prepared_tasks(preparation: dict[str, Any], names: tuple[str, ...]) -
 
 
 def list_prepared_tasks(request: EvaluationRequest, *, host_config_path=None) -> dict[str, Any]:
-    host = HostConfig.read(Path(request.runtime.working_directory), host_config_path)
-    descriptor = builtin_catalog().get(request.benchmark.benchmark_id).descriptor
-    preparation = load_preparation(host, descriptor, request.benchmark.variant)
+    adapter = builtin_catalog().get(request.benchmark.benchmark_id)
+    backend = preparation_backend(adapter)
+    host = backend.read_host(Path(request.runtime.working_directory), host_config_path)
+    descriptor = adapter.descriptor
+    preparation = backend.load(host, descriptor, request.benchmark.variant)
     selected = select_prepared_tasks(preparation, request.benchmark.task_names)
     return {'preparation_id': preparation['id'], 'dataset': descriptor.dataset, 'tasks': selected['tasks']}

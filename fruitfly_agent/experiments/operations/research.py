@@ -233,18 +233,25 @@ async def _dispatch(args, workspace, outputs, reporting):
         manifest_path = getattr(args, 'measured_policy', None)
         if method == 'measured':
             try:
-                if not manifest_path:
-                    raise ValueError('measured comparison requires a measured policy JSON manifest')
-                path = Path(manifest_path).expanduser()
-                if not path.is_absolute():
-                    path = workspace / path
-                policy = json.loads(path.read_text())
-                if not isinstance(policy, dict):
-                    raise ValueError('measured policy manifest must be an object')
-                policy = apply_thresholds(roles.profile.component_settings['comparison'], policy)
-                reporting['configuration']['parameters']['measured_policy'] = policy
+                parameters = {'comparison_method': method,
+                    'comparison_settings': roles.profile.component_settings['comparison']['settings']}
+                if manifest_path:
+                    path = Path(manifest_path).expanduser()
+                    if not path.is_absolute():
+                        path = workspace / path
+                    policy = json.loads(path.read_text())
+                    if not isinstance(policy, dict):
+                        raise ValueError('measured policy manifest must be an object')
+                    parameters['measured_policy'] = apply_thresholds(roles.profile.component_settings['comparison'], policy)
+                requested_scope = (getattr(args, 'named_inputs', None) or {}).get('task_scope')
+                if requested_scope:
+                    requested_batches = args.named_inputs['batches']
+                    if requested_scope not in requested_batches:
+                        raise ValueError('task_scope must select a compare input batch')
+                    parameters['task_scope_id'] = named.batches[requested_batches.index(requested_scope)].artifact_id
+                reporting['configuration']['parameters'].update(parameters)
                 _capture_configuration(outputs, reporting)
-                return await service.perform_named('compare', named, parameters={'measured_policy': policy},
+                return await service.perform_named('compare', named, parameters=parameters,
                     fresh=args.fresh, retry_unresolved=args.retry_unresolved)
             finally:
                 await roles.aclose()
@@ -353,7 +360,8 @@ async def _dispatch(args, workspace, outputs, reporting):
                 system_source=str(roles.config_path))
         if args.command in {'organize', 'propose'}:
             service.role_identity[args.command]['evidence_selector'] = service.evidence_selector.identity
-        parameters = {'instruction': getattr(args, 'instruction', '')} if args.command == 'organize' else {}
+        parameters = ({'instruction': getattr(args, 'instruction', '')} if args.command == 'organize' else
+                      {'comparison_method': 'model'} if args.command == 'compare' else {})
         return await service.perform_named(args.command, named, parameters=parameters, fresh=args.fresh, retry_unresolved=args.retry_unresolved)
     finally:
         await roles.aclose()

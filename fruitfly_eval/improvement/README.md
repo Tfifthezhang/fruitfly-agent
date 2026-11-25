@@ -203,3 +203,21 @@ its source. Missing boundaries remain null; elapsed time never supplies a limit.
 Raw exception commands, output and private verifier content are excluded. Native
 termination diagnostics remain independent of Harbor outcome observations.
 Existing published batches remain immutable; reimport to obtain new projections.
+
+## Preserve measurements for deterministic comparison
+
+Native execution attaches `research/measurement.json`, using the same official
+outcome interpreter as historical import. Research hosts consume it directly into
+attributed measurements and retain task-attempt plans. Error-associated raw rewards
+remain available but ineligible for grading. Numeric objectives without explicit
+acceptance semantics do not become pass/fail outcomes.
+
+Import uses retained `artifacts/harbor/preparation.json` and `request.json` to
+preserve requested attempt counts and unstarted selected tasks when both exist.
+Without that material, scope is explicitly observed-only. Historical attempt
+numbering follows archive order; original attempt identities and verifier/source
+conditions are not fabricated. Missing provenance leaves controlled-comparison
+assurance unknown even when descriptive outcome metrics are available.
+
+See [measured metrics](../../fruitfly_agent/lab/improvement/assessment/methods/measured/README.md)
+and the [selected-task recipe](../../examples/experiments/small-batch/README.md).

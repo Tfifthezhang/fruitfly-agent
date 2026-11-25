@@ -148,3 +148,8 @@ The stored library survives process restart independently of the active runtime.
 Duplicate publication fails explicitly. Maintenance uses a separate nonblocking
 file lease so checkpoint reads and evidence appends remain available. Retry
 requires that lease and cannot replace an operation still running in another host.
+
+Measured comparison bundles publish `comparison.json` and byte-preserving
+`summary.md`, `metrics.csv` and `tasks.csv` resources. All are retained in the same
+artifact dependency closure. Metric definitions belong to
+[Assessment](../../lab/improvement/assessment/methods/measured/README.md).

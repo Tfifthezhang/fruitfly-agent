@@ -21,7 +21,9 @@ Verify single-configuration requests, Harbor mapping, artifacts, and reports off
 | `test_runtime.py` | Default/explicit selection, snapshots, model/credential dependencies, execution parameter preservation/rejection, remote-environment rejection, artifact integrity and installation identities |
 | `test_execution_facts.py` | Terminal diagnostics, legacy unknown facts, collection failure versus absence and excluded private verifier data |
 | `test_trajectory.py` | ATIF tools/observations, zero and unknown usage, malformed-session rejection |
-| `../support/harbor.py` | Isolated optional SDK substitute |
+| `test_backend_preparation.py / test_isolated_backend.py / test_native_bridge.py` | Backend capability dispatch, isolated protocol, literal native invocation and private trial mounts |
+| `test_workbuddy_*.py` | Complete dataset/shared-resource snapshots, exact selected probes, pinned source/engine, official attribution, API/Go preservation and native import/compare |
+| `../support/harbor.py`, `../support/workbuddy.py` | Isolated optional SDK and controller substitutes |
 
 The real container supervisor process test runs only on Linux with `/proc`.
 Other systems exercise ownership doubles and host-process cleanup. Default tests

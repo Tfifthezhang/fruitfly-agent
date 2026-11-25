@@ -374,3 +374,9 @@ execution navigation is a tool option and does not change component selection.
 The evidence catalog also accepts `compact: boolean` and `run_id: string` for
 execution navigation. Full-row behavior remains the default. These arguments
 filter existing authorized records and grant no additional source access.
+
+The `improvement-comparison` owner defaults to `settings.method: measured`.
+`bootstrap_resamples` and `bootstrap_seed` are configurable frozen policy fields,
+protected from candidate editing; declared gain/regression thresholds retain their
+existing I grants. Native batches need no manual pair manifest. See
+[metric and provenance contracts](../improvement/assessment/methods/measured/README.md).

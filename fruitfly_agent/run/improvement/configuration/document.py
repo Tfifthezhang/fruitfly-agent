@@ -70,6 +70,10 @@ class ResearchDocument:
             raise ValueError('stage context must be a list')
         for item in context:
             reference(item)
+        if 'task_scope' in result:
+            reference(result['task_scope'])
+            if result['task_scope'] not in inputs.get('batches', []):
+                raise ValueError('task_scope must select one of compare inputs.batches')
         allowance = mapping(result.get('allowance', {}), set(definition.allowance_fields), 'stages.' + stage + '.allowance')
         for name, value in allowance.items():
             if (isinstance(value, bool) or not isinstance(value, (int, float))

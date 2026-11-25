@@ -17,6 +17,28 @@ from tests.support.stages import proposal_fixture, Runner
 
 
 class ResearchServiceTests(unittest.IsolatedAsyncioTestCase):
+    def test_eval_import_retains_unstarted_tasks_from_selected_preparation(self):
+        from fruitfly_agent.improvement.contracts.observations import BatchManifest
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            trial = root / 'artifacts/harbor/job/observed'
+            (trial / 'agent').mkdir(parents=True)
+            (trial / 'result.json').write_text(json.dumps({'task_name': 'first',
+                'verifier_result': {'rewards': {'reward': 0}}}))
+            (trial / 'agent/session.jsonl').write_text(json.dumps({'message': {
+                'role': 'user', 'content': 'Work'}}) + '\n')
+            (root / 'request.json').write_text(json.dumps({'execution': {'attempts': 2}}))
+            (root / 'report.json').write_text(json.dumps({'benchmark': {'dataset': 'fixture'}}))
+            (root / 'artifacts/harbor/preparation.json').write_text(json.dumps({'tasks': [
+                {'id': 'first-id', 'name': 'first'}, {'id': 'unstarted-id', 'name': 'unstarted'}]}))
+            batch = import_history(root, MemoryArtifacts())
+            manifest = BatchManifest.from_dict(batch.observations[-1])
+            self.assertEqual(manifest.scope_kind, 'retained-planned')
+            self.assertEqual(len(manifest.planned), 4)
+            self.assertEqual(len(batch.records), 1)
+            self.assertEqual(len(batch.tasks), 2)
+            self.assertIn('fixture:unstarted-id', dict(manifest.origins).values())
+
     async def test_measured_compare_reuses_frozen_inputs_without_a_model_role(self):
         from dataclasses import replace
         from fruitfly_agent.improvement.contracts.stages import StageInputs
@@ -149,7 +171,10 @@ class ResearchServiceTests(unittest.IsolatedAsyncioTestCase):
             batch = import_history(root, artifacts)
             self.assertEqual(batch.tasks[0].instruction, 'Do the task')
             self.assertEqual(batch.records[0].status, 'error')
-            self.assertEqual(batch.observations[0]['value'], {'reward': 1})
+            self.assertEqual(batch.observations[0]['raw_value'], {'reward': 1})
+            self.assertEqual(batch.observations[0]['value'], 1)
+            self.assertFalse(batch.observations[0]['eligible'])
+            self.assertEqual(batch.observations[0]['semantics']['outcome'], 'unknown')
             self.assertTrue(all(b'PRIVATE SENTINEL' not in v for v in artifacts.values.values()))
             scope = next(r for r in batch.records[0].artifacts if r.path == 'diagnostics/reading-scope.json')
             extensions = json.loads(artifacts.read(scope.artifact_id))['extensions']

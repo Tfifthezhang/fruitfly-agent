@@ -38,6 +38,28 @@ class ResearchBatch:
         for observation in self.observations:
             if isinstance(observation, dict) and 'semantics' in observation:
                 ObservationSemantics(**observation['semantics'])
+        from .observations import BatchManifest, MeasurementObservation, PlannedAttempt
+        manifests = [BatchManifest.from_dict(o) for o in self.observations
+                     if isinstance(o, dict) and o.get('kind') == 'batch_manifest']
+        if len(manifests) > 1:
+            raise ValueError('a research batch has one execution plan')
+        measurements = [MeasurementObservation.from_dict(o) for o in self.observations
+                        if isinstance(o, dict) and o.get('kind') == 'measurement']
+        records = {r.run_id: r for r in self.records}
+        tasks = {t.task_id for t in self.tasks}
+        if manifests and any(p.task_id not in tasks for p in manifests[0].planned):
+            raise ValueError('planned attempt cites an unknown task')
+        seen = set()
+        for observation in measurements:
+            key = (observation.run_id, observation.name)
+            if key in seen:
+                raise ValueError('duplicate execution measurement')
+            seen.add(key)
+            record = records.get(observation.run_id)
+            if record is None or record.task_id != observation.task_id:
+                raise ValueError('measurement differs from execution receipt')
+            if manifests and PlannedAttempt(observation.task_id, observation.attempt) not in manifests[0].planned:
+                raise ValueError('measurement is outside the execution plan')
         canonical_json(self.observations)
 
     def to_dict(self):

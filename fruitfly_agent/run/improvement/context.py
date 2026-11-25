@@ -62,6 +62,8 @@ class ResearchContext:
         for name, value in inputs.items():
             resolved[name] = reference(value, harness=True) if name == 'harness' else [reference(item) for item in value]
         resolved['context'] = [reference(item) for item in document.settings(selected).get('context', [])]
+        if 'task_scope' in document.settings(selected):
+            resolved['task_scope'] = reference(document.settings(selected)['task_scope'])
         required = document.definitions[selected].required_inputs
         for name in required:
             if not resolved.get(name):
