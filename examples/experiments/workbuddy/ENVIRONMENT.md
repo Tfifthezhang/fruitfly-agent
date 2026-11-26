@@ -199,3 +199,10 @@ Only after the required checks pass, run one authorized smoke with a new output
 root. Review Agent failure, verifier outcome, engine aggregation and cleanup
 separately. A zero reward following an Agent infrastructure error is not evidence
 of model quality. Do not automatically replay failed attempts.
+
+A smoke whose verifier failed with `Permission denied` on `/tests/verifier.py`
+is an infrastructure artifact, not a baseline: the adapter now normalizes the
+container copy of uploaded test files. Before re-running, remove any host-level
+`docker` wrapper/shim installed to patch permissions during earlier debugging;
+it intercepts every Docker call and its state is unverified. Re-prepare after
+pulling the adapter change, then use a fresh output root.

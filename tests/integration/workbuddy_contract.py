@@ -28,6 +28,12 @@ class WorkBuddyContractTests(unittest.TestCase):
         from fruitfly_eval.workbuddy.environment import PreparedWorkBuddyEnvironment
         from harbor.environments.docker.docker import DockerEnvironment
         self.assertTrue(issubclass(PreparedWorkBuddyEnvironment, DockerEnvironment))
+        # The judge overwrites /tests/verifier.py through its environment's
+        # upload_file; the adapter must own that call with a compatible shape.
+        import inspect
+        self.assertIsNot(PreparedWorkBuddyEnvironment.upload_file, DockerEnvironment.upload_file)
+        self.assertEqual(list(inspect.signature(PreparedWorkBuddyEnvironment.upload_file).parameters),
+                         list(inspect.signature(DockerEnvironment.upload_file).parameters))
         self.assertTrue(callable(CompositeVerifier))
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()

@@ -82,6 +82,15 @@ not repaired in place. External links and cache overlap are rejected. Arbitrary
 host verifier patches are unsupported. Private scoring resources are not Agent or
 Editor inputs.
 
+The official judge rewrites `/tests/verifier.py` through a mode-600 temporary
+file, and `docker cp` preserves that mode, so the official non-root verifier
+user cannot read its own script. The environment adapter normalizes only the
+container copy of files uploaded under `/tests/` to the frozen 644 mode after
+the official upload completes. Host and frozen files are never modified,
+scoring logic is unchanged, and a failed normalization raises instead of
+silently producing a zero reward. Host-level `docker` wrapper scripts are not
+a supported substitute for this adapter.
+
 ## Execute and retain official evidence
 
 The runner preserves official bench timeout/environment behavior and uses explicit
