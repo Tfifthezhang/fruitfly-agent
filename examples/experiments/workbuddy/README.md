@@ -15,21 +15,31 @@ its [upstream setup](https://github.com/Tencent/workbuddy-bench). Preserve the c
 `wb-bench-code-v1.0/` root, including `dataset.toml`, `tasks/` and `shared/`.
 Cached task images alone do not supply these files or establish verifier readiness.
 
-WorkBuddy pins Harbor 0.18.0. Keep that controller environment separate from the
-FruitFlyAgent environment with its Harbor 0.23.0 benchmark extra. The WorkBuddy
-controller also needs FruitFlyAgent's base dependencies so it can load the native
-bridge and host credential services. Example installation steps below download
-packages, but make no model requests; replace all paths:
+The selected controller baseline is Harbor **0.23.0**, shared with the other
+FruitFlyAgent benchmarks. The worker enforces the actual installed version; see
+[controller ownership](../../../fruitfly_eval/workbuddy/README.md#controller-version-policy).
 
-```bash
-uv sync --project /absolute/path/to/workbuddy-bench
-uv pip install --python /absolute/path/to/workbuddy-bench/.venv/bin/python /absolute/path/to/fruitfly-agent
-```
+Use a fresh controller environment to validate the unified installation. Install
+FruitFlyAgent with its pinned `[benchmarks]` extra, then add WorkBuddy's declared
+runtime dependencies and reviewed source without allowing its upstream uv lock
+to replace Harbor. Validate the complete dependency set before preparation;
+`--no-deps` installation alone does not establish readiness. Do not run upstream
+`uv sync` in that environment: the upstream source currently selects 0.18.0.
+Do not modify the upstream checkout or lockfile to make a local guard pass.
 
-Do not install FruitFlyAgent's `[benchmarks]` extra into this controller. If you
-resync WorkBuddy later, reinstall the Agent base dependencies and prepare again.
-The separately mounted Agent Python environment must be Linux-compatible and
-complete; follow the [server runtime guide](../../../fruitfly_eval/SERVER_GUIDE.md).
+Record the installed Harbor version, WorkBuddy source checksum and imported
+module origins. Validate official tasks, CompositeVerifier, environment subclass,
+JobConfig, lifecycle hooks and native Agent capabilities against the actual
+0.23.0 SDK before container/model execution. Keep the old environment and retained
+results intact; engine changes are a changed experimental condition and need
+new preparation and a new baseline. Once validated, use one declared engine
+version for every benchmark; process isolation may remain where useful.
+
+The mounted Agent Python environment is separate from the controller. It must
+be Linux-compatible and complete; follow the
+[server runtime guide](../../../fruitfly_eval/SERVER_GUIDE.md) and
+[environment diagnostics](ENVIRONMENT.md). Do not install the controller SDK into
+task images or reinterpret a failed runtime probe as a reason to upgrade them.
 
 ## Initialize and bind owner files
 
@@ -69,21 +79,25 @@ source changes and prepare again. Do not repair frozen cache files manually.
 
 ## Prepare and inspect the smoke selection
 
+Read [environment diagnostics](ENVIRONMENT.md) before container work. It records
+current CLI, read-only mount and readiness limits, and separates host fixes from
+adapter defects.
+
 ```bash
 # Freezes/inspects local task materials; no containers or model calls.
 fruitfly-agent-lab eval prepare --tasks-only
 # May prepare dependencies and start environment probes; no model inference.
 fruitfly-agent-lab eval prepare
 # Checks recorded source, interpreter, packages and images; runs no tasks.
-fruitfly-agent-lab eval check
+fruitfly-agent-eval check --request .fruitfly/eval-request.json --host-config .fruitfly/eval-host.yaml
 ```
 
 Check the exact selected task, official verifier resources and full image
 references. Unknown/missing task names fail. Preflight does not establish account
 entitlement or verifier success. A rootless host must support the selected runtime
-mounts and actual Agent UID/GID. Native Linux can use the private Unix relay,
-with one communication directory per trial and group-scoped socket permission;
-otherwise configure the existing verified TLS relay fields in `eval-host.yaml`.
+mounts and actual Agent UID/GID. Unix relay communication mounts stay read-only;
+the host prepares socket access and the task receives a private per-trial grant.
+TLS fields in `eval-host.yaml` require proven container reachability before use.
 The actual Agent checks its relay descriptor before inference. A failed
 `host.docker.internal` path does not prove every transport is unavailable.
 
@@ -91,7 +105,7 @@ The actual Agent checks its relay descriptor before inference. A failed
 
 ```bash
 # Starts the official task/verifier and model requests; charges may apply.
-fruitfly-agent-lab eval run
+fruitfly-agent-eval run --request .fruitfly/eval-request.json --host-config .fruitfly/eval-host.yaml
 ```
 
 Inspect the returned report and logs. A completed controller is not a passed task;

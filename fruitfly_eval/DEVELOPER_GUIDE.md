@@ -30,7 +30,7 @@ See [Getting Started](../GETTING_STARTED.md#check-the-agent-offline) and the
 |---|---|
 | Host | macOS/Linux; native Windows unsupported, WSL2 unverified |
 | Python | Harbor requires 3.12+; Agent requires 3.11+ |
-| Harbor | Standard adapters: `0.23.0`, pinned by the benchmarks extra; WorkBuddy: isolated official `0.18.0` environment |
+| Harbor | `0.23.0`, pinned by the benchmarks extra for all adapters |
 | Docker | Reachable Engine and Compose v2 |
 | Model | Saved model catalog/profile and secret environment |
 
@@ -41,8 +41,9 @@ docker compose version
 .venv/bin/python -m fruitfly_eval catalog --json
 ```
 
-WorkBuddy has a [separate controller and dataset recipe](../examples/experiments/workbuddy/README.md);
-do not combine its older engine with the standard benchmarks extra. Shared
+WorkBuddy has a [controller and dataset recipe](../examples/experiments/workbuddy/README.md).
+The selected engine baseline is 0.23.0 and uses the shared native bridge. Preserve official source locks separately from
+the execution-engine identity. Shared
 preparation, host configuration, initialization and control use optional
 [backend capabilities](backends/README.md), composed by the existing Catalog.
 

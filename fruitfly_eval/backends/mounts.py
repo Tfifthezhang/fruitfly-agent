@@ -14,7 +14,7 @@ class PreparedMounts:
             if mount['target'] == TARGET:
                 private = trial_relay_directory(Path(mount['source']), kwargs['trial_paths'].trial_dir)
                 private.mkdir(mode=0o700, parents=True, exist_ok=True)
-                mount.update(source=str(private), read_only=False)
+                mount.update(source=str(private), read_only=True)
         targets = {mount['target'] for mount in combined}
         for definition in dependency_mounts:
             target = definition['target']

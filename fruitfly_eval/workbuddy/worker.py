@@ -30,7 +30,9 @@ def describe(checkout: Path) -> dict[str, Any]:
         raise ValueError('isolated engine lacks required public lifecycle hooks')
     from fruitfly_eval.harbor.controller import environment_snapshot
     from fruitfly_eval.harbor.material import tree_identity
-    return {'controller': environment_snapshot(), 'python': sys.executable,
+    import sysconfig
+    installed = sorted({sysconfig.get_path('purelib'), sysconfig.get_path('platlib')})
+    return {'controller': environment_snapshot(distribution_paths=installed), 'python': sys.executable,
             'engine': {'harbor': RUNNER_HARBOR_VERSION,
                        'sha256': tree_identity(Path(harbor.__file__).parent, exclude_bytecode=True)}}
 
@@ -72,6 +74,9 @@ def dispatch(operation: str, payload: dict[str, Any]) -> dict[str, Any]:
                 async def exec_as_root(self, target, *, command):
                     return await environment.exec(command=command, user='root', timeout_sec=60)
             await ensure_agent_user(Commands(), SimpleNamespace(default_user=definition['user']))
+            from fruitfly_eval.harbor.cache_access import configure
+            await configure(environment, payload['runtime']['python'],
+                            payload['runtime'].get('environment', {}), user=definition['user'])
         return probe_environment(payload['task'], payload['runtime'], payload['docker'],
             Path(payload['directory']), host=host,
             environment_import='fruitfly_eval.workbuddy.environment:PreparedWorkBuddyEnvironment',

@@ -36,7 +36,7 @@ def configure_model_access(environment: dict[str, Any], agent: dict[str, Any], *
         if platform.system() != 'Linux':
             raise ValueError('Subscription models on Docker Desktop require model_relay TLS settings')
         environment.setdefault('mounts', []).append({'type': 'bind', 'source': str(directory),
-                                                   'target': TARGET, 'read_only': False})
+                                                   'target': TARGET, 'read_only': True})
     else:
         from urllib.parse import urlsplit
         hostname = urlsplit(settings['network_url']).hostname

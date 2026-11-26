@@ -13,7 +13,7 @@ from fruitfly_eval.harbor.host import fields, path_at
 from fruitfly_eval.harbor.material import digest, tree_identity
 from .tasks import validate_tree
 
-RUNNER_HARBOR_VERSION = '0.18.0'
+RUNNER_HARBOR_VERSION = '0.23.0'
 RUNNER_RESOURCES = ('pyproject.toml', 'uv.lock', 'src/workbuddy_bench', 'configs/bench')
 
 
@@ -33,9 +33,8 @@ def runner_identity(checkout: Path) -> dict[str, Any]:
         rows.append({'path': relative, 'sha256': tree_identity(path, exclude_bytecode=True)})
     project = tomllib.loads((checkout / 'pyproject.toml').read_text())
     harbor = project.get('tool', {}).get('uv', {}).get('sources', {}).get('harbor', {})
-    if harbor.get('tag') != 'v' + RUNNER_HARBOR_VERSION:
-        raise ValueError('WorkBuddy runner requires its declared Harbor ' + RUNNER_HARBOR_VERSION)
-    return {'source_sha256': digest(rows), 'files': rows, 'harbor': RUNNER_HARBOR_VERSION}
+    return {'source_sha256': digest(rows), 'files': rows, 'upstream_harbor': harbor,
+            'harbor': RUNNER_HARBOR_VERSION}
 
 
 @dataclass(frozen=True)

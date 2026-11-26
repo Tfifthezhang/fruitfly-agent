@@ -375,11 +375,12 @@ API models retain their existing environment-key path.
 
 Native Linux uses an Agent-only bind of private Unix sockets at
 `/opt/fruitfly-model-relay`. The bind contains only the current trial's
-communication directory. Root setup grants the actual Agent group traversal
-(0710) and socket connection (0660), preserving host-owner identity and cleanup
-rights. Agent group members cannot create or remove directory entries. No
-credential store is mounted. Rootless mappings and bind permission changes still
-require an authorized integration check. Docker Desktop and remote Docker hosts need
+communication directory. The host grants traversal and socket connection
+permission without changing owner identity. The container mount remains
+read-only. Only the separately delivered owner-only descriptor authorizes
+inference through an opaque, revocable per-trial bearer grant. No credential
+store is mounted. Rootless reachability still requires an integration check.
+Docker Desktop and remote Docker hosts need
 explicit verified TLS reachability:
 
 ```yaml
@@ -417,3 +418,10 @@ verifier completion require explicitly authorized integration runs.
 and evidence controls. Derived experiment hosts use this owner interface;
 relative paths become absolute before publication so relocation does not change
 the selected resources. Offline regression: `tests.eval.test_host_serialization`.
+
+
+WorkBuddy uses [scoped cache access](cache_access.py) after official user setup.
+Only owned cache roots and the uv/python/pip subdirectories receive the effective
+container group and setgid directory mode. Asset/runtime mounts stay read-only;
+foreign ownership and symlinked roots fail. Existing cache contents are not
+recursively re-permissioned. See [environment diagnostics](../../examples/experiments/workbuddy/ENVIRONMENT.md).

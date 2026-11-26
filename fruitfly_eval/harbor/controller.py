@@ -7,9 +7,10 @@ import sys
 from typing import Any
 
 
-def environment_snapshot() -> dict[str, Any]:
+def environment_snapshot(*, distribution_paths: list[str] | None = None) -> dict[str, Any]:
     """Record installed versions and declared conflicts, never environment values."""
-    distributions = list(metadata.distributions())
+    distributions = list(metadata.distributions(path=distribution_paths) if distribution_paths is not None
+                         else metadata.distributions())
     packages = {d.metadata["Name"]: d.version for d in distributions if d.metadata["Name"]}
     issues = []
     try:

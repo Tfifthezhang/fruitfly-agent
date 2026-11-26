@@ -98,6 +98,24 @@ def normalized_dataset(host: HostConfig, descriptor: BenchmarkDescriptor, varian
             'normalization': saved['changes'], 'excluded': excluded}
 
 
+def validate_execution(request, host, receipt, client):
+    from dataclasses import asdict
+    from fruitfly_agent.providers.config import load_env
+    from fruitfly_agent.providers.workspace import WorkspacePaths
+    from fruitfly_eval.runtime import prepare_runtime
+    from .runner import job_configuration
+    environment = {**load_env(WorkspacePaths(Path(request.runtime.working_directory)).secret_file()), **os.environ}
+    with tempfile.TemporaryDirectory(prefix='execution-check-', dir=host.cache) as directory:
+        root = Path(directory)
+        config, models, secrets = prepare_runtime(runtime=asdict(request.runtime), output_dir=root,
+            environment=environment, model_relay=True)
+        runtime = json.loads((root / 'runtime.json').read_text())
+        job = job_configuration(request, host, receipt, root=root, config=config, models=models,
+            profile=runtime['profile'], secrets=secrets, relay_directory=root / 'relay',
+            relay_required=bool(runtime['connected_models']))
+        client.call('validate_job', {'checkout': str(settings(host).checkout), 'job': job})
+
+
 class WorkBuddyPreparation:
     def read_host(self, workspace: Path, path: str | Path | None) -> HostConfig:
         host = HostConfig.read(workspace, path)
@@ -131,6 +149,7 @@ class WorkBuddyPreparation:
         runtime = prepare_material(host, package)
         dependencies = prepare_dependencies(host, 'docker')
         client = engine(host, source=Path(runtime['source']))
+        state = client.call('describe', {'checkout': str(runner.checkout)})
         probes = []
         from fruitfly_eval.harbor.environments import environment_key
         for task in tasks:
@@ -147,6 +166,7 @@ class WorkBuddyPreparation:
             'controller': state['controller'], 'bench': bench, 'dataset_material': dataset,
             'selection': selection, 'tasks': tasks, 'runtime': runtime, 'dependencies': dependencies,
             'environments': probes}
+        validate_execution(request, host, receipt, client)
         receipt['id'] = digest(receipt)
         path = receipt_path(host, descriptor, request.benchmark.variant)
         write_json(path, receipt)
@@ -185,6 +205,7 @@ class WorkBuddyPreparation:
             current = engine(host, source=Path(record['runtime']['source'])).call('describe', {'checkout': str(runner.checkout)})
             if current['controller'] != record['controller'] or current['engine'] != record['engine']:
                 raise ValueError('isolated engine environment changed; prepare again')
+            validate_execution(request, host, record, engine(host, source=Path(record['runtime']['source'])))
             for probe in record['environments']:
                 for image in probe['images']:
                     if image_identity('docker', image['reference']) != image['id']:

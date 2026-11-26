@@ -18,8 +18,27 @@ separately authorized and uses models and containers.
 | Native bridge | Complete frozen system configuration, Session, supervisor and logs |
 | Providers | Model protocols, API/Go authentication, session headers and request policy |
 
-The runner uses WorkBuddy's declared Harbor 0.18.0 in its own Python environment.
-It does not change the Harbor 0.23.0 dependency used by existing benchmarks.
+## Controller version policy
+
+The selected FruitFlyAgent execution baseline is **Harbor 0.23.0 for all
+benchmarks**, including WorkBuddy Code. Separate Python processes may isolate
+imports and cleanup, but do not select a different Harbor version. Dataset and
+verifier adapters remain benchmark-owned; model authentication remains in
+Providers.
+
+The worker requires the installed Harbor 0.23.0 engine and shares the native
+Agent bridge with the other benchmarks. The upstream checkout's lockfile is
+retained as source evidence; it does not select the execution engine. Source
+identity and actual installed engine identity are recorded separately. Install
+the selected controller dependencies before preparation; the worker installs
+nothing and rejects a different installed engine version.
+
+Harbor Agent mounts remain read-only. The host owns socket permissions and
+issues an opaque per-trial bearer grant through a separate owner-only descriptor.
+A task sees only its trial's socket directory. Container users may connect to the
+socket but cannot create/remove entries in that read-only mount. No upstream
+credential store is mounted. TLS still requires independently verified routing.
+
 The same CLI request, prepared task selection and Improvement ports serve both.
 There is no additional benchmark or model registry and no model-name dispatch.
 
@@ -69,9 +88,10 @@ The runner preserves official bench timeout/environment behavior and uses explic
 request attempts/concurrency with retries disabled. The native CLI consumes the
 complete frozen H/S/I and model configuration. Subscription connections keep their
 Provider request policy and receive per-execution host relay grants. Unix relay
-communication directories are mounted per trial; socket permissions use the actual
-Agent group without changing host ownership. This avoids requiring a host TCP
-port on Linux. Rootless UID/GID mappings still need a real integration check. API models
+communication directories are mounted read-only per trial. Socket connection
+permission is independent of container UID mapping; grants remain required for
+inference and are revoked on retirement. Host parent directories remain private.
+TLS requires verified container-to-host reachability. API models
 retain the existing secret-environment path. No generic model configuration is
 synthesized by this adapter.
 
@@ -86,6 +106,17 @@ attempt number, scorer identity and frozen comparison conditions outside the
 Agent-writable log directory. Import preserves these original attempts. Official
 rewards remain unchanged; errors with raw rewards remain ineligible. The same
 attribution enters native execute measurements and imported batches.
+
+## Inspect current execution limits
+
+Full preparation and check construct and validate the complete model-dependent
+job against the selected engine without inference. They do not prove relay
+reachability, model entitlement or official verifier completion. Controller
+package discovery is restricted to the selected interpreter's installation
+paths, so source-tree egg-info does not masquerade as an installed distribution.
+Source material is hashed separately. Do not delete metadata or edit receipts.
+See [environment diagnostics](../../examples/experiments/workbuddy/ENVIRONMENT.md)
+for layer-specific checks and the direct Eval CLI route for fixed requests.
 
 ## Interpret comparison and limits
 

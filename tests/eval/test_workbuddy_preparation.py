@@ -20,7 +20,7 @@ class WorkBuddyPreparationTests(unittest.TestCase):
                 'benchmark': {'id': 'fixture', 'variant': 'full', 'task_names': ['first']}})
             client = Engine()
             backend = WorkBuddyPreparation()
-            runtime = {'id': 'runtime-fixture', 'source': str(root), 'host': host.identity()}
+            runtime = {'id': 'runtime-fixture', 'source': str(root), 'mounts': [], 'host': host.identity()}
             with patch('fruitfly_eval.workbuddy.preparation.engine', return_value=client), \
                  patch('fruitfly_eval.workbuddy.preparation.inspect_images', return_value=[]), \
                  patch('fruitfly_eval.workbuddy.preparation.prepare_material', return_value=runtime) as material, \

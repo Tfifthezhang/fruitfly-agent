@@ -146,6 +146,11 @@ def dispatch(args):
         overrides['task'] = {'source': 'eval', 'request': str((workspace / args.request).resolve())}
     config = load_configuration(workspace, args.config, overrides=overrides,
         material_only=command == 'prepare' and args.tasks_only)
+    if operation == 'eval' and command == 'check' and config.task.get('source') == 'task-set':
+        from .task_sets import check_collections
+        result = check_collections(config)
+        print_json(result)
+        return 0 if result['available'] else 3
     if command == 'prepare' and config.task.get('source') == 'task-set':
         from .task_sets import prepare_collections
         print_json(prepare_collections(config, tasks_only=args.tasks_only,

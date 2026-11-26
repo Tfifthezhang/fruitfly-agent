@@ -13,6 +13,31 @@ from fruitfly_eval.workbuddy.configuration import RunnerSettings
 
 
 class WorkBuddyWorkspaceTests(unittest.TestCase):
+    def test_eval_check_preserves_collection_scope_without_constructing_research_roles(self):
+        from contextlib import redirect_stdout
+        from types import SimpleNamespace
+        import io
+        from fruitfly_agent.experiments.cli import main
+        from fruitfly_eval.contracts import EvaluationRequest
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            initialize_workspace(root, source='task-set', benchmark='workbuddy-code')
+            collection = root / '.fruitfly/tasks/benchmark.yaml'
+            data = yaml.safe_load(collection.read_text())
+            data['collections'][0]['task_names'] = ['first']
+            collection.write_text(yaml.safe_dump(data))
+            benchmark = SimpleNamespace(request=EvaluationRequest.from_dict({
+                'runtime': {'working_directory': str(root)},
+                'benchmark': {'id': 'workbuddy-code', 'variant': 'full'}}),
+                require_host=lambda: root / 'prepared-host.yaml')
+            with patch('fruitfly_eval.improvement.configuration.resolve_benchmark', return_value=benchmark), \
+                 patch('fruitfly_eval.api.check_evaluation', return_value={'available': True}) as check, \
+                 patch('fruitfly_agent.experiments.cli.prepare_experiment', side_effect=AssertionError('research assembly')), \
+                 redirect_stdout(io.StringIO()):
+                result = main(['--cwd', str(root), 'eval', 'check'])
+            self.assertEqual(result, 0)
+            self.assertEqual(check.call_args.args[0].benchmark.task_names, ('first',))
+
     def test_init_writes_backend_references_and_generic_collection_offline(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

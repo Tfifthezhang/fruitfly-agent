@@ -47,8 +47,8 @@ class Engine:
     def call(self, operation, payload, **kwargs):
         self.calls.append((operation, payload))
         if operation == 'describe':
-            return {'controller': {'python': 'fixture', 'packages': {'harbor': '0.18.0'}},
-                    'engine': {'harbor': '0.18.0', 'sha256': 'fixture-engine-source'}}
+            return {'controller': {'python': 'fixture', 'packages': {'harbor': '0.23.0'}},
+                    'engine': {'harbor': '0.23.0', 'sha256': 'fixture-engine-source'}}
         if operation == 'bench':
             return {'bench': {'environment': {'type': 'docker'}, 'agent_user': 'dev',
                               'verifier_user': 'dev', 'timeout_multiplier': 2.5}}

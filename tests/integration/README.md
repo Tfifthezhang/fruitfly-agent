@@ -35,3 +35,16 @@ dependencies. Run `.venv/bin/python -m unittest tests.integration.eval_model_acc
 The check requires host OpenSSL. It mounts the checkout read-only and checks
 default and explicit Agent identities through a fixture Unix socket and a
 container-local TLS listener. The containers have no external network access.
+
+## WorkBuddy SDK contracts
+
+In an isolated controller with FruitFlyAgent's benchmarks extra (Harbor 0.23.0)
+and WorkBuddy's declared runtime dependencies installed, set
+`FRUITFLY_WORKBUDDY_CHECKOUT` to a reviewed source checkout. Make that checkout's
+`src` importable in the controller without replacing Harbor from its upstream uv
+lock. Run `LITELLM_LOCAL_MODEL_COST_MAP=True python -m unittest tests.integration.workbuddy_contract`.
+This explicitly selected check uses the actual SDK, official verifier/environment
+imports, complete generated JobConfig, named-source metric initialization and
+read-only relay admission. It starts no Docker environment, downloads or model
+requests. Installing its prerequisites can require network access. Container
+permissions, host routing and real scoring remain separate integration checks.

@@ -36,7 +36,7 @@ docker compose version
 | Item | Support |
 |---|---|
 | Datasets | Terminal-Bench 2.1, Terminal-Bench 4.0.0, SWE-bench Verified, WorkBuddy Code v1.0; see [task selections](benchmarks/TASKS.md) |
-| Backend | Docker through Harbor `0.23.0`; WorkBuddy uses its isolated `0.18.0` controller |
+| Backend | Harbor `0.23.0` for all adapters |
 | Selection | `smoke`, tasks without GPU requirements (`no_gpu`), or all tasks (`full`) |
 | Formats | Requests and host files have one format without version markers; results/reports and preparation receipts retain their record versions |
 | Output | `.fruitfly/eval/<evaluation-id>/` |
@@ -260,8 +260,8 @@ without selecting a backend by concrete class or model identity.
 
 The [WorkBuddy adapter](workbuddy/README.md) registers `workbuddy-code`, preserves
 dataset-local resources and supports exact task selection and native Improvement
-measurements. Use its [separate controller recipe](../examples/experiments/workbuddy/README.md);
-do not install the standard benchmarks extra in that controller environment.
+measurements. Its [controller recipe](../examples/experiments/workbuddy/README.md)
+uses the unified 0.23.0 engine while retaining official dataset and verifier material.
 Other WorkBuddy subsets and independent model judges are unsupported.
 
 [Native host bridges](bridges/README.md) launch the complete frozen Agent

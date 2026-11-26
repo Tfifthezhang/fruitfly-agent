@@ -58,3 +58,9 @@ retirement and absence of upstream credentials in container material.
 
 `test_access_files.py` covers container identity, private publication, failed
 uploads, cancellation and scoped file retirement.
+
+
+`test_cache_access.py` covers scoped cache roots and symlink refusal;
+`test_controller_identity.py` checks interpreter installation scope independently
+of checkout metadata. Actual optional SDK admission is covered by the explicitly
+selected [WorkBuddy contract check](../integration/README.md#workbuddy-sdk-contracts).

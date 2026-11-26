@@ -18,15 +18,14 @@ its supervisor, process cleanup and evidence capture responsibilities.
 | File | Responsibility |
 |---|---|
 | `native.py` | Complete configuration and Session CLI invocation |
-| `harbor018.py` | Older public installed-Agent interface and explicit exec failure handling |
 | `model_access.py` | Model transport grants, direct endpoint allowlists and private trial mount identity |
 
 Offline checks: `tests.eval.test_native_bridge` and the existing
 `tests.eval.test_harbor_agent` bridge tests. Native command construction does not
 prove real container/model compatibility.
 
-Unix relay mounts contain only one trial's communication directory. The Agent
-group receives directory traversal and socket connection permission while host
-ownership remains unchanged. Account credentials stay on the host. TLS transports
+Unix relay mounts are read-only and contain only one trial's communication
+directory. The host sets traversal/socket permissions; inference requires the
+separately delivered owner-only bearer grant. Account credentials stay on the host. TLS transports
 retain certificate/hostname validation and require independent network reachability.
 No model name or benchmark selects request headers in this layer.

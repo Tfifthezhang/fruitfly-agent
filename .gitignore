@@ -5,7 +5,9 @@
 !.env.example
 .fruitfly/
 .venv/
+.venv-docs/
 venv/
+.verify-logs/
 .claude/
 .codex/
 .agents/

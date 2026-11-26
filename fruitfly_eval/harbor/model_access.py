@@ -47,6 +47,13 @@ async def task_access(models: Path, directory: Path, settings: dict[str, Any]) -
             grants = []
             try:
                 async with RelaySocket(socket, relay, listen=listen, tls=tls) as listener:
+                    if not settings:
+                        # The host owns permissions; the container bind stays read-only.
+                        # Only this trial sees the socket. Bearer grants are delivered
+                        # separately in an owner-only descriptor, never in this mount.
+                        directory.chmod(0o711)
+                        root.chmod(0o711)
+                        socket.chmod(0o666)
                     if network_url:
                         from urllib.parse import urlsplit, urlunsplit
                         parsed = urlsplit(network_url)

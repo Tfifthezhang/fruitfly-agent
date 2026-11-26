@@ -122,3 +122,22 @@ def resolve(config):
         adoption_notice='joint development scores need an independently registered adoption verifier',
         config_path=path, profile=profile,
         task_set=preparation)
+
+
+def check_collections(config):
+    """Check exact Eval collections without assembling research roles."""
+    from fruitfly_eval.improvement.configuration import resolve_benchmark
+    from fruitfly_eval.api import check_evaluation
+    result = {}
+    for row in config.task.get('collections', ()):
+        if row.get('source') != 'eval':
+            raise ValueError('Eval check requires Eval collections')
+        benchmark = resolve_benchmark(replace(config, task={key: value for key, value in row.items()
+            if key in {'source', 'request', 'host'}}))
+        request = benchmark.request
+        if row.get('task_names'):
+            request = replace(request, benchmark=replace(request.benchmark, task_names=tuple(row['task_names'])))
+        result[row['id']] = check_evaluation(request, host_config_path=benchmark.require_host())
+    if not result:
+        raise ValueError('task set contains no Eval collections')
+    return {'available': all(row['available'] for row in result.values()), 'collections': result}

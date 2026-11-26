@@ -31,11 +31,15 @@ class ModelAccessTests(unittest.IsolatedAsyncioTestCase):
             return result
         @asynccontextmanager
         async def listener(*args, **kwargs):
+            args[0].touch()
             yield None
         with patch('fruitfly_eval.harbor.model_access.model_authorization', return_value=auth), patch(
             'fruitfly_eval.harbor.model_access.RelaySocket', listener), patch(
             'fruitfly_eval.harbor.model_access.ModelRelay', side_effect=relay):
             async with task_access(models, root / 'relay', {}) as descriptor:
+                endpoint = next((root / 'relay').glob('trial-*/model.sock'))
+                self.assertEqual(endpoint.stat().st_mode & 0o777, 0o666)
+                self.assertEqual(endpoint.parent.stat().st_mode & 0o777, 0o711)
                 encoded = json.dumps(descriptor)
                 self.assertNotIn('never-export-this-upstream-token', encoded)
                 auth.token.assert_not_called()

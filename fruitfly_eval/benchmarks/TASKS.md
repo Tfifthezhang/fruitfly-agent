@@ -11,7 +11,7 @@ check resulting state and write rewards.
 ## Choose a registered dataset
 
 These are declarations only. Standard Harbor entries use the [server guide](../SERVER_GUIDE.md).
-WorkBuddy uses its [isolated official controller](../workbuddy/README.md), complete
+WorkBuddy retains its [dataset owner and controller policy](../workbuddy/README.md), complete
 dataset layout and native bridge through the same preparation/execution ports.
 
 | ID | Dataset | Exact smoke task |
